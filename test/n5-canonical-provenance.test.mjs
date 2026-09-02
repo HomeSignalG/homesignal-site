@@ -74,12 +74,13 @@ ok(/NOT POPULATED BY THIS MIGRATION/.test(sql), 'migration does not populate the
 ok(!/insert into geo\.n5_proven_verdict/i.test(code), 'migration writes no verdict rows');
 
 // ---- 6. ORDER INDEPENDENCE: no z3 in any canonical write predicate ----
-const geomDel = py.slice(py.indexOf('delete from geo.n5_geom g')).split('"""')[0];
+const matSeg = py.slice(py.indexOf('def materialize_proven_points'));
+const geomDel = matSeg.slice(matSeg.indexOf('delete from geo.n5_geom g')).split('"""')[0];
 ok(/g\.source_key = v\.source_key/.test(geomDel) && /g\.provenance = 'proven_stored_point'/.test(geomDel),
   'stale point deletion is scoped to source_key AND the proven slot');
 ok(!/z3/.test(geomDel), 'geometry deletion never filters by z3');
 ok(!/recovered_authoritative/.test(geomDel), 'RECOVERY geometry is never deleted by this path');
-const rejDel = py.slice(py.indexOf('delete from geo.n5_point_reject r')).split('"""')[0];
+const rejDel = matSeg.slice(matSeg.indexOf('delete from geo.n5_point_reject r')).split('"""')[0];
 ok(!/z3/.test(rejDel), 'reject clearing never filters by z3');
 
 // ---- 7. GEOMETRY CURRENT STATE (not append-only) ----
@@ -144,8 +145,8 @@ ok(/where provenance='recovered_authoritative' and source_key in \(/.test(py),
 ok(!/geometry cache/i.test(py), 'no disposable-cache wording remains');
 
 // ---- 14. FAIL CLOSED ----
-ok(/geo\.n5_proven_verdict is empty for snapshot/.test(py),
-  'materialization refuses to run before the global verdict is built');
+ok(/A row-count check is NOT a readiness check/.test(py),
+  'the row-count guard was replaced by a readiness gate, and why is recorded');
 ok(/NOT RUN AUTOMATICALLY/.test(py), 'the expensive verdict refresh is not run implicitly');
 
 // ---- 15. MIGRATION SAFETY ----
@@ -153,5 +154,76 @@ ok(!/\b760\b/.test(code), 'migration does not reference shard 760');
 ok(!/b4_/.test(code), 'migration does not touch B4');
 ok(!/vacuum full/i.test(code) && !/\bdrop table\b/i.test(code), 'no reclamation, no table drops');
 ok(!/insert into geo\.n5_geom/i.test(code), 'migration performs no PROVEN backfill');
+
+// ---- 16. SNAPSHOT LIFECYCLE (round 4) ----
+ok(/os\.environ\.get\("SNAPSHOT", ""\)/.test(py), 'SNAPSHOT has NO default');
+ok(/def require_snapshot/.test(py) && /require_snapshot\(\)/.test(py.slice(py.indexOf('def assert_snapshot_consumable'))),
+  'the requirement is enforced at run time, not on import (import must stay safe)');
+ok(/SNAPSHOT must be set explicitly - there is no default/.test(py), 'an unset SNAPSHOT fails closed');
+
+ok(/create table if not exists geo\.n5_verdict_manifest/.test(code), 'verdict manifest exists');
+ok(/check \(state in \('BUILDING','READY','FAILED'\)\)/.test(code), 'manifest states are an allowlist');
+ok(/state <> 'READY' or \(completed_at is not null and expected_source_keys is not null/.test(code),
+  'READY requires recorded completeness');
+ok(/canonical_synced_at is null or state = 'READY'/.test(code),
+  'canonical sync is only meaningful for a READY verdict');
+ok(!/alter table geo\.n5_snapshot/.test(code), 'geo.n5_snapshot is NOT overloaded');
+
+// READY + synced gate
+ok(/def assert_snapshot_consumable/.test(py), 'a consumption gate exists');
+ok(/if str\(row\["state"\]\) != "READY":/.test(py),
+  'a non-READY verdict is refused by a live conditional, not just a message');
+ok(/if not row\["synced"\]:/.test(py),
+  'a READY-but-unsynced verdict is refused by a live conditional');
+ok(/if int\(row\["input_exists"\]\) == 0:/.test(py),
+  'an unknown snapshot is refused by a live conditional');
+ok(/point sweep has not completed/.test(py) && /never consumable/.test(py),
+  'both refusals carry an explanatory message');
+const gateSeg = py.slice(py.indexOf('def assert_snapshot_consumable'),
+  py.indexOf('def validate_verdict_completeness'));
+ok(/snapshot_id=\{lit\(SNAPSHOT\)\}/.test(gateSeg),
+  'the gate selects by EXACT snapshot equality');
+ok(!/order by/i.test(gateSeg) && !/limit 1/i.test(gateSeg),
+  'the gate never orders or limits to pick a snapshot (no MAX/latest/fallback)');
+ok(/assert_snapshot_consumable\(\)/.test(py.slice(py.indexOf('def materialize_proven_points'))),
+  'materialization consumes only a gated snapshot');
+ok(!/geo\.n5_proven_verdict is empty for snapshot/.test(py),
+  'the weak row-count guard is gone (a half-built snapshot would have passed it)');
+const runShard = py.slice(py.indexOf('def run_shard'));
+ok(runShard.indexOf('assert_snapshot_consumable()') < runShard.indexOf('FREEZE'),
+  'the gate runs before freeze/recovery/materialization/association');
+
+// n5_geom + reject snapshot provenance
+ok(/check \(\(provenance = 'proven_stored_point'\) = \(verdict_snapshot_id is not null\)\)/.test(code),
+  'proven <=> verdict_snapshot_id non-null, enforced structurally');
+ok(/verdict_snapshot_id text not null,/.test(code), 'current rejects carry their verdict snapshot');
+ok(/constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
+  'reject identity is STILL source_key alone (snapshot is provenance, not identity)');
+ok(/"verdict_snapshot_id": SNAPSHOT/.test(py), 'shard detail records the verdict snapshot');
+ok(!/alter table geo\.n5_association add column/.test(code), 'association rows are NOT widened');
+
+// global sweep
+ok(/def global_canonical_sweep_sql/.test(py), 'the global S1->S2 sweep exists as a code path');
+const sweepFn = py.slice(py.indexOf('def global_canonical_sweep_sql'), py.indexOf('def refresh_proven_verdict_sql'));
+// Slice past the docstring: it legitimately SAYS "no z3", which the absence check would match.
+const sweep = sweepFn.slice(sweepFn.indexOf('return ['));
+ok(/not exists \(select 1 from geo\.n5_proven_verdict v/.test(sweep),
+  'a project ABSENT from the new snapshot loses its stale pt:1');
+ok((sweep.match(/provenance='proven_stored_point'/g) || []).length >= 2,
+  'every sweep delete is scoped to the proven slot — RECOVERY geometry untouched');
+ok(!/for .* in .*:/.test(sweep), 'the sweep is set-based SQL, not an application-side row loop');
+ok(!/z3/.test(sweep.replace(/observed_in_z3/g,'').replace(/first_z3/g,'')),
+  'the sweep has no z3 ownership (first_z3/observed_in_z3 are columns, not scoping)');
+ok(/NOT EXECUTED BY THIS MODULE/.test(sweepFn), 'the sweep is not run here');
+ok(/PUBLICATION BARRIER/.test(sweepFn),
+  'the publication barrier is documented at the sweep');
+
+// completeness validation
+ok(/def validate_verdict_completeness/.test(py), 'completeness validation exists');
+ok(/except select source_key from v/.test(py) && /except select source_key from auth/.test(py),
+  'missing AND extra are both reconciled');
+ok(!/723449/.test(py), '723,449 never appears as a numeric literal — receipt evidence only');
+ok(/ORPHAN \/ INPUT BASELINE ABSENT \/ NOT CONSUMABLE/.test(sql),
+  'the orphan S2 manifest row is documented, not deleted');
 
 process.exit(fails ? 1 : 0);

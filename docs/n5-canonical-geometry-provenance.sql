@@ -80,6 +80,21 @@ comment on column geo.n5_geom.provenance is
   'verdict + per-project sanity gate. Allowlist + NOT NULL + no DEFAULT: an unrecognised or '
   'absent provenance cannot be written, so it can never become radius-eligible by default.';
 
+-- Which GLOBAL verdict snapshot produced a stored point's CURRENT state. Without this there
+-- is no way to prove which eligibility universe a pt:1 came from, and the S1->S2 sweep has
+-- nothing to target. NULL for recovered geometry: a recovered feature comes from the
+-- publisher, not from a verdict.
+alter table geo.n5_geom add column if not exists verdict_snapshot_id text;
+
+alter table geo.n5_geom drop constraint if exists n5_geom_verdict_snapshot_ck;
+alter table geo.n5_geom add constraint n5_geom_verdict_snapshot_ck
+  check ((provenance = 'proven_stored_point') = (verdict_snapshot_id is not null));
+
+comment on column geo.n5_geom.verdict_snapshot_id is
+  'The global PROVEN verdict snapshot that produced this stored point''s CURRENT state. '
+  'Non-null exactly when provenance=''proven_stored_point'' (enforced). Refreshed together '
+  'with geom whenever the canonical sweep republishes the point under a newer snapshot.';
+
 -- Structurally reserve the 'pt:' namespace. Until now it was only OBSERVED that publisher
 -- feature ids do not start 'pt:' (0 of 8,626). Observation is not a guarantee, so the
 -- biconditional is enforced: a proven stored point is EXACTLY 'pt:1', and no recovered row
@@ -153,6 +168,9 @@ create table if not exists geo.n5_point_reject (
   -- can appear in up to 12 shards, and keying rejection by z3 would let one project hold
   -- several contradictory "current" reasons at once. There is exactly ONE current answer to
   -- "why is source_key X not materialized?".
+  -- Which global verdict universe produced this CURRENT rejection. Not part of identity:
+  -- one project has exactly one current reason, replaced (never accumulated) across snapshots.
+  verdict_snapshot_id text not null,
   constraint n5_point_reject_pkey primary key (source_key),
   constraint n5_point_reject_reason_ck check (reason in (
     'NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND',
@@ -195,6 +213,54 @@ create table if not exists geo.n5_proven_verdict (
   constraint n5_proven_verdict_eligible_ck check (
     verdict <> 'ELIGIBLE' or (ncoord = 1 and lat is not null and lng is not null))
 );
+
+-- ============================================================================
+-- §4c  VERDICT PUBLICATION + CANONICAL SYNCHRONIZATION STATE
+-- ============================================================================
+-- Deliberately NOT folded into geo.n5_snapshot. That table records the existence and shape of
+-- a frozen INPUT baseline; this one records whether the global PROVEN eligibility derivation
+-- OVER that baseline is complete and consumable. Different facts, different lifecycles.
+--
+-- TWO gates, because READY and "canonical geometry has been swept" are different claims:
+--   state='READY'            -> the verdict is complete and safe to READ.
+--   canonical_synced_at set  -> the global S1->S2 canonical point sweep for this snapshot has
+--                               finished, so shards may consume it.
+-- Overloading READY to mean both would let a shard run against a verdict whose canonical
+-- corpus still holds the previous snapshot's points.
+--
+-- OPERATIONAL NOTE (evidence, do not act on it here): geo.n5_snapshot currently carries a
+-- second row, 'n5-2026-09-02T173042Z', which has NO rows in preservation.app_project_identity
+-- and is referenced by no shard. Status: ORPHAN / INPUT BASELINE ABSENT / NOT CONSUMABLE.
+-- It is preserved as evidence until its provenance is separately resolved; it must never be
+-- selected as a run snapshot.
+
+create table if not exists geo.n5_verdict_manifest (
+  snapshot_id           text        not null,
+  state                 text        not null,
+  expected_source_keys  bigint,
+  verdict_rows          bigint,
+  eligible_rows         bigint,
+  reject_counts         jsonb,
+  fingerprint           text,
+  started_at            timestamptz not null default now(),
+  completed_at          timestamptz,
+  canonical_synced_at   timestamptz,
+  constraint n5_verdict_manifest_pkey primary key (snapshot_id),
+  constraint n5_verdict_manifest_state_ck check (state in ('BUILDING','READY','FAILED')),
+  -- Completeness must have been recorded before a snapshot can claim READY.
+  constraint n5_verdict_manifest_ready_ck check (
+    state <> 'READY' or (completed_at is not null and expected_source_keys is not null
+                         and verdict_rows = expected_source_keys)),
+  -- Canonical synchronization is only meaningful for a READY verdict.
+  constraint n5_verdict_manifest_sync_ck check (
+    canonical_synced_at is null or state = 'READY')
+);
+
+comment on table geo.n5_verdict_manifest is
+  'Publication state of the global PROVEN eligibility derivation for one frozen input '
+  'snapshot. state=READY means the verdict is complete and safe to read; canonical_synced_at '
+  'means the global canonical-point sweep for that snapshot has completed. A shard requires '
+  'BOTH before it may consume the snapshot.';
 
 comment on table geo.n5_proven_verdict is
   'PROJECT-GLOBAL eligibility verdict for PROVEN stored points, computed once per snapshot from '
