@@ -36,10 +36,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'validate | load (B1) · b3-probe | b3-load (B3 source geometry)'
+        description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose]
         default: validate
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -114,6 +114,13 @@ jobs:
           MODE: n2b-resolve
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n2a_classify.py
+
+      - name: N2C - diagnose the 20 unresolved sources (read-only)
+        if: ${{ github.event.inputs.mode == 'n2c-diagnose' }}
+        env:
+          MODE: n2c-diagnose
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n2c_diagnose.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
