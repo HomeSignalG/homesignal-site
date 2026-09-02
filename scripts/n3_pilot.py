@@ -38,7 +38,6 @@ import zipfile
 UA = "HomeSignal-n3/1.0 (+https://homesignal.net)"
 PROJECT_REF = "qwnnmljucajnexpxdgxr"
 SNAPSHOT = "phase1-2026-09-01"
-BATCH_KEY = "786"
 DERIVATION_VERSION = 1
 CANON_SRID = 4269                    # the archive's own CRS, both sides. No transform.
 
@@ -47,22 +46,55 @@ TIGER_URL = ("https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/"
 TIGER_SHA256 = "e87129634eefe8719ef06ce4cfdf6588520be2e359360e590aaae90e4afb1911"
 EXPECTED_NATIONAL_FEATURES = 33791
 
-# The 37 ZCTA-matched pilot ZIPs, and the 7 that have no ZCTA. Both lists are
-# ACCEPTED CONTROLS: the run stops rather than loading a different set.
-PILOT_ZCTA = ("78602,78605,78608,78610,78611,78612,78613,78615,78616,78617,78619,"
-              "78620,78621,78626,78628,78633,78634,78639,78640,78641,78642,78645,"
-              "78650,78652,78653,78654,78657,78659,78660,78664,78665,78666,78669,"
-              "78672,78674,78676,78681").split(",")
-PILOT_NON_ZCTA = "78627,78630,78646,78667,78673,78682,78691".split(",")
-EXPECT_ZCTA, EXPECT_NON_ZCTA, EXPECT_CANON = 37, 7, 44
+# One batch registry, so a second prefix is configuration rather than a second
+# copy of the loader. Every list here is an ACCEPTED CONTROL: the run stops rather
+# than loading a set that does not match it.
+BATCHES = {
+    "786": {
+        "zcta": ("78602,78605,78608,78610,78611,78612,78613,78615,78616,78617,78619,"
+                 "78620,78621,78626,78628,78633,78634,78639,78640,78641,78642,78645,"
+                 "78650,78652,78653,78654,78657,78659,78660,78664,78665,78666,78669,"
+                 "78672,78674,78676,78681").split(","),
+        "non_zcta": "78627,78630,78646,78667,78673,78682,78691".split(","),
+        "recovery": [{
+            "registry_id": "txdot-projects-info-all",
+            "ident": "CONTROL_SECT_JOB",
+            "url": ("https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/"
+                    "TxDOT_Projects_Info_All/FeatureServer/0"),
+            "kind": "polyline", "expect_projects": 454, "in_batch": 30,
+        }],
+    },
+    "207": {
+        # Anne Arundel / Prince George's, MD. Every canonical ZIP has a ZCTA, which
+        # makes this the control for the non-ZCTA preservation path 786 exercised.
+        "zcta": ("20701,20705,20706,20707,20708,20710,20711,20712,20714,20715,20716,"
+                 "20720,20721,20722,20723,20724,20732,20733,20735,20736,20737,20740,"
+                 "20742,20743,20744,20745,20746,20747,20748,20751,20754,20755,20758,"
+                 "20759,20762,20763,20764,20765,20769,20770,20771,20772,20774,20776,"
+                 "20777,20778,20779,20781,20782,20783,20784,20785,20794").split(","),
+        "non_zcta": [],
+        "recovery": [
+            {"registry_id": "anne-arundel-subdivision-activity", "ident": "SUB_NUM",
+             "url": ("https://gis.aacounty.org/arcgis/rest/services/OpenData/"
+                     "Planning_OpenData/MapServer/30"),
+             "kind": "polygon", "expect_projects": 447, "in_batch": 10},
+            {"registry_id": "anne-arundel-commercial-site-plans", "ident": "PRJ_NUM",
+             "url": ("https://gis.aacounty.org/arcgis/rest/services/OpenData/"
+                     "Planning_OpenData/MapServer/4"),
+             "kind": "polygon", "expect_projects": 192, "in_batch": 10},
+        ],
+    },
+}
 
-TXDOT_RID = "txdot-projects-info-all"
-TXDOT_URL = ("https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/"
-             "TxDOT_Projects_Info_All/FeatureServer/0")
-TXDOT_IDENT = "CONTROL_SECT_JOB"
-EXPECT_TXDOT_PROJECTS = 454
+BATCH_KEY = os.environ.get("BATCH", "786").strip()
+if BATCH_KEY not in BATCHES:
+    raise SystemExit(f"STOP: unknown BATCH {BATCH_KEY!r}; known: {sorted(BATCHES)}")
+_B = BATCHES[BATCH_KEY]
+PILOT_ZCTA, PILOT_NON_ZCTA = _B["zcta"], _B["non_zcta"]
+EXPECT_ZCTA = len(PILOT_ZCTA)
+EXPECT_NON_ZCTA = len(PILOT_NON_ZCTA)
+EXPECT_CANON = EXPECT_ZCTA + EXPECT_NON_ZCTA
 
-IN_BATCH = 30
 TIMEOUT = 120
 POLITE = 0.3
 
@@ -208,11 +240,15 @@ create table if not exists geo.n3_batch (
   primary key (derivation_version, batch_key, phase)
 );
 
+-- batch-scoped on purpose: this is a P3 disposable, and a later batch reloading it
+-- must not silently destroy an earlier batch's boundary evidence.
 create table if not exists geo.n3_zcta_scratch (
-  zcta5 char(5) primary key,
-  geom  geometry(MultiPolygon, 4269) not null,
-  rings int not null,
-  pts   int not null
+  batch_key text    not null default '786',
+  zcta5     char(5) not null,
+  geom      geometry(MultiPolygon, 4269) not null,
+  rings     int not null,
+  pts       int not null,
+  primary key (batch_key, zcta5)
 );
 
 create table if not exists geo.n3_source_geometry (
@@ -332,26 +368,27 @@ def mode_zcta():
     # The scratch table is a P3 disposable and this mode is the only writer, so a
     # reload replaces it wholesale. ON CONFLICT DO NOTHING would silently keep a
     # previous run's rows, which is exactly how a bad geometry survives a fix.
-    sql("delete from geo.n3_zcta_scratch;", "zcta reset")
+    sql(f"delete from geo.n3_zcta_scratch where batch_key='{BATCH_KEY}';", "zcta reset")
 
     # tranched: network is already finished, and no single statement is huge
     total = 0
     for k in range(0, len(picked), 6):
         chunk = picked[k:k + 6]
         vals = ",".join(
-            "('{z}', ST_GeomFromText($w{i}${wkt}$w{i}$, {s}), {r}, {p})".format(
-                z=c["zcta5"], i=k + j, wkt=c["wkt"], s=CANON_SRID, r=c["rings"], p=c["pts"])
+            "('{b}', '{z}', ST_GeomFromText($w{i}${wkt}$w{i}$, {s}), {r}, {p})".format(
+                b=BATCH_KEY, z=c["zcta5"], i=k + j, wkt=c["wkt"], s=CANON_SRID,
+                r=c["rings"], p=c["pts"])
             for j, c in enumerate(chunk))
-        sql(f"""insert into geo.n3_zcta_scratch (zcta5, geom, rings, pts)
+        sql(f"""insert into geo.n3_zcta_scratch (batch_key, zcta5, geom, rings, pts)
                 values {vals}
-                on conflict (zcta5) do nothing;""", f"zcta load {k}")
+                on conflict (batch_key, zcta5) do nothing;""", f"zcta load {k}")
         total += len(chunk)
         say("  loaded", f"{total}/{len(picked)}")
 
-    r = sql("""select count(*) n, count(*) filter (where ST_IsValid(geom)) v,
+    r = sql(f"""select count(*) n, count(*) filter (where ST_IsValid(geom)) v,
                       md5(string_agg(zcta5, ',' order by zcta5 collate "C")) fp,
                       pg_size_pretty(pg_total_relation_size('geo.n3_zcta_scratch')) sz
-                 from geo.n3_zcta_scratch;""", "zcta verify")[0]
+                 from geo.n3_zcta_scratch where batch_key='{BATCH_KEY}';""", "zcta verify")[0]
     say("loaded polygons", r["n"])
     say("valid polygons", r["v"])
     say("loaded set md5", r["fp"] + ("  MATCH" if r["fp"] == fp else "  MISMATCH"))
@@ -377,144 +414,196 @@ def paths_to_multilinestring_wkt(paths):
         for p in parts) + ")")
 
 
-def mode_recover():
-    say("mode", "n3-recover (TxDOT authoritative POLYLINE recovery)")
-    say("registry", TXDOT_RID)
-    say("identity field", TXDOT_IDENT)
-    say("requested outSR", CANON_SRID)
+def rings_to_wkt(rings, ident):
+    """ArcGIS polygon rings use the SAME winding convention as a shapefile -
+    clockwise outer, counter-clockwise hole - so this reuses B1's single definition
+    rather than adding a third implementation of it. A ring set B1 refuses (a leading
+    counter-clockwise ring) is recorded as an invalid FEATURE, not raised, so one
+    malformed publisher record cannot end the batch."""
+    parts = [r for r in (rings or []) if r and len(r) >= 4]
+    if not parts:
+        return None, "NO_RINGS"
+    try:
+        return rings_to_multipolygon_wkt([list(r) for r in parts], ident), None
+    except SystemExit as e:
+        return None, f"RING_ORDER {str(e)[:60]}"
+
+
+def recover_source(cfg):
+    """One recovery source. Returns (rows, stats). Publisher feature multiplicity is
+    preserved: one row per (source_key, publisher OBJECTID)."""
+    rid, ident, url, kind = cfg["registry_id"], cfg["ident"], cfg["url"], cfg["kind"]
+    in_batch = cfg.get("in_batch", 30)
+    say("", "")
+    say("recovery source", rid)
+    say("  identity field", ident)
+    say("  declared kind", kind)
 
     rows = sql(f"""select distinct source_key
                      from preservation.app_project_identity
                     where snapshot_id='{SNAPSHOT}' and record_kind='development'
-                      and registry_id='{TXDOT_RID}' and zip like '{BATCH_KEY}%'
-                    order by source_key;""", "txdot frozen")
+                      and registry_id='{rid}' and zip like '{BATCH_KEY}%'
+                    order by source_key;""", "frozen " + rid)
     keys = [r["source_key"] for r in rows]
-    csj = [k.split(":", 2)[2] for k in keys]
-    say("frozen TxDOT projects", f"{len(keys)} (expect {EXPECT_TXDOT_PROJECTS})")
-    if len(keys) != EXPECT_TXDOT_PROJECTS:
-        raise SystemExit("STOP: frozen TxDOT project count moved")
+    cases = [k.split(":", 2)[2] for k in keys]
+    say("  frozen projects", f"{len(keys)} (expect {cfg['expect_projects']})")
+    if len(keys) != cfg["expect_projects"]:
+        raise SystemExit(f"STOP: frozen project count for {rid} moved")
 
-    meta, why = http(TXDOT_URL, {"f": "json"})
+    meta, why = http(url, {"f": "json"})
     if meta is None or esri(meta):
-        raise SystemExit(f"STOP: TxDOT layer metadata unreachable: {why or esri(meta)}")
-    say("publisher geometryType", meta.get("geometryType"))
-    say("publisher maxRecordCount", meta.get("maxRecordCount"))
-    if meta.get("geometryType") != "esriGeometryPolyline":
-        raise SystemExit("STOP: publisher is not a polyline layer; refusing to proceed")
+        raise SystemExit(f"STOP: {rid} layer metadata unreachable: {why or esri(meta)}")
+    gtype = meta.get("geometryType")
+    say("  publisher geometryType", gtype)
+    say("  publisher maxRecordCount", meta.get("maxRecordCount"))
+    want = {"polyline": "esriGeometryPolyline", "polygon": "esriGeometryPolygon"}[kind]
+    if gtype != want:
+        raise SystemExit(f"STOP: {rid} serves {gtype}, config declares {kind}")
     ftype = {f.get("name"): f.get("type") for f in (meta.get("fields") or [])}
-    if TXDOT_IDENT not in ftype:
-        raise SystemExit(f"STOP: {TXDOT_IDENT} absent from the live layer")
-    numeric = str(ftype[TXDOT_IDENT]).endswith(("Integer", "Double", "Single", "OID"))
-    say("identity field type", f"{ftype[TXDOT_IDENT]} -> {'unquoted' if numeric else 'quoted'}")
+    if ident not in ftype:
+        raise SystemExit(f"STOP: {ident} absent from the live {rid} layer")
+    numeric = str(ftype[ident]).endswith(("Integer", "Double", "Single", "OID"))
+    say("  identity field type", f"{ftype[ident]} -> {'unquoted' if numeric else 'quoted'}")
 
-    ctl, why = http(TXDOT_URL + "/query",
-                    {"where": "1=1", "returnCountOnly": "true", "f": "json"}, "POST")
+    ctl, why = http(url + "/query", {"where": "1=1", "returnCountOnly": "true",
+                                     "f": "json"}, "POST")
     e = why or esri(ctl)
     if e or not (ctl or {}).get("count"):
-        raise SystemExit(f"STOP: positive control failed ({e or 'count 0'}) - "
+        raise SystemExit(f"STOP: {rid} positive control failed ({e or 'count 0'}) - "
                          "a zero below would be the instrument, not the publisher")
-    say("POSITIVE CONTROL where=1=1", f"{ctl['count']:,} features")
+    say("  POSITIVE CONTROL where=1=1", f"{ctl['count']:,} features")
 
     oid_f = meta.get("objectIdField") or "OBJECTID"
-    got = {}                       # source_key -> [(feature_id, wkt_or_None, srid)]
-    errors = []
-    feats_total = 0
-    for i in range(0, len(csj), IN_BATCH):
-        chunk = csj[i:i + IN_BATCH]
+    out, errs, feats_total, capped = [], [], 0, 0
+    maxrc = meta.get("maxRecordCount") or 1000
+    for i in range(0, len(cases), in_batch):
+        chunk = cases[i:i + in_batch]
         vals = ",".join(c if numeric else lit(c) for c in chunk)
         time.sleep(POLITE)
-        j, why = http(TXDOT_URL + "/query", {
-            "where": f"{TXDOT_IDENT} IN ({vals})",
-            "outFields": f"{oid_f},{TXDOT_IDENT}",
+        j, why = http(url + "/query", {
+            "where": f"{ident} IN ({vals})", "outFields": f"{oid_f},{ident}",
             "returnGeometry": "true", "outSR": str(CANON_SRID), "f": "json"}, "POST")
         e = why or esri(j)
         if e:
-            errors.append(f"batch {i//IN_BATCH}: {e}")
-            say(f"  batch {i//IN_BATCH:2d}", f"ERROR {e}")
+            errs.append(f"batch {i//in_batch}: {e}")
+            say(f"    batch {i//in_batch:2d}", f"ERROR {e}")
             continue
         srid = ((j.get("spatialReference") or {}).get("wkid")
                 or (j.get("spatialReference") or {}).get("latestWkid"))
         feats = j.get("features") or []
         feats_total += len(feats)
+        if len(feats) >= maxrc:
+            capped += 1
         for f in feats:
             a = f.get("attributes") or {}
-            c = str(a.get(TXDOT_IDENT))
-            fid = a.get(oid_f)
+            c = str(a.get(ident))
             g = f.get("geometry") or {}
-            wkt = paths_to_multilinestring_wkt(g.get("paths") or [])
-            got.setdefault(f"arcgis:{TXDOT_RID}:{c}", []).append((fid, wkt, srid))
-        say(f"  batch {i//IN_BATCH:2d}", f"{len(chunk)} ids -> {len(feats)} features, srid {srid}")
-
-    say("publisher requests", STATS["requests"])
-    say("features returned", feats_total)
-    say("projects reconnected", f"{len(got)} of {len(keys)}")
-    say("batch errors", len(errors))
-    for e in errors:
-        say("  error", e)
-
-    # SRID discipline: validate in the SR the server ACTUALLY returned.
-    srids = {s for v in got.values() for (_, _, s) in v}
-    say("returned SRIDs", sorted(x for x in srids if x is not None))
-    if srids - {CANON_SRID, None}:
-        raise SystemExit(f"STOP: publisher returned a SR we did not request: {srids}")
-
-    sql(DDL, "n3 ddl")
-    loaded = with_geom = no_geom = 0
-    batch = []
-    def flush(b):
-        if not b:
-            return
-        vals = ",".join(b)
-        sql(f"""insert into geo.n3_source_geometry
-                  (source_key, registry_id, feature_id, outcome, geom,
-                   requested_srid, returned_srid, invalid_reason)
-                values {vals}
-                on conflict (source_key, feature_id) do nothing;""", "geom load")
-    for sk, feats in sorted(got.items()):
-        for fid, wkt, srid in feats:
-            if wkt is None:
-                no_geom += 1
-                batch.append("('{sk}','{r}',{f},2,NULL,{q},{s},NULL)".format(
-                    sk=sk.replace("'", "''"), r=TXDOT_RID, f=int(fid),
-                    q=CANON_SRID, s=srid if srid else "NULL"))
+            if kind == "polyline":
+                wkt, bad = paths_to_multilinestring_wkt(g.get("paths") or []), None
+                if wkt is None:
+                    bad = "NO_PATHS"
             else:
-                with_geom += 1
-                batch.append(
-                    "('{sk}','{r}',{f},1,ST_GeomFromText($g${wkt}$g$,{q})::geometry(MultiLineString,{q}),{q},{s},NULL)".format(
-                        sk=sk.replace("'", "''"), r=TXDOT_RID, f=int(fid), wkt=wkt,
-                        q=CANON_SRID, s=srid if srid else "NULL"))
-            loaded += 1
-            if len(batch) >= 40:
-                flush(batch); batch = []
-                say("  loaded features", loaded)
+                wkt, bad = rings_to_wkt(g.get("rings"), c)
+            out.append({"sk": f"arcgis:{rid}:{c}", "rid": rid, "fid": a.get(oid_f),
+                        "wkt": wkt, "bad": bad, "srid": srid})
+        say(f"    batch {i//in_batch:2d}",
+            f"{len(chunk)} ids -> {len(feats)} features, srid {srid}")
+
+    proj = {r["sk"] for r in out}
+    stats = {"registry_id": rid, "kind": kind, "requested": len(keys),
+             "reconnected": len(proj), "features": feats_total, "errors": len(errs),
+             "capped_batches": capped, "control": ctl["count"],
+             "srids": sorted({r["srid"] for r in out if r["srid"] is not None})}
+    say("  features returned", feats_total)
+    say("  projects reconnected", f"{len(proj)} of {len(keys)}")
+    say("  batch errors", len(errs))
+    say("  capped batches (must be 0)", capped)
+    say("  returned SRIDs", stats["srids"])
+    for e in errs:
+        say("    error", e)
+    if set(stats["srids"]) - {CANON_SRID}:
+        raise SystemExit(f"STOP: {rid} returned a SR we did not request: {stats['srids']}")
+    return out, stats
+
+
+def mode_recover():
+    say("mode", f"n3-recover (batch {BATCH_KEY}, authoritative geometry recovery)")
+    say("requested outSR", CANON_SRID)
+    sql(DDL, "n3 ddl")
+    # geom holds whichever authoritative type the publisher actually serves; the SRID
+    # stays constrained. Widening is idempotent and preserves existing rows.
+    sql("""alter table geo.n3_source_geometry
+             alter column geom type geometry(Geometry, 4269);""", "widen geom type")
+
+    all_rows, all_stats = [], []
+    for cfg in _B["recovery"]:
+        rows, st = recover_source(cfg)
+        all_rows.extend(rows)
+        all_stats.append(st)
+
+    loaded, batch = 0, []
+
+    def flush(b):
+        if b:
+            sql("""insert into geo.n3_source_geometry
+                     (source_key, registry_id, feature_id, outcome, geom,
+                      requested_srid, returned_srid, invalid_reason)
+                   values """ + ",".join(b) +
+                " on conflict (source_key, feature_id) do nothing;", "geom load")
+
+    for r in sorted(all_rows, key=lambda x: (x["sk"], x["fid"] or 0)):
+        sk = r["sk"].replace("'", "''")
+        srid = r["srid"] if r["srid"] else "NULL"
+        if r["wkt"] is None and r["bad"] in (None, "NO_PATHS", "NO_RINGS"):
+            batch.append(f"('{sk}','{r['rid']}',{int(r['fid'])},2,NULL,"
+                         f"{CANON_SRID},{srid},NULL)")
+        elif r["wkt"] is None:
+            reason = r["bad"].replace("'", "''")
+            batch.append(f"('{sk}','{r['rid']}',{int(r['fid'])},3,NULL,"
+                         f"{CANON_SRID},{srid},'{reason}')")
+        else:
+            batch.append("('{sk}','{rid}',{f},1,ST_GeomFromText($g${wkt}$g$,{q}),"
+                         "{q},{s},NULL)".format(sk=sk, rid=r["rid"], f=int(r["fid"]),
+                                                wkt=r["wkt"], q=CANON_SRID, s=srid))
+        loaded += 1
+        if len(batch) >= 25:
+            flush(batch); batch = []
+            say("  loaded features", loaded)
     flush(batch)
 
-    r = sql("""select count(*) n,
-                      count(*) filter (where outcome=1) g,
-                      count(*) filter (where outcome=2) ng,
-                      count(distinct source_key) proj,
-                      coalesce(sum(ST_NPoints(geom)),0) pts,
-                      count(*) filter (where geom is not null and not ST_IsValid(geom)) invalid,
-                      pg_size_pretty(pg_total_relation_size('geo.n3_source_geometry')) sz
-                 from geo.n3_source_geometry where registry_id='%s';""" % TXDOT_RID,
-            "geom verify")[0]
-    say("stored features", r["n"])
-    say("  with geometry", r["g"])
-    say("  no geometry", r["ng"])
-    say("  invalid geometry", r["invalid"])
-    say("distinct projects with geometry", r["proj"])
-    say("total vertices", f"{int(r['pts']):,}")
-    say("source-geometry table size", r["sz"])
+    rids = ",".join(lit(c["registry_id"]) for c in _B["recovery"])
+    r = sql(f"""select registry_id,
+                       count(*) n,
+                       count(*) filter (where outcome=1) g,
+                       count(*) filter (where outcome=2) ng,
+                       count(*) filter (where outcome=3) bad,
+                       count(distinct source_key) proj,
+                       coalesce(sum(ST_NPoints(geom)),0) pts,
+                       count(*) filter (where geom is not null and not ST_IsValid(geom)) invalid,
+                       coalesce(sum(pg_column_size(geom)),0) geom_bytes,
+                       max((select count(*) from geo.n3_source_geometry x
+                             where x.source_key = geo.n3_source_geometry.source_key)) max_feats
+                  from geo.n3_source_geometry
+                 where registry_id in ({rids})
+                 group by registry_id order by registry_id;""", "geom verify")
+    for row in r:
+        say("stored " + row["registry_id"],
+            f"features {row['n']} (geom {row['g']}, none {row['ng']}, malformed {row['bad']}) "
+            f"projects {row['proj']} vertices {int(row['pts']):,} "
+            f"geom_bytes {int(row['geom_bytes']):,} invalid {row['invalid']} "
+            f"max_features_per_project {row['max_feats']}")
     say("bytes downloaded", f"{STATS['bytes_in']:,}")
+    say("publisher requests", STATS["requests"])
 
+    detail = json.dumps({"sources": all_stats, "requests": STATS["requests"],
+                         "bytes_in": STATS["bytes_in"]}).replace("'", "''")
     sql(f"""insert into geo.n3_batch (derivation_version, batch_key, phase, detail)
             values ({DERIVATION_VERSION}, '{BATCH_KEY}', 'geometry_recovered',
-              '{{"requests":{STATS['requests']},"features":{feats_total},
-                 "projects":{len(got)},"errors":{len(errors)}}}'::jsonb)
+                    '{detail}'::jsonb)
             on conflict (derivation_version, batch_key, phase)
             do update set detail = excluded.detail, updated_at = now();""", "batch state")
-    print("\nN3 RECOVERY PHASE COMPLETE - publisher multiplicity preserved, "
-          "no representative point used.")
+    print("\nRECOVERY PHASE COMPLETE - publisher multiplicity preserved, "
+          "no representative point used, no repair applied.")
 
 
 def main():
