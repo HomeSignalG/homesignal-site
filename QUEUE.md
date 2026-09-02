@@ -40,6 +40,23 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — STANDING ANSWER: make a version visible via a PATH binary, not an rc variable
+
+**Environment state dies with the shell; filesystem state does not.** A `~/.bashrc` entry cannot
+affect a **non-interactive** shell — bash does not read `~/.bashrc` there. Founder-measured
+2026-09-02: `bash -c` and `bash -lc` both saw the value **unset**; only `bash -ic` saw it. So if a
+specific interpreter version must be visible to a **non-interactive** command (a CI gate, an
+agent-issued command), **put the binary earlier on `PATH` via a symlink** (filesystem state) —
+**do not set an rc variable** (shell state).
+
+**Second defect from the same work, recorded so it is not repeated:** an install script that
+**exited 1 whenever `nvm` was absent** — even on a machine that already met the Node requirement.
+It tested for a **version manager** instead of testing for the **requirement**. Test the
+requirement (is `node >= X` on PATH?), never the tool you assumed would provide it.
+
+_Origin: the retired Cursor env-setup config (PR #1012, now moot). This finding is
+platform-independent, which is why it was extracted here before that PR was closed._
+
 ### 2026-08-14 — KANSAS WIRED (#712): 61 → 182/202 (90.1%). Statewide-DOT lever, 5th state.
 
 **`kdot-wincpms-project-locations`, arcgis 166 → 167, merged `22868af`, deployed (run 31831595244).
