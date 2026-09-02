@@ -39,7 +39,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover]
         default: validate
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -128,6 +128,20 @@ jobs:
           MODE: n2c-attrgeom
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n2c_diagnose.py
+
+      - name: N3 pilot - acquire the 37 ZIP3-786 ZCTA polygons
+        if: ${{ github.event.inputs.mode == 'n3-zcta' }}
+        env:
+          MODE: n3-zcta
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n3_pilot.py
+
+      - name: N3 pilot - recover TxDOT authoritative polyline geometry
+        if: ${{ github.event.inputs.mode == 'n3-recover' }}
+        env:
+          MODE: n3-recover
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n3_pilot.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
