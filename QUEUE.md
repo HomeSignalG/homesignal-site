@@ -40,6 +40,74 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — N5 ANSWERS ONLY HALF THE COMPLETENESS REQUIREMENT — and 544 shards does not change that
+
+**The standing requirement is both directions: nothing on a ZIP page that is not inside that
+ZIP's boundary, and nothing inside the boundary missing from the page. Measured against the
+shipped code and live data, the build delivers the first and is nearly blind to the second.**
+Finishing all 544 shards does not close it — it repeats the same slice-first search 544 times.
+**Founder-accepted 2026-09-02: the answer to the standing requirement is NO.**
+
+**OVER-INCLUSION — served.** Every frozen legacy `(project, ZIP)` pair is re-judged by exact
+`ST_Intersects` and stored as `geo.n5_association.evidence` (1 verified · 2 unjudgeable ·
+3 **refuted** · 4 unresolved). Over 13 completed shards: 20,170 rows = 19,913 legacy pairs +
+257 additions; ev1 5,592 (5,335 legacy + 257 adds) · ev2 9,857 · ev3 **4,721** · ev4 0.
+**Cumulative refutation 4,721 / (4,721 + 5,335) = 46.9%** on the geometry-judgeable
+denominator; per shard 0.0% (520, n=2) → **83.6%** (011). Only **10,056 of 19,913 pairs
+(50.5%) were judgeable at all** — 7,869 of the 9,857 ev2 rows sit in shard 016 alone.
+⚠️ **Detection is not correction.** `grep -rln "n5_association\|n5_geom"` matches only
+`scripts/n5_shard.py` and `scripts/n5_verify_snapshot.py` — no page, no edge function, no
+HTML/JS. A refuted association is recorded and the ZIP page still shows it.
+
+**UNDER-INCLUSION — structurally unaddressed. The cause, verbatim from
+`scripts/n5_shard.py::build_associations`:**
+
+```sql
+rec as (select g.source_key, g.geom g
+          from geo.n5_geom g join proj p on p.source_key=g.source_key
+         where p.treatment='RECOVERY' and g.geom is not null),
+```
+
+**`rec` joins `geo.n5_geom` to `proj`, not to `bnd`.** `proj` derives from `fr`
+(`geo.n5_frozen where z3=<shard>`), so the national geometry corpus is filtered down to the
+shard's frozen slice **before** any intersection runs. An addition can therefore only ever be
+found for a project the legacy 3-mile method already placed in that prefix. A project whose
+geometry sits inside a ZCTA but which was never associated with that prefix is absent from
+`fr` → `proj` → `allgeom`, so it is invisible to `ver` and to `adds`: neither refuted nor
+added, just absent. **Nothing looks for it.**
+
+**Three independent narrowings, not one:**
+
+1. **Project scope** — only projects already in the frozen slice are searched.
+2. **Boundary scope** — `bnd` comes from `select distinct zip from geo.n5_frozen where z3=…`,
+   i.e. only ZIPs that already carry a legacy pair. **20 ZIP pages** in the 13 completed
+   prefixes had **no boundary loaded at all** (428 pages exist in those prefixes; 408 zips in
+   the slice), so they cannot receive an addition by construction, for any project.
+3. **Shard scope** — a searched project is tested only against its own prefix's boundaries.
+   **721 of 1,953 cached projects (36.9%) carry legacy pairs spanning more than one ZIP3
+   prefix, up to 10.**
+
+⚠️ **257 additions is an artifact of the search shape, not the size of the gap.** It measures
+one narrow case: a project already in the slice whose geometry lands in another ZIP of the
+same prefix that already carried a legacy pair.
+
+**Receipts (real stored rows):**
+
+- **`arcgis:massdot-highway-projects:613818` — 84 geometry features, 13 legacy ZIPs across 2
+  prefixes, `evidence=1` count **0**.** Every legacy claim refuted, no addition found; after
+  the build the layer asserts **no ZIP at all** for it, while its 84 features are physically
+  somewhere.
+- `arcgis:massdot-highway-projects:609402` — 191 features, 14 legacy ZIPs, ev1 in 4.
+- **86 of 1,953 cached projects have zero `evidence=1` associations** — geometry in hand, no
+  ZIP membership established. Founder-verified independently 2026-09-02.
+
+**What is needed:** a **boundary-first** pass — for each ZCTA, find all national geometry
+intersecting it, independent of what the legacy method guessed. Nothing in the repo does this;
+the shard builder cannot, because `join proj` removes the candidates before the predicate runs.
+**Do not run more shards until that pass is scoped — throughput is not the constraint, search
+shape is** (founder, 2026-09-02).
+
+
 ### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)
 
 Cursor has been retired from this project; **Claude Code is the only agent going forward.** Two
