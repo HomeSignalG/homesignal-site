@@ -307,6 +307,17 @@ def fetch_features(rid, entry, keys, z3):
 def build_associations(z3):
     """One evidence row per frozen legacy pair, plus geometry-only additions.
 
+    THE `pt` PATH READS THE PROJECT-GLOBAL VERDICT, not the shard-local frozen slice. Canonical
+    geometry and association construction must agree: it must be impossible for
+    geo.n5_geom to hold MULTI_COORD_UNRESOLVED while this CTE still supplies that project's
+    shard-local point(s). This is an EXPECTED SEMANTIC CORRECTION, not the old
+    zero-change invariant - a globally multi-coordinate project now contributes NO point here,
+    where the shard-local version would have contributed one per distinct in-shard pair.
+    Measured before any execution (2026-09-02): for the 13 COMPLETED shards the impact is ZERO
+    (they contain 1 PROVEN source_key, globally single-coordinate). For shard 760 it is
+    NONZERO - 29 projects are single-coordinate locally but multi-coordinate globally, and
+    global multi rises 579 -> 609.
+
     Membership is exact ST_Intersects against authoritative geometry. No centroid, no
     radius, no bounding box, no nearest-ZIP, no buffer, no simplification, no snapping,
     and no ST_MakeValid. Proven-POINT projects use their frozen stored coordinates and
@@ -319,9 +330,10 @@ proj as (select source_key, max(treatment) treatment,
                 bool_or(source_key_basis in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) unstable
            from fr group by source_key),
 bnd as (select zcta5, geom from geo.n5_zcta where z3={lit(z3)}),
-pt as (select distinct fr.source_key, ST_SetSRID(ST_MakePoint(fr.lng, fr.lat), {CANON_SRID}) g
-         from fr join proj p using (source_key)
-        where p.treatment='PROVEN' and fr.lat is not null and fr.lng is not null),
+pt as (select v.source_key, ST_SetSRID(ST_MakePoint(v.lng, v.lat), {CANON_SRID}) g
+         from geo.n5_proven_verdict v
+         join proj p on p.source_key = v.source_key
+        where v.snapshot_id={lit(SNAPSHOT)} and v.verdict='ELIGIBLE' and p.treatment='PROVEN'),
 rec as (select g.source_key, g.geom g
           from geo.n5_geom g join proj p on p.source_key=g.source_key
          where p.treatment='RECOVERY' and g.geom is not null),
@@ -350,131 +362,121 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 
 # ------------------------------------------------- PROVEN point materialization
 
-def proven_candidates(z3):
-    """Resolve the admission gate for every PROVEN project in this shard.
+def refresh_proven_verdict_sql():
+    """Rebuild the PROJECT-GLOBAL PROVEN verdict from the authoritative frozen baseline.
 
-    ZERO NEW ASSOCIATION SEMANTICS. These exact points ALREADY participate in association
-    construction through the `pt` CTE in build_associations, which computes
-    ST_MakePoint(fr.lng, fr.lat) for PROVEN projects and unions it into `allgeom`. This
-    function does not introduce a second PROVEN association path and does not change what
-    associations are produced; it makes the spatial representation the builder is already
-    using DURABLE in the canonical geometry corpus.
+    AUTHORITATIVE SOURCE: preservation.app_project_identity, filtered to the run snapshot and
+    record_kind='development', joined to geo.n5_accepted_source for the registry verdict. This
+    is the relation that yields the corrected 723,449 PROVEN source_key population. Global
+    multiplicity is NOT derived from ZIP3-local geo.n5_frozen, and NOT from app_projects page
+    rows (3.21 rows per project - a page-materialization count, not project grain).
 
-    ELIGIBILITY IS ENFORCED AT INSERTION, NOT AT QUERY TIME. A query-time join is a rule
-    every future caller must remember; an insertion gate is a rule callers cannot forget.
-    A point that fails any check is never written to geo.n5_geom, so no reader - however
-    it is written - can return it as radius-eligible.
+    NOT RUN AUTOMATICALLY. It is a full pass over a 1,125 MB table and is a deliberate,
+    separately authorized operation - see REMAINING APPLY GATES in PR #1016.
 
-    The registry verdict is necessary but NOT sufficient: it is a per-SOURCE statement and
-    cannot see a per-project geocode failure, so each candidate must also pass coordinate
-    sanity and fall inside its own shard's jurisdiction."""
+    Coordinate pairs are DISTINCT OBSERVED pairs: both values non-null on the SAME row, so a
+    latitude from one row can never be paired with a longitude from another."""
     return f"""
-with fr as (select * from geo.n5_frozen where z3={lit(z3)} and treatment='PROVEN'),
-verdict as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
-bnd as (select geom from geo.n5_zcta where z3={lit(z3)}),
-base as (select distinct source_key from fr),
-reg as (select source_key, min(registry_id) registry_id from fr group by source_key),
--- Distinct OBSERVED coordinate PAIRS. Deriving lat and lng with independent aggregates
--- (min(lat), min(lng)) could pair a latitude from one row with a longitude from another and
--- emit a point present in NO source row - fabrication. Rows A(42,-71) and B(41,NULL) must
--- never yield (41,-71). A pair is only observed when BOTH values are non-null on the SAME row.
-pairs as (select distinct source_key, lat, lng
-            from fr where lat is not null and lng is not null),
-cnt as (select b.source_key,
-               (select count(*) from pairs p where p.source_key = b.source_key) ncoord
-          from base b),
--- The candidate coordinate is taken ONLY when exactly one distinct pair was observed, and it
--- is that whole row - never assembled from parts.
-sel as (select p.source_key, p.lat, p.lng
-          from pairs p join cnt c on c.source_key = p.source_key and c.ncoord = 1),
-agg as (
-  select b.source_key, r.registry_id, c.ncoord, sl.lat, sl.lng
-    from base b
-    join reg r using (source_key)
-    join cnt c using (source_key)
-    left join sel sl using (source_key)),
-gated as (
-  select a.*,
-         (a.registry_id is not null
-          and exists (select 1 from verdict v where v.registry_id = a.registry_id)) has_verdict,
-         case when a.ncoord = 0 then null
-              else ST_SetSRID(ST_MakePoint(a.lng, a.lat), {CANON_SRID}) end g
-    from agg a),
-judged as (
-  select gg.*,
-         case
-           when not gg.has_verdict                             then 'NO_REGISTRY_VERDICT'
-           when gg.ncoord > 1                                  then 'MULTI_COORD_UNRESOLVED'
-           when gg.ncoord = 0                                  then 'NULL_COORD'
-           when gg.lat not between -90 and 90
-             or gg.lng not between -180 and 180                then 'INVALID_COORD'
-           when abs(gg.lat) < 1e-9 and abs(gg.lng) < 1e-9      then 'NULL_ISLAND'
-           when not exists (select 1 from bnd b where ST_Intersects(gg.g, b.geom))
-                                                               then 'OUTSIDE_JURISDICTION'
-           else null end reject_reason
-    from gated gg)
-"""
+delete from geo.n5_proven_verdict where snapshot_id={lit(SNAPSHOT)};
+insert into geo.n5_proven_verdict (snapshot_id, source_key, registry_id, ncoord, lat, lng, verdict)
+with src as (
+  select i.source_key, coalesce(i.registry_id,'(null)') registry_id, i.lat, i.lng
+    from preservation.app_project_identity i
+   where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'),
+verdict_reg as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
+proven as (select distinct s.source_key, s.registry_id from src s
+            where exists (select 1 from verdict_reg v where v.registry_id = s.registry_id)),
+pairs as (select distinct source_key, lat, lng from src
+           where lat is not null and lng is not null),
+cnt as (select p.source_key, (select count(*) from pairs q where q.source_key=p.source_key) ncoord
+          from proven p),
+sel as (select pr.source_key, pr.lat, pr.lng
+          from pairs pr join cnt c on c.source_key=pr.source_key and c.ncoord=1)
+select {lit(SNAPSHOT)}, p.source_key, p.registry_id, c.ncoord, sl.lat, sl.lng,
+       case when c.ncoord > 1                            then 'MULTI_COORD_UNRESOLVED'
+            when c.ncoord = 0                            then 'NULL_COORD'
+            when sl.lat not between -90 and 90
+              or sl.lng not between -180 and 180         then 'INVALID_COORD'
+            when abs(sl.lat) < 1e-9 and abs(sl.lng) < 1e-9 then 'NULL_ISLAND'
+            else 'ELIGIBLE' end
+  from proven p join cnt c using (source_key) left join sel sl using (source_key);"""
 
 
 def materialize_proven_points(z3):
-    """Persist admitted PROVEN points, and record every rejection with its reason.
+    """Bring canonical PROVEN geometry and current reject state into line with the GLOBAL verdict.
 
-    feature_id is the reserved slot 'pt:1' - see FEATURE_ID_PT1_DOC. Multi-coordinate
-    projects are NOT materialized in v1: they are recorded MULTI_COORD_UNRESOLVED and
-    'pt:2' is never generated.
+    OWNERSHIP: a canonical proven_stored_point is owned by source_key, never by z3. Measured
+    2026-09-02: 72,856 of 723,449 PROVEN source_keys (10.1%) appear in more than one z3 - up to
+    12 shards, 217 page ZIPs. So nothing here is keyed, filtered or deleted by z3.
 
-    *** DISABLED - TWO RULINGS OUTSTANDING. DO NOT ENABLE WITHOUT THEM. ***
+    ORDER INDEPENDENCE: every write below is a function of (source_key, global verdict) alone.
+    The verdict is shard-independent, so shard A and shard B compute the identical action for a
+    shared source_key, and each action is idempotent (upsert / delete-if-present). Processing
+    A then B therefore leaves exactly the state of B then A.
 
-    (a) OWNERSHIP / DELETION BOUNDARY is unresolved. Measured on the frozen baseline
-        2026-09-02: of 723,449 PROVEN source_keys, 72,856 (10.1%) appear in MORE THAN ONE z3
-        shard - up to 12 shards and 217 distinct ZIPs for one project. But the canonical point
-        is ONE row per project, keyed (source_key,'pt:1'). So a per-z3 destructive delete would
-        let shards erase each other's points, and eligibility judged on a shard-LOCAL slice can
-        disagree between shards for the same project. This insert is still append-only
-        (ON CONFLICT DO NOTHING), which the audit correctly rejected: a stale pt:1 survives
-        ineligibility and a corrected coordinate is never applied.
-
-    (b) JURISDICTION is unresolved. The gate below tests "intersects ANY ZCTA loaded for this
-        shard", which the audit classified TOO BROAD. The narrower rule needs a project-level
-        jurisdiction, and the freeze source preservation.app_project_identity carries only
-        (zip, lat, lng) where `zip` is the ZIP PAGE the project was materialized onto - up to
-        217 of them per project - not an address ZIP. There is therefore no unambiguous "own
-        jurisdiction" field available.
-
-    Until both are ruled, this refuses to run rather than writing geometry under semantics
-    known to be wrong. Fail closed."""
-    if os.environ.get("N5_PROVEN_MATERIALIZE", "0").strip() != "1":
+    JURISDICTION: deliberately absent. There is no authoritative project-level jurisdiction in
+    the corpus - preservation.app_project_identity.zip is the ZIP PAGE a project was
+    materialized onto (up to 217 per project), not an address ZIP. Validating against it, or
+    against 'any ZCTA in the shard', would fabricate a check from the wrong field.
+    OUTSIDE_JURISDICTION stays reserved in the vocabulary and is NEVER emitted by v1."""
+    have = int(one(sql(f"""select count(*) n from geo.n5_proven_verdict
+                           where snapshot_id={lit(SNAPSHOT)};""", "verdict n"), "n"))
+    if have == 0:
         raise SystemExit(
-            "STOP: PROVEN point materialization is disabled pending two rulings - the "
-            "cross-shard ownership/deletion boundary (10.1% of PROVEN projects span multiple "
-            "shards) and the 'own jurisdiction' definition (the freeze source carries only the "
-            "page ZIP). See materialize_proven_points.__doc__.")
-    q = proven_candidates(z3) + f"""
+            "STOP: geo.n5_proven_verdict is empty for snapshot " + SNAPSHOT + ". The "
+            "project-global PROVEN verdict must be built before any shard may materialize "
+            "canonical points - see refresh_proven_verdict_sql().")
+
+    scope = f"""
+with slice as (select distinct source_key from geo.n5_frozen
+                where z3={lit(z3)} and treatment='PROVEN'),
+v as (select vv.* from geo.n5_proven_verdict vv join slice s using (source_key)
+       where vv.snapshot_id={lit(SNAPSHOT)})"""
+
+    # ELIGIBLE -> insert, or UPDATE the geometry if the authoritative coordinate changed.
+    sql(scope + """
 insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
                          invalid_reason, first_z3, provenance)
-select source_key, registry_id, 'pt:1', 1, g, null, {lit(z3)}, 'proven_stored_point'
-  from judged where reject_reason is null
-on conflict (source_key, feature_id) do nothing;"""
-    sql(q, "proven points " + z3)
-    r = proven_candidates(z3) + f"""
-insert into geo.n5_point_reject (z3, source_key, registry_id, lat, lng, reason)
-select {lit(z3)}, source_key, registry_id, lat, lng, reject_reason
-  from judged where reject_reason is not null
-on conflict (z3, source_key, reason) do nothing;"""
-    sql(r, "proven rejects " + z3)
-    return one(sql(f"""select
-        (select count(*) from geo.n5_geom
-          where first_z3={lit(z3)} and provenance='proven_stored_point') materialized,
-        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejected;""",
-                   "proven counts"), None)
+select v.source_key, coalesce(v.registry_id,'(null)'), 'pt:1', 1,
+       ST_SetSRID(ST_MakePoint(v.lng, v.lat), """ + str(CANON_SRID) + f"""),
+       null, {lit(z3)}, 'proven_stored_point'
+  from v where v.verdict='ELIGIBLE'
+on conflict (source_key, feature_id) do update
+   set geom = excluded.geom, registry_id = excluded.registry_id, recovered_at = now();""",
+        "proven upsert " + z3)
+
+    # INELIGIBLE -> remove any stale canonical point. Scoped to this source_key AND to the
+    # proven slot, so RECOVERY geometry is never touched and no other project is affected.
+    sql(scope + """
+delete from geo.n5_geom g
+ using v
+ where g.source_key = v.source_key and g.feature_id = 'pt:1'
+   and g.provenance = 'proven_stored_point' and v.verdict <> 'ELIGIBLE';""",
+        "proven prune " + z3)
+
+    # CURRENT reject state: an eligible project must hold no reject row at all, and an
+    # ineligible one holds exactly its current reason. Both directions, so a fixed project
+    # stops reporting a stale reason and a newly broken one starts reporting the real one.
+    sql(scope + """
+delete from geo.n5_point_reject r using v
+ where r.source_key = v.source_key and v.verdict = 'ELIGIBLE';""",
+        "reject clear " + z3)
+    sql(scope + f"""
+insert into geo.n5_point_reject (source_key, registry_id, lat, lng, reason, observed_in_z3)
+select v.source_key, v.registry_id, v.lat, v.lng, v.verdict, {lit(z3)}
+  from v where v.verdict <> 'ELIGIBLE'
+on conflict (source_key) do update
+   set reason = excluded.reason, registry_id = excluded.registry_id,
+       lat = excluded.lat, lng = excluded.lng,
+       observed_in_z3 = excluded.observed_in_z3, rejected_at = now();""",
+        "reject write " + z3)
+
+    return one(sql(scope + """
+select (select count(*) from v where verdict='ELIGIBLE') materialized,
+       (select count(*) from v where verdict<>'ELIGIBLE') rejected;""",
+                   "proven counts " + z3), None)
 
 
-# 'pt:' is a RESERVED synthetic namespace meaning "the canonical fidelity-proven stored point
-# slot for this source_key". It cannot collide with publisher feature ids: those use '#' as
-# their ordinal separator (e.g. '0001-0100#2', 'NHSX-020-9(183)--3H-31#0') and contain no
-# colon. Identity is the SLOT, not the coordinate value, so correcting a coordinate updates
-# geom in place and leaves feature_id unchanged. 'pt:2' and beyond are RESERVED AND UNDEFINED
-# and MUST NOT be generated until multi-coordinate PROVEN semantics are separately approved.
 FEATURE_ID_PT1_DOC = "pt:1"
 
 

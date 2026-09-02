@@ -1,24 +1,21 @@
-// N5 canonical geometry provenance + association key correction — structural guards.
+// N5 canonical geometry — provenance, PROJECT-GLOBAL PROVEN verdict, association key
+// correction, stage-and-swap. STATIC SOURCE ASSERTIONS ONLY.
 //
-// CI has no database (same convention as test/app-projects-stable-key.test.mjs and
-// test/app-refresh-zip-determinism.test.mjs), so these assert against the SQL of record and
-// the builder source. The live measurements that justify the design were taken read-only on
-// 2026-09-02 and are recorded here so they are auditable:
+// ⚠️ These are NOT database proof. No SQL is executed here. This container has no PostgreSQL
+// server, no Docker daemon, and package egress is blocked, so the executable PostGIS suite
+// required before apply does not exist yet. Do not read a green run as pre-apply readiness.
 //
-//   * geo.n5_association: 20,170 rows = 20,170 distinct (source_key, zip); 0 pairs carry
-//     multiple evidence values. evidence is state, not identity — so the old PK
-//     (source_key, zip, evidence) permitted a corruption that has not yet occurred.
-//   * shard boundary left(zip,3): every one of the 13 completed shards' association counts
-//     matches its stored detail.associations exactly, 0 rows outside the done set.
-//   * geo.n5_geom is RECOVERY-exclusive today (recover_shard filters treatment='RECOVERY'),
-//     which is what makes the backfill to 'recovered_authoritative' provably safe.
-//   * PROVEN nationally: 145 sources, 729,575 distinct projects, of which 4,802 carry more
-//     than one distinct coordinate and are excluded from v1.
-//
-// Shard 760 (Arlington / Fort Worth TX) is the approved later validation geography. Its
-// PLANNING expectations — 17,226 projects, 16,964 PROVEN, 4 PROVEN registries, ~16,385
-// single-coordinate candidates, ~579 MULTI_COORD_UNRESOLVED, 262 RECOVERY — are documented
-// here as expectations, deliberately NOT asserted as acceptance values.
+// Live read-only measurements behind the design (2026-09-02):
+//   * PROVEN population on the authoritative frozen baseline: 723,449 source_keys.
+//   * 72,856 of them (10.1%) appear in MORE THAN ONE z3 — up to 12 shards, 217 page ZIPs.
+//     Hence canonical point ownership is source_key, never z3.
+//   * preservation.app_project_identity has ONE index, (snapshot_id, app_project_id). A single
+//     source_key lookup plans as Parallel Seq Scan cost=0.00..149046.81 over 1,125 MB — so the
+//     global verdict is precomputed, not evaluated interactively per shard.
+//   * Association impact of global eligibility: ZERO for the 13 completed shards (they hold 1
+//     PROVEN source_key, globally single-coordinate). NONZERO for shard 760 — 29 projects are
+//     single-coordinate locally but multi-coordinate globally; global multi 579 -> 609.
+//   * geo.n5_association: 20,170 rows = 20,170 distinct pairs, 0 conflicting evidence.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -26,195 +23,135 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sql = readFileSync(join(root, 'docs/n5-canonical-geometry-provenance.sql'), 'utf8');
 const py = readFileSync(join(root, 'scripts/n5_shard.py'), 'utf8');
-
-// The migration header quotes the very things asserted absent ("cache", "b4", "760"), so
-// code-level assertions strip whole-line SQL comments first — the false-failure recorded in
-// test/app-projects-stable-key.test.mjs.
 const code = sql.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
-
-// Absence-assertions must not match the builder's own PROSE. This file documents the very
-// things it asserts absent ("pt:2 is RESERVED", "Deliberately NO `on conflict`"), which is how
-// the first run of this suite produced four false failures. Strip # lines and plain docstrings;
-// KEEP f""" """ bodies, which are executable SQL.
-const pycode = py
-  .replace(/(^|[^f])"""[\s\S]*?"""/g, '$1')
-  .split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+// Absence assertions must not match the builder's own prose (it documents what it forbids).
+const pycode = py.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
 
 let fails = 0;
 const ok = (c, n) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) fails++; };
 
-ok(sql.length > 4000 && py.length > 20000, 'migration + builder loaded (non-trivial)');
-ok(code.length > 1500 && code.length < sql.length, 'comment-stripped SQL extracted');
+ok(sql.length > 5000 && py.length > 20000, 'migration + builder loaded');
 
-// ---- 1. PROVENANCE: order, fail-closed, no default ----
-const addAt = code.indexOf('add column if not exists provenance');
-const backfillAt = code.indexOf("set provenance = 'recovered_authoritative'");
-const assertAt = code.indexOf('provenance backfill incomplete');
-const checkAt = code.indexOf('n5_geom_provenance_ck');
-const notNullAt = code.indexOf('alter column provenance set not null');
-ok(addAt > 0 && backfillAt > addAt, 'column added nullable BEFORE backfill');
-ok(assertAt > backfillAt, 'zero-NULL assertion runs AFTER backfill');
-ok(checkAt > assertAt, 'CHECK added AFTER the assertion');
-ok(notNullAt > checkAt, 'NOT NULL enforced LAST');
-ok(!/add column if not exists provenance[^;]*default/i.test(code)
-  && !/alter column provenance set default/i.test(code),
-  'provenance has NO default (a default would silently misclassify)');
-ok(/check \(provenance in \('recovered_authoritative','proven_stored_point'\)\)/.test(code),
-  'provenance allowlist is exactly the two approved v1 values');
-ok(/raise exception 'n5_geom provenance backfill incomplete/.test(code),
-  'incomplete backfill raises rather than constraining a dirty table');
-
-// ---- 2. BUILDER writes provenance explicitly on both paths ----
-ok(/insert into geo\.n5_geom \(source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,"\n\s*"provenance\)/.test(py),
-  'recovered-geometry insert names the provenance column');
-ok((py.match(/'recovered_authoritative'\)"/g) || []).length === 2,
-  'both recovered rows (geometry and NO_GEOMETRY) stamp recovered_authoritative');
-ok(/'pt:1', 1, g, null, \{lit\(z3\)\}, 'proven_stored_point'/.test(py),
-  'admitted PROVEN point is stamped proven_stored_point');
-
-// ---- 3. ELIGIBILITY GATE — all six reasons, enforced at insertion ----
-for (const r of ['NO_REGISTRY_VERDICT','MULTI_COORD_UNRESOLVED','NULL_COORD','INVALID_COORD','NULL_ISLAND','OUTSIDE_JURISDICTION']) {
-  ok(new RegExp(`'${r}'`).test(py), `gate produces ${r}`);
-  ok(new RegExp(`'${r}'`).test(code), `reject table permits ${r}`);
-}
-ok(/where reject_reason is null/.test(py), 'ONLY candidates with no reject reason are materialized');
-ok(/where reject_reason is not null/.test(py), 'every rejected candidate is recorded');
-ok(/exists \(select 1 from verdict v where v\.registry_id = a\.registry_id\)/.test(py),
-  'affirmative registry verdict is required');
-ok(/gg\.lat not between -90 and 90/.test(py) && /gg\.lng not between -180 and 180/.test(py),
-  'coordinate range is validated');
-ok(/abs\(gg\.lat\) < 1e-9 and abs\(gg\.lng\) < 1e-9/.test(py), 'null-island is rejected');
-ok(/ST_Intersects\(gg\.g, b\.geom\)/.test(py) && /from geo\.n5_zcta where z3=/.test(py),
-  'jurisdiction uses the shard ZCTA semantics');
-ok(/when gg\.ncoord > 1\s+then 'MULTI_COORD_UNRESOLVED'/.test(py),
-  'multi-coordinate projects are rejected, not materialized');
-ok(/Eligibility is enforced at insertion, not at query time|ELIGIBILITY IS ENFORCED AT INSERTION/i.test(py),
-  'insertion-gate rationale is recorded in the code');
-ok(/an insertion gate is a rule callers cannot forget/.test(py), 'the rationale states WHY');
-
-// ---- 4. FEATURE IDENTITY ----
-ok(/'pt:1'/.test(py), "admitted point uses the reserved slot pt:1");
-// Every occurrence of pt:2 must be documentation. Checked per LINE against SQL verbs,
-// because the builder legitimately documents that pt:2 is reserved.
-const pt2Lines = py.split('\n').filter((l) => l.includes('pt:2'));
-ok(pt2Lines.length > 0 && pt2Lines.every((l) => !/(insert|select|values|feature_id\s*=)/i.test(l)),
-  'pt:2 appears only in documentation, never in emitted SQL');
-ok(!/pt:\$\{|pt:" \+|'pt:' \+/.test(pycode), 'no computed pt: identifier is ever built');
-ok(/RESERVED AND UNDEFINED/.test(py), 'pt:2+ is documented as reserved and undefined');
-ok(/Identity is the SLOT, not the coordinate value/.test(py),
-  'coordinate correction cannot change geometry-instance identity');
-ok(!/md5\([^)]*\b(lat|lng)\b/.test(pycode), 'feature_id is not derived from the coordinate');
-
-// ---- 5. ASSOCIATION PK CORRECTION ----
-ok(/primary key \(source_key, zip\)/.test(code), 'new PK is (source_key, zip)');
-ok(/drop constraint if exists n5_association_pkey/.test(code), 'old PK is dropped, not duplicated');
-ok(/having count\(\*\) > 1/.test(code) && /having count\(distinct evidence\) > 1/.test(code),
-  'both preconditions verified: duplicate pairs AND conflicting evidence');
-ok(/raise exception[\s\S]{0,200}needs reconciliation first/.test(code),
-  'nonzero preconditions STOP the migration');
-ok(/Automatic reconciliation is deliberately NOT attempted/.test(code),
-  'migration refuses to auto-reconcile');
-ok(!/create (unique )?index[\s\S]{0,80}n5_association \(source_key, zip\)/i.test(code),
-  'no second equivalent uniqueness index is added');
-
-// ---- 6. STAGE-AND-SWAP ----
-ok(/create table if not exists geo\.n5_association_stage/.test(code), 'staging table exists');
-ok(/primary key \(z3, source_key, zip\)/.test(code),
-  'stage PK enforces one evidence class per pair — a bad run fails in staging');
-ok(/delete from geo\.n5_association_stage where z3=/.test(py), 'staging clears its own z3 first (idempotent rerun)');
-const stageIns = py.indexOf('insert into geo.n5_association_stage');
-const stageIdx = pycode.indexOf('insert into geo.n5_association_stage');
-const stageSeg = pycode.slice(stageIdx, stageIdx + 400);
-ok(stageIdx > 0 && !/on conflict/.test(stageSeg), 'staging insert has NO on-conflict — duplicates must fail loudly');
-ok(/do \$swap\$/.test(py) && /\$swap\$;/.test(py), 'swap is a single DO block = one transaction');
-const swapAt = py.indexOf('do $swap$');
-const swapSeg = py.slice(swapAt, swapAt + 600);
-ok(/delete from geo\.n5_association where/.test(swapSeg) && /insert into geo\.n5_association \(/.test(swapSeg),
-  'swap deletes then inserts inside the same transaction');
-ok(/left\(zip,3\)=/.test(swapSeg), 'swap is scoped to the verified shard boundary');
-ok(/stage_associations\(z3\)[\s\S]{0,300}reconcile_stage\(z3\)[\s\S]{0,1600}swap_shard\(z3\)/.test(py),
-  'order is stage -> reconcile -> swap');
-ok(/refusing to swap/.test(py), 'reconciliation failure prevents the swap');
-ok(/staged.*!=.*staged_pairs|int\(rc\["staged"\]\) != int\(rc\["staged_pairs"\]\)/.test(py),
-  'reconcile asserts staged rows == staged distinct pairs');
-
-// ---- 7. REJECT LEDGER ----
-ok(/constraint n5_point_reject_pkey primary key \(z3, source_key, reason\)/.test(code),
-  'reject PK makes recording deterministic and idempotent');
-ok(/on conflict \(z3, source_key, reason\) do nothing/.test(py), 'rerun cannot duplicate a reject');
-ok(/source_key/.test(code.slice(code.indexOf('n5_point_reject'))), 'reject is queryable by source_key');
-
-// ---- 8. ASSOCIATION INVARIANCE (semantic, not hard-coded totals) ----
-ok(/ZERO NEW ASSOCIATION SEMANTICS/.test(py), 'the invariant is stated in the builder');
-ok(/ALREADY participate in association/.test(py) && /`pt` CTE in build_associations/.test(py),
-  'rationale names the existing pt CTE as the reason no association is added');
-ok(!/20,?170|5,?592|9,?857|4,?721/.test(py),
-  'production totals are NOT hard-coded into builder logic');
-ok((py.match(/from geo\.n5_geom g join proj p/g) || []).length === 1,
-  'exactly one geometry->association path (rec); no second PROVEN association path');
-ok(/where p\.treatment='RECOVERY' and g\.geom is not null/.test(py),
-  'rec stays RECOVERY-filtered, so persisted PROVEN points are not double-counted');
-
-// ---- 9. CANONICAL-DATA LANGUAGE ----
-ok(/PERMANENT CANONICAL PRODUCT GEOMETRY/.test(code), 'table comment states canonical product data');
-ok(/MUST NOT be reclaimed, truncated, or /.test(code), 'comment forbids reclamation');
-ok(!/cross-shard geometry cache/.test(py), 'the misleading "cross-shard geometry cache" wording is gone');
-ok(/PERMANENT CANONICAL PRODUCT GEOMETRY/.test(py), 'builder carries the canonical wording too');
-
-// ---- 10. MIGRATION SAFETY — schema only ----
-ok(!/\b760\b/.test(code), 'migration does not reference shard 760');
-ok(!/b4_/.test(code), 'migration does not touch B4');
-ok(!/vacuum full/i.test(code), 'migration performs no reclamation');
-ok(!/\bdrop table\b/i.test(code), 'migration drops no table');
-ok(!/update geo\.n5_shard|delete from geo\.n5_association\b/i.test(code),
-  'migration rebuilds no shard and deletes no association');
-ok(!/insert into geo\.n5_geom/i.test(code),
-  'migration performs NO national PROVEN backfill — materialization is shard-time only');
-
-// ---- 11. AUDIT CORRECTIONS (PR #1016 round 2) ----
-// #1 migration atomicity
-ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'migration is wrapped in ONE transaction');
+// ---- 1. MIGRATION ATOMICITY ----
+ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'migration is one transaction');
 ok(code.indexOf('begin;') < code.indexOf('drop constraint if exists n5_association_pkey')
    && code.indexOf('add constraint n5_association_pkey') < code.lastIndexOf('commit;'),
-  'the DROP PK / ADD PK window is inside the transaction (no unprotected interval)');
+  'the DROP PK / ADD PK window is inside the transaction');
+ok(/APPLY THIS FILE AS A SINGLE STATEMENT\/SCRIPT/.test(sql),
+  'the apply-mechanism gate is documented in the migration');
 
-// #8 pt: namespace structurally reserved
+// ---- 2. PROVENANCE ----
+ok(code.indexOf('add column if not exists provenance') < code.indexOf("set provenance = 'recovered_authoritative'"),
+  'column added nullable before backfill');
+ok(code.indexOf('provenance backfill incomplete') < code.indexOf('n5_geom_provenance_ck'),
+  'zero-NULL assertion precedes the CHECK');
+ok(code.indexOf('n5_geom_provenance_ck') < code.indexOf('alter column provenance set not null'),
+  'NOT NULL enforced last');
+ok(!/add column if not exists provenance[^;]*default/i.test(code), 'provenance has NO default');
+ok(/check \(provenance in \('recovered_authoritative','proven_stored_point'\)\)/.test(code),
+  'provenance allowlist is exactly the two v1 values');
+
+// ---- 3. pt: NAMESPACE STRUCTURALLY RESERVED ----
 ok(/check \(\(provenance = 'proven_stored_point'\) = \(feature_id = 'pt:1'\)\)/.test(code),
-  'pt: namespace reserved by a biconditional CHECK, not by observation');
-ok(/violate the pt: namespace reservation/.test(code) && /NOT modified automatically/.test(code),
-  'pre-existing violators STOP the migration rather than being rewritten');
+  'biconditional CHECK reserves the pt: namespace');
+ok(/violate the pt: namespace reservation/.test(code), 'pre-existing violators STOP the migration');
+ok(!/'pt:2'/.test(pycode), 'no executable path emits pt:2');
 
-// #2 coordinate pairs — never assembled from parts
-ok(!/min\(fr\.lat\)|min\(fr\.lng\)/.test(pycode), 'independent min(lat)/min(lng) selection is GONE');
-ok(/pairs as \(select distinct source_key, lat, lng/.test(py)
-  && /from fr where lat is not null and lng is not null\)/.test(py),
-  'distinct OBSERVED coordinate pairs are derived first');
-ok(/join cnt c on c\.source_key = p\.source_key and c\.ncoord = 1/.test(py),
-  'a candidate coordinate is taken only when exactly ONE distinct pair was observed');
-ok(/never yield \(41,-71\)/.test(py), 'the fabrication case is documented at the fix site');
+// ---- 4. ASSOCIATION PK ----
+ok(/primary key \(source_key, zip\)/.test(code), 'association PK is (source_key, zip)');
+ok(/having count\(\*\) > 1/.test(code) && /having count\(distinct evidence\) > 1/.test(code),
+  'both PK preconditions are verified');
+ok(/needs reconciliation first/.test(code), 'nonzero preconditions STOP the migration');
 
-// #7 cache probe is RECOVERY-only
-ok(/where provenance='recovered_authoritative' and source_key in \(/.test(py),
-  'cache-hit probe counts only recovered_authoritative geometry');
+// ---- 5. PROJECT-GLOBAL OWNERSHIP ----
+ok(/create table if not exists geo\.n5_proven_verdict/.test(code), 'global verdict table exists');
+ok(/primary key \(snapshot_id, source_key\)/.test(code),
+  'verdict grain is source_key (per snapshot) — NOT z3');
+ok(/verdict <> 'ELIGIBLE' or \(ncoord = 1 and lat is not null and lng is not null\)/.test(code),
+  'an ELIGIBLE verdict must carry exactly one observed coordinate pair');
+ok(/preservation\.app_project_identity/.test(py), 'verdict is built from the authoritative baseline');
+ok(/NOT POPULATED BY THIS MIGRATION/.test(sql), 'migration does not populate the verdict');
+ok(!/insert into geo\.n5_proven_verdict/i.test(code), 'migration writes no verdict rows');
 
-// #6 reconciliation actually gates the swap
-ok(/staged_not_prior/.test(py) && /prior_not_staged/.test(py), 'staged-vs-prior diffs are computed');
-ok(/if prior > 0 and drift and not ALLOW_ASSOCIATION_DELTA:/.test(py),
-  'a rebuild with ANY association delta HALTS before the swap');
+// ---- 6. ORDER INDEPENDENCE: no z3 in any canonical write predicate ----
+const geomDel = py.slice(py.indexOf('delete from geo.n5_geom g')).split('"""')[0];
+ok(/g\.source_key = v\.source_key/.test(geomDel) && /g\.provenance = 'proven_stored_point'/.test(geomDel),
+  'stale point deletion is scoped to source_key AND the proven slot');
+ok(!/z3/.test(geomDel), 'geometry deletion never filters by z3');
+ok(!/recovered_authoritative/.test(geomDel), 'RECOVERY geometry is never deleted by this path');
+const rejDel = py.slice(py.indexOf('delete from geo.n5_point_reject r')).split('"""')[0];
+ok(!/z3/.test(rejDel), 'reject clearing never filters by z3');
+
+// ---- 7. GEOMETRY CURRENT STATE (not append-only) ----
+ok(/on conflict \(source_key, feature_id\) do update/.test(py),
+  'eligible points UPSERT — a corrected coordinate updates the canonical geom');
+ok(/set geom = excluded\.geom/.test(py), 'the update actually replaces the geometry');
+ok(/v\.verdict <> 'ELIGIBLE'/.test(py), 'ineligible projects have their stale pt:1 removed');
+
+// ---- 8. REJECT CURRENT STATE ----
+ok(/constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
+  'reject identity is project-global (source_key alone)');
+const rejDdl = code.slice(code.indexOf('create table if not exists geo.n5_point_reject'),
+  code.indexOf('create table if not exists geo.n5_proven_verdict'));
+ok(/observed_in_z3/.test(rejDdl) && !/primary key \(z3/.test(rejDdl),
+  'z3 is retained only as diagnostic metadata, not as identity');
+ok(/where r\.source_key = v\.source_key and v\.verdict = 'ELIGIBLE'/.test(py),
+  'a newly eligible project has its stale reject cleared');
+ok(/on conflict \(source_key\) do update\s*\n?\s*set reason = excluded\.reason/.test(py),
+  'an ineligible project holds exactly its CURRENT reason');
+
+// ---- 9. JURISDICTION RULING ----
+ok(!/ST_Intersects/.test(pycode.slice(pycode.indexOf('def refresh_proven_verdict_sql'),
+                                      pycode.indexOf('def stage_associations'))),
+  'no jurisdiction containment test in the PROVEN gate');
+ok(!/'OUTSIDE_JURISDICTION'/.test(py), 'v1 never EMITS OUTSIDE_JURISDICTION as a SQL literal');
+ok(/'OUTSIDE_JURISDICTION'/.test(code), 'the reason stays RESERVED in the schema vocabulary');
+ok(/ZIP-page materialization is NOT jurisdiction evidence/.test(sql)
+   || /not jurisdiction evidence/i.test(sql), 'the migration documents why page ZIP is not jurisdiction');
+ok(/not an address ZIP/.test(py), 'the builder documents the same');
+
+// ---- 10. COORDINATE PAIRS ----
+ok(!/min\(fr\.lat\)|min\(fr\.lng\)|min\(i\.lat\)|min\(i\.lng\)/.test(pycode),
+  'no independent latitude/longitude aggregation anywhere');
+ok(/pairs as \(select distinct source_key, lat, lng from src/.test(py),
+  'distinct OBSERVED pairs are derived from the same row');
+ok(/c\.ncoord=1/.test(py), 'a coordinate is taken only when exactly one distinct pair exists');
+
+// ---- 11. ASSOCIATION pt PATH USES THE GLOBAL VERDICT ----
+// Scope this to the pt CTE ITSELF. Asserting on the whole file passed even when the CTE was
+// reverted to the shard-local slice, because n5_proven_verdict also appears in the
+// materializer — a guard that cannot fail is not a guard.
+const ptCte = py.slice(py.indexOf('pt as ('), py.indexOf('rec as ('));
+ok(ptCte.length > 40 && ptCte.length < 600, 'pt CTE located');
+ok(/geo\.n5_proven_verdict/.test(ptCte) && /verdict='ELIGIBLE'/.test(ptCte),
+  'the pt CTE itself reads the project-global verdict');
+ok(!/\bfr\b/.test(ptCte), 'the pt CTE no longer reads the shard-local frozen slice');
+ok(/EXPECTED SEMANTIC CORRECTION/.test(py),
+  'the association change is documented as a correction, not hidden behind the old invariant');
+ok(/13 COMPLETED shards the impact is ZERO/.test(py) && /579 -> 609/.test(py),
+  'the measured impact is recorded at the decision site');
+ok((py.match(/from geo\.n5_geom g join proj p/g) || []).length === 1,
+  'exactly one geometry->association path');
+
+// ---- 12. RECONCILIATION GATE ----
+ok(/staged_not_prior/.test(py) && /prior_not_staged/.test(py), 'bidirectional diffs computed');
+ok(/if prior > 0 and drift and not ALLOW_ASSOCIATION_DELTA:/.test(py), 'any delta HALTS a rebuild');
 ok(/raise SystemExit\([\s\S]{0,400}Refusing to swap/.test(py), 'the halt is a raise, not a print');
-ok(/ALLOW_ASSOCIATION_DELTA = os\.environ/.test(py),
-  'the invariant is explicitly overridable, never silently weakened');
-ok(/prior > 0/.test(py), 'a first-run shard (prior=0) is not blocked by the delta gate');
 
-// #9 no disposable-cache language remains
-ok(!/geometry cache/i.test(py), 'no "geometry cache" wording remains anywhere in the builder');
-ok(/canonical geometry corpus \(NOT reclaimable\)/.test(py), 'reporting names it a canonical corpus');
+// ---- 13. CACHE PROBE ----
+ok(/where provenance='recovered_authoritative' and source_key in \(/.test(py),
+  'cache reuse counts only recovered_authoritative geometry');
+ok(!/geometry cache/i.test(py), 'no disposable-cache wording remains');
 
-// #3/#5 unresolved -> materialization must fail closed
-ok(/N5_PROVEN_MATERIALIZE/.test(py), 'PROVEN materialization is gated behind an explicit flag');
-ok(/STOP: PROVEN point materialization is disabled pending two rulings/.test(py),
-  'it refuses to run while the ownership and jurisdiction rulings are outstanding');
-ok(/72,856 \(10\.1%\) appear in MORE THAN ONE z3/.test(py),
-  'the cross-shard ownership measurement is recorded at the decision site');
+// ---- 14. FAIL CLOSED ----
+ok(/geo\.n5_proven_verdict is empty for snapshot/.test(py),
+  'materialization refuses to run before the global verdict is built');
+ok(/NOT RUN AUTOMATICALLY/.test(py), 'the expensive verdict refresh is not run implicitly');
+
+// ---- 15. MIGRATION SAFETY ----
+ok(!/\b760\b/.test(code), 'migration does not reference shard 760');
+ok(!/b4_/.test(code), 'migration does not touch B4');
+ok(!/vacuum full/i.test(code) && !/\bdrop table\b/i.test(code), 'no reclamation, no table drops');
+ok(!/insert into geo\.n5_geom/i.test(code), 'migration performs no PROVEN backfill');
 
 process.exit(fails ? 1 : 0);

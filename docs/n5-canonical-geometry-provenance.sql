@@ -142,18 +142,67 @@ comment on column geo.n5_association.evidence is
 -- Answers, durably: "why was source_key X not materialized as radius-eligible geometry?"
 
 create table if not exists geo.n5_point_reject (
-  z3           character(3) not null,
-  source_key   text         not null,
-  registry_id  text,
-  lat          double precision,
-  lng          double precision,
-  reason       text         not null,
-  rejected_at  timestamptz  not null default now(),
-  constraint n5_point_reject_pkey primary key (z3, source_key, reason),
+  source_key      text        not null,
+  registry_id     text,
+  lat             double precision,
+  lng             double precision,
+  reason          text        not null,
+  observed_in_z3  character(3),
+  rejected_at     timestamptz not null default now(),
+  -- PROJECT-GLOBAL identity. z3 is diagnostic "observed during" metadata only: a source_key
+  -- can appear in up to 12 shards, and keying rejection by z3 would let one project hold
+  -- several contradictory "current" reasons at once. There is exactly ONE current answer to
+  -- "why is source_key X not materialized?".
+  constraint n5_point_reject_pkey primary key (source_key),
   constraint n5_point_reject_reason_ck check (reason in (
     'NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND',
     'OUTSIDE_JURISDICTION','INVALID_COORD','MULTI_COORD_UNRESOLVED'))
 );
+
+-- OUTSIDE_JURISDICTION stays in the vocabulary but is RESERVED and UNUSED in v1.
+-- Jurisdiction validation is reserved until an authoritative project-level jurisdiction field
+-- or boundary is available. ZIP-page materialization is NOT jurisdiction evidence and MUST NOT
+-- be used as a substitute: preservation.app_project_identity.zip is the ZIP PAGE a project was
+-- materialized onto (up to 217 per project), not an address ZIP. v1 never emits this reason.
+
+-- ============================================================================
+-- §4b  PROJECT-GLOBAL PROVEN VERDICT  (required: the alternative is a full scan per shard)
+-- ============================================================================
+-- MEASURED 2026-09-02: preservation.app_project_identity carries exactly ONE index,
+-- (snapshot_id, app_project_id). There is no index on source_key, so a per-shard global
+-- verdict lookup plans as `Parallel Seq Scan ... cost=0.00..149046.81` for a SINGLE key over a
+-- 1,125 MB table. Evaluating ~17k source_keys interactively per shard would scan the national
+-- table repeatedly. Correctness first, then bounded execution: the verdict is precomputed once
+-- per snapshot at project-global grain and read by key.
+--
+-- Grain is source_key ALONE. Not z3. z3 is processing/resume provenance, never geometry
+-- ownership - which is what makes shard processing order-independent.
+
+create table if not exists geo.n5_proven_verdict (
+  snapshot_id  text        not null,
+  source_key   text        not null,
+  registry_id  text,
+  ncoord       integer     not null,
+  lat          double precision,
+  lng          double precision,
+  verdict      text        not null,
+  computed_at  timestamptz not null default now(),
+  constraint n5_proven_verdict_pkey primary key (snapshot_id, source_key),
+  constraint n5_proven_verdict_ck check (verdict in (
+    'ELIGIBLE','NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND',
+    'INVALID_COORD','MULTI_COORD_UNRESOLVED')),
+  -- An eligible verdict must carry exactly one observed coordinate pair.
+  constraint n5_proven_verdict_eligible_ck check (
+    verdict <> 'ELIGIBLE' or (ncoord = 1 and lat is not null and lng is not null))
+);
+
+comment on table geo.n5_proven_verdict is
+  'PROJECT-GLOBAL eligibility verdict for PROVEN stored points, computed once per snapshot from '
+  'preservation.app_project_identity (the authoritative frozen identity baseline that yields '
+  '723,449 PROVEN source_keys). Keyed by source_key alone - NOT by z3 - so every shard reaches '
+  'the identical verdict and processing order cannot change the outcome. Multi-coordinate is a '
+  'GLOBAL condition: shard A can no longer materialize a point that shard B would later '
+  'discover to be multi-coordinate. NOT POPULATED BY THIS MIGRATION.';
 
 comment on table geo.n5_point_reject is
   'Why a PROVEN-treatment project was NOT materialized into canonical radius-eligible geometry. '
