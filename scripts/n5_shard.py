@@ -161,7 +161,17 @@ def recover_shard(z3, registry):
     Publisher feature multiplicity is preserved (one row per source_key x OBJECTID) and a
     recovered feature is keyed by the FROZEN identity we asked for, never by the string the
     publisher echoes back - the N4 trailing-space defect. Geometry already in geo.n5_geom
-    from an earlier shard is a cache HIT and is not refetched."""
+    from an earlier shard is a cache HIT and is not refetched.
+
+    CANONICAL DATA - geo.n5_geom is no longer RECOVERY-only. This path writes
+    provenance='recovered_authoritative'; the PROVEN materialisation writes
+    'proven_stored_point' with feature_id 'pt:1' ('pt:2' and beyond are RESERVED and
+    UNDEFINED - no code path emits them). PRESENCE IN THE TABLE IS THEREFORE NO LONGER A
+    TREATMENT GATE; `provenance` is. The column is NOT NULL with NO DEFAULT on purpose, so
+    a new writer must state which kind of geometry it is writing rather than inheriting one
+    by omission. Rows are never refreshed (ON CONFLICT DO NOTHING), so the FIRST acquisition
+    is the durable vintage in recovered_at - which is also why deleting rows from this table
+    is what would break vintage, not writing to it."""
     rows = sql(f"""select registry_id,
                           count(distinct source_key) filter (where source_key_basis is null
                               or source_key_basis not in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) recoverable,
@@ -282,14 +292,16 @@ def fetch_features(rid, entry, keys, z3):
         nfeat += 1
         if not wkt:
             reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)})")
+            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)},"
+                        f"'recovered_authoritative')")
         else:
             # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
             # thousands of characters and must not be re-escaped per quote.
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)})")
+                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)},"
+                        f"'recovered_authoritative')")
     for i in range(0, len(rows), 25):
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3) values "
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,provenance) values "
             + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
