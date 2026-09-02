@@ -40,6 +40,41 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — map-address-search branch is GONE (tip `ff71dcd`) — never pushed, do not hunt for it
+
+**The blocked `feature/map-address-search` branch and its six commits (tip `ff71dcd`) no longer
+exist and cannot be recovered.** They lived only on a previous Cursor agent's VM, plus a
+`.bundle` on that same disk (`/opt/cursor/artifacts/map-address-search/…treatment-gated.bundle`).
+Both are unreachable — verified from **two separate containers**, each with a working positive
+control (a `find / -name "*.bundle"` that returns cleanly, so the empty result means something).
+**Nothing was ever pushed; no remote branch ever existed.**
+
+- **The implementation does NOT survive.** If address mode is rebuilt after **N5**, the UI
+  scaffolding is rebuilt **from scratch** — do **not** go looking for `ff71dcd` or the bundle.
+- ⚠️ **Honest correction to the handoff:** the findings that were said to "survive in QUEUE"
+  (the architecture ruling, the classification-D audit, the identity correction, and treatment
+  eligibility) were **NOT present in this QUEUE.md or anywhere in `main`** — they were on the same
+  unpushed branch and did not survive here either.
+- ✅ **RE-DERIVED AND VERIFIED 2026-09-02 → `docs/n5-address-search-architecture-record.md`.**
+  Because the transcript claims are hypotheses, not findings, each was re-checked against the
+  committed source of truth (`scripts/n5_shard.py`, `docs/app-projects-stable-key-migration.sql`,
+  `docs/maps-source-identity-migration.sql`). Result: the identity model (`source_key` identity,
+  `source_seq` multiplicity, unique index `(zip, source_key, source_seq)`), the multi-geometry
+  design (`geo.n5_geom` keyed `(source_key, feature_id)`), and the treatment-eligibility gap (no
+  coordinate-fidelity field; `geo.n5_association` is only `(source_key, zip, evidence)`;
+  `treatment` is a per-source label discarded per shard) are **VERIFIED**. Live numbers were
+  **founder-measured 2026-09-02** (this container has no DB access): distinct `source_key`
+  (development) **932,736** vs distinct `(source_ref, lat, lng)` **629,617** — so `source_ref`
+  merges distinct projects and must not be identity; **9,121** development projects carry >1
+`(lat,lng)`; `geo.n5_association` **4,068** and `geo.n5_geom` **449** — which **exceed** what
+shards 520/062 alone produced (1,892 / 256), so **≥1 further shard completed since** (likely 063);
+exact shard count NOT VERIFIED. `723,449 PROVEN POINT` stays **NOT VERIFIED** (transcript-only). The ruling's
+  **read-surface RPC does not exist in `main`**; `app_projects` is the ZIP read model, **not** the
+  address-radius source (one representative `lat/lng` per row; authoritative geometry is
+  polygons/polylines, so no view over it answers distance-to-polygon).
+- 🔑 **General lesson (applies to every future agent):** work produced by an agent that cannot
+  push to the target repo exists only on that agent's disk. **Push first, or do not rely on it.**
+
 ### 2026-08-14 — KANSAS WIRED (#712): 61 → 182/202 (90.1%). Statewide-DOT lever, 5th state.
 
 **`kdot-wincpms-project-locations`, arcgis 166 → 167, merged `22868af`, deployed (run 31831595244).
