@@ -106,6 +106,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Unconditional, offline, no credential. sql() guards EVERY mode below, so the
+      # instrument that decides whether a batch survives a gateway throttle is itself
+      # checked on every dispatch rather than trusted.
+      - name: 'Self-test: sql() retries 429 only and still fails closed'
+        run: python3 scripts/test_sql_retry.py
+
       - name: Validate (no database credential in scope)
         if: ${{ github.event.inputs.mode == 'validate' }}
         env:

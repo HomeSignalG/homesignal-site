@@ -105,18 +105,47 @@ def say(k, v):
     print(f"{k:<46} {v}", flush=True)
 
 
+# The Management API rate-limits with HTTP 429 (ThrottlerException). A 429 is refused
+# AT THE GATEWAY - the statement never reached Postgres - so re-sending it is safe even
+# for a write, and that is the ONLY status retried here.
+#
+# 5xx is deliberately NOT retried. A 5xx can mean the statement RAN and the response was
+# lost, so re-sending a non-idempotent write would apply it twice; a stalled batch that
+# says why is recoverable, a silently doubled write is not. Every other status is a real
+# SQL/auth error and must still stop immediately - that is the fail-closed property.
+#
+# Retries are announced on stdout, never silent: a batch that took 40 s of backoff must
+# not be indistinguishable from one that did not.
+SQL_RETRY_STATUS = (429,)
+SQL_MAX_ATTEMPTS = 6
+SQL_BACKOFF_S = (2, 5, 15, 30, 60)
+
+
 def sql(query, tag=""):
     token = os.environ["SUPABASE_ACCESS_TOKEN"]
-    req = urllib.request.Request(
-        f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query",
-        data=json.dumps({"query": query}).encode(),
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                 "Accept": "application/json", "User-Agent": UA}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=900) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        raise SystemExit(f"STOP: SQL {tag} failed HTTP {e.code}\n{e.read().decode()[:3000]}")
+    for attempt in range(1, SQL_MAX_ATTEMPTS + 1):
+        req = urllib.request.Request(
+            f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query",
+            data=json.dumps({"query": query}).encode(),
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
+                     "Accept": "application/json", "User-Agent": UA}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=900) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code not in SQL_RETRY_STATUS or attempt == SQL_MAX_ATTEMPTS:
+                raise SystemExit(
+                    f"STOP: SQL {tag} failed HTTP {e.code} on attempt {attempt}\n"
+                    + e.read().decode()[:3000])
+            hdr = e.headers.get("Retry-After") if e.headers else None
+            try:
+                wait = float(hdr) if hdr else SQL_BACKOFF_S[attempt - 1]
+            except (TypeError, ValueError):
+                wait = SQL_BACKOFF_S[attempt - 1]
+            STATS["retries"] += 1
+            say(f"SQL {tag} HTTP {e.code} - retry {attempt}", f"waiting {wait:g}s")
+            time.sleep(wait)
+    raise SystemExit(f"STOP: SQL {tag} exhausted {SQL_MAX_ATTEMPTS} attempts")
 
 
 def http(url, params=None, method="GET", timeout=TIMEOUT):
