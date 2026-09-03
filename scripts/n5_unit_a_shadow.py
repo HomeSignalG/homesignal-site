@@ -89,7 +89,12 @@ begin
   end if;
   if pt is null then rule := 'UNRESOLVED'; end if;
   return next;
-end $fn$;""", "rep_point fn")
+end $fn$;
+-- Postgres grants EXECUTE to PUBLIC by default on every new function.
+-- anon/authenticated have no USAGE on `geo`, so this is unreachable either way -
+-- but a default grant left in place is how a hole appears the day someone grants
+-- schema usage for an unrelated reason.
+revoke all on function geo.n5_rep_point(geometry) from public;""", "rep_point fn")
 
     sql(f"""
 create table if not exists {MEMB} (
@@ -145,7 +150,8 @@ drop trigger if exists zz_shadow_complete_status on {STATUS};
 create constraint trigger zz_shadow_complete_status
   after insert or update on {STATUS}
   deferrable initially deferred
-  for each row execute function geo.n5_assert_shadow_complete();""", "invariant trigger")
+  for each row execute function geo.n5_assert_shadow_complete();
+revoke all on function geo.n5_assert_shadow_complete() from public;""", "invariant trigger")
     say("shadow objects", "ensured (geo schema, RLS on, no grants)")
 
 
