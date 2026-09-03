@@ -665,3 +665,113 @@ the synchronized canonical corpus, returns provenance-labelled rows at the
 `(source_key, feature_id)` grain, bounds distances to the requested radius, orders nearest-first,
 and reports truncation explicitly. It does **not** establish street-address geocoding — no address
 was involved at any point.
+
+---
+
+## 17. Address → coordinate proof — **BLOCKED BEFORE THE ADDRESS LOOKUP**, 2026-09-03 22:57:54Z
+
+**Outcome: C — BLOCKED BEFORE ADDRESS LOOKUP.** The geocode endpoint was **not invoked**
+(invocation count **0**), and `public.n5_projects_within_radius` was **not invoked** (count **0**).
+The block is the sandbox's egress policy, not a defect in the geocoding path.
+
+### The existing production path — identified from source, not assumed
+
+The repo contains **two** address-touching production surfaces, and they are different products:
+
+| | `geocode-address` | `get-address-report` |
+|---|---|---|
+| repo path | `supabase/functions/geocode-address/index.ts` (41 lines) | `supabase/functions/get-address-report/index.ts` |
+| called by | **`shell.js:493` and `shell.js:968`** — the site's add-your-home address flow | `homesignalmap.html:484` — the development-tracker report engine |
+| job | street address → coordinate, nothing else | full multi-source property/ZIP report |
+| provider | **U.S. Census one-line geocoder**, `benchmark=Public_AR_Current`, `/geocoder/locations/onelineaddress` | Census direct at `index.ts:202`, plus a cached ladder for *source records* |
+| request | `POST {address}` | `POST {address, radius_mi}` or `{zip,…}` |
+| response | `{match:{matchedAddress,lat,lng,zip,city,state}}`, or `{match:null}`, or 502 `{error:'geocoder_unavailable'}` | full report document |
+| **persistent writes** | **NONE** — the file imports no Supabase client, opens no DB connection, and touches no table or cache | `property_reports` upsert (`index.ts:538`) and the write-through `geocodes` cache ladder, both in the **ZIP-mode** branch |
+
+**`geocode-address` was selected** because this unit's objective is exactly *street address →
+coordinate* and that function is the only production surface whose sole job is that, and is
+**provably free of persistent application-data writes** — it is a stateless Census proxy. It is a
+real production path, not a test harness: the shipped `shell.js` calls it for every visitor who
+adds their home.
+
+**`get-address-report` was deliberately NOT selected.** Its ZIP-mode branch performs a
+`property_reports` upsert and write-through geocode-cache writes; qualifying its address mode as
+write-free would have required auditing the whole engine, and calling it would have risked exactly
+the read-only violation §1 says to stop for. Recorded as a decision, not an oversight.
+
+Its honesty contract is worth preserving in any future Map 1 wording: it returns **only the first
+confirmed match** reduced to fixed fields, never a raw passthrough and never a guessed point, and
+distinguishes a geocoder **outage** (502) from a genuine **no-match** (`match:null`) so the two
+never collapse into one message.
+
+⚠️ **The contract exposes no match-quality field.** `{matchedAddress, lat, lng, zip, city, state}`
+carries no `match_type`. The repo's own tiering classifies the Census rung as
+`range_interpolated` (`geocode-cache.ts`, `censusRung`), but **that is repo knowledge, not
+something this response would state**, and an approximate match must never be reported as exact.
+
+### Selected address — documented, not invented
+
+`2200 CALDWELL LN, DEL VALLE, TX 78617` — the repo's canonical positive control: CLAUDE.md §8
+names the 78617/Caldwell case study "always the acceptance test for TX sources"; it appears as a
+geocode fixture in `test/verify-geocodes.test.mjs` (with `matched_address` identical to the input)
+and in `test/navigation-zip.test.mjs`. **Not** derived by reverse-geocoding the previous unit's
+canonical point.
+
+### What blocked it
+
+One request was attempted to
+`https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/geocode-address` at
+**22:57:54.030018090Z**. It never left the sandbox:
+
+```
+curl: (56) CONNECT tunnel failed, response 403
+HTTP_STATUS=000   TIME_TOTAL=0.221615s
+```
+
+The agent proxy's own status endpoint records the cause verbatim:
+
+```
+{ "ts": "2026-09-03T22:57:54.259Z", "kind": "connect_rejected",
+  "detail": "gateway answered 403 to CONNECT (policy denial or upstream failure)",
+  "host": "qwnnmljucajnexpxdgxr.supabase.co:443" }
+```
+
+`/root/.ccr/README.md` is explicit for this failure class: *"The destination host is not allowed
+by your organization's egress policy for this session. Do not retry or route around it — report
+the blocked host."* So it was not retried and not routed around.
+
+**The TCP tunnel was refused, so no HTTP request reached Supabase.** The edge function did not
+run, the Census geocoder was never contacted, and no coordinate was produced. Nothing was
+invoked twice, and no second address, spelling or geocoder was tried.
+
+⚠️ **Why the database still works while this does not.** The Supabase MCP transport reaches the
+project through `mcp-proxy.anthropic.com`, which is on the proxy's `noProxy` allow-list; direct
+HTTPS to `*.supabase.co` is not. So catalog and SQL evidence in §§13–16 remains fully valid — the
+blocked surface is specifically the **edge-function HTTP endpoint**.
+
+### Assertions not reached
+
+Latitude/longitude, matched address, match quality, cache status and the N5 input-domain
+assertion are all **unevaluated** — there is no response to assert against. None is claimed.
+
+### Side effects
+
+- **N5 data mutation: NONE.** Nothing in this unit wrote to `geo.*`; the only production contact
+  was read-only catalog/SQL and one refused TCP tunnel.
+- **Persistent application-data writes: NONE.** The selected endpoint has no write path at all,
+  and it never executed.
+- **Map 1: unmodified.** No file under the map surfaces was touched.
+- Ordinary platform request logging is the sandbox proxy's own failure record quoted above.
+
+### The founder's call to unblock
+
+1. **Allow `qwnnmljucajnexpxdgxr.supabase.co` for this session's egress policy**, then re-run this
+   unit unchanged — one address, one call, against a write-free endpoint. Cleanest, and it keeps
+   the proof on the real browser→edge-function path the product uses.
+2. **Invoke the endpoint from Postgres via `pg_net`** (`net.http_post`), the pattern CLAUDE.md
+   already documents for "sandbox has no egress; Postgres does". ⚠️ **This is not equivalent**: it
+   writes rows into `net.http_request_queue` / `net._http_response`, so it is no longer a
+   zero-write unit, and it exercises a different transport than the one the product uses. Offered
+   for completeness; **not** taken on my own judgement.
+
+Option 1 preserves the boundary this unit was written around. Option 2 trades it away.
