@@ -1,0 +1,453 @@
+name: n5-apply-migration
+
+# ⚠️ THE ONE PRODUCTION-MUTATING WORKFLOW IN THIS REPOSITORY.
+#
+# Applies docs/n5-canonical-geometry-provenance.sql to the production database over the
+# verified PG-wire session-pooler path. Founder-authorized 2026-09-03 for ONE bounded
+# operation. It does NOT publish verdicts, sync canonical geometry, run shards, run 760,
+# reclaim storage, touch B4 or #1015, change RLS, or merge anything.
+#
+# WHY THE MIGRATION IS READ OUT OF A COMMIT RATHER THAN THE WORKING TREE:
+# the authorization pins HEAD 8a50978. Adding this workflow necessarily moves HEAD, so the
+# artifact is extracted with `git show 8a50978:...` and its sha256 asserted against the
+# authorized digest. What reaches production is therefore the AUTHORIZED COMMIT'S BLOB, not
+# "whatever is checked out" - a stronger guarantee than a HEAD comparison would have given.
+#
+# NO -1 / --single-transaction: the file owns its own BEGIN ... COMMIT. Wrapping it makes the
+# atomicity boundary ambiguous and emits two spurious warnings into the one receipt that must
+# be unambiguous.
+# NO Management API. NO port 6543. NO RETRY - a failure is reported, never re-attempted.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-apply-migration.yml'
+
+permissions:
+  contents: read
+
+env:
+  AUTHORIZED_SHA: 8a50978ef1c2c2ec2345bbcd7e79db85989c2e0a
+  AUTHORIZED_DIGEST: 33ea024fcc333efdd9a7da9095768a3e39d2528cf2d5df12634faae95c9de79f
+  SNAPSHOT: phase1-2026-09-01
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate 1 - extract the AUTHORIZED artifact and assert its digest
+        run: |
+          set -euo pipefail
+          git show "${AUTHORIZED_SHA}:docs/n5-canonical-geometry-provenance.sql" > /tmp/n5-migration.sql
+          ACTUAL=$(sha256sum /tmp/n5-migration.sql | cut -d' ' -f1)
+          echo "authorized commit : ${AUTHORIZED_SHA}"
+          echo "authorized digest : ${AUTHORIZED_DIGEST}"
+          echo "extracted digest  : ${ACTUAL}"
+          if [ "$ACTUAL" != "$AUTHORIZED_DIGEST" ]; then
+            echo "ABORT: migration digest does not match the authorized artifact."; exit 1
+          fi
+          # It must own exactly one transaction, and must not be wrapped by us.
+          test "$(grep -c '^begin;$'  /tmp/n5-migration.sql)" = "1"
+          test "$(grep -c '^commit;$' /tmp/n5-migration.sql)" = "1"
+          grep -q "^set local lock_timeout = '5s';$"       /tmp/n5-migration.sql
+          grep -q "^set local statement_timeout = '15min';$" /tmp/n5-migration.sql
+          echo "GATE 1 PASS - authorized artifact, one transaction, timeout policy present"
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
+
+      - name: Gate 2 - endpoint shape (port only; no host, user or password printed)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_DB_URL:-}" || { echo "ABORT: SUPABASE_DB_URL not set"; exit 1; }
+          python3 - <<'PY'
+          import os, sys
+          from urllib.parse import urlparse
+          u = urlparse(os.environ["SUPABASE_DB_URL"])
+          print(f"port: {u.port}   pooler: {(u.hostname or '').endswith('pooler.supabase.com')}")
+          if u.port == 6543:
+              sys.exit("ABORT: port 6543 is TRANSACTION-mode pooling. Session mode 5432 only.")
+          if u.port not in (5432, None):
+              sys.exit(f"ABORT: unexpected port {u.port}.")
+          PY
+          echo "GATE 2 PASS"
+
+      # ------------------------------------------------------------------ PRECHECK
+      # Read-only session. Every item is asserted in-database; a failure raises and, under
+      # ON_ERROR_STOP=1, the apply step is never reached.
+      - name: Gate 3 - 13-item production precheck (READ-ONLY, fail-closed)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/n5-precheck.sql <<'SQL'
+          \conninfo
+          set session characteristics as transaction read only;
+          do $ro$ begin
+            if current_setting('default_transaction_read_only') <> 'on' then
+              raise exception 'ABORT: precheck session is not read-only';
+            end if;
+          end $ro$;
+
+          -- psql does NOT interpolate :vars inside a dollar-quoted block, so expectations are
+          -- handed to PL/pgSQL through custom GUCs. (Found by rehearsing against a disposable
+          -- fixture: `if position(:'exp_pg' in pgv)` is a syntax error inside $pre$.)
+          select set_config('n5.exp_canonical',  :'exp_canonical',  false),
+                 set_config('n5.exp_rejects',    :'exp_rejects',    false),
+                 set_config('n5.exp_derivation', :'exp_derivation', false),
+                 set_config('n5.exp_pg',         :'exp_pg',         false),
+                 set_config('n5.exp_gis',        :'exp_gis',        false);
+
+          do $pre$
+          declare
+            bad text := '';
+            e_canon  bigint := current_setting('n5.exp_canonical')::bigint;
+            e_rej    bigint := current_setting('n5.exp_rejects')::bigint;
+            e_deriv  bigint := current_setting('n5.exp_derivation')::bigint;
+            e_pg     text   := current_setting('n5.exp_pg');
+            e_gis    text   := current_setting('n5.exp_gis');
+            has_vsid bool; has_bicond bool; has_ptns bool; rpk text; apk text; arch bool;
+            n_canon bigint; n_pt1 bigint; n_notpt bigint; n_squat bigint; n_dupc bigint;
+            n_rej bigint; n_snapv int; snap text; n_duprej bigint;
+            n_deriv bigint; n_dist bigint; n_dup bigint;
+            n_elig bigint; d1 bigint; d2 bigint; d3 bigint;
+            n_act bigint; n_lock bigint; n_run bigint; n_build bigint; n_slot bigint;
+            n_life bigint; pgv text; gisv text;
+          begin
+            select version(), postgis_full_version() into pgv, gisv;
+            if position(e_pg  in pgv)  = 0 then bad := bad || ' [unexpected PostgreSQL: ' || left(pgv,40)  || ']'; end if;
+            if position(e_gis in gisv) = 0 then bad := bad || ' [unexpected PostGIS: '    || left(gisv,30) || ']'; end if;
+
+            select exists (select 1 from information_schema.columns
+                    where table_schema='geo' and table_name='n5_geom'
+                      and column_name='verdict_snapshot_id') into has_vsid;
+            select exists (select 1 from pg_constraint where conname='n5_geom_verdict_snapshot_ck') into has_bicond;
+            select exists (select 1 from pg_constraint where conname='n5_geom_pt_namespace_ck') into has_ptns;
+            select pg_get_constraintdef(oid) into rpk from pg_constraint
+              where conrelid='geo.n5_point_reject'::regclass and contype='p';
+            select pg_get_constraintdef(oid) into apk from pg_constraint
+              where conrelid='geo.n5_association'::regclass and contype='p';
+            select exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                    where n.nspname='geo' and c.relname='n5_point_reject_archive') into arch;
+            if has_vsid or has_bicond or has_ptns or arch
+               or rpk <> 'PRIMARY KEY (source_key, reason)' then
+              bad := bad || ' [pre-state is NOT A_LEGACY: vsid=' || has_vsid || ' bicond=' || has_bicond
+                         || ' ptns=' || has_ptns || ' archive=' || arch
+                         || ' reject_pk=' || coalesce(rpk,'<none>') || ']'; end if;
+            if apk <> 'PRIMARY KEY (source_key, zip)' then
+              bad := bad || ' [association PK drifted: ' || coalesce(apk,'<none>') || ']'; end if;
+
+            select count(*) filter (where provenance='proven_stored_point'),
+                   count(*) filter (where provenance='proven_stored_point' and feature_id='pt:1'),
+                   count(*) filter (where provenance='proven_stored_point' and ST_GeometryType(geom)<>'ST_Point'),
+                   count(*) filter (where provenance<>'proven_stored_point' and feature_id like 'pt:%')
+              into n_canon, n_pt1, n_notpt, n_squat from geo.n5_geom;
+            select count(*) into n_dupc from (select source_key from geo.n5_geom
+              where provenance='proven_stored_point' group by 1 having count(*)<>1) t;
+            if n_canon <> e_canon then bad := bad || ' [canonical count ' || n_canon || ' <> ' || e_canon || ']'; end if;
+            if n_pt1 <> n_canon then bad := bad || ' [not all canonical are pt:1]'; end if;
+            if n_notpt <> 0 then bad := bad || ' [non-ST_Point canonical rows]'; end if;
+            if n_squat <> 0 then bad := bad || ' [pt: namespace squatters]'; end if;
+            if n_dupc <> 0 then bad := bad || ' [duplicate canonical source_key]'; end if;
+
+            select count(*), count(distinct detail->>'snapshot'), min(detail->>'snapshot')
+              into n_rej, n_snapv, snap from geo.n5_point_reject;
+            select count(*) into n_duprej from (select source_key from geo.n5_point_reject
+              group by 1 having count(*)<>1) t;
+            if n_rej <> e_rej then bad := bad || ' [reject count ' || n_rej || ' <> ' || e_rej || ']'; end if;
+            if n_snapv <> 1 or snap <> 'phase1-2026-09-01' then
+              bad := bad || ' [reject snapshot identity: ' || n_snapv || '/' || coalesce(snap,'<null>') || ']'; end if;
+            if n_duprej <> 0 then bad := bad || ' [duplicate reject source_key]'; end if;
+
+            -- Derivation, eligibility and set identity in ONE query. NO temporary tables: a
+            -- read-only transaction refuses CREATE TEMP TABLE with SQLSTATE 25006 - the same
+            -- refusal the write-protection probe relies on.
+            with src as (
+              select i.source_key, coalesce(i.registry_id,'(null)') registry_id, i.lat, i.lng
+                from preservation.app_project_identity i
+                join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+               where a.treatment='PROVEN' and i.snapshot_id='phase1-2026-09-01'
+                 and i.record_kind='development'),
+            du    as (select distinct source_key, registry_id from src),
+            pairs as (select distinct source_key, lat, lng from src where lat is not null and lng is not null),
+            pc    as (select source_key, count(*) c from pairs group by source_key),
+            elig  as (select p.source_key, p.lat, p.lng from pairs p join pc using (source_key) where pc.c = 1)
+            select (select count(*) from du),
+                   (select count(distinct source_key) from src),
+                   (select count(*) from (select source_key from du group by 1 having count(*)<>1) t),
+                   (select count(*) from elig),
+                   (select count(*) from (select source_key from geo.n5_geom
+                      where provenance='proven_stored_point' except select source_key from elig) t),
+                   (select count(*) from (select source_key from elig
+                      except select source_key from geo.n5_geom where provenance='proven_stored_point') t),
+                   (select count(*) from elig e join geo.n5_geom g on g.source_key=e.source_key
+                     where g.provenance='proven_stored_point'
+                       and (abs(ST_X(g.geom)-e.lng) > 1e-9 or abs(ST_Y(g.geom)-e.lat) > 1e-9))
+              into n_deriv, n_dist, n_dup, n_elig, d1, d2, d3;
+
+            if n_dup <> 0 then bad := bad || ' [derivation NOT unique: ' || n_dup || ' duplicated source_key]'; end if;
+            if n_deriv <> e_deriv or n_dist <> e_deriv then
+              bad := bad || ' [derivation population ' || n_deriv || '/' || n_dist || ' <> ' || e_deriv || ']'; end if;
+            if n_elig <> e_canon then bad := bad || ' [eligible ' || n_elig || ' <> ' || e_canon || ']'; end if;
+            if d1 <> 0 or d2 <> 0 or d3 <> 0 then
+              bad := bad || ' [set identity broken: canon-not-elig=' || d1 || ' elig-not-canon=' || d2
+                         || ' coord-mismatch=' || d3 || ']'; end if;
+            if n_elig + n_rej <> n_dist then
+              bad := bad || ' [partition does not close: ' || n_elig || '+' || n_rej || '<>' || n_dist || ']'; end if;
+
+            select count(*) into n_life from pg_class c join pg_namespace n on n.oid=c.relnamespace
+              where n.nspname='geo' and c.relname in ('n5_proven_verdict','n5_verdict_manifest','n5_association_stage');
+            if n_life <> 0 then bad := bad || ' [lifecycle objects already present: ' || n_life || ']'; end if;
+
+            select count(*) into n_act from pg_stat_activity
+              where state <> 'idle' and pid <> pg_backend_pid() and query ilike '%n5!_%' escape '!';
+            select count(*) into n_lock from pg_locks l join pg_class c on c.oid=l.relation
+              join pg_namespace n on n.oid=c.relnamespace
+              where n.nspname='geo' and c.relname in ('n5_geom','n5_point_reject','n5_association')
+                and l.pid <> pg_backend_pid();
+            select count(*) into n_run from geo.n5_shard where state='running';
+            select count(*) into n_slot from pg_replication_slots where not active;
+            select count(*) into n_build from information_schema.tables
+              where table_schema='geo' and table_name='n5_verdict_manifest';
+            if n_act <> 0 or n_lock <> 0 or n_run <> 0 then
+              bad := bad || ' [NOT QUIESCENT: active_n5=' || n_act || ' locks=' || n_lock
+                         || ' shards_running=' || n_run || ']'; end if;
+            if n_slot <> 0 then bad := bad || ' [inactive replication slot retaining WAL: ' || n_slot || ']'; end if;
+            if n_build <> 0 then bad := bad || ' [a verdict manifest already exists]'; end if;
+
+            if bad <> '' then raise exception 'PRECHECK ABORT -%. Nothing was applied.', bad; end if;
+            raise notice 'PRECHECK PASSED - canonical % / rejects % / derivation % / eligible %; quiescent; pre-state A_LEGACY',
+                         n_canon, n_rej, n_dist, n_elig;
+          end $pre$;
+
+          select now() as precheck_and_quiescence_at_utc;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off \
+               -v exp_canonical=718278 -v exp_rejects=5171 -v exp_derivation=723449 \
+               -v exp_pg="PostgreSQL 17" -v exp_gis="3.3.7" \
+               -f /tmp/n5-precheck.sql
+
+          # Capture pre-values the post-state step compares against. collate "C" is mandatory
+          # (CLAUDE.md rule 9): Postgres order-by uses the DB collation, so an unpinned sort
+          # can report drift on identical data.
+          Q() { psql "$SUPABASE_DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "$1"; }
+          {
+            echo "PRE_RECOVERED=$(Q "select count(*) from geo.n5_geom where provenance='recovered_authoritative';")"
+            echo "PRE_GEOM_TOTAL=$(Q "select count(*) from geo.n5_geom;")"
+            echo "PRE_ASSOC=$(Q "select count(*) from geo.n5_association;")"
+            echo "PRE_REJECT_MD5=$(Q "select md5(string_agg(source_key||'|'||reason||'|'||coalesce(detail::text,'')||'|'||rejected_at::text, chr(10) order by source_key collate \"C\", reason collate \"C\")) from geo.n5_point_reject;")"
+            echo "PRE_GEOM_MD5=$(Q "select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text, chr(10) order by source_key collate \"C\", feature_id collate \"C\")) from geo.n5_geom where provenance='proven_stored_point';")"
+          } >> "$GITHUB_ENV"
+          echo "GATE 3 PASS - precheck clean, pre-state fingerprints captured"
+
+      # ------------------------------------------------------------------ APPLY
+      - name: APPLY the migration (ONE transaction, no -1, no retry)
+        id: apply
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          echo "START  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "command: psql \"\$SUPABASE_DB_URL\" -X -v ON_ERROR_STOP=1 -f <authorized ${AUTHORIZED_SHA} blob>"
+          START=$(date -u +%s)
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/n5-migration.sql
+          END=$(date -u +%s)
+          echo "COMMIT $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "ELAPSED_SECONDS=$((END-START))" >> "$GITHUB_ENV"
+          echo "elapsed: $((END-START))s"
+
+      # ------------------------------------------------------------------ ROLLBACK PROOF
+      - name: Prove ROLLBACK if the apply failed
+        if: failure() && steps.apply.outcome == 'failure'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -c "
+            set session characteristics as transaction read only;
+            select (select count(*) from geo.n5_geom where provenance='proven_stored_point') canonical,
+                   (select count(*) from geo.n5_point_reject) rejects,
+                   (select exists (select 1 from information_schema.columns
+                      where table_schema='geo' and table_name='n5_geom'
+                        and column_name='verdict_snapshot_id')) has_vsid,
+                   (select pg_get_constraintdef(oid) from pg_constraint
+                     where conrelid='geo.n5_point_reject'::regclass and contype='p') reject_pk,
+                   (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                     where n.nspname='geo' and c.relname in ('n5_point_reject_archive',
+                           'n5_proven_verdict','n5_verdict_manifest','n5_association_stage')) new_objects;"
+          echo "^ 718278 / 5171 / f / PRIMARY KEY (source_key, reason) / 0 == FULL ROLLBACK"
+
+      # ------------------------------------------------------------------ POST-STATE
+      - name: Prove the POST-STATE (READ-ONLY)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/n5-post.sql <<'SQL'
+          set session characteristics as transaction read only;
+          select set_config('n5.exp_canonical',  :'exp_canonical',  false),
+                 set_config('n5.exp_rejects',    :'exp_rejects',    false),
+                 set_config('n5.pre_recovered',  :'pre_recovered',  false),
+                 set_config('n5.pre_geom_total', :'pre_geom_total', false),
+                 set_config('n5.pre_assoc',      :'pre_assoc',      false),
+                 set_config('n5.pre_reject_md5', :'pre_reject_md5', false),
+                 set_config('n5.pre_geom_md5',   :'pre_geom_md5',   false);
+
+          do $post$
+          declare
+            bad text := ''; n bigint; m bigint; t text; d1 bigint; d2 bigint; n_deriv_post bigint;
+            e_canon bigint := current_setting('n5.exp_canonical')::bigint;
+            e_rej   bigint := current_setting('n5.exp_rejects')::bigint;
+            p_recov bigint := current_setting('n5.pre_recovered')::bigint;
+            p_total bigint := current_setting('n5.pre_geom_total')::bigint;
+            p_assoc bigint := current_setting('n5.pre_assoc')::bigint;
+            p_rmd5  text   := current_setting('n5.pre_reject_md5');
+            p_gmd5  text   := current_setting('n5.pre_geom_md5');
+          begin
+            -- ---------- GEOMETRY ----------
+            select count(*) into n from geo.n5_geom where provenance='proven_stored_point'
+              and (verdict_snapshot_id is null or verdict_snapshot_id <> 'phase1-2026-09-01');
+            if n <> 0 then bad := bad || ' [' || n || ' canonical rows lack the authorized snapshot]'; end if;
+
+            select count(*) into n from geo.n5_geom where provenance='proven_stored_point';
+            if n <> e_canon then bad := bad || ' [canonical count changed: ' || n || ']'; end if;
+
+            select count(*) into n from geo.n5_geom where provenance='recovered_authoritative';
+            if n <> p_recov then bad := bad || ' [recovered_authoritative count changed: ' || n || ']'; end if;
+            select count(*) into n from geo.n5_geom
+              where provenance='recovered_authoritative' and verdict_snapshot_id is not null;
+            if n <> 0 then bad := bad || ' [recovered rows were attributed - biconditional violated]'; end if;
+
+            select count(*) into n from geo.n5_geom;
+            if n <> p_total then bad := bad || ' [total geometry rows changed: ' || n || ']'; end if;
+            select count(*) into m from (select distinct source_key, feature_id from geo.n5_geom) t2;
+            if n <> m then bad := bad || ' [(source_key,feature_id) identity broken]'; end if;
+
+            select count(*) into n from geo.n5_geom
+              where feature_id like 'pt:%' and provenance <> 'proven_stored_point';
+            if n <> 0 then bad := bad || ' [unexpected pt: namespace rows]'; end if;
+            select count(*) into n from geo.n5_geom
+              where provenance='proven_stored_point' and feature_id <> 'pt:1';
+            if n <> 0 then bad := bad || ' [canonical rows not pt:1]'; end if;
+
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into t from geo.n5_geom where provenance='proven_stored_point';
+            if t is distinct from p_gmd5 then
+              bad := bad || ' [canonical geometry FINGERPRINT changed - a point was lost, added or moved]'; end if;
+
+            -- ---------- REJECTS / ARCHIVE ----------
+            select count(*) into n from geo.n5_point_reject_archive;
+            if n <> e_rej then bad := bad || ' [archive holds ' || n || ', expected ' || e_rej || ']'; end if;
+            select md5(string_agg(source_key||'|'||reason||'|'||coalesce(detail::text,'')||'|'||rejected_at::text,
+                       chr(10) order by source_key collate "C", reason collate "C"))
+              into t from geo.n5_point_reject_archive;
+            if t is distinct from p_rmd5 then
+              bad := bad || ' [archive does NOT reproduce the legacy rejects byte for byte]'; end if;
+            select count(*) into n from geo.n5_point_reject_archive
+              where archived_snapshot_id <> 'phase1-2026-09-01' or archived_by is null;
+            if n <> 0 then bad := bad || ' [archive provenance columns incomplete]'; end if;
+
+            select pg_get_constraintdef(oid) into t from pg_constraint
+              where conrelid='geo.n5_point_reject'::regclass and contype='p';
+            if t <> 'PRIMARY KEY (source_key)' then bad := bad || ' [reject PK is ' || coalesce(t,'<none>') || ']'; end if;
+            select count(*) into n from pg_attribute
+              where attrelid='geo.n5_point_reject'::regclass and attname='verdict_snapshot_id' and attnotnull;
+            if n <> 1 then bad := bad || ' [reject.verdict_snapshot_id is not NOT NULL]'; end if;
+
+            with src as (
+              select i.source_key, i.lat, i.lng
+                from preservation.app_project_identity i
+                join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+               where a.treatment='PROVEN' and i.snapshot_id='phase1-2026-09-01'
+                 and i.record_kind='development'),
+            pairs as (select distinct source_key, lat, lng from src where lat is not null and lng is not null),
+            pc    as (select source_key, count(*) c from pairs group by source_key),
+            elig  as (select p.source_key from pairs p join pc using (source_key) where pc.c = 1),
+            inel  as (select distinct source_key from src except select source_key from elig)
+            select (select count(*) from (select source_key from inel
+                      except select source_key from geo.n5_point_reject) t2),
+                   (select count(*) from (select source_key from geo.n5_point_reject
+                      except select source_key from inel) t2),
+                   (select count(distinct source_key) from src)
+              into d1, d2, n_deriv_post;
+            if d1 <> 0 or d2 <> 0 then
+              bad := bad || ' [current rejects <> derivation: missing=' || d1 || ' stale=' || d2 || ']'; end if;
+
+            select count(*) into n from geo.n5_point_reject r join geo.n5_geom g on g.source_key=r.source_key
+              where g.provenance='proven_stored_point';
+            if n <> 0 then bad := bad || ' [' || n || ' eligible source_key still carries a reject]'; end if;
+            select count(*) into n from geo.n5_point_reject where verdict_snapshot_id <> 'phase1-2026-09-01';
+            if n <> 0 then bad := bad || ' [rejects carry a foreign snapshot]'; end if;
+
+            -- ---------- LIFECYCLE ----------
+            for t in
+              select x.tbl || ' expected ' || x.pk || ' got ' || coalesce(a.got,'<absent>')
+                from (values ('geo.n5_proven_verdict','snapshot_id,source_key'),
+                             ('geo.n5_verdict_manifest','snapshot_id'),
+                             ('geo.n5_association_stage','z3,source_key,zip'),
+                             ('geo.n5_point_reject','source_key'),
+                             ('geo.n5_point_reject_archive','source_key,reason,rejected_at')
+                     ) x(tbl, pk)
+                left join lateral (
+                  select string_agg(att.attname, ',' order by k.ord) got
+                    from pg_constraint c
+                    join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
+                    join pg_attribute att on att.attrelid=c.conrelid and att.attnum=k.attnum
+                   where c.conrelid = to_regclass(x.tbl) and c.contype='p') a on true
+               where a.got is distinct from x.pk
+            loop bad := bad || ' [PK ' || t || ']'; end loop;
+
+            foreach t in array array['n5_geom_verdict_snapshot_ck','n5_geom_pt_namespace_ck'] loop
+              if not exists (select 1 from pg_constraint where conname=t) then
+                bad := bad || ' [missing constraint ' || t || ']'; end if;
+            end loop;
+
+            -- ---------- ASSOCIATION (must be untouched) ----------
+            select count(*) into n from geo.n5_association;
+            if n <> p_assoc then bad := bad || ' [association row count changed: ' || n || ']'; end if;
+            select pg_get_constraintdef(oid) into t from pg_constraint
+              where conrelid='geo.n5_association'::regclass and contype='p';
+            if t <> 'PRIMARY KEY (source_key, zip)' then bad := bad || ' [association PK changed]'; end if;
+
+            -- ---------- PARTITION CLOSURE ----------
+            select count(*) into m from geo.n5_point_reject;
+            select count(*) into n from geo.n5_geom where provenance='proven_stored_point';
+            if n + m <> n_deriv_post then
+              bad := bad || ' [partition does not close: ' || n || '+' || m || '<>' || n_deriv_post || ']'; end if;
+
+            if bad <> '' then raise exception 'POST-STATE VERIFICATION FAILED -%', bad; end if;
+            raise notice 'POST-STATE VERIFIED - geometry, rejects, archive, lifecycle, association and partition all close';
+          end $post$;
+
+          select (select count(*) from geo.n5_geom where provenance='proven_stored_point'
+                    and verdict_snapshot_id='phase1-2026-09-01')                     as canonical_attributed,
+                 (select count(*) from geo.n5_geom where provenance='recovered_authoritative') as recovered,
+                 (select count(*) from geo.n5_point_reject)                          as current_rejects,
+                 (select count(*) from geo.n5_point_reject_archive)                  as archived,
+                 (select count(*) from geo.n5_association)                           as associations,
+                 now()                                                               as verified_at_utc;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off \
+               -v pre_recovered="$PRE_RECOVERED" -v pre_geom_total="$PRE_GEOM_TOTAL" \
+               -v pre_assoc="$PRE_ASSOC" -v pre_reject_md5="$PRE_REJECT_MD5" \
+               -v pre_geom_md5="$PRE_GEOM_MD5" \
+               -v exp_canonical=718278 -v exp_rejects=5171 \
+               -f /tmp/n5-post.sql
+          echo "POST-STATE PASS"
