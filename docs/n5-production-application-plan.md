@@ -1,4 +1,4 @@
-# N5 PRODUCTION APPLICATION PLAN — design only, NOT AUTHORIZED TO RUN
+# N5 PRODUCTION APPLICATION PLAN — ✅ APPLIED 2026-09-03 17:40:03Z
 
 Written 2026-09-03 against branch `claude/n5-canonical-provenance`. Migration of record:
 `docs/n5-canonical-geometry-provenance.sql`. Pre-state receipts:
@@ -293,3 +293,62 @@ inside the transaction — **without that declaration the 718,278-row UPDATE wou
 - Static source assertions: **206 / 206**. Offline unit suite: **141 / 141 files**.
 - Residual fidelity limit: the fixture reproduces production's **shape and invariants** at 5-project
   scale, not its 723,449-project volume. Scale is the only modelled difference.
+
+
+---
+
+## 6. APPLICATION RECEIPT — ✅ APPLIED AND VERIFIED 2026-09-03
+
+Founder-authorized for ONE bounded operation. Applied once. **No retry occurred.**
+
+| field | value |
+|---|---|
+| Authorized SHA | `8a50978ef1c2c2ec2345bbcd7e79db85989c2e0a` |
+| Migration | `docs/n5-canonical-geometry-provenance.sql` |
+| SHA-256 | `33ea024fcc333efdd9a7da9095768a3e39d2528cf2d5df12634faae95c9de79f` (asserted on the runner before connecting) |
+| Applied from | `git show 8a50978:docs/…` — the **authorized commit's blob**, not the working tree |
+| Executed at | commit `91aab3d`, workflow run [33785587515](https://github.com/HomeSignalG/homesignal-site/actions/runs/33785587515) |
+| Transport | session-mode Supavisor `:5432`, TLS 1.3 (`TLS_AES_256_GCM_SHA384`) |
+| Command | `psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f <authorized blob>` — credential **redacted**, never echoed, never an argv item; **no `-1`**, no Management API, no port 6543 |
+| PostgreSQL / PostGIS | **17.6** / **3.3.7** |
+| Precheck + writer quiescence | `17:37:03Z – 17:38:01Z` — 0 active N5 queries, 0 relation locks, 0 shards running, 0 inactive replication slots, no manifest, pre-state `A_LEGACY` |
+| Migration START | **2026-09-03 17:38:01Z** (same second the quiescence proof completed) |
+| Migration COMMIT | **2026-09-03 17:40:03Z** |
+| Elapsed | **122 s** |
+| Retry count | **0** |
+
+**In-transaction gate receipts, in order, from the job log:**
+
+```
+BEGIN · SET · SET
+NOTICE: N5 pre-state classified as A_LEGACY
+NOTICE: MULTIPLICITY INVARIANT PASSED - 723449 derivation rows, 723449 distinct source_keys
+NOTICE: gate: authoritative=723449 eligible=718278 ineligible=5171 legacy_points=718278
+NOTICE: GATE PASSED - legacy state is exactly the phase1-2026-09-01 eligible/ineligible partition
+UPDATE 718278
+NOTICE: ARCHIVE GATE PASSED - 5171 legacy reject row(s) preserved with detail and rejected_at intact
+NOTICE: REBUILD GATE PASSED - current-state rejects reproduce the archived partition
+NOTICE: DEFINITION VALIDATION PASSED - all three lifecycle tables match the contract
+COMMIT
+```
+
+**Row counts, before → after:**
+
+| | before | after |
+|---|---:|---:|
+| canonical `proven_stored_point` | 718,278 | **718,278** (all now carrying `verdict_snapshot_id='phase1-2026-09-01'`) |
+| `recovered_authoritative` | 23,284 | **23,284** (0 attributed — biconditional holds) |
+| `geo.n5_geom` total | 741,562 | **741,562** |
+| `geo.n5_point_reject` | 5,171 (legacy) | **5,171** (rebuilt current-state, PK `(source_key)`) |
+| `geo.n5_point_reject_archive` | — | **5,171** |
+| `geo.n5_association` | 20,170 | **20,170** (untouched, PK `(source_key, zip)`) |
+
+**Fingerprints (`collate "C"` pinned, per rule 9):** canonical geometry `bbda250fc30ee0b3aa3f46a259392aa3` — **unchanged**, so no point was lost, added or moved. Legacy rejects `17acf9a3116b2ecf71155c476771a027` — the archive reproduces them **byte for byte**.
+
+**Post-state verification** (read-only, immediately after commit): `POST-STATE VERIFIED — geometry, rejects, archive, lifecycle, association and partition all close`. Independently re-confirmed on a second transport at 17:41Z. Partition: 718,278 + 5,171 = 723,449 ✓.
+
+**Warnings:** two benign `constraint … does not exist, skipping` notices from `drop constraint if exists` in state A, and GitHub's unrelated Node 20 deprecation warning. Nothing else.
+
+**Lifecycle NOT executed, by design:** `geo.n5_proven_verdict` **0 rows**, `geo.n5_verdict_manifest` **0 rows**. The tables exist with the validated definitions; nothing was published, no sweep, no shards, no 760, no reclamation, B4 and #1015 untouched, no RLS change, PR #1016 still DRAFT.
+
+**Rehearsal that preceded this** (disposable PG16/PostGIS, production-faithful fixture): precheck PASS → the real authorized blob applied → POST-STATE VERIFIED; negative control (one canonical point deleted) failed four independent ways. Two harness defects were found there and fixed **before** production was contacted: a read-only transaction refuses `create temporary table` (SQLSTATE 25006), and psql does not interpolate `:vars` inside dollar-quoted blocks.
