@@ -35,9 +35,25 @@ jobs:
   postgis:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # PRODUCTION RUNS POSTGRESQL 17 (17.6, PostGIS 3.3.7 - measured 2026-09-03 via the
+    # Management API). Proving the migration only on 16 would leave the production MAJOR
+    # version untested, so the suite runs on both. The PostGIS minor differs from
+    # production's 3.3.7 by necessity (no published image pairs PG17 with PostGIS 3.3);
+    # the spatial functions this migration uses - ST_Point, ST_X/ST_Y, ST_SetSRID,
+    # ST_MakePoint, ST_GeometryType, ST_SRID - all predate 3.0, and every one of them was
+    # additionally exercised against production's real 3.3.7 by the read-only preflight.
+    # What the 17 leg buys is the PostgreSQL half: PL/pgSQL, catalog shapes, CHECK
+    # semantics, format_type/pg_get_constraintdef and create-table-if-not-exists behaviour.
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgis/postgis:16-3.4
+          - postgis/postgis:17-3.5
+    name: postgis (${{ matrix.image }})
     services:
       postgres:
-        image: postgis/postgis:16-3.4
+        image: ${{ matrix.image }}
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: n5_disposable
