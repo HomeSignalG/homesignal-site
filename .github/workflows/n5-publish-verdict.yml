@@ -118,12 +118,29 @@ jobs:
               bad := bad || ' [partition does not close: ' || n_elig || '+' || n_rej || '<>' || n_dist || ']'; end if;
             if n_canon <> n_elig then bad := bad || ' [canonical <> eligible]'; end if;
 
+            -- THE KNOWN STALE BUILDING ROW from failed Management-API run 33787011485.
+            -- It must be EXACTLY the empty failed-attempt shape: state BUILDING, every metric
+            -- NULL, canonical_synced_at NULL, zero verdict rows. Anything else - a completed
+            -- metric, a fingerprint, a sync timestamp, any verdict row - means this is not the
+            -- state we were authorized to restart, and the job stops rather than cleaning up.
             select count(*) into n_man from geo.n5_verdict_manifest where snapshot_id = snap;
             select count(*) into n_build from geo.n5_verdict_manifest where state='BUILDING';
             select count(*) into n_vrows from geo.n5_proven_verdict where snapshot_id = snap;
-            if n_build <> 0 then bad := bad || ' [a manifest is BUILDING]'; end if;
-            if n_man <> 0 then bad := bad || ' [a manifest already exists for this snapshot]'; end if;
+            if n_man <> 1 or n_build <> 1 then
+              bad := bad || ' [expected exactly one BUILDING manifest, found man=' || n_man
+                         || ' building=' || n_build || ']'; end if;
             if n_vrows <> 0 then bad := bad || ' [verdict rows already present: ' || n_vrows || ']'; end if;
+            if exists (select 1 from geo.n5_verdict_manifest
+                        where snapshot_id = snap
+                          and (state <> 'BUILDING'
+                            or expected_source_keys is not null or verdict_rows is not null
+                            or eligible_rows is not null or reject_counts is not null
+                            or fingerprint is not null or completed_at is not null
+                            or canonical_synced_at is not null)) then
+              bad := bad || ' [the BUILDING manifest is NOT the empty failed-attempt shape - '
+                         || 'it carries completed metrics; NOT cleaning it up]'; end if;
+            if (select count(*) from geo.n5_verdict_manifest where snapshot_id <> snap) <> 0 then
+              bad := bad || ' [an unexpected manifest exists for another snapshot]'; end if;
 
             select count(*) into n_run from geo.n5_shard where state='running';
             if n_run <> 0 then bad := bad || ' [' || n_run || ' shard(s) running]'; end if;
@@ -143,10 +160,16 @@ jobs:
       - name: PUBLISH VERDICT (committed implementation, exactly once, no retry)
         id: publish
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # PG-WIRE ONLY. SUPABASE_ACCESS_TOKEN is deliberately NOT provided: if anything in
+          # this path fell back to the Management API it would raise KeyError instead of
+          # silently succeeding on the transport that already failed with 57014.
+          N5_TRANSPORT: pgwire
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
           SNAPSHOT: phase1-2026-09-01
         run: |
           set -euo pipefail
+          psql --version
           echo "START  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           START=$(date -u +%s)
           SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py publish-verdict

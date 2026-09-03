@@ -69,8 +69,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install the driver (CI-only; the repo itself stays dependency-free)
-        run: pip install --quiet psycopg2-binary
+      - name: Install the driver and psql (CI-only; the repo itself stays dependency-free)
+        run: |
+          pip install --quiet psycopg2-binary
+          # psql is required by the PG-WIRE TRANSPORT group, which drives the real
+          # N5_TRANSPORT=pgwire code path rather than a stand-in.
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
 
       # An instrument must prove it ran. Print the real server and PostGIS versions, and
       # fail here rather than later if the extension is missing - a suite that silently

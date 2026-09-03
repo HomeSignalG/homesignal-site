@@ -39,6 +39,94 @@ from n3_pilot import (  # noqa: E402  - one implementation, imported not re-deri
 SNAPSHOT = os.environ.get("SNAPSHOT", "").strip()
 
 
+# ---------------------------------------------------------------- PG-wire transport
+#
+# WHY THIS EXISTS. `publish-verdict` rebuilds the verdict with a single full pass over the
+# 1,125 MB preservation.app_project_identity. Through n3_pilot.sql() -> the Supabase
+# Management API that statement is CANCELLED at 120 s by a server-side statement_timeout the
+# caller cannot raise: production run 33787011485 failed at ~121 s with
+#     ERROR: 57014: canceling statement due to statement timeout
+# leaving the manifest BUILDING with 0 verdict rows (fail-closed, exactly as designed).
+#
+# THE DERIVATION IS NOT THE PROBLEM AND IS NOT TOUCHED. refresh_proven_verdict_sql() and
+# validate_verdict_completeness() are byte-for-byte unchanged. Only the pipe changes: the same
+# SQL is executed over the verified PG-wire SESSION POOLER (:5432, TLS), where the migration
+# already proved a 122 s transaction runs under a transaction-local timeout.
+#
+# ONE TRANSACTION PER CALL, deliberately. publish_verdict()'s own contract is that it does NOT
+# depend on the rebuild being one transaction - "a partially rebuilt verdict fails the
+# completeness check, records FAILED, and never reaches READY. The barrier is the state
+# machine, not the transport." One call = one transaction is exactly the Management API's
+# semantics, so this transport is SEMANTICALLY IDENTICAL to the one it replaces. Wrapping the
+# whole publish in a single transaction would CHANGE those semantics - the FAILED marker would
+# roll back with the work it is meant to record - so it is deliberately not done.
+#
+# NO HTTP FALLBACK and NO RETRY: a failure raises SystemExit exactly as n3_pilot.sql() does.
+
+def _pg_wire_sql(query, tag=""):
+    """Execute one lifecycle statement group over psql on the session pooler.
+
+    Returns rows as a list of dicts, matching n3_pilot.sql()'s shape. A single SELECT (no
+    internal ';') is wrapped in json_agg so its rows come back; anything else is executed for
+    effect and returns [] - which is what every non-SELECT call site here expects.
+
+    The credential is passed through the child ENVIRONMENT, never as an argv item (argv is
+    visible in `ps`), and is never logged.
+    """
+    import subprocess
+    from urllib.parse import urlparse, unquote
+
+    dsn = os.environ.get("SUPABASE_DB_URL", "").strip()
+    if not dsn:
+        raise SystemExit("STOP: N5_TRANSPORT=pgwire requires SUPABASE_DB_URL.")
+    u = urlparse(dsn)
+    if u.port == 6543:
+        raise SystemExit("STOP: port 6543 is TRANSACTION-mode pooling; session state is not "
+                         "guaranteed. Use the session pooler on 5432.")
+
+    body = query.strip()
+    core = body.rstrip().rstrip(";")
+    single_select = (";" not in core) and core.lower().lstrip().startswith(("select", "with"))
+    stmt = ("select coalesce(json_agg(t)::text, '[]') from (%s) t;" % core) if single_select \
+        else (core + ";")
+
+    script = ("begin;\n"
+              "set local lock_timeout = '5s';\n"
+              "set local statement_timeout = '15min';\n"
+              + stmt + "\ncommit;\n")
+
+    env = dict(os.environ)
+    env.update({"PGHOST": u.hostname or "", "PGDATABASE": (u.path or "/postgres").lstrip("/"),
+                "PGSSLMODE": env.get("PGSSLMODE", "require"), "PGCONNECT_TIMEOUT": "30"})
+    if u.port:
+        env["PGPORT"] = str(u.port)
+    if u.username:
+        env["PGUSER"] = unquote(u.username)
+    if u.password:
+        env["PGPASSWORD"] = unquote(u.password)
+
+    p = subprocess.run(["psql", "-X", "-v", "ON_ERROR_STOP=1", "-q", "-A", "-t",
+                        "-P", "pager=off", "-f", "-"],
+                       input=script, env=env, text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        raise SystemExit("STOP: SQL %s failed over PG-wire (exit %d)\n%s"
+                         % (tag, p.returncode, (p.stderr or "")[-3000:]))
+    if not single_select:
+        return []
+    out = (p.stdout or "").strip()
+    try:
+        return json.loads(out) if out else []
+    except ValueError:
+        raise SystemExit("STOP: SQL %s returned unparseable output over PG-wire" % tag)
+
+
+# Opt-in and explicit. Unset, every existing caller keeps the Management API transport, so no
+# other command's behaviour changes.
+if os.environ.get("N5_TRANSPORT", "").strip() == "pgwire":
+    sql = _pg_wire_sql
+
+
 def require_snapshot():
     """Refuse to do any work without an explicit SNAPSHOT.
 

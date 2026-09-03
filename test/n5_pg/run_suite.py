@@ -1437,6 +1437,122 @@ _c4.close()
 
 
 # =============================================================================
+group("PG-WIRE TRANSPORT")
+# =============================================================================
+# publish-verdict's full-corpus derivation is CANCELLED at 120s by the Supabase Management
+# API's server-side statement_timeout (production run 33787011485: SQLSTATE 57014 at ~121s,
+# manifest left BUILDING with 0 verdict rows). N5_TRANSPORT=pgwire runs the SAME SQL over the
+# session pooler instead, where the timeout is transaction-local. The derivation itself is
+# NOT touched - assertion 125 is the guard that keeps it that way.
+
+import shutil                                                          # noqa: E402
+import subprocess as _sp                                               # noqa: E402
+from urllib.parse import quote as _q                                   # noqa: E402
+
+
+def _dsn_uri():
+    """Build a URI from the keyword N5_TEST_DSN the rest of this suite uses."""
+    kv = dict(part.split("=", 1) for part in DSN.split() if "=" in part)
+    auth = _q(kv.get("user", "postgres"))
+    if kv.get("password"):
+        auth += ":" + _q(kv["password"])
+    return "postgresql://%s@%s:%s/%s?sslmode=disable" % (
+        auth, kv.get("host", "127.0.0.1"), kv.get("port", "5432"), kv.get("dbname", "postgres"))
+
+
+if not shutil.which("psql"):
+    check(118, "psql client present for the PG-wire transport proofs", False, "psql not on PATH")
+else:
+    reset(apply_migration=True, legacy=True)
+    seed_snapshot("phase1-2026-09-01")
+    _prev_sql, _prev_env = n5_shard.sql, dict(os.environ)
+    os.environ["SUPABASE_DB_URL"] = _dsn_uri()
+    os.environ["PGSSLMODE"] = "disable"
+    n5_shard.sql = n5_shard._pg_wire_sql          # exactly what N5_TRANSPORT=pgwire installs
+    use_snapshot("phase1-2026-09-01")
+    try:
+        # 118 - the whole publish reaches READY over PG-wire. SUPABASE_ACCESS_TOKEN cannot be
+        # set (the suite refuses to start if it is), so a Management API fallback would raise
+        # KeyError rather than silently working: this doubles as the no-fallback proof.
+        try:
+            v = n5_shard.publish_verdict()
+            pub_ok, pub_err = True, ""
+        except SystemExit as e:
+            v, pub_ok, pub_err = None, False, str(e)
+        m = manifest()
+        check(118, "publish-verdict reaches READY over PG-wire, with no Management API credential",
+              pub_ok and m and m["state"] == "READY" and m["canonical_synced_at"] is None,
+              {"err": pub_err[:200], "state": (m or {}).get("state")})
+
+        # 119/120 - transaction-local timeout control is what the Management API could not give.
+        r = n5_shard.sql("select current_setting('lock_timeout') lt, "
+                         "current_setting('statement_timeout') st;", "t")
+        check(119, "the migration's timeout policy is in force INSIDE each PG-wire call",
+              r and r[0]["lt"] == "5s" and r[0]["st"] == "15min", r)
+        r2 = n5_shard.sql("select current_setting('statement_timeout') st;", "t2")
+        check(120, "each call is its own transaction - SET LOCAL does not leak into the session",
+              bool(r2) and r2[0]["st"] == "15min", r2)
+
+        # 121 - a failing statement group rolls back everything in it, including the DELETE that
+        # precedes the INSERT in the verdict rebuild.
+        before = int(n5_shard.sql("select count(*) n from geo.n5_proven_verdict;", "b")[0]["n"])
+        raised, _ = raises(n5_shard.sql,
+                           "delete from geo.n5_proven_verdict; "
+                           "insert into geo.n5_proven_verdict "
+                           "(snapshot_id,source_key,registry_id,ncoord,lat,lng,verdict) "
+                           "select 'x','y','z',1/0,1,1,'ELIGIBLE';", "deliberate failure")
+        after = int(n5_shard.sql("select count(*) n from geo.n5_proven_verdict;", "a")[0]["n"])
+        check(121, "a SQL failure rolls back the verdict mutations in that statement group",
+              raised and before > 0 and after == before, {"before": before, "after": after})
+
+        # 122 - and an interrupted publish stays unconsumable.
+        n5_shard.sql("update geo.n5_verdict_manifest set state='BUILDING', completed_at=null, "
+                     "expected_source_keys=null, verdict_rows=null, eligible_rows=null, "
+                     "reject_counts=null, fingerprint=null, canonical_synced_at=null "
+                     "where snapshot_id='phase1-2026-09-01';", "force BUILDING")
+        refused, msg = raises(n5_shard.assert_snapshot_consumable)
+        check(122, "a BUILDING (interrupted) publication is never consumable",
+              refused and "not READY" in msg, msg[:160])
+
+        # 123 - ONE psql invocation per call. No retry loop anywhere.
+        calls = {"n": 0}
+        _real_run = _sp.run
+
+        def _counting(*a, **k):
+            calls["n"] += 1
+            return _real_run(*a, **k)
+
+        _sp.run = _counting
+        raises(n5_shard.sql, "select 1/0 as boom;", "one shot")
+        _sp.run = _real_run
+        check(123, "a failing call is attempted exactly ONCE - no automatic retry",
+              calls["n"] == 1, calls)
+
+        # 124 - no HTTP transport inside the PG-wire path. urllib.PARSE is used (to read the
+        # DSN); urllib.REQUEST would be a fallback, and is what this forbids.
+        _src = open(os.path.join(ROOT, "scripts", "n5_shard.py"), encoding="utf-8").read()
+        _seg = _src[_src.index("def _pg_wire_sql"):_src.index('if os.environ.get("N5_TRANSPORT"')]
+        check(124, "the PG-wire transport contains no HTTP fallback and no retry loop",
+              "urllib.request" not in _seg and "api.supabase.com" not in _seg
+              and "while True" not in _seg and "for attempt" not in _seg,
+              "urlparse present (DSN parsing): " + str("urlparse" in _seg))
+
+        # 125 - THE DERIVATION MUST NOT DRIFT. The authorized correction was the TRANSPORT.
+        # Optimising the verdict SQL to fit a timeout is a different change and needs its own
+        # decision; this fingerprint is what makes that impossible to do by accident.
+        import hashlib as _h
+        _d = _src[_src.index("def refresh_proven_verdict_sql"):
+                  _src.index("# ------------------------------------------------- verdict publication pipeline")]
+        check(125, "the verdict derivation is byte-for-byte unchanged by the transport change",
+              _h.md5(_d.encode()).hexdigest() == "82397daae888ad0fcbf1f3c93774ca14",
+              _h.md5(_d.encode()).hexdigest())
+    finally:
+        n5_shard.sql = _prev_sql
+        os.environ.clear()
+        os.environ.update(_prev_env)
+
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 print("")
@@ -1448,7 +1564,8 @@ for g, num, name, ok, _d in RESULTS:
 for g in ("MIGRATION", "GLOBAL VERDICT", "PUBLICATION", "SWEEP", "SWEEP FAILURE",
           "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS",
           "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS",
-          "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION", "TIMEOUT POLICY"):
+          "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION", "TIMEOUT POLICY",
+          "PG-WIRE TRANSPORT"):
     if g in groups:
         p, f = groups[g]
         print(f"{g:<22} PASS {p:>3}   FAIL {f:>3}")
