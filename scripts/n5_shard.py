@@ -670,7 +670,22 @@ def refresh_proven_verdict_sql():
     over a 1,125 MB table - see REMAINING APPLY GATES in PR #1016.
 
     Coordinate pairs are DISTINCT OBSERVED pairs: both values non-null on the SAME row, so a
-    latitude from one row can never be paired with a longitude from another."""
+    latitude from one row can never be paired with a longitude from another.
+
+    ⚠️ `cnt` IS A LEFT JOIN AGAINST A GROUPED AGGREGATE, AND THE COALESCE IS LOAD-BEARING.
+    It was a correlated subquery - `(select count(*) from pairs q where q.source_key =
+    p.source_key)` - which re-scanned `pairs` once per PROVEN project, 723,449 times. That form
+    could not complete: production run 33787011485 was cancelled at 120s by the Management
+    API's ceiling (SQLSTATE 57014), and run 33789161115, over PG-wire with a 15-minute
+    transaction-local budget, ran the FULL 15 minutes and was cancelled too. The set-based form
+    computes the identical relation in one pass.
+
+    A correlated `count(*)` over an empty set yields **0**, not NULL. An INNER JOIN to `pc`
+    would instead DROP every project with no usable coordinate pair - silently deleting the
+    NULL_COORD verdict, which is 294 of production's 5,171 rejects. Hence `left join` +
+    `coalesce(..., 0)`. Nothing else about the derivation changed; the two forms are proven
+    row-for-row equal (source_key, ncoord, verdict, lat, lng) by the OLD-VS-NEW DERIVATION
+    group in test/n5_pg/run_suite.py."""
     return f"""
 delete from geo.n5_proven_verdict where snapshot_id={lit(SNAPSHOT)};
 insert into geo.n5_proven_verdict (snapshot_id, source_key, registry_id, ncoord, lat, lng, verdict)
@@ -683,8 +698,9 @@ proven as (select distinct s.source_key, s.registry_id from src s
             where exists (select 1 from verdict_reg v where v.registry_id = s.registry_id)),
 pairs as (select distinct source_key, lat, lng from src
            where lat is not null and lng is not null),
-cnt as (select p.source_key, (select count(*) from pairs q where q.source_key=p.source_key) ncoord
-          from proven p),
+pc as (select source_key, count(*) ncoord from pairs group by source_key),
+cnt as (select p.source_key, coalesce(pc.ncoord, 0) ncoord
+          from proven p left join pc on pc.source_key = p.source_key),
 sel as (select pr.source_key, pr.lat, pr.lng
           from pairs pr join cnt c on c.source_key=pr.source_key and c.ncoord=1)
 select {lit(SNAPSHOT)}, p.source_key, p.registry_id, c.ncoord, sl.lat, sl.lng,

@@ -1544,12 +1544,101 @@ else:
         _d = _src[_src.index("def refresh_proven_verdict_sql"):
                   _src.index("# ------------------------------------------------- verdict publication pipeline")]
         check(125, "the verdict derivation is byte-for-byte unchanged by the transport change",
-              _h.md5(_d.encode()).hexdigest() == "82397daae888ad0fcbf1f3c93774ca14",
+              _h.md5(_d.encode()).hexdigest() == "4bb0f35c4909528984bc60df2e05f658",
               _h.md5(_d.encode()).hexdigest())
     finally:
         n5_shard.sql = _prev_sql
         os.environ.clear()
         os.environ.update(_prev_env)
+
+
+# =============================================================================
+group("OLD-VS-NEW DERIVATION")
+# =============================================================================
+# The ONE authorized algorithmic change: `cnt` went from a correlated subquery, which
+# re-scanned `pairs` once per PROVEN project (723,449 times, and could not finish inside
+# either a 2-minute or a 15-minute budget), to a grouped aggregate LEFT JOINed to `proven`.
+#
+# These assertions compare the SHIPPED SQL against the old form ROW FOR ROW - source_key,
+# ncoord, verdict, lat, lng - over a fixture built to contain every shape the rule can see.
+# Totals alone would not catch the trap this change is most likely to introduce.
+
+reset(apply_migration=True, legacy=True)
+seed_snapshot("phase1-2026-09-01")
+seed_registry({"r-proven2": "PROVEN"})
+# Edge cases beyond the legacy seed. E-mixed is the important one: lat on one row and lng on
+# another is NOT a pair, because pairing is per-ROW.
+seed_identity("phase1-2026-09-01", [
+    ("E-one",      "10001", "r-proven",  51.0, -1.0,  1),   # exactly one coordinate
+    ("E-multi",    "10002", "r-proven",  52.0, -2.0,  1),   # multiple coordinates
+    ("E-multi",    "10002", "r-proven",  53.0, -3.0,  2),
+    ("E-lat-null", "10003", "r-proven",  None, -4.0,  1),   # NULL latitude only
+    ("E-lng-null", "10004", "r-proven",  55.0, None,  1),   # NULL longitude only
+    ("E-mixed",    "10005", "r-proven",  56.0, None,  1),   # same-row pairing: NOT a pair
+    ("E-mixed",    "10005", "r-proven",  None, -6.0,  2),
+    ("E-dup",      "10006", "r-proven",  57.0, -7.0,  1),   # duplicate IDENTICAL coordinate rows
+    ("E-dup",      "10006", "r-proven",  57.0, -7.0,  2),
+    ("E-page1",    "10007", "r-proven",  58.0, -8.0,  1),   # cross-page multiplicity, one coord
+    ("E-page1",    "10008", "r-proven",  58.0, -8.0,  2),
+    ("E-page1",    "10009", "r-proven",  58.0, -8.0,  3),
+    ("E-tworeg",   "10010", "r-proven",  59.0, -9.0,  1),   # two accepted registry relationships
+    ("E-tworeg",   "10011", "r-proven2", 59.0, -9.0,  2),
+])
+
+_ins = n5_shard.refresh_proven_verdict_sql()
+NEW_SELECT = _ins[_ins.index("with src as"):].rstrip().rstrip(";")
+_new_cnt = ("pc as (select source_key, count(*) ncoord from pairs group by source_key),\n"
+            "cnt as (select p.source_key, coalesce(pc.ncoord, 0) ncoord\n"
+            "          from proven p left join pc on pc.source_key = p.source_key),")
+_old_cnt = ("cnt as (select p.source_key, "
+            "(select count(*) from pairs q where q.source_key=p.source_key) ncoord\n"
+            "          from proven p),")
+# The INNER-JOIN form is the plausible-looking mistake this change could have shipped.
+_bad_cnt = ("pc as (select source_key, count(*) ncoord from pairs group by source_key),\n"
+            "cnt as (select p.source_key, pc.ncoord ncoord\n"
+            "          from proven p join pc on pc.source_key = p.source_key),")
+check(126, "the shipped derivation really does carry the authorized grouped-aggregate shape",
+      _new_cnt in NEW_SELECT and "(select count(*) from pairs q where" not in NEW_SELECT,
+      NEW_SELECT[:0])
+OLD_SELECT = NEW_SELECT.replace(_new_cnt, _old_cnt)
+BAD_SELECT = NEW_SELECT.replace(_new_cnt, _bad_cnt)
+assert OLD_SELECT != NEW_SELECT and BAD_SELECT != NEW_SELECT
+
+
+def _cols(sel):
+    """Project only the compared columns, in a stable order."""
+    return ("select source_key, ncoord, verdict, lat, lng from (" + sel
+            + ") z(snapshot_id, source_key, registry_id, ncoord, lat, lng, verdict)")
+
+
+_o, _n, _b = _cols(OLD_SELECT), _cols(NEW_SELECT), _cols(BAD_SELECT)
+d = q(f"""select (select count(*) from (({_o}) except ({_n})) t) old_not_new,
+                 (select count(*) from (({_n}) except ({_o})) t) new_not_old,
+                 (select count(*) from ({_n}) t) new_rows,
+                 (select count(*) from ({_o}) t) old_rows;""")[0]
+check(127, "OLD except NEW = 0 - the new shape loses nothing", int(d["old_not_new"]) == 0, dict(d))
+check(128, "NEW except OLD = 0 - the new shape invents nothing", int(d["new_not_old"]) == 0, dict(d))
+check(129, "both forms return the same number of rows over every edge case",
+      int(d["new_rows"]) == int(d["old_rows"]) and int(d["new_rows"]) > 0, dict(d))
+
+# The load-bearing case, named explicitly: a project with NO usable coordinate pair.
+nulls = q(f"""select source_key, ncoord, verdict from ({_n}) t
+               where source_key in ('E-lat-null','E-lng-null','E-mixed','L-null')
+               order by source_key collate "C";""")
+check(130, "NULL_COORD survives: every project with no same-row pair keeps ncoord 0 and "
+           "NULL_COORD (a correlated count over an empty set is 0, not NULL)",
+      len(nulls) == 4 and all(int(r["ncoord"]) == 0 and r["verdict"] == "NULL_COORD"
+                              for r in nulls), nulls)
+
+# ...and prove that assertion is load-bearing rather than decorative: the INNER JOIN a careless
+# rewrite would have used DROPS exactly those rows.
+bad = q(f"""select (select count(*) from ({_b}) t) bad_rows,
+                   (select count(*) from ({_n}) t) good_rows,
+                   (select count(*) from (({_n}) except ({_b})) t) lost_by_inner_join;""")[0]
+check(131, "an INNER JOIN instead of LEFT JOIN + COALESCE would silently DROP those rows - "
+           "so 130 is a real guard, not decoration",
+      int(bad["bad_rows"]) < int(bad["good_rows"]) and int(bad["lost_by_inner_join"]) == 4,
+      dict(bad))
 
 
 # =============================================================================
@@ -1565,7 +1654,7 @@ for g in ("MIGRATION", "GLOBAL VERDICT", "PUBLICATION", "SWEEP", "SWEEP FAILURE"
           "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS",
           "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS",
           "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION", "TIMEOUT POLICY",
-          "PG-WIRE TRANSPORT"):
+          "PG-WIRE TRANSPORT", "OLD-VS-NEW DERIVATION"):
     if g in groups:
         p, f = groups[g]
         print(f"{g:<22} PASS {p:>3}   FAIL {f:>3}")

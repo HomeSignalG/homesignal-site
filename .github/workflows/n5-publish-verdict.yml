@@ -30,6 +30,13 @@ permissions:
 
 env:
   SNAPSHOT: phase1-2026-09-01
+  # ARMING TOKEN. Must equal the contents of .github/n5-publish-arm or the job stops before
+  # touching the database. WHY: `pull_request` + `paths:` filters on the PR's WHOLE diff, not
+  # on the individual push, so once this workflow file is part of the PR every subsequent
+  # commit - including a receipt-only doc commit - re-triggers it. That produced two
+  # unintended publish attempts (runs 33787551271 and 33790964577, the latter cancelled
+  # mid-flight). A path filter is not an arming mechanism; this is.
+  EXPECTED_ARM: arm-2026-09-03-optimized-derivation
 
 jobs:
   publish:
@@ -37,6 +44,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse to touch the database unless deliberately armed
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-publish-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED (file token does not match EXPECTED_ARM)."
+            echo "No database contact. This is how a receipt-only commit is prevented from"
+            echo "re-triggering a publication. To arm, set both to the same new token."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
 
       - name: Identify the EXACT committed implementation being executed
         run: |
@@ -156,6 +175,48 @@ jobs:
           select now() as precheck_at_utc;
           SQL
           psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+
+      - name: LIVE EQUIVALENCE + PERFORMANCE of the OPTIMIZED derivation (READ-ONLY)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SNAPSHOT: phase1-2026-09-01
+        run: |
+          set -euo pipefail
+          # The SELECT is taken from the SHIPPED function, never retyped, so this measures the
+          # exact SQL publish-verdict will run. The already-proven canonical geometry and reject
+          # ledger are the semantic oracle; the OLD derivation is deliberately NOT re-run,
+          # because it cannot finish inside any budget we are permitted to grant it.
+          python3 scripts/n5_live_equivalence_sql.py > /tmp/live_equiv.sql
+          head -3 /tmp/live_equiv.sql
+          echo "derivation start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          T0=$(date -u +%s)
+          OUT=$(psql "$SUPABASE_DB_URL" -X -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -f /tmp/live_equiv.sql)
+          T1=$(date -u +%s)
+          ELAPSED=$((T1-T0))
+          echo "derivation end   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "OPTIMIZED DERIVATION ELAPSED: ${ELAPSED}s (transaction budget 900s)"
+          IFS='|' read -r ROWS DIST DUPS ELIG REJ MULTI NULLC ENC CNE RNL LNR CMM <<< "$OUT"
+          echo "rows=$ROWS distinct=$DIST duplicates=$DUPS eligible=$ELIG rejected=$REJ"
+          echo "MULTI_COORD_UNRESOLVED=$MULTI NULL_COORD=$NULLC"
+          echo "elig_not_canon=$ENC canon_not_elig=$CNE rej_not_ledger=$RNL ledger_not_rej=$LNR coord_mismatch=$CMM"
+          fail=0
+          chk() { [ "$2" = "$3" ] || { echo "ABORT: $1 = $2, expected $3"; fail=1; }; }
+          chk rows "$ROWS" 723449
+          chk distinct "$DIST" 723449
+          chk duplicates "$DUPS" 0
+          chk eligible "$ELIG" 718278
+          chk rejected "$REJ" 5171
+          chk MULTI_COORD_UNRESOLVED "$MULTI" 4877
+          chk NULL_COORD "$NULLC" 294
+          chk elig_not_canon "$ENC" 0
+          chk canon_not_elig "$CNE" 0
+          chk rej_not_ledger "$RNL" 0
+          chk ledger_not_rej "$LNR" 0
+          chk coord_mismatch "$CMM" 0
+          [ "$ELAPSED" -lt 600 ] || { echo "ABORT: ${ELAPSED}s is too close to the 900s budget"; fail=1; }
+          [ "$fail" = "0" ] || exit 1
+          echo "LIVE EQUIVALENCE PASS - the optimized derivation reproduces the proven state exactly"
 
       - name: PUBLISH VERDICT (committed implementation, exactly once, no retry)
         id: publish
