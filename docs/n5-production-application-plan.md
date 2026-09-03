@@ -352,3 +352,60 @@ COMMIT
 **Lifecycle NOT executed, by design:** `geo.n5_proven_verdict` **0 rows**, `geo.n5_verdict_manifest` **0 rows**. The tables exist with the validated definitions; nothing was published, no sweep, no shards, no 760, no reclamation, B4 and #1015 untouched, no RLS change, PR #1016 still DRAFT.
 
 **Rehearsal that preceded this** (disposable PG16/PostGIS, production-faithful fixture): precheck PASS → the real authorized blob applied → POST-STATE VERIFIED; negative control (one canonical point deleted) failed four independent ways. Two harness defects were found there and fixed **before** production was contacted: a read-only transaction refuses `create temporary table` (SQLSTATE 25006), and psql does not interpolate `:vars` inside dollar-quoted blocks.
+
+---
+
+## 7. PUBLISH-VERDICT ATTEMPT 1 — ❌ FAILED 2026-09-03 17:54:48Z (statement timeout)
+
+**Outcome: B — verdict publication FAILED. Nothing was repaired, nothing retried.**
+
+| field | value |
+|---|---|
+| Snapshot | `phase1-2026-09-01` |
+| Implementation | `scripts/n5_shard.py` blob `99349f5e4b31eaccf64627f4de4499aeb30e9e68` · `scripts/n3_pilot.py` blob `ae42015b86aac64047d3e586364e0da3d670d5cc`, at commit `18276e1`, `scripts/` clean |
+| Run | [33787011485](https://github.com/HomeSignalG/homesignal-site/actions/runs/33787011485) |
+| Precheck | **PASS** `17:51:32–17:52:37Z` — snapshot registered, 2,976,275 preservation rows, 145 PROVEN registries, derivation 723,449/723,449 with **0 duplicates**, eligible 718,278, partition closes, no manifest, 0 verdict rows, 0 shards running, no competing publisher |
+| BUILDING written | `17:52:47.139568Z` |
+| Failure | `17:54:48Z`, **~121 s** into the verdict build |
+| Error | `STOP: SQL build verdict phase1-2026-09-01 failed HTTP 400` → `ERROR: 57014: canceling statement due to statement timeout` |
+
+**ROOT CAUSE — a transport limit, not a data or logic defect.** `publish-verdict` reaches the
+database through `n3_pilot.sql()` → the Supabase **Management API**, and that path enforces
+`statement_timeout = 2min` (measured directly: `current_setting('statement_timeout')` = `2min`
+on both this endpoint and the session pooler's default). `refresh_proven_verdict_sql()` is a
+full pass over the 1,125 MB `preservation.app_project_identity` whose `cnt` CTE uses a
+**correlated subquery**:
+
+```sql
+cnt as (select p.source_key,
+               (select count(*) from pairs q where q.source_key = p.source_key) ncoord
+          from proven p)
+```
+
+`n3_pilot.sql()`'s own 900 s `urlopen` timeout is irrelevant — the **server** cancels at 120 s.
+
+**State after the failure — the fail-closed design worked exactly as written:**
+
+- `geo.n5_proven_verdict`: **0 rows.** No partial verdict exists.
+- Manifest `phase1-2026-09-01`: **`BUILDING`**, `expected_source_keys`/`verdict_rows`/
+  `eligible_rows`/`reject_counts`/`fingerprint`/`completed_at` all NULL,
+  **`canonical_synced_at` NULL**. `assert_snapshot_consumable()` refuses a BUILDING snapshot,
+  so nothing downstream can consume it. It never approached READY.
+- **Geometry untouched:** total 741,562 · canonical 718,278 · recovered 23,284 · rejects 5,171 ·
+  archive 5,171 · associations 20,170 — all identical to the post-migration receipt in §6.
+- Retry count **0**. No production table was repaired by hand.
+
+**A measured fact that bounds the fix:** the precheck performs an *equivalent* derivation using
+a `GROUP BY` join instead of the correlated subquery, over the same data, and the whole precheck
+step — connection, TLS, ten assertions and that derivation — completed in **65 seconds**, well
+inside the 120 s ceiling. The cost is in the correlated subquery's shape, not in the data volume.
+
+**Two candidate corrections, neither authorized and neither performed:**
+1. **Change the transport** — run `publish-verdict` over the PG-wire session pooler, where
+   `set local statement_timeout` can be raised (proven: the migration ran a 122 s transaction
+   there under a 15 min local timeout). Requires changing `n5_shard.py`'s transport.
+2. **Change the derivation shape** — rewrite `cnt` as a `GROUP BY` aggregate joined to `proven`,
+   which the precheck shows completes comfortably. This is an algorithm change in production
+   code and is explicitly out of scope without authorization.
+
+Re-running `publish-verdict` unchanged would fail identically and re-write `BUILDING`.
