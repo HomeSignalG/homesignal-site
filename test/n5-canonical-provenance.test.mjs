@@ -34,34 +34,40 @@ ok(sql.length > 5000 && py.length > 20000, 'migration + builder loaded');
 
 // ---- 1. MIGRATION ATOMICITY ----
 ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'migration is one transaction');
-ok(code.indexOf('begin;') < code.indexOf('drop constraint if exists n5_association_pkey')
-   && code.indexOf('add constraint n5_association_pkey') < code.lastIndexOf('commit;'),
-  'the DROP PK / ADD PK window is inside the transaction');
+ok(code.indexOf('begin;') < code.indexOf('drop table geo.n5_point_reject')
+   && code.indexOf('drop table geo.n5_point_reject') < code.lastIndexOf('commit;'),
+  'the destructive reject DROP is inside the transaction');
+ok(code.indexOf('archive is NOT provably complete') < code.indexOf('drop table geo.n5_point_reject'),
+  'the archive-complete gate precedes the destructive DROP');
 ok(/APPLY THIS FILE AS A SINGLE STATEMENT\/SCRIPT/.test(sql),
   'the apply-mechanism gate is documented in the migration');
 
-// ---- 2. PROVENANCE ----
-ok(code.indexOf('add column if not exists provenance') < code.indexOf("set provenance = 'recovered_authoritative'"),
-  'column added nullable before backfill');
-ok(code.indexOf('provenance backfill incomplete') < code.indexOf('n5_geom_provenance_ck'),
-  'zero-NULL assertion precedes the CHECK');
-ok(code.indexOf('n5_geom_provenance_ck') < code.indexOf('alter column provenance set not null'),
-  'NOT NULL enforced last');
-ok(!/add column if not exists provenance[^;]*default/i.test(code), 'provenance has NO default');
-ok(/check \(provenance in \('recovered_authoritative','proven_stored_point'\)\)/.test(code),
-  'provenance allowlist is exactly the two v1 values');
+// ---- 2. PROVENANCE — VALIDATE, DO NOT RE-APPLY ----
+// f7c4b79 already created provenance + CHECK + NOT NULL. Re-issuing that backfill is a
+// loaded gun (it would relabel canonical PROVEN geometry if the column were ever nullable
+// again). #1016 must refuse a missing provenance column, not recreate it.
+ok(/VALIDATES that column/.test(sql) && /does not create it/.test(sql),
+  'provenance is validated, not created, by this migration');
+ok(!/add column if not exists provenance/.test(code),
+  'this migration does not re-add the provenance column f7c4b79 already applied');
+ok(!/set provenance = 'recovered_authoritative'/.test(code),
+  'this migration does not re-run the f7c4b79 provenance backfill');
+ok(/check \(provenance in \('recovered_authoritative','proven_stored_point'\)\)/.test(sql),
+  'provenance allowlist is exactly the two v1 values (quoted as the definition this file validates)');
 
 // ---- 3. pt: NAMESPACE STRUCTURALLY RESERVED ----
 ok(/check \(\(provenance = 'proven_stored_point'\) = \(feature_id = 'pt:1'\)\)/.test(code),
   'biconditional CHECK reserves the pt: namespace');
-ok(/violate the pt: namespace reservation/.test(code), 'pre-existing violators STOP the migration');
+ok(/wrong_feature_id/.test(sql) && /recovered_squatting_pt/.test(sql),
+  'pre-existing namespace violators STOP the migration');
 ok(!/'pt:2'/.test(pycode), 'no executable path emits pt:2');
 
-// ---- 4. ASSOCIATION PK ----
-ok(/primary key \(source_key, zip\)/.test(code), 'association PK is (source_key, zip)');
-ok(/having count\(\*\) > 1/.test(code) && /having count\(distinct evidence\) > 1/.test(code),
-  'both PK preconditions are verified');
-ok(/needs reconciliation first/.test(code), 'nonzero preconditions STOP the migration');
+// ---- 4. ASSOCIATION PK — ALREADY CORRECT, VALIDATED, NOT REBUILT ----
+ok(/expected \(source_key,zip\)/.test(sql), 'association PK is required to already be (source_key, zip)');
+ok(/already corrected this key by table swap/.test(sql),
+  'a legacy three-column key is a STOP, not a silent rebuild');
+ok(!/drop constraint if exists n5_association_pkey/.test(code),
+  'this migration does not re-drop the association PK f7c4b79 already swapped');
 
 // ---- 5. PROJECT-GLOBAL OWNERSHIP ----
 ok(/create table if not exists geo\.n5_proven_verdict/.test(code), 'global verdict table exists');
@@ -90,12 +96,16 @@ ok(/set geom = excluded\.geom/.test(py), 'the update actually replaces the geome
 ok(/v\.verdict <> 'ELIGIBLE'/.test(py), 'ineligible projects have their stale pt:1 removed');
 
 // ---- 8. REJECT CURRENT STATE ----
-ok(/constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
+ok(/constraint n5_point_reject_new_pkey primary key \(source_key\)/.test(code)
+   || /constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
   'reject identity is project-global (source_key alone)');
-const rejDdl = code.slice(code.indexOf('create table if not exists geo.n5_point_reject'),
+const rejDdl = code.slice(code.indexOf('create table geo.n5_point_reject_new'),
   code.indexOf('create table if not exists geo.n5_proven_verdict'));
+ok(rejDdl.length > 200, 'explicit reject rebuild (not create-if-not-exists) is present');
 ok(/observed_in_z3/.test(rejDdl) && !/primary key \(z3/.test(rejDdl),
   'z3 is retained only as diagnostic metadata, not as identity');
+ok(/create table if not exists geo\.n5_point_reject_archive/.test(code),
+  'the legacy reject provenance is archived before rebuild');
 ok(/where r\.source_key = v\.source_key and v\.verdict = 'ELIGIBLE'/.test(py),
   'a newly eligible project has its stale reject cleared');
 ok(/on conflict \(source_key\) do update\s*\n?\s*set reason = excluded\.reason/.test(py),
@@ -152,8 +162,15 @@ ok(/NOT RUN AUTOMATICALLY/.test(py), 'the expensive verdict refresh is not run i
 // ---- 15. MIGRATION SAFETY ----
 ok(!/\b760\b/.test(code), 'migration does not reference shard 760');
 ok(!/b4_/.test(code), 'migration does not touch B4');
-ok(!/vacuum full/i.test(code) && !/\bdrop table\b/i.test(code), 'no reclamation, no table drops');
-ok(!/insert into geo\.n5_geom/i.test(code), 'migration performs no PROVEN backfill');
+ok(!/vacuum full/i.test(code), 'no reclamation');
+ok(!/drop table geo\.n5_geom/i.test(code) && !/drop table geo\.n5_association\b/i.test(code),
+  'canonical geometry and association tables are never dropped');
+ok((code.match(/drop table geo\.n5_point_reject\b/g) || []).length === 1,
+  'exactly one drop of the reject table, gated behind the archive-complete proof');
+ok(!/insert into geo\.n5_geom/i.test(code),
+  'migration inserts no geometry rows (Option D: keep the 718,278 canonical points)');
+ok(/set verdict_snapshot_id = current_setting\('n5\.snapshot'/.test(code),
+  'the only geometry write is the verdict_snapshot_id backfill of existing proven_stored_point rows');
 
 // ---- 16. SNAPSHOT LIFECYCLE (round 4) ----
 ok(/os\.environ\.get\("SNAPSHOT", ""\)/.test(py), 'SNAPSHOT has NO default');
@@ -195,8 +212,11 @@ ok(runShard.indexOf('assert_snapshot_consumable()') < runShard.indexOf('FREEZE')
 // n5_geom + reject snapshot provenance
 ok(/check \(\(provenance = 'proven_stored_point'\) = \(verdict_snapshot_id is not null\)\)/.test(code),
   'proven <=> verdict_snapshot_id non-null, enforced structurally');
-ok(/verdict_snapshot_id text not null,/.test(code), 'current rejects carry their verdict snapshot');
-ok(/constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
+ok(/verdict_snapshot_id  text        not null/.test(code)
+   || /verdict_snapshot_id text not null/.test(code),
+  'current rejects carry their verdict snapshot');
+ok(/rename constraint n5_point_reject_new_pkey to n5_point_reject_pkey/.test(code)
+   || /constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
   'reject identity is STILL source_key alone (snapshot is provenance, not identity)');
 ok(/"verdict_snapshot_id": SNAPSHOT/.test(py), 'shard detail records the verdict snapshot');
 ok(!/alter table geo\.n5_association add column/.test(code), 'association rows are NOT widened');
