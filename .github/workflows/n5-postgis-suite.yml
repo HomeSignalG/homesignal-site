@@ -1,0 +1,74 @@
+name: n5-postgis-suite
+
+# EXECUTABLE PostgreSQL + PostGIS proof for the N5 migration and the verdict publication /
+# canonical synchronization lifecycle. This is the check that static source assertions
+# cannot be: it applies the ACTUAL migration file and runs the ACTUAL SQL emitted by
+# scripts/n5_shard.py against a real PostGIS server, then reads the results back.
+#
+# The target is a THROWAWAY service container created for this job and destroyed with it.
+# It holds no credentials and can reach no Supabase project; the suite additionally refuses
+# to start if any SUPABASE_* secret is present in the environment. It must never be pointed
+# at production.
+#
+# Reported, NOT required: it is deliberately absent from branch protection. It is a normal
+# job with no continue-on-error, so a failure shows as a RED CHECK rather than being
+# swallowed - a suite that cannot go red proves nothing.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/n5_shard.py'
+      - 'scripts/n3_pilot.py'
+      - 'docs/n5-canonical-geometry-provenance.sql'
+      - 'test/n5_pg/**'
+      - '.github/workflows/n5-postgis-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: n5_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the driver (CI-only; the repo itself stays dependency-free)
+        run: pip install --quiet psycopg2-binary
+
+      # An instrument must prove it ran. Print the real server and PostGIS versions, and
+      # fail here rather than later if the extension is missing - a suite that silently
+      # skipped its spatial assertions would be success-shaped and attest to nothing.
+      - name: Prove the disposable PostGIS target is real
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d n5_disposable -c "create extension if not exists postgis;"
+          echo "POSTGRESQL: $(psql -h localhost -U postgres -d n5_disposable -tAc 'select version();')"
+          echo "POSTGIS:    $(psql -h localhost -U postgres -d n5_disposable -tAc 'select postgis_full_version();')"
+          psql -h localhost -U postgres -d n5_disposable -tAc "select 1 from pg_extension where extname='postgis';" | grep -q 1
+
+      - name: Run the executable N5 database suite
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_disposable"
+        run: python3 test/n5_pg/run_suite.py
