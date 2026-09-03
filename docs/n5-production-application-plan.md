@@ -469,3 +469,30 @@ to a `GROUP BY` join — is now required, and is explicitly outside the current 
 
 The transport change is kept: it is correct, proven by 8 executable assertions, and every
 future full-corpus operation needs it regardless.
+
+---
+
+## 9. CARRIED DOWNSTREAM — the A3 read-path finding (NOT solved here)
+
+Recorded, not acted on. This belongs **after** the canonical verdict lifecycle is closed.
+
+The parallel `claude/homesignal-zip-forensics-13xkmw` workstream benchmarked the one-pass
+shadow project read `geo.n5_a3_projects_one_pass(zip)` on 2026-09-03 (run `a3m-1788459821`,
+346 cutover-candidate ZIPs × 2 passes). Its own commit title states the finding:
+**"one-pass shadow read benchmarked — NOT servable without a source_key index."**
+
+`docs/maps-coverage/UNIT-A3-BENCHMARK-EVIDENCE.md` on that branch names the cause: the only
+index containing `source_key` is `app_projects_zip_source_key_uidx (zip, source_key,
+source_seq)`, so the read plans as a **Memoized nested loop over an index scan** rather than a
+single sequential scan. That is the per-ZIP project read Map 1 would sit on.
+
+**Explicitly NOT done here, by ruling:** no index added · `public.app_projects` unchanged ·
+the shadow read unchanged · the A3 branch not merged · A3 objects not promoted, modified or
+deleted · Map 1 unchanged. A3's results are another workstream's evidence, cited only.
+
+Object family is disjoint from verdict publication: A3 writes `geo.n5_a3_*` and
+`geo.zip_authoritative_marker`; it does not touch `geo.n5_geom`, `geo.n5_association`,
+`geo.n5_boundary_membership`, `geo.n5_proven_verdict`, `geo.n5_verdict_manifest`,
+`public.app_projects` or its indexes. Its own preservation control on
+`public.app_projects_for_zip` (md5 `ec1b01ae4485ad2c59b9f946c9d565b6`) was re-verified at both
+ends of that unit.
