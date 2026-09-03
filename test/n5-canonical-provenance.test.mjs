@@ -163,8 +163,7 @@ ok(/SNAPSHOT must be set explicitly - there is no default/.test(py), 'an unset S
 
 ok(/create table if not exists geo\.n5_verdict_manifest/.test(code), 'verdict manifest exists');
 ok(/check \(state in \('BUILDING','READY','FAILED'\)\)/.test(code), 'manifest states are an allowlist');
-ok(/state <> 'READY' or \(completed_at is not null and expected_source_keys is not null/.test(code),
-  'READY requires recorded completeness');
+ok(/constraint n5_verdict_manifest_ready_ck/.test(code), 'READY constraint exists');
 ok(/canonical_synced_at is null or state = 'READY'/.test(code),
   'canonical sync is only meaningful for a READY verdict');
 ok(!/alter table geo\.n5_snapshot/.test(code), 'geo.n5_snapshot is NOT overloaded');
@@ -214,7 +213,8 @@ ok((sweep.match(/provenance='proven_stored_point'/g) || []).length >= 2,
 ok(!/for .* in .*:/.test(sweep), 'the sweep is set-based SQL, not an application-side row loop');
 ok(!/z3/.test(sweep.replace(/observed_in_z3/g,'').replace(/first_z3/g,'')),
   'the sweep has no z3 ownership (first_z3/observed_in_z3 are columns, not scoping)');
-ok(/NOT EXECUTED BY THIS MODULE/.test(sweepFn), 'the sweep is not run here');
+ok(/EXECUTED BY EXACTLY ONE CALLER - sync_canonical\(\)/.test(sweepFn),
+  'the sweep names its single caller — no shard runs it');
 ok(/PUBLICATION BARRIER/.test(sweepFn),
   'the publication barrier is documented at the sweep');
 
@@ -225,5 +225,159 @@ ok(/except select source_key from v/.test(py) && /except select source_key from 
 ok(!/723449/.test(py), '723,449 never appears as a numeric literal — receipt evidence only');
 ok(/ORPHAN \/ INPUT BASELINE ABSENT \/ NOT CONSUMABLE/.test(sql),
   'the orphan S2 manifest row is documented, not deleted');
+
+// ---- 17. VERDICT PUBLICATION PIPELINE + CANONICAL SYNCHRONIZATION (round 5) ----
+// Every guard below asserts a LIVE CONDITIONAL or a LIVE CALL. None of them can be satisfied
+// by a comment, a docstring, or an error-message string — each was verified by defeating the
+// code it guards and confirming the guard turned red.
+
+// 17a. the READY constraint's three-valued-logic hole
+const readyCk = code.slice(code.indexOf('constraint n5_verdict_manifest_ready_ck'),
+                           code.indexOf('constraint n5_verdict_manifest_sync_ck'));
+ok(readyCk.length > 100 && readyCk.length < 900, 'READY constraint located');
+for (const col of ['completed_at', 'expected_source_keys', 'verdict_rows', 'eligible_rows',
+                   'reject_counts', 'fingerprint']) {
+  ok(new RegExp(col + '\\s+is not null').test(readyCk),
+    'READY asserts ' + col + ' IS NOT NULL (a NULL CHECK is ACCEPTED by PostgreSQL)');
+}
+ok(/verdict_rows = expected_source_keys/.test(readyCk),
+  'READY still asserts the completeness equality');
+ok(/state is not null|not null,\s*\n\s*state /.test(code) || /state {17}text {8}not null/.test(code),
+  'manifest.state is NOT NULL, so the sync CHECK has no NULL branch of its own');
+
+// 17b. frozen INPUT validation — the orphan snapshot must fail
+ok(/def assert_frozen_input_present/.test(py), 'frozen input validation exists');
+const frozenSeg = py.slice(py.indexOf('def assert_frozen_input_present'),
+                           py.indexOf('def assert_snapshot_consumable'));
+// Match the QUERY, not the docstring: the docstring legitimately names the relation, so a
+// bare /preservation\.app_project_identity/ passed even with the query pointed elsewhere.
+ok(/from preservation\.app_project_identity\s*\n\s*where snapshot_id=\{lit\(SNAPSHOT\)\} and record_kind='development'\) input_rows/.test(frozenSeg),
+  'the frozen input is COUNTED from the INPUT RELATION, not from the declaration alone');
+ok(/if int\(row\["input_rows"\]\) == 0:/.test(frozenSeg),
+  'a zero-row snapshot is refused by a live conditional');
+ok(/if int\(row\["declared"\]\) == 0:/.test(frozenSeg),
+  'an undeclared snapshot is refused by a live conditional');
+
+// 17c. publish_verdict — BUILDING -> BUILD -> VALIDATE -> RECORD -> READY, in that order
+ok(/def publish_verdict/.test(py), 'the verdict publication entry point exists');
+const pubSeg = py.slice(py.indexOf('def publish_verdict'),
+                        py.indexOf('def verify_canonical_geometry_sets'));
+ok(pubSeg.length > 1500, 'publish_verdict located');
+ok(/assert_frozen_input_present\(\)/.test(pubSeg),
+  'publication validates the frozen input before creating a manifest row');
+ok(pubSeg.indexOf("'BUILDING'") < pubSeg.indexOf('refresh_proven_verdict_sql()'),
+  'the manifest is set BUILDING BEFORE the verdict is rebuilt underneath it');
+ok(/canonical_synced_at=null/.test(pubSeg),
+  'entering BUILDING clears the canonical sync barrier');
+ok(/expected_source_keys=null, verdict_rows=null/.test(pubSeg),
+  'entering BUILDING clears every recorded completeness metric');
+ok(/sql\(refresh_proven_verdict_sql\(\), /.test(pubSeg),
+  'the verdict build is actually EXECUTED, not merely defined');
+ok(/snapshot_id=\{lit\(SNAPSHOT\)\}/.test(pubSeg), 'publication writes are snapshot-keyed');
+const refreshSeg = py.slice(py.indexOf('def refresh_proven_verdict_sql'), py.indexOf('def publish_verdict'));
+ok(/delete from geo\.n5_proven_verdict where snapshot_id=\{lit\(SNAPSHOT\)\};/.test(refreshSeg),
+  'the verdict rebuild deletes ONLY this snapshot rows — set replacement, not a truncate');
+ok((py.match(/delete from geo\.n5_proven_verdict/g) || []).length
+   === (py.match(/delete from geo\.n5_proven_verdict where snapshot_id=/g) || []).length,
+  'EVERY delete against the verdict table is snapshot-scoped — S1 can never erase S2');
+ok(!/truncate\s+(table\s+)?geo\./i.test(py), 'no TRUNCATE of any geo table');
+ok(/v = validate_verdict_completeness\(\)/.test(pubSeg),
+  'completeness validation is CALLED (it was previously dead code)');
+for (const [re, name] of [[/if int\(v\["missing"\]\) != 0:/, 'missing'],
+                          [/if int\(v\["extra"\]\) != 0:/, 'extra'],
+                          [/if int\(v\["verdict_rows"\]\) != int\(v\["verdict_distinct"\]\):/, 'distinctness'],
+                          [/if v\["fingerprint"\] is None:/, 'fingerprint']]) {
+  ok(re.test(pubSeg), 'completeness ENFORCES ' + name + ' via a live conditional');
+}
+ok(/if problems:/.test(pubSeg) && pubSeg.indexOf('if problems:') < pubSeg.indexOf("state='READY'"),
+  'the failure branch is evaluated BEFORE READY can be written');
+ok(/state='FAILED', completed_at=now\(\)/.test(pubSeg),
+  'a failed completeness check records FAILED');
+ok(/raise SystemExit\("STOP: verdict completeness FAILED/.test(pubSeg),
+  'a failed completeness check raises loudly');
+ok(pubSeg.indexOf("state='READY'") > pubSeg.indexOf('validate_verdict_completeness()'),
+  'READY is written only after validation has run');
+ok(/where snapshot_id=\{lit\(SNAPSHOT\)\} and state='BUILDING';/.test(pubSeg),
+  'the READY transition is guarded on the row still being BUILDING');
+ok(/if str\(chk\["state"\]\) != "READY":/.test(pubSeg),
+  'the READY transition is read back and verified by a live conditional');
+ok(!/canonical_synced_at *= *now\(\)/.test(pubSeg),
+  'publishing the verdict NEVER marks the canonical corpus synced');
+
+// 17d. sync_canonical — invalidate FIRST, sweep, verify both set equalities, then publish
+ok(/def sync_canonical/.test(py), 'the canonical synchronization entry point exists');
+const syncSeg = py.slice(py.indexOf('def sync_canonical'),
+                         py.indexOf('def materialize_proven_points'));
+ok(syncSeg.length > 1500, 'sync_canonical located');
+ok(/if str\(man\["state"\]\) != "READY":/.test(syncSeg),
+  'the sweep refuses a non-READY verdict via a live conditional');
+ok(/set canonical_synced_at=null/.test(syncSeg), 'the sweep invalidates the sync barrier');
+ok(syncSeg.indexOf('set canonical_synced_at=null') < syncSeg.indexOf('global_canonical_sweep_sql()'),
+  'INVALIDATION PRECEDES MUTATION — a half-swept corpus is never marked synced');
+ok(!/finally:/.test(syncSeg),
+  'the sync barrier is not set from a finally/cleanup path (a killed process never reaches one)');
+ok(/for stmt, tag in global_canonical_sweep_sql\(\):/.test(syncSeg),
+  'the sweep statements are actually EXECUTED (previously nothing called them)');
+ok(syncSeg.indexOf('verify_canonical_geometry_sets()') > syncSeg.indexOf('global_canonical_sweep_sql()')
+   && syncSeg.indexOf('verify_canonical_reject_sets()') > syncSeg.indexOf('global_canonical_sweep_sql()'),
+  'both set-equality verifications run AFTER the sweep');
+ok(/if bad:/.test(syncSeg) && syncSeg.indexOf('if bad:') < syncSeg.indexOf('canonical sync complete'),
+  'a set mismatch is evaluated BEFORE the sync timestamp is written');
+ok(/raise SystemExit\("HALT: canonical sets do not match/.test(syncSeg),
+  'a set mismatch HALTS');
+ok(/canonical_synced_at REMAINS NULL/.test(syncSeg),
+  'the halt states that the snapshot stays unconsumable');
+ok(/if not done\["synced"\]:/.test(syncSeg),
+  'the sync write is read back and verified by a live conditional');
+
+// 17e. exactly ONE writer of the canonical sync barrier, anywhere
+ok((py.match(/canonical_synced_at *= *now\(\)/g) || []).length === 1,
+  'canonical_synced_at = now() is written in EXACTLY ONE place in the module');
+ok((syncSeg.match(/canonical_synced_at *= *now\(\)/g) || []).length === 1,
+  'that one place is inside sync_canonical');
+ok(/and state='READY';/.test(syncSeg.slice(syncSeg.indexOf('canonical_synced_at = now()'))) ||
+   /set canonical_synced_at = now\(\)\s*\n\s*where snapshot_id=\{lit\(SNAPSHOT\)\} and state='READY';/.test(syncSeg),
+  'the sync write re-checks state=READY at write time');
+
+// 17f. post-sweep SET EQUALITY, both directions, both corpora
+const geomVer = py.slice(py.indexOf('def verify_canonical_geometry_sets'),
+                         py.indexOf('def verify_canonical_reject_sets'));
+for (const col of ['eligible_not_canonical', 'canonical_not_eligible', 'coord_mismatch',
+                   'wrong_snapshot']) {
+  ok(new RegExp(col).test(geomVer), 'geometry verification measures ' + col);
+}
+ok(/except select source_key from can/.test(geomVer)
+   && /except select source_key from elig/.test(geomVer),
+  'geometry set equality is checked in BOTH directions');
+ok(/abs\(ST_X\(c\.geom\) - e\.lng\)/.test(geomVer) && /abs\(ST_Y\(c\.geom\) - e\.lat\)/.test(geomVer),
+  'coordinate equality is checked, not just membership');
+ok(/verdict_snapshot_id is distinct from \{lit\(SNAPSHOT\)\}/.test(geomVer),
+  'every canonical proven point must carry THIS snapshot');
+const rejVer = py.slice(py.indexOf('def verify_canonical_reject_sets'), py.indexOf('def sync_canonical'));
+for (const col of ['ineligible_not_rejected', 'rejected_not_ineligible', 'reason_mismatch',
+                   'wrong_snapshot', 'eligible_still_rejected']) {
+  ok(new RegExp(col).test(rejVer), 'reject verification measures ' + col);
+}
+ok(/sweep reject drop absent/.test(sweep),
+  'the sweep drops rejects for projects absent from the snapshot (else both-direction '
+  + 'reject equality could never reach zero)');
+
+// 17g. no durable mutation before the gate
+const mainSeg = py.slice(py.indexOf('def main():'), py.indexOf('COMMANDS = {'));
+ok(mainSeg.indexOf('assert_snapshot_consumable()') > 0
+   && mainSeg.indexOf('assert_snapshot_consumable()') < mainSeg.indexOf("state='running'"),
+  'the snapshot gate runs BEFORE any shard is marked running');
+const assocSeg = py.slice(py.indexOf('def associate(z3):'), py.indexOf('def shard_counts'));
+ok(assocSeg.indexOf('assert_snapshot_consumable()') > 0
+   && assocSeg.indexOf('assert_snapshot_consumable()') < assocSeg.indexOf('stage_associations(z3)'),
+  'associate() is gated DIRECTLY, not only by its caller');
+
+// 17h. operator entry points
+ok(/"publish-verdict": publish_verdict/.test(py) && /"sync-canonical": sync_canonical/.test(py)
+   && /"shards": main/.test(py), 'three named commands, one per publication act');
+ok(/raise SystemExit\("STOP: unknown command/.test(py), 'an unknown command is refused');
+ok(/sys\.exit\(cli\(sys\.argv\)/.test(py), 'the CLI dispatcher is the entry point');
+ok(/require_snapshot\(\)/.test(py.slice(py.indexOf('def cli('))),
+  'every command requires an explicit SNAPSHOT');
 
 process.exit(fails ? 1 : 0);

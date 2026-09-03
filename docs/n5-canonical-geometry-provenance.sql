@@ -247,10 +247,22 @@ create table if not exists geo.n5_verdict_manifest (
   canonical_synced_at   timestamptz,
   constraint n5_verdict_manifest_pkey primary key (snapshot_id),
   constraint n5_verdict_manifest_state_ck check (state in ('BUILDING','READY','FAILED')),
-  -- Completeness must have been recorded before a snapshot can claim READY.
+  -- Completeness must have been RECORDED, not merely claimed, before READY.
+  --
+  -- EVERY metric is asserted NOT NULL individually before the equality is evaluated. This is
+  -- not belt-and-braces: PostgreSQL ACCEPTS a CHECK that evaluates to NULL, and
+  -- `verdict_rows = expected_source_keys` is NULL whenever either side is NULL. The previous
+  -- form therefore admitted state='READY' with verdict_rows NULL - a snapshot claiming
+  -- completeness while recording none. Under `and`, a failed is-not-null yields FALSE (never
+  -- NULL), so the whole conjunction is three-valued-safe: it is TRUE or FALSE, never NULL.
   constraint n5_verdict_manifest_ready_ck check (
-    state <> 'READY' or (completed_at is not null and expected_source_keys is not null
-                         and verdict_rows = expected_source_keys)),
+    state <> 'READY' or (completed_at          is not null
+                     and expected_source_keys  is not null
+                     and verdict_rows          is not null
+                     and eligible_rows         is not null
+                     and reject_counts         is not null
+                     and fingerprint           is not null
+                     and verdict_rows = expected_source_keys)),
   -- Canonical synchronization is only meaningful for a READY verdict.
   constraint n5_verdict_manifest_sync_ck check (
     canonical_synced_at is null or state = 'READY')
@@ -272,8 +284,8 @@ comment on table geo.n5_proven_verdict is
 
 comment on table geo.n5_point_reject is
   'Why a PROVEN-treatment project was NOT materialized into canonical radius-eligible geometry. '
-  'The PK (z3, source_key, reason) makes reject recording deterministic and idempotent under '
-  'rerun. Failures are recorded, never silently dropped.';
+  'The PK is (source_key) ALONE - project-global, so one project has exactly one CURRENT reason '
+  'rather than one contradictory reason per z3. Failures are recorded, never silently dropped.';
 
 -- ============================================================================
 -- §5  ASSOCIATION STAGING  (stage-and-swap rebuild)

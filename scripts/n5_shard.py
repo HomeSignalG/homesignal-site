@@ -378,6 +378,33 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 
 # ------------------------------------------------- PROVEN point materialization
 
+def assert_frozen_input_present():
+    """The frozen INPUT baseline must exist as ROWS, not merely as a declared snapshot id.
+
+    geo.n5_snapshot is a declaration; preservation.app_project_identity is the baseline. They
+    can disagree: geo.n5_snapshot carries 'n5-2026-09-02T173042Z', which has ZERO rows in
+    preservation.app_project_identity and is referenced by no shard. Validating against the
+    declaration alone would let that orphan be published - producing an empty verdict that is
+    internally consistent (expected 0 == verdict 0) and would then sweep every canonical
+    proven point out of existence as 'absent from the snapshot'.
+
+    So the check is on the INPUT RELATION. An orphan fails here, before a manifest row exists."""
+    require_snapshot()
+    row = sql(f"""select
+        (select count(*) from geo.n5_snapshot where snapshot_id={lit(SNAPSHOT)}) declared,
+        (select count(*) from preservation.app_project_identity
+          where snapshot_id={lit(SNAPSHOT)} and record_kind='development') input_rows;""",
+              "frozen input")[0]
+    if int(row["declared"]) == 0:
+        raise SystemExit(f"STOP: snapshot {SNAPSHOT} is not declared in geo.n5_snapshot.")
+    if int(row["input_rows"]) == 0:
+        raise SystemExit(
+            f"STOP: snapshot {SNAPSHOT} has ZERO rows in preservation.app_project_identity "
+            f"(record_kind='development'). ORPHAN / INPUT BASELINE ABSENT / NOT CONSUMABLE. "
+            f"Publishing it would build an empty verdict and sweep the canonical corpus away.")
+    return row
+
+
 def assert_snapshot_consumable():
     """Refuse to run unless THIS run's exact snapshot is published and canonically synced.
 
@@ -448,9 +475,10 @@ select (select count(*) from auth) expected_source_keys,
 def global_canonical_sweep_sql():
     """The S1->S2 global canonical sweep. SET-BASED, project-global, order-independent.
 
-    NOT EXECUTED BY THIS MODULE. Shard processing is NOT responsible for snapshot transition:
-    a project that DISAPPEARS from the new PROVEN population is visited by no shard, so its
-    stale pt:1 would otherwise survive forever as if still eligible.
+    EXECUTED BY EXACTLY ONE CALLER - sync_canonical(), the `sync-canonical` command. Never by
+    a shard: shard processing is NOT responsible for snapshot transition, because a project
+    that DISAPPEARS from the new PROVEN population is visited by no shard, so its stale pt:1
+    would otherwise survive forever as if still eligible.
 
     Three set operations, each keyed on source_key alone - no z3, no shard order, no
     application-side row loop (723,449 HTTP operations is not an implementation):
@@ -461,10 +489,11 @@ def global_canonical_sweep_sql():
     Every statement is a no-op when already applied, so rerunning converges. RECOVERY geometry
     is never touched: each delete filters provenance='proven_stored_point'.
 
-    PUBLICATION BARRIER: run this only after state='READY', then set canonical_synced_at. Until
-    that timestamp exists, assert_snapshot_consumable() refuses the snapshot, so no shard can
-    observe a half-swept corpus. If size/WAL makes one transaction unsafe, the three statements
-    may be staged separately - the barrier is canonical_synced_at, not a single transaction."""
+    PUBLICATION BARRIER: sync_canonical() runs this only after state='READY', and NULLs
+    canonical_synced_at before the first statement executes. Until that timestamp is (re)set,
+    assert_snapshot_consumable() refuses the snapshot, so no shard can observe a half-swept
+    corpus. The statements need not share one transaction - the barrier is canonical_synced_at,
+    which is why invalidation precedes mutation rather than following it."""
     return [
         (f"""insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
                                       invalid_reason, first_z3, provenance, verdict_snapshot_id)
@@ -499,6 +528,13 @@ def global_canonical_sweep_sql():
         (f"""delete from geo.n5_point_reject r using geo.n5_proven_verdict v
               where v.snapshot_id={lit(SNAPSHOT)} and v.verdict='ELIGIBLE'
                 and r.source_key=v.source_key;""", "sweep reject clear"),
+        # 4  ABSENT from S2 -> drop the stale reject too. Without this a project that left the
+        #    PROVEN population keeps asserting a CURRENT reason forever, and post-sweep reject
+        #    set equality (rejected-not-ineligible) could never reach zero.
+        (f"""delete from geo.n5_point_reject r
+              where not exists (select 1 from geo.n5_proven_verdict v
+                                 where v.snapshot_id={lit(SNAPSHOT)} and v.source_key=r.source_key);""",
+         "sweep reject drop absent"),
     ]
 
 
@@ -511,8 +547,9 @@ def refresh_proven_verdict_sql():
     multiplicity is NOT derived from ZIP3-local geo.n5_frozen, and NOT from app_projects page
     rows (3.21 rows per project - a page-materialization count, not project grain).
 
-    NOT RUN AUTOMATICALLY. It is a full pass over a 1,125 MB table and is a deliberate,
-    separately authorized operation - see REMAINING APPLY GATES in PR #1016.
+    NOT RUN AUTOMATICALLY, AND NOT BY A SHARD. Its only caller is publish_verdict(), the
+    `publish-verdict` command, which an operator invokes deliberately: this is a full pass
+    over a 1,125 MB table - see REMAINING APPLY GATES in PR #1016.
 
     Coordinate pairs are DISTINCT OBSERVED pairs: both values non-null on the SAME row, so a
     latitude from one row can never be paired with a longitude from another."""
@@ -540,6 +577,215 @@ select {lit(SNAPSHOT)}, p.source_key, p.registry_id, c.ncoord, sl.lat, sl.lng,
             when abs(sl.lat) < 1e-9 and abs(sl.lng) < 1e-9 then 'NULL_ISLAND'
             else 'ELIGIBLE' end
   from proven p join cnt c using (source_key) left join sel sl using (source_key);"""
+
+
+# ------------------------------------------------- verdict publication pipeline
+#
+# THE ONLY VALID ORDER. Each arrow is a barrier, not a suggestion:
+#
+#   BUILDING -> BUILD VERDICT -> VALIDATE -> RECORD COMPLETENESS -> READY
+#            -> CANONICAL SWEEP -> VERIFY CANONICAL SETS -> CANONICAL SYNC COMPLETE
+#
+# Two commands implement it, split exactly where the two claims differ:
+#   publish_verdict()  BUILDING .. READY               "the verdict is complete and readable"
+#   sync_canonical()   sweep .. canonical_synced_at     "canonical geometry matches that verdict"
+# A shard requires BOTH (assert_snapshot_consumable). Nothing else writes either state.
+
+
+def publish_verdict():
+    """BUILDING -> BUILD -> VALIDATE -> RECORD COMPLETENESS -> READY, for THIS snapshot only.
+
+    SET-REPLACEMENT SEMANTICS, snapshot-scoped: every write below is filtered to SNAPSHOT, so
+    republishing S1 cannot read, alter or invalidate S2's verdict. There is no truncate.
+
+    FAIL-CLOSED: the manifest is reset to BUILDING with canonical_synced_at NULL as the FIRST
+    durable act, so an interrupted publish leaves a snapshot that assert_snapshot_consumable()
+    refuses. READY is written once, at the end, in the same statement that records the metrics
+    the READY constraint requires - it is never claimed ahead of the evidence for it."""
+    require_snapshot()
+    assert_frozen_input_present()
+
+    # 1 - BUILDING. Clears every completeness metric and the canonical sync barrier: a stale
+    #     READY must never survive a rebuild of the verdict underneath it.
+    sql(f"""insert into geo.n5_verdict_manifest
+              (snapshot_id, state, expected_source_keys, verdict_rows, eligible_rows,
+               reject_counts, fingerprint, started_at, completed_at, canonical_synced_at)
+            values ({lit(SNAPSHOT)}, 'BUILDING', null, null, null, null, null, now(), null, null)
+            on conflict (snapshot_id) do update
+               set state='BUILDING', expected_source_keys=null, verdict_rows=null,
+                   eligible_rows=null, reject_counts=null, fingerprint=null,
+                   started_at=now(), completed_at=null, canonical_synced_at=null;""",
+        "manifest BUILDING")
+    say("verdict state", f"BUILDING  ({SNAPSHOT})")
+
+    # 2 - BUILD. Full snapshot-scoped set replacement of the verdict rows.
+    sql(refresh_proven_verdict_sql(), "build verdict " + SNAPSHOT)
+
+    # 3 - VALIDATE. Completeness is ENFORCED here, not merely reported.
+    v = validate_verdict_completeness()
+    for k in ("expected_source_keys", "verdict_rows", "eligible_rows", "missing", "extra",
+              "multi_coord"):
+        say("  " + k, v[k])
+    problems = []
+    if v["expected_source_keys"] is None or int(v["expected_source_keys"]) == 0:
+        problems.append("expected_source_keys is null/zero - the frozen input yielded no "
+                        "PROVEN population")
+    if int(v["missing"]) != 0:
+        problems.append(f"{v['missing']} authoritative source_key(s) have no verdict row")
+    if int(v["extra"]) != 0:
+        problems.append(f"{v['extra']} verdict row(s) are not in the authoritative population")
+    if int(v["verdict_rows"]) != int(v["verdict_distinct"]):
+        problems.append(f"verdict rows {v['verdict_rows']} != distinct source_keys "
+                        f"{v['verdict_distinct']}")
+    if int(v["verdict_rows"]) != int(v["expected_source_keys"] or -1):
+        problems.append(f"verdict_rows {v['verdict_rows']} != expected "
+                        f"{v['expected_source_keys']}")
+    if int(v["eligible_rows"]) + int(v["rejected_rows"]) != int(v["verdict_rows"]):
+        problems.append("eligible + rejected does not close on verdict_rows")
+    if v["fingerprint"] is None:
+        problems.append("fingerprint is null")
+    if problems:
+        # FAILED is safe to record: canonical_synced_at is already NULL, so the snapshot stays
+        # unconsumable either way. If even this write fails, the row remains BUILDING - also
+        # unconsumable. There is no path from here that reaches READY.
+        sql(f"""update geo.n5_verdict_manifest set state='FAILED', completed_at=now()
+                 where snapshot_id={lit(SNAPSHOT)};""", "manifest FAILED")
+        raise SystemExit("STOP: verdict completeness FAILED for " + SNAPSHOT + " - "
+                         + "; ".join(problems) + ". State=FAILED, canonical_synced_at NULL, "
+                         "no sweep performed.")
+
+    # 4 - RECORD COMPLETENESS **and** transition to READY in ONE statement. Recording the
+    #     metrics in a separate earlier statement would leave a window in which they are
+    #     durable but the state is not, and the constraint that ties them together is the
+    #     only thing keeping "READY" honest.
+    sql(f"""update geo.n5_verdict_manifest
+               set state='READY', completed_at=now(),
+                   expected_source_keys={int(v['expected_source_keys'])},
+                   verdict_rows={int(v['verdict_rows'])},
+                   eligible_rows={int(v['eligible_rows'])},
+                   reject_counts={lit(json.dumps(v['reject_counts']))}::jsonb,
+                   fingerprint={lit(v['fingerprint'])}
+             where snapshot_id={lit(SNAPSHOT)} and state='BUILDING';""", "manifest READY")
+    chk = sql(f"""select state, canonical_synced_at is null unsynced
+                    from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)};""",
+              "manifest verify")[0]
+    if str(chk["state"]) != "READY":
+        raise SystemExit(f"STOP: manifest for {SNAPSHOT} did not reach READY (state="
+                         f"{chk['state']}). Another writer changed it mid-publish.")
+    say("verdict state", "READY  (canonical sweep NOT yet run)")
+    say("verdict fingerprint", v["fingerprint"])
+    return v
+
+
+def verify_canonical_geometry_sets():
+    """Post-sweep SET EQUALITY between the verdict's ELIGIBLE set and canonical proven points.
+
+    Both directions, plus coordinate equality and snapshot attribution. A one-directional
+    check passes while canonical geometry still holds points the new verdict rejects."""
+    return sql(f"""
+with elig as (select source_key, lat, lng from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict='ELIGIBLE'),
+     can  as (select source_key, geom, verdict_snapshot_id from geo.n5_geom
+               where provenance='proven_stored_point')
+select (select count(*) from (select source_key from elig
+                              except select source_key from can) t) eligible_not_canonical,
+       (select count(*) from (select source_key from can
+                              except select source_key from elig) t) canonical_not_eligible,
+       (select count(*) from elig e join can c using (source_key)
+         where c.geom is null
+            or abs(ST_X(c.geom) - e.lng) > 1e-9
+            or abs(ST_Y(c.geom) - e.lat) > 1e-9) coord_mismatch,
+       (select count(*) from can
+         where verdict_snapshot_id is distinct from {lit(SNAPSHOT)}) wrong_snapshot;""",
+               "verify geometry sets")[0]
+
+
+def verify_canonical_reject_sets():
+    """Post-sweep SET EQUALITY between the verdict's INELIGIBLE set and the reject ledger.
+
+    Both directions, reason equality, snapshot attribution, and the cross-check that no
+    ELIGIBLE project is simultaneously carrying a rejection."""
+    return sql(f"""
+with inel as (select source_key, verdict from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict<>'ELIGIBLE'),
+     elig as (select source_key from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict='ELIGIBLE'),
+     rej  as (select source_key, reason, verdict_snapshot_id from geo.n5_point_reject)
+select (select count(*) from (select source_key from inel
+                              except select source_key from rej) t) ineligible_not_rejected,
+       (select count(*) from (select source_key from rej
+                              except select source_key from inel) t) rejected_not_ineligible,
+       (select count(*) from inel i join rej r using (source_key)
+         where r.reason is distinct from i.verdict) reason_mismatch,
+       (select count(*) from rej
+         where verdict_snapshot_id is distinct from {lit(SNAPSHOT)}) wrong_snapshot,
+       (select count(*) from elig e join rej r using (source_key)) eligible_still_rejected;""",
+               "verify reject sets")[0]
+
+
+def sync_canonical():
+    """CANONICAL SWEEP -> VERIFY CANONICAL SETS -> CANONICAL SYNC COMPLETE.
+
+    THE ONLY WRITER OF canonical_synced_at ANYWHERE. It is set in exactly one statement, at
+    the end, only after both set-equality verifications return all zeroes.
+
+    INVALIDATION IS THE FIRST DURABLE ACT of every attempt, before any mutation. The moment
+    the corpus starts moving, the previous 'synced' claim is false - so it is retracted first
+    rather than left standing while the sweep runs. Deliberately NOT a finally/cleanup path: a
+    process killed mid-sweep never reaches finally, and the whole point is that a half-swept
+    corpus must not remain marked synced."""
+    require_snapshot()
+    man = sql(f"""select state, expected_source_keys, verdict_rows
+                    from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)};""",
+              "sync manifest")
+    if not man:
+        raise SystemExit(f"STOP: no verdict manifest for {SNAPSHOT}. Publish the verdict first.")
+    man = man[0]
+    if str(man["state"]) != "READY":
+        raise SystemExit(f"STOP: verdict for {SNAPSHOT} is state={man['state']}, not READY. "
+                         f"The canonical sweep may only run against a published verdict.")
+    if man["expected_source_keys"] is None or \
+            int(man["verdict_rows"]) != int(man["expected_source_keys"]):
+        raise SystemExit(f"STOP: manifest for {SNAPSHOT} is internally inconsistent - "
+                         f"verdict_rows={man['verdict_rows']} "
+                         f"expected={man['expected_source_keys']}.")
+
+    # INVALIDATE FIRST - before a single row of canonical geometry moves.
+    sql(f"""update geo.n5_verdict_manifest set canonical_synced_at=null
+             where snapshot_id={lit(SNAPSHOT)};""", "sync invalidate")
+    say("canonical_synced_at", "NULL (invalidated before sweep)")
+
+    for stmt, tag in global_canonical_sweep_sql():
+        sql(stmt, tag)
+
+    g = verify_canonical_geometry_sets()
+    r = verify_canonical_reject_sets()
+    for k in ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
+              "wrong_snapshot"):
+        say("  geometry " + k, g[k])
+    for k in ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
+              "wrong_snapshot", "eligible_still_rejected"):
+        say("  reject " + k, r[k])
+    bad = [f"geometry.{k}={g[k]}" for k in
+           ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
+            "wrong_snapshot") if int(g[k]) != 0]
+    bad += [f"reject.{k}={r[k]}" for k in
+            ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
+             "wrong_snapshot", "eligible_still_rejected") if int(r[k]) != 0]
+    if bad:
+        raise SystemExit("HALT: canonical sets do not match the verdict for " + SNAPSHOT
+                         + " - " + "; ".join(bad) + ". canonical_synced_at REMAINS NULL, so "
+                         "no shard can consume this snapshot. Investigate before retrying.")
+
+    sql(f"""update geo.n5_verdict_manifest set canonical_synced_at = now()
+             where snapshot_id={lit(SNAPSHOT)} and state='READY';""", "canonical sync complete")
+    done = sql(f"""select canonical_synced_at is not null synced from geo.n5_verdict_manifest
+                    where snapshot_id={lit(SNAPSHOT)};""", "sync verify")[0]
+    if not done["synced"]:
+        raise SystemExit(f"STOP: canonical sync for {SNAPSHOT} did not commit; the snapshot "
+                         f"remains unconsumable.")
+    say("canonical_synced_at", "SET - shards may now consume " + SNAPSHOT)
+    return {"geometry": g, "rejects": r}
 
 
 def materialize_proven_points(z3):
@@ -693,7 +939,13 @@ ALLOW_ASSOCIATION_DELTA = os.environ.get("ALLOW_ASSOCIATION_DELTA", "0").strip()
 
 def associate(z3):
     """Stage -> reconcile -> swap. Rerunning is idempotent: staging clears its own z3 first
-    and the swap is a full scoped replacement, never an append."""
+    and the swap is a full scoped replacement, never an append.
+
+    GATED DIRECTLY, not by its caller. build_associations reads geo.n5_proven_verdict for the
+    run snapshot, so this function is a consumer of the published verdict in its own right; a
+    gate that lives only in run_shard protects nothing if associate() is ever called from a
+    repair path, a notebook, or a future driver."""
+    assert_snapshot_consumable()
     stage_associations(z3)
     rc = reconcile_stage(z3)
     if int(rc["staged"]) != int(rc["staged_pairs"]):
@@ -987,6 +1239,14 @@ def main():
     if not todo:
         raise SystemExit("STOP: no shards selected")
 
+    # SNAPSHOT GATE BEFORE ANY DURABLE MUTATION, including the shard status flag. Marking a
+    # shard 'running' and only then discovering the snapshot is unpublished leaves a shard
+    # stranded in 'running' - neither done nor halted - which a resume silently skips while
+    # the run reports no failure. run_shard() re-asserts the same gate; this one exists so
+    # the refusal happens before the first write rather than after it.
+    assert_snapshot_consumable()
+    say("snapshot gate", f"{SNAPSHOT} READY and canonically synced")
+
     done = 0
     for z3 in todo:
         sql(f"update geo.n5_shard set state='running', started_at=now() "
@@ -1019,5 +1279,26 @@ def main():
     return 0
 
 
+COMMANDS = {
+    # ONE entry point per publication act. The order between them is enforced by state, not by
+    # documentation: sync-canonical refuses a non-READY verdict, and shards refuse an unsynced
+    # one, so running them out of order fails rather than half-publishes.
+    "publish-verdict": publish_verdict,   # BUILDING -> BUILD -> VALIDATE -> RECORD -> READY
+    "sync-canonical": sync_canonical,     # invalidate -> sweep -> verify sets -> synced
+    "shards": main,                       # consume a published+synced snapshot, shard by shard
+}
+
+
+def cli(argv):
+    cmd = (argv[1] if len(argv) > 1 else "shards").strip()
+    if cmd not in COMMANDS:
+        raise SystemExit("STOP: unknown command %r. One of: %s"
+                         % (cmd, ", ".join(sorted(COMMANDS))))
+    require_snapshot()
+    say("command", cmd)
+    rc = COMMANDS[cmd]()
+    return rc if isinstance(rc, int) else 0
+
+
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(cli(sys.argv) or 0)
