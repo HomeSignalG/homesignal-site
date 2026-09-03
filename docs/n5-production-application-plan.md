@@ -409,3 +409,63 @@ inside the 120 s ceiling. The cost is in the correlated subquery's shape, not in
    code and is explicitly out of scope without authorization.
 
 Re-running `publish-verdict` unchanged would fail identically and re-write `BUILDING`.
+
+---
+
+## 8. PUBLISH-VERDICT ATTEMPT 2 — ❌ FAILED 2026-09-03 18:29:04Z (57014 at the 15-minute wall)
+
+**Outcome: B — publication FAILED and rolled back. Nothing repaired, nothing retried.**
+
+**The transport correction was necessary but NOT sufficient.** Attempt 1 (Management API) was
+cancelled at **120 s** by a server-side ceiling the caller cannot raise. Attempt 2 ran the
+identical SQL over the PG-wire session pooler with `set local statement_timeout='15min'` — and
+the statement ran for the **full 15 minutes** before being cancelled at exactly `18:29:04Z`.
+So the transport change did exactly what it was designed to do (2 min → 15 min of headroom);
+the binding constraint is the **derivation**, not the pipe.
+
+| field | value |
+|---|---|
+| Snapshot | `phase1-2026-09-01` |
+| Execution SHA | `414844a` · `scripts/n5_shard.py` blob `53dfc12ec878f3bdd6eebaccf8898eb991c45162` |
+| Algorithm changed | **NO** — derivation md5 `82397daae888ad0fcbf1f3c93774ca14`, guarded by executable assertion 125 |
+| Transport | PG-wire session pooler `:5432`, TLS, `psql -X -v ON_ERROR_STOP=1`, `SET LOCAL lock_timeout='5s'` / `statement_timeout='15min'`, no Management API credential present |
+| Run | [33789161115](https://github.com/HomeSignalG/homesignal-site/actions/runs/33789161115) |
+| Precheck | **PASS** `18:13:10–18:13:56Z` (46 s) — including the stale-BUILDING re-proof |
+| BUILDING written | `18:14:04.019Z` |
+| Failure | `18:29:04Z` — **exactly 15 min**, SQLSTATE `57014` |
+| Retry count | **0** |
+
+**Rollback proven, read-only, after the failure:** `geo.n5_proven_verdict` **0 rows** — the
+rebuild's `DELETE` and partial `INSERT` rolled back together. Manifest `BUILDING`, every metric
+NULL, `canonical_synced_at` NULL. Geometry **byte-identical to §6**: total 741,562 · canonical
+718,278 · recovered 23,284 · fingerprint **`bbda250fc30ee0b3aa3f46a259392aa3`** unchanged ·
+rejects 5,171 · archive 5,171 · associations 20,170. No orphaned backend.
+
+### The decisive measurement
+
+The same result set, computed two ways over the same 1,125 MB table, in the same run:
+
+| form | where | time |
+|---|---|---|
+| `cnt` as a **correlated subquery** — the committed derivation | the publish | **> 15 min (cancelled)** |
+| `cnt` as a **`GROUP BY` aggregate join** — the precheck's independent re-derivation | the precheck | the **whole** precheck step, connect + TLS + 12 assertions + this derivation, took **46 s** |
+
+```sql
+-- committed, in refresh_proven_verdict_sql():
+cnt as (select p.source_key,
+               (select count(*) from pairs q where q.source_key = p.source_key) ncoord
+          from proven p)
+-- the precheck's equivalent:
+pc  as (select source_key, count(*) c from pairs group by source_key)
+```
+
+The correlated form re-scans `pairs` once per PROVEN project — 723,449 times. That is the cost,
+and no timeout value fixes it.
+
+**Consequence:** Option 1 alone cannot complete this publication. **Option 2 — reshaping `cnt`
+to a `GROUP BY` join — is now required, and is explicitly outside the current authorization**
+("Do NOT rewrite or optimize the verdict derivation"). Re-running unchanged would burn another
+15 minutes of production CPU and fail identically.
+
+The transport change is kept: it is correct, proven by 8 executable assertions, and every
+future full-corpus operation needs it regardless.
