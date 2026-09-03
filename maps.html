@@ -1127,9 +1127,16 @@ HS.onReady(async function () {
           y = Math.max(14, Math.min(h - 14, cy - north * pxPerMile));
       var i = plotted.length; plotted.push(it);
       var tip = (mk.typeLabel || it.type || (it._restFacility ? 'Regulated facility' : 'Record')) + ' · ' + (it.name || it.title || '');
-      html += '<g class="hspin" data-rest-idx="' + i + '" role="button" tabindex="0" aria-label="'
-        + HS.esc(mk.popupLabel) + '" style="cursor:pointer">'
-        + HS.shapeEl(mk.shape, x, y, 9, mk.color, 2.2) + '<title>' + HS.esc(tip) + '</title></g>';
+      // Every marker point of this item points at the SAME plotted index, so several
+      // pins never become several cards.
+      HS.markerPoints(it).forEach(function (pt) {
+        var pn = (pt.lat - hLat) * 69, pe = (pt.lng - hLng) * 69 * Math.cos(hLat * Math.PI / 180);
+        var px = Math.max(14, Math.min(w - 14, cx + pe * pxPerMile)),
+            py = Math.max(14, Math.min(h - 14, cy - pn * pxPerMile));
+        html += '<g class="hspin" data-rest-idx="' + i + '" role="button" tabindex="0" aria-label="'
+          + HS.esc(mk.popupLabel) + '" style="cursor:pointer">'
+          + HS.shapeEl(mk.shape, px, py, 9, mk.color, 2.2) + '<title>' + HS.esc(tip) + '</title></g>';
+      });
     });
     if (!html) return;
     // ONE group, drawn UNDER the lettered pins + home so the nearest-16 stay legible.
@@ -1378,12 +1385,16 @@ HS.onReady(async function () {
         .setPopup(new maplibregl.Popup({offset:16,maxWidth:'260px'}).setHTML(HS.homePopupHTML(home))).addTo(glMap));
     }
     items.forEach(function(it){
-      var el=pinEl(it, 26);
       var mkt = HS.resolveMarker(it);
-      // hover = type + name (founder launch spec)
-      el.title=(mkt.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'');
-      el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
+      // One card, possibly several places: each point opens the SAME item, so a
+      // multi-marker project never produces a second card.
+      HS.markerPoints(it).forEach(function(pt){
+        var el=pinEl(it, 26);
+        // hover = type + name (founder launch spec)
+        el.title=(mkt.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'');
+        el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
+        glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([pt.lng,pt.lat]).addTo(glMap));
+      });
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
@@ -1596,11 +1607,13 @@ HS.onReady(async function () {
     }
     items.forEach(function(it){
       var mk = HS.resolveMarker(it);
-      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26),
-          title:(mk.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'')})
-        .addTo(lfMap);
-      m.on('click', function(){ openItem(it); });
-      lfMarkers.push(m);
+      HS.markerPoints(it).forEach(function(pt){
+        var m = L.marker([pt.lat,pt.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26),
+            title:(mk.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'')})
+          .addTo(lfMap);
+        m.on('click', function(){ openItem(it); });
+        lfMarkers.push(m);
+      });
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
@@ -1624,14 +1637,16 @@ HS.onReady(async function () {
         // record shows its real SHAPE here too. This replaced canvas circleMarkers,
         // which could only express colour and therefore drew every record past the
         // lettered head as a circle regardless of its type.
-        var m = L.marker([it.lat, it.lng], {
-          icon: lfDivIcon('<div class="hspin hsrest" data-rid="' + HS.esc(String(it.id == null ? '' : it.id))
-            + '" style="line-height:0">' + HS.markerSVG(mk.shape, mk.color, '', 20) + '</div>', 20),
-          title:(mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||'')
-        }).addTo(lfMap);
-        m.on('click', function(){ if (it._restFacility) selectFacility(it); else openItem(it); });
-        m.bindTooltip((mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||''));
-        lfMarkers.push(m);
+        HS.markerPoints(it).forEach(function(pt){
+          var m = L.marker([pt.lat, pt.lng], {
+            icon: lfDivIcon('<div class="hspin hsrest" data-rid="' + HS.esc(String(it.id == null ? '' : it.id))
+              + '" style="line-height:0">' + HS.markerSVG(mk.shape, mk.color, '', 20) + '</div>', 20),
+            title:(mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||'')
+          }).addTo(lfMap);
+          m.on('click', function(){ if (it._restFacility) selectFacility(it); else openItem(it); });
+          m.bindTooltip((mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||''));
+          lfMarkers.push(m);
+        });
       });
     }
   }
