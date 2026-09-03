@@ -380,4 +380,52 @@ ok(/sys\.exit\(cli\(sys\.argv\)/.test(py), 'the CLI dispatcher is the entry poin
 ok(/require_snapshot\(\)/.test(py.slice(py.indexOf('def cli('))),
   'every command requires an explicit SNAPSHOT');
 
+// ---- 18. AUDIT-INSTRUCTION HARDENING (round 5b) ----
+
+// 18a. the consumability gate proves the FROZEN BASELINE, not just the declaration
+ok(/from preservation\.app_project_identity\s*\n\s*where snapshot_id=\{lit\(SNAPSHOT\)\} and record_kind='development'\) input_rows/.test(gateSeg),
+  'the shard/associate gate COUNTS the frozen baseline rows, not only the declaration');
+ok(/if int\(row\["input_rows"\]\) == 0:/.test(gateSeg),
+  'a declared-but-orphaned snapshot is refused by a live conditional in the gate itself');
+
+// 18b. geometry reconciliation asserts the SLOT, not just membership
+ok(/where feature_id is distinct from 'pt:1'\) wrong_feature_id/.test(geomVer),
+  'every canonical proven row is proved to be feature_id pt:1');
+ok(/where provenance is distinct from 'proven_stored_point'\) wrong_provenance/.test(geomVer),
+  'every canonical proven row is proved to carry provenance proven_stored_point');
+ok(/where provenance='proven_stored_point' or feature_id='pt:1'/.test(geomVer),
+  'the slot is claimed by EITHER marker — an OR also catches a squatted pt:1');
+ok(/GEOM_CHECKS = \("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",\s*\n\s*"wrong_feature_id", "wrong_provenance", "wrong_snapshot"\)/.test(syncSeg),
+  'the halt list and the printed list are ONE tuple — a new check cannot be reported but unenforced');
+ok(/bad = \[f"geometry\.\{k\}=\{g\[k\]\}" for k in GEOM_CHECKS/.test(syncSeg),
+  'the geometry halt iterates that same tuple');
+
+// 18c. completeness proves malformed rows impossible and the vocabulary closed
+ok(/\) malformed,/.test(py) && /\) bad_verdict_value,/.test(py),
+  'completeness measures malformed rows and out-of-vocabulary verdicts');
+ok(/if int\(v\["malformed"\]\) != 0:/.test(pubSeg),
+  'malformed verdict rows block READY via a live conditional');
+ok(/if int\(v\["bad_verdict_value"\]\) != 0:/.test(pubSeg),
+  'an out-of-vocabulary verdict blocks READY via a live conditional');
+
+// 18d. stored metrics are RECONCILED after the write, not assumed
+ok(/select sum\(value::bigint\) from jsonb_each_text\(reject_counts\)/.test(pubSeg),
+  'the STORED reason counts are read back and summed');
+ok(/if int\(chk\["count_sum"\] or -1\) != int\(v\["verdict_rows"\]\):/.test(pubSeg),
+  'stored reason counts must sum to verdict_rows — live conditional');
+ok(/if int\(chk\["stored_eligible"\]\) != int\(v\["eligible_rows"\]\):/.test(pubSeg),
+  'the stored ELIGIBLE bucket must equal eligible_rows — live conditional');
+ok(/if str\(chk\["fingerprint"\]\) != str\(v\["fingerprint"\]\):/.test(pubSeg),
+  'the stored fingerprint must match the derivation — live conditional');
+
+// 18e. BOTH reconciliations precede the sync write, by position not by narration
+const syncWrite = syncSeg.indexOf('canonical_synced_at = now()');
+ok(syncWrite > 0 && syncSeg.indexOf('g = verify_canonical_geometry_sets()') < syncWrite
+   && syncSeg.indexOf('r = verify_canonical_reject_sets()') < syncWrite,
+  'canonical_synced_at is written only AFTER both reconciliations have run');
+ok(syncSeg.indexOf('raise SystemExit("HALT: canonical sets do not match') < syncWrite,
+  'the halt on mismatch is positioned before the sync write, not after it');
+ok(syncSeg.indexOf('set canonical_synced_at=null') < syncSeg.indexOf('sql(stmt, tag)'),
+  'the barrier is cleared before the FIRST sweep mutation statement executes');
+
 process.exit(fails ? 1 : 0);

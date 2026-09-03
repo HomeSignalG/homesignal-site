@@ -416,11 +416,18 @@ def assert_snapshot_consumable():
     A shard requires BOTH. Consuming a READY-but-unsynced verdict would build associations
     from one universe while canonical geometry still held the previous one.
 
+    THREE claims, not two: the frozen INPUT must also still exist as ROWS. Declaration and
+    baseline can disagree - geo.n5_snapshot carries an orphan with zero rows in
+    preservation.app_project_identity - and a shard that trusted the declaration alone would
+    build associations against a baseline that is not there.
+
     No MAX(snapshot_id), no 'latest', no fallback, no partial BUILDING read, no FAILED read,
     and no shard-local coordinate fallback (that path no longer exists)."""
     require_snapshot()
     row = sql(f"""select
         (select count(*) from geo.n5_snapshot where snapshot_id={lit(SNAPSHOT)}) input_exists,
+        (select count(*) from preservation.app_project_identity
+          where snapshot_id={lit(SNAPSHOT)} and record_kind='development') input_rows,
         (select state from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)}) state,
         (select canonical_synced_at is not null from geo.n5_verdict_manifest
           where snapshot_id={lit(SNAPSHOT)}) synced,
@@ -430,6 +437,10 @@ def assert_snapshot_consumable():
     if int(row["input_exists"]) == 0:
         raise SystemExit(f"STOP: snapshot {SNAPSHOT} is not present in geo.n5_snapshot. It is "
                          f"not a known frozen input baseline.")
+    if int(row["input_rows"]) == 0:
+        raise SystemExit(f"STOP: snapshot {SNAPSHOT} is declared but has ZERO rows in "
+                         f"preservation.app_project_identity. ORPHAN / INPUT BASELINE ABSENT / "
+                         f"NOT CONSUMABLE - the declaration is not the baseline.")
     if row["state"] is None:
         raise SystemExit(f"STOP: no verdict manifest for snapshot {SNAPSHOT}. The global PROVEN "
                          f"verdict has never been built for it.")
@@ -457,7 +468,8 @@ with auth as (
     from preservation.app_project_identity i
     join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
    where a.treatment='PROVEN' and i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'),
-v as (select source_key, verdict from geo.n5_proven_verdict where snapshot_id={lit(SNAPSHOT)})
+v as (select source_key, verdict, ncoord, lat, lng from geo.n5_proven_verdict
+       where snapshot_id={lit(SNAPSHOT)})
 select (select count(*) from auth) expected_source_keys,
        (select count(*) from v) verdict_rows,
        (select count(distinct source_key) from v) verdict_distinct,
@@ -468,6 +480,17 @@ select (select count(*) from auth) expected_source_keys,
        (select count(*) from v where verdict='MULTI_COORD_UNRESOLVED') multi_coord,
        (select jsonb_object_agg(verdict, n) from
           (select verdict, count(*) n from v group by verdict) z) reject_counts,
+       -- MALFORMED rows must be impossible, not merely unlikely. The table's CHECK enforces
+       -- the ELIGIBLE contract, but this migration is not applied yet, so completeness proves
+       -- it independently rather than trusting a constraint that may not exist.
+       (select count(*) from v
+         where (verdict = 'ELIGIBLE'
+                and (ncoord is distinct from 1 or lat is null or lng is null))
+            or (verdict <> 'ELIGIBLE' and (lat is not null or lng is not null)
+                and verdict not in ('NULL_ISLAND','INVALID_COORD'))) malformed,
+       (select count(*) from v where verdict not in (
+          'ELIGIBLE','NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND',
+          'INVALID_COORD','MULTI_COORD_UNRESOLVED')) bad_verdict_value,
        (select md5(string_agg(source_key||'|'||verdict, ',' order by source_key collate "C"))
           from v) fingerprint;""", "verdict completeness")[0]
 
@@ -628,8 +651,8 @@ def publish_verdict():
 
     # 3 - VALIDATE. Completeness is ENFORCED here, not merely reported.
     v = validate_verdict_completeness()
-    for k in ("expected_source_keys", "verdict_rows", "eligible_rows", "missing", "extra",
-              "multi_coord"):
+    for k in ("expected_source_keys", "verdict_rows", "eligible_rows", "rejected_rows",
+              "missing", "extra", "multi_coord", "malformed", "bad_verdict_value"):
         say("  " + k, v[k])
     problems = []
     if v["expected_source_keys"] is None or int(v["expected_source_keys"]) == 0:
@@ -651,6 +674,11 @@ def publish_verdict():
         problems.append("fingerprint is null")
     if v["reject_counts"] is None:
         problems.append("reject_counts is null")
+    if int(v["malformed"]) != 0:
+        problems.append(f"{v['malformed']} verdict row(s) are malformed for their own verdict")
+    if int(v["bad_verdict_value"]) != 0:
+        problems.append(f"{v['bad_verdict_value']} verdict row(s) carry a value outside the "
+                        f"declared vocabulary")
     if problems:
         # FAILED is safe to record: canonical_synced_at is already NULL, so the snapshot stays
         # unconsumable either way. If even this write fails, the row remains BUILDING - also
@@ -673,12 +701,27 @@ def publish_verdict():
                    reject_counts={lit(json.dumps(v['reject_counts']))}::jsonb,
                    fingerprint={lit(v['fingerprint'])}
              where snapshot_id={lit(SNAPSHOT)} and state='BUILDING';""", "manifest READY")
-    chk = sql(f"""select state, canonical_synced_at is null unsynced
+    # READ BACK from the DB and reconcile the STORED metrics against the derivation. A count
+    # computed and a count durably written are different facts (CLAUDE.md rule 8): a truncated
+    # or garbled jsonb write would otherwise sit under a READY row looking authoritative.
+    chk = sql(f"""select state, canonical_synced_at is null unsynced, verdict_rows, fingerprint,
+                    (select sum(value::bigint) from jsonb_each_text(reject_counts)) count_sum,
+                    coalesce((reject_counts->>'ELIGIBLE')::bigint, 0) stored_eligible
                     from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)};""",
               "manifest verify")[0]
     if str(chk["state"]) != "READY":
         raise SystemExit(f"STOP: manifest for {SNAPSHOT} did not reach READY (state="
                          f"{chk['state']}). Another writer changed it mid-publish.")
+    if int(chk["count_sum"] or -1) != int(v["verdict_rows"]):
+        raise SystemExit(f"STOP: stored reason counts for {SNAPSHOT} sum to {chk['count_sum']}, "
+                         f"not verdict_rows {v['verdict_rows']}. The written metrics do not "
+                         f"reconcile with the derivation.")
+    if int(chk["stored_eligible"]) != int(v["eligible_rows"]):
+        raise SystemExit(f"STOP: stored ELIGIBLE count {chk['stored_eligible']} != "
+                         f"eligible_rows {v['eligible_rows']} for {SNAPSHOT}.")
+    if str(chk["fingerprint"]) != str(v["fingerprint"]):
+        raise SystemExit(f"STOP: stored fingerprint for {SNAPSHOT} does not match the "
+                         f"derivation. The manifest was not written as computed.")
     say("verdict state", "READY  (canonical sweep NOT yet run)")
     say("verdict fingerprint", v["fingerprint"])
     return v
@@ -692,8 +735,13 @@ def verify_canonical_geometry_sets():
     return sql(f"""
 with elig as (select source_key, lat, lng from geo.n5_proven_verdict
                where snapshot_id={lit(SNAPSHOT)} and verdict='ELIGIBLE'),
-     can  as (select source_key, geom, verdict_snapshot_id from geo.n5_geom
-               where provenance='proven_stored_point')
+     -- The slot is claimed by EITHER marker, deliberately: an OR (not an AND) also catches a
+     -- recovered row squatting 'pt:1' and a proven row filed under some other feature_id.
+     -- Relying on the biconditional CHECK would verify the constraint, not the sweep - and
+     -- that constraint is not applied yet.
+     can  as (select source_key, feature_id, provenance, geom, verdict_snapshot_id
+                from geo.n5_geom
+               where provenance='proven_stored_point' or feature_id='pt:1')
 select (select count(*) from (select source_key from elig
                               except select source_key from can) t) eligible_not_canonical,
        (select count(*) from (select source_key from can
@@ -702,6 +750,9 @@ select (select count(*) from (select source_key from elig
          where c.geom is null
             or abs(ST_X(c.geom) - e.lng) > 1e-9
             or abs(ST_Y(c.geom) - e.lat) > 1e-9) coord_mismatch,
+       (select count(*) from can where feature_id is distinct from 'pt:1') wrong_feature_id,
+       (select count(*) from can
+         where provenance is distinct from 'proven_stored_point') wrong_provenance,
        (select count(*) from can
          where verdict_snapshot_id is distinct from {lit(SNAPSHOT)}) wrong_snapshot;""",
                "verify geometry sets")[0]
@@ -767,15 +818,14 @@ def sync_canonical():
 
     g = verify_canonical_geometry_sets()
     r = verify_canonical_reject_sets()
-    for k in ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
-              "wrong_snapshot"):
+    GEOM_CHECKS = ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
+                   "wrong_feature_id", "wrong_provenance", "wrong_snapshot")
+    for k in GEOM_CHECKS:
         say("  geometry " + k, g[k])
     for k in ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
               "wrong_snapshot", "eligible_still_rejected"):
         say("  reject " + k, r[k])
-    bad = [f"geometry.{k}={g[k]}" for k in
-           ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
-            "wrong_snapshot") if int(g[k]) != 0]
+    bad = [f"geometry.{k}={g[k]}" for k in GEOM_CHECKS if int(g[k]) != 0]
     bad += [f"reject.{k}={r[k]}" for k in
             ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
              "wrong_snapshot", "eligible_still_rejected") if int(r[k]) != 0]
