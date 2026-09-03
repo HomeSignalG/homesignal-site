@@ -878,3 +878,124 @@ mechanically across the branch: **no arm token equals its workflow's `EXPECTED_A
 probe (`n5-geocode-probe-arm`, `n5-rpc-apply-arm`) is disarmed, so no accidentally armed
 production probe is left behind. The workflow file is retained, disarmed, as the documented record
 of how the proof was run — the same convention as `epa-recovery-watch.yml`.
+
+---
+
+## 19. FIRST END-TO-END STREET-ADDRESS RADIUS PROOF — **PASSED**, 2026-09-03 23:19:44Z
+
+**Outcome: A — END-TO-END STREET-ADDRESS RADIUS PROOF PASSED.** The complete production path
+executed for the first time:
+
+> **one real street address → production `geocode-address` → the lat/lng it returned →
+> production `public.n5_projects_within_radius` → a bounded canonical nearby-project result**
+
+**Test type:** STREET ADDRESS → PRODUCTION GEOCODER → N5 RADIUS
+**Execution surface:** GitHub Actions `ubuntu-latest`, `.github/workflows/n5-e2e-address-radius.yml`,
+run **33817080874**, job `100851488526`, head **`e99d812`**. Chosen because it is the only existing
+authorized pattern that reaches **both** halves in one execution context — §18 proved the HTTPS
+half here, §§13–16 proved the PG-wire half here. No new architecture, no `pg_net`, no direct Census
+call.
+**Input address:** `2200 CALDWELL LN, DEL VALLE, TX 78617`
+
+### Geocoder — invocation 1 of 2
+
+| | |
+|---|---|
+| invocations | **1** (no retry, no second spelling, no second address) |
+| HTTP status | **200** |
+| matched address | `2200 CALDWELL LN, DEL VALLE, TX, 78617` |
+| **latitude** | **`30.215054966235`** |
+| **longitude** | **`-97.53885104845`** |
+| other metadata | `zip 78617`, `city DEL VALLE`, `state TX` |
+| match-quality fields returned | **NONE** — no classification claimed |
+
+### Chain of custody — the central assertion, enforced byte-wise
+
+The raw lat/lng **text** was lifted straight out of the HTTP response body by regex and
+substituted verbatim into the SQL — never parsed to a float and re-printed, never rounded, never
+transformed, never looked up in `geo.n5_geom`, and never replaced by the §18 value. The exact
+statement sent, printed by the run:
+
+```
+  from public.n5_projects_within_radius(30.215054966235, -97.53885104845, 0.5, 5) r;
+```
+
+A `grep -F` gate then required that literal to contain the raw geocoder text, and would have
+failed the job otherwise:
+
+> `CHAIN OF CUSTODY: SQL argument is byte-identical to the geocoder's raw lat/lng text`
+
+**geocoder lat `30.215054966235` = RPC `p_lat` `30.215054966235` ✅ ·
+geocoder lng `-97.53885104845` = RPC `p_lng` `-97.53885104845` ✅**
+
+⚠️ **These happen to equal the §18 control exactly — which is corroboration, not the source.**
+The values used were produced by **this run's** geocoder call and carried forward mechanically;
+the §18 numbers rode along only as `CONTROL_LAT`/`CONTROL_LNG` and were never substituted. A
+separate assertion also proved the raw text round-trips to the parsed value, so "raw" could not
+silently be something else.
+
+### Radius RPC — invocation 2 of 2
+
+Radius **0.5 mi**, `p_limit` **5**, invoked at `23:19:44.194920647Z`, returned
+`23:19:44.900012205Z` (**~0.71 s**). **2 rows**, in the function's own emission order
+(`row_number() over ()`, empty window — never re-sorted):
+
+| # | source_key | feature_id | registry_id | provenance | distance_mi | geometry_type | has_more |
+|---|---|---|---|---|---:|---|---|
+| 1 | `socrata:data.austintexas.gov:mavg-96ck:SP-2021-0320D` | `pt:1` | `austin-site-plan-cases` | `proven_stored_point` | **0.021017590124** | ST_Point | f |
+| 2 | `socrata:data.austintexas.gov:mavg-96ck:SP-2020-0236D` | `pt:1` | `austin-site-plan-cases` | `proven_stored_point` | **0.278213114517** | ST_Point | f |
+
+**`proven_stored_point` = 2 · `recovered_authoritative` = 0** — classes reported separately and
+never collapsed. A stored point is the snapshot's asserted coordinate, **not** recovered publisher
+geometry.
+
+**Distance bounds:** 0.021017590124 .. 0.278213114517, all `>= 0` and `<= 0.5` ✅
+**Emission ordering:** non-decreasing ✅ **Tie ordering:** **NOT EXERCISED** — both distances
+distinct, so the tie-break never arbitrated; reported as not-exercised, not as a pass.
+**`has_more` = `f`**, identical on both rows, read from the explicit column.
+**Interpretation:** *this was the complete eligible canonical radius result at this query
+transaction* — **not** "no further canonical geometry can ever exist there". The RECOVERY corpus
+is live (§16 ruling), so the result is point-in-time.
+
+Zero rows would have been a legitimate outcome for a real street address, and the workflow was
+built to exit 0 and say so honestly. It did not arise: two real Austin site-plan cases sit within
+0.5 miles of the address.
+
+### HARD controls — verified before AND after both calls
+
+`rpc 1 overload / postgres / SECURITY DEFINER / STABLE / search_path=public` · manifest **READY** ·
+`canonical_synced_at` **2026-09-03 20:49:04.959655+00 → identical** · PROVEN **718,278** ·
+fingerprint **`bbda250fc30ee0b3aa3f46a259392aa3`** · rejects **5,171** · wrong-snapshot PROVEN
+**0** · rejected identities with RPC-visible PROVEN geometry **0**. The same fail-closed block ran
+pre and post; both passed.
+
+### OBSERVATIONAL — live RECOVERY corpus
+
+| | before 23:19:39.892434Z | after 23:19:48.330792Z | delta |
+|---|---:|---:|---:|
+| geometry total | 742,722 | 742,722 | **0** |
+| recovered_authoritative | 24,444 | 24,444 | **0** |
+| association | 23,711 | 23,711 | **0** |
+| shards done / pending / running | 141 / 402 / **1** | 141 / 402 / **1** | 0 |
+
+A shard was **running** throughout and the campaign was neither paused nor altered; it simply did
+not complete a unit inside the ~9-second window, so nothing needed attributing.
+
+### Side effects
+
+`geocode-address` application-data writes **none** (a nine-check source gate re-proved it
+write-free on the runner immediately before the request) · N5 RPC data writes **none** (the
+function is `STABLE`; every hard control identical) · Map 1 modifications **none**. Ordinary CI
+logs are not application-data mutation.
+
+### Probe disarmed
+
+`.github/n5-e2e-arm` now reads `DISARMED-2026-09-03-after-e2e-proof`. Verified mechanically across
+the branch: **no arm token equals its workflow's `EXPECTED_ARM`** — `n5-e2e-arm`,
+`n5-geocode-probe-arm` and `n5-rpc-apply-arm` are all disarmed, so no accidentally armed production
+probe remains. The workflow files are retained disarmed, per the `epa-recovery-watch.yml`
+convention.
+
+⚠️ **Scope.** This proves the *machinery* end to end for one address at one radius. It does not
+establish source completeness for that address, that neighbourhood, or anywhere else, and it is
+not a Map 1 implementation.
