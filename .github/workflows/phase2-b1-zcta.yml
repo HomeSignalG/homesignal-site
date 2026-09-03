@@ -50,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -71,6 +71,11 @@ on:
         description: 'n5-boundary-first: comma-separated ZIP3 list, run sequentially in one process'
         required: false
         default: ''
+        type: string
+      marker_mode:
+        description: 'n5-a3-marker: measure (component primitives) | build (marker relation)'
+        required: false
+        default: 'measure'
         type: string
       registry_id:
         description: 'n5-acquire: the ONE registry_id to acquire in full'
@@ -242,6 +247,16 @@ jobs:
           DISK_FLOOR_MB: '2048'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_a3_clip_stats.py
+
+      - name: N5 Unit A3 - authoritative marker grain (measure primitives | build relation)
+        if: ${{ github.event.inputs.mode == 'n5-a3-marker' }}
+        env:
+          MODE: n5-a3-marker
+          MARKER_MODE: ${{ github.event.inputs.marker_mode }}
+          SNAPSHOT: phase1-2026-09-01
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_a3_markers.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
