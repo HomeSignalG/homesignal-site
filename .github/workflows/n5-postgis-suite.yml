@@ -68,7 +68,42 @@ jobs:
           echo "POSTGIS:    $(psql -h localhost -U postgres -d n5_disposable -tAc 'select postgis_full_version();')"
           psql -h localhost -U postgres -d n5_disposable -tAc "select 1 from pg_extension where extname='postgis';" | grep -q 1
 
+      # The receipt has to be readable. Without this the suite's own output is buried
+      # under the service container's Postgres log, which Actions appends at teardown.
       - name: Run the executable N5 database suite
         env:
           N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_disposable"
-        run: python3 test/n5_pg/run_suite.py
+        run: |
+          set -o pipefail
+          python3 test/n5_pg/run_suite.py 2>&1 | tee /tmp/n5-suite.log
+        continue-on-error: true
+        id: suite
+
+      - name: Publish the receipt (versions + PASS/FAIL summary + any failures)
+        if: always()
+        env:
+          PGPASSWORD: postgres
+        run: |
+          {
+            echo '## N5 executable PostgreSQL + PostGIS receipt'
+            echo ''
+            echo '```'
+            psql -h localhost -U postgres -d n5_disposable -tAc 'select version();'
+            psql -h localhost -U postgres -d n5_disposable -tAc "select 'POSTGIS ' || postgis_lib_version();"
+            echo ''
+            sed -n '/^=\{20,\}$/,$p' /tmp/n5-suite.log | head -60
+            echo '```'
+            echo ''
+            echo '### Failing assertions'
+            echo '```'
+            grep '^FAIL' /tmp/n5-suite.log || echo '(none)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^(PASS|FAIL)' /tmp/n5-suite.log | tail -90
+          sed -n '/^=\{20,\}$/,$p' /tmp/n5-suite.log
+
+      - name: Fail the job if any executable assertion failed
+        if: steps.suite.outcome != 'success'
+        run: |
+          echo "The executable database suite reported failures - see the job summary."
+          exit 1
