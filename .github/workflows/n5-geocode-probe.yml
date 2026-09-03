@@ -1,0 +1,170 @@
+name: n5-geocode-probe
+
+# BOUNDED ONE-SHOT PROBE — street address -> production geocode-address -> coordinate.
+#
+# WHY THIS EXISTS: the Claude Code sandbox cannot open a TCP tunnel to *.supabase.co (the
+# agent proxy answers 403 to CONNECT; recorded in docs/n5-spatial-read-rpc-readiness.md §17).
+# That is an environment/transport block, NOT a HomeSignal geocoder failure, and the founder
+# ruled the fix is to run the proof from an existing authorized surface rather than to alter
+# the application architecture.
+#
+# EXISTING AUTHORIZED PATTERN it follows, not a new one:
+#   * CLAUDE.md §5: "the build sandbox can't reach Supabase/homesignal.net (egress blocked),
+#     so .github/workflows/verify-communities.yml + scripts/verify-communities.mjs do the live
+#     check on a GitHub runner."
+#   * verify-development.yml: "Runs where network egress works (GitHub-hosted runner), the
+#     piece the build sandbox cannot do", and scripts/verify-development.mjs already issues
+#     live HTTPS to .../functions/v1/get-address-report — the committed precedent for calling
+#     a production EDGE FUNCTION from CI.
+#   * That script reads the endpoint + public anon key out of the SHIPPED page "so nothing is
+#     forked". This probe does the same, from config.js.
+#   * Arming-token convention, as used by .github/epa-recovery-armed and by every N5 unit in
+#     this series.
+#
+# NOT verify-edge-function.yml: that workflow states it "NEVER calls the live database, the
+# Census geocoder, the Supabase project, or the deployed Edge Function". Using it would
+# contradict its own contract.
+#
+# SCOPE, hard: ONE request, ONE address, to ONE endpoint. It does NOT call
+# get-address-report, does NOT call the Census geocoder directly, does NOT touch the database,
+# and does NOT invoke public.n5_projects_within_radius. No secrets: the public anon key is
+# read from the shipped config.js. permissions: contents:read — it cannot write to the repo.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-geocode-probe.yml'
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_ARM: arm-2026-09-03-geocode-probe
+  ADDRESS: '2200 CALDWELL LN, DEL VALLE, TX 78617'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - no network contact unless deliberately armed
+        id: arm
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-geocode-probe-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED. No request will be made."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: ZERO-APPLICATION-WRITE GATE - re-prove geocode-address from current source
+        run: |
+          set -euo pipefail
+          # Re-proven ON THE RUNNER, against the checked-out source, immediately before the
+          # call. If geocode-address ever gains a DB client, a cache or a write, this fails
+          # and the request is never made.
+          python3 - <<'PY'
+          import re, sys
+          s = open("supabase/functions/geocode-address/index.ts").read()
+          checks = [
+            ("no supabase-js / createClient", not re.search(r"@supabase/supabase-js|createClient", s)),
+            ("no service-role or project key", not re.search(r"SERVICE_KEY|SERVICE_ROLE|SUPABASE_URL", s)),
+            ("no DB client or table access",   not re.search(r"\.from\(|postgres|Pool|Client\(", s)),
+            ("no persistent geocode cache",    not re.search(r"geocode-cache|resolveGeocode|supabaseStore|GeocodeStore", s)),
+            ("no insert/upsert/update/delete", not re.search(r"\b(insert|upsert|update|delete)\s*\(", s, re.I)),
+            ("no local persistence",           not re.search(r"Deno\.write|openKv|localStorage", s)),
+            ("proxies Census onelineaddress",  "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in s),
+            ("benchmark Public_AR_Current",    "benchmark=Public_AR_Current" in s),
+            ("exactly one outbound fetch",     len(re.findall(r"\bfetch\(", s)) == 1),
+          ]
+          bad = 0
+          for n, ok in checks:
+              print(("PASS " if ok else "FAIL ") + n)
+              bad += (0 if ok else 1)
+          if bad:
+              print(f"::error::{bad} zero-write check(s) failed - NOT making the request")
+              sys.exit(1)
+          print("ZERO-APPLICATION-WRITE CONFIRMED")
+          PY
+
+      - name: EXACTLY ONE request to the production geocode-address Edge Function
+        run: |
+          set -euo pipefail
+          # Endpoint + public anon key read from the SHIPPED config.js so nothing is forked
+          # (the scripts/verify-development.mjs principle). The anon key is public by design;
+          # it is not echoed.
+          URL="$(grep -o "SUPABASE_URL: '[^']*'" config.js | sed "s/.*: '//;s/'$//")"
+          KEY="$(grep -o "SUPABASE_ANON_KEY: '[^']*'" config.js | sed "s/.*: '//;s/'$//")"
+          echo "endpoint : $URL/functions/v1/geocode-address"
+          echo "address  : $ADDRESS"
+          echo "key len  : ${#KEY} (public anon key, not printed)"
+          BODY=$(python3 -c 'import json,os;print(json.dumps({"address":os.environ["ADDRESS"]}))')
+          echo "invoked_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          # --retry 0: a single attempt. A failure is reported, never retried.
+          HTTP=$(curl -sS --retry 0 --max-time 60 \
+                   -o /tmp/geocode.json -w '%{http_code}' \
+                   -X POST "$URL/functions/v1/geocode-address" \
+                   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                   -H "Content-Type: application/json" \
+                   -d "$BODY")
+          echo "returned_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          echo "HTTP_STATUS=$HTTP"
+          echo "--- raw response body ---"
+          cat /tmp/geocode.json; echo
+          echo "$HTTP" > /tmp/http_status.txt
+
+      - name: ASSERT the coordinate, and its N5 input-domain compatibility (offline)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, sys
+          status = open("/tmp/http_status.txt").read().strip()
+          raw = open("/tmp/geocode.json").read()
+          print("HTTP status:", status)
+          if status != "200":
+              print("::error::non-200 from geocode-address"); sys.exit(1)
+          d = json.loads(raw)
+          if d.get("error"):
+              print("::error::geocoder_unavailable - a service outage, NOT a no-match"); sys.exit(1)
+          m = d.get("match")
+          if m is None:
+              print("::error::match:null - the geocoder returned NO MATCH for this address"); sys.exit(1)
+          lat, lng = m.get("lat"), m.get("lng")
+          print("matched_address :", m.get("matchedAddress"))
+          print("latitude        :", lat)
+          print("longitude       :", lng)
+          print("zip             :", m.get("zip"))
+          print("city            :", m.get("city"))
+          print("state           :", m.get("state"))
+          print("fields returned :", sorted(m.keys()))
+          # Match quality: report ONLY what the response actually supplies.
+          quality = [k for k in m if k.lower() in
+                     ("match_type","matchtype","quality","precision","accuracy","confidence","side")]
+          print("match-quality fields actually returned:", quality if quality else "NONE")
+          bad = 0
+          def chk(name, ok):
+              global bad
+              print(("PASS " if ok else "FAIL ") + name)
+              bad += (0 if ok else 1)
+          chk("latitude is not null",  lat is not None)
+          chk("longitude is not null", lng is not None)
+          chk("latitude is a finite number",  isinstance(lat,(int,float)) and lat == lat and abs(lat) != float("inf"))
+          chk("longitude is a finite number", isinstance(lng,(int,float)) and lng == lng and abs(lng) != float("inf"))
+          chk("-90 <= latitude <= 90",     lat is not None and -90  <= lat <= 90)
+          chk("-180 <= longitude <= 180",  lng is not None and -180 <= lng <= 180)
+          # N5 INPUT-DOMAIN COMPATIBILITY - a TYPE/RANGE assertion only. The RPC is NOT called,
+          # geo.n5_geom is NOT queried, and no radius search is reproduced here.
+          chk("p_lat accepts it (double precision, in RPC's validated range)",
+              isinstance(lat,(int,float)) and -90 <= lat <= 90)
+          chk("p_lng accepts it (double precision, in RPC's validated range)",
+              isinstance(lng,(int,float)) and -180 <= lng <= 180)
+          if bad:
+              print(f"::error::{bad} coordinate assertion(s) failed"); sys.exit(1)
+          print()
+          print("ADDRESS -> COORDINATE PROOF PASSED")
+          print("N5 RPC input-domain compatible: YES (domain only; the RPC was NOT invoked)")
+          PY
