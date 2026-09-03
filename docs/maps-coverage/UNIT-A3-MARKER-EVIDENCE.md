@@ -285,3 +285,85 @@ and the functions `n5_a3_projects_one_pass`, `n5_a3_bench_one`. The scratch boun
 `geo.n5_a3_descriptive_pool` (48,032 rows) is analysis scaffolding — a one-sequential-scan copy
 of the in-scope `app_projects` development rows, used so Step 10 did not need 1,875 index probes
 (~8 minutes). It is not part of the read product and can be dropped.
+
+## 14. Query plan (Step 11)
+
+The proposed one-pass shadow read does **not** plan as one sequential scan. The planner chooses
+a **Memoized nested loop over an index scan** on `app_projects_zip_source_key_uidx`.
+
+The reason is structural: that is the ONLY index containing `source_key`, and `source_key` is its
+**second** column, so each distinct key costs a full 431 MB index scan (~54,300 buffers per loop,
+all cache hits when warm). The heap is 2,870 MB against 1,024 MB of `shared_buffers`, so the
+sequential-scan alternative can never be cached.
+
+Forcing the set-based plan (`enable_indexscan/bitmapscan/memoize=off`, inside a rolled-back
+transaction) measured the alternative directly on 06390:
+
+- memoized index nested loop — **1,788 ms** (`shared hit=381,350 read=2`)
+- forced seq scan + hash join — **31,740 ms** (`hit=14,004 read=353,376 dirtied=106,749 written=58,113`)
+
+**17.8x slower**, and it additionally evicts the 431 MB index from the buffer pool.
+
+The **`n5_association` bounding strategy was tested and REJECTED**: of 17,125 `(source_key, zip)`
+pairs present in `app_projects` for the 1,875 in-scope keys, **4,983 (29.1%) are absent from it**,
+so bounding the index by it would silently drop **6,477 of 48,032 rows (13.5%)** — fail-open.
+
+## 15. All-346 benchmark (Step 12)
+
+Executed, not extrapolated: every one of the 346 cutover candidates, twice, timed server-side so
+network latency is excluded. Run 33790218669.
+
+| | pass 1 (cold-ish) | pass 2 (warm/repeat) |
+|---|---:|---:|
+| ZIPs | 346 | 346 |
+| project total | 1,519.7 s (25.3 min) | 1,453.8 s (24.2 min) |
+| project p50 | 2,662.1 ms | 2,530.4 ms |
+| project p95 | 13,425.4 ms | 13,002.5 ms |
+| project p99 | 18,541.2 ms | 17,646.1 ms |
+| project max | 21,735.2 ms | 21,969.9 ms |
+| marker p50 / p95 / max | 4.86 / 6.25 / 10.41 ms | 4.75 / 5.22 / 32.31 ms |
+| combined p50 / p95 / max | 2,627.6 / 12,896.0 / 20,672.1 ms | 2,394.8 / 13,120.7 / 20,992.5 ms |
+| timeouts (> 30 s) | **0** | **0** |
+| rows returned | 5,842 project · 13,218 marker | 5,842 · 13,218 |
+
+Control: rows returned equal the authoritative counts exactly in both passes.
+
+**Warm is only ~4% faster than cold-ish.** The 431 MB index is already resident, so this cost is
+index-scan CPU, not I/O — warming cannot rescue it, and neither can a bigger cache.
+
+Named ZIPs, measured individually one call per statement (warm):
+
+| ZIP | pick | distinct source_keys | project time |
+|---|---|---:|---:|
+| 01009 | measured-zero, boundary_complete | 0 | ~1 ms (never touches `app_projects`) |
+| 01003 | smallest nonzero | 1 | 286 ms |
+| 06390 | named | 7 | 1,788 ms |
+| 01026 | median | 9 | 2,211 ms |
+| 06242 | p95 | 54 | 15,543 ms |
+| 06360 | largest | 86 | 21,288 ms |
+
+Cost is linear at ~245-290 ms per distinct source_key. A zero-membership ZIP is free, so the
+honest-empty case costs nothing.
+
+⚠️ **An instrument fault is recorded rather than hidden.** An early attempt timed three calls in
+one statement using `clock_timestamp()` in the target list. PostgreSQL does not guarantee
+target-list evaluation order, so its split (14.0 / 32562.4 / 4723.8 ms) was not valid
+attribution — the call it charged 32,562 ms measures 286 ms. All figures above were re-measured
+one call per statement.
+
+## 16. Index decision (Step 13)
+
+**YES - a new index is required.** p50 2.5 s and p95 13.0 s for a browser-facing RPC is not
+servable, and the cause is structural rather than tuning: no index leads on `source_key`.
+
+Sizing for `app_projects(source_key, record_kind)`, **not created**:
+
+- `pg_stats` avg widths: `source_key` 46 bytes, `record_kind` 11; `reltuples` 3,211,106.
+- A naive formula gives ~283 MB, but the **measured comparable disagrees**:
+  `app_projects_zip_source_key_uidx` carries a 54-byte payload and occupies **431 MB**, while
+  this index's payload is 57 bytes. Taking the empirical anchor over the formula, expect
+  **~455 MB**.
+- Capacity: free 3,416.3 MB against the 2,048 MB floor → **~1,368 MB of headroom**, so it fits
+  with roughly 900 MB to spare.
+
+Creating it remains the founder's call. It was not created.
