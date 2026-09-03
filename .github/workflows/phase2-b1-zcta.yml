@@ -264,6 +264,10 @@ jobs:
         env:
           MODE: n5-a3-marker
           MARKER_MODE: ${{ github.event.inputs.marker_mode }}
+          # Optional. Restricts a build to the named prefixes so a batch never rebuilds
+          # markers under ZIPs that are already production_geography_verified (the
+          # delete/insert window would make those live pages raise). Empty = all.
+          PREFIXES: ${{ github.event.inputs.prefixes }}
           SNAPSHOT: phase1-2026-09-01
           DISK_FLOOR_MB: '2048'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

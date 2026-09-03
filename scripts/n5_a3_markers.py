@@ -288,8 +288,34 @@ def bench():
 
 
 def prefixes():
-    return [r["z3"].strip() for r in sql(
+    """Prefixes to (re)build, honouring an optional explicit PREFIXES restriction.
+
+    WHY the restriction exists, and it is a production-safety property rather than a
+    convenience: build mode is `delete ... where left(zcta5,3)=PFX` followed by an
+    insert, so while a prefix is being rebuilt its ZIPs momentarily carry ZERO markers.
+    public.app_authoritative_projects_for_zip raises on "marker count != relation count"
+    and never falls back to legacy - correctly, that is the fail-closed contract - so
+    rebuilding a prefix that is already production_geography_verified would make those
+    live ZIP pages ERROR for the width of the rebuild.
+
+    Passing PREFIXES keeps a batch off ZIPs that are already serving. Unset it and the
+    behaviour is exactly as before (every membership prefix), so nothing existing moves.
+
+    A named prefix carrying no membership rows is a HARD ERROR, not a silent skip: a
+    restriction that selects nothing looks exactly like one that worked.
+    """
+    live = [r["z3"].strip() for r in sql(
         "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership order by 1;", "prefixes")]
+    want = [p.strip() for p in os.environ.get("PREFIXES", "").split(",") if p.strip()]
+    if not want:
+        return live
+    missing = [p for p in want if p not in live]
+    if missing:
+        raise SystemExit(
+            "STOP: PREFIXES names prefixes with no zip_authoritative_membership rows: "
+            + ",".join(missing))
+    say("PREFIXES restriction", f"{len(want)} of {len(live)} membership prefixes")
+    return [p for p in live if p in want]
 
 
 def ensure_scratch():
