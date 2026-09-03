@@ -213,6 +213,80 @@ select b.zcta5, m.source_key,
 """
 
 
+# Benchmark. Timed SERVER-SIDE so network latency is excluded, one row per (ZIP, pass).
+# The project half and the marker half are timed separately, then together, because they are
+# different questions: only the project half has to touch public.app_projects.
+BENCH_FN = """
+create table if not exists geo.n5_a3_bench (
+  zip char(5) not null, pass_no int not null, n_keys int,
+  ms_project double precision, rows_project int,
+  ms_marker double precision, rows_marker int,
+  ms_combined double precision, run_id text not null,
+  measured_at timestamptz not null default now(),
+  primary key (zip, pass_no));
+alter table geo.n5_a3_bench enable row level security;
+revoke all on geo.n5_a3_bench from public;
+
+create or replace function geo.n5_a3_bench_one(p_zip text, p_pass int, p_run text)
+returns void language plpgsql as $fn$
+declare t0 timestamptz; t1 timestamptz; t2 timestamptz; t3 timestamptz;
+        rp int; rm int; nk int;
+begin
+  select count(*) into nk from geo.zip_authoritative_membership where zcta5 = p_zip;
+  t0 := clock_timestamp();
+  select jsonb_array_length(geo.n5_a3_projects_one_pass(p_zip)) into rp;
+  t1 := clock_timestamp();
+  select count(*) into rm from geo.zip_authoritative_marker where zcta5 = p_zip;
+  t2 := clock_timestamp();
+  perform geo.n5_a3_projects_one_pass(p_zip);
+  perform count(*) from geo.zip_authoritative_marker where zcta5 = p_zip;
+  t3 := clock_timestamp();
+  insert into geo.n5_a3_bench (zip, pass_no, n_keys, ms_project, rows_project,
+                               ms_marker, rows_marker, ms_combined, run_id)
+  values (p_zip, p_pass, nk,
+          extract(epoch from (t1-t0))*1000, rp,
+          extract(epoch from (t2-t1))*1000, rm,
+          extract(epoch from (t3-t2))*1000, p_run)
+  on conflict (zip, pass_no) do update set
+    n_keys=excluded.n_keys, ms_project=excluded.ms_project, rows_project=excluded.rows_project,
+    ms_marker=excluded.ms_marker, rows_marker=excluded.rows_marker,
+    ms_combined=excluded.ms_combined, run_id=excluded.run_id, measured_at=now();
+end $fn$;
+revoke all on function geo.n5_a3_bench_one(text,int,text) from public;
+"""
+
+
+def bench():
+    """All 346 cutover candidates, two passes. No extrapolation: every ZIP is executed."""
+    sql(BENCH_FN, "bench harness")
+    zips = [r["zip"].strip() for r in sql(
+        "select zip::text zip from geo.maps_zip_geography_status "
+        "where note like '%cutover flag cleared 2026-09-03%' order by zip;", "346 zips")]
+    say("ZIPs to benchmark", len(zips))
+    if len(zips) != 346:
+        raise SystemExit(f"STOP: expected 346 cutover candidates, found {len(zips)}")
+    for p in (1, 2):
+        say("PASS", f"{p} ({'cold-ish' if p == 1 else 'warm/repeat'})")
+        t0 = time.time()
+        for i in range(0, len(zips), 2):
+            chunk = zips[i:i + 2]
+            sql(";".join(f"select geo.n5_a3_bench_one({lit(z)},{p},{lit(RUN_ID)})" for z in chunk) + ";",
+                f"bench p{p} {chunk[0]}")
+            if (i // 2) % 25 == 0:
+                say("  progress", f"{min(i+2, len(zips))}/{len(zips)}  {time.time()-t0:.0f}s")
+        say(f"PASS {p} wall seconds", round(time.time() - t0, 1))
+    for row in sql("""select pass_no, count(*) n, round((sum(ms_project)/1000.0)::numeric,1) total_s,
+                 round(percentile_disc(0.5) within group (order by ms_project)::numeric,1) p50,
+                 round(percentile_disc(0.95) within group (order by ms_project)::numeric,1) p95,
+                 round(percentile_disc(0.99) within group (order by ms_project)::numeric,1) p99,
+                 round(max(ms_project)::numeric,1) mx,
+                 round(max(ms_marker)::numeric,2) marker_mx
+               from geo.n5_a3_bench group by pass_no order by pass_no;""", "summary"):
+        say(f"pass {row['pass_no']}: n / total_s / p50 / p95 / p99 / max / marker_max",
+            f"{row['n']} / {row['total_s']} / {row['p50']} / {row['p95']} / "
+            f"{row['p99']} / {row['mx']} / {row['marker_mx']}")
+
+
 def prefixes():
     return [r["z3"].strip() for r in sql(
         "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership order by 1;", "prefixes")]
@@ -267,6 +341,10 @@ def main():
                alter table geo.n5_a3_merged_component enable row level security;
                revoke all on geo.n5_a3_merged_component from public;""", "merged table")
         stmt, tbl = MERGED, "geo.n5_a3_merged_component"
+    elif MODE == "bench":
+        bench()
+        say("AFTER free disk MB", round(disk(), 1))
+        return
     elif MODE == "bench":
         bench()
         say("AFTER free disk MB", round(disk(), 1))
