@@ -165,7 +165,7 @@ result indistinguishable from "nothing near this home". The apply gate below ver
 | suite | where | result |
 |---|---|---|
 | Static contract guards | `test/n5-spatial-read-rpc.test.mjs` (offline) | **82/82** |
-| Executable contract suite | `test/n5_spatial_pg/run_suite.py` on PostGIS 16-3.4 and 17-3.5 | see `n5-spatial-rpc-suite` CI |
+| Executable contract suite | `test/n5_spatial_pg/run_suite.py` on PostGIS 16-3.4 and 17-3.5 | **78 assertions, 0 failures on both legs** — run `33807098228` |
 | Full offline gate | `node scripts/run-unit-tests.mjs` | **141/141 files** |
 
 The executable suite runs the **shipped DDL verbatim** against a disposable PostGIS and proves
@@ -177,6 +177,22 @@ nested; multi-geometry preserved as separate rows; deterministic ordering; `has_
 when complete, true when truncated, and correct at the exact `limit == true count` boundary;
 all 16 parameter-validation rejections; and the lifecycle gate refusing on non-READY,
 READY-but-unsynced (**the mid-sweep window**), absent and ambiguous manifests.
+
+**Executed receipt.** Run `33807098228` (head `04269b8`), both matrix legs
+`postgis/postgis:16-3.4` (PostgreSQL 16.4) and `postgis/postgis:17-3.5`: the fail-gate step
+was **skipped** on each, which happens only when the executable and static suites both exit 0.
+
+⚠️ **The first run, `33806849721`, went RED — and the defect was in the INSTRUMENT, not the
+RPC.** Assertions 29 and 30 (`MULTILINESTRING is handled`, `MULTIPOLYGON is handled`) failed
+because the suite collected geometry types as `{source_key: geometry_type}`, which collapses
+`proj:multi`'s three geometry instances to whichever sorted last and discards two of the five
+types before they can be asserted — **the very per-`source_key` collapse this RPC exists to
+prevent, reproduced inside the instrument built to detect it.** The other 75 assertions passed,
+including the two that contradicted the failures outright: `PASS 36 — one source_key with 3
+geometries returns 3 SEPARATE rows` and `PASS 37 — and their feature_ids are distinct`. Fixed
+by keying on the full `(source_key, feature_id)` grain and adding an assertion that all five
+geometry types survive in one result set. `docs/n5-spatial-read-rpc.sql` was **not changed** —
+its sha256 is identical across both runs.
 
 **Both suites carry negative controls.** Statically, seven mutations each turn the suite red
 and the file restores clean: dropping the STRICT lifecycle gate, dropping `provenance`,
