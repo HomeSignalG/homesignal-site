@@ -41,7 +41,7 @@ TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
 # Marker rule parameters. Chosen from the measure pass; see UNIT-A3 evidence doc.
 D_M = float(os.environ.get("MARKER_D_M", "1000"))          # max gap along a line component
 MIN_LINE_M = float(os.environ.get("MARKER_MIN_LINE_M", "250"))   # sliver floor, lines
-MIN_AREA_M2 = float(os.environ.get("MARKER_MIN_AREA_M2", "10000"))  # sliver floor, polygons
+MIN_AREA_M2 = float(os.environ.get("MARKER_MIN_AREA_M2", "1000"))  # sliver floor, polygons
 
 SCRATCH = "geo.n5_a3m_zcta"
 COMP = "geo.n5_a3_clip_component"
@@ -115,10 +115,17 @@ select b.zcta5, m.source_key,
  where b.prefix = {{PFX}} and not ST_IsEmpty(d.geom);
 """
 
-# The chosen rule, expressed once. Lines: keep components at or above the sliver floor (all of
-# them if none qualifies), then place ceil(len/D) evenly spaced interior points so the gap along
-# a component never exceeds D. Polygons: one PointOnSurface per component at or above the area
-# floor (largest if none qualifies). Points: the authoritative point itself.
+# THE CHOSEN RULE, expressed once, derived from the measure passes (see the A3 evidence doc).
+#
+#   LINE     ST_LineMerge first - the raw clip is publisher segmentation, p50 component 20.6 m,
+#            and merging is lossless (6,581.0 km before and after). Keep merged components at or
+#            above MIN_LINE_M, or the longest one if none qualifies, so every membership keeps a
+#            marker. On each kept component place ceil(len/D) evenly spaced interior points, so
+#            the gap ALONG that component never exceeds D and every point lies ON the line.
+#   POLYGON  one ST_PointOnSurface per component at or above MIN_AREA_M2 (largest if none
+#            qualifies). Measured: 584 of 659 multi-component memberships have parts more than
+#            1 km apart, so one marker per membership would hide separate project areas.
+#   POINT    the authoritative point itself.
 BUILD = f"""
 delete from {MARK} where left(zcta5,3) = {{PFX}};
 insert into {MARK} (zcta5, source_key, marker_seq, lat, lng, marker_rule, family, dim, run_id)
@@ -134,119 +141,52 @@ with base as (
            and ST_Intersects(ST_MakeValid(g.geom), b.geom)) x
    where b.prefix = {{PFX}}),
 comp as (
-  select z.zcta5, z.source_key, z.family, d.geom g, ST_Dimension(d.geom) dim,
-         ST_Length(d.geom::geography) len_m, ST_Area(d.geom::geography) area_m2
-    from base z cross join lateral ST_Dump(z.clip) d
+  select z.zcta5, z.source_key, z.family, 1 as dim, d.geom g,
+         ST_Length(d.geom::geography) measure
+    from base z
+    cross join lateral ST_Dump(ST_LineMerge(ST_CollectionExtract(z.clip, 2))) d
+   where not ST_IsEmpty(d.geom)
+  union all
+  select z.zcta5, z.source_key, z.family, 2, d.geom, ST_Area(d.geom::geography)
+    from base z cross join lateral ST_Dump(ST_CollectionExtract(z.clip, 3)) d
+   where not ST_IsEmpty(d.geom)
+  union all
+  select z.zcta5, z.source_key, z.family, 0, d.geom, 0
+    from base z cross join lateral ST_Dump(ST_CollectionExtract(z.clip, 1)) d
    where not ST_IsEmpty(d.geom)),
 keep as (
   select c.*,
-         case when c.dim = 1 then
-                (c.len_m >= {MIN_LINE_M} or c.len_m = max(c.len_m)
-                   filter (where c.dim=1) over (partition by c.zcta5, c.source_key))
-              when c.dim = 2 then
-                (c.area_m2 >= {MIN_AREA_M2} or c.area_m2 = max(c.area_m2)
-                   filter (where c.dim=2) over (partition by c.zcta5, c.source_key))
-              else true end as keep_it
+         (c.dim = 0
+          or (c.dim = 1 and (c.measure >= {MIN_LINE_M}
+                             or c.measure = max(case when c.dim=1 then c.measure end)
+                                              over (partition by c.zcta5, c.source_key)))
+          or (c.dim = 2 and (c.measure >= {MIN_AREA_M2}
+                             or c.measure = max(case when c.dim=2 then c.measure end)
+                                              over (partition by c.zcta5, c.source_key)))) as keep_it
     from comp c),
 placed as (
-  select k.zcta5, k.source_key, k.family, k.dim, k.len_m, k.area_m2, k.g,
-         gs.i, greatest(1, ceil(k.len_m / {D_M})::int) as n_on_comp
+  select k.zcta5, k.source_key, k.family, k.dim, k.measure, k.g, gs.i,
+         greatest(1, ceil(k.measure / {D_M})::int) as n_on_comp
     from keep k
     cross join lateral generate_series(
-        0, case when k.dim = 1 then greatest(1, ceil(k.len_m / {D_M})::int) - 1 else 0 end) gs(i)
+        0, case when k.dim = 1 then greatest(1, ceil(k.measure / {D_M})::int) - 1 else 0 end) gs(i)
    where k.keep_it),
 pt as (
-  select p.zcta5, p.source_key, p.family, p.dim, p.len_m, p.area_m2, p.i, p.n_on_comp, p.g,
-         case when p.dim = 1
-                then ST_LineInterpolatePoint(p.g, (p.i + 0.5) / p.n_on_comp::float8)
-              else ST_PointOnSurface(p.g) end as mp
+  select p.*,
+         case when p.dim = 1 then ST_LineInterpolatePoint(p.g, (p.i + 0.5) / p.n_on_comp::float8)
+              when p.dim = 2 then ST_PointOnSurface(p.g)
+              else p.g end as mp
     from placed p)
 select zcta5, source_key,
        row_number() over (partition by zcta5, source_key
-                          order by dim desc, coalesce(area_m2,0) desc, coalesce(len_m,0) desc,
-                                   ST_AsBinary(g) asc, i asc)::int,
+                          order by dim desc, measure desc, ST_AsBinary(g) asc, i asc)::int,
        ST_Y(mp), ST_X(mp),
-       case when dim = 1 then 'LINE_COMPONENT_INTERVAL_{{DTAG}}M'
+       case when dim = 1 then 'LINE_MERGED_COMPONENT_INTERVAL_{{DTAG}}M'
             when dim = 2 then 'POLYGON_COMPONENT_POINT_ON_SURFACE'
             else 'POINT_AUTHORITATIVE' end,
        family, dim::smallint, {{RUN}}
   from pt;
 """
-
-
-# Benchmark. Timed SERVER-SIDE so network latency is excluded, one row per (ZIP, pass).
-# The project half and the marker half are timed separately, then together, because they are
-# different questions: the project half is the one that has to touch public.app_projects.
-BENCH_FN = """
-create table if not exists geo.n5_a3_bench (
-  zip char(5) not null, pass_no int not null, n_keys int,
-  ms_project double precision, rows_project int,
-  ms_marker double precision, rows_marker int,
-  ms_combined double precision, run_id text not null,
-  measured_at timestamptz not null default now(),
-  primary key (zip, pass_no));
-alter table geo.n5_a3_bench enable row level security;
-revoke all on geo.n5_a3_bench from public;
-
-create or replace function geo.n5_a3_bench_one(p_zip text, p_pass int, p_run text)
-returns void language plpgsql as $fn$
-declare t0 timestamptz; t1 timestamptz; t2 timestamptz; t3 timestamptz;
-        rp int; rm int; nk int;
-begin
-  select count(*) into nk from geo.zip_authoritative_membership where zcta5 = p_zip;
-  t0 := clock_timestamp();
-  select jsonb_array_length(geo.n5_a3_projects_one_pass(p_zip)) into rp;
-  t1 := clock_timestamp();
-  select count(*) into rm from geo.zip_authoritative_marker where zcta5 = p_zip;
-  t2 := clock_timestamp();
-  perform geo.n5_a3_projects_one_pass(p_zip),
-          (select count(*) from geo.zip_authoritative_marker where zcta5 = p_zip);
-  t3 := clock_timestamp();
-  insert into geo.n5_a3_bench (zip, pass_no, n_keys, ms_project, rows_project,
-                               ms_marker, rows_marker, ms_combined, run_id)
-  values (p_zip, p_pass, nk,
-          extract(epoch from (t1-t0))*1000, rp,
-          extract(epoch from (t2-t1))*1000, rm,
-          extract(epoch from (t3-t2))*1000, p_run)
-  on conflict (zip, pass_no) do update set
-    n_keys=excluded.n_keys, ms_project=excluded.ms_project, rows_project=excluded.rows_project,
-    ms_marker=excluded.ms_marker, rows_marker=excluded.rows_marker,
-    ms_combined=excluded.ms_combined, run_id=excluded.run_id, measured_at=now();
-end $fn$;
-revoke all on function geo.n5_a3_bench_one(text,int,text) from public;
-"""
-
-
-def bench():
-    """All 346 cutover candidates, two passes. No extrapolation: every ZIP is executed."""
-    sql(BENCH_FN, "bench harness")
-    zips = [r["zip"].strip() for r in sql(
-        "select zip::text zip from geo.maps_zip_geography_status "
-        "where note like '%cutover flag cleared 2026-09-03%' order by zip;", "346 zips")]
-    say("ZIPs to benchmark", len(zips))
-    if len(zips) != 346:
-        raise SystemExit(f"STOP: expected 346 cutover candidates, found {len(zips)}")
-    for p in (1, 2):
-        say("PASS", f"{p} ({'cold-ish' if p == 1 else 'warm/repeat'})")
-        t0 = time.time()
-        for i in range(0, len(zips), 8):
-            chunk = zips[i:i + 8]
-            sql(";".join(f"select geo.n5_a3_bench_one({lit(z)},{p},{lit(RUN_ID)})" for z in chunk) + ";",
-                f"bench p{p} {chunk[0]}-{chunk[-1]}")
-            if (i // 8) % 5 == 0:
-                say("  progress", f"{min(i+8, len(zips))}/{len(zips)}  {time.time()-t0:.0f}s")
-        say(f"PASS {p} wall seconds", round(time.time() - t0, 1))
-    r = sql("""select pass_no, count(*) n, round(sum(ms_project)/1000.0,1) total_s,
-                 round(percentile_disc(0.5) within group (order by ms_project)::numeric,1) p50,
-                 round(percentile_disc(0.95) within group (order by ms_project)::numeric,1) p95,
-                 round(percentile_disc(0.99) within group (order by ms_project)::numeric,1) p99,
-                 round(max(ms_project)::numeric,1) mx,
-                 round(max(ms_marker)::numeric,2) marker_mx
-               from geo.n5_a3_bench group by pass_no order by pass_no;""", "summary")
-    for row in r:
-        say(f"pass {row['pass_no']}: n / total_s / p50 / p95 / p99 / max / marker_max",
-            f"{row['n']} / {row['total_s']} / {row['p50']} / {row['p95']} / "
-            f"{row['p99']} / {row['mx']} / {row['marker_mx']}")
 
 
 # Are the 51,219 line "components" real disconnected corridors, or just publisher
