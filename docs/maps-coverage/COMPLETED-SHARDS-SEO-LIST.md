@@ -1,64 +1,26 @@
-# SEO-ready ZIP pages — the 13 completed shards
+# WITHDRAWN — superseded 2026-09-03 by COMPLETED-SHARDS-BOUNDARY-PLACED-LIST.md
 
-**Shippable artifact, measured 2026-09-03.** Data: `completed-shards-zip-coverage.csv` (411 rows).
-Definition of record: `scripts/n5_zip_coverage.sql`.
+**This file called 411 ZIP pages "SEO-ready". That name was wrong and the founder corrected it.**
+`pending = 0` means **ACQUISITION_UNBLOCKED**, nothing more. It does not mean boundary-first
+placement has run (**BOUNDARY_PLACED**), and neither of those means a page has cleared an SEO or
+content gate — a page satisfying both is a **SEO_CANDIDATE**, and the current product set is the
+**Maps geography-ready candidate set**.
 
-**Fingerprinted, not eyeballed.** The CSV body was verified against the database by md5 —
-`2a3c0633cb1745d2902bdd3670fc83f5` on both sides, 411 rows. Control that the population is the
-right one: `legacy_associations` sums to **20,170**, exactly the 13 shards' association count.
+Two things in the withdrawn text are also numerically superseded, and the reasons are recorded so
+neither is re-derived:
 
-## Headline
+1. **411 pages → 424.** 13 further ZIP pages carry boundary-first membership while carrying no
+   legacy candidate at all. They exist only because boundaries, not the frozen legacy slice, drove
+   the placement pass — pure under-inclusion discoveries, invisible to a slice-first build.
+2. **`legacy_associations` was the ADJUDICATED CANDIDATE PAIR count, not the legacy membership.**
+   The current artifact separates them: `legacy_membership` is `geo.n5_association` (20,170 pairs
+   across these 13 prefixes) and `adjudicated` stays the candidate-enumeration count (12,320).
+   Every adjudicated pair is in `n5_association`; 7,850 association pairs are not adjudicated
+   pairs, because the legacy 3-mile method associated a project with ZIPs the snapshot never
+   enumerated it under. Mixing the two is how an earlier intermediate reported a legacy total of
+   19,913 that closed only against itself — see the final receipt.
 
-**All 411 ZIP pages across the 13 completed shards are UNBLOCKED — pending = 0 on every one.**
-
-| | |
-|---|---:|
-| ZIP pages | **411** |
-| unblocked (pending = 0) | **411 — 100%** |
-| blocked | **0** |
-| adjudicated candidate developments | 12,320 |
-| **pending (waiting on geometry)** | **0** |
-| terminal (can never have geometry — disclosed, does not block) | 7,593 |
-| legacy associations these pages carry today | 20,170 |
-
-Pages per prefix: 010 **69** · 011 22 · 012 37 · 013 4 · 014 26 · 015 51 · 016 17 · 017 31 ·
-018 47 · 019 38 · 062 33 · 063 35 · 520 1.
-
-## ⚠️ Two states, and only one of them is finished
-
-**UNBLOCKED ≠ PLACED. Do not ship the whole 411 as "done".**
-
-| state | meaning | count |
-|---|---|---:|
-| **UNBLOCKED + PLACED** | pending = 0 **and** the boundary-first pass has computed this page's actual polygon membership | **69** (prefix 010 only) |
-| **UNBLOCKED, not yet placed** | pending = 0 — nothing is waiting on geometry, so the page *can* be completed — but boundary-first has not run, so its true membership is not yet computed | **342** |
-
-`placed_by_polygon` is populated **only for 010**. Elsewhere the column is empty — that is
-"not measured", never "no developments".
-
-**So the immediately shippable set is the 69 pages of prefix 010**, where geometry is complete
-*and* the polygon membership exists. The other 342 need one boundary-first run each (0.9–1.3 s of
-probe time per prefix, 12 prefixes) and no acquisition work at all.
-
-## Why these 411 are unblocked when only 14.6% of the nation is
-
-These prefixes are New England + one Iowa ZIP, and their RECOVERY registries — massdot, ctdot,
-iowa-dot — are **already fully acquired**. Their large NOAUTH population (7,593 terminal, nearly
-all in 016 Worcester) does **not** block, by design: waiting cannot change it, so it is disclosed
-on the page instead of holding the page hostage.
-
-## What 010 actually shows
-
-630 developments placed by polygon across 69 pages, against 1,689 legacy associations —
-**a net reduction of 1,059**, of which **89 are developments the legacy 3-mile method never
-associated with the page at all** (under-inclusion, now visible). Three pages — **01034, 01054,
-01093** — carry placed developments with **zero** legacy candidates: pages that would have shown
-nothing, and now show something real.
-
-## The gate, restated
-
-```
-pending = 0   ->  UNBLOCKED    (no development on this page is waiting on geometry)
-placed  set   ->  PLACED       (boundary-first has computed the true polygon membership)
-SEO-ready     ==  UNBLOCKED and PLACED
-```
+The withdrawn file's own fingerprint (`2a3c0633cb1745d2902bdd3670fc83f5`, 411 rows) was correct
+for what it measured on its date; it is the NAME and the mixed denominator that were wrong.
+Current artifact: `completed-shards-zip-coverage.csv`, 424 rows, body md5
+`c999fe69662606670996c497663ae00b`.
