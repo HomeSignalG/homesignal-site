@@ -244,3 +244,89 @@ affect `geo.n5_geom`, the reject ledger, associations, the manifest, Map 1 or Ma
 not wired to it by this change. If a future revision changes the signature, the **old**
 signature must be dropped explicitly; `create or replace` will not remove it and two
 overloads would make the callable surface ambiguous.
+
+---
+
+## 13. Production apply attempt 2026-09-03 21:23Z — **BLOCKED BEFORE APPLY, nothing installed**
+
+**Outcome: C — BLOCKED BEFORE APPLY.** `CREATE FUNCTION` was **not** issued. The RPC is still
+absent from production, no N5 data was touched, and no ruling was made unilaterally.
+
+**Artifact identity — PASSED.** HEAD `361941d4aaf77766368ce64834e42e918b5bea55` (the authorized
+commit itself), origin == local, tree clean, and the DDL byte-identical to that commit. Its full
+sha256 was read from **this committed receipt**, not from the abbreviated conversation value, and
+three independent computations agree:
+
+| source | sha256 |
+|---|---|
+| this receipt (§ header) | `2b1b80995cb1419a35cfa8d0ba64e975fac91779a84b163e0eef2a319f80b764` |
+| working-tree file | `2b1b80995cb1419a35cfa8d0ba64e975fac91779a84b163e0eef2a319f80b764` |
+| blob at `361941d` | `2b1b80995cb1419a35cfa8d0ba64e975fac91779a84b163e0eef2a319f80b764` |
+
+**Production preconditions, observed read-only at `2026-09-03 21:23:07.223842Z`:**
+
+| precondition | required | observed | verdict |
+|---|---|---|---|
+| `n5_projects_within_radius` exists (any signature) | 0 | **0** | ✅ safe to create |
+| manifest `phase1-2026-09-01` state | READY | **READY** | ✅ |
+| `canonical_synced_at` | not null | **2026-09-03 20:49:04.959655+00** | ✅ |
+| `geo.n5_geom` total | 741,562 | **741,562** | ✅ |
+| `proven_stored_point` | 718,278 | **718,278** | ✅ |
+| `recovered_authoritative` | 23,284 | **23,284** | ✅ |
+| canonical PROVEN fingerprint | `bbda250f…` | **`bbda250fc30ee0b3aa3f46a259392aa3`** | ✅ |
+| `geo.n5_point_reject` | 5,171 | **5,171** | ✅ |
+| **`geo.n5_association`** | **20,170** | **21,674** | ⛔ **+1,504 — DIVERGED** |
+
+**Quiescence at the same instant:** 0 active N5 sessions · 0 shards `running` · **0 locks on
+`geo.n5*`** (two locks seen moments earlier were transient and had cleared). So nothing was
+executing — but see below: nothing executing is not the same as nothing in flight.
+
+### Why the association count moved, and why it is not a defect
+
+`geo.n5_shard`: **18 `done`, 526 `pending`, 0 `running`**, newest completion
+**2026-09-03 20:51:07.302586Z** — roughly **two minutes after** `sync_canonical()` set
+`canonical_synced_at` at 20:49:04.959655Z.
+
+That is the lifecycle behaving exactly as designed, not a fault.
+`assert_snapshot_consumable()` refuses a snapshot that is not READY **and** canonically synced,
+so shard processing could not have run before 20:49:04 and began as soon as it could. The
++1,504 associations are the first 18 shards consuming the snapshot this session published.
+Canonical geometry, its fingerprint, the reject ledger and the manifest are all **unchanged**,
+which is the control that makes this attributable to shard consumption rather than to drift.
+
+### Why this blocks, even though the RPC never reads `geo.n5_association`
+
+The function's predicate touches `geo.n5_geom`, `geo.n5_point_reject` and
+`geo.n5_verdict_manifest` only — the association count is irrelevant to its correctness. The
+block is not about correctness; it is about two things the authorization requires and that
+cannot currently be satisfied honestly:
+
+1. **§2 states `associations = 20170` as a precondition and says to STOP on material
+   divergence.** Deciding on my own that this particular precondition does not matter would be
+   narrowing a founder-set gate mid-flight — the move this session has refused three times
+   already. Rule #0: the parameter is not mine to change.
+2. **§8's zero-mutation proof would be unsound as written.** With **526 shards still pending**,
+   the association count is a *moving* value owned by another writer. Pinning the post-apply
+   assertion to 20,170 fails immediately; pinning it to 21,674 fails the moment shard 19 runs —
+   and it would fail by attributing an unrelated writer's rows to my `CREATE FUNCTION`. A
+   zero-mutation proof whose baseline another session is actively changing does not prove zero
+   mutation; it manufactures a false alarm about the wrong change.
+
+### What is needed to unblock (founder ruling, not a change I may make)
+
+Either of these makes the apply provable; both are the founder's call:
+
+- **(a) Re-baseline and scope the proof.** Accept the live association count as the baseline and
+  **exclude `geo.n5_association` from the zero-mutation assertion**, since the RPC cannot write
+  it and an independent shard campaign is actively growing it. The remaining zero-mutation
+  proof — geometry total/provenance split/fingerprint, rejects, manifest, `canonical_synced_at`
+  — stays exact and is what a `CREATE FUNCTION` could actually threaten.
+- **(b) Wait for the campaign to drain.** Apply once the 526 pending shards complete and the
+  association count is stable, then use that stable value.
+
+Nothing about the reviewed artifact changes under either ruling: the DDL, its sha256, and all
+78 + 82 assertions stand.
+
+**Holds observed:** the RPC was not created, not executed, and not modified. No shard was run or
+reconciled, no index added, `app_projects`/A3/Map 1/RLS untouched, no canonical geometry, reject
+or association write, no publish-verdict, no sync-canonical, PR #1015 still DRAFT.
