@@ -1081,6 +1081,153 @@ check(96, "a partially migrated pre-state fails loudly at classification rather 
 
 
 # =============================================================================
+group("B1 DEFINITION VALIDATION")
+# =============================================================================
+# `create table if not exists` accepts an existing object of the right NAME whatever its
+# SHAPE. Each control below pre-creates ONE lifecycle table, fully correct EXCEPT for a single
+# migration-critical property, so the create is a silent no-op and only the §6b definition
+# validation can catch it. Each proves ROLLBACK, not merely an error.
+
+PV_COLS = """snapshot_id text not null, source_key text not null, registry_id text,
+  ncoord integer not null, lat double precision, lng double precision,
+  verdict text not null, computed_at timestamptz not null default now(),
+  constraint n5_proven_verdict_ck check (verdict in ('ELIGIBLE','NO_REGISTRY_VERDICT',
+    'NULL_COORD','NULL_ISLAND','INVALID_COORD','MULTI_COORD_UNRESOLVED')),
+  constraint n5_proven_verdict_eligible_ck check (
+    verdict <> 'ELIGIBLE' or (ncoord = 1 and lat is not null and lng is not null))"""
+
+VM_COLS_NO_SYNC = """snapshot_id text not null, state text not null,
+  expected_source_keys bigint, verdict_rows bigint, eligible_rows bigint,
+  reject_counts jsonb, fingerprint text, started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  constraint n5_verdict_manifest_pkey primary key (snapshot_id),
+  constraint n5_verdict_manifest_state_ck check (state in ('BUILDING','READY','FAILED')),
+  constraint n5_verdict_manifest_ready_ck check (
+    state <> 'READY' or (completed_at is not null and expected_source_keys is not null
+                     and verdict_rows is not null and eligible_rows is not null
+                     and reject_counts is not null and fingerprint is not null
+                     and verdict_rows = expected_source_keys))"""
+
+B1_CONTROLS = [
+    (97, "a pre-existing n5_proven_verdict with the WRONG PK aborts and rolls back",
+     "create table geo.n5_proven_verdict (" + PV_COLS +
+     ", constraint n5_proven_verdict_pkey primary key (source_key));",
+     "PK geo.n5_proven_verdict"),
+    (98, "a pre-existing n5_verdict_manifest MISSING canonical_synced_at aborts and rolls back",
+     "create table geo.n5_verdict_manifest (" + VM_COLS_NO_SYNC + ");",
+     "canonical_synced_at"),
+    (99, "a pre-existing n5_association_stage with the WRONG GRAIN aborts and rolls back",
+     """create table geo.n5_association_stage (
+          z3 character(3) not null, source_key text not null, zip character(5) not null,
+          evidence smallint not null,
+          constraint n5_association_stage_pkey primary key (source_key, zip),
+          constraint n5_association_stage_evidence_ck check (evidence in (1,2,3,4)));""",
+     "PK geo.n5_association_stage"),
+]
+for num, name, malformation, marker in B1_CONTROLS:
+    reset(apply_migration=False, legacy=True)
+    mok, merr = apply_script(malformation, is_path=False)
+    okm, errm = apply_script(MIGRATION)
+    rolled = q1("""select not exists (select 1 from information_schema.columns
+        where table_schema='geo' and table_name='n5_geom'
+          and column_name='verdict_snapshot_id');""")
+    reject_pk_intact = q1("""select pg_get_constraintdef(oid) from pg_constraint
+        where conrelid='geo.n5_point_reject'::regclass and contype='p';""") \
+        == 'PRIMARY KEY (source_key, reason)'
+    check(num, name,
+          mok and (not okm)
+          and "definition validation FAILED" in errm and marker in errm
+          and rolled and reject_pk_intact,
+          {"malformation_created": mok or merr[:80], "migration_ok": okm,
+           "rolled_back": rolled, "reject_pk_intact": reject_pk_intact, "err": errm[:200]})
+
+# 100 - the guard passes on the good state, and the three PKs really are what the runtime needs.
+reset(apply_migration=False, legacy=True)
+ok100, err100 = apply_script(MIGRATION)
+pks = {r["tbl"]: r["pk"] for r in q("""
+  select c.conrelid::regclass::text tbl,
+         (select string_agg(a.attname, ',' order by k.ord)
+            from pg_constraint c2
+            join lateral unnest(c2.conkey) with ordinality k(attnum, ord) on true
+            join pg_attribute a on a.attrelid=c2.conrelid and a.attnum=k.attnum
+           where c2.oid=c.oid) pk
+    from pg_constraint c
+   where c.contype='p' and c.conrelid::regclass::text in
+     ('geo.n5_proven_verdict','geo.n5_verdict_manifest','geo.n5_association_stage');""")}
+check(100, "definition validation PASSES on the good state, with the contracted PKs",
+      ok100 and pks.get('geo.n5_proven_verdict') == 'snapshot_id,source_key'
+      and pks.get('geo.n5_verdict_manifest') == 'snapshot_id'
+      and pks.get('geo.n5_association_stage') == 'z3,source_key,zip',
+      {"err": err100[:160], "pks": pks})
+
+# =============================================================================
+group("B2 UNIQUE DERIVATION")
+# =============================================================================
+# One source_key gains a SECOND distinct PROVEN registry verdict carrying the SAME coordinate.
+# That is the case every pre-existing gate misses, and the test proves both halves: that the
+# old gate quantities all still look clean, and that the migration nonetheless aborts on B2.
+DUP_DERIVATION = """
+insert into geo.n5_accepted_source (registry_id, treatment, projects, pairs)
+  values ('r-proven2','PROVEN',1,1);
+insert into preservation.app_project_identity
+  (snapshot_id, source_key, zip, registry_id, lat, lng, source_seq, record_kind)
+  values ('phase1-2026-09-01','L-elig-1','02138','r-proven2',42.0,-71.0,3,'development');"""
+
+reset(apply_migration=False, legacy=True)
+dok, derr = apply_script(DUP_DERIVATION, is_path=False)
+
+# Recompute exactly what the OLD gates would have measured, on this corrupted input.
+old = q("""
+with src as (
+  select i.source_key, coalesce(i.registry_id,'(null)') registry_id, i.lat, i.lng
+    from preservation.app_project_identity i
+   where i.snapshot_id='phase1-2026-09-01' and i.record_kind='development'),
+verdict_reg as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
+proven as (select distinct s.source_key, s.registry_id from src s
+            where exists (select 1 from verdict_reg v where v.registry_id = s.registry_id)),
+pairs as (select distinct source_key, lat, lng from src where lat is not null and lng is not null),
+pc  as (select source_key, count(*) ncoord from pairs group by source_key),
+cnt as (select p.source_key, p.registry_id, coalesce(pc.ncoord,0) ncoord
+          from proven p left join pc using (source_key)),
+sel as (select pr.source_key, pr.lat, pr.lng
+          from pairs pr join cnt c using (source_key) where c.ncoord = 1),
+v as (select c.source_key, sl.lat, sl.lng,
+        case when c.ncoord > 1 then 'MULTI_COORD_UNRESOLVED'
+             when c.ncoord = 0 then 'NULL_COORD'
+             else 'ELIGIBLE' end verdict
+      from cnt c left join sel sl using (source_key))
+select (select count(*) from (select source_key from geo.n5_geom
+          where provenance='proven_stored_point'
+          except select source_key from v where verdict='ELIGIBLE') t) canon_not_elig,
+       (select count(*) from (select source_key from v where verdict='ELIGIBLE'
+          except select source_key from geo.n5_geom
+                 where provenance='proven_stored_point') t) elig_not_canon,
+       (select count(*) from v vv join geo.n5_geom g on g.source_key=vv.source_key
+         where vv.verdict='ELIGIBLE' and g.provenance='proven_stored_point'
+           and (abs(ST_X(g.geom)-vv.lng) > 1e-9 or abs(ST_Y(g.geom)-vv.lat) > 1e-9)) coord_bad,
+       (select count(*) from v where verdict='ELIGIBLE') elig_n,
+       (select count(*) from v where verdict<>'ELIGIBLE') inel_n,
+       (select count(*) from v) auth_n,
+       (select count(*) from (select source_key from v group by 1 having count(*)<>1) t) dup;""")[0]
+old_gates_all_clean = (int(old["canon_not_elig"]) == 0 and int(old["elig_not_canon"]) == 0
+                       and int(old["coord_bad"]) == 0
+                       and int(old["elig_n"]) + int(old["inel_n"]) == int(old["auth_n"]))
+check(101, "the OLD gates are demonstrably insufficient: every one of them passes on this input",
+      dok and old_gates_all_clean and int(old["dup"]) == 1, dict(old))
+
+ok102, err102 = apply_script(MIGRATION)
+rolled102 = q1("""select not exists (select 1 from information_schema.columns
+    where table_schema='geo' and table_name='n5_geom' and column_name='verdict_snapshot_id');""")
+check(102, "duplicate PROVEN derivation aborts on the B2 guard, before any attribution",
+      (not ok102)
+      and "not one row per source_key" in err102
+      and "L-elig-1 x2" in err102
+      and rolled102
+      and q1("select count(*) from geo.n5_point_reject;") == 2,
+      {"migration_ok": ok102, "rolled_back": rolled102, "err": err102[:220]})
+
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 print("")
@@ -1091,7 +1238,8 @@ for g, num, name, ok, _d in RESULTS:
     groups[g] = (p + (1 if ok else 0), f + (0 if ok else 1))
 for g in ("MIGRATION", "GLOBAL VERDICT", "PUBLICATION", "SWEEP", "SWEEP FAILURE",
           "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS",
-          "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS"):
+          "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS",
+          "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION"):
     if g in groups:
         p, f = groups[g]
         print(f"{g:<22} PASS {p:>3}   FAIL {f:>3}")

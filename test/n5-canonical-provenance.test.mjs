@@ -446,4 +446,48 @@ ok(syncSeg.indexOf('raise SystemExit("HALT: canonical sets do not match') < sync
 ok(syncSeg.indexOf('set canonical_synced_at=null') < syncSeg.indexOf('sql(stmt, tag)'),
   'the barrier is cleared before the FIRST sweep mutation statement executes');
 
+// ---- 19. B1 POST-CREATION DEFINITION VALIDATION ----
+const defn = code.slice(code.indexOf('do $defn$'), code.indexOf('end $defn$'));
+ok(defn.length > 1500, 'B1 definition-validation block located');
+ok(/pg_constraint/.test(defn) && /pg_attribute/.test(defn) && /format_type/.test(defn),
+  'B1 reads CATALOG definitions, not the text of this file');
+for (const t of ['geo.n5_proven_verdict', 'geo.n5_verdict_manifest', 'geo.n5_association_stage']) {
+  ok(defn.includes(t), 'B1 validates ' + t);
+}
+ok(/'snapshot_id,source_key'/.test(defn) && /'z3,source_key,zip'/.test(defn),
+  'B1 asserts the expected PRIMARY KEY column lists, in order');
+ok(/act\.nn is distinct from w\.nn/.test(defn),
+  'B1 asserts NULLABILITY, not just column presence');
+ok(/act\.typ <> w\.typ/.test(defn), 'B1 asserts DATA TYPE where semantics depend on it');
+ok(/canonical_synced_at/.test(defn) && /reject_counts/.test(defn) && /ncoord/.test(defn),
+  'B1 covers the snapshot, verdict/eligibility and coordinate-bearing columns');
+ok(/pg_get_constraintdef/.test(defn) && /position\(r\.token in d\.def\)/.test(defn),
+  'B1 checks migration-critical CHECKs by DEFINITION token, not by name alone');
+ok(/definition validation FAILED/.test(defn) && /raise exception/.test(defn),
+  'B1 RAISES on an incompatible shape');
+ok(!/alter table/i.test(defn) && !/drop table/i.test(defn),
+  'B1 never ALTERs-to-repair or drops an unknown shape');
+
+// ---- 20. B2 UNIQUE VERDICT DERIVATION ----
+const mult = code.slice(code.indexOf('do $multiplicity$'), code.indexOf('end $multiplicity$'));
+ok(mult.length > 500, 'B2 multiplicity block located');
+ok(/group by d\.source_key having count\(\*\) <> 1/.test(mult),
+  'B2 states the multiplicity invariant DIRECTLY: group by source_key having count(*) <> 1');
+// \bexcept\b, not /except/i: the latter matches "raise exception" and would pass vacuously.
+ok(!/\bexcept\b/i.test(mult),
+  'B2 does not rely on EXCEPT / set-difference, which dedupes the very duplicate it must catch');
+ok(/not one row per source_key/.test(mult) && /raise exception/.test(mult),
+  'B2 RAISES on a duplicated derivation');
+ok(!/distinct on/i.test(mult) && !/limit 1\b/.test(mult.replace(/limit 5/g, '')),
+  'B2 never deduplicates automatically or picks an arbitrary coordinate');
+ok(/geo\.n5_accepted_source/.test(mult) && /preservation\.app_project_identity/.test(mult),
+  'B2 measures the EXACT authoritative derivation feeding the migration');
+// ordering: B2 before the legacy gate, and both before any attribution or destruction
+ok(code.indexOf('do $multiplicity$') < code.indexOf('do $gate$')
+   && code.indexOf('do $multiplicity$') < code.indexOf("set verdict_snapshot_id = 'phase1")
+   && code.indexOf('do $multiplicity$') < code.indexOf('do $reject_transition$'),
+  'B2 runs BEFORE the gate, before attribution and before the destructive reject step');
+ok(!/if legacy_points = 0/.test(mult),
+  'B2 runs unconditionally - not behind the "are there legacy points" early return');
+
 process.exit(fails ? 1 : 0);

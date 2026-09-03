@@ -137,6 +137,73 @@ comment on column geo.n5_geom.verdict_snapshot_id is
   'the publisher rather than from a verdict.';
 
 -- ============================================================================
+-- §2b  UNIQUE VERDICT DERIVATION  (B2) — a MULTIPLICITY invariant, nothing else
+-- ============================================================================
+-- The authoritative PROVEN derivation must yield EXACTLY ONE row per source_key. §3's gate
+-- and §5's rebuild both read that derivation, and neither can detect a violation:
+--
+--   * §3 compares sets with EXCEPT on source_key, which DEDUPES - a source_key derived twice
+--     produces zero set difference in either direction.
+--   * §3's closure check (eligible + ineligible = authoritative) double-counts the duplicate
+--     on BOTH sides, so it still balances.
+--   * §3's coordinate check joins the duplicate rows to the one canonical point; if the two
+--     derivations carry the same coordinate, it reports zero mismatches.
+--   * §5's rebuild only inserts INELIGIBLE rows, so an ELIGIBLE duplicate never reaches the
+--     (source_key) primary key that would otherwise have raised.
+--
+-- A duplicated ELIGIBLE derivation therefore clears every existing gate and commits, and is
+-- only discovered later when `publish-verdict` violates n5_proven_verdict's
+-- (snapshot_id, source_key) key. That is too late: canonical geometry has already been
+-- attributed by then. So the multiplicity is proven DIRECTLY, here, before §3 and before any
+-- attribution or destruction.
+--
+-- This is a multiplicity invariant ONLY. It changes no eligibility semantics: not the
+-- accepted-source treatment rules, not the global coordinate rules, not
+-- MULTI_COORD_UNRESOLVED or NULL_COORD, not snapshot selection, not registry eligibility,
+-- not canonical geometry identity, not 'pt:1', not association identity. A violation is
+-- RAISED, never deduplicated, and no coordinate is ever chosen arbitrarily.
+--
+-- It runs UNCONDITIONALLY - not behind §3's "are there legacy points" early return - because
+-- §5's rebuild reads the same derivation whether or not legacy geometry exists. Cost is one
+-- additional pass over preservation.app_project_identity, which is the correct price for
+-- proving the derivation well-formed before acting on it.
+
+do $multiplicity$
+declare dup_keys bigint; derived_rows bigint; derived_keys bigint; worst text;
+begin
+  create temporary table _n5_derivation on commit drop as
+  select distinct i.source_key, coalesce(i.registry_id,'(null)') as registry_id
+    from preservation.app_project_identity i
+    join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+   where a.treatment = 'PROVEN'
+     and i.snapshot_id = 'phase1-2026-09-01'
+     and i.record_kind = 'development';
+
+  select count(*), count(distinct d.source_key) into derived_rows, derived_keys
+    from _n5_derivation d;
+
+  -- THE INVARIANT, stated directly: one derivation row per source_key.
+  select count(*) into dup_keys from (
+    select d.source_key from _n5_derivation d group by d.source_key having count(*) <> 1) t;
+
+  if dup_keys <> 0 then
+    select string_agg(x.source_key || ' x' || x.n, ', ')
+      into worst
+      from (select d.source_key, count(*) n from _n5_derivation d
+             group by d.source_key having count(*) <> 1
+             order by count(*) desc, d.source_key limit 5) x;
+    raise exception 'STOP: the authoritative PROVEN derivation is not one row per source_key - '
+      '% source_key(s) derive multiple rows (derived_rows=%, distinct source_keys=%). '
+      'Examples: %. This is NOT deduplicated automatically and no coordinate is chosen '
+      'arbitrarily: a source_key carrying more than one PROVEN registry verdict must be '
+      'resolved at the source. Refusing to attribute canonical geometry.',
+      dup_keys, derived_rows, derived_keys, coalesce(worst, '(none)');
+  end if;
+  raise notice 'MULTIPLICITY INVARIANT PASSED - % derivation rows, % distinct source_keys',
+               derived_rows, derived_keys;
+end $multiplicity$;
+
+-- ============================================================================
 -- §3  FAIL-CLOSED LEGACY GEOMETRY GATE
 -- ============================================================================
 -- The 718,278 pre-existing proven points are attributed to a snapshot IN PLACE. That is only
@@ -572,6 +639,136 @@ comment on table geo.n5_association_stage is
   'Per-shard staging for the stage-and-swap rebuild. The PK (z3, source_key, zip) enforces the '
   'same one-class-per-pair identity as the authoritative table, so a staging run that would '
   'produce two rows for one pair fails HERE rather than corrupting production.';
+
+-- ============================================================================
+-- §6b  POST-CREATION DEFINITION VALIDATION  (B1)
+-- ============================================================================
+-- `create table if not exists` accepts an existing object of the right NAME whatever its
+-- SHAPE. That is exactly how the reject-table defect was missed: the table already existed
+-- with a different primary key and four missing columns, and the create was a silent no-op.
+-- §1 classifies the PRE-state; this closes the other half by proving, AFTER the creates, that
+-- each of the three lifecycle tables actually has the definition the runtime depends on.
+--
+-- It reads the CATALOG (pg_attribute / pg_constraint / format_type), not the text of this
+-- file, so it is immune to formatting and to how Postgres chooses to print a definition.
+-- Cosmetic equivalence is not required; semantic equivalence is required for every property
+-- the publication pipeline relies on.
+--
+-- Runs in BOTH the legacy and already-corrected branches - "already applied" is a claim that
+-- has to survive being checked too. An incompatible shape RAISES: no ALTER-to-repair, no
+-- drop/recreate, no silent acceptance.
+
+do $defn$
+declare
+  bad text := '';
+  got text;
+begin
+  -- ---- primary keys (ordered column lists) --------------------------------------------
+  for got in
+    select t.tbl || ' pk=(' || coalesce(t.actual,'<none>') || ') expected=(' || t.want || ')'
+      from (values
+        ('geo.n5_proven_verdict',    'snapshot_id,source_key'),
+        ('geo.n5_verdict_manifest',  'snapshot_id'),
+        ('geo.n5_association_stage', 'z3,source_key,zip')
+      ) v(tbl, want)
+      cross join lateral (
+        select v.tbl as tbl, v.want as want,
+               (select string_agg(a.attname, ',' order by k.ord)
+                  from pg_constraint c
+                  join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
+                  join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+                 where c.conrelid = to_regclass(v.tbl) and c.contype = 'p') as actual
+      ) t
+     where t.actual is distinct from t.want
+  loop
+    bad := bad || ' PK ' || got || ';';
+  end loop;
+
+  -- ---- columns: presence, type where semantics depend on it, and nullability ----------
+  -- snapshot columns, verdict/eligibility columns, coordinate columns and the stage grain
+  -- are all covered here; a wrong type or a wrong NOT NULL is as fatal as an absent column.
+  for got in
+    select w.tbl || '.' || w.col || ' expected ' || w.typ
+           || case when w.nn then ' NOT NULL' else ' NULL' end
+           || ' got ' || coalesce(act.typ, '<absent>')
+           || case when act.typ is null then ''
+                   when act.nn then ' NOT NULL' else ' NULL' end
+      from (values
+        -- geo.n5_proven_verdict — the eligibility record the sweep reads
+        ('geo.n5_proven_verdict','snapshot_id','text',true),
+        ('geo.n5_proven_verdict','source_key','text',true),
+        ('geo.n5_proven_verdict','registry_id','text',false),
+        ('geo.n5_proven_verdict','ncoord','integer',true),
+        ('geo.n5_proven_verdict','lat','double precision',false),
+        ('geo.n5_proven_verdict','lng','double precision',false),
+        ('geo.n5_proven_verdict','verdict','text',true),
+        ('geo.n5_proven_verdict','computed_at','timestamp with time zone',true),
+        -- geo.n5_verdict_manifest — the publication state machine
+        ('geo.n5_verdict_manifest','snapshot_id','text',true),
+        ('geo.n5_verdict_manifest','state','text',true),
+        ('geo.n5_verdict_manifest','expected_source_keys','bigint',false),
+        ('geo.n5_verdict_manifest','verdict_rows','bigint',false),
+        ('geo.n5_verdict_manifest','eligible_rows','bigint',false),
+        ('geo.n5_verdict_manifest','reject_counts','jsonb',false),
+        ('geo.n5_verdict_manifest','fingerprint','text',false),
+        ('geo.n5_verdict_manifest','started_at','timestamp with time zone',true),
+        ('geo.n5_verdict_manifest','completed_at','timestamp with time zone',false),
+        ('geo.n5_verdict_manifest','canonical_synced_at','timestamp with time zone',false),
+        -- geo.n5_association_stage — the stage-and-swap grain
+        ('geo.n5_association_stage','z3','character(3)',true),
+        ('geo.n5_association_stage','source_key','text',true),
+        ('geo.n5_association_stage','zip','character(5)',true),
+        ('geo.n5_association_stage','evidence','smallint',true)
+      ) w(tbl, col, typ, nn)
+      left join lateral (
+        select format_type(a.atttypid, a.atttypmod) as typ, a.attnotnull as nn
+          from pg_attribute a
+         where a.attrelid = to_regclass(w.tbl) and a.attname = w.col
+           and a.attnum > 0 and not a.attisdropped
+      ) act on true
+     where act.typ is null
+        or act.typ <> w.typ
+        or act.nn is distinct from w.nn
+  loop
+    bad := bad || ' COLUMN ' || got || ';';
+  end loop;
+
+  -- ---- migration-critical CHECK constraints, by DEFINITION not by name alone ----------
+  -- Each pattern names a semantic token the runtime depends on. Read from
+  -- pg_get_constraintdef, which Postgres normalises, so this is not a formatting comparison.
+  for got in
+    select r.conname || ' on ' || r.tbl
+             || case when d.def is null then ' ABSENT' else ' def=' || d.def end
+      from (values
+        ('geo.n5_proven_verdict','n5_proven_verdict_ck','MULTI_COORD_UNRESOLVED'),
+        ('geo.n5_proven_verdict','n5_proven_verdict_ck','NO_REGISTRY_VERDICT'),
+        ('geo.n5_proven_verdict','n5_proven_verdict_eligible_ck','ncoord'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_state_ck','BUILDING'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','verdict_rows'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','expected_source_keys'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','reject_counts'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','fingerprint'),
+        ('geo.n5_verdict_manifest','n5_verdict_manifest_sync_ck','canonical_synced_at'),
+        ('geo.n5_association_stage','n5_association_stage_evidence_ck','evidence')
+      ) r(tbl, conname, token)
+      left join lateral (
+        select pg_get_constraintdef(c.oid) as def
+          from pg_constraint c
+         where c.conrelid = to_regclass(r.tbl) and c.conname = r.conname and c.contype = 'c'
+      ) d on true
+     where d.def is null or position(r.token in d.def) = 0
+  loop
+    bad := bad || ' CHECK ' || got || ';';
+  end loop;
+
+  if bad <> '' then
+    raise exception 'STOP: lifecycle-table definition validation FAILED -%. An object of the '
+      'right NAME but the wrong SHAPE is exactly what `create table if not exists` conceals, '
+      'which is why this reads catalog definitions rather than trusting names. Not repaired '
+      'automatically: reconcile by hand against docs/n5-object-ownership.md.', bad;
+  end if;
+  raise notice 'DEFINITION VALIDATION PASSED - all three lifecycle tables match the contract';
+end $defn$;
 
 -- ============================================================================
 -- §7  ASSOCIATION KEY — ALREADY APPLIED BY THE PARALLEL SESSION
