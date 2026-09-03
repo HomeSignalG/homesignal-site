@@ -40,6 +40,55 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-03 — BOUNDARY-FIRST MEASURED ON ONE PREFIX: membership is ~1 row per project, and the disk question is CLOSED
+
+**Prefix 021 (Boston/Cambridge MA), S1 shape, 46.4 s total, probe 1.3 s.** Boundaries
+streamed for the whole GEOID prefix (53 ZCTAs, 20,151 vertices, 0 invalid, 0 wrong SRID),
+probed against the **entire resident corpus of 741,561 features / 734,728 projects**, then
+dropped. **Candidate-bounding guard ran inside the pass over the SQL that executed and
+reported CLEAN** — it did not fire; what would have fired it is recorded in
+`test/n5-candidate-bounding.test.mjs` (15 assertions, proven failing under two neuterings).
+
+**THE RATIO THAT MATTERS, split by class rather than blended:**
+- **PROVEN: 4,471 rows / 4,471 projects = exactly 1.0000.** A point lies in exactly one
+  ZCTA. Theory and measurement agree with no residual.
+- **RECOVERY: 91 rows / 48 projects = 1.8958.** Polylines and polygons span ~1.9.
+- overall 1.0095, dominated by points — **do not quote the blend**; the national mix is
+  81.5/18.5, not 97.9/2.1.
+
+**National membership: ~887,000 – 955,000 rows → ~0.24–0.29 GB** at the measured **285.5
+bytes/row**, built per family (PROVEN 718,278 x 1.0 · RECOVERY point-family 105,227 x 1.0 ·
+polygon 15,656 x 1.0–1.9 · polyline 5,510 x 1.9–5.4 · unprobed 37,792 x 1.0–1.9).
+**Prior estimate 0.5–1.35 GB — the fourth extrapolation corrected downward this session,
+by ~4.6x.**
+
+🔻 **MY OWN PREDICTION WAS REFUTED ON THE LOW SIDE, which is the point of stating it
+first.** Predicted 6,000–9,000 rows, got **4,562**. Predicted under-inclusion 200–800, got
+**50**. Over-inclusion predicted 13,000–16,000, got **16,892** (slightly high). The error
+was assuming resident MassDOT polylines would contribute 1,500–4,000 rows in Boston; they
+contributed **91**, because a statewide highway corpus barely intersects one urban prefix.
+
+**FIRST REAL UNDER-INCLUSION NUMBER: 50 rows on 021** — `discovered \ legacy`, i.e. real
+ZIP membership the slice-first build would never have found. Against **16,892**
+over-inclusion on the same prefix. So the legacy 3-mile method is wrong in both directions
+but **overwhelmingly by over-claiming**: 21,404 legacy pairs over 4,930 projects is **4.34
+ZIPs per project** where exact geometry assigns **1.01**.
+
+⚠️ **A REPORTING LINE IN THE FIRST RUN WAS WRONG — recorded because the number was
+printed.** "boundaries a shard-first build would never have loaded" printed **-4**, by
+subtracting two set SIZES (53 ZCTAs, 57 legacy ZIPs) instead of taking a set DIFFERENCE;
+the sets overlap only partially because some legacy ZIPs have no ZCTA at all. Fixed to
+compute the real difference both ways. **The unfixed consequence: for 021 the true
+"never-loaded" count is not known**, because the scratch boundary table was dropped with
+the GEOID set still in it. What IS known: 57 legacy ZIPs, 53 ZCTAs, **13 legacy ZIPs
+received no member**, and **44 of 53 ZCTAs carry at least one**.
+
+✅ **THE DISK DECISION IS DETERMINABLE AND THE ANSWER IS: NO INCREASE NEEDED.**
+Permanent additional from today **~0.32–0.64 GB against 1.60 GB headroom** (free 3,690.5
+MB vs the 2,048 floor) — RECOVERY remaining ~0.08–0.35 GB, membership ~0.24–0.29 GB, and
+**ZCTA boundaries 0 because streaming is now demonstrated, not argued**: 53 loaded, probed
+in 1.3 s, dropped in the same run.
+
 ### 2026-09-03 — POLYGONS ARE LIGHT, THE NATIONAL ZCTA COST IS MEASURED, AND ONE TERM IS LEFT
 
 **Every storage term for the boundary-first pass is now measured except one — and the

@@ -109,7 +109,19 @@ def main():
                                    where snapshot_id={lit(SNAPSHOT)} and record_kind='development'
                                      and left(zip,3)={lit(PREFIX)};""", "legacy zips"), "n"))
     say("ZIPs carrying a legacy pair (what a shard would load)", legacy_zips)
-    say("boundaries a shard-first build would never have loaded", len(wanted) - legacy_zips)
+    # SET DIFFERENCE, not a difference of set SIZES. The first version of this line
+    # subtracted the two counts and printed -4 for prefix 021 (53 ZCTAs, 57 legacy ZIPs),
+    # which is not a count of anything: the two sets overlap partially, because some
+    # legacy ZIPs have no ZCTA at all. Only the difference answers "which boundaries
+    # would a shard-first build never have loaded".
+    have = {r["zip"] for r in sql(f"""select distinct zip from preservation.app_project_identity
+                                       where snapshot_id={lit(SNAPSHOT)} and record_kind='development'
+                                         and left(zip,3)={lit(PREFIX)};""", "legacy zip set")}
+    never = sorted(set(wanted) - have)
+    say("boundaries a shard-first build would NEVER have loaded", len(never))
+    if never:
+        say("  (first 12)", ",".join(never[:12]))
+    say("legacy ZIPs with no ZCTA in the national file", len(have - set(wanted)))
 
     sql(f"delete from {SCRATCH} where prefix={lit(PREFIX)};", "clear scratch")
     shapes, _ = read_shp_polygons(t["raw"], set(wanted.values()))
