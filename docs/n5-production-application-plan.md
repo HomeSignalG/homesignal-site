@@ -202,6 +202,48 @@ created inside the failed transaction survives it.
 
 ---
 
+## 4b. READ-ONLY PRODUCTION PREFLIGHT — measured 2026-09-03 ~16:49Z
+
+Re-measured from production, not carried from earlier receipts. Read-only; zero writes.
+
+| item | measured |
+|---|---|
+| PostgreSQL | **17.6** aarch64 (engine 17.6.1.127) — **production is PG 17, not 16** |
+| PostGIS | **3.3.7** (GEOS 3.14.1, PROJ 9.7.1) |
+| project / region | `qwnnmljucajnexpxdgxr` · **us-west-2** · ACTIVE_HEALTHY · db `postgres`, port 5432 |
+| §1 pre-state classification | `has_vsid=false` · `has_bicond=false` · `has_ptns=false` · reject PK `PRIMARY KEY (source_key, reason)` · no archive → **A_LEGACY** |
+| association PK | `PRIMARY KEY (source_key, zip)` — already applied, §1 asserts it, #1016 does not re-author it |
+| canonical geometry | **718,278** `proven_stored_point`, **718,278** `pt:1`, 0 non-`ST_Point`, 0 wrong SRID, 0 duplicate keys, 0 `pt:` squatters |
+| rejects | **5,171**, 0 duplicate keys, **1** distinct snapshot = `phase1-2026-09-01`, 0 missing snapshot |
+| partition closure | 718,278 + 5,171 = **723,449** ✓ |
+| B2 unique derivation | 723,449 derivation rows · 723,449 distinct `source_key` · **0 duplicates** |
+| §3 set identity | ELIGIBLE **718,278**; canonical∖eligible **0**; eligible∖canonical **0**; coordinate mismatch **0** at 1e-9 |
+| sizes | `geo.n5_geom` 322 MB · `geo.n5_point_reject` 1,624 kB · database 6,895 MB |
+| replication slots | **0** (none, so no WAL-retention risk) |
+| writer quiescence @ **2026-09-03 16:49:18Z** | 0 active N5 queries · 0 locks on `n5_geom`/`n5_point_reject`/`n5_association` · 0 idle-in-transaction · **0 shards running** (544 total) · no `n5_verdict_manifest` yet |
+
+⚠️ **Writer quiescence above is EVIDENCE, NOT PERMISSION.** It is stale the moment it is
+recorded and MUST be re-proven immediately before any authorized application (§0(i)).
+
+**Not visible from SQL, founder-side checks at apply time:** free disk headroom (budget ≈2× the
+322 MB relation while the UPDATE's dead tuples await VACUUM, plus ~140–190 MB WAL) and the
+PITR/backup posture with the pre-apply restore point.
+
+**PG 17 compatibility closed:** `.github/workflows/n5-postgis-suite.yml` now runs the full
+117-assertion suite on a **two-leg matrix — `postgis/postgis:16-3.4` and `postgis/postgis:17-3.5`**,
+both green. The PostGIS minor cannot match 3.3.7 (no image pairs PG17 with 3.3), but every
+spatial function the migration uses predates 3.0 and each was exercised against production's
+real 3.3.7 by the preflight above.
+
+**Credential status, checked rather than inferred:** run
+[33781209601](https://github.com/HomeSignalG/homesignal-site/actions/runs/33781209601) step
+"Is a PG-wire credential provisioned?" reported `SUPABASE_DB_URL: NOT SET`. No GitHub
+Environment is referenced by any workflow; the only DB transport in the repo is `db-sql.yml`
+over the Management API. `.github/workflows/n5-db-connectivity.yml` is the SELECT-only proof,
+ready to re-run the moment the secret exists.
+
+---
+
 ## 5. GREEN RECEIPTS BACKING THIS PLAN
 
 - Executable PostgreSQL + PostGIS: **117 / 117**, local (PG 16.13 / PostGIS 3.4.2) and in CI
