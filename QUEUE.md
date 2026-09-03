@@ -40,6 +40,45 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — A2 MEASURED: features/project is 1.000, not 4.416 — and it moved the uncertainty rather than removing it
+
+**`raleigh-building-permits` acquired IN FULL** (run 33697…, 198.8 s, 604 requests,
+907,466 bytes): accepted 6,023 projects → **6,023 recoverable → 6,023 fetched → 6,023
+features**, `esriGeometryPoint`, **0 batch errors, 0 unasked echoes, 0 rows with no usable
+geometry**. **FEATURES PER PROJECT = 1.000.**
+
+⚠️ **The 4.416 figure was ONE registry, not a corpus property.** Per-registry, now that a
+fourth exists: **massdot-highway-projects 5.437** · ctdot-project-work-areas **1.000** ·
+iowa-dot-bid-projects-lines **1.000** · raleigh-building-permits **1.000**. **Three of the
+four are exactly 1.000**; the aggregate was carried entirely by MassDOT. Any future
+national extrapolation from a single registry should be treated the same way this one
+was — as a lead, not a rate.
+
+🔻 **BUT THE CAPACITY QUESTION DID NOT CLOSE, and the reason is worth reading.** A2
+collapsed *multiplicity* and simultaneously exposed a term the old single average was
+hiding: **bytes per feature spans 9× by geometry family** — measured heap per row,
+raleigh (point) **194 B** · massdot (polyline) **746 B** · iowa (polyline) 1,064 B ·
+ctdot (polygon) **5,065 B**. All-in for the point family is **561.7 B/feature** (measured
+as the delta over the acquisition: 3,383,296 B ÷ 6,023).
+- Prior RECOVERY bracket **0.19 – 0.85 GB** → now **~0.17 – 1.63 GB**: the floor fell,
+  and **the ceiling ROSE**, because polygon rows are far heavier than the 822 B average
+  the DOT-only corpus implied.
+- **The next measurement that actually collapses it is one POLYGON-family registry** —
+  `henderson-residential-permits` (8,475 projects) is the obvious candidate. Multiplicity
+  is now answered; vertex count is not.
+
+**Permanent additional storage from today: ~0.66 – 2.97 GB against ~1.61 GB of headroom**
+(free 3,698.5 MB vs the 2,048 MB floor). It still straddles. PROVEN's 0.318 GB is already
+spent and is inside that free figure; the membership-output term (0.5–1.35 GB) remains
+open and is now the single largest component.
+
+✅ **Full acquisition of the two largest registries is CHEAPER than scoped.** Measured
+rate **604 requests / 198.8 s ≈ 0.33 s per request**, so `little-rock-permits` (4,901
+requests) is **~27 min** and `new-hanover-county-building-permits` (3,751) **~21 min** —
+both comfortably inside a 120-minute job. The earlier 41–82 min estimate that argued for
+picking a smaller registry was pessimistic by ~2.5×; the pick was still right for the
+modal-family reason, but the cost argument behind it does not hold.
+
 ### 2026-09-02 — N5 A0/A1 APPLIED: PROVEN points materialised, and three things logged as untested or deviant
 
 **A1 landed: `geo.n5_geom` is no longer RECOVERY-only.** 718,278 `proven_stored_point`
