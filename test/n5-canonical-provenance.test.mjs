@@ -34,34 +34,49 @@ ok(sql.length > 5000 && py.length > 20000, 'migration + builder loaded');
 
 // ---- 1. MIGRATION ATOMICITY ----
 ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'migration is one transaction');
-ok(code.indexOf('begin;') < code.indexOf('drop constraint if exists n5_association_pkey')
-   && code.indexOf('add constraint n5_association_pkey') < code.lastIndexOf('commit;'),
-  'the DROP PK / ADD PK window is inside the transaction');
+// The association PK is ALREADY (source_key, zip) in production, applied by the parallel
+// session (f7c4b79) as a table swap. #1016 must therefore NOT re-author it.
+ok(!/drop constraint if exists n5_association_pkey/.test(code)
+   && !/add constraint n5_association_pkey/.test(code),
+  'the association PK is validated, never re-authored by this migration');
 ok(/APPLY THIS FILE AS A SINGLE STATEMENT\/SCRIPT/.test(sql),
   'the apply-mechanism gate is documented in the migration');
 
 // ---- 2. PROVENANCE ----
-ok(code.indexOf('add column if not exists provenance') < code.indexOf("set provenance = 'recovered_authoritative'"),
-  'column added nullable before backfill');
+// provenance + its backfill are the parallel session's and already applied; what #1016 adds
+// nullable-then-populates-then-constrains is verdict_snapshot_id.
+ok(code.indexOf('add column if not exists verdict_snapshot_id')
+   < code.indexOf("set verdict_snapshot_id = 'phase1-2026-09-01'"),
+  'verdict_snapshot_id is added nullable before it is backfilled');
 ok(code.indexOf('provenance backfill incomplete') < code.indexOf('n5_geom_provenance_ck'),
   'zero-NULL assertion precedes the CHECK');
-ok(code.indexOf('n5_geom_provenance_ck') < code.indexOf('alter column provenance set not null'),
-  'NOT NULL enforced last');
-ok(!/add column if not exists provenance[^;]*default/i.test(code), 'provenance has NO default');
-ok(/check \(provenance in \('recovered_authoritative','proven_stored_point'\)\)/.test(code),
-  'provenance allowlist is exactly the two v1 values');
+ok(code.indexOf('primary key (source_key)')
+   < code.indexOf('alter column verdict_snapshot_id set not null'),
+  'the reject PK is narrowed before verdict_snapshot_id is made NOT NULL');
+ok(!/add column if not exists verdict_snapshot_id[^;]*default/i.test(code),
+  'verdict_snapshot_id has NO default - NULL is the required value for recovered geometry');
+ok(/n5_geom_provenance_ck is missing or unrecognised/.test(code)
+   && /prov_ck !~ 'recovered_authoritative'/.test(code)
+   && /prov_ck !~ 'proven_stored_point'/.test(code),
+  'the provenance allowlist is VALIDATED against the two v1 values, not re-authored');
 
 // ---- 3. pt: NAMESPACE STRUCTURALLY RESERVED ----
 ok(/check \(\(provenance = 'proven_stored_point'\) = \(feature_id = 'pt:1'\)\)/.test(code),
   'biconditional CHECK reserves the pt: namespace');
-ok(/violate the pt: namespace reservation/.test(code), 'pre-existing violators STOP the migration');
+ok(/legacy geometry namespace violated/.test(code)
+   && /recovered squatting pt:\*/.test(code),
+  'pre-existing namespace violators STOP the migration');
 ok(!/'pt:2'/.test(pycode), 'no executable path emits pt:2');
 
 // ---- 4. ASSOCIATION PK ----
-ok(/primary key \(source_key, zip\)/.test(code), 'association PK is (source_key, zip)');
-ok(/having count\(\*\) > 1/.test(code) && /having count\(distinct evidence\) > 1/.test(code),
-  'both PK preconditions are verified');
-ok(/needs reconciliation first/.test(code), 'nonzero preconditions STOP the migration');
+ok(/PRIMARY KEY \(source_key, zip\)/.test(code)
+   && /already applied by the parallel session/.test(code),
+  'the migration requires the association PK to already be (source_key, zip)');
+ok(/canonical-not-eligible=%, eligible-not-canonical=%/.test(code)
+   && /ineligible-not-rejected=%, rejected-not-ineligible=%, reason mismatch=%/.test(code),
+  'both directions of BOTH set-equality preconditions are verified in the gate');
+ok(/Attribution refused/.test(code) && /raise exception/.test(code),
+  'nonzero preconditions STOP the migration');
 
 // ---- 5. PROJECT-GLOBAL OWNERSHIP ----
 ok(/create table if not exists geo\.n5_proven_verdict/.test(code), 'global verdict table exists');
@@ -106,7 +121,8 @@ ok(!/ST_Intersects/.test(pycode.slice(pycode.indexOf('def refresh_proven_verdict
                                       pycode.indexOf('def stage_associations'))),
   'no jurisdiction containment test in the PROVEN gate');
 ok(!/'OUTSIDE_JURISDICTION'/.test(py), 'v1 never EMITS OUTSIDE_JURISDICTION as a SQL literal');
-ok(/'OUTSIDE_JURISDICTION'/.test(code), 'the reason stays RESERVED in the schema vocabulary');
+ok(/'OUTSIDE_JURISDICTION'/.test(sql) && !/'OUTSIDE_JURISDICTION'/.test(code),
+  'OUTSIDE_JURISDICTION stays RESERVED and documented, and this migration never authors it');
 ok(/ZIP-page materialization is NOT jurisdiction evidence/.test(sql)
    || /not jurisdiction evidence/i.test(sql), 'the migration documents why page ZIP is not jurisdiction');
 ok(/not an address ZIP/.test(py), 'the builder documents the same');
@@ -195,7 +211,9 @@ ok(runShard.indexOf('assert_snapshot_consumable()') < runShard.indexOf('FREEZE')
 // n5_geom + reject snapshot provenance
 ok(/check \(\(provenance = 'proven_stored_point'\) = \(verdict_snapshot_id is not null\)\)/.test(code),
   'proven <=> verdict_snapshot_id non-null, enforced structurally');
-ok(/verdict_snapshot_id text not null,/.test(code), 'current rejects carry their verdict snapshot');
+ok(/add column if not exists verdict_snapshot_id text/.test(code)
+   && /alter column verdict_snapshot_id set not null/.test(code),
+  'current rejects carry their verdict snapshot, enforced NOT NULL after the rebuild');
 ok(/constraint n5_point_reject_pkey primary key \(source_key\)/.test(code),
   'reject identity is STILL source_key alone (snapshot is provenance, not identity)');
 ok(/"verdict_snapshot_id": SNAPSHOT/.test(py), 'shard detail records the verdict snapshot');

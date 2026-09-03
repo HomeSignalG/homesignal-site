@@ -39,6 +39,7 @@ if not DSN:
 
 MIGRATION = os.path.join(ROOT, "docs", "n5-canonical-geometry-provenance.sql")
 FIXTURE = os.path.join(ROOT, "test", "n5_pg", "fixture_pre_state.sql")
+LEGACY  = os.path.join(ROOT, "test", "n5_pg", "fixture_legacy_seed.sql")
 
 RESULTS = []
 GROUP = "?"
@@ -145,7 +146,7 @@ def apply_script(path_or_text, is_path=True, inject_failure=None):
         c.close()
 
 
-def reset(apply_migration=True, pre_geom=None, pre_assoc=None):
+def reset(apply_migration=True, pre_geom=None, pre_assoc=None, legacy=False):
     """Destroy and rebuild the disposable schemas. `pre_geom` / `pre_assoc` are seeded
     BEFORE the migration, so the migration is exercised against pre-existing rows."""
     apply_script("drop schema if exists geo cascade; drop schema if exists preservation cascade; "
@@ -153,6 +154,10 @@ def reset(apply_migration=True, pre_geom=None, pre_assoc=None):
     ok, err = apply_script(FIXTURE)
     if not ok:
         raise SystemExit("fixture failed: " + err)
+    if legacy:
+        ok, err = apply_script(LEGACY)
+        if not ok:
+            raise SystemExit("legacy seed failed: " + err)
     if pre_geom:
         apply_script(pre_geom, is_path=False)
     if pre_assoc:
@@ -229,18 +234,25 @@ pk = q1("""select string_agg(a.attname, ',' order by k.ord)
              join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
              join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum
             where c.conrelid='geo.n5_association'::regclass and c.contype='p';""")
-check(3, "association PK becomes (source_key, zip)", pk == "source_key,zip", f"got {pk!r}")
+check(3, "association PK is (source_key, zip) and the migration leaves it alone",
+      pk == "source_key,zip"
+      and "drop constraint if exists n5_association_pkey" not in open(MIGRATION, encoding="utf-8").read(),
+      f"got {pk!r}")
 
-# 4 - pre-existing RECOVERY geometry survives and is backfilled.
+# 4 - pre-existing RECOVERY geometry survives untouched and stays UNATTRIBUTED.
+#     (Premise updated 2026-09-03: the provenance backfill belongs to the parallel session and
+#      is already applied in production, so the migration no longer performs it. What #1016
+#      must guarantee is that recovered geometry is preserved and keeps verdict_snapshot_id
+#      NULL - which the biconditional then requires of it.)
 reset(apply_migration=False, pre_geom="""
-insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,first_z3)
-values ('sk-rec-1','r-rec','oid-9',1,ST_SetSRID(ST_MakePoint(-71.1,42.3),4269),'021'),
-       ('sk-rec-2','r-rec','oid-8',1,ST_SetSRID(ST_MakePoint(-71.2,42.4),4269),'021');""")
+insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance)
+values ('sk-rec-1','r-rec','oid-9',1,ST_SetSRID(ST_MakePoint(-71.1,42.3),4269),'021','recovered_authoritative'),
+       ('sk-rec-2','r-rec','oid-8',1,ST_SetSRID(ST_MakePoint(-71.2,42.4),4269),'021','recovered_authoritative');""")
 before_n = q1("select count(*) from geo.n5_geom;")
 ok4, err4 = apply_script(MIGRATION)
 after = q("select source_key, provenance, verdict_snapshot_id, ST_X(geom) x from geo.n5_geom "
           "order by source_key;")
-check(4, "existing compatible RECOVERY geometry migrates successfully",
+check(4, "pre-existing RECOVERY geometry is preserved and stays unattributed",
       ok4 and before_n == 2 and len(after) == 2
       and all(r["provenance"] == "recovered_authoritative" for r in after)
       and all(r["verdict_snapshot_id"] is None for r in after)
@@ -248,25 +260,22 @@ check(4, "existing compatible RECOVERY geometry migrates successfully",
       err4 or after)
 
 # 2 - an injected failure rolls back the ENTIRE migration transaction.
-reset(apply_migration=False, pre_geom="""
-insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,first_z3)
-values ('sk-rec-1','r-rec','oid-9',1,ST_SetSRID(ST_MakePoint(-71.1,42.3),4269),'021');""")
+reset(apply_migration=False, legacy=True)
 ok2, err2 = apply_script(MIGRATION, inject_failure=
                          "do $inj$ begin raise exception 'INJECTED MIGRATION FAILURE'; end $inj$;")
 rolled = {
     "manifest_absent": q1("select to_regclass('geo.n5_verdict_manifest') is null;"),
     "verdict_absent": q1("select to_regclass('geo.n5_proven_verdict') is null;"),
-    "reject_absent": q1("select to_regclass('geo.n5_point_reject') is null;"),
     "stage_absent": q1("select to_regclass('geo.n5_association_stage') is null;"),
-    "provenance_absent": q1("""select not exists (select 1 from information_schema.columns
-        where table_schema='geo' and table_name='n5_geom' and column_name='provenance');"""),
-    "assoc_pk_unchanged": q1("""select string_agg(a.attname, ',' order by k.ord)
-             from pg_constraint c
-             join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
-             join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum
-            where c.conrelid='geo.n5_association'::regclass and c.contype='p';""")
-            == "source_key,zip,evidence",
-    "geom_row_survives": q1("select count(*) from geo.n5_geom;") == 1,
+    "verdict_snapshot_id_absent": q1("""select not exists (select 1 from information_schema.columns
+        where table_schema='geo' and table_name='n5_geom' and column_name='verdict_snapshot_id');"""),
+    "archive_absent": q1("select to_regclass('geo.n5_point_reject_archive') is null;"),
+    "reject_pk_unchanged": q1("""select pg_get_constraintdef(oid) from pg_constraint
+        where conrelid='geo.n5_point_reject'::regclass and contype='p';""")
+        == 'PRIMARY KEY (source_key, reason)',
+    "legacy_rejects_intact": q1("select count(*) from geo.n5_point_reject;") == 2,
+    "legacy_points_intact": q1("select count(*) from geo.n5_geom "
+                               "where provenance='proven_stored_point';") == 3,
 }
 check(2, "injected migration failure rolls back the ENTIRE transaction",
       (not ok2) and all(rolled.values()), {"applied": ok2, **rolled})
@@ -290,25 +299,25 @@ check(5, "provenance constraints reject invalid combinations",
 
 # 6 - verdict_snapshot_id biconditional.
 prov_no_vsid, e6a = exec_raw("""insert into geo.n5_geom
-  (source_key,feature_id,outcome,geom,first_z3,provenance)
-  values ('y1','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point');""")
+  (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance)
+  values ('y1','r','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point');""")
 rec_with_vsid, e6b = exec_raw("""insert into geo.n5_geom
-  (source_key,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
-  values ('y2','f9',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','recovered_authoritative','S1');""")
+  (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
+  values ('y2','r','f9',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','recovered_authoritative','S1');""")
 proven_ok, e6c = exec_raw("""insert into geo.n5_geom
-  (source_key,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
-  values ('y3','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point','S1');""")
+  (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
+  values ('y3','r','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point','S1');""")
 check(6, "verdict_snapshot_id constraints reject invalid combinations",
       (not prov_no_vsid) and (not rec_with_vsid) and proven_ok,
       {"proven_null_vsid": e6a[:70], "recovered_with_vsid": e6b[:70], "valid": e6c[:70]})
 
 # 7 - the pt: namespace reservation.
 proven_pt2, e7a = exec_raw("""insert into geo.n5_geom
-  (source_key,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
-  values ('z1','pt:2',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point','S1');""")
+  (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance,verdict_snapshot_id)
+  values ('z1','r','pt:2',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','proven_stored_point','S1');""")
 rec_squats, e7b = exec_raw("""insert into geo.n5_geom
-  (source_key,feature_id,outcome,geom,first_z3,provenance)
-  values ('z2','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','recovered_authoritative');""")
+  (source_key,registry_id,feature_id,outcome,geom,first_z3,provenance)
+  values ('z2','r','pt:1',1,ST_SetSRID(ST_MakePoint(-71,42),4269),'021','recovered_authoritative');""")
 check(7, "pt:1 namespace constraint works (no pt:2, no recovered squatter)",
       (not proven_pt2) and (not rec_squats), {"pt2": e7a[:70], "squat": e7b[:70]})
 
@@ -922,6 +931,156 @@ check(66, "successful shard completion records the exact verdict_snapshot_id in 
 
 
 # =============================================================================
+group("PRODUCTION PRE-STATE")
+# =============================================================================
+# The migration is now exercised against a production-FAITHFUL legacy pre-state: provenance
+# already present, 3 legacy proven pt:1 points, 1 recovered row, the old reject table shape
+# with 2 legacy rows carrying detail.{snapshot,distinct_coords}, association PK already
+# (source_key, zip). Receipts for the real corpus: docs/n5-applied-state-of-record.md.
+
+SNAP = "phase1-2026-09-01"
+
+def reject_cols():
+    return {r["column_name"] for r in q("""select column_name from information_schema.columns
+        where table_schema='geo' and table_name='n5_point_reject';""")}
+
+def con_def(name):
+    return q1(f"select pg_get_constraintdef(oid) from pg_constraint where conname='{name}';")
+
+reset(apply_migration=False, legacy=True)
+pre_ok = (q1("select count(*) from geo.n5_geom where provenance='proven_stored_point';") == 3
+          and q1("select count(*) from geo.n5_point_reject;") == 2
+          and con_def('n5_point_reject_pkey') == 'PRIMARY KEY (source_key, reason)')
+ok74, err74 = apply_script(MIGRATION)
+check(74, "migration SUCCEEDS against a production-faithful legacy pre-state",
+      pre_ok and ok74, {"pre_state_ok": pre_ok, "err": err74[:200]})
+
+att = q("""select source_key, verdict_snapshot_id v, provenance p
+             from geo.n5_geom order by source_key;""")
+check(75, "all legacy proven points are attributed to the snapshot recorded in the data",
+      all(r["v"] == SNAP for r in att if r["p"] == "proven_stored_point")
+      and len([r for r in att if r["p"] == "proven_stored_point"]) == 3, att)
+check(76, "recovered geometry is preserved and keeps verdict_snapshot_id NULL",
+      [r["v"] for r in att if r["p"] == "recovered_authoritative"] == [None], att)
+check(77, "the biconditional and pt: namespace constraints now exist",
+      con_def('n5_geom_verdict_snapshot_ck') is not None
+      and con_def('n5_geom_pt_namespace_ck') is not None)
+check(78, "reject PK becomes (source_key)",
+      con_def('n5_point_reject_pkey') == 'PRIMARY KEY (source_key)',
+      con_def('n5_point_reject_pkey'))
+check(79, "reject target columns exist and detail is retained",
+      {'lat','lng','observed_in_z3','verdict_snapshot_id','detail'} <= reject_cols(),
+      sorted(reject_cols()))
+
+arch = q("""select source_key, reason, detail, rejected_at::text ts, archived_snapshot_id asn
+              from geo.n5_point_reject_archive order by source_key;""")
+check(80, "every legacy reject row is archived with detail and rejected_at preserved",
+      len(arch) == 2
+      and all(r["detail"] and r["detail"].get("snapshot") == SNAP for r in arch)
+      and all(r["ts"].startswith("2026-09-02 23:50:51") for r in arch)
+      and all(r["asn"] == SNAP for r in arch), arch)
+
+cur = {r["source_key"]: r for r in q("""select source_key, reason, verdict_snapshot_id v
+                                          from geo.n5_point_reject;""")}
+check(81, "current-state rejects equal the expected ineligible set with matching reasons",
+      set(cur) == {"L-multi", "L-null"}
+      and cur["L-multi"]["reason"] == "MULTI_COORD_UNRESOLVED"
+      and cur["L-null"]["reason"] == "NULL_COORD", cur)
+check(82, "current-state rejects carry the verdict snapshot attribution",
+      all(r["v"] == SNAP for r in cur.values())
+      and q1("""select attnotnull from pg_attribute
+                 where attrelid='geo.n5_point_reject'::regclass
+                   and attname='verdict_snapshot_id';""") is True, cur)
+check(83, "no ELIGIBLE source_key carries a current reject",
+      q1("""select count(*) from geo.n5_point_reject r join geo.n5_geom g
+              on g.source_key=r.source_key where g.provenance='proven_stored_point';""") == 0)
+
+# 84 / 85 - rerunning the migration against the corrected post-state is a clean no-op.
+ok84, err84 = apply_script(MIGRATION)
+check(84, "rerun against the corrected post-state is a safe no-op (state B)", ok84, err84[:200])
+check(85, "the archive rerun does not duplicate legacy rows",
+      q1("select count(*) from geo.n5_point_reject_archive;") == 2
+      and q1("select count(*) from geo.n5_point_reject;") == 2)
+
+# =============================================================================
+group("PRE-STATE NEGATIVE CONTROLS")
+# =============================================================================
+# Each corrupts ONE invariant of an otherwise production-faithful legacy state, and the
+# migration must FAIL and roll back rather than silently normalising it.
+
+PRESTATE_CORRUPTIONS = [
+    (86, "an extra canonical PROVEN source_key blocks attribution",
+     "insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,provenance) "
+     "values ('L-ghost','r-proven','pt:1',1,"
+     "ST_SetSRID(ST_MakePoint(-70.0,41.0),4269),'proven_stored_point');"),
+    (87, "a missing canonical eligible source_key blocks attribution",
+     "delete from geo.n5_geom where source_key='L-elig-2';"),
+    (88, "a coordinate mismatch blocks attribution",
+     "update geo.n5_geom set geom=ST_SetSRID(ST_MakePoint(0.5,0.5),4269) "
+     "where source_key='L-elig-1';"),
+    (89, "a wrong feature_id blocks attribution",
+     "update geo.n5_geom set feature_id='pt:9' where source_key='L-elig-1';"),
+    (90, "a duplicate PROVEN geometry for one source_key blocks attribution",
+     "insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,provenance) "
+     "values ('L-elig-1','r-proven','pt:7',1,"
+     "ST_SetSRID(ST_MakePoint(-71.0,42.0),4269),'proven_stored_point');"),
+    (91, "recovered geometry squatting the pt: namespace blocks attribution",
+     "update geo.n5_geom set feature_id='pt:1' where source_key='L-rec';"),
+    (92, "a reject-partition mismatch blocks attribution",
+     "delete from geo.n5_point_reject where source_key='L-null';"),
+    (93, "a snapshot-attribution mismatch blocks attribution",
+     """update geo.n5_point_reject set detail=jsonb_set(detail,'{snapshot}','"other-snap"')
+          where source_key='L-null';"""),
+    (94, "a reject reason disagreeing with the current rules blocks attribution",
+     "update geo.n5_point_reject set reason='NULL_ISLAND' where source_key='L-multi';"),
+]
+for num, name, corruption in PRESTATE_CORRUPTIONS:
+    reset(apply_migration=False, legacy=True)
+    cok, cerr = apply_script(corruption, is_path=False)
+    okm, errm = apply_script(MIGRATION)
+    rolled_back = q1("""select not exists (select 1 from information_schema.columns
+        where table_schema='geo' and table_name='n5_geom'
+          and column_name='verdict_snapshot_id');""")
+    check(num, name, cok and (not okm) and rolled_back,
+          {"corruption_applied": cok or cerr[:80], "migration_ok": okm,
+           "rolled_back": rolled_back, "err": errm[:160]})
+
+# 95 - the destructive reject step is UNREACHABLE unless the archive is provably complete.
+#      Poisoned in STATE A, before the first migration: pre-create the archive holding a row
+#      whose PK collides with the live legacy row but whose detail differs, so `on conflict do
+#      nothing` cannot copy the real detail and the gate must refuse.
+reset(apply_migration=False, legacy=True)
+apply_script("""
+create table geo.n5_point_reject_archive (
+  source_key text not null, registry_id text, reason text not null, detail jsonb,
+  rejected_at timestamptz not null, archived_snapshot_id text,
+  archived_at timestamptz not null default now(), archived_by text not null,
+  constraint n5_point_reject_archive_pkey primary key (source_key, reason, rejected_at));
+insert into geo.n5_point_reject_archive
+  (source_key,registry_id,reason,detail,rejected_at,archived_snapshot_id,archived_by)
+values ('L-multi','r-proven','MULTI_COORD_UNRESOLVED',
+        '{"snapshot":"phase1-2026-09-01","distinct_coords":99}'::jsonb,
+        '2026-09-02 23:50:51.752805+00','phase1-2026-09-01','poisoned');""", is_path=False)
+live_before = q1("select count(*) from geo.n5_point_reject;")
+ok95, err95 = apply_script(MIGRATION)
+check(95, "the destructive reject rebuild is unreachable when the archive is not provably complete",
+      (not ok95) and "archive is NOT provably complete" in err95
+      and q1("select count(*) from geo.n5_point_reject;") == live_before
+      and q1("""select pg_get_constraintdef(oid) from pg_constraint
+                 where conrelid='geo.n5_point_reject'::regclass and contype='p';""")
+          == 'PRIMARY KEY (source_key, reason)',
+      {"migration_ok": ok95, "live_rows": q1("select count(*) from geo.n5_point_reject;"),
+       "err": err95[:200]})
+
+# 96 - a genuinely unrecognised / partially migrated pre-state fails at classification.
+reset(apply_migration=False, legacy=True)
+apply_script("alter table geo.n5_geom add column verdict_snapshot_id text;", is_path=False)
+ok96, err96 = apply_script(MIGRATION)
+check(96, "a partially migrated pre-state fails loudly at classification rather than guessing",
+      (not ok96) and "PARTIALLY MIGRATED OR UNRECOGNISED PRE-STATE" in err96, err96[:180])
+
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 print("")
@@ -931,7 +1090,8 @@ for g, num, name, ok, _d in RESULTS:
     p, f = groups.get(g, (0, 0))
     groups[g] = (p + (1 if ok else 0), f + (0 if ok else 1))
 for g in ("MIGRATION", "GLOBAL VERDICT", "PUBLICATION", "SWEEP", "SWEEP FAILURE",
-          "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS"):
+          "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS",
+          "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS"):
     if g in groups:
         p, f = groups[g]
         print(f"{g:<22} PASS {p:>3}   FAIL {f:>3}")
