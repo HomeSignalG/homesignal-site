@@ -243,3 +243,45 @@ Controls: 5,335 + 507 = 5,842 (authoritative) ✓ · 5,335 + 12,384 = 17,719 (pr
 **So of the 32,655 net rows removed, 24,165 are geographic refutation and 8,997 are marker-grain
 correction.** Treating all removed rows as geographically wrong would overstate refutation by
 more than a third.
+
+## 12. Idempotency (Step 15)
+
+The marker relation was populated **twice** (runs 33789531163 and 33789914485, both
+`marker_mode=build`, both success).
+
+| | pass 1 | pass 2 |
+|---|---|---|
+| marker rows | 13,221 | **13,221** |
+| marker fingerprint | `e3a0efeb826befc77a4ec57762cf4a1f` | **`e3a0efeb826befc77a4ec57762cf4a1f`** |
+| membership fingerprint | `ff09ed6d59b3a436bf0a8c9ca6f5eaa9` | **unchanged** |
+| status fingerprint | `3f452ffa40fc1f540af3270655ad7400` | **unchanged** |
+
+Byte-identical. The fingerprint deliberately excludes `run_id` and `computed_at`, which are
+provenance and do change; `distinct run_id = 1` after pass 2 confirms it was a genuine full
+rebuild rather than a no-op.
+
+## 13. Preservation controls, re-verified after A3
+
+| artifact | state |
+|---|---|
+| `public.app_projects_for_zip` body / md5 | **`ec1b01ae4485ad2c59b9f946c9d565b6`** — unchanged |
+| `app_projects` indexes | 4, set md5 `cb54ea1146439b94a0b329c42629255b` — unchanged, **none added** |
+| `geo.zip_authoritative_membership` | 5,845 rows, md5 `ff09ed6d59b3a436bf0a8c9ca6f5eaa9` — unchanged |
+| `geo.n5_association` | 20,170 rows — unchanged |
+| `geo.n5_boundary_membership` | 18,184 rows — unchanged |
+| `geo.n5_geom` | 741,562 rows — unchanged |
+| acquisition shard count | 544 — unchanged |
+| `public.development_reports` | 12,722 rows — unchanged |
+| HTML / JS | not modified |
+| sitemap / indexability | not modified |
+| workbook | not modified |
+| `geo` exposure to anon/authenticated/PUBLIC | NONE — unchanged |
+
+New objects, all inside `geo` and all shadow: `zip_authoritative_marker`,
+`n5_a3_clip_component`, `n5_a3_merged_component`, `n5_a3_descriptive_pool`, `n5_a3_bench`,
+and the functions `n5_a3_projects_one_pass`, `n5_a3_bench_one`. The scratch boundary table
+`n5_a3m_zcta` is created and dropped inside each run.
+
+`geo.n5_a3_descriptive_pool` (48,032 rows) is analysis scaffolding — a one-sequential-scan copy
+of the in-scope `app_projects` development rows, used so Step 10 did not need 1,875 index probes
+(~8 minutes). It is not part of the read product and can be dropped.
