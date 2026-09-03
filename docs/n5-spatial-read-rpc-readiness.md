@@ -330,3 +330,120 @@ Nothing about the reviewed artifact changes under either ruling: the DDL, its sh
 **Holds observed:** the RPC was not created, not executed, and not modified. No shard was run or
 reconciled, no index added, `app_projects`/A3/Map 1/RLS untouched, no canonical geometry, reject
 or association write, no publish-verdict, no sync-canonical, PR #1015 still DRAFT.
+
+---
+
+## 14. PRODUCTION INSTALLATION — **INSTALLED AND VERIFIED**, 2026-09-03 21:31:19Z
+
+**Outcome: A — RPC INSTALLED AND VERIFIED.** `public.n5_projects_within_radius(double precision,
+double precision, numeric, integer)` is live in production, owned by `postgres`, with a body
+**byte-identical** to the reviewed artifact. **It has never been executed.**
+
+| | |
+|---|---|
+| Authorized DDL commit | `361941d4aaf77766368ce64834e42e918b5bea55` |
+| DDL sha256 | `2b1b80995cb1419a35cfa8d0ba64e975fac91779a84b163e0eef2a319f80b764` |
+| Applied at | **2026-09-03 21:31:19Z**, run `33808337362`, head `c7ff0a7` |
+| Transport | PG-wire session pooler :5432, TLS, `psql -X --single-transaction`, `ON_ERROR_STOP`, `lock_timeout='5s'`, `statement_timeout='5min'` |
+| Retry count | **0** — applied exactly once, never re-applied |
+
+**Artifact identity.** The receipt-only commit `ed957b0` changed `docs/n5-spatial-read-rpc-readiness.md`
+and nothing else; the DDL sha256 is identical at `361941d`, at `ed957b0`, at HEAD and in the
+working tree. Passed on the runner before any database contact.
+
+### The association gate — original, observed, superseded
+
+The unit was first **BLOCKED** (§13) because `geo.n5_association` read **21,674** against a fixed
+precondition of **20,170**. **Founder ruling 2026-09-03: that fixed equality is RETIRED for this
+installation unit and is not replaced by any other constant.** The RPC neither reads nor writes
+that table — proven from the installed body itself (`no_n5_association = true`) — and an
+independent shard campaign is legitimately consuming the snapshot this session published, so a
+fixed equality would convert real shard progress into a false installation failure. Association
+is **observational**: measured, reported, never asserted.
+
+| observational | before (21:23:07Z) | after (21:33:05Z) | delta |
+|---|---:|---:|---:|
+| `geo.n5_association` | 21,674 | **22,698** | **+1,024** |
+| shards `done` | 18 | **41** | +23 |
+| shards `pending` | 526 | **503** | −23 |
+| shards `running` | 0 | **0** | 0 |
+
+**Attribution:** association growth tracks shard completion exactly in direction and timing
+(+23 shards, +1,024 rows), the installed function contains no reference to `geo.n5_association`,
+and every hard control below is unchanged. The movement is the independent campaign, not the
+install.
+
+### Hard controls — all unchanged (a divergence would have been a STOP)
+
+| control | before | after |
+|---|---|---|
+| `geo.n5_geom` total | 741,562 | **741,562** |
+| `proven_stored_point` | 718,278 | **718,278** |
+| `recovered_authoritative` | 23,284 | **23,284** |
+| canonical PROVEN fingerprint | `bbda250fc30ee0b3aa3f46a259392aa3` | **`bbda250fc30ee0b3aa3f46a259392aa3`** |
+| `geo.n5_point_reject` | 5,171 | **5,171** |
+| manifest state | READY | **READY** |
+| `canonical_synced_at` | 2026-09-03 20:49:04.959655+00 | **2026-09-03 20:49:04.959655+00** |
+
+The pre-apply values are the run's own PRE-STATE gate, which passed at 21:31:06–21:31:19Z and
+asserts each of them; the post-apply values were re-read at 21:33:05Z. **`CREATE FUNCTION`
+mutated no N5 data.**
+
+### Installed object
+
+```
+n5_projects_within_radius(double precision, double precision, numeric, integer)
+identity args : p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer
+returns       : TABLE(source_key text, feature_id text, registry_id text, provenance text,
+                      distance_mi double precision, geometry_type text, has_more boolean)
+owner         : postgres          prosecdef : true (SECURITY DEFINER)
+provolatile   : s (STABLE)        proconfig : search_path=public
+overloads     : 1
+```
+
+**Definition identity — EXACT, not merely token-level.** `md5(prosrc)` in production is
+**`e1bb67c604aaaa4e1ab541ee32bc82ea`**, length **6,569**, equal to the md5 of the dollar-quoted
+body of the committed file. Production carries the reviewed semantics verbatim.
+
+Token readout over the **stored production body**: both provenance classes allowlisted by name ·
+provenance in the result type, selected from the row and carried to the output · `outcome=1` +
+`geom is not null` · proven snapshot condition · rejected-identity exclusion via
+`geo.n5_point_reject` · lifecycle `READY` + `canonical_synced_at is not null` + `INTO STRICT` ·
+radius allowlist `{0.5,1,2,5}` · `p_limit` validation · hard maximum 2000 · `limit p_limit + 1` ·
+explicit `has_more` · deterministic ordering · true-geometry `ST_DWithin`/`ST_Distance` ·
+`(source_key, feature_id)` grain · **no** `distinct on` · **no** representative-point reduction ·
+**no** `app_projects` · **no** `geo.n5_association` · **no** dynamic SQL.
+
+### Security
+
+`EXECUTE`: PUBLIC **false**, `anon` **true**, `authenticated` **true** — exactly the reviewed
+grants. No new privilege on `geo.*`: `anon`/`authenticated` SELECT on `geo.n5_geom` **false**,
+`anon` SELECT on `geo.n5_point_reject` **false** and on `geo.n5_verdict_manifest` **false**,
+`anon` USAGE on schema `geo` **false**. RLS **unchanged and unaltered** — `n5_geom`,
+`n5_point_reject`, `n5_verdict_manifest` each `rls=true, force=false, policies=0`, which is the
+state the SECURITY DEFINER model depends on and which makes the `postgres` ownership above
+load-bearing rather than cosmetic.
+
+### Two defects, both in the instrument, neither in production
+
+1. **The run went red on DEFINITION IDENTITY against a byte-identical install.** The expected
+   `prosrc` md5 was computed by anchoring on `as $fn$\n … \n$fn$;`, which strips the leading and
+   trailing newline Postgres stores inside the dollar quotes — 6,567 characters compared against
+   production's 6,569. It could never have matched. Verified afterwards: md5 of the file's true
+   dollar-quoted content is `e1bb67c604aaaa4e1ab541ee32bc82ea`, exactly what production holds.
+2. **`provenance_returned` searched `prosrc` for a `RETURNS TABLE` element.** The result type is
+   not part of the body, so that check could only ever report false. Replaced by three checks
+   that read the right places: `pg_get_function_result` for the result type, and the body for the
+   select-list and output carry-through — all three **true**.
+
+Both are fixed in `.github/workflows/n5-rpc-apply.yml`. **The RPC was NOT re-applied to correct
+them** — a second application is not authorized and was not needed: the remaining verification
+(definition identity, tokens, grants, RLS, hard controls, observational delta) was completed by
+**read-only catalog queries** against the already-installed function.
+
+**Arming:** the apply workflow is now **DISARMED**, so no ordinary commit can re-run it. The
+precheck's own `n5_projects_within_radius` absence requirement is a second, independent guard —
+it would now refuse rather than replace.
+
+⚠️ **INSTALLATION IS NOT A LIVE PROOF.** The function has never been called. The next unit is a
+single read-only invocation at one known point, 0.5 mi, small `p_limit`.
