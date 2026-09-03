@@ -547,3 +547,139 @@ gate before any database contact — proven live twice, on runs `33794183150` an
 
 ⚠️ **READY means the verdict is complete and readable. It does NOT authorize downstream
 synchronization. `sync-canonical` has NOT been run and `canonical_synced_at` is NULL.**
+
+---
+
+## §11 — CANONICAL SYNC COMPLETE receipt (`phase1-2026-09-01`, 2026-09-03 20:49:04.959655Z)
+
+**Outcome: A — CANONICAL SYNC COMPLETE.** The N5 lifecycle
+`BUILDING → BUILD → VALIDATE → RECORD COMPLETENESS → READY → SWEEP → VERIFY → CANONICAL SYNC
+COMPLETE` is closed for this snapshot. `sync-canonical` executed **exactly once**.
+
+| | |
+|---|---|
+| Snapshot | `phase1-2026-09-01` |
+| Execution SHA | `8f21754e1197573f3bbb6aa99082962ff350597a` |
+| `scripts/n5_shard.py` blob | `fa5409a19c89a51ad3d18a113a459e0f8e9abe6d` (sha256 `05b16869…`) |
+| Workflow / run / job | `n5-sync-canonical` · run **33804282706** attempt 1 · job 100810902283 |
+| Command | `SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py sync-canonical`, `N5_TRANSPORT=pgwire` |
+| Transport | session-mode Supavisor, port 5432, TLS 1.3, `psql -X`, `ON_ERROR_STOP=1`, `lock_timeout='5s'`, `statement_timeout='15min'` |
+| Retry count | **0** — no retry, no second execution, no Management API fallback |
+
+### Code identity
+`sync_canonical`, `global_canonical_sweep_sql`, `verify_canonical_geometry_sets`,
+`verify_canonical_reject_sets` and `require_snapshot` are **byte-identical** to `81c1d3b`, the
+last commit before this session's transport and derivation work. The only changed function is
+`refresh_proven_verdict_sql`, whose sole caller is `publish_verdict` — `sync-canonical` never
+reaches it. Every statement was classified against the pgwire transport's own single-SELECT rule
+first: the three read queries return rows, all six sweep statements execute for effect.
+
+### Gates (all from the existing suites; none added, none weakened)
+Executable **131/131** on both PostGIS legs (`postgis:16-3.4`, `17-3.5`), static **206/206**,
+offline **141/141**. The fail-closed behaviour this unit depends on is *executed* there:
+37/38/39 (a partial sweep leaves `canonical_synced_at` NULL, cannot be consumed, and a rerun
+converges), 40/41/44/45/46/47/50 (geometry corruption, reject corruption, coordinate mismatch,
+wrong `feature_id`, wrong provenance, wrong `verdict_snapshot_id`, reason mismatch each block
+publication), 21/22/23 (non-READY and wrong-snapshot refusal), 106/107/110 (lock and statement
+timeout in force).
+
+### Global N5 quiescence — proven immediately before mutation, not narrowed
+`20:47:31 → 20:48:16Z`. 0 active N5 sessions · 0 publish/sync sessions · 0 shard/association
+sessions · 0 A3 sessions · 0 shards in `state='running'` · 0 relevant idle-in-transaction ·
+**0 locks on `geo.n5*` relations** · 0 orphaned/stuck backends.
+
+### Exact pre-state — re-measured live, not taken from the §10 receipt
+> `PRE-STATE VERIFIED - READY, 723449/718278/5171, canonical 741562/718278/23284, fingerprint
+> bbda250f..., rejects 5171, assoc 20170, all four set-equivalences 0, coord mismatches 0,
+> canonical_synced_at NULL`
+
+### Execution
+`20:48:16.???Z → 20:49:05Z` — **49 seconds** against a 15-minute transaction budget.
+`canonical_synced_at` was NULLed as the first durable act, then the six sweep statements, then
+both set-equality verifications, then the timestamp.
+
+### Exact mutation accounting — forecast, then outcome, and they agree
+
+Forecast (read-only, taken before the sweep): geometry `insert=0 delete_ineligible=0
+delete_absent=0 upsert_touch=718278 snapid_change=0`; rejects `insert=0 update=5171
+delete_eligible=0 delete_absent=0 snapid_change=0`.
+
+| `geo.n5_geom` | before | after |
+|---|---|---|
+| source_key membership md5 | `b63cf4c27c478b94b9b4b71cf44652c0` | `b63cf4c27c478b94b9b4b71cf44652c0` |
+| proven points inserted | — | **0** |
+| proven points updated (touched) | — | **718,278** |
+| stale proven points deleted | — | **0** (ineligible 0 + absent 0) |
+| recovered_authoritative | **23,284** | **23,284** |
+| total rows | **741,562** | **741,562** |
+| PROVEN fingerprint | `bbda250fc30ee0b3aa3f46a259392aa3` | `bbda250fc30ee0b3aa3f46a259392aa3` |
+
+| `geo.n5_point_reject` | before | after |
+|---|---|---|
+| membership+reason md5 | `9d4146388d967ed726f6c0a5511e4723` | `9d4146388d967ed726f6c0a5511e4723` |
+| inserted | — | **0** |
+| updated/replaced (touched) | — | **5,171** |
+| deleted stale/orphaned | — | **0** (eligible-in-ledger 0 + absent 0) |
+| final count | 5,171 | **5,171** |
+
+`canonical_synced_at`: **NULL → 2026-09-03 20:49:04.959655+00**. Associations **20,170 →
+20,170**, no delta.
+
+⚖️ **A zero-row reconciliation was the EXPECTED result and was still checked rather than waved
+through.** The corpus already matched the READY verdict, so no row changed identity or
+coordinate — proven by *membership* md5s, which is strictly stronger than comparing counts (an
+equal-sized insert+delete would satisfy a count check and not this one). But the sweep was **not
+a physical no-op**: the upsert's `DO UPDATE` stamped `recovered_at` on all 718,278 proven rows
+and `rejected_at` on all 5,171 rejects, and those touch counts were asserted equal to the
+forecast. `snapid_change=0` on both tables means canonical geometry already carried
+`verdict_snapshot_id='phase1-2026-09-01'` from the migration's backfill.
+
+### Post-state
+> `POST-STATE VERIFIED - CANONICAL SYNC COMPLETE at 2026-09-03 20:49:04.959655+00, all
+> set-equivalences 0, recovered geometry preserved, associations unchanged`
+
+Verdict unmoved: 723,449 rows / 723,449 distinct / 718,278 ELIGIBLE / 5,171 rejected
+(MULTI_COORD_UNRESOLVED 4,877 + NULL_COORD 294). ELIGIBLE↔canonical 0/0 · rejects↔ledger 0/0 ·
+coordinate mismatches 0 · ELIGIBLE keys in the reject ledger 0 · non-`pt:1` proven rows 0 ·
+wrong-provenance `pt:1` rows 0 · wrong-snapshot proven rows 0.
+
+### Consumability gate — the shipped assertion, read-only
+`assert_snapshot_consumable()` **ACCEPTED** `phase1-2026-09-01`: `input_exists 1` ·
+`input_rows 2,976,275` · `state READY` · `synced True` · `verdict_rows 723,449 == expected
+723,449`. Nothing downstream was consumed.
+
+### Two defects found on the way, both mine, neither reaching production
+
+1. **Attempt 1 (run 33803891235) refused on `[8 lock(s) on geo.n5* relations]` — and the
+   concurrent session was MY OWN, not the other session and not A3.** The same push triggers
+   `n5-apply-migration`, whose read-only Gate 3 precheck ran `20:43:30 → 20:44:10` holding
+   AccessShareLocks while my gate sampled at `20:43:34`. Identified from the reported query
+   text: it reads `current_setting('n5.exp_canonical')`, which appears in
+   `n5-apply-migration.yml` and nowhere else in the repo. That workflow's own precheck then
+   refused (the migration is already applied) and its APPLY step was **skipped** — no re-apply.
+   The gate was right to refuse; the remedy was to let the siblings finish, never to narrow it.
+2. **Attempt 2 failed in my instrument after passing both real gates:**
+   `ERROR: Argument to ST_X() must have type POINT`. **`geo.n5_geom`'s
+   `recovered_authoritative` population is not uniformly POINT geometry** — my baseline hashed
+   it with `ST_X`/`ST_Y`, which is only valid for the PROVEN population. It now hashes
+   `md5(ST_AsEWKB(geom))`, type-agnostic and per-row bounded. The PROVEN fingerprint keeps
+   `ST_X`/`ST_Y` deliberately: those rows are points by construction and that exact expression
+   produced `bbda250f…`, so changing it would break comparability with every earlier receipt.
+
+Neither attempt executed the sweep — step 7 was skipped both times, `canonical_synced_at`
+stayed NULL, and each failure reporter re-read production unchanged. Two instrument defects were
+also corrected *before* the first run: orphaned backends were being measured on `backend_start`
+(connection age — would abort on healthy pooled traffic; now measured on **query age**), and a
+blanket non-idle check would have flagged ordinary PostgREST requests.
+
+### Arming
+**DISARMED.** Two independent guards now refuse a second sync: the arming token no longer
+matches `EXPECTED_ARM`, and the precheck hard-requires `canonical_synced_at IS NULL`, which is
+no longer true. `publish-verdict` remained disarmed throughout and was refused at its own gate
+on this push — all eight subsequent steps skipped, **zero database contact**.
+
+⚠️ **CANONICAL SYNC COMPLETE authorizes NOTHING downstream.** No shard ran, 760 did not run,
+the 13 completed shards were not reconciled, no radius RPC was executed, A3 was not touched or
+promoted, no `source_key` index was added, `app_projects` and the A3 shadow read are unchanged,
+Map 1 is unchanged, RLS is unchanged, no storage was reclaimed, B4 and #1015 are untouched, and
+PR #1016 remains **DRAFT and unmerged**.
