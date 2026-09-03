@@ -238,9 +238,34 @@ def populate(pfx):
     return int(r["memb"]), int(r["status_rows"]), int(r["no_point"])
 
 
-def main():
-    prefixes = [r["z3"].strip() for r in sql(
+def select_prefixes():
+    """Completed shards to (re)build, honouring an optional PREFIXES restriction.
+
+    Same production-safety property as n5_a3_markers.prefixes(): populate() is
+    `delete from zip_authoritative_membership where left(zcta5,3)=PFX` followed by an
+    insert, so a prefix under rebuild momentarily has zero membership rows. The
+    authoritative producer raises on a membership/relation mismatch and never falls
+    back to legacy, so rebuilding a prefix that is already production_geography_verified
+    would make those live ZIP pages ERROR for the width of the rebuild.
+
+    Unset PREFIXES and behaviour is exactly as before - every done shard. A named
+    prefix that is not a done shard is a HARD ERROR, never a silent skip.
+    """
+    done = [r["z3"].strip() for r in sql(
         "select z3::text z3 from geo.n5_shard where state='done' order by z3;", "prefixes")]
+    want = [p.strip() for p in os.environ.get("PREFIXES", "").split(",") if p.strip()]
+    if not want:
+        return done
+    missing = [p for p in want if p not in done]
+    if missing:
+        raise SystemExit("STOP: PREFIXES names prefixes that are not done shards: "
+                         + ",".join(missing))
+    say("PREFIXES restriction", f"{len(want)} of {len(done)} done shards")
+    return [p for p in done if p in want]
+
+
+def main():
+    prefixes = select_prefixes()
     say("UNIT A - AUTHORITATIVE SHADOW READ PRODUCT", "")
     say("run id / completed prefixes", f"{RUN_ID} / {','.join(prefixes)}")
     free0, db0, wal0 = disk()

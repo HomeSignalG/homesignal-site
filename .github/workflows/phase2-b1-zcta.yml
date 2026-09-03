@@ -245,6 +245,10 @@ jobs:
         if: ${{ github.event.inputs.mode == 'n5-unit-a' }}
         env:
           MODE: n5-unit-a
+          # Optional, same meaning as on the marker step: restrict the rebuild so it
+          # never deletes membership under ZIPs that are already serving. Empty = all
+          # done shards.
+          PREFIXES: ${{ github.event.inputs.prefixes }}
           SNAPSHOT: phase1-2026-09-01
           DISK_FLOOR_MB: '2048'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
