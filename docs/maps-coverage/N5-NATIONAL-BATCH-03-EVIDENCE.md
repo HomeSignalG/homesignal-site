@@ -196,3 +196,103 @@ count did not move it. Worst case measured individually: **10280 (131 membership
 `update public.app_zip_geography_cutover set enabled = false;` — it destroys no
 authoritative data, and this batch's rows carry `set_fingerprint = 'cutover3-2026-09-03'`
 so they can be reverted alone.
+
+---
+
+# N5 national batch 04 — 40 prefixes, production geography 744 -> 935
+
+Acquisition run 33810072975 completed **all 40** shards (41 -> 81 done) — the 429 retry
+held, and the unconditional self-test step passed on every dispatch in this batch.
+
+| stage | run | result |
+|---|---|---|
+| acquisition, 40 shards AUTO | 33810072975 | success, associations 22,698 -> 22,835 |
+| boundary, 40 prefixes | 33811643454 | success, 771.9 s, "prefixes completed 40", guard CLEAN |
+| Unit A shadow, 40 prefixes | 33812782916 | success, status 820 -> 1,012, membership 6,516 -> 6,606, **0 points unresolved** |
+| markers, 33 prefixes | 33813188554 | success, 13,895 -> 14,420 |
+
+**Six prefixes produced zero boundary rows and ALL SIX are measured zeros, unlike 055 last
+batch.** Each loaded real ZCTA boundaries and the spatial test ran and matched nothing:
+472 (33 ZCTAs) · 687 (73) · 893 (9) · 902 (35) · 925 (40) · 932 (65, 145,253 vertices).
+That is why they are cut-over eligible while 055 was not — the difference is whether a
+boundary existed to test, never the zero itself.
+
+`not_measured` classification added **0** rows this batch: every canonical ZIP in the 40
+prefixes had a TIGER ZCTA. Closure over all done shards stayed exact —
+**1,012 = 936 boundary_complete + 76 not_measured + 0 unclassified**, 0 non-canonical.
+
+## The producer REFUSED a ZIP, and that is the gate working
+
+Exercising the 192 staged candidates raised:
+
+```
+AUTHORITATIVE INVARIANT: zip 05843 returned 2 projects for 4 memberships
+```
+
+**Cause, read rather than guessed.** Two of 05843's four authoritative memberships name
+VTrans source_keys that are in the frozen snapshot but **no longer exist in live
+`public.app_projects`**:
+
+| source_key | in frozen snapshot | live |
+|---|---|---|
+| `arcgis:vtrans-project-locations-lines:STP FPAV(74)` | yes | yes |
+| `arcgis:vtrans-project-locations-lines:STP PS24(5)` | yes | yes |
+| `arcgis:vtrans-project-locations:ER P23-1(716)` | yes | **NO** |
+| `arcgis:vtrans-project-locations:RELV2316` | yes | **NO** |
+
+This is the documented freeze-vs-live drift in the REMOVAL direction — an ingest refresh
+dropped rows the frozen basis still carries. **The invariant was not weakened and the
+membership rows were not deleted** (they are authoritative geometry facts; the gap is on
+the live side). 05843 is held disabled with the cause recorded on its cutover row, and it
+still serves its original legacy output **byte-identical** (dev and facility md5 both match
+the pre-staging baseline).
+
+⚠️ **A wrong probe was caught by its own control and is recorded, not quietly fixed.**
+The first scope measurement joined `p.zip = m.zcta5` and reported 8 broken memberships
+across 7 ZIPs — but its control over the already-serving population returned **712**, on
+ZIPs that provably reconcile exactly. `app_projects.zip` is the legacy assumption the
+authoritative model exists to replace; the association comes from geometry. Re-probed on
+`source_key` alone: **2 memberships, 1 ZIP, control 0.**
+
+## Cutover group 4
+
+192 staged disabled and proven inert (0 development and 0 facility changes while
+disabled), 1 refused and held, **191 enabled**:
+
+```
+development now equals the authoritative producer   191 of 191   (0 differences)
+development rows      legacy 273  ->  authoritative 86
+FACILITIES CHANGED                                  0
+ZIPs rendering a measured zero                      138
+```
+
+**Full reconciliation over all 935 enabled ZIPs — exact and bidirectional:**
+
+```
+production projects 6,602  =  membership rows 6,602
+production markers 14,415  =  marker rows    14,415
+0 no source_key · 0 project without marker · 0 duplicate source_key
+0 missing in production   · 0 missing in relation
+14,415 markers compared: 0 not in relation, 0 coordinate differences
+```
+
+Marker quality across the whole relation: **0 membership without a marker · 0 orphans ·
+0 markers missing coordinates · 0 duplicate markers · 0 duplicate memberships.**
+
+**Latency, EXPLAIN ANALYZE: 14,547.1 ms / 935 calls = 15.6 ms mean**, against 16.5 ms at
+744 ZIPs — it improved as the population grew.
+
+**Free disk 2,177 MB**, above the 2,048 floor. The dip from 3,059 was entirely WAL
+(1,104 -> 1,968 MB); the database itself grew ~8 MB across the whole boundary pass.
+
+## National state after batch 04 (geo.maps_zip_export, controls passed)
+
+| bucket | ZIPs |
+|---|---:|
+| A authoritative with projects | 496 |
+| B authoritative measured zero | 439 |
+| C measured, not cut over (blocked) | 1 |
+| D not_measured, no ZCTA | 76 |
+| E no shard, zero development in freeze | 445 |
+| F pending acquisition | 11,265 |
+| **TOTAL** | **12,722** |
