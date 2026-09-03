@@ -40,6 +40,61 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-03 — THREE PREFIXES: every multiplier measured, and UNDER-INCLUSION IS 21.5%, not 1%
+
+**021 alone was misleading in the direction that mattered most.** Three prefixes, each with
+the prediction stated first:
+
+| prefix | shape | rows | projects | **rows/proj** | under-incl | over-incl | ZCTA vertices | probe |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 021 Boston | 97.9% point | 4,562 | 4,519 | 1.0095 | **50** (1.1%) | 16,892 | 20,151 / 53 | 1.3 s |
+| 010 Springfield | **100% polyline** | 630 | 381 | **1.654** | **89** (14.1%) | 1,148 | 39,867 / 62 | 0.9 s |
+| 890 Las Vegas | **polygon + huge ZCTAs** | 7,729 | 7,715 | **1.002** | **2,640 (34.2%)** | 9,552 | **100,486 / 47** | 1.1 s |
+
+**PER-FAMILY rows/project, now MEASURED not assumed:** PROVEN point **1.0000** (n=4,471) ·
+polygon **1.002** (n=7,715) · polyline **1.654** (n=381). **The x1.0–1.9 polygon assumption
+is now x1.00**, and the x1.9–5.4 polyline assumption is **x1.654** — both were too high, a
+fifth and sixth downward correction. RECOVERY point-family takes 1.0000 from the PROVEN
+measurement: the multiplier is a property of GEOMETRY TYPE under one predicate, not of
+treatment.
+
+🔴 **UNDER-INCLUSION IS 2,779 of 12,921 discovered rows = 21.5%, not the ~1% that 021
+implied — and my "overwhelmingly over-claiming" characterisation from 021 was WRONG as a
+generalisation.** 890 alone contributes 2,640, **34.2% of its own discovered rows**: a
+Henderson parcel's true ZCTA frequently was not among the ~1.42 the 3-mile method guessed,
+so the method is wrong in both directions there, not merely inflationary. **National
+under-inclusion at that rate: ~190,000–204,000 project x ZIP memberships the slice-first
+shape can never find.** That is the size of the blind half, and it is not small.
+- Predictions refuted, all in the informative direction: 010 rows/project 1.654 vs
+  predicted 1.8–3.0; 890 under-inclusion **2,640 vs predicted 50–400 (6.6x over)**; 890
+  boundary vertices 100,486 vs predicted 40,000–90,000.
+- **Boundaries a shard-first build would NEVER have loaded: 010 → 4 of 62 (01034, 01054,
+  01072, 01093); 890 → 11 of 47, 23%** (89001, 89008, 89010, 89013, 89017, 89019, 89020,
+  89022, 89042, 89043, 89047). 890 also shows the opposite extreme of concentration —
+  only **8 of 47 ZCTAs** carry any geometry at all.
+
+**POPULATION RECONCILED, no double counting.** Resident **734,728** = 718,278 PROVEN +
+16,450 RECOVERY (5 registries). National geometry-bearing **882,463** = 718,278 materialised
+PROVEN + 164,185 RECOVERY. **Gap = 147,735, exactly 164,185 − 16,450 — entirely
+un-recovered RECOVERY, nothing else.** Multipliers are applied to NATIONAL counts, and the
+RECOVERY terms sum to 164,185 exactly. PROVEN's 1.0000 is measured on a COMPLETE population;
+every RECOVERY multiplier is measured on 16,450 of 164,185 (10.0%) and extrapolated — that is
+the honest split. **2,966 projects are permanently EXCLUDED** (cincinnati 2,866, cook 70,
+lake 30 — no service_url / row_id identity), so RECOVERY-eligible is **161,219** and the
+unprobed remainder is **34,826**, not 37,792.
+
+✅ **WORST CASE, ONE NUMBER: 949,175 rows → 240.5 MB**, taking the top of every PRIOR
+multiplier (polygon 1.9, polyline 5.4, unprobed 1.9) and ignoring the new measurements
+entirely. Bytes/row **265.6**, cumulative over all three runs.
+
+✅ **THE DISK DECISION IS DETERMINABLE AND THE PESSIMISTIC CASE FITS WITH MARGIN — NOT
+THIN.** Worst-case permanent additional **619 MB** (RECOVERY geometry high 0.37 GB +
+membership 0.235 GB + boundaries **0**, streaming demonstrated three times). Free would fall
+3,674.7 → **3,055 MB, which is 1,007 MB above the 2,048 floor.** Not within 200 MB; not thin.
+- 🔻 **The transient-WAL term I carried at 0.5–1.2 GB is REFUTED by measurement.** Across
+  the 718,278-row PROVEN materialisation WAL went **1,124,073,844 → 1,073,742,196** — it did
+  not grow. WAL is checkpoint-bounded and is already inside the free figure.
+
 ### 2026-09-03 — BOUNDARY-FIRST MEASURED ON ONE PREFIX: membership is ~1 row per project, and the disk question is CLOSED
 
 **Prefix 021 (Boston/Cambridge MA), S1 shape, 46.4 s total, probe 1.3 s.** Boundaries
