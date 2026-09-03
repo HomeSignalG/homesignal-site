@@ -67,6 +67,11 @@ on:
         required: false
         default: ''
         type: string
+      prefixes:
+        description: 'n5-boundary-first: comma-separated ZIP3 list, run sequentially in one process'
+        required: false
+        default: ''
+        type: string
       registry_id:
         description: 'n5-acquire: the ONE registry_id to acquire in full'
         required: false
@@ -215,6 +220,7 @@ jobs:
           MODE: n5-boundary-first
           SNAPSHOT: phase1-2026-09-01
           PREFIX: ${{ github.event.inputs.prefix }}
+          PREFIXES: ${{ github.event.inputs.prefixes }}
           DISK_FLOOR_MB: '2048'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_boundary_first.py

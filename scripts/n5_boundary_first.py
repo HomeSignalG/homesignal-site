@@ -33,6 +33,11 @@ from n5_shard import sql, say, one, tiger_index, SNAPSHOT  # noqa: E402
 from n5_candidate_bounding import check_candidate_bounding  # noqa: E402
 
 PREFIX = os.environ.get("PREFIX", "").strip()
+# A LIST is accepted so 12 prefixes run in ONE process. They must not run concurrently:
+# every run shares one scratch boundary table and drops it at the end, so parallel jobs
+# would delete each other's boundaries mid-probe. Sequential-in-one-process removes that
+# race by construction rather than by scheduling luck.
+PREFIXES = [x.strip() for x in os.environ.get("PREFIXES", "").split(",") if x.strip()]
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"bf-{PREFIX}-{int(time.time())}"
 FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
 TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
@@ -67,10 +72,11 @@ def snap(tag):
     return int(r["memb"]), int(r["rows"]), free
 
 
-def main():
+def run_prefix(PREFIX, RUN_ID):
     t0 = time.time()
-    say("N5 S1 BOUNDARY-FIRST - ONE PREFIX", "")
-    say("prefix / run_id / snapshot", f"{PREFIX} / {RUN_ID} / {SNAPSHOT}")
+    say("", "")
+    say("=" * 56, "")
+    say("PREFIX", PREFIX)
     if not PREFIX or len(PREFIX) != 3 or not PREFIX.isdigit():
         raise SystemExit("STOP: PREFIX must be a 3-digit ZIP3")
 
@@ -154,6 +160,18 @@ def main():
     say("resident corpus probed (features / projects)",
         f"{corpus['feats']} / {corpus['projects']}")
 
+    # ---- spatial evaluations, reported rather than assumed: how many (boundary,
+    # feature) pairs the GiST prefilter admitted, and how many the exact predicate
+    # accepted. The gap between them is the work ST_Intersects actually did.
+    ev = sql(f"""select count(*) bbox_candidates,
+                        count(*) filter (where ST_Intersects(g.geom, b.geom)) exact_true
+                   from {SCRATCH} b
+                   join geo.n5_geom g on g.geom && b.geom
+                  where b.prefix={lit(PREFIX)} and g.outcome=1 and g.geom is not null;""",
+             "evals")[0]
+    say("spatial evaluations: bbox candidates / exact true",
+        f"{ev['bbox_candidates']} / {ev['exact_true']}")
+
     # ---- the probe. Boundaries drive; the candidate set is the whole corpus.
     t1 = time.time()
     sql(probe, "boundary-first probe")
@@ -186,7 +204,12 @@ select (select count(*) from disc) discovered,
           (select 1 from disc d where d.zip=l.zip and d.source_key=l.source_key)) over_inclusion,
        (select count(*) from disc where provenance='proven_stored_point') from_proven,
        (select count(*) from disc where provenance='recovered_authoritative') from_recovery,
-       (select count(distinct zcta5) from geo.n5_boundary_membership where run_id={lit(RUN_ID)}) zctas_hit;""",
+       (select count(distinct zcta5) from geo.n5_boundary_membership
+         where run_id={lit(RUN_ID)} and left(zcta5,3)={lit(PREFIX)}) zctas_hit,
+       (select count(*) from (select distinct zip from disc
+          where not exists (select 1 from leg l where l.zip=disc.zip)) q) geometry_only_pages,
+       (select count(*) from (select distinct zip from disc
+          intersect select zip from leg) q) pages_both;""",
             "diff")[0]
     say("", "")
     say("discovered rows / legacy pairs", f"{d['discovered']} / {d['legacy']}")
@@ -195,15 +218,35 @@ select (select count(*) from disc) discovered,
     say("over-inclusion legacy \\ discovered", d["over_inclusion"])
     say("rows from PROVEN / from RECOVERY", f"{d['from_proven']} / {d['from_recovery']}")
     say("ZCTAs with at least one member", f"{d['zctas_hit']} of {chk['n']}")
+    say("geometry-only pages (membership, zero legacy candidates)", d["geometry_only_pages"])
+    say("pages with zero authoritative membership",
+        int(chk["n"]) - int(d["zctas_hit"] or 0))
+    say("NET membership change vs legacy",
+        int(d["discovered"]) - int(d["legacy"]))
     if int(d["disc_projects"] or 0):
         say("rows per discovered project",
             round(int(d["discovered"]) / int(d["disc_projects"]), 3))
+    say("prefix wall seconds", round(time.time() - t0, 1))
 
     sql(f"delete from {SCRATCH} where prefix={lit(PREFIX)};", "drop scratch rows")
+    return 0
+
+
+def main():
+    t0 = time.time()
+    todo = PREFIXES or ([PREFIX] if PREFIX else [])
+    say("N5 S1 BOUNDARY-FIRST", "")
+    say("prefixes / snapshot", f"{','.join(todo)} / {SNAPSHOT}")
+    if not todo:
+        raise SystemExit("STOP: set PREFIX or PREFIXES")
+    for pfx in todo:
+        run_prefix(pfx, f"bf-{pfx}-{int(time.time())}")
     sql(f"drop table if exists {SCRATCH};", "drop scratch")
+    say("", "")
     say("scratch boundary table dropped",
         one(sql(f"select (to_regclass('{SCRATCH}') is null) g;", "gone"), "g"))
-    say("seconds", round(time.time() - t0, 1))
+    say("prefixes completed", len(todo))
+    say("total seconds", round(time.time() - t0, 1))
     return 0
 
 
