@@ -40,6 +40,62 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-03 — POLYGONS ARE LIGHT, THE NATIONAL ZCTA COST IS MEASURED, AND ONE TERM IS LEFT
+
+**Every storage term for the boundary-first pass is now measured except one — and the
+survivor is the largest.** Only the membership output remains an estimate, and no further
+acquisition can settle it; it needs the pass itself.
+
+**PART 1 — `henderson-residential-permits`, polygon family, acquired 8,474 of 8,475.**
+features/project **1.019** · mean **12.1** vertices · **median 6** · p90 14 · max 827 ·
+avg `ST_MemSize` **242 B** · **247 B per project**.
+- ⚖️ **CTDOT IS THE OUTLIER, exactly as MassDOT was one level up.** CTDOT: mean 298
+  vertices but **median 33**, dragged by a single 16,278-point polygon. Henderson is
+  **20× lighter per feature**. A registry mean had again been standing in for a family.
+- Multiplicity is settled across five measured registries: **1.000 (raleigh), 1.000
+  (ctdot), 1.000 (iowa), 1.019 (henderson), 5.437 (massdot)** — four of five at ~1.0.
+- **RECOVERY complete: 0.19–0.85 GB (pre-A2) → 0.17–1.63 GB (post-A2, polygon size
+  assumed from CTDOT) → ~0.10–0.37 GB (measured).** The A2-era ceiling was inflated by
+  treating CTDOT as typical.
+
+🛑 **THE FIRST HENDERSON RUN WAS PARTIAL AND REPORTED SUCCESS — 28 batch errors, 8,194 of
+8,475 projects (3.3% missing), `fetch status OK`, exit 0.** That is the precise failure
+`n5_acquire_registry.py`'s own docstring says it exists to avoid, and it shipped because
+`batch_errors` was printed as a statistic rather than treated as a verdict. Fixed
+(`ad30537`): the run compares asked-for against acquired, prints `acquisition complete:
+NO - PARTIAL`, and **exits non-zero**. **The gate fired on its first real use** — the
+completion re-run recovered 280 of 281 and correctly failed on the last one.
+- **The final missing project is a PUBLISHER-SIDE ABSENCE, receipted not assumed.**
+  `arcgis:henderson-residential-permits:BMFD2024317224` → direct single-ident query,
+  **HTTP 200 with `"features":[]`**. The snapshot holds it; the live layer has dropped it.
+  So the registry is complete as far as the publisher offers, and a green run now means
+  that rather than "nobody checked".
+- 📌 **Logged, not built: there is no RECOVERY analogue of `geo.n5_point_reject`.** A
+  PROVEN project that cannot be materialised gets a CHECKed reason; a RECOVERY project the
+  publisher has dropped gets nothing, and is visible only as a count mismatch.
+
+**PART 2 — NATIONAL ZCTA GEOMETRY, MEASURED OFF THE PINNED FILE. Nothing persisted, and
+no database credential was in the job's environment.** 33,791 features, all shape type 5,
+37,813 rings, `.shp` content **822,289,256 bytes**, run time 8.9 s.
+- **TOTAL VERTICES 51,290,700** · mean **1,517.9** · **median 981** · p75 1,999 · p90
+  3,407 · p95 4,598 · p99 7,947 · max 61,813 · min 5 · 1.12 rings/feature.
+- **National ZCTA table 791–814 MB** (geometry 784–807 + heap 6.3 + GiST 1.4), against the
+  **0.9–1.3 GB** the two samples implied. **Both samples were HIGH** — 2,181 and 1,282 mean
+  vertices against a national 1,517.9 with a median of 981 — and the spread collapses from
+  **43% to 2.9%**.
+- The estimate constants are measured, not assumed: **16.022–16.490 B/vertex** from three
+  live samples; PostGIS stores geometry **uncompressed** (`pg_column_size` 34,936 vs
+  `ST_MemSize` 34,939 on the same rows); **GiST 42.0 B/row** and **heap 195.8 B/row** on
+  `geo.n5_geom` at 732,927 rows, GiST being vertex-independent because it indexes bounding
+  boxes.
+
+**WHERE CAPACITY STANDS: permanent additional ~0.58–1.70 GB against ~1.64 GB headroom.**
+PROVEN 0.318 GB is spent; RECOVERY ~0.10–0.37 GB; ZCTA 0.79–0.81 GB and **transient if
+boundaries stream per prefix (S1)**; **membership output 0.5–1.35 GB, unmeasured**. The
+low end fits comfortably, the high end sits on the line, and **the decision no longer
+waits on sampling** — it waits on provisioning for the 1.35 GB case or on a bounded
+single-prefix boundary-first run that measures the membership row count directly.
+
 ### 2026-09-02 — A2 MEASURED: features/project is 1.000, not 4.416 — and it moved the uncertainty rather than removing it
 
 **`raleigh-building-permits` acquired IN FULL** (run 33697…, 198.8 s, 604 requests,
