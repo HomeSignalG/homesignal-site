@@ -46,6 +46,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: ARMING GATE - refuse to touch the database unless deliberately armed
+        id: arm
         run: |
           set -euo pipefail
           ARM="$(tr -d '[:space:]' < .github/n5-publish-arm)"
@@ -360,8 +361,12 @@ jobs:
           psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/post.sql
           echo "POST-STATE PASS"
 
+      # Gated on the ARMING GATE having PASSED. Without this the reporter still opened a
+      # (read-only) connection on a disarmed run, which contradicts the property the arming
+      # gate exists to guarantee: while disarmed, an ordinary commit reaches the database in
+      # NO way at all. Observed on run 33794183150 and corrected here.
       - name: On failure - report manifest state, DO NOT repair
-        if: failure()
+        if: failure() && steps.arm.outcome == 'success'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           PGSSLMODE: require
