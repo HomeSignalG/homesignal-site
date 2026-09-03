@@ -447,3 +447,104 @@ it would now refuse rather than replace.
 
 ⚠️ **INSTALLATION IS NOT A LIVE PROOF.** The function has never been called. The next unit is a
 single read-only invocation at one known point, 0.5 mi, small `p_limit`.
+
+---
+
+## 15. First live radius proof — **BLOCKED BEFORE THE RPC CALL**, 2026-09-03 22:19:43Z
+
+**Outcome: C — BLOCKED BEFORE RPC CALL.** `public.n5_projects_within_radius` was **not invoked**.
+Invocation count for this unit: **0**.
+
+### Positive control selected (read-only, deterministic — first by `source_key collate "C"`)
+
+| field | value |
+|---|---|
+| `source_key` | `arcgis:adams-county-building-permits:BDP25-2820` |
+| `feature_id` | `pt:1` |
+| `registry_id` | `adams-county-building-permits` |
+| `provenance` | `proven_stored_point` |
+| geometry type | `ST_Point` (SRID 4269) |
+| latitude | `39.8448270000018` |
+| longitude | `-104.992321500002` |
+| `verdict_snapshot_id` | `phase1-2026-09-01` |
+
+Intended as a **POINT/COORDINATE TEST** — the geometry's own stored coordinate, no geocoding and
+no reverse-geocoding. It was never passed to the RPC.
+
+### Pre-call hard controls — the RPC object passed, the corpus did not
+
+| control | required | observed 22:19:43Z | verdict |
+|---|---|---|---|
+| RPC overloads | 1 | **1** | ✅ |
+| owner | postgres | **postgres** | ✅ |
+| SECURITY DEFINER | true | **true** | ✅ |
+| volatility | STABLE | **s** | ✅ |
+| search_path | public | **search_path=public** | ✅ |
+| manifest state | READY | **READY** | ✅ |
+| `canonical_synced_at` | not null | **2026-09-03 20:49:04.959655+00** | ✅ |
+| `proven_stored_point` | 718,278 | **718,278** | ✅ |
+| canonical PROVEN fingerprint | `bbda250f…` | **`bbda250fc30ee0b3aa3f46a259392aa3`** | ✅ |
+| rejects | 5,171 | **5,171** | ✅ |
+| **`geo.n5_geom` total** | **741,562** | **741,715 (+153)** | ⛔ |
+| **`recovered_authoritative`** | **23,284** | **23,437 (+153)** | ⛔ |
+
+§2 is explicit — *"If ANY hard control differs: STOP WITHOUT INVOKING THE RPC."* Two differ, so
+the call was not made.
+
+### What moved, and why it is not corruption
+
+| observational | 21:33:05Z | 22:19:43Z | delta |
+|---|---:|---:|---:|
+| `geo.n5_association` | 22,698 | **22,835** | +137 |
+| shards `done` | 41 | **81** | +40 |
+| shards `pending` | 503 | **463** | −40 |
+| shards `running` | 0 | **0** | 0 |
+
+Attribution, measured rather than assumed:
+
+- **153 `recovered_authoritative` rows** were written between **21:50:53.636437Z** and
+  **22:08:19.006257Z**; the last shard finished **22:08:30.850042Z**, immediately after.
+- **0 `proven_stored_point` rows** were written in that window, and the PROVEN fingerprint is
+  byte-identical — the control proving the canonical PROVEN corpus was not disturbed.
+- The new rows span **33 distinct z3 shards** and are all `ST_MultiLineString` / `ST_MultiPolygon`
+  — publisher geometry, exactly what `n5_shard.py::recover_shard` fetches on the RECOVERY path.
+- All recovered rows carry `verdict_snapshot_id` NULL, by design.
+
+So this is the shard campaign doing precisely its job. It is legitimate independent work — and it
+is still a hard-control divergence I may not reinterpret on my own.
+
+### ⚠️ Why this is NOT the same as the association ruling
+
+The association gate was retired because the RPC neither reads nor writes `geo.n5_association`.
+**That reasoning does not transfer here: `geo.n5_geom` is the RPC's actual read target**, and it
+is growing while the campaign runs. Three consequences worth stating before any ruling:
+
+1. **Newly recovered geometry is immediately visible to the RPC.** The predicate is
+   snapshot-isolated for PROVEN rows (`verdict_snapshot_id = v_snapshot`) but recovered rows pass
+   on `provenance = 'recovered_authoritative'` alone — correct under the founder's semantic
+   ("any canonical physically located project geometry near this home"), but it means the
+   eligible corpus is not frozen.
+2. **The RPC's result set is therefore not stable between calls while the campaign runs.** A
+   result is true at the instant of the call.
+3. **`has_more = false` means "complete at that instant"**, not "complete thereafter". That is
+   worth pinning down before the value is ever shown to a resident.
+
+None of this makes a single read-only proof invalid — it makes the *wording* of what the proof
+establishes matter.
+
+### Ruling needed (I did not choose)
+
+- **(a) Re-baseline, freezing only what is genuinely frozen.** Keep `proven_stored_point`
+  = 718,278, the PROVEN fingerprint, rejects, manifest state and `canonical_synced_at` as HARD —
+  those are snapshot-isolated and demonstrably stable — and make `geo.n5_geom` total and
+  `recovered_authoritative` **observational** while the campaign runs, exactly as association is.
+  A single point-in-time proof is then meaningful and repeatable.
+- **(b) Wait for the campaign to drain** (463 shards pending) and use the stable totals.
+
+The installed RPC is unaffected either way: owner, security, volatility, search_path and its
+byte-identical body (`prosrc` md5 `e1bb67c604aaaa4e1ab541ee32bc82ea`) all re-verified above.
+
+**Holds observed:** the RPC was not invoked, not modified, not re-applied. No second point, no
+second radius, no geocoding. No shard run, paused, resumed or altered; no 760; no index; no
+`app_projects`/A3/RLS/Map 1 change; no canonical geometry, reject or association write by me;
+PR #1015 still DRAFT.
