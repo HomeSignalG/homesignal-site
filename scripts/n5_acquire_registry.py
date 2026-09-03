@@ -99,6 +99,17 @@ def main():
     if st.get("status") != "OK":
         raise SystemExit(f"STOP: {st.get('status')} - {st.get('reason')}")
 
+    # A batch error means projects we ASKED for came back with nothing, and the registry
+    # is then acquired in PART - which is indistinguishable afterwards from a complete
+    # one, the exact confusion this driver exists to avoid. Measured on
+    # henderson-residential-permits (2026-09-03): 28 batch errors silently cost 281 of
+    # 8,475 projects (3.3%), and the run still reported status OK. Re-running is cheap
+    # because cached projects are skipped, so an incomplete acquisition is now LOUD.
+    if int(st.get("batch_errors") or 0):
+        say("", "")
+        say("INCOMPLETE - batch errors", st.get("batch_errors"))
+        say("re-run this same mode to fetch only what is missing", "cached keys are skipped")
+
     after = sql(f"""select pg_total_relation_size('geo.n5_geom') b,
                            (select count(*) from geo.n5_geom) rows,
                            (select count(*) from geo.n5_geom where registry_id={lit(REGISTRY_ID)}) mine,
@@ -117,12 +128,18 @@ def main():
     if projs:
         say("FEATURES PER PROJECT (the measurement)", round(feats / projs, 3))
     say("rows with outcome<>1 (no usable geometry)", after["bad"])
+    missing = len(keys) - int(after["proj"])
+    say("projects asked for / acquired / MISSING", f"{len(keys)} / {after['proj']} / {missing}")
+    say("acquisition complete", "yes" if missing == 0 else "NO - PARTIAL")
     say("bytes added to geo.n5_geom", int(after["b"]) - int(before["b"]))
     if feats - int(before["mine"]):
         say("bytes per added feature, all-in",
             round((int(after["b"]) - int(before["b"])) / (feats - int(before["mine"])), 1))
     say("publisher requests / bytes", f"{STATS['requests']} / {STATS['bytes_in']:,}")
     say("seconds", round(time.time() - t0, 1))
+    if missing:
+        raise SystemExit(f"STOP: acquisition is PARTIAL - {missing} of {len(keys)} projects "
+                         f"missing. A green run must mean a complete registry.")
     return 0
 
 
