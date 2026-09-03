@@ -244,6 +244,8 @@ def main():
     # ============================== PROVENANCE ==================================
     print("-" * 78)
     print("PROVENANCE CONTRACT (founder decision: BOTH classes, distinguishable)")
+    # Single-geometry projects only; proj:multi is checked through `gtypes` above at the
+    # full (source_key, feature_id) grain rather than through this collapsed view.
     keys = {r["source_key"]: r for r in rows}
     check("proven_stored_point is RETURNED", "proj:near" in keys, sorted(keys))
     check("  and carries provenance='proven_stored_point'",
@@ -290,13 +292,23 @@ def main():
     # ============================== GEOMETRY ====================================
     print("-" * 78)
     print("GEOMETRY SEMANTICS")
-    gtypes = {r["source_key"]: r["geometry_type"] for r in rows}
-    check("POINT geometry is handled", gtypes.get("proj:near") == "ST_Point", gtypes)
-    check("LINESTRING geometry is handled", gtypes.get("proj:line") == "ST_LineString", gtypes)
+    # Keyed by the FULL grain (source_key, feature_id). Keying by source_key alone
+    # collapses proj:multi's three geometry instances to whichever sorted last, which
+    # silently hid two of the five geometry types - the same collapse this RPC exists
+    # to avoid, reproduced in the instrument that was supposed to detect it.
+    gtypes = {(r["source_key"], r["feature_id"]): r["geometry_type"] for r in rows}
+    present = set(gtypes.values())
+    check("POINT geometry is handled", gtypes.get(("proj:near", "pt:1")) == "ST_Point", present)
+    check("LINESTRING geometry is handled",
+          gtypes.get(("proj:line", "f:1")) == "ST_LineString", present)
     check("MULTILINESTRING geometry is handled",
-          "ST_MultiLineString" in gtypes.values(), gtypes)
-    check("POLYGON geometry is handled", gtypes.get("proj:poly") == "ST_Polygon", gtypes)
-    check("MULTIPOLYGON geometry is handled", "ST_MultiPolygon" in gtypes.values(), gtypes)
+          gtypes.get(("proj:multi", "f:2")) == "ST_MultiLineString", present)
+    check("POLYGON geometry is handled", gtypes.get(("proj:poly", "f:1")) == "ST_Polygon", present)
+    check("MULTIPOLYGON geometry is handled",
+          gtypes.get(("proj:multi", "f:3")) == "ST_MultiPolygon", present)
+    check("all five geometry types survive in ONE result set",
+          present == {"ST_Point", "ST_LineString", "ST_MultiLineString",
+                      "ST_Polygon", "ST_MultiPolygon"}, present)
     # the polygon CONTAINS the home -> distance must be 0, not a centroid distance
     polyd = keys["proj:poly"]["distance_mi"]
     check("home INSIDE a polygon returns distance 0 (not a centroid distance)",
