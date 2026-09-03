@@ -667,9 +667,14 @@ begin
   for got in
     select t.tbl || ' pk=(' || coalesce(t.actual,'<none>') || ') expected=(' || t.want || ')'
       from (values
-        ('geo.n5_proven_verdict',    'snapshot_id,source_key'),
-        ('geo.n5_verdict_manifest',  'snapshot_id'),
-        ('geo.n5_association_stage', 'z3,source_key,zip')
+        ('geo.n5_proven_verdict',       'snapshot_id,source_key'),
+        ('geo.n5_verdict_manifest',     'snapshot_id'),
+        ('geo.n5_association_stage',    'z3,source_key,zip'),
+        -- the table this whole finding came from: prove its FINAL shape too, not just the
+        -- pre-state §1 checked. In state B the transition no-ops, so a later hand-alteration
+        -- would otherwise pass unnoticed.
+        ('geo.n5_point_reject',         'source_key'),
+        ('geo.n5_point_reject_archive', 'source_key,reason,rejected_at')
       ) v(tbl, want)
       cross join lateral (
         select v.tbl as tbl, v.want as want,
@@ -718,7 +723,18 @@ begin
         ('geo.n5_association_stage','z3','character(3)',true),
         ('geo.n5_association_stage','source_key','text',true),
         ('geo.n5_association_stage','zip','character(5)',true),
-        ('geo.n5_association_stage','evidence','smallint',true)
+        ('geo.n5_association_stage','evidence','smallint',true),
+        -- geo.n5_point_reject — the CURRENT-STATE ledger the sweep writes. These are exactly
+        -- the columns whose absence the silent create-if-not-exists no-op produced.
+        ('geo.n5_point_reject','source_key','text',true),
+        ('geo.n5_point_reject','registry_id','text',false),
+        ('geo.n5_point_reject','reason','text',true),
+        ('geo.n5_point_reject','detail','jsonb',false),
+        ('geo.n5_point_reject','rejected_at','timestamp with time zone',true),
+        ('geo.n5_point_reject','lat','double precision',false),
+        ('geo.n5_point_reject','lng','double precision',false),
+        ('geo.n5_point_reject','observed_in_z3','character(3)',false),
+        ('geo.n5_point_reject','verdict_snapshot_id','text',true)
       ) w(tbl, col, typ, nn)
       left join lateral (
         select format_type(a.atttypid, a.atttypmod) as typ, a.attnotnull as nn
@@ -749,7 +765,12 @@ begin
         ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','reject_counts'),
         ('geo.n5_verdict_manifest','n5_verdict_manifest_ready_ck','fingerprint'),
         ('geo.n5_verdict_manifest','n5_verdict_manifest_sync_ck','canonical_synced_at'),
-        ('geo.n5_association_stage','n5_association_stage_evidence_ck','evidence')
+        ('geo.n5_association_stage','n5_association_stage_evidence_ck','evidence'),
+        -- the two structural invariants #1016 owns on canonical geometry
+        ('geo.n5_geom','n5_geom_verdict_snapshot_ck','verdict_snapshot_id'),
+        ('geo.n5_geom','n5_geom_pt_namespace_ck','pt:1'),
+        -- and the reject reason domain, owned by the parallel session, validated here
+        ('geo.n5_point_reject','n5_point_reject_reason_ck','MULTI_COORD_UNRESOLVED')
       ) r(tbl, conname, token)
       left join lateral (
         select pg_get_constraintdef(c.oid) as def

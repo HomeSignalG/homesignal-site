@@ -1159,6 +1159,48 @@ check(100, "definition validation PASSES on the good state, with the contracted 
       and pks.get('geo.n5_verdict_manifest') == 'snapshot_id'
       and pks.get('geo.n5_association_stage') == 'z3,source_key,zip',
       {"err": err100[:160], "pks": pks})
+# 103 - B1 also protects the table the finding came from. The mutation must be one §1 does
+#       NOT classify on (it reads only the PK), so a MISSING COLUMN in the already-corrected
+#       state B reaches §6b: the transition no-ops, and only definition validation is left.
+reset(apply_migration=False, legacy=True)
+apply_script(MIGRATION)
+apply_script("alter table geo.n5_point_reject drop column observed_in_z3;", is_path=False)
+ok103, err103 = apply_script(MIGRATION)
+check(103, "a reject column dropped in state B is caught by definition validation",
+      (not ok103) and "definition validation FAILED" in err103
+      and "observed_in_z3" in err103,
+      {"migration_ok": ok103, "err": err103[:200]})
+
+# 104 - the archive's identity GRAIN is validated, not merely its existence. Again in state B,
+#       where the transition no-ops and the archive insert is skipped, so nothing else can
+#       catch it first.
+reset(apply_migration=False, legacy=True)
+apply_script(MIGRATION)
+apply_script("""alter table geo.n5_point_reject_archive
+                  drop constraint n5_point_reject_archive_pkey;
+                alter table geo.n5_point_reject_archive
+                  add constraint n5_point_reject_archive_pkey primary key (source_key);""",
+             is_path=False)
+ok104, err104 = apply_script(MIGRATION)
+check(104, "an archive with the WRONG identity grain is caught by definition validation",
+      (not ok104) and "PK geo.n5_point_reject_archive" in err104,
+      {"migration_ok": ok104, "err": err104[:200]})
+
+# 105 - and a reject-PK regression is caught EARLIER STILL, at §1 classification, because a
+#       corrected snapshot-attribution layer over a legacy reject key is not a state this
+#       migration recognises. Recording it so the stronger behaviour is not lost.
+reset(apply_migration=False, legacy=True)
+apply_script(MIGRATION)
+apply_script("""alter table geo.n5_point_reject drop constraint n5_point_reject_pkey;
+                alter table geo.n5_point_reject add constraint n5_point_reject_pkey
+                  primary key (source_key, reason);""", is_path=False)
+ok105, err105 = apply_script(MIGRATION)
+check(105, "a reject-PK regression is refused at §1 classification, before any write",
+      (not ok105) and "PARTIALLY MIGRATED OR UNRECOGNISED PRE-STATE" in err105
+      and "reject_pk=PRIMARY KEY (source_key, reason)" in err105,
+      {"migration_ok": ok105, "err": err105[:200]})
+
+
 
 # =============================================================================
 group("B2 UNIQUE DERIVATION")
