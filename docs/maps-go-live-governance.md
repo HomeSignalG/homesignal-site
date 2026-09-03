@@ -189,6 +189,73 @@ integer `Year`; there the entry still had `Entry_Date` to fall back on, **here t
 
 ---
 
+## §N5 — ZIP-MODE GEOGRAPHY IS POLYGON MEMBERSHIP, AND THE DISK QUESTION IS CLOSED (2026-09-03)
+
+**THE BUG, RESTATED SO IT IS NOT RE-LITIGATED.** A Map 1 ZIP page must show every development
+whose authoritative geometry intersects that ZCTA polygon. **In ZIP mode there is no saved
+address, so centroid/radius placement is structurally impossible** — a ZIP centroid is a page
+anchor, never a home. Radius remains valid ONLY in address mode (resident-entered home +
+0.5/1/2/5 mi). The legacy 3-mile ZIP membership is therefore the wrong instrument for ZIP
+mode, and replacing it with polygon intersection is the fix.
+
+### The population, reconciled so it visibly closes
+
+```
+PROVEN     718,278 materialised (pt:1)  +  5,171 rejects  =  723,449   national PROVEN
+                                           4,877 MULTI_COORD_UNRESOLVED
+                                             294 NULL_COORD
+RECOVERY   164,185 national
+            =  16,450 resident (5 of 78 registries)
+            +   2,966 PERMANENTLY EXCLUDED (cincinnati 2,866 · cook 70 · lake 30 —
+                       no service_url / row_id identity; can never carry geometry)
+            + 144,769 UNRECOVERED but recoverable
+geometry-bearing national  =  718,278 + 164,185  =  882,463
+resident corpus            =  718,278 +  16,450  =  734,728
+13 completed shards        =  20,170 associations in geo.n5_association (untouched)
+```
+
+### Per-family rows/project — MEASURED, and which half is complete
+
+| family | rows/project | n | population it was measured on |
+|---|---:|---:|---|
+| **point (PROVEN)** | **1.0000** | 4,471 | **COMPLETE** — all 718,278 PROVEN points are resident. Exact, no residual. |
+| **polygon (RECOVERY)** | **1.002** | 7,715 | extrapolated |
+| **polyline (RECOVERY)** | **1.654** | 381 | extrapolated |
+
+⚠️ **THE ASYMMETRY IS THE HEADLINE, NOT A FOOTNOTE.** PROVEN's 1.0000 is measured on a
+COMPLETE population and is exact. **EVERY RECOVERY multiplier is extrapolated from 16,450 of
+164,185 projects (10.0%), on a RECOVERY corpus that is itself 5 of 78 registries (6.4%).**
+Point-family RECOVERY inherits 1.0000 from the PROVEN measurement because the multiplier is a
+property of GEOMETRY TYPE under one predicate, not of treatment — that inheritance is an
+argument, not a measurement, and is flagged as such.
+
+### National estimate and the closed disk decision
+
+Bytes/row **265.6**, cumulative over three prefix runs (12,921 rows / 3,432,448 B).
+
+```
+measured, unprobed point-like      883,132 rows   223.7 MB
+measured, unprobed polyline-like   905,908 rows   229.5 MB
+WORST CASE (top of every PRIOR multiplier: polygon 1.9, polyline 5.4, unprobed 1.9)
+                                   949,175 rows   240.5 MB
+```
+
+**DECISION — NO TIER INCREASE. CLOSED; DO NOT RE-DERIVE.** Worst-case permanent additional
+**619 MB** = RECOVERY geometry 0.37 GB (high) + membership 0.235 GB + boundaries **0**
+(streaming demonstrated on three prefixes: load, probe in ~1 s, drop in the same run). Free
+would fall 3,674.7 → **3,055 MB, i.e. 1,007 MB above the 2,048 MB floor — ~5x the 200 MB
+"thin" threshold.**
+
+Assumptions the decision rests on, stated so a future reader can invalidate it deliberately:
+boundaries are STREAMED per prefix and never persisted · the membership artifact is
+PROJECT-grain, not feature-grain · reclamation stays suspended (capacity AND vintage) · the
+RECOVERY multipliers hold within the worst-case envelope above.
+
+🔻 **The transient-WAL term of 0.5–1.2 GB that earlier sizing carried is REFUTED BY
+MEASUREMENT, not by argument.** Across the 718,278-row PROVEN materialisation WAL moved
+**1,124,073,844 → 1,073,742,196 bytes — it FELL.** WAL is checkpoint-bounded and already sits
+inside the free figure. Do not re-add a WAL surge term to any N5 sizing.
+
 ## 1. The goal — all states live
 
 **12,722 ZIP pages across 50 states.** LIVE means every ZIP page in the state is modelled,

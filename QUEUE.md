@@ -40,6 +40,27 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-03 — DECISION RECORDED: no tier increase, and the reconciliation that closes it
+
+**Durable home is `docs/maps-go-live-governance.md` §N5** — the arithmetic, the per-family
+multipliers, the measured-vs-extrapolated split, and the assumptions live there so this queue
+does not become the second copy. Recorded here once as a pointer, per the division of record.
+
+**NO TIER INCREASE. CLOSED — do not re-derive.** Worst case 949,175 membership rows /
+**240.5 MB**; permanent additional **619 MB**; free would land **1,007 MB above the 2,048 MB
+floor**, ~5x the 200 MB "thin" threshold. The 0.5–1.2 GB transient WAL term is **refuted by
+measurement** — WAL FELL across the 718,278-row materialisation (1,124,073,844 →
+1,073,742,196).
+
+**Reconciliation, closing exactly:** PROVEN 718,278 materialised + 5,171 rejects = **723,449**
+· RECOVERY 164,185 = 16,450 resident + 2,966 permanently excluded + **144,769 unrecovered** ·
+13 shards = **20,170** associations in `geo.n5_association`, **untouched**.
+
+⚠️ **Measured on a COMPLETE population: PROVEN point 1.0000 only.** Polygon 1.002 and polyline
+1.654 are **extrapolated from 10.0% of RECOVERY projects on a corpus that is 5 of 78
+registries**. Point-family RECOVERY inherits 1.0000 by a geometry-type argument, not a
+measurement.
+
 ### 2026-09-03 — THREE PREFIXES: every multiplier measured, and UNDER-INCLUSION IS 21.5%, not 1%
 
 **021 alone was misleading in the direction that mattered most.** Three prefixes, each with
