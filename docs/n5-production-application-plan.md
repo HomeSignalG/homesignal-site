@@ -496,3 +496,54 @@ Object family is disjoint from verdict publication: A3 writes `geo.n5_a3_*` and
 `public.app_projects` or its indexes. Its own preservation control on
 `public.app_projects_for_zip` (md5 `ec1b01ae4485ad2c59b9f946c9d565b6`) was re-verified at both
 ends of that unit.
+
+---
+
+## 10. VERDICT PUBLISHED — ✅ MANIFEST READY 2026-09-03 20:20:30Z
+
+**Outcome: A.** Snapshot `phase1-2026-09-01`. Third attempt; the first two are retained above.
+
+| | |
+|---|---|
+| Publication run | [33801374538](https://github.com/HomeSignalG/homesignal-site/actions/runs/33801374538) at commit `3abf470` |
+| Implementation | `scripts/n5_shard.py` blob `53dfc12…` lineage, `scripts/` clean at run time |
+| Derivation fingerprint | old `82397daae888ad0fcbf1f3c93774ca14` → **new `4bb0f35c4909528984bc60df2e05f658`** |
+| Transport | PG-wire session pooler `:5432`, TLS, `psql -X`, `ON_ERROR_STOP=1`, `SET LOCAL lock_timeout='5s'` / `statement_timeout='15min'` |
+| Precheck | PASS, 54 s (20:17:41–20:18:35) |
+| Live equivalence + performance | PASS, step 20:18:35–20:19:39 (**64 s**, budget 900 s) |
+| Publication | **20:19:45.258809Z → 20:20:30.023926Z = 45 SECONDS** |
+| Retry count | **0** |
+
+**The three attempts, all retained — this is the whole arc:**
+
+1. Management API, correlated derivation → cancelled at **120 s**, SQLSTATE `57014`.
+2. PG-wire, correlated derivation → cancelled at the **full 15 minutes**, SQLSTATE `57014`.
+   Transport was necessary but not sufficient.
+3. PG-wire, **grouped-aggregate** derivation → **45 seconds**. Same rows, ~20× under the
+   first ceiling that killed it.
+
+**Verdict:** 723,449 rows · 723,449 distinct source keys · **0** duplicates · 718,278 ELIGIBLE
+· 5,171 rejected · `MULTI_COORD_UNRESOLVED` **4,877** + `NULL_COORD` **294** · 0 missing · 0
+extra · 0 coordinate mismatches. ELIGIBLE set ≡ canonical PROVEN set and rejected set ≡ reject
+ledger, **0 differences in all four directions**.
+
+**Manifest:** `READY` · expected_source_keys 723,449 · verdict_rows 723,449 · eligible_rows
+718,278 · reject_counts `{"ELIGIBLE": 718278, "NULL_COORD": 294, "MULTI_COORD_UNRESOLVED": 4877}`
+(sums to 723,449; rejects 294 + 4,877 = 5,171) · fingerprint
+**`2f10843874bc6e6d509c22908a9d44be`** · completed_at populated ·
+**`canonical_synced_at` NULL**.
+
+**Canonical geometry NOT mutated:** total 741,562 · canonical 718,278 · recovered 23,284 ·
+fingerprint **`bbda250fc30ee0b3aa3f46a259392aa3`** unchanged · rejects 5,171 · associations
+20,170. Re-confirmed on a second transport at 20:22Z.
+
+**Concurrency:** the parallel `a3m-1788459821` benchmark was allowed to finish naturally
+(346 + 346 = **692** rows, single run_id) and was never touched. Global N5 quiescence was proven
+at 20:11:00Z — 0 N5 sessions, 0 relation locks, 0 shards, 0 idle-in-transaction — and re-proven
+by the run's own precheck immediately before publication.
+
+**Arming:** the workflow is **DISARMED** again (`d49542b`). An ordinary commit is refused at the
+gate before any database contact — proven live twice, on runs `33794183150` and `33794399500`.
+
+⚠️ **READY means the verdict is complete and readable. It does NOT authorize downstream
+synchronization. `sync-canonical` has NOT been run and `canonical_synced_at` is NULL.**
