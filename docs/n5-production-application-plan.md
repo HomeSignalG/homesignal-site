@@ -244,6 +244,44 @@ ready to re-run the moment the secret exists.
 
 ---
 
+## 4c. PG-WIRE CONNECTIVITY — INCIDENT, THEN PROOF
+
+⚠️ **The first verification run is NOT a readiness receipt, and is retained rather than
+overwritten.** Run `33781209601` attempt 2, 2026-09-03 17:13Z. The workflow established
+read-only mode with `PGOPTIONS=-c default_transaction_read_only=on`. **Supavisor does not
+forward the `options` startup parameter**, so the server never applied it: the job printed
+`default_read_only | off` and then executed `create temporary table n5_readonly_probe (x int)`,
+which **SUCCEEDED**. That was one unintended DDL statement against production, contrary to the
+standing NO-DDL constraint.
+
+- **Measured impact:** the object existed only in that session's temp schema and was dropped
+  when psql disconnected. Verified read-only afterwards: `probe_object_anywhere = 0`, canonical
+  **718,278**, rejects **5,171**, `verdict_snapshot_id` absent, reject PK `(source_key, reason)`,
+  **0** lifecycle objects. Nothing persisted; no user data touched. It remains a real violation.
+- **The job still reported SUCCESS**, because nothing asserted on the probe's outcome.
+- Second defect the same run exposed: `pg_stat_ssl` reports the **pooler's** connection to
+  Postgres, not ours, so it read `ssl = f` on a TLS client link.
+
+**Two rules now encoded in the workflow, and they generalise beyond it:**
+1. **A safety layer that can be silently stripped in transit is not a safety layer.** Read-only
+   mode is now set **server-side, in-session** (`set session characteristics as transaction read
+   only`), where the pooler cannot remove it.
+2. **A probe whose result nothing asserts on is not a proof.** The probe now **fails the job**
+   when it succeeds, and is **unreachable** unless read-only mode was affirmatively observed
+   `on` in the same session — enforced by a `raise` under `ON_ERROR_STOP=1`.
+
+Both directions were proven on a disposable cluster before production was touched again:
+read-only on → probe rejected `25006`, 0 objects; read-only off → the gate aborts (exit 3) and
+the statement after it never executes; probe reached with read-only off → raises, exit 3, and
+the `raise` rolls the attempted object back so **0 objects survive either way**.
+
+**Also learned, and load-bearing for the migration:** this transport's session default is
+`statement_timeout = 2min`. The migration's `set local statement_timeout = '15min'` overrides it
+inside the transaction — **without that declaration the 718,278-row UPDATE would be cancelled at
+2 minutes.** The timeout policy is required on this path, not decorative.
+
+---
+
 ## 5. GREEN RECEIPTS BACKING THIS PLAN
 
 - Executable PostgreSQL + PostGIS: **117 / 117**, local (PG 16.13 / PostGIS 3.4.2) and in CI
