@@ -166,3 +166,29 @@ closed only against itself. The gap is exactly **257 pairs, across 196 projects 
 each present in `n5_association` AND re-derived by geometry, but not a candidate pair in the
 snapshot. Counting them as newly-discovered under-inclusion overstated the discovery by 85%
 (558 vs 301). **Two counts that both "close" can still disagree; check the denominators.**
+
+### The run log and the artifact measure against DIFFERENT legacy sets — both correct, never interchangeable
+
+`scripts/n5_boundary_first.py` prints its per-prefix diff against the **candidate-pair
+enumeration** (`preservation.app_project_identity`, every development pair in the prefix):
+
+```sql
+leg as (select distinct i.zip::text zip, i.source_key
+          from preservation.app_project_identity i
+         where i.snapshot_id=… and i.record_kind='development' and left(i.zip,3)=…)
+```
+
+The artifact diffs against **`geo.n5_association`** — the 3-mile membership Maps actually
+reads. So the two answer different questions and their under/over-inclusion numbers differ
+per prefix by construction:
+
+| | run log (`bf-*` job 100705341524) | artifact |
+|---|---|---|
+| legacy set | candidate pairs from the snapshot | `geo.n5_association` |
+| question | did geometry place a project on a page the snapshot never paired it with? | how does exact membership differ from the membership in production? |
+| under-inclusion, 12 prefixes | **469** | **253** (301 including 010, run in an earlier job) |
+
+The gap reconciles exactly, prefix by prefix: for every prefix, `artifact_legacy −
+log_legacy = log_under − artifact_under` (062: 1,890 − 1,797 = 102 − 9 = 93 · 063: 2,176 −
+2,130 = 54 − 8 = 46 · 012: 528 − 490 = 62 − 24 = 38 · 015: 22 · 017: 8 · 019: 4 · 014: 3 ·
+018: 2; 011, 013, 016 and 520 agree exactly). **Quote the basis with the number.**
