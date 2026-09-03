@@ -548,3 +548,120 @@ byte-identical body (`prosrc` md5 `e1bb67c604aaaa4e1ab541ee32bc82ea`) all re-ver
 second radius, no geocoding. No shard run, paused, resumed or altered; no 760; no index; no
 `app_projects`/A3/RLS/Map 1 change; no canonical geometry, reject or association write by me;
 PR #1015 still DRAFT.
+
+---
+
+## 16. FIRST LIVE RADIUS PROOF — **PASSED**, 2026-09-03 22:51:48Z → 22:52:44Z
+
+**Outcome: A — FIRST LIVE RADIUS PROOF PASSED.** `public.n5_projects_within_radius` was invoked
+**exactly once** against the live production corpus and returned a truthful, bounded, correctly
+ordered result.
+
+### ⚖️ Founder ruling applied — RECOVERY is live, PROVEN is pinned
+
+The fixed equalities `geo.n5_geom total = 741,562` and `recovered_authoritative = 23,284` are
+**RETIRED** for this proof and are **not** replaced by any newer constant. RECOVERY geometry is
+authoritative publisher geometry added by the national shard campaign and legitimately grows
+while that campaign runs; PROVEN is snapshot-scoped and stays pinned to the synchronized verdict
+snapshot. So those two populations are **observational** here, while PROVEN count, PROVEN
+fingerprint, rejects, manifest state, `canonical_synced_at` and snapshot/reject leakage remain
+**HARD**.
+
+**Product semantic this establishes, and which must survive into any Map 1 wording:** a radius
+result is *the canonical physically located project geometry available at the time of the query*.
+Therefore **`has_more = false` means "this was the complete eligible radius result at this query
+transaction" — NOT "no further canonical geometry can ever be added".**
+
+### Test identity
+
+**POINT/COORDINATE TEST.** The query coordinate is a stored canonical geometry's own point.
+**No geocoding and no reverse-geocoding was performed, and this does not prove street-address
+geocoding.**
+
+| | |
+|---|---|
+| positive control | `arcgis:adams-county-building-permits:BDP25-2820` · `pt:1` · `adams-county-building-permits` |
+| provenance / geometry | `proven_stored_point` · `ST_Point` · SRID 4269 · snapshot `phase1-2026-09-01` |
+| test latitude | `39.8448270000018` |
+| test longitude | `-104.992321500002` |
+| call | `public.n5_projects_within_radius(39.8448270000018, -104.992321500002, 0.5, 5)` |
+| invocation count | **1** — no retry, no second point, radius or limit |
+| elapsed | **not separately instrumented** (see defects) |
+| rows returned | **5** (= `p_limit`) |
+
+### Returned rows — in the function's own emission order
+
+| # | source_key | feature_id | registry_id | provenance | distance_mi | geometry_type | has_more |
+|---|---|---|---|---|---:|---|---|
+| 1 | `arcgis:adams-county-building-permits:BDP25-2820` | `pt:1` | adams-county-building-permits | `proven_stored_point` | **0.000000000000** | ST_Point | true |
+| 2 | `arcgis:adams-county-building-permits:BDP26-0844` | `pt:1` | adams-county-building-permits | `proven_stored_point` | 0.030504138270 | ST_Point | true |
+| 3 | `arcgis:adams-county-building-permits:BDP26-0113` | `pt:1` | adams-county-building-permits | `proven_stored_point` | 0.087110433866 | ST_Point | true |
+| 4 | `arcgis:adams-county-building-permits:BDP26-0651` | `pt:1` | adams-county-building-permits | `proven_stored_point` | 0.095105952282 | ST_Point | true |
+| 5 | `arcgis:adams-county-building-permits:BDP26-1660` | `pt:1` | adams-county-building-permits | `proven_stored_point` | 0.101699266347 | ST_Point | true |
+
+Order was captured with `row_number() over ()` — an **empty** window, which preserves the
+function's own emission order rather than re-sorting it, so the ordering below is the function's
+and not the test's.
+
+**Provenance counts (never collapsed): `proven_stored_point` = 5 · `recovered_authoritative` = 0.**
+A stored point is the snapshot's asserted coordinate; it is **not** recovered publisher geometry.
+
+### Assertions
+
+- Every row: `source_key`, `feature_id`, `registry_id`, `provenance`, `distance_mi`,
+  `geometry_type`, `has_more` all non-null ✅
+- `provenance` ∈ {`proven_stored_point`, `recovered_authoritative`} on all 5 ✅
+- Distance bounds: min **0.000000000000**, max **0.101699266347**, all `>= 0` and `<= 0.5` ✅
+- Ordering: strictly increasing, hence monotonically non-decreasing ✅
+- **Tie ordering: NOT EXERCISED.** All five distances are distinct, so the deterministic
+  `(distance_mi, source_key, feature_id)` tie-break never arbitrated anything. Reported as
+  not-exercised rather than as a pass — an untriggered branch is not evidence.
+- Positive control: **present at emission order 1 with distance exactly `0.000000000000`** ✅ —
+  the geography round trip from the stored 4269 point through 4326 and back returns the point to
+  itself with no measurable error.
+- `has_more`: **true**, identical on all 5 rows ✅ — taken from the explicit returned value, not
+  inferred from the row count. **Interpretation: additional eligible canonical geometries existed
+  beyond `p_limit = 5` within 0.5 miles at this query transaction.** They were not enumerated; no
+  second call was made.
+
+### HARD controls — snapshot-pinned PROVEN, unchanged across the call
+
+| control | before 22:51:48.620918Z | after 22:52:44.128733Z |
+|---|---|---|
+| `proven_stored_point` | 718,278 | **718,278** |
+| PROVEN fingerprint | `bbda250fc30ee0b3aa3f46a259392aa3` | **`bbda250fc30ee0b3aa3f46a259392aa3`** |
+| rejects | 5,171 | **5,171** |
+| manifest state | READY | **READY** |
+| `canonical_synced_at` | 2026-09-03 20:49:04.959655+00 | **2026-09-03 20:49:04.959655+00** |
+| PROVEN rows on a wrong snapshot | 0 | **0** |
+| rejected identities with RPC-visible PROVEN geometry | 0 | **0** |
+
+RPC object at call time: 1 overload · owner `postgres` · SECURITY DEFINER · STABLE ·
+`search_path=public` · positive control present with the expected snapshot attribution.
+
+### OBSERVATIONAL — live RECOVERY corpus
+
+| observational | before | after | delta |
+|---|---:|---:|---:|
+| `geo.n5_geom` total | 742,398 | 742,398 | **0** |
+| `recovered_authoritative` | 24,120 | 24,120 | **0** |
+| `geo.n5_association` | 23,324 | 23,324 | **0** |
+| shards done / pending / running | 121 / 423 / 0 | 121 / 423 / 0 | **0** |
+
+The campaign happened to be quiet across this ~56-second window, so nothing had to be attributed.
+Had it moved, the movement would have belonged to the campaign, not to this `STABLE` read.
+
+### Unexpected defects
+
+**One, in the harness, not the RPC: elapsed time was not instrumented.** Server-side timing would
+have required either wrapping the call in a timing CTE — whose evaluation order Postgres does not
+guarantee, so it could have misreported — or a second timed execution, which is exactly what the
+authorization forbids. Preserving the single-invocation guarantee was worth more than a duration
+figure, so none is claimed rather than one being estimated. No defect was found in the RPC: every
+semantic assertion passed and every hard control held.
+
+⚠️ **What this proof does and does not establish.** It establishes that the installed RPC reads
+the synchronized canonical corpus, returns provenance-labelled rows at the
+`(source_key, feature_id)` grain, bounds distances to the requested radius, orders nearest-first,
+and reports truncation explicitly. It does **not** establish street-address geocoding — no address
+was involved at any point.
