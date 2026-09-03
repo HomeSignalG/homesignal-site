@@ -1,0 +1,557 @@
+name: n5-sync-canonical
+
+# Runs the CANONICAL SWEEP for ONE snapshot using the COMMITTED lifecycle implementation,
+# unmodified:
+#     SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py sync-canonical
+#
+# Founder-authorized 2026-09-03 for ONE sync-canonical execution ONLY. It does NOT run
+# publish-verdict, any shard, 760, the 13 completed shards, a radius RPC, A3, an index
+# addition, an app_projects change, an RLS change, reclamation, B4 or #1015, and it merges
+# nothing. CANONICAL SYNC COMPLETE does NOT authorize any downstream operation.
+#
+# sync_canonical() is READY..CANONICAL SYNC COMPLETE and is the ONLY writer of
+# canonical_synced_at. It NULLs that timestamp as its first durable act, sweeps, verifies both
+# set-equalities, and only then sets it. A half-swept corpus is therefore never consumable.
+#
+# Transport: PG-wire session-mode pooler, port 5432, TLS, psql -X, ON_ERROR_STOP, with
+# lock_timeout='5s' and statement_timeout='15min' applied transaction-locally by n5_shard's
+# pgwire path. SUPABASE_ACCESS_TOKEN is deliberately NOT provided so nothing can silently fall
+# back to the Management API and its unraisable 2-minute ceiling.
+#
+# NO RETRY. NO SECOND EXECUTION. If it fails, the job stops and reports; production tables are
+# never repaired by hand and sync SQL is never reproduced manually.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-sync-canonical.yml'
+
+permissions:
+  contents: read
+
+env:
+  SNAPSHOT: phase1-2026-09-01
+  # ARMING TOKEN. Must equal the contents of .github/n5-sync-arm or the job stops before
+  # touching the database. `pull_request` + `paths:` filters on the PR's WHOLE diff, not on the
+  # individual push, so once this file is in the PR every later commit - a receipt-only doc
+  # commit included - re-triggers it. A path filter is not an arming mechanism; this is. It is
+  # the FIRST of two independent guards against a second execution; the second is the
+  # precheck's hard requirement that canonical_synced_at IS NULL.
+  EXPECTED_ARM: arm-2026-09-03-sync-canonical
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse to touch the database unless deliberately armed
+        id: arm
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-sync-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED (file token does not match EXPECTED_ARM). No database contact."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: Identify the EXACT committed implementation being executed
+        run: |
+          set -euo pipefail
+          echo "commit            : $(git rev-parse HEAD)"
+          echo "n5_shard.py blob  : $(git rev-parse HEAD:scripts/n5_shard.py)"
+          echo "n3_pilot.py blob  : $(git rev-parse HEAD:scripts/n3_pilot.py)"
+          sha256sum scripts/n5_shard.py scripts/n3_pilot.py
+          test -z "$(git status --porcelain scripts/)" || { echo "ABORT: scripts/ is dirty"; exit 1; }
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: GLOBAL N5 QUIESCENCE + EXACT PRE-STATE (READ-ONLY, fail-closed)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/pre.sql <<'SQL'
+          \conninfo
+          set session characteristics as transaction read only;
+          set statement_timeout = '15min';
+          do $ro$ begin
+            if current_setting('default_transaction_read_only') <> 'on' then
+              raise exception 'ABORT: precheck session is not read-only'; end if;
+          end $ro$;
+
+          -- ================= GLOBAL N5 QUIESCENCE =================
+          -- Deliberately NOT narrowed to the object families this unit writes. A3 lives in a
+          -- disjoint family and is still disqualifying: CLAUDE.md Rule #0a says two sessions
+          -- write this repo and unexplained concurrent movement means STOP, not "measure
+          -- around it".
+          do $quiesce$
+          declare
+            bad text := '';
+            n_sess bigint; n_pubsync bigint; n_shard_q bigint; n_a3 bigint;
+            n_running bigint; n_idlext bigint; n_locks bigint; n_orphan bigint;
+            detail text;
+          begin
+            select count(*) into n_sess from pg_stat_activity
+              where pid <> pg_backend_pid() and state <> 'idle' and query ilike '%n5\_%';
+            select count(*) into n_pubsync from pg_stat_activity
+              where pid <> pg_backend_pid() and state <> 'idle'
+                and (query ilike '%n5_proven_verdict%' or query ilike '%n5_verdict_manifest%'
+                  or query ilike '%n5_point_reject%'  or query ilike '%n5_geom%');
+            select count(*) into n_shard_q from pg_stat_activity
+              where pid <> pg_backend_pid() and state <> 'idle'
+                and (query ilike '%n5_association%' or query ilike '%n5_shard%');
+            select count(*) into n_a3 from pg_stat_activity
+              where pid <> pg_backend_pid() and state <> 'idle' and query ilike '%n5\_a3\_%';
+            select count(*) into n_running from geo.n5_shard where state = 'running';
+            -- "relevant" idle-in-transaction = one that could block or interleave with the
+            -- sweep: it either names an n5 relation or holds a lock on one. A momentary
+            -- idle-in-transaction elsewhere in the cluster is not evidence of an N5 writer.
+            select count(*) into n_idlext from pg_stat_activity a
+              where a.pid <> pg_backend_pid() and a.state = 'idle in transaction'
+                and (a.query ilike '%n5\_%'
+                  or exists (select 1 from pg_locks l
+                               join pg_class c  on c.oid = l.relation
+                               join pg_namespace ns on ns.oid = c.relnamespace
+                              where l.pid = a.pid and ns.nspname = 'geo' and c.relname like 'n5%'));
+            select count(*) into n_locks from pg_locks l
+              join pg_class c on c.oid = l.relation
+              join pg_namespace ns on ns.oid = c.relnamespace
+             where l.pid <> pg_backend_pid() and ns.nspname = 'geo' and c.relname like 'n5%';
+            -- ORPHANED BACKEND. Measured on QUERY age, never on backend_start: a session-mode
+            -- pooler connection is legitimately hours old while its current statement is
+            -- milliseconds, so backend_start would abort on healthy traffic and teach nothing.
+            -- Two shapes are disqualifying: an N5 statement still running after 5 minutes (the
+            -- shape the cancelled publish attempt left behind), and ANY client statement still
+            -- running after 15 minutes, which no healthy request on this database does.
+            select count(*) into n_orphan from pg_stat_activity
+              where pid <> pg_backend_pid() and state = 'active'
+                and backend_type = 'client backend'
+                and ((query ilike '%n5\_%' and query_start < now() - interval '5 minutes')
+                  or query_start < now() - interval '15 minutes');
+
+            if n_sess    <> 0 then bad := bad || ' [' || n_sess    || ' active N5 session(s)]'; end if;
+            if n_pubsync <> 0 then bad := bad || ' [' || n_pubsync || ' publish/sync session(s)]'; end if;
+            if n_shard_q <> 0 then bad := bad || ' [' || n_shard_q || ' shard/association session(s)]'; end if;
+            if n_a3      <> 0 then bad := bad || ' [' || n_a3      || ' A3 session(s)]'; end if;
+            if n_running <> 0 then bad := bad || ' [' || n_running || ' shard(s) in state=running]'; end if;
+            if n_idlext  <> 0 then bad := bad || ' [' || n_idlext  || ' relevant idle-in-transaction session(s)]'; end if;
+            if n_locks   <> 0 then bad := bad || ' [' || n_locks   || ' lock(s) on geo.n5* relations]'; end if;
+            if n_orphan  <> 0 then bad := bad || ' [' || n_orphan  || ' orphaned/stuck backend(s)]'; end if;
+
+            if bad <> '' then
+              select string_agg(pid || ':' || state || ':' || left(regexp_replace(query, '\s+', ' ', 'g'), 90), ' | ')
+                into detail from pg_stat_activity
+               where pid <> pg_backend_pid() and state <> 'idle';
+              raise exception 'QUIESCENCE ABORT -%. Active: %. Nothing was swept. Another session is NOT terminated.',
+                              bad, coalesce(detail, '(none visible)');
+            end if;
+            raise notice 'GLOBAL N5 QUIESCENCE PROVEN - 0 N5/publish/sync/shard/A3 sessions, 0 running shards, 0 idle-in-transaction, 0 n5 relation locks, 0 orphaned backends';
+          end $quiesce$;
+
+          -- ================= EXACT PRE-STATE =================
+          do $pre$
+          declare
+            bad text := ''; snap text := 'phase1-2026-09-01'; db text;
+            m_state text; m_exp bigint; m_vrows bigint; m_elig bigint; m_sync timestamptz;
+            v_rows bigint; v_dist bigint; v_dup bigint; v_elig bigint; v_rej bigint;
+            v_multi bigint; v_null bigint;
+            g_total bigint; g_canon bigint; g_recov bigint; g_md5 text;
+            n_rej bigint; n_assoc bigint;
+            enc bigint; cne bigint; rnl bigint; lnr bigint; cmm bigint;
+          begin
+            select current_database() into db;
+            if db <> 'postgres' then bad := bad || ' [unexpected database ' || db || ']'; end if;
+
+            -- manifest
+            select state, expected_source_keys, verdict_rows, eligible_rows, canonical_synced_at
+              into m_state, m_exp, m_vrows, m_elig, m_sync
+              from geo.n5_verdict_manifest where snapshot_id = snap;
+            if m_state is distinct from 'READY' then bad := bad || ' [manifest state ' || coalesce(m_state,'<absent>') || ' <> READY]'; end if;
+            if m_exp   is distinct from 723449 then bad := bad || ' [expected_source_keys ' || coalesce(m_exp,-1) || ']'; end if;
+            if m_vrows is distinct from 723449 then bad := bad || ' [manifest verdict_rows ' || coalesce(m_vrows,-1) || ']'; end if;
+            if m_elig  is distinct from 718278 then bad := bad || ' [manifest eligible_rows ' || coalesce(m_elig,-1) || ']'; end if;
+            -- SECOND INDEPENDENT GUARD AGAINST A SECOND EXECUTION.
+            if m_sync is not null then
+              bad := bad || ' [canonical_synced_at is ALREADY SET (' || m_sync
+                         || ') - this snapshot has already been synced; a second sync is NOT authorized]'; end if;
+
+            -- verdict
+            select count(*), count(distinct source_key),
+                   count(*) filter (where verdict = 'ELIGIBLE'),
+                   count(*) filter (where verdict <> 'ELIGIBLE'),
+                   count(*) filter (where verdict = 'MULTI_COORD_UNRESOLVED'),
+                   count(*) filter (where verdict = 'NULL_COORD')
+              into v_rows, v_dist, v_elig, v_rej, v_multi, v_null
+              from geo.n5_proven_verdict where snapshot_id = snap;
+            select count(*) into v_dup from (select source_key from geo.n5_proven_verdict
+              where snapshot_id = snap group by 1 having count(*) <> 1) t;
+            if v_rows  <> 723449 then bad := bad || ' [verdict rows ' || v_rows || ']'; end if;
+            if v_dist  <> 723449 then bad := bad || ' [distinct source_key ' || v_dist || ']'; end if;
+            if v_dup   <> 0      then bad := bad || ' [' || v_dup || ' duplicate source_key]'; end if;
+            if v_elig  <> 718278 then bad := bad || ' [eligible ' || v_elig || ']'; end if;
+            if v_rej   <> 5171   then bad := bad || ' [rejected ' || v_rej || ']'; end if;
+            if v_multi <> 4877   then bad := bad || ' [MULTI_COORD_UNRESOLVED ' || v_multi || ']'; end if;
+            if v_null  <> 294    then bad := bad || ' [NULL_COORD ' || v_null || ']'; end if;
+
+            -- canonical
+            select count(*) into g_total from geo.n5_geom;
+            select count(*) into g_canon from geo.n5_geom where provenance = 'proven_stored_point';
+            select count(*) into g_recov from geo.n5_geom where provenance = 'recovered_authoritative';
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into g_md5 from geo.n5_geom where provenance = 'proven_stored_point';
+            if g_total <> 741562 then bad := bad || ' [geometry total ' || g_total || ']'; end if;
+            if g_canon <> 718278 then bad := bad || ' [canonical ' || g_canon || ']'; end if;
+            if g_recov <> 23284  then bad := bad || ' [recovered ' || g_recov || ']'; end if;
+            if g_md5 <> 'bbda250fc30ee0b3aa3f46a259392aa3' then
+              bad := bad || ' [canonical PROVEN fingerprint ' || coalesce(g_md5,'<null>') || ']'; end if;
+
+            select count(*) into n_rej   from geo.n5_point_reject;
+            select count(*) into n_assoc from geo.n5_association;
+            if n_rej   <> 5171  then bad := bad || ' [reject ledger ' || n_rej || ']'; end if;
+            if n_assoc <> 20170 then bad := bad || ' [association ' || n_assoc || ']'; end if;
+
+            -- the four set-equivalences + coordinate agreement
+            select (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id = snap and verdict = 'ELIGIBLE'
+                      except select source_key from geo.n5_geom where provenance = 'proven_stored_point') t),
+                   (select count(*) from (select source_key from geo.n5_geom where provenance = 'proven_stored_point'
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id = snap and verdict = 'ELIGIBLE') t),
+                   (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id = snap and verdict <> 'ELIGIBLE'
+                      except select source_key from geo.n5_point_reject) t),
+                   (select count(*) from (select source_key from geo.n5_point_reject
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id = snap and verdict <> 'ELIGIBLE') t)
+              into enc, cne, rnl, lnr;
+            select count(*) into cmm
+              from geo.n5_proven_verdict v join geo.n5_geom g
+                on g.source_key = v.source_key and g.feature_id = 'pt:1'
+               and g.provenance = 'proven_stored_point'
+             where v.snapshot_id = snap and v.verdict = 'ELIGIBLE'
+               and (abs(ST_X(g.geom) - v.lng) > 1e-9 or abs(ST_Y(g.geom) - v.lat) > 1e-9);
+            if enc <> 0 then bad := bad || ' [eligible-not-canonical ' || enc || ']'; end if;
+            if cne <> 0 then bad := bad || ' [canonical-not-eligible ' || cne || ']'; end if;
+            if rnl <> 0 then bad := bad || ' [verdict-rejects-not-in-ledger ' || rnl || ']'; end if;
+            if lnr <> 0 then bad := bad || ' [ledger-not-in-verdict-rejects ' || lnr || ']'; end if;
+            if cmm <> 0 then bad := bad || ' [coordinate mismatches ' || cmm || ']'; end if;
+
+            if bad <> '' then raise exception 'PRE-STATE ABORT -%. Nothing was swept. Production NOT repaired.', bad; end if;
+            raise notice 'PRE-STATE VERIFIED - READY, 723449/718278/5171, canonical 741562/718278/23284, fingerprint bbda250f..., rejects 5171, assoc 20170, all four set-equivalences 0, coord mismatches 0, canonical_synced_at NULL';
+          end $pre$;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+
+          # ---- MUTATION BASELINE + INDEPENDENT FORECAST (still read-only) ----
+          # Set fingerprints are keyed on source_key MEMBERSHIP: if the pre and post membership
+          # md5s agree, no row was inserted and none deleted. That is a stronger statement than
+          # a count comparison, which an equal-sized insert+delete would satisfy.
+          # collate "C" is pinned (CLAUDE.md rule 9) so the ordering is codepoint order and a
+          # false drift alarm cannot be manufactured by the DB collation.
+          cat > /tmp/premetrics.sql <<'SQL'
+          set session characteristics as transaction read only;
+          set statement_timeout = '15min';
+          with
+            snap as (select 'phase1-2026-09-01'::text s),
+            v    as (select * from geo.n5_proven_verdict where snapshot_id = (select s from snap)),
+            gp   as (select * from geo.n5_geom where provenance = 'proven_stored_point' and feature_id = 'pt:1')
+          select
+            (select now())                                                              as t0,
+            (select count(*) from geo.n5_geom)                                          as g_total,
+            (select count(*) from geo.n5_geom where provenance='proven_stored_point')    as g_canon,
+            (select count(*) from geo.n5_geom where provenance='recovered_authoritative')as g_recov,
+            (select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                        chr(10) order by source_key collate "C", feature_id collate "C"))
+               from geo.n5_geom where provenance='proven_stored_point')                  as g_md5,
+            (select md5(string_agg(source_key, chr(10) order by source_key collate "C")) from gp) as g_keymd5,
+            (select md5(string_agg(source_key||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                        chr(10) order by source_key collate "C", feature_id collate "C"))
+               from geo.n5_geom where provenance='recovered_authoritative')              as g_recovmd5,
+            (select count(*) from geo.n5_point_reject)                                   as r_total,
+            (select md5(string_agg(source_key||'|'||reason, chr(10) order by source_key collate "C"))
+               from geo.n5_point_reject)                                                 as r_keymd5,
+            (select count(*) from geo.n5_association)                                    as n_assoc,
+            (select count(*) from v where verdict='ELIGIBLE'
+               and not exists (select 1 from gp where gp.source_key=v.source_key))       as pred_ins,
+            (select count(*) from v where verdict<>'ELIGIBLE'
+               and exists (select 1 from gp where gp.source_key=v.source_key))           as pred_del_inelig,
+            (select count(*) from gp where not exists
+               (select 1 from v where v.source_key=gp.source_key))                       as pred_del_absent,
+            (select count(*) from v where verdict='ELIGIBLE'
+               and exists (select 1 from gp where gp.source_key=v.source_key))           as pred_upd,
+            (select count(*) from gp where verdict_snapshot_id is distinct from (select s from snap)) as pred_snapid_chg,
+            (select count(*) from v where verdict<>'ELIGIBLE' and not exists
+               (select 1 from geo.n5_point_reject r where r.source_key=v.source_key))    as rpred_ins,
+            (select count(*) from v where verdict<>'ELIGIBLE' and exists
+               (select 1 from geo.n5_point_reject r where r.source_key=v.source_key))    as rpred_upd,
+            (select count(*) from geo.n5_point_reject r where exists
+               (select 1 from v where v.source_key=r.source_key and v.verdict='ELIGIBLE'))as rpred_del_elig,
+            (select count(*) from geo.n5_point_reject r where not exists
+               (select 1 from v where v.source_key=r.source_key))                        as rpred_del_absent,
+            (select count(*) from geo.n5_point_reject
+               where verdict_snapshot_id is distinct from (select s from snap))           as rpred_snapid_chg;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/premetrics.sql | grep -v '^$' | tail -1 > /tmp/pre_metrics.txt
+          echo "PRE METRICS: $(cat /tmp/pre_metrics.txt)"
+          test -s /tmp/pre_metrics.txt || { echo "ABORT: no pre-metrics captured"; exit 1; }
+
+      - name: SYNC-CANONICAL (committed implementation, exactly once, no retry)
+        id: sync
+        env:
+          # PG-WIRE ONLY. SUPABASE_ACCESS_TOKEN deliberately absent: a Management API fallback
+          # would raise KeyError rather than silently running on the 2-minute-ceiling transport.
+          N5_TRANSPORT: pgwire
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SNAPSHOT: phase1-2026-09-01
+        run: |
+          set -euo pipefail
+          psql --version
+          echo "START  $(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          START=$(date -u +%s)
+          SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py sync-canonical
+          END=$(date -u +%s)
+          echo "END    $(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          echo "elapsed: $((END-START))s"
+
+      - name: POST-STATE PROOF + EXACT MUTATION ACCOUNTING (READ-ONLY)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          IFS='|' read -r T0 P_GTOT P_GCAN P_GREC P_GMD5 P_GKEY P_GRECMD5 P_RTOT P_RKEY P_ASSOC \
+                          P_INS P_DELI P_DELA P_UPD P_SNAP P_RINS P_RUPD P_RDELE P_RDELA P_RSNAP \
+                       < /tmp/pre_metrics.txt
+
+          # ---- fail-closed post-state assertions ----
+          cat > /tmp/post.sql <<'SQL'
+          set session characteristics as transaction read only;
+          set statement_timeout = '15min';
+          do $post$
+          declare
+            bad text := ''; snap text := 'phase1-2026-09-01';
+            m_state text; m_sync timestamptz; m_exp bigint; m_vrows bigint; m_elig bigint;
+            v_rows bigint; v_dist bigint; v_elig bigint; v_rej bigint; v_multi bigint; v_null bigint;
+            g_total bigint; g_canon bigint; g_recov bigint; g_md5 text;
+            n_rej bigint; n_assoc bigint;
+            enc bigint; cne bigint; rnl bigint; lnr bigint; cmm bigint; elig_rej bigint;
+            wrong_fid bigint; wrong_prov bigint; wrong_snap bigint;
+          begin
+            select state, canonical_synced_at, expected_source_keys, verdict_rows, eligible_rows
+              into m_state, m_sync, m_exp, m_vrows, m_elig
+              from geo.n5_verdict_manifest where snapshot_id = snap;
+            if m_state is distinct from 'READY' then bad := bad || ' [manifest state ' || coalesce(m_state,'<absent>') || ']'; end if;
+            if m_sync is null then bad := bad || ' [canonical_synced_at is STILL NULL - the sweep did not publish]'; end if;
+            if m_sync is not null and m_sync < now() - interval '2 hours' then
+              bad := bad || ' [canonical_synced_at ' || m_sync || ' does not correspond to this execution]'; end if;
+            if m_exp is distinct from 723449 or m_vrows is distinct from 723449
+               or m_elig is distinct from 718278 then bad := bad || ' [manifest metrics moved]'; end if;
+
+            select count(*), count(distinct source_key),
+                   count(*) filter (where verdict='ELIGIBLE'),
+                   count(*) filter (where verdict<>'ELIGIBLE'),
+                   count(*) filter (where verdict='MULTI_COORD_UNRESOLVED'),
+                   count(*) filter (where verdict='NULL_COORD')
+              into v_rows, v_dist, v_elig, v_rej, v_multi, v_null
+              from geo.n5_proven_verdict where snapshot_id = snap;
+            if v_rows <> 723449 or v_dist <> 723449 then bad := bad || ' [verdict rows/distinct moved: ' || v_rows || '/' || v_dist || ']'; end if;
+            if v_elig <> 718278 then bad := bad || ' [eligible ' || v_elig || ']'; end if;
+            if v_rej  <> 5171   then bad := bad || ' [rejected ' || v_rej || ']'; end if;
+            if v_multi<> 4877   then bad := bad || ' [MULTI_COORD_UNRESOLVED ' || v_multi || ']'; end if;
+            if v_null <> 294    then bad := bad || ' [NULL_COORD ' || v_null || ']'; end if;
+
+            select count(*) into g_total from geo.n5_geom;
+            select count(*) into g_canon from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into g_recov from geo.n5_geom where provenance='recovered_authoritative';
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into g_md5 from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into n_rej from geo.n5_point_reject;
+            select count(*) into n_assoc from geo.n5_association;
+            if g_recov <> 23284 then bad := bad || ' [RECOVERED GEOMETRY NOT PRESERVED: ' || g_recov || ' <> 23284]'; end if;
+            if n_assoc <> 20170 then bad := bad || ' [association changed: ' || n_assoc || ' <> 20170]'; end if;
+
+            select (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict='ELIGIBLE'
+                      except select source_key from geo.n5_geom where provenance='proven_stored_point') t),
+                   (select count(*) from (select source_key from geo.n5_geom where provenance='proven_stored_point'
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict='ELIGIBLE') t),
+                   (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict<>'ELIGIBLE'
+                      except select source_key from geo.n5_point_reject) t),
+                   (select count(*) from (select source_key from geo.n5_point_reject
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict<>'ELIGIBLE') t)
+              into enc, cne, rnl, lnr;
+            select count(*) into cmm
+              from geo.n5_proven_verdict v join geo.n5_geom g
+                on g.source_key=v.source_key and g.feature_id='pt:1' and g.provenance='proven_stored_point'
+             where v.snapshot_id=snap and v.verdict='ELIGIBLE'
+               and (abs(ST_X(g.geom)-v.lng) > 1e-9 or abs(ST_Y(g.geom)-v.lat) > 1e-9);
+            select count(*) into elig_rej
+              from geo.n5_point_reject r join geo.n5_proven_verdict v
+                on v.source_key=r.source_key and v.snapshot_id=snap
+             where v.verdict='ELIGIBLE';
+            select count(*) into wrong_fid  from geo.n5_geom where provenance='proven_stored_point' and feature_id<>'pt:1';
+            select count(*) into wrong_snap from geo.n5_geom where provenance='proven_stored_point'
+                                             and verdict_snapshot_id is distinct from snap;
+            select count(*) into wrong_prov from geo.n5_geom where feature_id='pt:1' and provenance<>'proven_stored_point';
+
+            if enc <> 0 then bad := bad || ' [eligible-not-canonical ' || enc || ']'; end if;
+            if cne <> 0 then bad := bad || ' [canonical-not-eligible ' || cne || ']'; end if;
+            if rnl <> 0 then bad := bad || ' [verdict-rejects-not-in-ledger ' || rnl || ']'; end if;
+            if lnr <> 0 then bad := bad || ' [ledger-not-in-verdict-rejects ' || lnr || ']'; end if;
+            if cmm <> 0 then bad := bad || ' [coordinate mismatches ' || cmm || ']'; end if;
+            if elig_rej  <> 0 then bad := bad || ' [' || elig_rej  || ' ELIGIBLE key(s) still in the reject ledger]'; end if;
+            if wrong_fid <> 0 then bad := bad || ' [' || wrong_fid || ' proven row(s) not pt:1]'; end if;
+            if wrong_prov<> 0 then bad := bad || ' [' || wrong_prov|| ' pt:1 row(s) with wrong provenance]'; end if;
+            if wrong_snap<> 0 then bad := bad || ' [' || wrong_snap|| ' proven row(s) with wrong verdict_snapshot_id]'; end if;
+
+            if bad <> '' then raise exception 'POST-STATE VERIFICATION FAILED -%', bad; end if;
+            raise notice 'POST-STATE VERIFIED - CANONICAL SYNC COMPLETE at %, all set-equivalences 0, recovered geometry preserved, associations unchanged', m_sync;
+          end $post$;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/post.sql
+
+          # ---- ACTUAL MUTATION ACCOUNTING, measured not asserted ----
+          # recovered_at / rejected_at are set to now() by the upsert's DO UPDATE and by the
+          # insert, so counting rows stamped after T0 measures how many rows the sweep actually
+          # touched. Membership md5s decide inserted/deleted.
+          cat > /tmp/acct.sql <<SQL
+          set session characteristics as transaction read only;
+          set statement_timeout = '15min';
+          select
+            (select count(*) from geo.n5_geom)                                           as g_total,
+            (select count(*) from geo.n5_geom where provenance='proven_stored_point')     as g_canon,
+            (select count(*) from geo.n5_geom where provenance='recovered_authoritative') as g_recov,
+            (select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                        chr(10) order by source_key collate "C", feature_id collate "C"))
+               from geo.n5_geom where provenance='proven_stored_point')                   as g_md5,
+            (select md5(string_agg(source_key, chr(10) order by source_key collate "C"))
+               from geo.n5_geom where provenance='proven_stored_point' and feature_id='pt:1') as g_keymd5,
+            (select md5(string_agg(source_key||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                        chr(10) order by source_key collate "C", feature_id collate "C"))
+               from geo.n5_geom where provenance='recovered_authoritative')               as g_recovmd5,
+            (select count(*) from geo.n5_point_reject)                                    as r_total,
+            (select md5(string_agg(source_key||'|'||reason, chr(10) order by source_key collate "C"))
+               from geo.n5_point_reject)                                                  as r_keymd5,
+            (select count(*) from geo.n5_association)                                     as n_assoc,
+            (select count(*) from geo.n5_geom where provenance='proven_stored_point'
+               and recovered_at > '$T0'::timestamptz)                                     as g_touched,
+            (select count(*) from geo.n5_point_reject where rejected_at > '$T0'::timestamptz) as r_touched,
+            (select canonical_synced_at from geo.n5_verdict_manifest
+              where snapshot_id='phase1-2026-09-01')                                      as sync_at;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/acct.sql | grep -v '^$' | tail -1 > /tmp/post_metrics.txt
+          IFS='|' read -r Q_GTOT Q_GCAN Q_GREC Q_GMD5 Q_GKEY Q_GRECMD5 Q_RTOT Q_RKEY Q_ASSOC \
+                          Q_GTOUCH Q_RTOUCH Q_SYNC < /tmp/post_metrics.txt
+
+          fail=0
+          eq() { [ "$2" = "$3" ] || { echo "ABORT: $1 = $2, expected $3"; fail=1; }; }
+
+          echo "================ EXACT MUTATION ACCOUNTING ================"
+          echo "FORECAST (read-only, before the sweep):"
+          echo "  geometry  insert=$P_INS  delete_ineligible=$P_DELI  delete_absent=$P_DELA  upsert_touch=$P_UPD  snapid_change=$P_SNAP"
+          echo "  rejects   insert=$P_RINS update=$P_RUPD delete_eligible=$P_RDELE delete_absent=$P_RDELA snapid_change=$P_RSNAP"
+          echo
+          echo "geo.n5_geom"
+          echo "  membership md5 before : $P_GKEY"
+          echo "  membership md5 after  : $Q_GKEY"
+          eq "membership (0 inserted, 0 deleted iff equal)" "$Q_GKEY" "$P_GKEY"
+          echo "  proven points inserted        : $P_INS   (membership unchanged confirms 0)"
+          echo "  proven points updated (touched): $Q_GTOUCH"
+          echo "  stale proven points deleted   : $((P_DELI + P_DELA))  (ineligible $P_DELI + absent $P_DELA)"
+          echo "  recovered_authoritative before: $P_GREC"
+          echo "  recovered_authoritative after : $Q_GREC"
+          eq "recovered preserved" "$Q_GREC" "$P_GREC"
+          eq "recovered fingerprint preserved" "$Q_GRECMD5" "$P_GRECMD5"
+          echo "  total rows before             : $P_GTOT"
+          echo "  total rows after              : $Q_GTOT"
+          eq "total rows" "$Q_GTOT" "$P_GTOT"
+          eq "canonical rows" "$Q_GCAN" "$P_GCAN"
+          echo "  geometry fingerprint before   : $P_GMD5"
+          echo "  geometry fingerprint after    : $Q_GMD5"
+          eq "COORDINATES UNCHANGED (fingerprint)" "$Q_GMD5" "$P_GMD5"
+          echo
+          echo "geo.n5_point_reject"
+          echo "  membership+reason md5 before  : $P_RKEY"
+          echo "  membership+reason md5 after   : $Q_RKEY"
+          eq "reject membership+reason" "$Q_RKEY" "$P_RKEY"
+          echo "  inserted                      : $P_RINS"
+          echo "  updated/replaced (touched)    : $Q_RTOUCH"
+          echo "  deleted stale/orphaned        : $((P_RDELE + P_RDELA))  (eligible-in-ledger $P_RDELE + absent $P_RDELA)"
+          echo "  final count                   : $Q_RTOT"
+          eq "reject final count" "$Q_RTOT" "$P_RTOT"
+          echo
+          echo "manifest"
+          echo "  canonical_synced_at before    : NULL (asserted by the precheck)"
+          echo "  canonical_synced_at after     : $Q_SYNC"
+          [ -n "$Q_SYNC" ] || { echo "ABORT: canonical_synced_at empty after sync"; fail=1; }
+          echo
+          echo "association before/after        : $P_ASSOC / $Q_ASSOC"
+          eq "association unchanged" "$Q_ASSOC" "$P_ASSOC"
+
+          # The forecast and the outcome must agree. A zero-row reconciliation is VALID and
+          # expected here - the corpus already matched the READY verdict - but "expected" is not
+          # "unchecked": the upsert still stamps every ELIGIBLE row, so g_touched should equal
+          # the forecast upsert_touch, and that is asserted rather than waved through.
+          eq "touched rows == forecast upsert_touch" "$Q_GTOUCH" "$P_UPD"
+          eq "reject touched == forecast update"     "$Q_RTOUCH" "$P_RUPD"
+          [ "$fail" = "0" ] || exit 1
+          echo "MUTATION ACCOUNTING RECONCILED"
+
+      - name: CONSUMABILITY GATE (existing read-only assertion, exact snapshot)
+        env:
+          N5_TRANSPORT: pgwire
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SNAPSHOT: phase1-2026-09-01
+        run: |
+          set -euo pipefail
+          # The SHIPPED assert_snapshot_consumable(), not a re-implementation. It is read-only:
+          # every statement it issues is a SELECT. It must ACCEPT the snapshot now, and it is
+          # the lifecycle completion gate - nothing downstream is consumed here.
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, "scripts")
+          import n5_shard
+          row = n5_shard.assert_snapshot_consumable()
+          print("assert_snapshot_consumable ACCEPTED", n5_shard.SNAPSHOT)
+          print("  input_exists :", row["input_exists"])
+          print("  input_rows   :", row["input_rows"])
+          print("  state        :", row["state"])
+          print("  synced       :", row["synced"])
+          print("  verdict_rows :", row["vrows"], "expected:", row["expected"])
+          PY
+          echo "LIFECYCLE COMPLETE - CANONICAL SYNC COMPLETE. No downstream operation run."
+
+      - name: On failure - report state, DO NOT repair
+        if: failure() && steps.arm.outcome == 'success'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -P pager=off -c "
+            set session characteristics as transaction read only;
+            select snapshot_id, state, verdict_rows, eligible_rows, fingerprint,
+                   canonical_synced_at, started_at, completed_at
+              from geo.n5_verdict_manifest;
+            select provenance, count(*) from geo.n5_geom group by 1 order by 1;
+            select count(*) as rejects from geo.n5_point_reject;
+            select count(*) as associations from geo.n5_association;"
+          echo "Reported only. No table was repaired. No retry. No second sync."
