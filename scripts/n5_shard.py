@@ -81,6 +81,13 @@ def one(rows, col):
     return rows[0][col] if rows else None
 
 
+def first(rows):
+    """The whole first row, or None. NOT one(rows, None): one() treats its second argument as
+    a dictionary KEY, so one(rows, None) evaluates rows[0][None] and raises KeyError(None) on
+    any non-empty result. Two callers want the row itself rather than one column of it."""
+    return rows[0] if rows else None
+
+
 def load_registry():
     reg = json.load(open(REG_PATH))
     out = {}
@@ -912,10 +919,10 @@ on conflict (source_key) do update
        verdict_snapshot_id = excluded.verdict_snapshot_id, rejected_at = now();""",
         "reject write " + z3)
 
-    return one(sql(scope + """
+    return first(sql(scope + """
 select (select count(*) from v where verdict='ELIGIBLE') materialized,
        (select count(*) from v where verdict<>'ELIGIBLE') rejected;""",
-                   "proven counts " + z3), None)
+                     "proven counts " + z3))
 
 
 FEATURE_ID_PT1_DOC = "pt:1"
@@ -938,7 +945,7 @@ select {lit(z3)}, source_key, zip::char(5), ev
 
 def reconcile_stage(z3):
     """Verify the staged set before anything authoritative is touched."""
-    return one(sql(f"""select
+    return first(sql(f"""select
         (select count(*) from geo.n5_association_stage where z3={lit(z3)}) staged,
         (select count(distinct (source_key, zip)) from geo.n5_association_stage
           where z3={lit(z3)}) staged_pairs,
@@ -951,7 +958,8 @@ def reconcile_stage(z3):
            and provenance='recovered_authoritative') geom_recovered,
         (select count(*) from geo.n5_geom where first_z3={lit(z3)}
            and provenance='proven_stored_point') geom_proven,
-        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejects,
+        (select count(*) from geo.n5_point_reject
+          where observed_in_z3={lit(z3)}) rejects,
         (select count(*) from (
             select source_key, zip, evidence from geo.n5_association_stage where z3={lit(z3)}
             except
@@ -963,7 +971,7 @@ def reconcile_stage(z3):
             except
             select source_key, zip, evidence from geo.n5_association_stage
              where z3={lit(z3)}) d) prior_not_staged;""",
-                   "reconcile " + z3), None)
+                     "reconcile " + z3))
 
 
 def swap_shard(z3):
