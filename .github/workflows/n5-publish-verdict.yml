@@ -192,7 +192,13 @@ jobs:
           head -3 /tmp/live_equiv.sql
           echo "derivation start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           T0=$(date -u +%s)
-          OUT=$(psql "$SUPABASE_DB_URL" -X -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -f /tmp/live_equiv.sql)
+          # -q is REQUIRED. Without it psql echoes a "SET" command tag for each of the two
+          # session settings at the top of the script, `read` consumes the FIRST line, and
+          # every metric parses as empty with rows="SET". Observed on run 33800801237: the
+          # derivation itself succeeded in 54s and only the capture was wrong. `tail -1` is
+          # belt-and-braces so a future added statement cannot reintroduce the same class.
+          OUT=$(psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+                     -f /tmp/live_equiv.sql | grep -v '^$' | tail -1)
           T1=$(date -u +%s)
           ELAPSED=$((T1-T0))
           echo "derivation end   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
