@@ -13,8 +13,18 @@ name: n5-db-connectivity
 # command-line argument (which would appear in `ps`), and `set -x` is never enabled. Only the
 # PORT and a host-shape boolean are printed - never the URL, host, user or password.
 
+# TRIGGER NOTE: workflow_dispatch alone is not enough. GitHub only registers a dispatchable
+# workflow once its FILE exists on the default branch, so this could not be dispatched from
+# the PR branch (HTTP 404) and #1016 must not be merged before the migration is applied. The
+# pull_request trigger is scoped to this file's own path, so it fires when the workflow
+# changes and otherwise never - and it can be re-run on demand from the Actions UI ("Re-run
+# jobs") after the credential is added, with no merge to main required. Secrets are available
+# to same-repo pull_request runs; this repo takes no fork PRs.
 on:
   workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-db-connectivity.yml'
 
 permissions:
   contents: read
