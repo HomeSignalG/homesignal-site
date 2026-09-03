@@ -29,14 +29,17 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
       - name: Install Playwright (chromium)
-        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+        # No --with-deps: the ubuntu-latest image already carries chromium's shared
+        # libraries, and the apt half of --with-deps is what hung run 33819018693 for
+        # 19 minutes past its own bound. Install the browser only.
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
       - name: Capture crawler ground truth
         env:
           SITE_BASE: https://homesignal.net
