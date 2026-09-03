@@ -999,3 +999,106 @@ convention.
 ⚠️ **Scope.** This proves the *machinery* end to end for one address at one radius. It does not
 establish source completeness for that address, that neighbourhood, or anywhere else, and it is
 not a Map 1 implementation.
+
+---
+
+## 20. Map 1 address-radius implementation — **BLOCKED: the RPC returns no coordinate**
+
+**Outcome: C — BLOCKED ON ANOTHER SPECIFIC EXISTING CONTRACT.** No Map 1 file was edited. The
+blocker is *not* dossier hydration (that works) — it is that a radius result **cannot be placed on
+the map**, because the installed RPC returns no position and no authorized surface can supply one.
+
+### What the read-only trace actually found (the brief's premise needs correcting)
+
+⚠️ **Map 1 ALREADY HAS A WORKING ADDRESS MODE.** The implementation plan assumed items A–D had to
+be built. They exist today in `homesignalmap.html`:
+
+| brief item | status in current Map 1 | evidence |
+|---|---|---|
+| A address-mode state | **exists** — `ZIP_MODE=false` *is* address mode; `CUR_ADDRESS`, `CUR_RADIUS`, `LAST_ADDR`, `HOME_ANCHOR` | `homesignalmap.html:519, 962-966` |
+| B geocode + retrieval | **exists**, but via `get-address-report` `{address, radius_mi}` | `:484, :970-973` |
+| C HOME marker | **exists** — `GL.home`, dropped only on a real address search | `:962`, `updateHome3D()` |
+| D radius selector + ring | **exists** — `circlePoly(GL.home.lat, GL.home.lng, CUR_RADIUS, 96)`, suppressed in ZIP mode | `:1790`, `:1902-1903` |
+| H ZIP mode preserved | **exists** — separate `loadZip()` path reading `development_reports` | `:1008, :1077` |
+
+So the real unit is narrower than stated: **swap address-mode's DEVELOPMENT retrieval to the proven
+N5 chain (Rule 2) and keep everything else.** Items A, C, D, H need no work.
+
+### Rule 7 — dossier hydration RESOLVES. This is not the blocker.
+
+`public.app_projects` is anon-readable through an **existing** RLS policy —
+`app_projects_read [SELECT] roles={anon,authenticated}` — and Map 1 already has a generic anon
+PostgREST helper (`sbFetch`, `:2371`). Hydrating `source_key` needs **no new backend, no grant
+change, no RLS change**. Verified against the two identities §19's live proof returned:
+
+| source_key | name | source_ref (record_url) | type | status / stage | impact_score |
+|---|---|---|---|---|---|
+| `…mavg-96ck:SP-2021-0320D` | **Caldwell Lane** | real per-record `abc.austintexas.gov` permit URL | Industrial | Approved / Approved and Released | 55 |
+| `…mavg-96ck:SP-2020-0236D` | **Riverside Resort** | real per-record `abc.austintexas.gov` permit URL | unclassified | Proposed / Waiting on Legal | 72 |
+
+Both `record_kind='development'`, both carrying the `label` + `record_url` that Map 1's
+anti-fabrication gate `sourced()` (`:667`) requires. *(Noted, not blocking: `impact_dimensions` is
+NULL on both, so QoL dimensions would render in their existing honest-absent state; `impact_score`
+is present.)*
+
+### THE BLOCKER — no position, and no authorized way to get one
+
+`public.n5_projects_within_radius` returns
+`(source_key, feature_id, registry_id, provenance, distance_mi, geometry_type, has_more)`.
+**There is no latitude, no longitude, no geometry.** Map 1 places every marker from `s.lat`/`s.lng`.
+
+No existing surface can close that gap, measured 2026-09-03:
+
+- anon-executable functions whose body touches `geo.n5_geom`: **exactly one —
+  `public.n5_projects_within_radius`** (the one with no coordinate)
+- public views over `geo.n5_geom`: **0**
+- `anon` SELECT on `geo.n5_geom`: **false** · `anon` USAGE on schema `geo`: **false**
+
+Rule 15 forbids granting direct `geo.*` access, and the HOLDS forbid expanding the RPC
+speculatively. So the position must come from the RPC, and today it does not.
+
+### Why `app_projects.lat/lng` is NOT a safe substitute
+
+It is *tempting* because for the two proven rows it agrees almost exactly (computed locally):
+
+| identity | provenance | RPC distance_mi | distance to app_projects point | delta |
+|---|---|---:|---:|---:|
+| SP-2021-0320D | `proven_stored_point` | 0.021017590 | 0.020982797 | 0.0000348 |
+| SP-2020-0236D | `proven_stored_point` | 0.278213115 | 0.278335783 | 0.0001227 |
+
+That agreement is **an artefact of provenance, not a general property**. For
+`proven_stored_point` the canonical geometry *is* the stored coordinate, so the two coincide. For
+`recovered_authoritative` — **9,083 MultiPolygon + 8,177 MultiLineString rows in the corpus** — the
+RPC measures to the **true edge** while `app_projects` holds **one representative point**;
+CLAUDE.md is explicit that "no view over a representative point can answer distance-to-polygon at
+any effort." Plotting the representative point beside an authoritative edge-distance would put a
+marker somewhere the stated distance does not describe. §19's proof returned only
+`proven_stored_point` rows, so it **did not exercise the hazardous case** — using it as licence
+would be generalising from the one shape that happens to work.
+
+### Smallest contract required (NOT implemented — needs authorization)
+
+Add two nullable columns to the RPC's `RETURNS TABLE` — a display position derived from the row's
+**own** geometry, inside the function that already reads it:
+
+```
+display_lat  double precision,
+display_lng  double precision
+```
+
+sourced from `ST_Y/ST_X` for point geometry and `ST_PointOnSurface`/`ST_LineInterpolatePoint` for
+polygon/line rows — the same derivation `featurePoint()` already performs elsewhere in this repo —
+**with `distance_mi` remaining the authoritative radius value**, and the UI labelling a non-point
+row's marker as an indicative location on real geometry rather than a precise site. That keeps
+Rule 5 ("do not convert polygons/lines to representative points for distance claims") intact,
+because the derived point would be used for *placement only*, never for distance.
+
+It is a change to the reviewed, installed RPC, so it is the founder's call, and it would need its
+own review + reinstall gate. **I did not implement it, and I did not ship a list-only Map 1 view**
+— Rule 7 forbids shipping a degraded parallel project experience, and a radius result with no
+marker on the primary map is exactly that.
+
+### Nothing was changed
+
+No Map 1 edit, no RPC change, no new backend, no grant/RLS change, no production call in this unit
+beyond read-only catalog and `app_projects` inspection. Map 2 untouched. PR #1015/#1016 DRAFT.
