@@ -775,3 +775,106 @@ assertion are all **unevaluated** — there is no response to assert against. No
    for completeness; **not** taken on my own judgement.
 
 Option 1 preserves the boundary this unit was written around. Option 2 trades it away.
+
+---
+
+## 18. ADDRESS → COORDINATE PROOF — **PASSED**, 2026-09-03 23:13:26Z
+
+**Outcome: A — ADDRESS → COORDINATE PROOF PASSED.** The production `geocode-address` Edge
+Function was invoked **exactly once** and returned a real, valid coordinate for the documented
+positive-control address. `public.n5_projects_within_radius` was invoked **zero** times.
+
+### This supersedes the §17 block — and the two are different things
+
+**§17 was an ENVIRONMENT/TRANSPORT block, not a geocoder failure**, and that distinction is now
+proven rather than asserted. In §17 the Claude Code sandbox's agent proxy answered **403 to
+CONNECT** for `qwnnmljucajnexpxdgxr.supabase.co:443`, so no HTTP request ever reached Supabase and
+the function never ran. Run from a surface with ordinary egress, **the very same endpoint, address
+and request shape returned HTTP 200 and a correct coordinate on the first attempt.** Nothing in
+the application was changed to achieve that: no `pg_net`, no alternate transport, no edit to
+`geocode-address`, `get-address-report`, Supabase or Map 1.
+
+### Execution surface — existing authorized pattern, not new infrastructure
+
+GitHub Actions, `ubuntu-latest`, `.github/workflows/n5-geocode-probe.yml`, run
+**`33816635075`**, job `100850116977`, head `17379b4`. Authorization evidence from the repo:
+
+- **CLAUDE.md §5:** "the build sandbox can't reach Supabase/homesignal.net (egress blocked), so
+  `.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs` do the live check
+  on a GitHub runner."
+- **`verify-development.yml`:** "Runs where network egress works (GitHub-hosted runner), the piece
+  the build sandbox cannot do" — and `scripts/verify-development.mjs:38` already issues live HTTPS
+  to `.../functions/v1/get-address-report`, the committed precedent for calling a production
+  **Edge Function** from CI.
+- That script reads endpoint + public anon key out of the **shipped page** "so nothing is forked";
+  this probe does the same from `config.js`. **No secrets are used** — the anon key is public by
+  design — and `permissions: contents: read` means the job cannot write to the repo.
+- Arming-token convention, as in `.github/epa-recovery-armed` and every N5 unit in this series.
+
+**`verify-edge-function.yml` was deliberately NOT used**: it states it "NEVER calls the live
+database, the Census geocoder, the Supabase project, or the deployed Edge Function". Using it
+would have contradicted its own contract.
+
+### Bounds — asserted mechanically before arming
+
+The workflow contains **exactly one** outbound request construct: a single `curl --retry 0` to
+`functions/v1/geocode-address`. It does not call `get-address-report`, does not call Census
+directly, does not touch the database, and does not invoke the radius RPC. Two other token hits
+were **checked rather than assumed**: `census.gov` appears only inside a Python string literal
+used to inspect the function's *source*, and `n5_geom` only inside a comment stating it is not
+queried.
+
+A **zero-application-write gate** re-proved on the runner, immediately before the request, that
+`geocode-address` still has no `supabase-js` client, no project key, no DB or table access, no
+persistent geocode cache, no insert/upsert/update/delete, no local persistence, and exactly one
+outbound `fetch` — to the U.S. Census one-line geocoder at `benchmark=Public_AR_Current`. All nine
+checks passed; had any failed, the request would never have been made.
+
+### The one request, and what production returned
+
+| | |
+|---|---|
+| endpoint | `https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/geocode-address` |
+| input address | `2200 CALDWELL LN, DEL VALLE, TX 78617` |
+| invocations | **1** — no retry, no second address, no alternate spelling |
+| HTTP status | **200** |
+| matched address | **`2200 CALDWELL LN, DEL VALLE, TX, 78617`** |
+| **latitude** | **`30.215054966235`** |
+| **longitude** | **`-97.53885104845`** |
+| zip / city / state | `78617` / `DEL VALLE` / `TX` |
+| fields returned | `city, lat, lng, matchedAddress, state, zip` |
+| **match-quality fields actually returned** | **NONE** |
+
+⚠️ **No match-quality classification is claimed.** The response carries no `match_type`,
+`quality`, `precision`, `accuracy` or `confidence` field — the probe enumerated the returned keys
+and reported `NONE`. The result is therefore **not** described as exact, rooftop, parcel or
+range_interpolated. (The repo's own ladder classifies the Census rung as `range_interpolated` in
+`geocode-cache.ts`, but that is repo knowledge about the provider, not something this response
+supplied, and it is not asserted here.)
+
+### Coordinate assertions — all passed
+
+latitude not null ✅ · longitude not null ✅ · latitude finite ✅ · longitude finite ✅ ·
+`-90 <= 30.215054966235 <= 90` ✅ · `-180 <= -97.53885104845 <= 180` ✅
+
+**N5 input-domain compatibility (offline, type/range only):** both values are `double precision`
+and fall inside the ranges `n5_projects_within_radius` validates for `p_lat` and `p_lng` ✅.
+**The RPC was not invoked, `geo.n5_geom` was not queried around the coordinate, and no radius
+search was reproduced.** This says the coordinate is *admissible input* — it says nothing yet
+about whether any project is near that address.
+
+### Side effects
+
+- **Application-data writes: NONE.** The endpoint has no write path (re-proved on the runner) and
+  the probe holds no service-role key.
+- **N5 data mutation: NONE.** No `geo.*` contact of any kind in this unit.
+- **Map 1: unmodified.**
+- Ordinary GitHub Actions run logs are not application-data writes.
+
+### Probe disarmed
+
+`.github/n5-geocode-probe-arm` now reads `DISARMED-2026-09-03-after-geocode-probe`. Verified
+mechanically across the branch: **no arm token equals its workflow's `EXPECTED_ARM`** — every N5
+probe (`n5-geocode-probe-arm`, `n5-rpc-apply-arm`) is disarmed, so no accidentally armed
+production probe is left behind. The workflow file is retained, disarmed, as the documented record
+of how the proof was run — the same convention as `epa-recovery-watch.yml`.
