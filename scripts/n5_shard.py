@@ -601,7 +601,12 @@ def publish_verdict():
     FAIL-CLOSED: the manifest is reset to BUILDING with canonical_synced_at NULL as the FIRST
     durable act, so an interrupted publish leaves a snapshot that assert_snapshot_consumable()
     refuses. READY is written once, at the end, in the same statement that records the metrics
-    the READY constraint requires - it is never claimed ahead of the evidence for it."""
+    the READY constraint requires - it is never claimed ahead of the evidence for it.
+
+    The verdict rebuild's delete+insert is one HTTP call, but this function does NOT depend on
+    that being one transaction: a partially rebuilt verdict fails the completeness check below
+    (missing/extra/closure), records FAILED, and never reaches READY. The barrier is the state
+    machine, not the transport."""
     require_snapshot()
     assert_frozen_input_present()
 
@@ -644,6 +649,8 @@ def publish_verdict():
         problems.append("eligible + rejected does not close on verdict_rows")
     if v["fingerprint"] is None:
         problems.append("fingerprint is null")
+    if v["reject_counts"] is None:
+        problems.append("reject_counts is null")
     if problems:
         # FAILED is safe to record: canonical_synced_at is already NULL, so the snapshot stays
         # unconsumable either way. If even this write fails, the row remains BUILDING - also
