@@ -274,7 +274,14 @@ jobs:
                         chr(10) order by source_key collate "C", feature_id collate "C"))
                from geo.n5_geom where provenance='proven_stored_point')                  as g_md5,
             (select md5(string_agg(source_key, chr(10) order by source_key collate "C")) from gp) as g_keymd5,
-            (select md5(string_agg(source_key||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+            -- RECOVERED GEOMETRY IS NOT ALL POINT. ST_X/ST_Y raise
+            -- "Argument to ST_X() must have type POINT" on this population (observed live,
+            -- run 33803891235 attempt 2), so the recovered fingerprint is taken over the
+            -- geometry's own binary form, which is type-agnostic and per-row bounded. The
+            -- PROVEN fingerprint above deliberately keeps ST_X/ST_Y: those rows are points by
+            -- construction and that expression is what produced bbda250f..., so changing it
+            -- would break comparability with every earlier receipt.
+            (select md5(string_agg(source_key||'|'||feature_id||'|'||md5(ST_AsEWKB(geom)),
                         chr(10) order by source_key collate "C", feature_id collate "C"))
                from geo.n5_geom where provenance='recovered_authoritative')              as g_recovmd5,
             (select count(*) from geo.n5_point_reject)                                   as r_total,
@@ -442,7 +449,14 @@ jobs:
                from geo.n5_geom where provenance='proven_stored_point')                   as g_md5,
             (select md5(string_agg(source_key, chr(10) order by source_key collate "C"))
                from geo.n5_geom where provenance='proven_stored_point' and feature_id='pt:1') as g_keymd5,
-            (select md5(string_agg(source_key||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+            -- RECOVERED GEOMETRY IS NOT ALL POINT. ST_X/ST_Y raise
+            -- "Argument to ST_X() must have type POINT" on this population (observed live,
+            -- run 33803891235 attempt 2), so the recovered fingerprint is taken over the
+            -- geometry's own binary form, which is type-agnostic and per-row bounded. The
+            -- PROVEN fingerprint above deliberately keeps ST_X/ST_Y: those rows are points by
+            -- construction and that expression is what produced bbda250f..., so changing it
+            -- would break comparability with every earlier receipt.
+            (select md5(string_agg(source_key||'|'||feature_id||'|'||md5(ST_AsEWKB(geom)),
                         chr(10) order by source_key collate "C", feature_id collate "C"))
                from geo.n5_geom where provenance='recovered_authoritative')               as g_recovmd5,
             (select count(*) from geo.n5_point_reject)                                    as r_total,
