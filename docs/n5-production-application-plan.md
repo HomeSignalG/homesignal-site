@@ -123,21 +123,93 @@ and states no transaction semantics. Not tested against production.
 and the writes they authorise must be in **one transaction**, so a transport that cannot carry
 `BEGIN … COMMIT` as one unit is not acceptable regardless of convenience.
 
+**Selected architecture: Supabase session-mode pooler, port 5432, TLS** — `PG-WIRE TRANSPORT
+DESIGN: PASS`. Session mode assigns a dedicated backend for the connection's lifetime, so
+`SET LOCAL`, multi-statement transactions and transactional DDL all hold. **Transaction-mode
+pooling (port 6543) is excluded**: a connection is multiplexed per transaction and session state
+is not guaranteed. The direct endpoint (`db.<ref>.supabase.co:5432`) has identical semantics but
+is IPv6-only without the IPv4 add-on, and GitHub-hosted runners are IPv4-only — hence session
+mode is preferred on *reachability*, not on semantics. `PRODUCTION INSTANCE CONNECTIVITY:
+UNVERIFIED` — no credentialed SELECT has reached this project's endpoint, so the gate overall is
+`ATOMIC TRANSPORT GATE: CONDITIONAL` until §0 item 10 proves hostname, port, TLS, session
+semantics, SELECT connectivity and server identity/version.
+
+**The application command (design only — not run):**
+
+```
+psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -f docs/n5-canonical-geometry-provenance.sql
+```
+
+**Do NOT add `-1` / `--single-transaction`.** The file owns an explicit `begin; … commit;`. With
+`-1`, psql sends its own `BEGIN` first, the file's `begin;` warns *"there is already a transaction
+in progress"* and is ignored, the file's `commit;` closes **psql's** transaction, and psql's
+trailing `COMMIT` warns *"there is no transaction in progress"*. Still one transaction, but the
+atomicity boundary becomes ambiguous — anything after the file's `commit;` would silently run
+outside it — and two spurious warnings pollute the one receipt that must be unambiguous.
+Atomicity is already total without it: `ON_ERROR_STOP=1` makes psql exit before reaching
+`commit;`, and the server rolls the aborted transaction back.
+
 **The single prerequisite:** a `SUPABASE_DB_URL` (direct connection string, or the pooler in
 *session* mode — transaction-mode pooling is not acceptable) available to whoever applies, as a
 GitHub Actions secret or an operator-local value. **No such credential exists in this repository
 today** — `grep` for `postgres://`, `postgresql://`, `DATABASE_URL`, `PGPASSWORD` across all
 `.yml`/`.py`/`.mjs`/`.sh` returns nothing outside the disposable test harness. Obtaining it is a
-founder action, not an agent action.
+founder action, not an agent action. `CREDENTIAL PROVISIONING REQUIRED`.
+
+---
+
+## 4a. TIMEOUT POLICY — adopted, and executably proven
+
+```sql
+begin;
+set local lock_timeout      = '5s';
+set local statement_timeout = '15min';
+```
+
+**`lock_timeout` protects READERS, not the migration.** PostgreSQL's lock queue is FIFO: if an N5
+writer holds ROW EXCLUSIVE on `geo.n5_geom`, the migration's pending ACCESS EXCLUSIVE request
+queues behind it *and every subsequent reader queues behind the migration*. An unbounded wait
+therefore turns a blocked migration into a read outage on production geometry while nothing has
+been changed. 5s bounds that window; then the transaction aborts and the queue drains.
+
+Statements needing ACCESS EXCLUSIVE: §2's `ADD COLUMN` (catalog-only), §4's two **validating**
+`ADD CONSTRAINT` scans over the canonical rows, and §5's reject-table `DROP`/`ADD PRIMARY KEY`
+and `SET NOT NULL`. `statement_timeout '15min'` is the ceiling for the longest single statement
+(§4's UPDATE and those two scans); honest scope limit — it bounds each **statement**, not the
+transaction.
+
+**`SET LOCAL`, never `SET`:** reverted at commit *and* at rollback, so neither this session nor
+the next tenant of a pooled backend inherits the values.
+
+**No retry, no escalation, no fallback transport.** A timeout abort is the signal that the
+quiescence precondition in §0 was false or stale. The two SQLSTATEs are distinguishable and the
+apply receipt must record which fired: **`55P03`** lock_not_available (a writer was active) vs
+**`57014`** query_canceled (the work exceeded budget).
+
+**Executable proof — disposable PostgreSQL only, never production:**
+
+| test | proves | result |
+|---|---|---|
+| E1 | `current_setting()` inside the *real* migration transaction | `lock_timeout=5s`, `statement_timeout=15min` |
+| E2 | transaction-locality across **both** exits, on the same session pinned to distinctive `7s`/`77s` | unchanged after COMMIT and after ROLLBACK |
+| E3 | two real concurrent connections; A holds ROW EXCLUSIVE on `geo.n5_geom`, B applies the migration | `55P03`, **5.010 / 5.009 / 5.009 s** over three repeats; full rollback |
+| E3 control | the same migration with the `lock_timeout` line removed | still waiting past 120 s — the guard, not something else, is what bounds E3 |
+| E4 | mechanism only, scratch `100ms` value | `57014`; setting not retained |
+
+E3 also re-proves atomicity under a lock abort: `verdict_snapshot_id` still absent, reject PK
+still `(source_key, reason)`, both row counts unchanged, and no archive or lifecycle object
+created inside the failed transaction survives it.
 
 ---
 
 ## 5. GREEN RECEIPTS BACKING THIS PLAN
 
-- Executable PostgreSQL + PostGIS: **96 / 96**, local (PG 16.13 / PostGIS 3.4.2) and in CI
+- Executable PostgreSQL + PostGIS: **117 / 117**, local (PG 16.13 / PostGIS 3.4.2) and in CI
   (`postgis/postgis:16-3.4`, PG 16.4), against a **production-faithful** fixture.
-- Of those, **12** assert the corrected migration succeeds against the real legacy pre-state and
-  **11** are negative controls proving it fails and rolls back when any invariant is corrupted.
-- Static source assertions: **178 / 178**. Offline unit suite: **141 / 141 files**.
+- Of those, **12** assert the corrected migration succeeds against the real legacy pre-state,
+  **11** are negative controls proving it fails and rolls back when any invariant is corrupted,
+  **7** are B1 definition validation, **2** are B2 unique-derivation, and **12** are the §4a
+  timeout policy (E1–E4).
+- Static source assertions: **206 / 206**. Offline unit suite: **141 / 141 files**.
 - Residual fidelity limit: the fixture reproduces production's **shape and invariants** at 5-project
   scale, not its 723,449-project volume. Scale is the only modelled difference.

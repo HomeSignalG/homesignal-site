@@ -58,6 +58,37 @@
 
 begin;
 
+-- ----------------------------------------------------------------------------
+-- §0a  TIMEOUT POLICY — transaction-local, no retry
+-- ----------------------------------------------------------------------------
+-- lock_timeout '5s'. The hazard is NOT migration convenience. PostgreSQL's lock queue is
+-- FIFO: if an N5 writer holds ROW EXCLUSIVE on geo.n5_geom, our pending ACCESS EXCLUSIVE
+-- request queues behind it AND EVERY SUBSEQUENT READER QUEUES BEHIND US. An unbounded wait
+-- therefore turns a blocked migration into a READ OUTAGE on production geometry while we
+-- have changed nothing. 5s bounds that reader-starvation window; then this transaction
+-- aborts, rolls back, and the queue drains. Statements needing ACCESS EXCLUSIVE: §2's ADD
+-- COLUMN (catalog-only), §4's two validating ADD CONSTRAINTs (full scan of the canonical
+-- rows), and §5's reject-table DROP/ADD PRIMARY KEY and SET NOT NULL.
+--
+-- statement_timeout '15min'. Ceiling for the longest single statement — §4's UPDATE over the
+-- canonical rows and the two validating constraint scans. Honest scope limit: this bounds
+-- each STATEMENT, not the transaction.
+--
+-- SET LOCAL, never SET: reverted at commit AND at rollback, so neither this session nor the
+-- next tenant of a pooled backend inherits these values. SET LOCAL outside a transaction
+-- block warns and does nothing, so the placement immediately after begin; is load-bearing,
+-- and it must precede §1 — which takes ACCESS SHARE and can itself queue.
+--
+-- A timeout abort is a SIGNAL that the quiescence precondition was false, not noise.
+-- There is no retry, no escalation of these values, and no fallback transport. Re-running
+-- blindly would re-enter the reader-starvation window.
+--
+-- SQLSTATEs are distinguishable and the apply receipt must record which fired:
+--   55P03 lock_not_available  -> a writer was active; the precheck was wrong or stale.
+--   57014 query_canceled      -> the work itself exceeded budget.
+set local lock_timeout = '5s';
+set local statement_timeout = '15min';
+
 -- ============================================================================
 -- §1  PRE-STATE CLASSIFICATION — A migrate / B no-op / C fail loudly
 -- ============================================================================

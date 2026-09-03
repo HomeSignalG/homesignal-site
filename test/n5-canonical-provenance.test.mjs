@@ -490,4 +490,65 @@ ok(code.indexOf('do $multiplicity$') < code.indexOf('do $gate$')
 ok(!/if legacy_points = 0/.test(mult),
   'B2 runs unconditionally - not behind the "are there legacy points" early return');
 
+// ---- 21. TIMEOUT POLICY (lock_timeout / statement_timeout) ----
+// `code` is the migration with comment lines stripped, so the migration's own prose about
+// these settings cannot satisfy any assertion below. Every regex names the GUC explicitly,
+// so no unrelated word (`exception`, `preset`, `resettable`, ...) can match.
+const countOf = (re) => (code.match(re) || []).length;
+
+// 21.1 / 21.2 — exactly one declaration each, with the exact authorized value.
+ok(countOf(/^\s*set\s+local\s+lock_timeout\s*=\s*'5s'\s*;\s*$/gim) === 1,
+  "exactly one `set local lock_timeout = '5s';`");
+ok(countOf(/^\s*set\s+local\s+statement_timeout\s*=\s*'15min'\s*;\s*$/gim) === 1,
+  "exactly one `set local statement_timeout = '15min';`");
+
+// 21.3 / 21.4 — no BARE SET of either GUC anywhere. A bare SET is session-scoped: it would
+// survive commit and, on a session-mode pooler, leak onto the next tenant of that backend.
+// The negative lookahead is what distinguishes `set lock_timeout` from `set local lock_timeout`.
+ok(countOf(/\bset\s+(?!local\b)(?:session\s+)?lock_timeout\b/gi) === 0,
+  'lock_timeout is never assigned with a bare/session-scoped SET');
+ok(countOf(/\bset\s+(?!local\b)(?:session\s+)?statement_timeout\b/gi) === 0,
+  'statement_timeout is never assigned with a bare/session-scoped SET');
+
+// 21.5 — both fall inside the transaction. SET LOCAL outside a transaction block warns and
+// silently does nothing, so being after `begin;` is the difference between a policy and a
+// no-op that looks like one.
+const iBegin = code.search(/^begin;$/m);
+const iLock  = code.search(/^\s*set\s+local\s+lock_timeout\b/im);
+const iStmt  = code.search(/^\s*set\s+local\s+statement_timeout\b/im);
+ok(iBegin >= 0 && iLock > iBegin && iStmt > iBegin,
+  'both SET LOCALs occur AFTER begin; (outside a transaction they would be a silent no-op)');
+
+// 21.6 — both precede every statement that can take a lock, §1's introspection included:
+// a catalog read takes ACCESS SHARE and can itself queue behind someone else's exclusive lock.
+const iWork = Math.min(...[
+  /^do \$/m, /^\s*alter\s+table\b/im, /^\s*create\s+table\b/im, /^\s*create\s+index\b/im,
+  /^\s*update\s+/im, /^\s*insert\s+into\b/im, /^\s*delete\s+from\b/im, /^\s*select\b/im,
+].map((re) => { const i = code.search(re); return i < 0 ? Infinity : i; }));
+ok(Number.isFinite(iWork) && iLock < iWork && iStmt < iWork,
+  'both SET LOCALs precede the first lock-taking statement (introspection included)');
+
+// 21.7 — nothing later clears or re-assigns them. A RESET or a second assignment mid-migration
+// would silently return the rest of the transaction to unbounded waiting.
+// Enumerate every assignment and check its VALUE, rather than negating with a lookahead:
+// `=\s*(?!'5s')` backtracks \s* to zero width and then matches the space, so the negative
+// form passes vacuously on the correct file. Found by this assertion failing on a correct
+// migration - a false positive in the test, not a defect in the SQL.
+const assigns = [...code.matchAll(/\bset\s+local\s+(lock_timeout|statement_timeout)\s*=\s*('[^']*')/gi)]
+  .map((m) => [m[1].toLowerCase(), m[2]]);
+ok(!/\breset\s+(all|lock_timeout|statement_timeout)\b/i.test(code)
+   && !/\bset\s+local\s+(lock_timeout|statement_timeout)\s+to\s+default\b/i.test(code)
+   && assigns.length === 2
+   && assigns.every(([g, v]) => (g === 'lock_timeout' && v === "'5s'")
+                             || (g === 'statement_timeout' && v === "'15min'")),
+  'neither GUC is RESET, set TO DEFAULT, or re-assigned to any other value later');
+
+// 21.8 — "immediately after begin;": the two declarations are the FIRST two statements of the
+// transaction, in that order, with nothing executable between them and begin;.
+const afterBegin = code.slice(iBegin).replace(/^begin;/, '');
+const firstStmts = afterBegin.split(';').map((x) => x.trim()).filter((x) => x.length);
+ok(/^set\s+local\s+lock_timeout\s*=\s*'5s'$/i.test(firstStmts[0] || '')
+   && /^set\s+local\s+statement_timeout\s*=\s*'15min'$/i.test(firstStmts[1] || ''),
+  'the two declarations are the first two statements after begin;, lock_timeout first');
+
 process.exit(fails ? 1 : 0);

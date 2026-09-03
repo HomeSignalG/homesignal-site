@@ -20,6 +20,7 @@ test is unchanged - only the transport is.
 import json
 import os
 import sys
+import time
 import traceback
 
 import psycopg2
@@ -144,6 +145,43 @@ def apply_script(path_or_text, is_path=True, inject_failure=None):
         return False, f"{type(e).__name__}: {e}"
     finally:
         c.close()
+
+
+def apply_script_ex(path_or_text, is_path=True, inject_failure=None, conn=None):
+    """Like apply_script(), but additionally returns the real SQLSTATE and the wall clock,
+    and can run on a CALLER-SUPPLIED connection so transaction-locality can be observed on
+    the SAME session afterwards.
+
+    The SQLSTATE is psycopg2's .pgcode, read off the exception object - not parsed out of a
+    message string, which could not reliably distinguish 55P03 (lock_not_available) from
+    57014 (query_canceled). Additive: apply_script() is untouched and still serves every
+    earlier assertion.
+    """
+    text = open(path_or_text, encoding="utf-8").read() if is_path else path_or_text
+    if inject_failure:
+        text = text.replace("\ncommit;", "\n" + inject_failure + "\ncommit;")
+    own = conn is None
+    c = new_conn(autocommit=True) if own else conn
+    t0 = time.monotonic()
+    try:
+        with c.cursor() as cur:
+            cur.execute(text)
+        return True, "", None, time.monotonic() - t0
+    except Exception as e:
+        el = time.monotonic() - t0
+        code = getattr(e, "pgcode", None)
+        if not own:
+            # The script's explicit BEGIN left an ABORTED transaction; ROLLBACK is the
+            # legitimate end of it, and is itself the event SET LOCAL must not survive.
+            # It must be sent as SQL: under autocommit psycopg2 believes it opened no
+            # transaction, so connection.rollback() is inert and the session stays wedged
+            # in InFailedSqlTransaction. (Found by this test crashing, not by reasoning.)
+            with c.cursor() as _rb:
+                _rb.execute("rollback;")
+        return False, f"{type(e).__name__}: {e}", code, el
+    finally:
+        if own:
+            c.close()
 
 
 def reset(apply_migration=True, pre_geom=None, pre_assoc=None, legacy=False):
@@ -1270,6 +1308,135 @@ check(102, "duplicate PROVEN derivation aborts on the B2 guard, before any attri
 
 
 # =============================================================================
+group("TIMEOUT POLICY")
+# =============================================================================
+# E1-E4. The migration declares, immediately after begin;:
+#     set local lock_timeout      = '5s';
+#     set local statement_timeout = '15min';
+# The static suite proves those lines exist and are placed correctly. Placement is not
+# behaviour, so everything below is measured on a real server: the values IN FORCE inside the
+# real transaction, the fact that they do not survive it, and - the load-bearing one - that a
+# genuine competing lock makes the migration ABORT rather than queue while readers pile up
+# behind its pending ACCESS EXCLUSIVE request.
+
+# ---- E1: the values actually in force inside the real migration transaction --------------
+# Injected as the LAST statement before commit;, so it reports what held for the whole
+# transaction, and read with current_setting() rather than assumed from the file text.
+reset(apply_migration=False, legacy=True)
+_probe = ("do $timeout_probe$ begin raise exception "
+          "'TIMEOUT PROBE lock_timeout=[%] statement_timeout=[%]', "
+          "current_setting('lock_timeout'), current_setting('statement_timeout'); "
+          "end $timeout_probe$;")
+e1_ok, e1_err, e1_code, _ = apply_script_ex(MIGRATION, inject_failure=_probe)
+check(106, "E1 lock_timeout is '5s' IN FORCE inside the real migration transaction",
+      (not e1_ok) and "lock_timeout=[5s]" in e1_err, e1_err[:200])
+check(107, "E1 statement_timeout is '15min' IN FORCE inside the real migration transaction",
+      (not e1_ok) and "statement_timeout=[15min]" in e1_err, e1_err[:200])
+
+# ---- E2: transaction-locality, PROVEN on the same connection, not assumed from the docs ---
+# The session is first pinned to distinctive values that are neither the default nor the
+# migration's. If SET LOCAL leaked, the read-back would show 5s/15min; if the test merely
+# compared against 0/0 it could not tell a leak from a reset. Proven across BOTH exits.
+reset(apply_migration=False, legacy=True)
+_c = new_conn(autocommit=True)
+with _c.cursor() as _cur:
+    _cur.execute("set lock_timeout='7s'; set statement_timeout='77s';")
+
+
+def _gucs(conn):
+    with conn.cursor() as cur:
+        cur.execute("select current_setting('lock_timeout'), current_setting('statement_timeout');")
+        return cur.fetchone()
+
+
+_before = _gucs(_c)
+e2_commit_ok, e2_commit_err, _, _ = apply_script_ex(MIGRATION, conn=_c)
+_after_commit = _gucs(_c)
+check(108, "E2 after the migration COMMITS, the same session is back to its own values "
+           "(SET LOCAL did not leak)",
+      e2_commit_ok and _before == ("7s", "77s") and _after_commit == ("7s", "77s"),
+      {"before": _before, "after_commit": _after_commit, "err": e2_commit_err[:160]})
+
+reset(apply_migration=False, legacy=True)
+with _c.cursor() as _cur:
+    _cur.execute("set lock_timeout='7s'; set statement_timeout='77s';")
+e2_roll_ok, _e2r, _, _ = apply_script_ex(
+    MIGRATION, inject_failure="do $abort$ begin raise exception 'E2 ROLLBACK PATH'; end $abort$;",
+    conn=_c)
+_after_rollback = _gucs(_c)
+check(109, "E2 after the migration ROLLS BACK, the same session is back to its own values",
+      (not e2_roll_ok) and _after_rollback == ("7s", "77s"), {"after_rollback": _after_rollback})
+_c.close()
+
+# ---- E3: LOAD-BEARING. A real competing lock, two real concurrent connections -------------
+# Connection A takes ROW EXCLUSIVE on geo.n5_geom - exactly what an ordinary N5 writer's
+# UPDATE holds. It does not conflict with the ACCESS SHARE that §1/§2b/§3 take, so the
+# migration runs its introspection and gates normally and then blocks where production would:
+# §2's ALTER TABLE ... ADD COLUMN, which needs ACCESS EXCLUSIVE.
+reset(apply_migration=False, legacy=True)
+_pre = {
+    "geom": q1("select count(*) from geo.n5_geom;"),
+    "rej": q1("select count(*) from geo.n5_point_reject;"),
+    "pk": q1("""select pg_get_constraintdef(c.oid) from pg_constraint c
+                 where c.conrelid='geo.n5_point_reject'::regclass and c.contype='p';"""),
+}
+_A = new_conn(autocommit=False)
+with _A.cursor() as _ca:
+    _ca.execute("lock table geo.n5_geom in row exclusive mode;")     # held, NOT committed
+e3_ok, e3_err, e3_code, e3_elapsed = apply_script_ex(MIGRATION)      # connection B
+
+check(110, "E3 the migration does NOT wait indefinitely behind a competing lock - it returns",
+      (not e3_ok) and e3_elapsed < 60, {"elapsed_s": round(e3_elapsed, 2), "ok": e3_ok})
+check(111, "E3 it fails with SQLSTATE 55P03 (lock_not_available), read off the exception",
+      e3_code == "55P03", {"pgcode": e3_code, "err": e3_err[:200]})
+# Lower bound proves the 5s guard actually elapsed rather than something else failing fast;
+# upper bound is CI scheduling tolerance only. A window this tight cannot be satisfied by a
+# 0s (instant) failure nor by an unbounded wait.
+check(112, "E3 elapsed is consistent with the configured 5s lock_timeout (4.5s..20s)",
+      4.5 <= e3_elapsed <= 20.0, {"elapsed_s": round(e3_elapsed, 3)})
+check(113, "E3 nothing partially committed: verdict_snapshot_id is still ABSENT",
+      q1("""select not exists (select 1 from information_schema.columns
+              where table_schema='geo' and table_name='n5_geom'
+                and column_name='verdict_snapshot_id');"""))
+_post_pk = q1("""select pg_get_constraintdef(c.oid) from pg_constraint c
+                  where c.conrelid='geo.n5_point_reject'::regclass and c.contype='p';""")
+check(114, "E3 the production-faithful pre-state is intact: legacy reject PK "
+           "(source_key, reason) and both row counts unchanged",
+      _post_pk == _pre["pk"] and _post_pk == "PRIMARY KEY (source_key, reason)"
+      and q1("select count(*) from geo.n5_geom;") == _pre["geom"]
+      and q1("select count(*) from geo.n5_point_reject;") == _pre["rej"],
+      {"pk": _post_pk, "pre": _pre})
+check(115, "E3 no archive transition and no lifecycle object created inside the failed "
+           "transaction survives it",
+      q1("""select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+             where n.nspname='geo' and c.relname in ('n5_point_reject_archive',
+                   'n5_proven_verdict','n5_verdict_manifest','n5_association_stage');""") == 0)
+_A.rollback()                                                        # release A
+_A.close()
+
+# ---- E4: statement_timeout mechanism, on a deliberately short scratch value ---------------
+# Mechanism test only - the real migration is never made to wait 15 minutes.
+_c4 = new_conn(autocommit=False)
+try:
+    with _c4.cursor() as _cur:
+        _cur.execute("set local statement_timeout='100ms';")
+        _cur.execute("select pg_sleep(1);")
+    e4_code, e4_ok = None, True
+except Exception as _e4:
+    e4_code, e4_ok = getattr(_e4, "pgcode", None), False
+    _c4.rollback()
+check(116, "E4 statement_timeout cancels an over-budget statement with SQLSTATE 57014",
+      (not e4_ok) and e4_code == "57014", {"pgcode": e4_code})
+with _c4.cursor() as _cur:
+    _cur.execute("select current_setting('statement_timeout');")
+    _e4_after = _cur.fetchone()[0]
+_c4.commit()
+check(117, "E4 the scratch SET LOCAL is not retained by the session after that transaction",
+      _e4_after != "100ms", {"after": _e4_after})
+_c4.close()
+
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 print("")
@@ -1281,7 +1448,7 @@ for g, num, name, ok, _d in RESULTS:
 for g in ("MIGRATION", "GLOBAL VERDICT", "PUBLICATION", "SWEEP", "SWEEP FAILURE",
           "GEOMETRY EQUALITY", "REJECT EQUALITY", "RECOVERY CACHE", "ASSOCIATIONS",
           "PRODUCTION PRE-STATE", "PRE-STATE NEGATIVE CONTROLS",
-          "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION"):
+          "B1 DEFINITION VALIDATION", "B2 UNIQUE DERIVATION", "TIMEOUT POLICY"):
     if g in groups:
         p, f = groups[g]
         print(f"{g:<22} PASS {p:>3}   FAIL {f:>3}")
