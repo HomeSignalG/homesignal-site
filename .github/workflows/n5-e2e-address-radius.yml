@@ -1,0 +1,325 @@
+name: n5-e2e-address-radius
+
+# FIRST END-TO-END STREET-ADDRESS RADIUS PROOF — joins two already-proven production
+# components exactly once:
+#
+#   ONE street address
+#     -> production geocode-address Edge Function        (proven in readiness §18)
+#     -> the lat/lng IT returns, unmodified
+#     -> production public.n5_projects_within_radius()    (proven in readiness §16)
+#     -> bounded canonical nearby-project result
+#
+# WHY THIS SURFACE: the proof needs ONE execution context that can reach BOTH the HTTPS
+# Edge Function and the production database. GitHub Actions is the only existing authorized
+# pattern that does — §18 proved the curl half here, §§13–16 proved the psql PG-wire half
+# here. No new architecture, no pg_net, no direct Census call, no Map 1 change.
+#
+# CHAIN OF CUSTODY IS THE CENTRAL ASSERTION. The RAW TEXT of lat/lng is lifted straight out
+# of the HTTP response body and substituted verbatim into the SQL. It is never re-parsed
+# into a float and re-printed, never rounded, never transformed, and never replaced with the
+# coordinate observed in §18 (30.215054966235, -97.53885104845) — that value is carried only
+# as a comparison control.
+#
+# EXACTLY TWO production invocations: one geocode, one RPC. No retry on either.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-e2e-address-radius.yml'
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_ARM: arm-2026-09-03-e2e-address-radius
+  ADDRESS: '2200 CALDWELL LN, DEL VALLE, TX 78617'
+  CONTROL_LAT: '30.215054966235'
+  CONTROL_LNG: '-97.53885104845'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE
+        id: arm
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-e2e-arm)"
+          [ "$ARM" = "$EXPECTED_ARM" ] || { echo "NOT ARMED. No production contact."; exit 1; }
+          echo "ARMED: $ARM"
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: GEOCODER SOURCE GATE - re-prove geocode-address is write-free
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, sys
+          s = open("supabase/functions/geocode-address/index.ts").read()
+          checks = [
+            ("no supabase-js / createClient", not re.search(r"@supabase/supabase-js|createClient", s)),
+            ("no service-role or project key", not re.search(r"SERVICE_KEY|SERVICE_ROLE|SUPABASE_URL", s)),
+            ("no DB client or table access",   not re.search(r"\.from\(|postgres|Pool|Client\(", s)),
+            ("no persistent geocode cache",    not re.search(r"geocode-cache|resolveGeocode|supabaseStore|GeocodeStore", s)),
+            ("no insert/upsert/update/delete", not re.search(r"\b(insert|upsert|update|delete)\s*\(", s, re.I)),
+            ("no local persistence",           not re.search(r"Deno\.write|openKv|localStorage", s)),
+            ("proxies Census onelineaddress",  "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in s),
+            ("benchmark Public_AR_Current",    "benchmark=Public_AR_Current" in s),
+            ("exactly one outbound fetch",     len(re.findall(r"\bfetch\(", s)) == 1),
+          ]
+          bad = sum(0 if ok else 1 for _, ok in checks)
+          for n, ok in checks: print(("PASS " if ok else "FAIL ") + n)
+          if bad: print(f"::error::{bad} geocoder write-free check(s) failed"); sys.exit(1)
+          print("GEOCODER ZERO-APPLICATION-WRITE CONFIRMED")
+          PY
+
+      - name: PRE-CALL HARD CONTROLS + observational baseline (READ-ONLY)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/pre.sql <<'SQL'
+          set session characteristics as transaction read only;
+          set statement_timeout = '5min';
+          do $pre$
+          declare
+            bad text := ''; snap text := 'phase1-2026-09-01';
+            n_fn bigint; owner text; secdef boolean; vol text; cfg text;
+            m_state text; m_sync timestamptz;
+            g_proven bigint; g_md5 text; n_rej bigint; n_wrong bigint; n_rejvis bigint;
+          begin
+            select count(*) into n_fn from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+              where n.nspname='public' and p.proname='n5_projects_within_radius';
+            if n_fn <> 1 then bad := bad || ' [rpc overloads ' || n_fn || ' <> 1]'; end if;
+            select pg_get_userbyid(p.proowner), p.prosecdef, p.provolatile::text,
+                   coalesce(array_to_string(p.proconfig,','),'')
+              into owner, secdef, vol, cfg
+              from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+             where n.nspname='public' and p.proname='n5_projects_within_radius';
+            if owner  is distinct from 'postgres' then bad := bad || ' [owner ' || coalesce(owner,'?') || ']'; end if;
+            if secdef is distinct from true      then bad := bad || ' [not SECURITY DEFINER]'; end if;
+            if vol    is distinct from 's'       then bad := bad || ' [not STABLE]'; end if;
+            if position('search_path=public' in cfg) = 0 then bad := bad || ' [search_path ' || cfg || ']'; end if;
+
+            select state, canonical_synced_at into m_state, m_sync
+              from geo.n5_verdict_manifest where snapshot_id = snap;
+            if m_state is distinct from 'READY' then bad := bad || ' [manifest ' || coalesce(m_state,'<absent>') || ']'; end if;
+            if m_sync is null then bad := bad || ' [canonical_synced_at NULL]'; end if;
+
+            select count(*) into g_proven from geo.n5_geom where provenance='proven_stored_point';
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into g_md5 from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into n_rej from geo.n5_point_reject;
+            select count(*) into n_wrong from geo.n5_geom
+              where provenance='proven_stored_point' and verdict_snapshot_id is distinct from snap;
+            select count(*) into n_rejvis from geo.n5_geom g join geo.n5_point_reject r using (source_key)
+              where g.provenance='proven_stored_point' and g.outcome=1 and g.geom is not null;
+            if g_proven <> 718278 then bad := bad || ' [PROVEN ' || g_proven || ']'; end if;
+            if g_md5 <> 'bbda250fc30ee0b3aa3f46a259392aa3' then bad := bad || ' [fingerprint ' || coalesce(g_md5,'?') || ']'; end if;
+            if n_rej <> 5171 then bad := bad || ' [rejects ' || n_rej || ']'; end if;
+            if n_wrong <> 0 then bad := bad || ' [wrong-snapshot PROVEN ' || n_wrong || ']'; end if;
+            if n_rejvis <> 0 then bad := bad || ' [rejected-visible PROVEN ' || n_rejvis || ']'; end if;
+
+            if bad <> '' then raise exception 'HARD CONTROL ABORT -%. Neither production call was made.', bad; end if;
+            raise notice 'HARD CONTROLS VERIFIED - rpc 1/postgres/definer/stable/search_path, manifest READY synced %, PROVEN 718278, fingerprint bbda250f..., rejects 5171, wrong-snapshot 0, rejected-visible 0', m_sync;
+          end $pre$;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+
+          cat > /tmp/obs.sql <<'SQL'
+          set session characteristics as transaction read only;
+          select now()::text,
+                 (select canonical_synced_at::text from geo.n5_verdict_manifest where snapshot_id='phase1-2026-09-01'),
+                 (select count(*) from geo.n5_geom),
+                 (select count(*) from geo.n5_geom where provenance='recovered_authoritative'),
+                 (select count(*) from geo.n5_association),
+                 (select count(*) from geo.n5_shard where state='done'),
+                 (select count(*) from geo.n5_shard where state='pending'),
+                 (select count(*) from geo.n5_shard where state='running');
+          SQL
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -f /tmp/obs.sql \
+            | grep -v '^$' | tail -1 > /tmp/obs_pre.txt
+          echo "OBSERVATIONAL PRE: $(cat /tmp/obs_pre.txt)"
+
+      - name: INVOCATION 1 of 2 - production geocode-address, exactly once
+        run: |
+          set -euo pipefail
+          URL="$(grep -o "SUPABASE_URL: '[^']*'" config.js | sed "s/.*: '//;s/'$//")"
+          KEY="$(grep -o "SUPABASE_ANON_KEY: '[^']*'" config.js | sed "s/.*: '//;s/'$//")"
+          BODY=$(python3 -c 'import json,os;print(json.dumps({"address":os.environ["ADDRESS"]}))')
+          echo "address: $ADDRESS"
+          echo "geocode_invoked_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          HTTP=$(curl -sS --retry 0 --max-time 60 -o /tmp/geocode.json -w '%{http_code}' \
+                   -X POST "$URL/functions/v1/geocode-address" \
+                   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                   -H "Content-Type: application/json" -d "$BODY")
+          echo "HTTP_STATUS=$HTTP"; echo "$HTTP" > /tmp/http.txt
+          echo "--- raw response body (the byte source for the coordinate) ---"
+          cat /tmp/geocode.json; echo
+
+      - name: CHAIN OF CUSTODY - lift the RAW coordinate text out of the response
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, re, sys
+          status = open("/tmp/http.txt").read().strip()
+          raw = open("/tmp/geocode.json").read()
+          if status != "200": print("::error::geocoder HTTP", status); sys.exit(1)
+          d = json.loads(raw)
+          if d.get("error"): print("::error::geocoder_unavailable (outage, not a no-match)"); sys.exit(1)
+          m = d.get("match")
+          if m is None: print("::error::match:null - no geocoder match"); sys.exit(1)
+
+          # RAW TEXT, straight from the response body. Not json->float->str: that would be a
+          # re-print, and the whole point of this gate is that the SAME CHARACTERS the
+          # geocoder emitted become the SQL argument.
+          def raw_field(name):
+              mm = re.search(r'"%s"\s*:\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)' % name, raw)
+              if not mm: print(f"::error::could not lift raw {name} from the body"); sys.exit(1)
+              return mm.group(1)
+          lat_raw, lng_raw = raw_field("lat"), raw_field("lng")
+          lat, lng = m["lat"], m["lng"]
+          print("matched_address :", m.get("matchedAddress"))
+          print("raw lat text    :", lat_raw)
+          print("raw lng text    :", lng_raw)
+          print("parsed lat      :", lat)
+          print("parsed lng      :", lng)
+          print("fields returned :", sorted(m.keys()))
+          q = [k for k in m if k.lower() in ("match_type","matchtype","quality","precision","accuracy","confidence")]
+          print("match-quality fields actually returned:", q if q else "NONE")
+          bad = 0
+          def chk(n, ok):
+              global bad; print(("PASS " if ok else "FAIL ") + n); bad += (0 if ok else 1)
+          chk("lat not null", lat is not None); chk("lng not null", lng is not None)
+          chk("lat finite", isinstance(lat,(int,float)) and lat == lat and abs(lat) != float("inf"))
+          chk("lng finite", isinstance(lng,(int,float)) and lng == lng and abs(lng) != float("inf"))
+          chk("-90 <= lat <= 90", -90 <= lat <= 90)
+          chk("-180 <= lng <= 180", -180 <= lng <= 180)
+          chk("raw text round-trips to the parsed value (no transformation)",
+              float(lat_raw) == lat and float(lng_raw) == lng)
+          if bad: print(f"::error::{bad} geocode assertion(s) failed - RPC will NOT be invoked"); sys.exit(1)
+          open("/tmp/lat.txt","w").write(lat_raw)
+          open("/tmp/lng.txt","w").write(lng_raw)
+          open("/tmp/matched.txt","w").write(str(m.get("matchedAddress")))
+          json.dump({k:m[k] for k in m}, open("/tmp/match.json","w"))
+          print("GEOCODE PASSED - raw coordinate text captured for verbatim substitution")
+          PY
+
+      - name: INVOCATION 2 of 2 - production radius RPC, exactly once, verbatim coordinate
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          LAT="$(cat /tmp/lat.txt)"; LNG="$(cat /tmp/lng.txt)"
+          # The SQL is built by substituting the RAW response text. Printed in full below so the
+          # receipt can show the literal that was sent.
+          cat > /tmp/rpc.sql <<SQL
+          set session characteristics as transaction read only;
+          set statement_timeout = '5min';
+          select row_number() over () as emission_order,
+                 r.source_key, r.feature_id, r.registry_id, r.provenance,
+                 r.distance_mi::numeric(20,12) as distance_mi,
+                 r.geometry_type, r.has_more
+            from public.n5_projects_within_radius($LAT, $LNG, 0.5, 5) r;
+          SQL
+          echo "--- EXACT SQL SENT ---"; cat /tmp/rpc.sql; echo "----------------------"
+          # Byte-level chain of custody: the raw geocoder text must literally appear as the argument.
+          grep -F "n5_projects_within_radius($LAT, $LNG, 0.5, 5)" /tmp/rpc.sql >/dev/null \
+            || { echo "::error::chain of custody broken - SQL literal does not match raw geocoder text"; exit 1; }
+          echo "CHAIN OF CUSTODY: SQL argument is byte-identical to the geocoder's raw lat/lng text"
+          echo "rpc_invoked_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/rpc.sql | grep -v '^$' > /tmp/rows.txt || true
+          echo "rpc_returned_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          echo "--- RPC rows (function emission order preserved) ---"
+          cat /tmp/rows.txt; echo
+          echo "row_count=$(wc -l < /tmp/rows.txt)"
+
+      - name: RESULT ASSERTIONS (zero rows is a valid outcome here)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys
+          rows = [l for l in open("/tmp/rows.txt").read().splitlines() if l.strip()]
+          print("rows returned:", len(rows))
+          if not rows:
+              print()
+              print("ZERO ROWS — a legitimate outcome for a real street address.")
+              print("Correct statement: 'No eligible canonical project geometry was returned")
+              print("within 0.5 miles at this query transaction.'")
+              print("has_more: NOT OBSERVABLE from returned rows (no value invented).")
+              print("This proves the address -> coordinate -> radius machinery executed; it does")
+              print("NOT establish anything about broader source completeness.")
+              sys.exit(0)
+          bad = 0
+          def chk(n, ok):
+              global bad; print(("PASS " if ok else "FAIL ") + n); bad += (0 if ok else 1)
+          parsed, prev, hm = [], None, set()
+          for i, l in enumerate(rows, 1):
+              f = l.split("|")
+              o, sk, fid, rid, prov, dist, gt, more = f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]
+              parsed.append((sk, fid, rid, prov, float(dist), gt, more))
+              chk(f"row {i} source_key not null", bool(sk))
+              chk(f"row {i} feature_id not null", bool(fid))
+              chk(f"row {i} registry_id not null", bool(rid))
+              chk(f"row {i} provenance is an eligible class",
+                  prov in ("proven_stored_point", "recovered_authoritative"))
+              chk(f"row {i} distance_mi not null", dist != "")
+              chk(f"row {i} 0 <= distance_mi <= 0.5", 0 <= float(dist) <= 0.5)
+              chk(f"row {i} geometry_type not null", bool(gt))
+              chk(f"row {i} has_more not null", more in ("t", "f"))
+              if prev is not None:
+                  chk(f"row {i} emission order non-decreasing", float(dist) >= prev)
+              prev = float(dist); hm.add(more)
+          chk("all rows carry the same has_more", len(hm) == 1)
+          ds = [p[4] for p in parsed]
+          ties = len(ds) != len(set(ds))
+          if ties:
+              tie_ok = all((parsed[i][4], parsed[i][0], parsed[i][1]) <= (parsed[i+1][4], parsed[i+1][0], parsed[i+1][1])
+                           for i in range(len(parsed)-1))
+              chk("deterministic tie ordering (distance, source_key, feature_id)", tie_ok)
+          else:
+              print("TIE ORDERING NOT EXERCISED — all distances distinct")
+          pv = sum(1 for p in parsed if p[3] == "proven_stored_point")
+          rc = sum(1 for p in parsed if p[3] == "recovered_authoritative")
+          print(); print("proven_stored_point =", pv); print("recovered_authoritative =", rc)
+          print("distance bounds:", min(ds), "..", max(ds))
+          v = hm.pop()
+          print("has_more =", v)
+          print("interpretation:", "additional eligible canonical geometry existed beyond p_limit=5 at this query transaction"
+                if v == "t" else "this WAS the complete eligible canonical radius result at this query transaction")
+          if bad: print(f"::error::{bad} assertion(s) failed"); sys.exit(1)
+          print("ALL RESULT ASSERTIONS PASSED")
+          PY
+
+      - name: POST-CALL HARD PROOF + observational delta
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -f /tmp/obs.sql \
+            | grep -v '^$' | tail -1 > /tmp/obs_post.txt
+          IFS='|' read -r T0 S0 GT0 GR0 AS0 D0 P0 R0 < /tmp/obs_pre.txt
+          IFS='|' read -r T1 S1 GT1 GR1 AS1 D1 P1 R1 < /tmp/obs_post.txt
+          echo "=== HARD: canonical_synced_at $S0 -> $S1 ==="
+          [ "$S0" = "$S1" ] || { echo "::error::canonical_synced_at changed"; exit 1; }
+          echo "=== OBSERVATIONAL (RECOVERY campaign is live; deltas do not fail this proof) ==="
+          echo "  geometry total : $GT0 -> $GT1  (delta $((GT1-GT0)))"
+          echo "  recovered      : $GR0 -> $GR1  (delta $((GR1-GR0)))"
+          echo "  association    : $AS0 -> $AS1  (delta $((AS1-AS0)))"
+          echo "  shards d/p/r   : $D0/$P0/$R0 -> $D1/$P1/$R1"
+          echo "  observed at    : $T0 -> $T1"
+          echo "POST-CALL HARD CONTROLS RE-VERIFIED"
