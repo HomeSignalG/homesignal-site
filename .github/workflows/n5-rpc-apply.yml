@@ -134,19 +134,52 @@ jobs:
           declare
             bad text := ''; snap text := 'phase1-2026-09-01'; db text;
             n_fn bigint; m_state text; m_sync timestamptz;
+            p_args text; p_res text; p_owner text; p_secdef boolean; p_vol char(1);
+            p_cfg text; p_md5 text; p_pub boolean; p_anon boolean; p_auth boolean;
+            n_wrongsnap bigint; n_rejvis bigint;
             g_total bigint; g_proven bigint; g_recov bigint; g_md5 text; n_rej bigint;
             n_lock bigint; lock_detail text;
           begin
             select current_database() into db;
             if db <> 'postgres' then bad := bad || ' [unexpected database ' || db || ']'; end if;
 
-            -- The function must be ABSENT. Any signature counts: an overload would make the
-            -- callable surface ambiguous, so this is not narrowed to the reviewed signature.
+            -- REVISION 3 REPLACES REVISION 2, so the predecessor must be PRESENT and must be
+            -- exactly the reviewed revision 2. The previous version of this gate demanded the
+            -- function be ABSENT, which was correct for the first install and is wrong now.
+            -- Anything other than the known predecessor means production is not in the state
+            -- this unit was authorized against, and the DROP must not happen.
             select count(*) into n_fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'public' and p.proname = 'n5_projects_within_radius';
-            if n_fn <> 0 then
-              bad := bad || ' [n5_projects_within_radius ALREADY EXISTS (' || n_fn
-                         || ' overload(s)) - NOT replacing it]'; end if;
+            if n_fn <> 1 then
+              bad := bad || ' [expected exactly 1 predecessor overload, found ' || n_fn || ']';
+            else
+              select pg_get_function_identity_arguments(p.oid), pg_get_function_result(p.oid),
+                     pg_get_userbyid(p.proowner), p.prosecdef, p.provolatile,
+                     coalesce(array_to_string(p.proconfig, ','), ''), md5(p.prosrc)
+                into p_args, p_res, p_owner, p_secdef, p_vol, p_cfg, p_md5
+                from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where n.nspname = 'public' and p.proname = 'n5_projects_within_radius';
+              if p_args <> 'p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer' then
+                bad := bad || ' [predecessor args ' || p_args || ']'; end if;
+              if p_res <> 'TABLE(source_key text, feature_id text, registry_id text, provenance text, distance_mi double precision, geometry_type text, has_more boolean)' then
+                bad := bad || ' [predecessor is not the 7-column revision 2: ' || p_res || ']'; end if;
+              if p_owner <> 'postgres' then bad := bad || ' [predecessor owner ' || p_owner || ']'; end if;
+              if not p_secdef then bad := bad || ' [predecessor not SECURITY DEFINER]'; end if;
+              if p_vol <> 's' then bad := bad || ' [predecessor volatility ' || p_vol || ']'; end if;
+              if position('search_path=public' in p_cfg) = 0 then
+                bad := bad || ' [predecessor proconfig ' || p_cfg || ']'; end if;
+              -- measured 2026-09-03 at the revision-2 installation and recorded in
+              -- docs/n5-spatial-read-rpc-readiness.md section 14.
+              if p_md5 <> 'e1bb67c604aaaa4e1ab541ee32bc82ea' then
+                bad := bad || ' [predecessor body md5 ' || coalesce(p_md5,'<null>') || ']'; end if;
+              select has_function_privilege('public','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE'),
+                     has_function_privilege('anon','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE'),
+                     has_function_privilege('authenticated','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE')
+                into p_pub, p_anon, p_auth;
+              if p_pub then bad := bad || ' [predecessor: PUBLIC holds EXECUTE]'; end if;
+              if not p_anon then bad := bad || ' [predecessor: anon lacks EXECUTE]'; end if;
+              if not p_auth then bad := bad || ' [predecessor: authenticated lacks EXECUTE]'; end if;
+            end if;
 
             -- ---- HARD controls (founder: unchanged, divergence = STOP) ----
             select state, canonical_synced_at into m_state, m_sync
@@ -162,12 +195,32 @@ jobs:
                        chr(10) order by source_key collate "C", feature_id collate "C"))
               into g_md5 from geo.n5_geom where provenance='proven_stored_point';
             select count(*) into n_rej from geo.n5_point_reject;
-            if g_total  <> 741562 then bad := bad || ' [geometry total ' || g_total || ']'; end if;
+            -- FOUNDER RULING for this unit: total geometry and recovered_authoritative are
+            -- OBSERVATIONAL, not hard. The recovery campaign is live and legitimately grows
+            -- both, so a fixed equality would turn its progress into a false install failure.
+            -- PROVEN is snapshot-frozen and stays HARD, as do the fingerprint and rejects.
+            raise notice 'OBSERVATIONAL pre: geometry total %, recovered_authoritative %', g_total, g_recov;
             if g_proven <> 718278 then bad := bad || ' [proven ' || g_proven || ']'; end if;
-            if g_recov  <> 23284  then bad := bad || ' [recovered ' || g_recov || ']'; end if;
-            if g_md5 <> 'bbda250fc30ee0b3aa3f46a259392aa3' then
+            -- `is distinct from`, not `<>`: string_agg over an empty set returns NULL, and
+            -- `NULL <> 'bbda...'` is NULL, so an IF on it never fires - the fingerprint gate
+            -- would silently PASS on an empty table. The proven-count check would catch that
+            -- case today, but a gate must not depend on another gate to not be NULL-blind.
+            if g_md5 is distinct from 'bbda250fc30ee0b3aa3f46a259392aa3' then
               bad := bad || ' [PROVEN fingerprint ' || coalesce(g_md5,'<null>') || ']'; end if;
             if n_rej <> 5171 then bad := bad || ' [rejects ' || n_rej || ']'; end if;
+
+            -- Required by this unit: no PROVEN geometry may belong to another snapshot, and
+            -- no rejected identity may still carry RPC-visible PROVEN geometry.
+            select count(*) into n_wrongsnap from geo.n5_geom g
+             where g.provenance = 'proven_stored_point'
+               and g.verdict_snapshot_id is distinct from snap;
+            if n_wrongsnap <> 0 then
+              bad := bad || ' [wrong-snapshot PROVEN ' || n_wrongsnap || ']'; end if;
+            select count(*) into n_rejvis from geo.n5_geom g
+             where g.provenance = 'proven_stored_point' and g.outcome = 1 and g.geom is not null
+               and exists (select 1 from geo.n5_point_reject r where r.source_key = g.source_key);
+            if n_rejvis <> 0 then
+              bad := bad || ' [rejected-visible PROVEN ' || n_rejvis || ']'; end if;
 
             -- ---- QUIESCENCE, narrowed BY RULING to an actual conflicting lock ----
             -- Pending shards are explicitly NOT a blocker. A shard writes geo.n5_association
@@ -191,7 +244,7 @@ jobs:
 
             if bad <> '' then
               raise exception 'PRE-STATE ABORT -%. Nothing was installed.', bad; end if;
-            raise notice 'PRE-STATE VERIFIED - RPC absent, manifest READY + synced at %, geometry 741562/718278/23284, fingerprint bbda250f..., rejects 5171, no conflicting exclusive lock',
+            raise notice 'PRE-STATE VERIFIED - revision-2 predecessor present and identical, manifest READY + synced at %, PROVEN 718278, fingerprint bbda250f..., rejects 5171, wrong-snapshot 0, rejected-visible 0, no conflicting exclusive lock',
                          m_sync;
           end $pre$;
           SQL
@@ -215,13 +268,18 @@ jobs:
                  (select count(*) from geo.n5_association),
                  (select count(*) from geo.n5_shard where state='done'),
                  (select count(*) from geo.n5_shard where state='pending'),
-                 (select count(*) from geo.n5_shard where state='running');
+                 (select count(*) from geo.n5_shard where state='running'),
+                 (select count(*) from geo.n5_geom g where g.provenance='proven_stored_point'
+                    and g.verdict_snapshot_id is distinct from 'phase1-2026-09-01'),
+                 (select count(*) from geo.n5_geom g where g.provenance='proven_stored_point'
+                    and g.outcome=1 and g.geom is not null
+                    and exists (select 1 from geo.n5_point_reject r where r.source_key=g.source_key));
           SQL
           psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
                -f /tmp/premetrics.sql | grep -v '^$' | tail -1 > /tmp/pre_metrics.txt
           echo "PRE METRICS: $(cat /tmp/pre_metrics.txt)"
           test -s /tmp/pre_metrics.txt || { echo "ABORT: no pre-metrics"; exit 1; }
-          IFS='|' read -r T0 SYNC ST GT GP GR GM RJ AS SD SP SR < /tmp/pre_metrics.txt
+          IFS='|' read -r T0 SYNC ST GT GP GR GM RJ AS SD SP SR WS RV < /tmp/pre_metrics.txt
           echo "--- observational baseline (NOT asserted, per founder ruling) ---"
           echo "  association       : $AS"
           echo "  shards done       : $SD"
@@ -422,23 +480,25 @@ jobs:
           PGSSLMODE: require
         run: |
           set -euo pipefail
-          IFS='|' read -r T0 SYNC0 ST0 GT0 GP0 GR0 GM0 RJ0 AS0 SD0 SP0 SR0 < /tmp/pre_metrics.txt
+          IFS='|' read -r T0 SYNC0 ST0 GT0 GP0 GR0 GM0 RJ0 AS0 SD0 SP0 SR0 WS0 RV0 < /tmp/pre_metrics.txt
           cp /tmp/premetrics.sql /tmp/postmetrics.sql
           psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
                -f /tmp/postmetrics.sql | grep -v '^$' | tail -1 > /tmp/post_metrics.txt
-          IFS='|' read -r T1 SYNC1 ST1 GT1 GP1 GR1 GM1 RJ1 AS1 SD1 SP1 SR1 < /tmp/post_metrics.txt
+          IFS='|' read -r T1 SYNC1 ST1 GT1 GP1 GR1 GM1 RJ1 AS1 SD1 SP1 SR1 WS1 RV1 < /tmp/post_metrics.txt
           fail=0
           eq() { [ "$2" = "$3" ] || { echo "HARD CONTROL FAILED: $1 = $2, expected $3"; fail=1; }; }
           echo "================ HARD CONTROLS (divergence = STOP) ================"
-          echo "canonical total      : $GT0 -> $GT1";  eq "geometry total" "$GT1" "741562";  eq "geometry total unchanged" "$GT1" "$GT0"
           echo "proven_stored_point  : $GP0 -> $GP1";  eq "proven" "$GP1" "718278";          eq "proven unchanged" "$GP1" "$GP0"
-          echo "recovered_authorit.  : $GR0 -> $GR1";  eq "recovered" "$GR1" "23284";        eq "recovered unchanged" "$GR1" "$GR0"
+          echo "wrong-snapshot PROVEN: $WS0 -> $WS1";  eq "wrong-snapshot PROVEN" "$WS1" "0"
+          echo "rejected-visible PRV : $RV0 -> $RV1";  eq "rejected-visible PROVEN" "$RV1" "0"
           echo "PROVEN fingerprint   : $GM0 -> $GM1";  eq "fingerprint" "$GM1" "bbda250fc30ee0b3aa3f46a259392aa3"; eq "fingerprint unchanged" "$GM1" "$GM0"
           echo "rejects              : $RJ0 -> $RJ1";  eq "rejects" "$RJ1" "5171";           eq "rejects unchanged" "$RJ1" "$RJ0"
           echo "manifest state       : $ST0 -> $ST1";  eq "manifest" "$ST1" "READY";         eq "manifest unchanged" "$ST1" "$ST0"
           echo "canonical_synced_at  : $SYNC0 -> $SYNC1"; eq "canonical_synced_at unchanged" "$SYNC1" "$SYNC0"
           echo
           echo "======== OBSERVATIONAL (founder ruling: reported, never asserted) ========"
+          echo "canonical total      : $GT0 -> $GT1   delta = $((GT1 - GT0))"
+          echo "recovered_authorit.  : $GR0 -> $GR1   delta = $((GR1 - GR0))"
           echo "association          : $AS0 -> $AS1   delta = $((AS1 - AS0))"
           echo "shards done          : $SD0 -> $SD1"
           echo "shards pending       : $SP0 -> $SP1"
