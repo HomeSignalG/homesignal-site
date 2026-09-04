@@ -96,38 +96,72 @@ async function capture(page, draft, proj) {
 
   // The page exposes its drawn markers for exactly this purpose (see homesignalmap.html:
   // "Lets the offline browser proof open a specific marker's real popup instead of
-  // guessing at DOM order"). Wait for the real draw, not a timer.
+  // guessing at DOM order"). WAIT FOR THE DRAW TO SETTLE, not merely to start: a ZIP page
+  // draws, then re-frames and re-draws (zipFitRadius, drawParcels), so the first non-empty
+  // siteMarkers is a partial pass. Reading it there reports a project as missing that the
+  // page simply had not drawn yet — measured on the first live run, which saw 40 markers on
+  // a ZIP whose cached report holds 1,024.
   await page.waitForFunction(
-    () => Array.isArray(window.siteMarkers) && window.siteMarkers.length > 0,
-    { timeout: 45000 },
+    () => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0
+      && Array.isArray(window.siteMarkers) && window.siteMarkers.length > 0,
+    { timeout: 60000 },
   ).catch(() => {});
+  await page.waitForFunction(() => {
+    const n = (window.siteMarkers || []).length;
+    const prev = window.__hsMarkerSettle;
+    window.__hsMarkerSettle = n;
+    return prev === n && n > 0;          // two consecutive polls agree
+  }, { timeout: 60000, polling: 900 }).catch(() => {});
 
   const drew = await page.evaluate(() => (window.siteMarkers || []).length);
   if (!drew) return { ok: false, reason: 'map drew no markers for this ZIP' };
 
-  // Find the marker the page itself drew for THIS project, by coordinate identity.
-  const found = await page.evaluate(([lat, lng, eps]) => {
-    const near = (a, b) => typeof a === 'number' && Math.abs(a - b) < eps;
+  // Find the marker the page drew for THIS project. The join is the SOURCE ID: a cached
+  // site carries source_id (e.g. "carto:phl.carto.com:permits:ZP-2026-008877"), which is
+  // byte-identical to app_projects.source_key — the same string both sides were built from.
+  // Coordinates are the CORROBORATION, not the key, because siteLL() may return a fanned
+  // DISPLAY position (_mLat/_mLng) for co-located points, so a marker's drawn latlng is not
+  // always its record's latlng.
+  const found = await page.evaluate(([sourceKey, lat, lng, eps]) => {
+    const near = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < eps;
     const list = window.siteMarkers || [];
-    let idx = -1;
-    for (let i = 0; i < list.length; i++) {
-      const x = list[i];
-      const ll = x && x.m && typeof x.m.getLatLng === 'function' ? x.m.getLatLng() : null;
-      if (ll && near(ll.lat, lat) && near(ll.lng, lng)) { idx = i; break; }
+    const sites = window.__HS_SITES || [];
+    let idx = list.findIndex((x) => x && x.s && x.s.source_id === sourceKey);
+    let how = 'source_id';
+    if (idx < 0) {                       // fall back to the record's own coordinates
+      idx = list.findIndex((x) => x && x.s && near(x.s.lat, lat) && near(x.s.lng, lng));
+      how = 'coordinates';
     }
-    if (idx < 0) return { found: false, total: list.length };
+    if (idx < 0) {
+      return {
+        found: false, total: list.length, sites: sites.length,
+        inCache: sites.some((s) => s && (s.source_id === sourceKey || (near(s.lat, lat) && near(s.lng, lng)))),
+      };
+    }
     const hit = list[idx];
     const ll = hit.m.getLatLng();
     return {
-      found: true, idx, total: list.length,
+      found: true, idx, how, total: list.length, sites: sites.length,
       label: (hit.s && (hit.s.label || hit.s.title)) || '',
+      site_lat: hit.s.lat, site_lng: hit.s.lng,
       lat: ll.lat, lng: ll.lng,
+      fanned: hit.s._mLat != null,
+      coord_agrees: near(hit.s.lat, lat) && near(hit.s.lng, lng),
       record_url: (hit.s && hit.s.record_url) || null,
     };
-  }, [proj.lat, proj.lng, COORD_EPS]);
+  }, [proj.source_key, proj.lat, proj.lng, COORD_EPS]);
 
   if (!found.found) {
-    return { ok: false, reason: `no drawn marker at the project's coordinates (${drew} markers on the map)` };
+    return {
+      ok: false,
+      reason: `no drawn marker for this project (${found.total} markers drawn, `
+        + `${found.sites} sites in the ZIP report, present in that report: ${found.inCache})`,
+    };
+  }
+  // Whichever way it was found, the record's OWN coordinates must be the project's. A
+  // marker matched by source_id whose coordinates disagree is a different record.
+  if (!found.coord_agrees) {
+    return { ok: false, reason: `matched by ${found.how} but the record's coordinates differ from the project's` };
   }
 
   // Frame on the PROJECT's own coordinates. The map instance is reached through the
@@ -137,7 +171,9 @@ async function capture(page, draft, proj) {
     const hit = (window.siteMarkers || [])[idx];
     const map = hit && hit.m && hit.m._map;
     if (!map) return { ok: false };
-    map.setView(hit.m.getLatLng(), zoom, { animate: false });
+    // Centre on the RECORD's own coordinates. A fanned display position is a pixel nudge
+    // for legibility; the project's real location is what the image must be about.
+    map.setView([hit.s.lat, hit.s.lng], zoom, { animate: false });
     hit.m.openPopup();
     // Selection halo, screen-pixel sized so it is constant at every zoom and can never
     // read as a distance. Injected into this throwaway DOM only.
@@ -184,7 +220,8 @@ async function capture(page, draft, proj) {
 
   return {
     ok: true, file,
-    marker: { label: found.label, lat: found.lat, lng: found.lng, of: found.total },
+    marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
+      of: found.total, how: found.how, fanned: found.fanned },
     framed: { zoom: framed.zoom, center: framed.center },
     checks: clean,
   };
@@ -268,6 +305,8 @@ async function attach(draft, objectPath, r, proj) {
     marker_lat: r.marker.lat,
     marker_lng: r.marker.lng,
     marker_label: r.marker.label,
+    matched_by: r.marker.how,
+    marker_display_fanned: r.marker.fanned,
     markers_on_map: r.marker.of,
     framed_zoom: r.framed.zoom,
     home_markers: r.checks.homePins,

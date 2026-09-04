@@ -50,15 +50,21 @@ ok(/homePins > 0.*refused|refused: a home marker/.test(GEN_CODE),
   'the ONLY geometry veto is the home marker');
 ok(/vectorPaths/.test(GEN_CODE) && /vector_paths/.test(GEN_CODE),
   'vector paths in frame are recorded into the evidence, not silently ignored');
-ok(/setView\(hit\.m\.getLatLng\(\)/.test(GEN),
-  'the view is centred on the PROJECT marker, never on a ZIP centroid');
+ok(/setView\(\[hit\.s\.lat, hit\.s\.lng\]/.test(GEN),
+  'the view is centred on the RECORD\u2019s own coordinates, never a ZIP centroid or a fanned pixel position');
 ok(/screen-pixel|SCREEN PIXELS/i.test(GEN) && /46px/.test(GEN),
   'the selection halo is sized in screen pixels, so it cannot read as a distance');
 
 // ── the target must be identified, not assumed ───────────────────────────────────────
 ok(/COORD_EPS\s*=\s*1e-5/.test(GEN), 'marker matching is a coordinate identity test');
-ok(/no drawn marker at the project's coordinates/.test(GEN),
+ok(/no drawn marker for this project/.test(GEN),
   'no matching marker is an honest failure, not a fallback image');
+ok(/x\.s\.source_id === sourceKey/.test(GEN),
+  'the marker join is the source id — the same string app_projects.source_key holds');
+ok(/coord_agrees/.test(GEN),
+  'and the record\u2019s own coordinates must still agree with the project\u2019s');
+ok(/__hsMarkerSettle/.test(GEN),
+  'the capture waits for the draw to SETTLE, not merely to start');
 ok(/live coordinates differ from the draft evidence/.test(GEN),
   'the live project row is re-read and must still agree with the draft');
 ok(/record_kind !== 'development'/.test(GEN), 'facilities can never be captured');
