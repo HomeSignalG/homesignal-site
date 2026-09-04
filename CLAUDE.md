@@ -592,19 +592,31 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 - **GitHub Pages**, static. Merging to `main` publishes the site. Data/content
   changes (new communities, alerts) go live via **Supabase / ingest**, not a repo
   push — that's the whole point of §0.
-- ✅ **THE DEPLOYMENT SOURCE IS NOW "GitHub Actions" — switched by the founder and PROVEN IN
-  PRODUCTION 2026-09-04 15:42:39Z** (receipts: `docs/alerts-seo-build-2026-09-04.md`).
-  `merging to main` still publishes the site; it now does so by running `pages.yml`, whose
-  artifact carries **one generated document per canonical ZIP** at `/community/<zip>/`.
-  - **What that means for a normal change:** nothing new to do — push to `main` and the
-    workflow deploys. But a red `pages` build now means **the site does not update**, where
-    before a red workflow was cosmetic. Treat it as a deploy failure.
-  - **`/community/<zip>/` is LIVE.** Measured through `pg_net`: 01034 → HTTP 200, 3,912 bytes,
+- 🛑 **THE DEPLOYMENT SOURCE IS STILL "Deploy from a branch" — measured 2026-09-04 15:58Z,
+  and this is the one thing blocking the Alerts SEO pages** (receipts:
+  `docs/alerts-seo-build-2026-09-04.md` §11, including the retraction of the earlier
+  "it's switched" claim).
+  - **The artifact deploys and serves — for as long as nothing pushes to `main`.**
+    `actions/deploy-pages@v4` succeeds in legacy mode too (a workflow with `pages: write` can
+    create a Pages deployment through the API), so a green `deploy` job is **NOT** evidence of
+    the setting. `/community/<zip>/` was live 15:42:39Z → 15:54:24Z and is **404 again**.
+  - **The discriminator is a FIRING, not a success:** GitHub's dynamic
+    `pages-build-deployment` workflow runs on a push to `main` **only** while the source is a
+    branch. It ran on all three pushes today (runs 896/897/898). While those runs keep
+    appearing, the setting is not in effect.
+  - **Do not "fix" this by re-dispatching `pages.yml`.** That restores the pages only until
+    the next push to `main`, and advertises 7,256 canonical URLs that then 404.
+  `pages.yml` is built, gated and proven; its artifact carries **one generated document per
+  canonical ZIP** at `/community/<zip>/`. Once the source is genuinely switched, a red `pages`
+  build means **the site does not update** — treat it as a deploy failure then.
+  - **What the 12-minute live window proved** (Measured through `pg_net` while the artifact was
+    the active deployment): 01034 → HTTP 200, 3,912 bytes,
     `index, follow`, self-canonical, ZIP-specific title and H1, 6 real local-news items in the
     initial bytes; 01002 → 200, `noindex, follow`, honest empty sections. Production sitemap:
     **7,256 canonical community URLs, 0 legacy, 0 duplicates**, development half untouched at
-    11,701.
-  - **`verify-zip-pages-live.yml`** proves it daily on a runner (162 assertions, read-only).
+    11,701. All of it reproducible the moment the source is switched.
+  - **`verify-zip-pages-live.yml`** re-proves it on a runner (162 assertions, read-only) and
+    runs daily — it will fail while the pages are 404, which is the correct signal.
     It is the deployed twin of the pre-deployment proof inside `pages.yml`; if the two ever
     disagree, the deployment is what changed.
   `.github/workflows/pages.yml` builds the artifact: the whole static site **plus one

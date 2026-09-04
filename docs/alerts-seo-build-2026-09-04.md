@@ -281,12 +281,52 @@ Over the built artifact, served locally, before any deployment exists:
 
 ---
 
-## 11 · DEPLOYED — and the production proof that was withheld until it was
+## 11 · DEPLOYED, PROVEN, THEN SUPERSEDED — the Pages source is still branch-mode
 
-**The founder switched *Settings → Pages → Build and deployment → Source* to "GitHub
-Actions".** That setting is not readable from this session — the egress proxy blocks
-`/repos/{owner}/{repo}/pages` and `/environments` (both HTTP 403, "not permitted through this
-proxy") — so it was verified the only way available, **operationally and then empirically**:
+> 🛑 **RETRACTION, written 15 minutes after the section below (measured 15:58Z).** Two claims
+> in the original table were **wrong**, and they were wrong in the most convincing direction —
+> they inferred a setting from a success instead of measuring the setting's consequence:
+>
+> 1. *"`deploy-pages` cannot succeed while the source is a branch"* — **false.** A workflow
+>    holding `pages: write` + `id-token: write` can create a Pages deployment through the API
+>    in legacy mode too. It deploys, and it serves, until the next branch build replaces it.
+> 2. *"the branch deployment going inactive proves the switch"* — **false.** Whichever
+>    deployment is newest wins and marks the other inactive. It orders them; it does not
+>    identify the configured source.
+>
+> **What actually happened.** The artifact was live from **15:42:39Z to 15:54:24Z (~12
+> minutes)** — every production proof in §11.2–§11.5 was taken inside that window and is a
+> true measurement of a real deployment. Then another session merged
+> [#1015](https://github.com/HomeSignalG/homesignal-site/pull/1015) (Map 1 address+radius) at
+> 15:53:57Z, GitHub's **legacy `pages-build-deployment`** ran on that push and its branch
+> build superseded the artifact; my own #1024 merge did it again at 15:56.
+>
+> **Measured at 15:58Z, via `pg_net`:** `/community/01034/` → **404** · `/community/01002/` →
+> **404** · `sitemap.xml` → **0 canonical community URLs, 11,701 legacy `community.html?zip=`**
+> (the committed file) · legacy page → 200, unchanged.
+>
+> **The discriminator, which is not a success but a firing:** `pages-build-deployment`
+> (`event: dynamic`) ran and succeeded on **every** push to `main` — run 896 @ `f7e448a`
+> 15:40:23Z, run 897 @ `6183585` 15:53:57Z, run 898 @ `18f65dd` 15:56:16Z. **GitHub creates
+> that workflow only while the source is "Deploy from a branch."** With the source set to
+> "GitHub Actions" it does not exist. So the setting is not in effect, whatever the Settings
+> page currently displays.
+>
+> The Pages configuration itself is unreadable from this session — the egress proxy answers
+> **403** to `/repos/{owner}/{repo}/pages` and `/environments` ("not permitted through this
+> proxy") — which is exactly why it had to be inferred, and why inferring it from a green job
+> was the mistake.
+>
+> **Deliberately NOT re-deployed.** Re-dispatching `pages.yml` would restore the pages until
+> the next push to `main` and would advertise 7,256 canonical URLs that then 404. The
+> committed sitemap advertises none of them, so the stable branch state is the honest one to
+> leave. The one action that fixes it is in §10.
+
+### The original table, retained as the dated receipt (rows 5 and 6 are the retracted ones)
+
+**The founder reported switching *Settings → Pages → Build and deployment → Source* to
+"GitHub Actions".** That setting is not readable from this session, so it was inferred from the
+deployment's behaviour — which is the reasoning the retraction above overturns:
 
 | step | receipt |
 |---|---|
@@ -381,7 +421,22 @@ sites load**, the address search box is present, no uncaught errors.
 
 ## 10 · What remains
 
-**Nothing blocking.** The one-time setting is done (§11) and the pages are live and proven.
+### 🛑 THE ONE REMAINING ACTION — and how to tell whether it took
+
+**`homesignal-site` → Settings → Pages → "Build and deployment" → Source must read
+"GitHub Actions".** It currently behaves as **"Deploy from a branch"** (§11 retraction).
+
+**How to confirm it took, without trusting the page or a green job:** push anything to `main`
+and look at the Actions list. If a run named **"pages build and deployment"** appears, the
+source is still a branch. If only **"pages"** runs, the switch is in effect — and
+`/community/<zip>/` will stay live instead of lasting until the next push.
+
+If the setting already displays "GitHub Actions", that is worth reporting to GitHub with these
+three receipts: runs **896** (`f7e448a`, 15:40:23Z), **897** (`6183585`, 15:53:57Z) and **898**
+(`18f65dd`, 15:56:16Z) of `dynamic/pages/pages-build-deployment`, all `success`, all after the
+change was made.
+
+Everything else is done and proven.
 
 One open follow-up, logged not done: `scripts/gen_sitemap.py` still writes the committed
 `sitemap.xml` with the legacy `community.html?zip=` URLs, and the artifact rewrite replaces
