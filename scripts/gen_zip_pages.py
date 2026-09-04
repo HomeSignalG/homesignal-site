@@ -232,6 +232,15 @@ def render(p):
     return (
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
         '<meta charset="UTF-8">\n'
+        # The document lives at /community/<zip>/, two levels deep, while the shared app
+        # resolves several URLs RELATIVELY - shell.js fetches 'partials/shell.html' and
+        # HS.navHref emits bare 'homesignalmap.html?zip='. Without a base those resolve
+        # under /community/<zip>/ and 404, which crashed hydration with
+        # "Cannot read properties of null (reading 'addEventListener')" when the shell
+        # partial came back as a 404 page. One <base> fixes every relative URL at once and
+        # is scoped to the generated documents. The only href="#" in partials/shell.html
+        # carries onclick=...return false, so it never navigates and is unaffected.
+        '<base href="/">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f'<meta name="robots" content="{robots}" id="robots-meta">\n'
         f"<title>{esc(title)}</title>\n"

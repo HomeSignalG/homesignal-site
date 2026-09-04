@@ -141,10 +141,29 @@ can't resolve a case (see §3's "when to stop").
 
 Consequences that are non-negotiable:
 
-- **No per-community HTML files.** The one dynamic page `community.html` serves any
-  community by `?id=`, `?community=<slug>`, or `?zip=`. `box-elder.html` and
-  `eagle-mountain.html` are **legacy launch pages, frozen — do not clone them** for
-  a new community. New communities live only as DB rows.
+- **No per-community HTML files — meaning no per-community SOURCE files.** The one dynamic
+  page `community.html` serves any community by `?id=`, `?community=<slug>`, or `?zip=`.
+  `box-elder.html` and `eagle-mountain.html` are **legacy launch pages, frozen — do not
+  clone them** for a new community. New communities live only as DB rows.
+  - ⚖️ **CLARIFIED 2026-09-04 (founder ruling), so this does not recur.** The prohibition is
+    on **maintaining or committing** hand-made per-community HTML, and on any architecture
+    that needs **engineering work when a ZIP is added**. It does **NOT** prohibit
+    deterministic ZIP-specific HTML **generated automatically during the deployment build
+    and existing only in the GitHub Pages artifact**.
+  - **The invariant, stated positively:** *one shared implementation/template + a
+    data-driven build → ZIP-specific deployment documents.* There must never be 12,722
+    independently maintained source implementations. Adding or removing a canonical ZIP must
+    require **no hand-created HTML file and no per-ZIP engineering**.
+  - **What that looks like in the repo today:** `lib/community-page.js` is the one shared
+    runtime (loaded by the legacy page *and* every generated document);
+    `scripts/gen_zip_pages.py` is the one shared template; `.github/workflows/pages.yml`
+    turns them into one document per canonical ZIP at `/community/<zip>/`, inside the Pages
+    artifact. **Nothing generated is ever committed** — a build gate fails if `community/`
+    becomes tracked. `sitemap.xml` is the older precedent for the same pattern.
+  - ⚠️ **A document existing and a document being indexable are SEPARATE decisions.** Every
+    canonical ZIP gets a document so a canonical URL never 404s and never falls through to a
+    generic shell; `robots` is then set per page from the Alerts substance rule. A ZIP
+    crossing that threshold changes its **robots directive**, never its existence.
 - **No hardcoded community registries as the runtime source.** The DB is the source
   of truth (§1). The in-repo JS registry is a bootstrap/fallback only.
 - **No per-community deploy.** Adding a community must not require a `git push` to
