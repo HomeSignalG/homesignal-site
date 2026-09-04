@@ -106,4 +106,56 @@ L = Layer(maxrec=2000, per_ident_feats=3); st, w = run(L, 100)
 ok(len(w) == 300, "3 features x 100 identities = 300 rows (got %d)" % len(w))
 ok(st["features"] == 300, "features count reports 300 (got %s)" % st["features"])
 
+# ---------------------------------------------------------- feature_id stability
+# (source_key, feature_id) is the ON CONFLICT target, so an id that moves between runs
+# turns a re-fetch into a second copy instead of a no-op. This is the property whose
+# absence cost 467 duplicated keys on shard 722; it is asserted, not assumed.
+
+import re as _re
+_ROW = _re.compile(r"^\('([^']*)','[^']*','([^']*)'")
+
+def ids_from(rows):
+    """Pull the (source_key, feature_id) pairs out of the generated VALUES rows.
+
+    Anchored on the first three quoted fields. A looser split("','") swallowed the WKT
+    into field 3 and still compared equal on both sides - a comparison that passes on
+    garbage is worse than one that fails."""
+    out = []
+    for r in rows:
+        m = _ROW.match(r)
+        assert m, "row does not parse: " + r[:80]
+        out.append((m.group(1), m.group(2)))
+    return out
+
+class MultiLayer(Layer):
+    """Two features per identity with DIFFERENT geometry, served in a different order the
+    second time - a publisher is under no obligation to be consistent about sequence."""
+    def __init__(self, **kw):
+        Layer.__init__(self, **kw); self.flip = False
+    def __call__(self, url, params=None, method="GET", timeout=None):
+        j, why = Layer.__call__(self, url, params, method, timeout)
+        if j and "features" in j:
+            for i, f in enumerate(j["features"]):
+                f["geometry"] = {"x": float(i % 2), "y": 9.0}
+            if self.flip:
+                j["features"] = list(reversed(j["features"]))
+        return j, why
+
+L = MultiLayer(maxrec=2000, per_ident_feats=2); st, w1 = run(L, 40)
+ids1 = sorted(ids_from(w1))
+L2 = MultiLayer(maxrec=2000, per_ident_feats=2); L2.flip = True
+st, w2 = run(L2, 40)
+ids2 = sorted(ids_from(w2))
+ok(ids1 == ids2,
+   "the same features get the same (source_key, feature_id) when the publisher reverses order")
+
+# and the id must NOT depend on how many OTHER keys the run happened to ask for - the
+# exact defect: a global counter made the id a function of the fetch, not the feature.
+L3 = MultiLayer(maxrec=2000, per_ident_feats=2); st, w3 = run(L3, 400)
+ids3 = {p for p in ids_from(w3) if p[0] in {p0[0] for p0 in ids1}}
+ok(ids3 == set(ids1),
+   "a 400-key run assigns the SAME ids to the 40 keys a 40-key run saw")
+ok(all(f.endswith("#0") or f.endswith("#1") for _, f in ids1),
+   "indices are per-identity (#0/#1), not a global counter")
+
 sys.exit(1 if fails else 0)

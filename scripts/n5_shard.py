@@ -398,11 +398,26 @@ def fetch_features(rid, entry, keys, z3):
     # the literal string 'None' into a char(3) column rather than SQL NULL - i.e. a
     # fabricated provenance value that looks like a ZIP3. Emit NULL instead.
     z3sql = lit(z3) if z3 else "null"
-    rows, nfeat = [], 0
+    rows = []
     oversize = {}
+    # FEATURE_ID MUST BE A FUNCTION OF THE FEATURE, NOT OF THE FETCH. It used to be
+    # `<identity>#<global counter>`, so the SAME feature got a different id in a run that
+    # asked for a different set of keys - and (source_key, feature_id) is the conflict
+    # target, so ON CONFLICT DO NOTHING could not see it as already present. Re-fetching an
+    # already-recovered key therefore INSERTED a second copy of its geometry instead of
+    # no-opping. Measured on shard 722 / little-rock-permits after the completeness-marker
+    # re-fetch: 467 keys held rows from both runs, 1,961 old against 1,929 new.
+    #
+    # The id is now `<identity>#<index within THAT identity's features, ordered by the
+    # geometry itself>`. Ordering by geometry rather than by response order is what makes
+    # it stable: a publisher is under no obligation to return one permit's features in the
+    # same sequence twice. Multiplicity is still preserved exactly - a permit that really
+    # does carry 80 features keeps 80 rows, #0..#79. That multiplicity is REAL, not an
+    # artefact: shard 720 ran once, cleanly, and its heaviest key holds 80 rows with 80
+    # distinct feature_ids and ONE distinct geometry, straight from the publisher.
+    prepared = {}
     for sk, ft in feats:
         g = ft.get("geometry") or {}
-        oid = str((ft.get("attributes") or {}).get(ident, "")).strip() + f"#{nfeat}"
         # rings_to_wkt returns a (wkt, reason) PAIR - a malformed publisher ring set is
         # reported rather than raised, so one bad record cannot end the batch. paths_ and
         # POINT return a bare string. Unpacking the pair is not optional: assigning it
@@ -416,25 +431,33 @@ def fetch_features(rid, entry, keys, z3):
             wkt, bad = f"POINT({g['x']} {g['y']})", None
         else:
             wkt, bad = None, "NO_GEOMETRY"
-        nfeat += 1
-        if not wkt:
-            reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{z3sql},"
-                        f"'recovered_authoritative')")
-        else:
-            # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
-            # thousands of characters and must not be re-escaped per quote.
-            row = (f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                   f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
-                   f"'recovered_authoritative')")
-            rows.append(row)
-            # If the server later refuses this row alone as 413, it is written instead as
-            # outcome=3 with the reason - the same quarantine channel a malformed ring set
-            # uses. The record survives; only its geometry is marked unusable.
-            oversize[row] = (
-                f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,"
-                f"{lit('WKT_EXCEEDS_TRANSPORT_LIMIT:' + str(len(wkt)) + ' chars')},"
-                f"{z3sql},'recovered_authoritative')")
+        echoed = str((ft.get("attributes") or {}).get(ident, "")).strip()
+        prepared.setdefault(sk, []).append((echoed, wkt, bad))
+    for sk in sorted(prepared):
+        # Sort key is deterministic and total: geometry-less rows last, then the WKT, then
+        # the reason. Identical geometries tie and take consecutive indices, which is what
+        # keeps the count right without inventing a distinction the publisher did not make.
+        group = sorted(prepared[sk], key=lambda t: (t[1] is None, t[1] or "", t[2] or ""))
+        for idx, (echoed, wkt, bad) in enumerate(group):
+            oid = f"{echoed}#{idx}"
+            if not wkt:
+                reason = bad or "no usable geometry"
+                rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{z3sql},"
+                            f"'recovered_authoritative')")
+            else:
+                # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
+                # thousands of characters and must not be re-escaped per quote.
+                row = (f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
+                       f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
+                       f"'recovered_authoritative')")
+                rows.append(row)
+                # If the server later refuses this row alone as 413, it is written instead
+                # as outcome=3 with the reason - the same quarantine channel a malformed
+                # ring set uses. The record survives; only its geometry is unusable.
+                oversize[row] = (
+                    f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,"
+                    f"{lit('WKT_EXCEEDS_TRANSPORT_LIMIT:' + str(len(wkt)) + ' chars')},"
+                    f"{z3sql},'recovered_authoritative')")
     quarantined = []
 
     def _quarantine(row_sql):
