@@ -479,3 +479,90 @@ read-only), `docs/crawler-ground-truth-2026-09-03.md` (this report).
 minutes, not the ~19 I inferred from the API timestamps. The `--with-deps` apt step was
 nonetheless the slow half; run 2 (`33819317777`) installed in **2m14s** without it and
 completed successfully. No measurement came from the cancelled run.
+
+---
+
+# ADDENDUM — ZIP-geography semantics: acceptance gate certified
+
+Added 2026-09-04 under the mandatory geography contract (**ZIP is an AREA, not a point**).
+Read-only audit of the frozen design in §10–§13 and of the code it would touch. **One real
+defect risk was found and is corrected below; one incidental property is promoted to an
+asserted invariant.** Nothing was implemented.
+
+## The seven acceptance criteria
+
+| # | criterion | verdict | evidence |
+|---|---|---|---|
+| 1 | No address required to render a canonical ZIP page | **PASS** | `community.html` keys on `?zip=`. `homeFor(zip, home)` returns `null` unless a **signed-in** user's own home is in that ZIP, so an anonymous crawler has none. `distanceMi` returns `null` on any missing coordinate and `fmtMi(null)` → `''`. Live proof: all six controls rendered fully with no address and no distance (§5). |
+| 2 | No ZIP centroid or representative point introduced | **PASS** | This unit introduces none. ⚠️ Disclosure: `public.zip_centroids` **already exists** and is read inside `app_refresh_zip` — but only to NULL implausible `app_projects` coordinates (a >100-mile great-circle geocode fence, engine v20). It touches **no** `app_changes` row and **no** Alerts count. The frozen gate must not read `_lat`/`_lng`; see the implementation constraint below. |
+| 3 | No radius calculation determines Alerts eligibility | **PASS — measured, not assumed** | See "The defect risk" below. |
+| 4 | All 12,722 page identities originate from the canonical ZIP registry | **PASS** | `scripts/measure_alerts_seo_readiness.sql` keys off `public.canonical_zip_registry` and re-ran clean: `count(*) = 12722`, `count(distinct zip) = 12722`, duplicates `0`. ZIP 80249 — the removed drift page — is correctly excluded despite still holding 32 `app_changes` rows. |
+| 5 | LN / GN / UM keep their existing approved applicability | **PASS** | Local News and Government Notices: `app_changes.zip`, written by `app_refresh_zip` whose community is resolved by `where zip_codes @> array[_zip]` — **set membership on the ZIP geography**. Upcoming Meetings: `meetings.community_id` walked over the `parent_id` chain. `resolveCommunity` ranks `zip > city > county` by containment, never by proximity. No applicability is recalculated in site code. |
+| 6 | A jurisdiction item applicable to many ZIPs stays on all of them | **PASS** | Fan-out is preserved by design and by recommendation: §12 explicitly declines a uniqueness gate, and the 145-ZIP El Paso and 107-ZIP King County clusters remain intact. Fan-out is treated as correct behaviour, never as a defect. |
+| 7 | Address-search / map behavior unchanged | **PASS** | The design leaves `app_community_meta.indexable`, `homesignalmap.html`, `get-address-report`, address mode, HOME markers, radius selectors and every distance calculation untouched. The new flag is additive. |
+
+## The defect risk found — and why criterion 3 still passes
+
+The frozen Rule F counts the Government Notices tile as
+`app_changes.category IN ('Government & civic','Planning & zoning')`. Auditing where those
+rows come from revealed that **`app_refresh_zip` writes some of them from
+`public.dev_sites_deduped(_zip)`** — the development/Maps cache, which upstream is built with
+a ZIP centroid and a radius.
+
+Had radius-derived records reached that tile, Rule F would have been partly determined by a
+radius and criterion 3 would have failed. **They do not**, and this was measured rather than
+argued:
+
+- The `Planning & zoning` insert carries `and coalesce(el->>'scope','') <> 'point'`, and the
+  `Government & civic` insert takes only `relevance = 'civic'`.
+- Measured on a 200-ZIP sample chosen **because it carries real `Government & civic` content**
+  (the first sample drawn, ZIPs 010xx–021xx, was GN-dark and would have proved nothing):
+  **2,322 `Government & civic` + 246 `Planning & zoning` rows · area-scoped matches 2,264 +
+  246 · no-dev_site match 58 · point-only matches 0 and 0.**
+- ⚠️ The first attempt at this measurement returned "45,984 point-scoped rows" and was
+  **wrong** — a many-to-many join blowup from ~3,000 real rows. Counting *distinct
+  `app_changes` rows* rather than join rows is what produced the real answer. A radius finding
+  from the multiplied query would have been a false alarm that killed a correct design.
+
+**So the guard holds — but it is currently incidental, not asserted.** One `scope <> 'point'`
+clause inside a 200-line function is all that separates the Alerts tile from radius-derived
+content, and nothing in CI would notice if it were dropped. **Promoted to a frozen invariant
+and an acceptance test (new test 10 below).**
+
+## Corrections to the frozen design
+
+1. **Rule F is unchanged in value, sharpened in definition.** The GN term means
+   *jurisdiction-derived, non-point-scoped* Alerts placements — which is exactly what it
+   already counts. No number in §9–§12 moves.
+2. **Implementation constraint (new, binding):** the `indexable_alerts` expression must be
+   computed **only** from `app_changes` counts and the forward-meetings count. It must not
+   read `_lat`, `_lng`, `zip_centroids`, `app_projects`, or any distance expression, even
+   though all of them are in scope in the same function. The gate's inputs are ZIP-geography
+   and jurisdiction counts, full stop.
+3. **Server-rendering constraint (new, binding):** the renderer reads only ZIP-keyed sources —
+   `app_changes.zip`, `app_projects_for_zip(p_zip, p_kind)`, and the `parent_id` chain for
+   meetings. It must **not** call `withDistance()` or `homeFor()`. There is no user at render
+   time, so distance must be **absent**, never `0` and never computed from a centroid. A
+   rendered "0.0 mi" would be a fabricated point, which the anti-fabrication contract forbids.
+4. **The development/facility sections stay in the page and stay ZIP-keyed at render time.**
+   The geography contract lists "applicable development/facility information" as legitimately
+   belonging to a ZIP page, and `app_projects_for_zip(zip)` is a per-ZIP cached read, so
+   rendering them requires no point. Their upstream applicability being centroid-and-radius
+   based is a pre-existing property of the Maps product; this unit neither uses it for Alerts
+   eligibility nor changes it.
+
+## New acceptance test
+
+| # | test | assertion |
+|---|---|---|
+| **10** | **ZIP-geography invariant** | (a) No `app_changes` row in the Government Notices tile matches a `development_reports` site with `scope='point'` — the production query above, asserted, over a GN-bearing sample. (b) The `indexable_alerts` expression references no coordinate, centroid, distance or `app_projects` symbol. (c) Server-rendered HTML for a control ZIP contains no distance string and no `HOME` marker. (d) Rendering succeeds with **no** address, no `home` object and no signed-in session. |
+
+Tests 1–9 in §13 stand unchanged.
+
+## Verdict
+
+**The architecture is NOT wrong for the product, and the STOP condition is not triggered.**
+No point inside a ZIP is required to make ZIP-page rendering work: every Alerts input is
+keyed by ZIP set-membership or by jurisdiction chain, and the one place a centroid appears in
+the same function is a coordinate-sanity fence on a different product's records. The frozen
+design proceeds with corrections 1–4 and acceptance test 10 attached.
