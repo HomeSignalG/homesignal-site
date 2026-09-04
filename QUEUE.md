@@ -40,6 +40,33 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-04 — 🔴 NEW ITEM (Rule 16): the authoritative cutover does NOT reach the public ZIP page
+
+**Evidence: `docs/maps-coverage/N5-DELIVERY-GAP-ZIP-PAGE.md`.** Recorded as a new queue item
+rather than folded into the cutover work in flight, per Rule 16. Nothing was changed.
+
+`production_geography_verified = 10,821` is true of the RPC `public.app_projects_for_zip`.
+`homesignalmap.html` ZIP mode reads `public.development_reports` directly (line 1077 → 1118 →
+1313) and contains **0** occurrences of `app_projects_for_zip`, so the pages still render the
+legacy 3-mile centroid-radius set.
+
+Measured over the 10,821 cut-over ZIPs (control: all 10,821 have a cached report): **8,857
+disagree**; the pages serve **1,363,148** development rows against **406,196** authoritative
+projects; **3,465** had their cache rewritten by the refresh cron in the last 24 h. Dated
+instance — ZIP 10804, cache refreshed 2026-09-04 21:32Z, 47 development records against an
+authoritative membership of 1.
+
+Wrong in BOTH directions on a 150-ZIP sample: **1,784 of 3,016 shown records lie outside the
+ZCTA** and **228 of 1,460 authoritative projects are missing from the page**. So filtering the
+cache to the authoritative set fixes one direction and leaves the other broken.
+
+`geo.maps_zip_export.served_development_rows` / `served_facility_rows` — the two columns that
+measure what is SERVED — are NULL on all 12,722 rows, which is why no instrument reported this.
+
+**Depends on:** nothing. **Blocks:** any coverage claim about Map 1, the final 12,722-page
+reconciliation, and SEO. **Not started** — it changes what every resident sees on 12,722 pages,
+which is a founder gate.
+
 ### 2026-09-03 — DECISION RECORDED: no tier increase, and the reconciliation that closes it
 
 **Durable home is `docs/maps-go-live-governance.md` §N5** — the arithmetic, the per-family
