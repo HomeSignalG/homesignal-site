@@ -592,8 +592,21 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 - **GitHub Pages**, static. Merging to `main` publishes the site. Data/content
   changes (new communities, alerts) go live via **Supabase / ingest**, not a repo
   push — that's the whole point of §0.
-- ⚠️ **The deployment SOURCE is moving from "deploy from a branch" to "GitHub Actions"**
-  (Alerts SEO build, 2026-09-04 — receipts: `docs/alerts-seo-build-2026-09-04.md`).
+- ✅ **THE DEPLOYMENT SOURCE IS NOW "GitHub Actions" — switched by the founder and PROVEN IN
+  PRODUCTION 2026-09-04 15:42:39Z** (receipts: `docs/alerts-seo-build-2026-09-04.md`).
+  `merging to main` still publishes the site; it now does so by running `pages.yml`, whose
+  artifact carries **one generated document per canonical ZIP** at `/community/<zip>/`.
+  - **What that means for a normal change:** nothing new to do — push to `main` and the
+    workflow deploys. But a red `pages` build now means **the site does not update**, where
+    before a red workflow was cosmetic. Treat it as a deploy failure.
+  - **`/community/<zip>/` is LIVE.** Measured through `pg_net`: 01034 → HTTP 200, 3,912 bytes,
+    `index, follow`, self-canonical, ZIP-specific title and H1, 6 real local-news items in the
+    initial bytes; 01002 → 200, `noindex, follow`, honest empty sections. Production sitemap:
+    **7,256 canonical community URLs, 0 legacy, 0 duplicates**, development half untouched at
+    11,701.
+  - **`verify-zip-pages-live.yml`** proves it daily on a runner (162 assertions, read-only).
+    It is the deployed twin of the pre-deployment proof inside `pages.yml`; if the two ever
+    disagree, the deployment is what changed.
   `.github/workflows/pages.yml` builds the artifact: the whole static site **plus one
   generated document per canonical ZIP** at `/community/<zip>/`, which is the only way a
   static host can return ZIP-specific initial HTML (Pages selects content by PATH and
@@ -603,11 +616,17 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     deployment → Source = GitHub Actions*, which **cannot be changed from CI**. Until a
     human flips it, branch deployment continues to serve the site unchanged — nothing is
     destroyed by preparing the replacement.
-  - **Until that flip, `/community/<zip>/` does not exist in production**; `404.html`
-    forwards the pretty path to `community.html?zip=` so links still land correctly, and the
-    committed `sitemap.xml` keeps advertising the legacy URLs. The artifact's own sitemap
-    carries the canonical paths, so the advertised set becomes correct at exactly the moment
-    the documents start existing.
+  - **`404.html` still forwards `/community/<zip>/`** — it is now reached only for a
+    NON-canonical 5-digit path (every canonical one is a real document), where it lands on the
+    dynamic page's honest "isn't covered yet" state. Measured: `/community/00000/` → **404**,
+    `noindex`. No unknown ZIP can become an indexable community page.
+  - ⚠️ **`scripts/gen_sitemap.py` still writes the COMMITTED `sitemap.xml` with the legacy
+    `community.html?zip=` URLs, and `gen_zip_pages.py::reconcile_sitemap` overwrites that half
+    inside the artifact.** The served sitemap is therefore correct, but the committed one is
+    not what ships. Retiring the community half of `gen_sitemap.py` is the obvious follow-up
+    and is deliberately NOT bundled into the deployment change.
+  - **`docs/` and `test/` are no longer served publicly** — the artifact excludes them. No
+    shipped page ever linked to either (checked: zero `href` references).
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file

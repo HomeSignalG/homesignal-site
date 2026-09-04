@@ -281,9 +281,110 @@ Over the built artifact, served locally, before any deployment exists:
 
 ---
 
+## 11 · DEPLOYED — and the production proof that was withheld until it was
+
+**The founder switched *Settings → Pages → Build and deployment → Source* to "GitHub
+Actions".** That setting is not readable from this session — the egress proxy blocks
+`/repos/{owner}/{repo}/pages` and `/environments` (both HTTP 403, "not permitted through this
+proxy") — so it was verified the only way available, **operationally and then empirically**:
+
+| step | receipt |
+|---|---|
+| merge | PR #1023 squash-merged → **`f7e448a`** |
+| build | run **33890821625**, job 101081759870, `main` @ `f7e448a`, **success** 15:40:26 → 15:42:23Z |
+| deploy | job 101082388260, `actions/deploy-pages@v4`, **success** 15:42:30 → 15:42:36Z |
+| deployment | id **6267785306**, created 15:42:23Z, **success 15:42:39Z**, via the `github-actions` app |
+| the switch, proven | the previous deployment (id 6267751012, via the `github-pages` app — the branch path) was marked **`inactive` at 15:42:39Z**, the same instant. `deploy-pages` cannot succeed while the source is a branch, and the branch deployment cannot go inactive unless something replaced it. |
+| the switch, proven again | `/community/01034/` returns **HTTP 200 with ZIP-specific bytes**. Under branch deployment that path does not exist — Pages ignores the query string and serves content by path only. This is the measurement that settles it. |
+
+Build stats for the deployed artifact: **12,722 documents · Rule F pass 7,256 / fail 5,466 ·
+indexable 7,256 · ZIP HTML 49.3 MB (avg 4,064 B, max 8,487 B) · whole artifact 132 MB
+uncompressed** · pre-upload candidate proof **63 passed, 0 failed**.
+
+### 11.1 · Rule F re-measured AFTER deployment (2026-09-04 15:45:37Z)
+
+Identical to the pre-deployment measurement, so nothing was forced: **12,722 canonical ZIPs ·
+PASS 7,256 · FAIL 5,466** · both 6,727 · Alerts-only 529 · development-only 4,975 · neither
+491. **Every A–J control held its class — no replacement was needed** (01001's local news moved
+5 → 6 items, which does not change its class).
+
+### 11.2 · Initial HTML, from the bytes, via `pg_net`
+
+The sandbox has no egress to `homesignal.net`, so Postgres fetched the pages. Raw response
+bodies, before any JavaScript:
+
+| ctl | ZIP | status | bytes | robots | canonical | H1 |
+|---|---|---:|---:|---|---|---|
+| **A** | 01001 | 200 | 3,903 | `index, follow` | `/community/01001/` | `01001 · Agawam (01001), MA` |
+| **B/E** | 01034 | 200 | 3,912 | `index, follow` | `/community/01034/` | `01034 · Granville (01034), MA` |
+| **C** | 01002 | 200 | 2,533 | `noindex, follow` | `/community/01002/` | `01002 · Amherst (01002), MA` |
+| **D/G** | 02543 | 200 | 2,543 | `noindex, follow` | `/community/02543/` | `02543 · Woods Hole (02543), MA` |
+| **F** | 04401 | 200 | 3,384 | `noindex, follow` | `/community/04401/` | `04401 · Bangor (04401), ME` |
+| **H** | 22030 | 200 | 4,413 | `index, follow` | `/community/22030/` | `22030 · Fairfax (22030), VA` |
+| **J** | 28468 | 200 | 6,024 | `index, follow` | `/community/28468/` | `28468 · Sunset Beach (28468), NC` |
+
+Every one carries a ZIP-specific `<title>` and meta description, all three Alerts headings, the
+"Compiled from official public records on <time>" line, and usable internal links. **`point
+leak` false on all of them** (no distance, HOME, centroid, radius or nearest string). 01034
+carries **6 local-news `<li>`** — the content that qualifies it — while its Government Notices
+section truthfully says none are on file. 04401 **displays a weather alert and is still
+`noindex`**: weather never carries Rule F.
+
+**No cloaking.** Same URL, three user agents, body md5 over the raw bytes:
+`01034` → `a6e5afd87cad` for normal, Googlebot smartphone and Googlebot desktop, all three
+identical; `01002` → `3f0902f2c945`, likewise. The runner instrument independently agrees
+(sha12 `494aee7b16d11d6e2587d51c` and `d5c9424b24e6ae7e7c910c15`).
+
+### 11.3 · Meetings geography, in production
+
+`95002` and `95008` (both Santa Clara County, which holds **231** forward-dated meetings) render
+**identical 12-item lists** — the county cascade reaching both of its ZIPs. `10001` (New York
+County) shares **0** titles with either. The 12 rendered titles for 95002 **exactly reproduce**
+the generator's documented total order `(meeting_date asc, id asc)` — verified in SQL,
+`matches_generator_total_order: true`, 12 of 12.
+
+⚠️ **One honest limit, stated rather than implied.** The sibling-exclusion half of that rule —
+`City government (X)` scoped to the ZIP's own place — **cannot be exercised in production today**:
+there are currently **ZERO** forward-dated `City government (%)` meetings in the table, so
+nothing exists for it to exclude. That specific rule stays proven by the offline fixture, which
+carries an Agawam and a Springfield council on one shared county root and asserts Springfield is
+dropped. An earlier ad-hoc comparison reported `sets_match: false` and was **my expectation's
+tie-break, not a defect** — it ordered ties by title where the generator orders by id; all 12
+rendered rows were inside the same 24-row date window.
+
+### 11.4 · Legacy URL, invalid ZIP, sitemap
+
+- `community.html?zip=01034` → **200**, 1,152 bytes, `noindex, nofollow` **in the initial
+  HTML**, no competing canonical in the bytes (the canonical to `/community/01034/` is added on
+  hydration and was confirmed present after JS). One canonical identity; the canonical path
+  returns 200 **directly**, not by redirect.
+- `/community/00000/` → **404**, `noindex`. A non-canonical ZIP is never an indexable page.
+- Production `sitemap.xml`: 2,719,785 bytes · **7,256 canonical community URLs, 7,256 distinct
+  (0 duplicates), 0 malformed** · **0 legacy `community.html?zip=`** · 11,701 development URLs
+  untouched · 18,962 `<loc>` total (7,256 + 11,701 + 5 statics) · no 80249. **Canonical
+  community URLs == current Rule F PASS, exactly.**
+
+### 11.5 · Hydration, and the map
+
+`verify-zip-pages-live` run **33891407719 — 162 passed, 0 failed**. After JavaScript executes:
+robots is unchanged on 01034 (`index, follow`), 01002 (`noindex, follow`) and 01001; canonical,
+ZIP identity and title all survive; there are no uncaught page errors; the development-map link
+still works. **The 529-class defect is re-proven fixed on a current member of that class:
+01034 (Alerts PASS, development FAIL, `data_quality = coverage_coming`) keeps its build-time
+Alerts block after hydration — 6 items still in the DOM.** 01001 instead re-renders the tiles
+itself (`ssr items 0, re-rendered true`), which is the other legitimate shape.
+
+Map/address regression: `homesignalmap.html?zip=28468` → 200, the Leaflet map renders, **19,551
+sites load**, the address search box is present, no uncaught errors.
+
+---
+
 ## 10 · What remains
 
-**The one-time repository setting: Settings → Pages → Build and deployment → Source =
-"GitHub Actions".** It cannot be changed from CI. Until it is, the existing branch
-deployment continues to serve the site exactly as today — the replacement is built and
-proven but not switched on.
+**Nothing blocking.** The one-time setting is done (§11) and the pages are live and proven.
+
+One open follow-up, logged not done: `scripts/gen_sitemap.py` still writes the committed
+`sitemap.xml` with the legacy `community.html?zip=` URLs, and the artifact rewrite replaces
+that half at build time. What is SERVED is correct; the committed file is not what ships.
+Retiring that generator's community half is a small separate change and was deliberately kept
+out of the deployment.

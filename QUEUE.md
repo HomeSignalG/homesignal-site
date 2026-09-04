@@ -40,20 +40,25 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-04 — ALERTS SEO: implementation complete, ONE founder setting remains
+### 2026-09-04 — ALERTS SEO: DEPLOYED AND PROVEN IN PRODUCTION
 
-**`/community/<zip>/` is built and gated but NOT deployed.** `.github/workflows/pages.yml`
-produces the Pages artifact (whole site + one generated document per canonical ZIP); its
-`deploy` job is gated on `main` **and** on the repository setting *Settings → Pages → Build
-and deployment → Source = **GitHub Actions***, which cannot be changed from CI.
+**`/community/<zip>/` is LIVE.** The founder switched *Settings → Pages → Build and
+deployment → Source* to **GitHub Actions**; PR #1023 squash-merged as `f7e448a`, `pages.yml`
+built and `actions/deploy-pages@v4` deployed at **2026-09-04 15:42:39Z** (run 33890821625,
+deployment 6267785306, which superseded the last branch deployment — marked `inactive` at the
+same instant).
 
-- **Until a human flips that setting, nothing changes in production.** Branch deployment
-  still serves the site (proof: `pages-build-deployment` run 895, `main` @ `36b5ebe`,
-  2026-09-04 12:09:58Z, success). `404.html` forwards the pretty path; the committed
-  `sitemap.xml` keeps the legacy URLs; the artifact's own sitemap carries the canonical ones.
-- **Do not "fix" `scripts/gen_sitemap.py`** to emit `/community/<zip>/` before the flip —
-  that would advertise ~7,000 URLs that 404. Its docstring says why.
-- Measured 2026-09-04 14:26:44Z: 12,722 canonical ZIPs, Rule F **PASS 7,256 / FAIL 5,466**;
+- **Production proof: `verify-zip-pages-live` run 33891407719 — 162 passed, 0 failed**, plus a
+  `pg_net` initial-HTML capture (the sandbox has no egress to homesignal.net). Both are in
+  `docs/alerts-seo-build-2026-09-04.md` §11.
+- **A red `pages` build now means the site does not update.** Before the switch it was
+  cosmetic. Treat it as a deploy failure.
+- 📌 **OPEN FOLLOW-UP (not blocking):** `scripts/gen_sitemap.py` still writes the committed
+  `sitemap.xml` with the legacy `community.html?zip=` URLs; the artifact rewrite replaces that
+  half at build time, so what is SERVED is correct (7,256 canonical / 0 legacy, measured) while
+  the committed file is not what ships. Retiring its community half is a small, separate change.
+- Re-measured 2026-09-04 15:45:37Z, after deployment: 12,722 canonical ZIPs, Rule F
+  **PASS 7,256 / FAIL 5,466**;
   vs the development gate — both 6,727 · Alerts-only 529 · development-only 4,975 ·
   neither 491.
 - Full receipt, publication policy, frozen controls A–J: **`docs/alerts-seo-build-2026-09-04.md`**.
