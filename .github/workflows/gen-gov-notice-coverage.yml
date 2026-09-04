@@ -1,0 +1,98 @@
+name: Regenerate the Government Notices coverage artifact
+
+# lib/generated/gov-notice-coverage.json is what community.html reads to decide, for a ZIP
+# with no notices on the page, whether to say "we track notices here, none right now" or
+# "we have no source for your area". It is DERIVED from production and must never be
+# hand-edited or transcribed — so it has to be regenerated where the generator can reach
+# Supabase. The build sandbox cannot: its proxy returns 403 for the Supabase REST host.
+#
+# The generator needs NO secret. It reads the public anon key out of the committed
+# config.js, the same key the browser uses, and every table it touches is anon-readable.
+#
+# NOTICES TILE, NOT EITHER TILE. The generator derives coverage from DELIVERED
+# government_notice ALERTS walked down the parent_id chain. That is the Government Notices
+# tile. Do not "improve" it to count government_notice feeds regardless of target_table —
+# a target_table='meetings' feed is Upcoming Meetings arming and can never produce a
+# notice, and mixing the two is the 7,293-vs-6,246 units mismatch that manufactured a
+# phantom 1,047-ZIP cohort in the engine repo. tests/gov-notice-coverage-artifact.test.mjs
+# pins this.
+#
+# The push is scoped to that ONE file, and the trigger's `paths` allow-list does not include
+# it, so the workflow's own commit cannot retrigger the workflow. The actor guard on the job
+# is the second half of the same fence.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      # `paths` and `paths-ignore` cannot both appear on one event, and they are not needed
+      # to: this allow-list already excludes the generated artifact, so the workflow's own
+      # commit cannot retrigger it. The actor guard below is the second half of the fence.
+      - "scripts/gen-gov-notice-coverage.mjs"
+      - ".github/workflows/gen-gov-notice-coverage.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gen-gov-notice-coverage-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    # Measured: the generator pages ~13k communities + ~11k alerts in well under a minute.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: State BEFORE (so the delta is provable from the log alone)
+        run: |
+          node -e '
+            const d = require("./lib/generated/gov-notice-coverage.json");
+            const z = d.configured_zips;
+            console.log("committed configured:", z.length);
+            console.log("committed counts   :", JSON.stringify(d._counts));
+          '
+
+      - name: Regenerate from production
+        run: node scripts/gen-gov-notice-coverage.mjs
+
+      - name: Prove the delta against git, never against a remembered list
+        run: |
+          git --no-pager diff --stat -- lib/generated/gov-notice-coverage.json || true
+          node -e '
+            const { execSync } = require("child_process");
+            const prev = JSON.parse(execSync("git show HEAD:lib/generated/gov-notice-coverage.json").toString());
+            const next = require("./lib/generated/gov-notice-coverage.json");
+            const a = new Set(prev.configured_zips), b = new Set(next.configured_zips);
+            const added   = [...b].filter(z => !a.has(z)).sort();
+            const removed = [...a].filter(z => !b.has(z)).sort();
+            console.log("before      :", a.size);
+            console.log("after       :", b.size);
+            console.log("net         :", b.size - a.size);
+            console.log("added   (" + added.length + "):", added.join(","));
+            console.log("removed (" + removed.length + "):", removed.join(","));
+            console.log("canonical   :", next._counts.canonical_zip_pages);
+            console.log("reconciles  :", next._counts.configured + next._counts.unconfigured === next._counts.canonical_zip_pages);
+          '
+
+      - name: --check must PASS against what was just written
+        run: node scripts/gen-gov-notice-coverage.mjs --check
+
+      - name: Commit the regenerated artifact back to this branch
+        run: |
+          if git diff --quiet -- lib/generated/gov-notice-coverage.json; then
+            echo "artifact unchanged — nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/generated/gov-notice-coverage.json
+          git commit -m "Regenerate gov-notice-coverage.json from production (runner)"
+          git push origin HEAD:${{ github.ref_name }}
