@@ -99,7 +99,11 @@ const devPage = fs.readFileSync(new URL('../development.html', import.meta.url),
 const dash = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
 const today = fs.readFileSync(new URL('../today.html', import.meta.url), 'utf8');
 const howItWorks = fs.readFileSync(new URL('../how-it-works.html', import.meta.url), 'utf8');
-const comm = fs.readFileSync(new URL('../community.html', import.meta.url), 'utf8');
+// The community page runtime was extracted from community.html's inline block into
+// lib/community-page.js (Alerts SEO unit) so the generated /community/<zip>/ documents
+// and the legacy page share ONE implementation. These assertions follow the code; they
+// are unchanged in substance.
+const comm = fs.readFileSync(new URL('../lib/community-page.js', import.meta.url), 'utf8');
 
 ok(/data-znav="homesignalmap\.html"/.test(mapsHtml),
   'maps.html cross-link targets homesignalmap.html with data-znav');
@@ -122,13 +126,13 @@ ok(/parseZipFromAddress/.test(devMapHtml) && /HS\.state\.zip\s*=\s*addrZip/.test
 ok(/data-znav="homesignalmap\.html"/.test(howItWorks),
   'how-it-works.html development map link preserves viewed ZIP via data-znav');
 ok(/View Development Map/.test(comm),
-  'community.html has View Development Map link');
+  'community page runtime has View Development Map link');
 ok(/HS\.navHref\('homesignalmap\.html',\s*zip\)/.test(comm),
-  'community.html View Development Map uses HS.navHref with current zip');
+  'community page runtime View Development Map uses HS.navHref with current zip');
 ok(/data-znav="homesignalmap\.html"/.test(comm),
-  'community.html View Development Map carries data-znav for ZIP stamping');
+  'community page runtime View Development Map carries data-znav for ZIP stamping');
 ok(!/homesignalmap\.html\?zip=78617/.test(comm),
-  'community.html does not hardcode sample ZIP in development map link');
+  'community page runtime does not hardcode sample ZIP in development map link');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll navigation-zip assertions passed.');

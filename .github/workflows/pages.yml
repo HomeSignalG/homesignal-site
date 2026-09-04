@@ -1,0 +1,98 @@
+name: pages
+
+# Builds the GitHub Pages deployment artifact: the whole static site PLUS one generated
+# HTML document per canonical ZIP geography at /community/<zip>/.
+#
+# ARCHITECTURE (founder decision, 2026-09-04): one shared implementation
+# (lib/community-page.js + the template in scripts/gen_zip_pages.py) plus a data-driven
+# build. The generated documents exist ONLY in this artifact and are NEVER committed —
+# CLAUDE.md §0 prohibits maintained per-community source files, not deterministic
+# build output. Adding or removing a canonical ZIP needs no hand-written HTML.
+#
+# SAFETY: the `build` job runs on every push to this workflow's inputs and proves the
+# gates. The `deploy` job runs ONLY on main, so the existing "deploy from a branch"
+# production path is untouched until the repository Pages Source is switched to
+# "GitHub Actions" — a one-time setting change that is not performable from CI.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/gen_zip_pages.py'
+      - 'lib/community-page.js'
+      - 'community.html'
+      - '.github/workflows/pages.yml'
+  schedule:
+    - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Stage the static site
+        run: |
+          mkdir -p _site
+          # everything that ships today, minus VCS/CI/dev-only trees
+          rsync -a --exclude '.git' --exclude '.github' --exclude '_site' \
+                   --exclude 'test' --exclude 'docs' --exclude 'node_modules' \
+                   ./ _site/
+
+      - name: Generate one document per canonical ZIP
+        run: python3 scripts/gen_zip_pages.py --out _site
+
+      - name: Build gates
+        run: |
+          set -euo pipefail
+          test -f _site/zip-pages-manifest.json
+          DOCS=$(find _site/community -mindepth 2 -name index.html | wc -l)
+          echo "generated documents: $DOCS"
+          # every generated path is a 5-digit canonical ZIP directory, nothing else
+          BAD=$(find _site/community -mindepth 1 -maxdepth 1 -type d \
+                  ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
+          echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
+          test ! -e _site/community/80249            # the removed drift ZIP must not exist
+          echo "artifact size: $(du -sh _site | cut -f1)"
+          # nothing generated may ever enter git
+          git status --porcelain | grep -E '^\?\?\s+community/' && \
+            { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
+          echo "GATES OK"
+
+      - name: Confirm no generated HTML is tracked by git
+        run: |
+          if git ls-files --error-unmatch community/ >/dev/null 2>&1; then
+            echo 'ERROR: community/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
+          echo "git is clean of generated ZIP documents"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    # Only main deploys. Requires the repository Pages Source = "GitHub Actions".
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
