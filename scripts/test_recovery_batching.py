@@ -12,7 +12,7 @@ ones a silent regression would break:
   - a SINGLE identity that still truncates is a hard stop, because it cannot be
     represented without losing features
 """
-import os, sys
+import io, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("SUPABASE_ACCESS_TOKEN", "test-token-not-a-secret")
 
@@ -159,23 +159,28 @@ ok(all(f.endswith("#0") or f.endswith("#1") for _, f in ids1),
    "indices are per-identity (#0/#1), not a global counter")
 
 
-# ── the freeze buckets: the ONE thing that decides whether a shard's slice is total ──
-# The manifest checksum gate catches a missed bucket at run time, but only after paying
-# the whole freeze. These assertions catch it offline, and they pin the two properties the
-# comment in n5_shard.py claims: exactly the ten digits, and no ordering anywhere in it.
-B = M.freeze_buckets("662")
-ok(B == ["6620", "6621", "6622", "6623", "6624", "6625", "6626", "6627", "6628", "6629"],
-   "freeze_buckets('662') is the ten ZIP4 values, in digit order")
-ok(len(B) == len(set(B)) == 10, "ten buckets, no duplicate - a duplicate would double-insert")
-ok(all(b[:3] == "662" for b in B), "every bucket stays inside its own prefix")
-ok({b[3] for b in B} == set("0123456789"),
-   "the ten buckets cover every 4th digit, so a 5-digit ZIP cannot fall outside them")
-ok(M.freeze_buckets("009")[0] == "0090",
-   "a leading-zero prefix keeps its zeros - '009' must not become '9'")
-# The bug this replaces: a RANGE form whose last upper bound was the prefix's arithmetic
-# successor. For '999' that is '1000', and '99900' > '1000' as text, so the final chunk
-# selected NOTHING. Equality on digits cannot express that mistake.
-ok(M.freeze_buckets("999") == ["999" + d for d in "0123456789"],
-   "prefix 999 gets ten real buckets, not a range that collapses to empty")
+# ── the freeze loop: the ONE thing that decides whether a shard's slice is total ──
+# freeze_zips() reads the DB, so what is checkable offline is the SHAPE of what it feeds:
+# that the freeze is per ZIP, that each statement carries the predicate the partial index
+# needs, and that the ZIP list is derived from the frozen basis rather than from the ZIP
+# registry. Each of these was a real failure mode on shard 662, so they are asserted rather
+# than left to a comment.
+_src = io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_shard.py"),
+               encoding="utf-8").read()
+_freeze = _src[_src.index("    zips = freeze_zips(z3)"):_src.index('", f"freeze {z}")')]
+ok("and i.zip = {lit(z)}" in _freeze,
+   "the freeze inserts ONE ZIP at a time - the whole-prefix statement is what timed out")
+ok("left(i.zip,3) = {lit(z3)}" in _freeze,
+   "it also carries left(zip,3), without which the planner cannot use the partial index")
+ok("statement_timeout='110s'" in _freeze,
+   "each ZIP statement bounds itself below the proxy cap instead of inheriting the default")
+ok("delete from geo.n5_frozen where z3=" in _src[:_src.index("    zips = freeze_zips(z3)")],
+   "the slice is cleared ONCE, before any ZIP - so a failed ZIP leaves a partial slice the "
+   "checksum gate rejects, never a doubled one")
+_zips = _src[_src.index("def freeze_zips(z3):"):_src.index("def run_shard(z3):")]
+ok("preservation.app_project_identity" in _zips and "canonical_zip_registry" not in _zips,
+   "the ZIP list comes from the frozen basis, not the registry - a ZIP in the basis and not "
+   "in the registry must not be skipped silently")
+ok("read_only=True" in _zips, "reading the ZIP list is declared read-only")
 
 sys.exit(1 if fails else 0)
