@@ -70,7 +70,9 @@ async function pendingDrafts() {
   const idFilter = ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '';
   return api('social_posts?select=id,zip,post_text,evidence,image_bucket_path,status,content_family'
     + `&content_family=eq.MAPS&status=eq.draft&image_bucket_path=is.null${idFilter}`
-    + `&order=zip.asc&limit=${LIMIT}`);
+    // Newest first. A freshly generated candidate is the one worth a picture, and it is also
+    // the one most likely to be in its ZIP's authoritative set — the two moved together.
+    + `&order=created_at.desc&limit=${LIMIT}`);
 }
 
 /**
