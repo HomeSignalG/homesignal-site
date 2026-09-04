@@ -1,0 +1,47 @@
+name: capture-crawler-ground-truth
+
+# READ-ONLY measurement for the Alerts SEO-readiness program. Captures, for a frozen list
+# of real production ZIP pages, the INITIAL HTTP response (normal + both Googlebot UAs)
+# and the post-JavaScript DOM, and prints the delta.
+#
+# It writes nothing: no commit, no DB call, no site change. It exists because the build
+# sandbox has no egress to homesignal.net (the agent proxy answers 403 to CONNECT), which
+# is the same reason verify-communities.yml exists.
+#
+# `push:` trigger is deliberate: workflow_dispatch is only offered for workflows already on
+# the default branch, and this one is intentionally NOT on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs (default: the six frozen controls)'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'scripts/capture-crawler-ground-truth.mjs'
+      - '.github/workflows/capture-crawler-ground-truth.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        # No --with-deps: the ubuntu-latest image already carries chromium's shared
+        # libraries, and the apt half of --with-deps is what hung run 33819018693 for
+        # 19 minutes past its own bound. Install the browser only.
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
+      - name: Capture crawler ground truth
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIPS: ${{ github.event.inputs.zips }}
+        run: node scripts/capture-crawler-ground-truth.mjs

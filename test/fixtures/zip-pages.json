@@ -1,0 +1,296 @@
+{
+ "zips": [
+  "01001",
+  "01002",
+  "02543",
+  "07010",
+  "99999"
+ ],
+ "meta": [
+  {
+   "zip": "01001",
+   "name": "Agawam (01001)",
+   "county": "Hampden",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "01002",
+   "name": "Amherst (01002)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "07010",
+   "name": "Cliffside Park (07010)",
+   "county": "Bergen",
+   "state": "NJ",
+   "data_quality": "pass",
+   "indexable": false
+  },
+  {
+   "zip": "99999",
+   "name": "Hostile <script>alert(1)</script> & \"Co\"",
+   "county": "X & Y",
+   "state": "ZZ",
+   "data_quality": "pass",
+   "indexable": false
+  },
+  {
+   "zip": "02543",
+   "name": "Woods Hole (02543)",
+   "county": "Barnstable",
+   "state": "MA",
+   "data_quality": "coverage_coming",
+   "indexable": false
+  }
+ ],
+ "changes": [
+  {
+   "zip": "01001",
+   "community_id": "c-ln",
+   "category": "Local News",
+   "title": "Storm warning issued",
+   "source_ref": "https://api.weather.gov/a1",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "01001",
+   "community_id": "c-ln",
+   "category": "Local News",
+   "title": "Town approves new library",
+   "source_ref": "https://gazette.example/1",
+   "occurred_at": "2026-09-02"
+  },
+  {
+   "zip": "01001",
+   "community_id": "c-ln",
+   "category": "Local News",
+   "title": "School budget debated",
+   "source_ref": "https://gazette.example/2",
+   "occurred_at": "2026-09-03"
+  },
+  {
+   "zip": "01001",
+   "community_id": "c-ln",
+   "category": "Local News",
+   "title": "RETRACTED wrong county",
+   "source_ref": "https://gazette.example/bad",
+   "occurred_at": "2026-09-03"
+  },
+  {
+   "zip": "01002",
+   "community_id": "c-x",
+   "category": "Local News",
+   "title": "Flood watch",
+   "source_ref": "https://api.weather.gov/b1",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "01002",
+   "community_id": "c-x",
+   "category": "Local News",
+   "title": "Heat advisory",
+   "source_ref": "https://api.weather.gov/b2",
+   "occurred_at": "2026-09-02"
+  },
+  {
+   "zip": "01002",
+   "community_id": "c-x",
+   "category": "Local News",
+   "title": "Wind advisory",
+   "source_ref": "https://api.weather.gov/b3",
+   "occurred_at": "2026-09-03"
+  },
+  {
+   "zip": "07010",
+   "community_id": "c-g",
+   "category": "Government & civic",
+   "title": "Notice of public hearing",
+   "source_ref": "https://gov.example/n1",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "07010",
+   "community_id": "c-g",
+   "category": "Government & civic",
+   "title": "Public meeting mirror",
+   "source_ref": "https://gov.example/n2",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "07010",
+   "community_id": "c-g",
+   "category": "Planning & zoning",
+   "title": "Rezoning application filed",
+   "source_ref": "https://gov.example/n3",
+   "occurred_at": "2026-09-02"
+  },
+  {
+   "zip": "99999",
+   "community_id": "c-h",
+   "category": "Government & civic",
+   "title": "Evil <img src=x onerror=alert(1)> & \"quoted\" 'title'",
+   "source_ref": "javascript:alert(1)",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "99999",
+   "community_id": "c-h",
+   "category": "Government & civic",
+   "title": "Second notice",
+   "source_ref": "https://ok.example/x?a=1&b=2",
+   "occurred_at": "2026-09-01"
+  },
+  {
+   "zip": "99999",
+   "community_id": "c-h",
+   "category": "Government & civic",
+   "title": "Third notice",
+   "source_ref": "https://ok.example/y",
+   "occurred_at": "2026-09-01"
+  }
+ ],
+ "agency": [
+  {
+   "source_url": "https://api.weather.gov/a1",
+   "agency_name": "api.weather.gov"
+  },
+  {
+   "source_url": "https://api.weather.gov/b1",
+   "agency_name": "api.weather.gov"
+  },
+  {
+   "source_url": "https://api.weather.gov/b2",
+   "agency_name": "api.weather.gov"
+  },
+  {
+   "source_url": "https://api.weather.gov/b3",
+   "agency_name": "api.weather.gov"
+  },
+  {
+   "source_url": "https://gazette.example/1",
+   "agency_name": "Daily Gazette"
+  },
+  {
+   "source_url": "https://gazette.example/2",
+   "agency_name": "Daily Gazette"
+  },
+  {
+   "source_url": "https://gazette.example/bad",
+   "agency_name": "Daily Gazette"
+  }
+ ],
+ "retractions": [
+  {
+   "community_id": "c-ln",
+   "source_url": "https://gazette.example/bad"
+  }
+ ],
+ "communities": [
+  {
+   "id": "county-1",
+   "parent_id": null,
+   "level": "county",
+   "zip_codes": [],
+   "name": "Hampden County"
+  },
+  {
+   "id": "zip-01001",
+   "parent_id": "county-1",
+   "level": "zip",
+   "zip_codes": [
+    "01001"
+   ],
+   "name": "Agawam (01001)"
+  },
+  {
+   "id": "zip-01002",
+   "parent_id": "county-1",
+   "level": "zip",
+   "zip_codes": [
+    "01002"
+   ],
+   "name": "Amherst (01002)"
+  },
+  {
+   "id": "county-2",
+   "parent_id": null,
+   "level": "county",
+   "zip_codes": [],
+   "name": "Bergen County"
+  },
+  {
+   "id": "zip-07010",
+   "parent_id": "county-2",
+   "level": "zip",
+   "zip_codes": [
+    "07010"
+   ],
+   "name": "Cliffside Park (07010)"
+  },
+  {
+   "id": "zip-99999",
+   "parent_id": null,
+   "level": "zip",
+   "zip_codes": [
+    "99999"
+   ],
+   "name": "Hostile <script>alert(1)</script> & \"Co\""
+  },
+  {
+   "id": "zip-02543",
+   "name": "Woods Hole (02543)",
+   "parent_id": null,
+   "level": "zip",
+   "zip_codes": [
+    "02543"
+   ]
+  }
+ ],
+ "meetings": [
+  {
+   "community_id": "county-1",
+   "title": "Board of Commissioners",
+   "meeting_date": "2026-09-20T14:00:00",
+   "category": "County Commission & county business",
+   "source_url": "https://gov.example/m1",
+   "id": "m1"
+  },
+  {
+   "community_id": "county-2",
+   "title": "Borough Council",
+   "meeting_date": "2026-09-21T19:00:00",
+   "category": "County Commission & county business",
+   "source_url": "https://gov.example/m2",
+   "id": "m2"
+  },
+  {
+   "id": "m3",
+   "community_id": "county-1",
+   "title": "Agawam City Council",
+   "meeting_date": "2026-09-22T18:00:00",
+   "category": "City government (Agawam)",
+   "source_url": "https://gov.example/m3"
+  },
+  {
+   "id": "m4",
+   "community_id": "county-1",
+   "title": "Springfield City Council",
+   "meeting_date": "2026-09-23T18:00:00",
+   "category": "City government (Springfield)",
+   "source_url": "https://gov.example/m4"
+  },
+  {
+   "id": "m5",
+   "community_id": "county-1",
+   "title": "Past meeting must never appear",
+   "meeting_date": "2020-01-01T18:00:00",
+   "category": "County Commission & county business",
+   "source_url": "https://gov.example/m5"
+  }
+ ]
+}
