@@ -1367,3 +1367,112 @@ n5-e2e-arm            DISARMED-2026-09-03-after-e2e-proof        vs arm-2026-09-
 n5-geocode-probe-arm  DISARMED-2026-09-03-after-geocode-probe    vs arm-2026-09-03-geocode-probe
 n5-rpc-apply-arm      DISARMED-2026-09-04-after-rev3-install     vs arm-2026-09-04-rpc-rev3-install
 ```
+
+---
+
+## 23. Map 1 address-radius — DEPLOYED AND PROVEN LIVE (2026-09-04)
+
+The feature is live on `homesignal.net` and was proven there by driving the real deployed page
+in a real browser against the real production geocoder, RPC, `app_projects` and cached ZIP
+report. Nothing in this section is a fixture.
+
+### 23.1 The merge
+
+| | |
+|---|---|
+| pre-merge `main` | `f7e448adbebb413853ab9a69624bc6187753cdce` |
+| feature head | `c0f6dbf0c7834b8f52a2367310d305abec3905d3` (PR #1015) |
+| merged `main` | `61835853c703838946183cf433567e5c87954b3d` (squash) |
+
+Checks on the feature head, all green: `unit`, `browser`, `spatial-rpc (postgis:16-3.4)`,
+`spatial-rpc (postgis:17-3.5)`. `mergeable_state: clean`.
+
+The diff against `main` carried **17 deletions and they were all inside `homesignalmap.html`
+itself** — this feature's own replaced lines. No other file lost a byte, and `maps.html` (Map 2)
+had a **zero** diff: it is not modified, not redirected, not deleted.
+
+### 23.2 The deployment, proven rather than assumed
+
+`pages build and deployment` run `33892102336` on the merge SHA — **success**. That a workflow
+went green is not proof that the bytes changed, so the proof compares them:
+
+```
+live page HTTP 200, 179852 bytes
+live page sha256: 23dc037dbb57cd7ffadac6efc28ecad164510965909a4fbf2642fe471d50db9d
+repo  page sha256: 23dc037dbb57cd7ffadac6efc28ecad164510965909a4fbf2642fe471d50db9d
+```
+
+`https://homesignal.net/homesignalmap.html` is byte-identical to the merged tree, and
+`lib/n5-radius.js` is served.
+
+### 23.3 The one live user flow — run `33893168089`, FAILS: 0
+
+One address search, one radius change, one ZIP regression. No separate database probes: every
+production call is one the page itself makes to serve that flow. The job holds **no credential**
+and refuses to start if one is present; it is a public read-only browser session.
+
+`2200 CALDWELL LN, DEL VALLE, TX 78617` → HOME `30.215054966235, -97.53885104845` from the
+production `geocode-address`.
+
+| | at 1 mile | at 2 miles |
+|---|---|---|
+| N5 rows returned | 5 | 19 |
+| canonical results rendered | 5 | 19 |
+| `has_more` | false | — |
+| completeness line | `5 canonical projects within 1 mile` | `19 canonical projects within 2 miles` |
+
+Representative row: `socrata:data.austintexas.gov:mavg-96ck:SP-2021-0320D` / `pt:1`,
+provenance `proven_stored_point`, geometry `ST_Point`, `distance_mi` `0.0210175901236777`.
+Its **marker position IS the RPC's `marker_lat`/`marker_lng`** and its **distance IS the RPC's
+`distance_mi`**, both asserted against the observed response body rather than recomputed.
+Clicking it opened the existing Map 1 dossier:
+`Caldwell Lane · Approved / permitted · at this address · austin-site-plan-cases · Official record ▸`.
+
+Also proven live: hydration was queried by `source_key`; a canonical project carries **no
+`registry_id`**, so it is never mistaken for an EPA facility and is not labelled as one;
+facilities are not converted into development (0 rendered here); the 18 area/jurisdiction
+notices carry **no radius distance**, so they cannot read as "within X miles"; HOME does not
+move across the radius change; widening loses nothing that was inside the smaller radius; and
+ZIP mode makes **no N5 call at all**, renders the entire-ZIP population (556 sites, "Across ZIP
+78617"), draws no HOME pin, and inherits nothing from the address search.
+
+### 23.4 Two harness defects the first two runs exposed — recorded, because both are the kind that hide real ones
+
+Neither was a page defect. Both were in the proof, and the second is the more serious.
+
+1. **Run 1 clicked a control the user cannot see.** It clicked `#radSel button[data-r="1"]`
+   before searching. Playwright resolved the element and timed out on "element is not visible" —
+   correctly: `#radSel` sits inside `#results`, and `.results{display:none}` until a search
+   produces something (unchanged by this feature). The first search now runs at the radius the
+   page is already showing, read off the page and asserted.
+
+2. **Run 2 sampled a page still mid-flight, and its key assertion was VACUOUS.** It waited a
+   fixed 6 s after the radius click while the first live search had taken ~28 s, so it read the
+   *previous* radius's render back as the new one: 5 rendered against 19 returned, and a
+   completeness line still saying "within 1 mile". That looked exactly like two real
+   user-visible defects. It was a stale DOM — with a condition-based wait the same page renders
+   19 of 19 and says "within 2 miles".
+   The assertion that should have caught it could not: `r.marker_lat != null || true` is always
+   true, so the filter kept every row and the fallback `n5b.length <= rows2.length` (5 ≤ 19)
+   could never fail. **It attested to nothing** — the vacuous-test class this repo has fixed
+   before. Replaced with three that can fail: every rendered result is one the RPC returned for
+   *that* radius; widening loses nothing that was inside the smaller radius; the wider radius
+   returns at least as much geometry. Plus a new scored check that the completeness line names
+   the **new** radius.
+
+### 23.5 Logged, not fixed — a radius change re-geocodes the address
+
+Observed live: `address re-geocoded on radius change: true`. This is **pre-existing page
+behaviour, not something this feature introduced** — the handler is
+`if(CUR_ADDRESS){ run(CUR_ADDRESS); }`, byte-identical to its pre-feature form at
+`f7e448ad` line 1902. A radius change has always re-run the whole address flow; before this
+feature the geocode happened server-side inside `get-address-report`, so it is now a *visible*
+call rather than a new one. HOME is asserted not to move across the change, and it does not.
+The cost is one extra geocode per radius change. Caching it is a page change and a separate
+decision — **logged, non-blocking, not done here**.
+
+### 23.6 Disarm
+
+`.github/map1-live-arm` = `DISARMED-2026-09-04-after-live-proof`, against
+`EXPECTED_ARM: arm-2026-09-04-map1-live-proof`. The workflow is dispatch-only and makes no
+production contact while the token does not match.

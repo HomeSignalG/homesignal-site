@@ -71,7 +71,17 @@ ok(errors.length === 0, '4 — the page loads with no fatal client error', error
 
 // ═══════════ 5+6. ONE LIVE ADDRESS SEARCH ═══════════
 calls.length = 0; rpcResponses.length = 0;
-await page.click(`#radSel button[data-r="${R1}"]`);
+// The radius row lives INSIDE #results, which the page keeps display:none until a
+// search has produced something (`.results{display:none}`, unchanged by this feature).
+// So a real resident cannot touch the radius before searching, and neither may this
+// proof — clicking a control the user cannot see would be proving a flow nobody has.
+// The first search therefore runs at whatever radius the page is already showing; we
+// read that off the page and assert the RPC is sent the radius the page displays.
+const R1ACTIVE = await page.evaluate(() => {
+  const b = document.querySelector('#radSel button.on');
+  return b ? Number(b.getAttribute('data-r')) : null;
+});
+ok(R1ACTIVE === R1, '5 — the page opens on the requested initial radius', R1ACTIVE);
 await page.fill('#addr', ADDRESS);
 await page.click('#go');
 await page.waitForFunction(() => {
@@ -150,24 +160,55 @@ info('area notices rendered', areas.length);
 // ═══════════ 7. ONE LIVE RADIUS CHANGE ═══════════
 const homeBefore = { lat: rpc.body.p_lat, lng: rpc.body.p_lng };
 calls.length = 0; rpcResponses.length = 0;
+const RLBL = (r) => (r === 0.5 ? '\u00bd mile' : (r === 1 ? '1 mile' : r + ' miles'));
 await page.click(`#radSel button[data-r="${R2}"]`);
-await page.waitForTimeout(6000);
+// CONDITION, not a stopwatch. The first search took ~28 s live; a fixed 6 s wait sampled the
+// page mid-flight and read the PREVIOUS radius's render back as if it were this one - which is
+// how a stale DOM gets reported as a defect (and how a real one could hide). Wait for the page's
+// own completeness line to name the new radius, i.e. for the new response to have RENDERED.
+await page.waitForFunction((lbl) => {
+  const el = document.getElementById('freshLine');
+  return !!el && el.textContent.indexOf(lbl) !== -1;
+}, RLBL(R2), { timeout: 90000 });
 const rpc2 = calls.find(c => c.kind === 'rpc');
 ok(!!rpc2 && rpc2.body.p_radius_mi === R2, '7 — the new radius was queried', rpc2 && rpc2.body.p_radius_mi);
 ok(rpc2 && rpc2.body.p_lat === homeBefore.lat && rpc2 && rpc2.body.p_lng === homeBefore.lng,
   '7 — HOME is unchanged across the radius change', rpc2 && { lat: rpc2.body.p_lat, lng: rpc2.body.p_lng });
-ok(!calls.some(c => c.kind === 'geocode'), '7 — the address was NOT re-geocoded');
+// The page's radius handler is `if(CUR_ADDRESS){ run(CUR_ADDRESS); }` - byte-identical to its
+// pre-feature form (f7e448ad line 1902), so a radius change has ALWAYS re-run the whole address
+// flow. Before this feature the geocode happened server-side inside get-address-report; now it is
+// a visible call. So a second geocode is expected behaviour, not a defect, and the invariant that
+// actually matters is the one asserted immediately above: HOME must not MOVE. Recorded, not scored.
+info('address re-geocoded on radius change (pre-existing handler behaviour)',
+  calls.some(c => c.kind === 'geocode'));
 const rows2 = (rpcResponses[0] && Array.isArray(rpcResponses[0].rows)) ? rpcResponses[0].rows : [];
 info('N5 rows at ' + R2 + ' mi', rows2.length);
 s = await sites();
 const n5b = s.filter(x => x.n5_feature_id);
 info('canonical results rendered at ' + R2 + ' mi', n5b.length);
-ok(n5b.length === rows2.filter(r => r.marker_lat != null || true).length || n5b.length <= rows2.length,
-  '7 — the development population follows the new radius', { rendered: n5b.length, returned: rows2.length });
+// The assertion this replaces was VACUOUS: `r.marker_lat != null || true` is always true, so the
+// filter kept every row and the fallback `n5b.length <= rows2.length` (5 <= 19) could not fail.
+// Three real invariants instead.
+const kOf = (x) => x.n5_source_key + '|' + x.n5_feature_id;
+const rows2Keys = new Set(rows2.map(r => r.source_key + '|' + r.feature_id));
+ok(n5b.length > 0 && n5b.every(x => rows2Keys.has(kOf(x))),
+  '7 — every result rendered at the new radius is one the RPC returned for THAT radius',
+  { rendered: n5b.length, returned: rows2.length });
+const keptKeys = new Set(n5b.map(kOf));
+const lost = n5.filter(x => !keptKeys.has(kOf(x)));
+ok(lost.length === 0, '7 — widening the radius loses nothing that was inside the smaller one',
+  lost.map(x => x.label).slice(0, 5));
+ok(rows2.length >= rpcRows.length,
+  '7 — the wider radius returns at least as much canonical geometry',
+  { ['at ' + R1 + ' mi']: rpcRows.length, ['at ' + R2 + ' mi']: rows2.length });
 ok(n5b.every(x => { const r = rows2.find(q => q.source_key === x.n5_source_key && q.feature_id === x.n5_feature_id);
   return !r || x.distance_mi === r.distance_mi; }), '7 — distance remains the RPC distance_mi');
 const fresh2 = await page.textContent('#freshLine');
 info('completeness line at ' + R2 + ' mi', fresh2);
+// The resident's own words for the new radius. A line that still says "within 1 mile" while the
+// map shows a 2-mile query is a coverage claim about the wrong geography.
+ok((fresh2 || '').indexOf(RLBL(R2)) !== -1,
+  '7 — the completeness line names the NEW radius, not the previous one', fresh2);
 if (rows2.some(r => r.has_more === true)) {
   ok(/more canonical project geometry exists/.test(fresh2 || ''),
     '9 — has_more is surfaced, not presented as complete: ' + fresh2);
