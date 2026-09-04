@@ -95,4 +95,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lib/generated/gov-notice-coverage.json
           git commit -m "Regenerate gov-notice-coverage.json from production (runner)"
-          git push origin HEAD:${{ github.ref_name }}
+          # Two pushes to the same branch can race (a second commit landing while this job
+          # runs rejects the push as non-fast-forward — observed on run 1 of this workflow).
+          # Rebase onto whatever arrived and retry once; the artifact is a single generated
+          # file, so a rebase cannot produce a semantic conflict.
+          if ! git push origin HEAD:${{ github.ref_name }}; then
+            echo "push rejected — rebasing onto the branch tip and retrying once"
+            git fetch origin ${{ github.ref_name }}
+            git rebase origin/${{ github.ref_name }}
+            git push origin HEAD:${{ github.ref_name }}
+          fi
