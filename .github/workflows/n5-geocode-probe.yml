@@ -30,11 +30,14 @@ name: n5-geocode-probe
 # and does NOT invoke public.n5_projects_within_radius. No secrets: the public anon key is
 # read from the shipped config.js. permissions: contents:read — it cannot write to the repo.
 
+# DISPATCH-ONLY, deliberately. This is an ARM-GATED operational workflow: its first step
+# hard-fails unless .github/n5-geocode-probe-arm matches EXPECTED_ARM, which is exactly what makes an
+# unarmed dispatch refuse to touch anything. It used to carry a `pull_request` trigger on
+# its own path, which meant it ran - and therefore went RED - on every PR that touched it,
+# because it is disarmed the other 99% of the time. A permanently-red check teaches people
+# to ignore red checks, so the trigger is removed rather than the gate weakened.
 on:
   workflow_dispatch: {}
-  pull_request:
-    paths:
-      - '.github/workflows/n5-geocode-probe.yml'
 
 permissions:
   contents: read
