@@ -653,6 +653,56 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var _gseg = (typeof Intl!=='undefined' && Intl.Segmenter) ? new Intl.Segmenter('en',{granularity:'grapheme'}) : null;
   function graphemeLen(s){ s=String(s||''); if(!_gseg) return s.length; var n=0; var it=_gseg.segment(s); for(var _ of it) n++; return n; }
   function fmtSlot(ts){ if(!ts) return ''; var d=new Date(ts); if(isNaN(d)) return ''; return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  // VISUAL STATUS. A generic OpenGraph link card and a real project-specific Map 1
+  // screenshot are different things, and the founder must never have to guess which one a
+  // draft carries. image_bucket_path is the fact: it is set only by the Maps visual
+  // generator after a real capture.
+  function visualStatus(p){
+    if(p.content_family!=='MAPS'){
+      return p.image_bucket_path
+        ? ' &nbsp;·&nbsp; <span class="t-real">📷 real screenshot attached</span>'
+        : ' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>';
+    }
+    var v=(p.evidence&&p.evidence.visual)||{};
+    if(p.image_bucket_path && v.status==='REAL_MAP_VISUAL'){
+      return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
+    }
+    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
+    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">NO PROJECT-SPECIFIC VISUAL · '+
+      'generic link-card fallback'+why+'</span>';
+  }
+
+  // The proposed image itself. Read from the PRIVATE social-images bucket through a
+  // short-lived signed URL created with the founder's own session — the bucket stays
+  // private and the page never holds a service key.
+  function mapsVisual(p){
+    if(p.content_family!=='MAPS' || !p.image_bucket_path) return '';
+    var id='vis-'+String(p.id);
+    setTimeout(function(){
+      var host=document.getElementById(id); if(!host||host.dataset.done) return;
+      host.dataset.done='1';
+      window.hsClient.storage.from('social-images').createSignedUrl(p.image_bucket_path, 900)
+        .then(function(r){
+          if(r.error||!r.data||!r.data.signedUrl){
+            host.innerHTML='<div class="muted" style="font-size:12px">Image stored at '+
+              esc(p.image_bucket_path)+' but could not be previewed.</div>';
+            return;
+          }
+          host.innerHTML='<img src="'+esc(r.data.signedUrl)+'" alt="Map 1 view of this project" '+
+            'style="max-width:100%;border:1px solid var(--line);border-radius:8px;display:block">';
+        })
+        .catch(function(){ host.innerHTML=''; });
+    },0);
+    var v=(p.evidence&&p.evidence.visual)||{};
+    return '<div style="margin:0 0 10px"><div id="'+esc(id)+'" '+
+      'style="min-height:20px"><div class="muted" style="font-size:12px">Loading map preview…</div></div>'+
+      (v.page_url?('<div class="muted" style="font-size:11.5px;margin-top:4px">Captured from '+
+        esc(v.page_url)+' · framed on the project\u2019s own coordinates ('+
+        esc(String(v.project_lat))+', '+esc(String(v.project_lng))+') · zoom '+esc(String(v.framed_zoom))+
+        ' · '+esc(String(v.markers_on_map))+' markers on the map, surrounding development left visible'+
+        '</div>'):'')+'</div>';
+  }
+
   // MAPS founder-review evidence. Approval IS the fact-check, so the reviewer needs the
   // project identity, the supported location, the provenance tier and the eligibility
   // reason next to the copy — not in another tab. Renders nothing for ALERTS rows.
@@ -677,6 +727,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         row('Registry', e.registry_id)+
         row('Why it qualified', e.eligibility_reason)+
         row('Dedupe identity', e.dedupe_key)+
+        row('Visual', (e.visual&&e.visual.status)||'none')+
+        (e.visual&&e.visual.note?('<div class="muted" style="margin-top:4px">'+esc(e.visual.note)+'</div>'):'')+
         (e.map_destination?('<div><span class="muted">Map 1 destination:</span> <a href="'+esc(e.map_destination)+
           '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||e.map_zip)+' ↗</a></div>'):'')+
         (e.geography_note?('<div style="margin-top:6px;color:var(--muted);border-left:3px solid var(--persist);'+
@@ -703,7 +755,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
         (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+
         ((p.embed&&p.embed.uri)?(' &nbsp;·&nbsp; <a href="'+esc(p.embed.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">post links to ↗</a> (link card)'):' &nbsp;·&nbsp; <span style="color:var(--persist)">NO site link on this draft</span>')+
-        (p.image_bucket_path?' &nbsp;·&nbsp; <span class="t-real">📷 real screenshot attached</span>':' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>')+'</div>'+
+        visualStatus(p)+'</div>'+
+      mapsVisual(p)+
       mapsEvidence(p)+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--accent);color:#fff">Approve</button>':'')+
