@@ -231,6 +231,11 @@ def recover_shard(z3, registry):
                      from geo.n5_frozen
                     where z3={lit(z3)} and treatment='RECOVERY'
                     group by 1 order by 1;""", "rec sources")
+    incomplete = {x["registry_id"] for x in sql(
+        "select distinct registry_id from geo.n5_recovery_attempt where not complete;",
+        "incomplete attempts", read_only=True)}
+    if incomplete:
+        say("registries with an UNFINISHED earlier attempt", ", ".join(sorted(incomplete)))
     report = []
     for r in rows:
         rid = r["registry_id"]
@@ -249,12 +254,26 @@ def recover_shard(z3, registry):
             report.append({"registry_id": rid, "status": "NO_RECOVERABLE_KEYS",
                            "unstable": n_unstable})
             continue
-        cached = {x["source_key"] for x in sql(
-            "select distinct source_key from geo.n5_geom where source_key in ("
-            + ",".join(lit(k) for k in keys) + ");", "cache probe")}
+        # PRESENCE IS NOT COMPLETENESS. insert_batched writes a registry's features in
+        # chunks, so a process killed mid-insert leaves SOME of a key's features behind -
+        # and a probe that asks only "is this source_key present?" then reads those keys
+        # as done and never asks for the rest. That is a permanent hole that looks exactly
+        # like a project with less geometry to find. geo.n5_recovery_attempt.complete is
+        # the marker: a registry with an unfinished attempt anywhere is re-asked in full.
+        # Nothing is deleted - the re-fetch inserts ON CONFLICT DO NOTHING, so existing
+        # rows keep their first-acquisition vintage and only the missing features arrive.
+        if rid in incomplete:
+            cached, forced = set(), True
+            say(f"  {rid} cache BYPASSED", "an earlier attempt did not complete")
+        else:
+            cached, forced = {x["source_key"] for x in sql(
+                "select distinct source_key from geo.n5_geom where source_key in ("
+                + ",".join(lit(k) for k in keys) + ");", "cache probe", read_only=True)}, False
         todo = [k for k in keys if k not in cached]
         st = {"registry_id": rid, "status": "OK", "projects": len(keys),
               "cache_hits": len(cached), "fetched": 0, "features": 0, "unstable": n_unstable}
+        if forced:
+            st["cache_bypassed"] = True
         if todo:
             plat, entry = registry.get(rid, (None, None))
             if entry is None or not entry.get("service_url"):
@@ -262,14 +281,26 @@ def recover_shard(z3, registry):
                 st["reason"] = "no service_url in jurisdiction-registry.json"
                 report.append(st)
                 continue
+            # Claim the attempt as INCOMPLETE first, so a process killed anywhere inside
+            # fetch_features leaves a durable marker instead of an absence.
+            sql(f"""insert into geo.n5_recovery_attempt
+                      (z3,registry_id,projects_in_shard,cache_hits,fetched,features,
+                       complete,started_at,completed_at)
+                    values ({lit(z3)},{lit(rid)},{len(keys)},{len(cached)},0,0,
+                            false,now(),null)
+                    on conflict (z3,registry_id) do update set
+                      complete=false, started_at=now(), completed_at=null;""", "rec claim")
             st.update(fetch_features(rid, entry, todo, z3))
         sql(f"""insert into geo.n5_recovery_attempt
-                  (z3,registry_id,projects_in_shard,cache_hits,fetched,features,bytes_in,requests)
+                  (z3,registry_id,projects_in_shard,cache_hits,fetched,features,bytes_in,requests,
+                   complete,completed_at)
                 values ({lit(z3)},{lit(rid)},{len(keys)},{len(cached)},{st.get('fetched',0)},
-                        {st.get('features',0)},{st.get('bytes_in',0)},{st.get('requests',0)})
+                        {st.get('features',0)},{st.get('bytes_in',0)},{st.get('requests',0)},
+                        true,now())
                 on conflict (z3,registry_id) do update set
                   projects_in_shard=excluded.projects_in_shard, cache_hits=excluded.cache_hits,
-                  fetched=excluded.fetched, features=excluded.features;""", "rec attempt")
+                  fetched=excluded.fetched, features=excluded.features,
+                  complete=true, completed_at=now();""", "rec attempt")
         report.append(st)
     return report
 
