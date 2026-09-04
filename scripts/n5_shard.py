@@ -454,7 +454,7 @@ select (select count(*) from legacy) legacy_pairs,
        (select count(distinct source_key) from proj) projects,
        (select count(*) from hasg) with_geom,
        (select count(*) from proj where unstable) unstable_projects;"""
-    return sql(q, "counts " + z3)[0]
+    return sql(q, "counts " + z3, read_only=True)[0]
 
 
 # ---------------------------------------------------------------- one shard
@@ -465,7 +465,7 @@ def run_shard(z3):
     say("SHARD", z3)
     t_shard = time.time()
     man = sql(f"""select projects, pairs, zips, checksum from geo.n5_shard
-                   where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest")[0]
+                   where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest", read_only=True)[0]
     say("manifest projects / pairs / zips",
         f"{man['projects']} / {man['pairs']} / {man['zips']}")
 
@@ -479,10 +479,15 @@ def run_shard(z3):
               left join public.app_projects p on p.id = i.app_project_id
              where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
                and left(i.zip,3)={lit(z3)};""", "freeze")
+    # The whole table was just replaced, so its planner statistics describe the PREVIOUS
+    # shard until autoanalyze happens to catch up. Cheap here, and it removes the
+    # stale-statistics class of plan blow-up on the dense shards. Hardening: it is not
+    # a proven cause of the 934 timeout, only a risk this removes.
+    sql("analyze geo.n5_frozen;", "analyze frozen")
     chk = sql(f"""select count(*) rows, count(distinct source_key) projects,
                          count(distinct source_key||'|'||zip) pairs, count(distinct zip) zips,
                          sum(('x'||substr(md5(source_key||'|'||zip||'|'||coalesce(source_seq::text,'')),1,8))::bit(32)::bigint) ck
-                    from geo.n5_frozen where z3={lit(z3)};""", "freeze chk")[0]
+                    from geo.n5_frozen where z3={lit(z3)};""", "freeze chk", read_only=True)[0]
     say("frozen rows / projects / pairs",
         f"{chk['rows']} / {chk['projects']} / {chk['pairs']}")
     drift = []
@@ -498,11 +503,12 @@ def run_shard(z3):
 
     # 2 - BOUNDARIES
     zips = [r["zip"] for r in sql(
-        f"select distinct zip from geo.n5_frozen where z3={lit(z3)} order by zip;", "zips")]
+        f"select distinct zip from geo.n5_frozen where z3={lit(z3)} order by zip;", "zips", read_only=True)]
     loaded, missing, nb, bad, pts = load_boundaries(z3, zips)
     say("ZIPs in shard / ZCTA-matched / no boundary",
         f"{len(zips)} / {loaded} / {len(missing)}")
     say("boundary polygons valid", f"{nb - bad} of {nb}" + ("" if bad == 0 else "  <-- INVALID"))
+    sql("analyze geo.n5_zcta;", "analyze zcta")
     say("boundary vertices", f"{pts:,}")
     if bad:
         return halt(z3, "INVALID_BOUNDARY", {"invalid": bad})
@@ -523,7 +529,7 @@ def run_shard(z3):
     before = shard_counts(z3)
     associate(z3)
     got = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                      "assoc n"), "n"))
+                      "assoc n", read_only=True), "n"))
     say("", "")
     say("legacy pairs", before["legacy_pairs"])
     say("  geometry_verified (1)", before["v1"])
@@ -546,17 +552,17 @@ def run_shard(z3):
                               where left(a.zip,3)={lit(z3)}
                                 and not exists (select 1 from geo.n5_frozen f
                                                  where f.z3={lit(z3)} and f.source_key=a.source_key);""",
-                          "phantom"), "n"))
+                          "phantom", read_only=True), "n"))
     say("phantom projects (not in frozen slice)", phantom)
     fp1 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp1"), "m")
+                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp1", read_only=True), "m")
     associate(z3)
     n2 = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                     "assoc n2"), "n"))
+                     "assoc n2", read_only=True), "n"))
     fp2 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp2"), "m")
+                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp2", read_only=True), "m")
     say("second-run inserts", n2 - got)
     say("fingerprint identical", "yes" if fp1 == fp2 else "NO")
     say("shard fingerprint", fp1)
@@ -568,8 +574,8 @@ def run_shard(z3):
     #     geo.n5_geom is deliberately NOT discarded: it is the cross-shard geometry cache.
     sql(f"delete from geo.n5_zcta where z3={lit(z3)};", "drop zcta")
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "drop frozen")
-    left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left"), "n"))
-    left_f = int(one(sql(f"select count(*) n from geo.n5_frozen where z3={lit(z3)};", "f left"), "n"))
+    left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left", read_only=True), "n"))
+    left_f = int(one(sql(f"select count(*) n from geo.n5_frozen where z3={lit(z3)};", "f left", read_only=True), "n"))
     say("working set discarded (boundaries / frozen)", f"{left_z} / {left_f} remaining")
 
     # 7 - DISK
