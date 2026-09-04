@@ -1,0 +1,541 @@
+name: n5-rpc-apply
+
+# Installs the REVIEWED revised radius RPC into production, exactly once:
+#     docs/n5-spatial-read-rpc.sql  ->  public.n5_projects_within_radius(
+#         double precision, double precision, numeric, integer)
+#
+# RE-POINTED 2026-09-04 AT REVISION 3 (marker_lat / marker_lng). STILL DISARMED - this
+# edit is a re-point plus wider verification, NOT an authorization to install. The arm
+# file does not match EXPECTED_ARM, so the job stops before any database contact.
+#
+# TWO THINGS REVISION 3 CHANGES ABOUT THIS WORKFLOW:
+#   1. The DDL now begins with `drop function if exists ...(<the exact 4-arg signature>)`,
+#      because adding columns to RETURNS TABLE changes the return type and PostgreSQL
+#      cannot `create or replace` through that. The apply already runs the whole file under
+#      --single-transaction, so the drop, the create, the comment, the revoke and the grant
+#      commit together or not at all.
+#   2. The gate-failure path below drops the function by signature. Under revision 2 that
+#      restored nothing and removed the new function; under revision 3 it leaves production
+#      with NO n5_projects_within_radius at all, because the old one is already gone. That
+#      is accepted deliberately: NOTHING IN PRODUCTION CALLS THIS FUNCTION YET (Map 1 does
+#      not), so "absent" is a safe terminal state and re-running the unit re-installs it. A
+#      restore-the-previous-revision path is not built, because an untested rollback path is
+#      worse than a known-safe absence.
+#
+# Founder-authorized 2026-09-03 for INSTALLATION + INSTALLATION VERIFICATION ONLY.
+# IT DOES NOT EXECUTE THE RPC. There is no call to n5_projects_within_radius anywhere in
+# this workflow; every post-install check is a CATALOG read. The 0.5-mile proof is a
+# separate, later, separately-authorized unit.
+#
+# FOUNDER RULING 2026-09-03 - the fixed precondition `geo.n5_association = 20170` is RETIRED
+# for this unit and is NOT replaced by 21674 or any other constant. The RPC neither reads nor
+# writes that table, and an independent shard campaign is legitimately consuming the
+# synchronized snapshot, so a fixed equality would turn real shard progress into a false
+# installation failure. Association is OBSERVATIONAL: measured before and after, delta
+# reported, never asserted.
+#
+# The HARD controls are unchanged and fail the job: geometry total / provenance split /
+# PROVEN fingerprint / rejects / manifest READY / canonical_synced_at identical before and
+# after. Those are exactly what a CREATE FUNCTION could threaten.
+#
+# NO RETRY. NO SECOND APPLICATION.
+
+# DISPATCH-ONLY, deliberately. This is an ARM-GATED operational workflow: its first step
+# hard-fails unless .github/n5-rpc-apply-arm matches EXPECTED_ARM, which is exactly what makes an
+# unarmed dispatch refuse to touch anything. It used to carry a `pull_request` trigger on
+# its own path, which meant it ran - and therefore went RED - on every PR that touched it,
+# because it is disarmed the other 99% of the time. A permanently-red check teaches people
+# to ignore red checks, so the trigger is removed rather than the gate weakened.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  # Must equal .github/n5-rpc-apply-arm or the job stops before touching the database.
+  EXPECTED_ARM: arm-2026-09-04-rpc-rev3-install
+  AUTHORIZED_COMMIT: 15e45ee7d6e5ada95c52824cba7a8755a97ba3f0
+  EXPECTED_DDL_SHA: 33fdb5d7025d4eee5dcc26e854f1f01d6c73ae4e7e4d016ba6f283f7b2557c02
+  SIG: double precision, double precision, numeric, integer
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ARMING GATE - refuse to touch the database unless deliberately armed
+        id: arm
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-rpc-apply-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED. No database contact."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: ARTIFACT IDENTITY - the authorized DDL, byte for byte
+        run: |
+          set -euo pipefail
+          echo "HEAD               : $(git rev-parse HEAD)"
+          echo "authorized commit  : $AUTHORIZED_COMMIT"
+          git merge-base --is-ancestor "$AUTHORIZED_COMMIT" HEAD \
+            || { echo "ABORT: authorized commit is not contained in HEAD"; exit 1; }
+          # The receipt-only commit must not have touched the DDL.
+          if ! git diff --quiet "$AUTHORIZED_COMMIT" HEAD -- docs/n5-spatial-read-rpc.sql; then
+            echo "ABORT: docs/n5-spatial-read-rpc.sql differs from the authorized commit"
+            git diff --stat "$AUTHORIZED_COMMIT" HEAD -- docs/n5-spatial-read-rpc.sql
+            exit 1
+          fi
+          echo "DDL identical to the authorized commit (receipt-only commits did not touch it)"
+          ACTUAL="$(sha256sum docs/n5-spatial-read-rpc.sql | cut -d' ' -f1)"
+          echo "DDL sha256 expected: $EXPECTED_DDL_SHA"
+          echo "DDL sha256 actual  : $ACTUAL"
+          [ "$ACTUAL" = "$EXPECTED_DDL_SHA" ] || { echo "ABORT: DDL hash mismatch"; exit 1; }
+          test -z "$(git status --porcelain docs/ scripts/)" || { echo "ABORT: tree dirty"; exit 1; }
+          # prosrc identity target, computed FROM THE FILE so it can never drift out of step.
+          # ⚠️ The capture must be the EXACT dollar-quoted content, INCLUDING the leading and
+          # trailing newline. Postgres stores prosrc verbatim as everything between $fn$ and
+          # $fn$; an earlier version anchored on `as $fn$\n ... \n$fn$;` and so compared a
+          # body two characters shorter (6567 vs 6569), which could never match and produced
+          # a false "production body differs" on a byte-identical install.
+          python3 - <<'PY' > /tmp/expected_prosrc_md5.txt
+          import re, hashlib
+          s = open("docs/n5-spatial-read-rpc.sql").read()
+          body = re.search(r"as \$fn\$(.*?)\$fn\$;", s, re.S).group(1)
+          print(hashlib.md5(body.encode()).hexdigest())
+          PY
+          echo "expected prosrc md5: $(cat /tmp/expected_prosrc_md5.txt)"
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: PRE-STATE - hard preconditions, RPC absence, quiescence, observational baseline
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/pre.sql <<'SQL'
+          \conninfo
+          set session characteristics as transaction read only;
+          set statement_timeout = '5min';
+          do $ro$ begin
+            if current_setting('default_transaction_read_only') <> 'on' then
+              raise exception 'ABORT: pre-state session is not read-only'; end if;
+          end $ro$;
+
+          do $pre$
+          declare
+            bad text := ''; snap text := 'phase1-2026-09-01'; db text;
+            n_fn bigint; m_state text; m_sync timestamptz;
+            p_args text; p_res text; p_owner text; p_secdef boolean; p_vol char(1);
+            p_cfg text; p_md5 text; p_pub boolean; p_anon boolean; p_auth boolean;
+            n_wrongsnap bigint; n_rejvis bigint;
+            g_total bigint; g_proven bigint; g_recov bigint; g_md5 text; n_rej bigint;
+            n_lock bigint; lock_detail text;
+          begin
+            select current_database() into db;
+            if db <> 'postgres' then bad := bad || ' [unexpected database ' || db || ']'; end if;
+
+            -- REVISION 3 REPLACES REVISION 2, so the predecessor must be PRESENT and must be
+            -- exactly the reviewed revision 2. The previous version of this gate demanded the
+            -- function be ABSENT, which was correct for the first install and is wrong now.
+            -- Anything other than the known predecessor means production is not in the state
+            -- this unit was authorized against, and the DROP must not happen.
+            select count(*) into n_fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'n5_projects_within_radius';
+            if n_fn <> 1 then
+              bad := bad || ' [expected exactly 1 predecessor overload, found ' || n_fn || ']';
+            else
+              select pg_get_function_identity_arguments(p.oid), pg_get_function_result(p.oid),
+                     pg_get_userbyid(p.proowner), p.prosecdef, p.provolatile,
+                     coalesce(array_to_string(p.proconfig, ','), ''), md5(p.prosrc)
+                into p_args, p_res, p_owner, p_secdef, p_vol, p_cfg, p_md5
+                from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where n.nspname = 'public' and p.proname = 'n5_projects_within_radius';
+              if p_args <> 'p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer' then
+                bad := bad || ' [predecessor args ' || p_args || ']'; end if;
+              if p_res <> 'TABLE(source_key text, feature_id text, registry_id text, provenance text, distance_mi double precision, geometry_type text, has_more boolean)' then
+                bad := bad || ' [predecessor is not the 7-column revision 2: ' || p_res || ']'; end if;
+              if p_owner <> 'postgres' then bad := bad || ' [predecessor owner ' || p_owner || ']'; end if;
+              if not p_secdef then bad := bad || ' [predecessor not SECURITY DEFINER]'; end if;
+              if p_vol <> 's' then bad := bad || ' [predecessor volatility ' || p_vol || ']'; end if;
+              if position('search_path=public' in p_cfg) = 0 then
+                bad := bad || ' [predecessor proconfig ' || p_cfg || ']'; end if;
+              -- measured 2026-09-03 at the revision-2 installation and recorded in
+              -- docs/n5-spatial-read-rpc-readiness.md section 14.
+              if p_md5 <> 'e1bb67c604aaaa4e1ab541ee32bc82ea' then
+                bad := bad || ' [predecessor body md5 ' || coalesce(p_md5,'<null>') || ']'; end if;
+              select has_function_privilege('public','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE'),
+                     has_function_privilege('anon','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE'),
+                     has_function_privilege('authenticated','public.n5_projects_within_radius(double precision, double precision, numeric, integer)','EXECUTE')
+                into p_pub, p_anon, p_auth;
+              if p_pub then bad := bad || ' [predecessor: PUBLIC holds EXECUTE]'; end if;
+              if not p_anon then bad := bad || ' [predecessor: anon lacks EXECUTE]'; end if;
+              if not p_auth then bad := bad || ' [predecessor: authenticated lacks EXECUTE]'; end if;
+            end if;
+
+            -- ---- HARD controls (founder: unchanged, divergence = STOP) ----
+            select state, canonical_synced_at into m_state, m_sync
+              from geo.n5_verdict_manifest where snapshot_id = snap;
+            if m_state is distinct from 'READY' then
+              bad := bad || ' [manifest ' || coalesce(m_state,'<absent>') || ' <> READY]'; end if;
+            if m_sync is null then bad := bad || ' [canonical_synced_at is NULL]'; end if;
+
+            select count(*) into g_total  from geo.n5_geom;
+            select count(*) into g_proven from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into g_recov  from geo.n5_geom where provenance='recovered_authoritative';
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into g_md5 from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into n_rej from geo.n5_point_reject;
+            -- FOUNDER RULING for this unit: total geometry and recovered_authoritative are
+            -- OBSERVATIONAL, not hard. The recovery campaign is live and legitimately grows
+            -- both, so a fixed equality would turn its progress into a false install failure.
+            -- PROVEN is snapshot-frozen and stays HARD, as do the fingerprint and rejects.
+            raise notice 'OBSERVATIONAL pre: geometry total %, recovered_authoritative %', g_total, g_recov;
+            if g_proven <> 718278 then bad := bad || ' [proven ' || g_proven || ']'; end if;
+            -- `is distinct from`, not `<>`: string_agg over an empty set returns NULL, and
+            -- `NULL <> 'bbda...'` is NULL, so an IF on it never fires - the fingerprint gate
+            -- would silently PASS on an empty table. The proven-count check would catch that
+            -- case today, but a gate must not depend on another gate to not be NULL-blind.
+            if g_md5 is distinct from 'bbda250fc30ee0b3aa3f46a259392aa3' then
+              bad := bad || ' [PROVEN fingerprint ' || coalesce(g_md5,'<null>') || ']'; end if;
+            if n_rej <> 5171 then bad := bad || ' [rejects ' || n_rej || ']'; end if;
+
+            -- Required by this unit: no PROVEN geometry may belong to another snapshot, and
+            -- no rejected identity may still carry RPC-visible PROVEN geometry.
+            select count(*) into n_wrongsnap from geo.n5_geom g
+             where g.provenance = 'proven_stored_point'
+               and g.verdict_snapshot_id is distinct from snap;
+            if n_wrongsnap <> 0 then
+              bad := bad || ' [wrong-snapshot PROVEN ' || n_wrongsnap || ']'; end if;
+            select count(*) into n_rejvis from geo.n5_geom g
+             where g.provenance = 'proven_stored_point' and g.outcome = 1 and g.geom is not null
+               and exists (select 1 from geo.n5_point_reject r where r.source_key = g.source_key);
+            if n_rejvis <> 0 then
+              bad := bad || ' [rejected-visible PROVEN ' || n_rejvis || ']'; end if;
+
+            -- ---- QUIESCENCE, narrowed BY RULING to an actual conflicting lock ----
+            -- Pending shards are explicitly NOT a blocker. A shard writes geo.n5_association
+            -- and reads geo.n5_geom; CREATE FUNCTION takes no lock on either. What WOULD
+            -- block is a competing DDL-strength lock on the function's dependencies.
+            select count(*) into n_lock
+              from pg_locks l join pg_class c on c.oid = l.relation
+              join pg_namespace ns on ns.oid = c.relnamespace
+             where l.pid <> pg_backend_pid() and ns.nspname = 'geo'
+               and c.relname in ('n5_geom','n5_point_reject','n5_verdict_manifest')
+               and l.mode in ('AccessExclusiveLock','ExclusiveLock','ShareRowExclusiveLock');
+            if n_lock <> 0 then
+              select string_agg(l.pid || ':' || c.relname || ':' || l.mode, ' | ')
+                into lock_detail
+                from pg_locks l join pg_class c on c.oid = l.relation
+                join pg_namespace ns on ns.oid = c.relnamespace
+               where l.pid <> pg_backend_pid() and ns.nspname = 'geo'
+                 and l.mode in ('AccessExclusiveLock','ExclusiveLock','ShareRowExclusiveLock');
+              bad := bad || ' [conflicting exclusive lock(s): ' || coalesce(lock_detail,'?') || ']';
+            end if;
+
+            if bad <> '' then
+              raise exception 'PRE-STATE ABORT -%. Nothing was installed.', bad; end if;
+            raise notice 'PRE-STATE VERIFIED - revision-2 predecessor present and identical, manifest READY + synced at %, PROVEN 718278, fingerprint bbda250f..., rejects 5171, wrong-snapshot 0, rejected-visible 0, no conflicting exclusive lock',
+                         m_sync;
+          end $pre$;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+
+          # Observational + hard baseline, captured for the post-state comparison.
+          cat > /tmp/premetrics.sql <<'SQL'
+          set session characteristics as transaction read only;
+          set statement_timeout = '5min';
+          select now()::text,
+                 (select canonical_synced_at::text from geo.n5_verdict_manifest
+                   where snapshot_id='phase1-2026-09-01'),
+                 (select state from geo.n5_verdict_manifest where snapshot_id='phase1-2026-09-01'),
+                 (select count(*) from geo.n5_geom),
+                 (select count(*) from geo.n5_geom where provenance='proven_stored_point'),
+                 (select count(*) from geo.n5_geom where provenance='recovered_authoritative'),
+                 (select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                             chr(10) order by source_key collate "C", feature_id collate "C"))
+                    from geo.n5_geom where provenance='proven_stored_point'),
+                 (select count(*) from geo.n5_point_reject),
+                 (select count(*) from geo.n5_association),
+                 (select count(*) from geo.n5_shard where state='done'),
+                 (select count(*) from geo.n5_shard where state='pending'),
+                 (select count(*) from geo.n5_shard where state='running'),
+                 (select count(*) from geo.n5_geom g where g.provenance='proven_stored_point'
+                    and g.verdict_snapshot_id is distinct from 'phase1-2026-09-01'),
+                 (select count(*) from geo.n5_geom g where g.provenance='proven_stored_point'
+                    and g.outcome=1 and g.geom is not null
+                    and exists (select 1 from geo.n5_point_reject r where r.source_key=g.source_key));
+          SQL
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/premetrics.sql | grep -v '^$' | tail -1 > /tmp/pre_metrics.txt
+          echo "PRE METRICS: $(cat /tmp/pre_metrics.txt)"
+          test -s /tmp/pre_metrics.txt || { echo "ABORT: no pre-metrics"; exit 1; }
+          IFS='|' read -r T0 SYNC ST GT GP GR GM RJ AS SD SP SR WS RV < /tmp/pre_metrics.txt
+          echo "--- observational baseline (NOT asserted, per founder ruling) ---"
+          echo "  association       : $AS"
+          echo "  shards done       : $SD"
+          echo "  shards pending    : $SP"
+          echo "  shards running    : $SR"
+
+      - name: APPLY the reviewed DDL verbatim (exactly once, no retry)
+        id: apply
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql --version
+          echo "START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # --single-transaction so the four statements (create / comment / revoke / grant)
+          # commit together or not at all. The FILE is passed verbatim with -f; the two
+          # timeouts ride on -c inside the same transaction, so nothing in the reviewed
+          # artifact is reconstructed or edited.
+          psql "$SUPABASE_DB_URL" -X --single-transaction -v ON_ERROR_STOP=1 -P pager=off \
+               -c "set local lock_timeout = '5s'" \
+               -c "set local statement_timeout = '5min'" \
+               -f docs/n5-spatial-read-rpc.sql
+          echo "END   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: OWNERSHIP HARD GATE - drop the function and stop if the owner is wrong
+        id: owner
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          # geo.n5_geom / n5_point_reject / n5_verdict_manifest all have RLS ENABLED with ZERO
+          # policies and relforcerowsecurity = false. A table owner bypasses RLS when force is
+          # off, so a SECURITY DEFINER function reads rows ONLY if it is owned by `postgres`.
+          # Owned by anything else it creates cleanly, passes every structural test, and then
+          # returns zero rows forever - indistinguishable from "nothing near this home".
+          OUT=$(psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -c "
+            select pg_get_userbyid(p.proowner), p.prosecdef, p.provolatile,
+                   coalesce(array_to_string(p.proconfig, ','), ''),
+                   pg_get_function_identity_arguments(p.oid),
+                   pg_get_function_result(p.oid)
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname='public' and p.proname='n5_projects_within_radius';" | grep -v '^$')
+          echo "catalog: $OUT"
+          IFS='|' read -r OWNER SECDEF VOL CFG ARGS RES <<< "$OUT"
+          fail=0
+          [ "$OWNER"  = "postgres" ] || { echo "OWNERSHIP GATE FAILED: owner=$OWNER"; fail=1; }
+          [ "$SECDEF" = "t" ]        || { echo "GATE FAILED: prosecdef=$SECDEF";      fail=1; }
+          [ "$VOL"    = "s" ]        || { echo "GATE FAILED: provolatile=$VOL";       fail=1; }
+          case "$CFG" in *search_path=public*) ;; *) echo "GATE FAILED: proconfig=$CFG"; fail=1;; esac
+          [ "$ARGS" = "p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer" ] \
+            || { echo "GATE FAILED: identity args = $ARGS"; fail=1; }
+          # REVISION 3: the public column contract is gated in full and IN ORDER. A marker
+          # column that arrived in the wrong position would still "contain marker_lat", so a
+          # substring test is not enough - callers read this positionally.
+          EXPECT_RES="TABLE(source_key text, feature_id text, registry_id text, provenance text, distance_mi double precision, geometry_type text, marker_lat double precision, marker_lng double precision, has_more boolean)"
+          [ "$RES" = "$EXPECT_RES" ] || {
+            echo "GATE FAILED: result type"
+            echo "  expected: $EXPECT_RES"
+            echo "  actual  : $RES"; fail=1; }
+          if [ "$fail" != "0" ]; then
+            echo "REMOVING the just-created function using its exact signature, then stopping."
+            psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off \
+                 -c "drop function if exists public.n5_projects_within_radius($SIG);"
+            psql "$SUPABASE_DB_URL" -X -q -tA -P pager=off -c "
+              select 'remaining_overloads=' || count(*) from pg_proc p
+                join pg_namespace n on n.oid=p.pronamespace
+               where n.nspname='public' and p.proname='n5_projects_within_radius';"
+            echo "B - APPLY FAILED / FUNCTION REMOVED"
+            exit 1
+          fi
+          echo "OWNERSHIP GATE PASSED"
+          echo "owner=$OWNER secdef=$SECDEF volatility=$VOL proconfig=$CFG"
+          echo "identity_args=$ARGS"
+          echo "returns=$RES"
+
+      # ⛔ NEVER put a DOUBLE QUOTE inside these psql -c "..." SQL blocks, not even inside a
+      # SQL comment. Bash ends the argument at the quote, psql receives a truncated statement,
+      # and it fails with `syntax error at end of input` AFTER the apply has already committed.
+      # Measured on run 33822830946: the install was correct and byte-identical, and this step
+      # still went red on a comment that read: so an "appears exactly once" test.
+      - name: DEFINITION IDENTITY - production body is byte-identical to the reviewed artifact
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          EXPECT="$(cat /tmp/expected_prosrc_md5.txt)"
+          ACTUAL=$(psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off -c "
+            select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+             where n.nspname='public' and p.proname='n5_projects_within_radius';" | grep -v '^$')
+          echo "prosrc md5 expected (from the committed file): $EXPECT"
+          echo "prosrc md5 in production                     : $ACTUAL"
+          [ "$EXPECT" = "$ACTUAL" ] || { echo "ABORT: production body differs from the reviewed artifact"; exit 1; }
+          echo "EXACT BODY IDENTITY PROVEN - production carries the reviewed semantics verbatim"
+
+          # Token-level readout over the STORED body, for the human receipt. prosrc is stored
+          # verbatim, so these are read from production, not from the repo file.
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -c "
+            with s as (select p.oid o, p.prosrc b from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                        where n.nspname='public' and p.proname='n5_projects_within_radius')
+            select
+              -- the RETURNS TABLE clause is NOT in prosrc; read the real result type.
+              'provenance_in_result_type='      || (position('provenance text' in pg_get_function_result(o)) > 0),
+              'provenance_selected_from_row='   || (position('g.provenance   as provenance' in b) > 0),
+              'provenance_carried_to_output='   || (position('h.provenance' in b) > 0),
+              'proven_allowlisted='             || (position('''proven_stored_point'',''recovered_authoritative''' in b) > 0),
+              'provenance_any_allowlist='       || (position('g.provenance = any (v_prov)' in b) > 0),
+              'outcome_geom_eligibility='       || ((position('g.outcome = 1' in b) > 0) and (position('g.geom is not null' in b) > 0)),
+              'proven_snapshot_condition='      || (position('g.verdict_snapshot_id = v_snapshot' in b) > 0),
+              'rejected_excluded='              || (position('geo.n5_point_reject' in b) > 0),
+              'lifecycle_ready='                || (position('m.state = ''READY''' in b) > 0),
+              'lifecycle_synced='               || (position('m.canonical_synced_at is not null' in b) > 0),
+              'lifecycle_strict='               || (position('into strict v_snapshot' in b) > 0),
+              'radius_allowlist='               || (position('array[0.5, 1, 2, 5]' in b) > 0),
+              'limit_validation='               || (position('p_limit > v_max_rows' in b) > 0),
+              'hard_max_2000='                  || (position('v_max_rows  constant integer := 2000' in b) > 0),
+              'limit_plus_one='                 || (position('limit p_limit + 1' in b) > 0),
+              'has_more='                       || (position('as has_more' in b) > 0),
+              'deterministic_order_page='       || (position('order by h.distance_mi, h.source_key, h.feature_id' in b) > 0),
+              'deterministic_order_final='      || (position('order by pl.distance_mi, pl.source_key, pl.feature_id' in b) > 0),
+              'true_geometry_dwithin='          || (position('st_dwithin(st_transform(g.geom, 4326)::geography' in b) > 0),
+              'true_geometry_distance='         || (position('st_distance(st_transform(g.geom, 4326)::geography' in b) > 0),
+              'grain_source_key_feature_id='    || ((position('g.source_key' in b) > 0) and (position('g.feature_id' in b) > 0)),
+              'NO_distinct_on='                 || (position('distinct on' in lower(b)) = 0),
+              -- REVISION 3: ST_PointOnSurface is now used, in the MARKER derivation only.
+              -- What must stay true is that nothing substitutes a derived point for the true
+              -- geometry in the region that FILTERS and MEASURES, so these are positional:
+              -- everything after 'limit p_limit + 1' is post-filter.
+              'NO_centroid='                    || (position('st_centroid' in lower(b)) = 0),
+              'NO_rep_point='                   || (position('n5_rep_point' in lower(b)) = 0),
+              'NO_bbox_centre='                 || ((position('st_envelope' in lower(b)) = 0) and (position('st_boundingdiagonal' in lower(b)) = 0)),
+              -- Counting occurrences would be WRONG here and was measured wrong before this
+              -- shipped: prosrc keeps the body's own comments, and the comment above the
+              -- polygon branch names ST_PointOnSurface, so an appears-exactly-once test
+              -- reports false on a correct function and would abort a valid install. The
+              -- property that actually matters is comment-insensitive: NO occurrence exists
+              -- before the end of the filter region.
+              'NO_pointonsurface_in_filter='    || (position('st_pointonsurface' in left(lower(b), position('limit p_limit + 1' in lower(b)))) = 0),
+              'pointonsurface_is_used='         || (position('st_pointonsurface' in lower(b)) > 0),
+              'marker_after_filter='            || (position('marker' in lower(b)) > position('limit p_limit + 1' in lower(b))),
+              'marker_after_page_limit='        || (position('marked as (' in lower(b)) > position('limit p_limit' in lower(b))),
+              'marker_lat_in_result_type='      || (position('marker_lat double precision' in pg_get_function_result(o)) > 0),
+              'marker_lng_in_result_type='      || (position('marker_lng double precision' in pg_get_function_result(o)) > 0),
+              'marker_from_same_identity='      || ((position('g.source_key = p.source_key' in b) > 0) and (position('g.feature_id = p.feature_id' in b) > 0)),
+              'marker_join_is_LEFT='            || (position('left join geo.n5_geom g' in b) > 0),
+              'marker_lat_is_ST_Y='             || (position('st_y(pl.marker4326) as marker_lat' in b) > 0),
+              'marker_lng_is_ST_X='             || (position('st_x(pl.marker4326) as marker_lng' in b) > 0),
+              'marker_point_is_own_geometry='   || (position('when t.g_type = ''POINT'' then t.g_geom' in b) > 0),
+              'marker_line_is_a_vertex='        || ((position('st_dumppoints(t.principal)' in b) > 0) and (position('st_lineinterpolatepoint(t.principal, 0.5)' in b) > 0)),
+              'marker_polygon_repairs_invalid=' || (position('st_collectionextract(st_makevalid(t.principal), 3)' in b) > 0),
+              'marker_srid_fails_closed='       || ((position('public.spatial_ref_sys srs' in b) > 0) and (position('end as marker4326' in b) > 0)),
+              'marker_never_measures='          || ((position('st_dwithin' in lower(b)) < position('marker' in lower(b))) and ((length(lower(b)) - length(replace(lower(b), 'st_dwithin', ''))) / length('st_dwithin') = 1)),
+              'NO_app_projects='                || (position('app_projects' in b) = 0),
+              'NO_n5_association='              || (position('n5_association' in b) = 0),
+              'NO_dynamic_sql='                 || ((position('execute format' in lower(b)) = 0) and (position('quote_ident' in lower(b)) = 0))
+            from s;" | tr '|' '\n' | tee /tmp/tokens.txt
+          if grep -q 'false' /tmp/tokens.txt; then
+            echo "ABORT: a definition-identity token check reported false"; exit 1; fi
+          echo "ALL DEFINITION-IDENTITY TOKEN CHECKS TRUE"
+
+      - name: SECURITY - grants, PUBLIC, geo.* privileges, RLS state
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -c "
+            select
+              'exec_public='        || has_function_privilege('public','public.n5_projects_within_radius($SIG)','EXECUTE'),
+              'exec_anon='          || has_function_privilege('anon','public.n5_projects_within_radius($SIG)','EXECUTE'),
+              'exec_authenticated=' || has_function_privilege('authenticated','public.n5_projects_within_radius($SIG)','EXECUTE'),
+              'anon_select_geom='   || has_table_privilege('anon','geo.n5_geom','SELECT'),
+              'auth_select_geom='   || has_table_privilege('authenticated','geo.n5_geom','SELECT'),
+              'anon_select_reject=' || has_table_privilege('anon','geo.n5_point_reject','SELECT'),
+              'anon_select_manif='  || has_table_privilege('anon','geo.n5_verdict_manifest','SELECT'),
+              'anon_usage_geo='     || has_schema_privilege('anon','geo','USAGE');" \
+            | tr '|' '\n' | tee /tmp/sec.txt
+          grep -q 'exec_public=false'        /tmp/sec.txt || { echo "ABORT: PUBLIC retains EXECUTE"; exit 1; }
+          grep -q 'exec_anon=true'           /tmp/sec.txt || { echo "ABORT: anon lacks EXECUTE"; exit 1; }
+          grep -q 'exec_authenticated=true'  /tmp/sec.txt || { echo "ABORT: authenticated lacks EXECUTE"; exit 1; }
+          grep -q 'anon_select_geom=false'   /tmp/sec.txt || { echo "ABORT: anon gained SELECT on geo.n5_geom"; exit 1; }
+          grep -q 'auth_select_geom=false'   /tmp/sec.txt || { echo "ABORT: authenticated gained SELECT on geo.n5_geom"; exit 1; }
+          grep -q 'anon_select_reject=false' /tmp/sec.txt || { echo "ABORT: anon gained SELECT on geo.n5_point_reject"; exit 1; }
+          grep -q 'anon_select_manif=false'  /tmp/sec.txt || { echo "ABORT: anon gained SELECT on geo.n5_verdict_manifest"; exit 1; }
+          echo "--- RLS state (must be unchanged; this workflow alters nothing) ---"
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off -c "
+            select c.relname, c.relrowsecurity, c.relforcerowsecurity,
+                   (select count(*) from pg_policies p where p.schemaname='geo' and p.tablename=c.relname)
+              from pg_class c join pg_namespace n on n.oid=c.relnamespace
+             where n.nspname='geo'
+               and c.relname in ('n5_geom','n5_point_reject','n5_verdict_manifest')
+             order by 1;" | tee /tmp/rls.txt
+          grep -q 'n5_geom|t|f|0'             /tmp/rls.txt || { echo "ABORT: RLS state changed on n5_geom"; exit 1; }
+          grep -q 'n5_point_reject|t|f|0'     /tmp/rls.txt || { echo "ABORT: RLS state changed on n5_point_reject"; exit 1; }
+          grep -q 'n5_verdict_manifest|t|f|0' /tmp/rls.txt || { echo "ABORT: RLS state changed on n5_verdict_manifest"; exit 1; }
+          echo "SECURITY VERIFIED"
+
+      - name: HARD ZERO-DATA-MUTATION PROOF + observational association delta
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          IFS='|' read -r T0 SYNC0 ST0 GT0 GP0 GR0 GM0 RJ0 AS0 SD0 SP0 SR0 WS0 RV0 < /tmp/pre_metrics.txt
+          cp /tmp/premetrics.sql /tmp/postmetrics.sql
+          psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/postmetrics.sql | grep -v '^$' | tail -1 > /tmp/post_metrics.txt
+          IFS='|' read -r T1 SYNC1 ST1 GT1 GP1 GR1 GM1 RJ1 AS1 SD1 SP1 SR1 WS1 RV1 < /tmp/post_metrics.txt
+          fail=0
+          eq() { [ "$2" = "$3" ] || { echo "HARD CONTROL FAILED: $1 = $2, expected $3"; fail=1; }; }
+          echo "================ HARD CONTROLS (divergence = STOP) ================"
+          echo "proven_stored_point  : $GP0 -> $GP1";  eq "proven" "$GP1" "718278";          eq "proven unchanged" "$GP1" "$GP0"
+          echo "wrong-snapshot PROVEN: $WS0 -> $WS1";  eq "wrong-snapshot PROVEN" "$WS1" "0"
+          echo "rejected-visible PRV : $RV0 -> $RV1";  eq "rejected-visible PROVEN" "$RV1" "0"
+          echo "PROVEN fingerprint   : $GM0 -> $GM1";  eq "fingerprint" "$GM1" "bbda250fc30ee0b3aa3f46a259392aa3"; eq "fingerprint unchanged" "$GM1" "$GM0"
+          echo "rejects              : $RJ0 -> $RJ1";  eq "rejects" "$RJ1" "5171";           eq "rejects unchanged" "$RJ1" "$RJ0"
+          echo "manifest state       : $ST0 -> $ST1";  eq "manifest" "$ST1" "READY";         eq "manifest unchanged" "$ST1" "$ST0"
+          echo "canonical_synced_at  : $SYNC0 -> $SYNC1"; eq "canonical_synced_at unchanged" "$SYNC1" "$SYNC0"
+          echo
+          echo "======== OBSERVATIONAL (founder ruling: reported, never asserted) ========"
+          echo "canonical total      : $GT0 -> $GT1   delta = $((GT1 - GT0))"
+          echo "recovered_authorit.  : $GR0 -> $GR1   delta = $((GR1 - GR0))"
+          echo "association          : $AS0 -> $AS1   delta = $((AS1 - AS0))"
+          echo "shards done          : $SD0 -> $SD1"
+          echo "shards pending       : $SP0 -> $SP1"
+          echo "shards running       : $SR0 -> $SR1"
+          echo "observed at          : $T0 -> $T1"
+          if [ "$AS1" -ne "$AS0" ]; then
+            echo "NOTE: association moved by $((AS1 - AS0)). This is NOT an installation failure."
+            echo "      The installed function neither reads nor writes geo.n5_association"
+            echo "      (proven by the NO_n5_association token check), and shards done moved"
+            echo "      $SD0 -> $SD1, which is the independent campaign consuming the snapshot."
+          else
+            echo "NOTE: association did not move during the apply window."
+          fi
+          [ "$fail" = "0" ] || { echo "STOP: a HARD control diverged. Not repaired, not blamed automatically."; exit 1; }
+          echo "ALL HARD CONTROLS UNCHANGED - CREATE FUNCTION mutated no N5 data"
+
+      - name: On failure - report state, DO NOT repair
+        if: failure() && steps.arm.outcome == 'success'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -P pager=off -c "
+            set session characteristics as transaction read only;
+            select p.oid::regprocedure::text as installed, pg_get_userbyid(p.proowner) as owner
+              from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+             where n.nspname='public' and p.proname='n5_projects_within_radius';
+            select provenance, count(*) from geo.n5_geom group by 1 order by 1;
+            select count(*) as rejects from geo.n5_point_reject;
+            select snapshot_id, state, canonical_synced_at from geo.n5_verdict_manifest;"
+          echo "Reported only. Nothing repaired. No retry."

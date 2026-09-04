@@ -15,15 +15,13 @@ name: gate2b-full-inventory-parity
 # workflows already registered on the DEFAULT branch, and this file exists only on the
 # feature branch (merging first is not permitted). So the gate also runs on pull_request,
 # which fires on the already-open PR for this branch without merging anything.
+# RETIRED 2026-09-04 with the second map. scripts/gate2/full-inventory.mjs drives
+# maps.html?zip=...&data=seed in real Chromium; that page is now a redirect stub to the one
+# primary map, so an automatic run could only ever fail. Its pull_request trigger is removed
+# for the same reason as the other maps.html verifiers: a permanently-red check teaches
+# people to ignore red. workflow_dispatch is KEPT so the job and its evidence stay available.
 on:
   workflow_dispatch: {}
-  pull_request:
-    paths:
-      - 'scripts/gate2/**'
-      - 'lib/map.js'
-      - 'lib/data.js'
-      - 'maps.html'
-      - '.github/workflows/gate2b-full-inventory-parity.yml'
 
 permissions:
   contents: read

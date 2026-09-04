@@ -202,12 +202,12 @@ try {
     var real = window.HS.realHome();
     window.__HS_TEST = {
       realHomeId: real && real.id,
-      mapHref: window.HS.pageHref('maps.html', { zip: window.HS.state.zip, place: real && real.id })
+      mapHref: window.HS.pageHref('homesignalmap.html', { zip: window.HS.state.zip, place: real && real.id })
     };
   });
   const inj = await page.evaluate(() => window.__HS_TEST);
   ok(inj.realHomeId === 'coomes', 'real home detected for Coomes Dr in active ZIP');
-  ok(inj.mapHref === 'maps.html?zip=78617&place=coomes', 'place included for real home in ZIP');
+  ok(inj.mapHref === 'homesignalmap.html?zip=78617&place=coomes', 'place included for real home in ZIP');
   await page.evaluate(function () {
     window.HS.state.activePropId = 'p2';
     var real = window.HS.realHome();
@@ -226,31 +226,34 @@ try {
     await page.waitForTimeout(400);
     const after = page.url();
     ok(after !== before && after.indexOf('dashboard') < 0, 'marker click navigates away from dashboard');
-    ok(after.indexOf('maps.html') < 0 || after.indexOf('id=') > 0 || after.indexOf('development') > 0 || after.indexOf('alerts') > 0,
-      'marker click does not open bare maps background');
+    ok(after.indexOf('homesignalmap.html') < 0 || after.indexOf('id=') > 0 || after.indexOf('development') > 0 || after.indexOf('alerts') > 0,
+      'marker click does not open the bare map background');
     await page.goBack();
     await page.waitForURL(/dashboard\.html/);
 
     // Keyboard Enter on map region opens full map
     await page.locator('#dashMap').focus();
     await page.keyboard.press('Enter');
-    await page.waitForURL(/maps\.html/, { timeout: 15000 });
-    ok(page.url().includes('zip=78617') && !page.url().includes('place='), 'Enter on map opens maps with zip only');
+    await page.waitForURL(/homesignalmap\.html/, { timeout: 15000 });
+    ok(page.url().includes('zip=78617') && !page.url().includes('place='), 'Enter on map opens the map with zip only');
     await page.goBack();
     await page.waitForURL(/dashboard\.html/);
 
     // Background click opens maps (not after drag — simulated by direct click corner)
     await page.locator('#dashMap').click({ position: { x: 12, y: 12 }, force: true });
-    await page.waitForURL(/maps\.html/, { timeout: 15000 });
-    assertHref('map background click', 'maps.html' + page.url().substring(page.url().indexOf('?')), { zip: '78617', noPlace: true });
+    await page.waitForURL(/homesignalmap\.html/, { timeout: 15000 });
+    assertHref('map background click', 'homesignalmap.html' + page.url().substring(page.url().indexOf('?')), { zip: '78617', noPlace: true });
   } else {
     console.log('SKIP — no map markers rendered in this environment');
   }
 
-  // maps.html place + id deep link
-  await page.goto(base + '/maps.html?data=seed&zip=78617&place=p1&id=proj-datacenter', { waitUntil: 'networkidle', timeout: 60000 });
-  ok(page.url().indexOf('maps.html') >= 0, 'maps invalid place still loads');
-  ok(await page.locator('#mapWrap, #mapSch, .mapwrap').count() >= 1, 'maps page renders map surface');
+// The retired map's URL must not be a dead end: it forwards to the primary map and CARRIES
+// ITS QUERY STRING, so an old bookmark lands on the same ZIP. `place`/`id` were that page's
+// deep-link params; the primary map ignores them, which must not break the page.
+await page.goto(base + '/maps.html?data=seed&zip=78617&place=p1&id=proj-datacenter', { waitUntil: 'networkidle', timeout: 60000 });
+ok(page.url().indexOf('homesignalmap.html') >= 0, 'the retired map URL forwards to the primary map');
+ok(page.url().indexOf('zip=78617') >= 0, 'the forward preserves the ZIP from the old URL');
+ok(await page.locator('#map, #mapInner').count() >= 1, 'the primary map renders its map surface');
 
 } finally {
   await browser.close();

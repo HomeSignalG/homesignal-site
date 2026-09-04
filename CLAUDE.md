@@ -141,10 +141,29 @@ can't resolve a case (see §3's "when to stop").
 
 Consequences that are non-negotiable:
 
-- **No per-community HTML files.** The one dynamic page `community.html` serves any
-  community by `?id=`, `?community=<slug>`, or `?zip=`. `box-elder.html` and
-  `eagle-mountain.html` are **legacy launch pages, frozen — do not clone them** for
-  a new community. New communities live only as DB rows.
+- **No per-community HTML files — meaning no per-community SOURCE files.** The one dynamic
+  page `community.html` serves any community by `?id=`, `?community=<slug>`, or `?zip=`.
+  `box-elder.html` and `eagle-mountain.html` are **legacy launch pages, frozen — do not
+  clone them** for a new community. New communities live only as DB rows.
+  - ⚖️ **CLARIFIED 2026-09-04 (founder ruling), so this does not recur.** The prohibition is
+    on **maintaining or committing** hand-made per-community HTML, and on any architecture
+    that needs **engineering work when a ZIP is added**. It does **NOT** prohibit
+    deterministic ZIP-specific HTML **generated automatically during the deployment build
+    and existing only in the GitHub Pages artifact**.
+  - **The invariant, stated positively:** *one shared implementation/template + a
+    data-driven build → ZIP-specific deployment documents.* There must never be 12,722
+    independently maintained source implementations. Adding or removing a canonical ZIP must
+    require **no hand-created HTML file and no per-ZIP engineering**.
+  - **What that looks like in the repo today:** `lib/community-page.js` is the one shared
+    runtime (loaded by the legacy page *and* every generated document);
+    `scripts/gen_zip_pages.py` is the one shared template; `.github/workflows/pages.yml`
+    turns them into one document per canonical ZIP at `/community/<zip>/`, inside the Pages
+    artifact. **Nothing generated is ever committed** — a build gate fails if `community/`
+    becomes tracked. `sitemap.xml` is the older precedent for the same pattern.
+  - ⚠️ **A document existing and a document being indexable are SEPARATE decisions.** Every
+    canonical ZIP gets a document so a canonical URL never 404s and never falls through to a
+    generic shell; `robots` is then set per page from the Alerts substance rule. A ZIP
+    crossing that threshold changes its **robots directive**, never its existence.
 - **No hardcoded community registries as the runtime source.** The DB is the source
   of truth (§1). The in-repo JS registry is a bootstrap/fallback only.
 - **No per-community deploy.** Adding a community must not require a `git push` to
@@ -573,6 +592,56 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 - **GitHub Pages**, static. Merging to `main` publishes the site. Data/content
   changes (new communities, alerts) go live via **Supabase / ingest**, not a repo
   push — that's the whole point of §0.
+- ✅ **THE DEPLOYMENT SOURCE IS "GitHub Actions", switched by the founder and PROVEN TO
+  PERSIST — 2026-09-04 16:55:42Z** (receipts: `docs/alerts-seo-build-2026-09-04.md` §11–§12;
+  §11 retains the retraction of an earlier, wrongly-inferred "it's switched" claim).
+  - **A red `pages` build now means the site does not update.** Before the switch a red run was
+    cosmetic. Treat it as a deploy failure.
+  - **How to tell the source is still right, without trusting the settings page or a green
+    job:** after any push to `main`, look for a run named **"pages build and deployment"**. Its
+    *presence* means the source has reverted to a branch. Its last run ever was **#900,
+    16:13:58Z**, before the switch.
+  - ⚠️ **`actions/deploy-pages@v4` succeeds in legacy mode too** (a workflow holding
+    `pages: write` can create a Pages deployment through the API), which is why a green
+    `deploy` job proves nothing about the setting on its own. That mistake was made and
+    corrected on 2026-09-04 — see §11 of the receipt.
+  - **Measured live after the switch:** 01034 → HTTP 200, `index, follow`, self-canonical,
+    ZIP-specific title/H1, 6 local-news items in the initial bytes; 01002 → 200,
+    `noindex, follow`, honest empty sections; sitemap **7,643 canonical / 0 legacy**,
+    reconciling to the Rule F PASS measured the same minute.
+  `pages.yml` is the implementation — **do not create a new Pages workflow from GitHub's
+  suggested Jekyll/static templates.** Its artifact carries **one generated document per
+  canonical ZIP** at `/community/<zip>/`.
+  - **Earlier receipt, from the 12-minute window before the switch took effect** (measured
+    through `pg_net`): 01034 → HTTP 200, 3,912 bytes,
+    `index, follow`, self-canonical, ZIP-specific title and H1, 6 real local-news items in the
+    initial bytes; 01002 → 200, `noindex, follow`, honest empty sections. Production sitemap:
+    **7,256 canonical community URLs, 0 legacy, 0 duplicates**, development half untouched at
+    11,701. All of it reproducible the moment the source is switched.
+  - **`verify-zip-pages-live.yml`** re-proves it on a runner (162 assertions, read-only) and
+    runs daily — it will fail while the pages are 404, which is the correct signal.
+    It is the deployed twin of the pre-deployment proof inside `pages.yml`; if the two ever
+    disagree, the deployment is what changed.
+  `.github/workflows/pages.yml` builds the artifact: the whole static site **plus one
+  generated document per canonical ZIP** at `/community/<zip>/`, which is the only way a
+  static host can return ZIP-specific initial HTML (Pages selects content by PATH and
+  ignores the query string entirely — measured, `docs/crawler-ground-truth-2026-09-03.md`).
+  - The **build** job runs on every push to its inputs and proves the gates. The **deploy**
+    job is gated on `main` AND on the repository setting *Settings → Pages → Build and
+    deployment → Source = GitHub Actions*, which **cannot be changed from CI**. Until a
+    human flips it, branch deployment continues to serve the site unchanged — nothing is
+    destroyed by preparing the replacement.
+  - **`404.html` still forwards `/community/<zip>/`** — it is now reached only for a
+    NON-canonical 5-digit path (every canonical one is a real document), where it lands on the
+    dynamic page's honest "isn't covered yet" state. Measured: `/community/00000/` → **404**,
+    `noindex`. No unknown ZIP can become an indexable community page.
+  - ⚠️ **`scripts/gen_sitemap.py` still writes the COMMITTED `sitemap.xml` with the legacy
+    `community.html?zip=` URLs, and `gen_zip_pages.py::reconcile_sitemap` overwrites that half
+    inside the artifact.** The served sitemap is therefore correct, but the committed one is
+    not what ships. Retiring the community half of `gen_sitemap.py` is the obvious follow-up
+    and is deliberately NOT bundled into the deployment change.
+  - **`docs/` and `test/` are no longer served publicly** — the artifact excludes them. No
+    shipped page ever linked to either (checked: zero `href` references).
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src https://www.youtube-nocookie.com; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src https://www.youtube-nocookie.com; form-action 'self'">
 <title>HomeSignal — Acquisition Dashboard</title>
 <meta name="description" content="HomeSignal internal acquisition &amp; growth dashboard.">
 <meta name="robots" content="noindex, nofollow">
@@ -653,23 +653,188 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var _gseg = (typeof Intl!=='undefined' && Intl.Segmenter) ? new Intl.Segmenter('en',{granularity:'grapheme'}) : null;
   function graphemeLen(s){ s=String(s||''); if(!_gseg) return s.length; var n=0; var it=_gseg.segment(s); for(var _ of it) n++; return n; }
   function fmtSlot(ts){ if(!ts) return ''; var d=new Date(ts); if(isNaN(d)) return ''; return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  // ---------------------------------------------------------------------------
+  // ONE IMAGE PATH FOR BOTH REVIEW SURFACES, AND IT IS THE PUBLISHER'S OWN BYTES.
+  //
+  // ROOT CAUSE of the broken preview, measured rather than guessed: the page CSP is
+  //   connect-src 'self' https://<project>.supabase.co   <- allowed
+  //   img-src     'self' data:                            <- did NOT allow that host
+  // createSignedUrl() is an XHR, so it SUCCEEDED and returned a real URL; the code
+  // therefore took its success branch and printed "Real screenshot of the live page".
+  // The browser then refused to LOAD that URL as an image. Two different directives
+  // governed the two steps, which is exactly why the status text was confident while
+  // the picture was broken. Storage RLS was never involved: social_images_admin_read
+  // grants SELECT to is_social_admin(), and the founder is in social_admins.
+  //
+  // The fix downloads the object through storage.download() -- the same authenticated
+  // storage read the publisher performs -- and renders the returned bytes as a blob.
+  // The founder is therefore looking at the object itself, not at a URL the browser
+  // resolved separately, which is what makes the parity claim true rather than likely.
+  // The bucket stays PRIVATE and no service key ever reaches the page.
+  var _bskyBlobUrl = {};   // post id -> object URL for its own image
+  var _bskyImgOk   = {};   // post id -> the exact image RENDERED (onload fired)
+
+  // A MAPS draft that carries an image_bucket_path WILL publish with that image, so
+  // the founder must have seen it before approving.
+  function mapsImageRequired(p){
+    return !!(p && p.content_family === 'MAPS' && p.image_bucket_path);
+  }
+  function bskyReleaseBlobs(){
+    for (var k in _bskyBlobUrl){ try{ URL.revokeObjectURL(_bskyBlobUrl[k]); }catch(e){} }
+    _bskyBlobUrl = {}; _bskyImgOk = {};
+  }
+  function bskyImageBlobUrl(p){
+    if (_bskyBlobUrl[p.id]) return Promise.resolve(_bskyBlobUrl[p.id]);
+    return window.hsClient.storage.from('social-images').download(p.image_bucket_path)
+      .then(function(r){
+        if (r.error || !r.data) return null;
+        var u = URL.createObjectURL(r.data);
+        _bskyBlobUrl[p.id] = u;
+        return u;
+      })
+      .catch(function(){ return null; });
+  }
+  // Renders into host and reports back. ok is set ONLY when the browser has actually
+  // painted the image -- a resolved URL is not a rendered image, which is the whole
+  // defect this unit exists to fix.
+  function bskyRenderImage(host, p, imgAttrs, onSettled){
+    if (!host) return;
+    bskyImageBlobUrl(p).then(function(url){
+      if (!url){
+        host.innerHTML = '<div class="muted" style="font-size:12px;color:var(--persist)">'+
+          'IMAGE COULD NOT BE READ from social-images/'+esc(p.image_bucket_path)+
+          '. This draft cannot be approved until it displays.</div>';
+        if (onSettled) onSettled(false);
+        return;
+      }
+      var img = document.createElement('img');
+      img.alt = '';                                  // decorative here; see payload panel
+      if (imgAttrs) img.setAttribute('style', imgAttrs);
+      img.onload  = function(){ _bskyImgOk[p.id] = true; if (onSettled) onSettled(true); };
+      img.onerror = function(){
+        host.innerHTML = '<div class="muted" style="font-size:12px;color:var(--persist)">'+
+          'Image downloaded but failed to render.</div>';
+        if (onSettled) onSettled(false);
+      };
+      img.src = url;
+      host.innerHTML = ''; host.appendChild(img);
+    });
+  }
+  // Approval gate. Re-reads the DOM rather than trusting a cached handle, so it works
+  // whether the image settles before or after the queue re-renders.
+  function bskyApplyApprovalGate(id){
+    var btn = document.querySelector('[data-post="'+id+'"] button[data-act="approve"]');
+    if (!btn || btn.getAttribute('data-gate') !== 'image') return;
+    var ok = !!_bskyImgOk[id];
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '0.45';
+    btn.style.cursor  = ok ? 'pointer' : 'not-allowed';
+    btn.title = ok ? '' : 'Approve is locked until the exact Map image this post would publish is visible above.';
+  }
+
+  // VISUAL STATUS. A generic OpenGraph link card and a real project-specific Map 1
+  // screenshot are different things, and the founder must never have to guess which one a
+  // draft carries. image_bucket_path is the fact: it is set only by the Maps visual
+  // generator after a real capture.
+  function visualStatus(p){
+    if(p.content_family!=='MAPS'){
+      return p.image_bucket_path
+        ? ' &nbsp;·&nbsp; <span class="t-real">📷 real screenshot attached</span>'
+        : ' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>';
+    }
+    var v=(p.evidence&&p.evidence.visual)||{};
+    if(p.image_bucket_path && v.status==='REAL_MAP_VISUAL'){
+      return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
+    }
+    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
+    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">NO PROJECT-SPECIFIC VISUAL · '+
+      'generic link-card fallback'+why+'</span>';
+  }
+
+  // The proposed image itself. Read from the PRIVATE social-images bucket through a
+  // short-lived signed URL created with the founder's own session — the bucket stays
+  // private and the page never holds a service key.
+  function mapsVisual(p){
+    if(p.content_family!=='MAPS' || !p.image_bucket_path) return '';
+    var id='vis-'+String(p.id);
+    setTimeout(function(){
+      var host=document.getElementById(id); if(!host||host.dataset.done) return;
+      host.dataset.done='1';
+      bskyRenderImage(host, p,
+        'max-width:100%;border:1px solid var(--line);border-radius:8px;display:block',
+        function(){ bskyApplyApprovalGate(p.id); });
+    },0);
+    var v=(p.evidence&&p.evidence.visual)||{};
+    return '<div style="margin:0 0 10px"><div id="'+esc(id)+'" '+
+      'style="min-height:20px"><div class="muted" style="font-size:12px">Loading map preview…</div></div>'+
+      (v.page_url?('<div class="muted" style="font-size:11.5px;margin-top:4px">Captured from '+
+        esc(v.page_url)+' · framed on the project\u2019s own coordinates ('+
+        esc(String(v.framed_zoom||''))+'× zoom) · no home marker, no radius ring</div>'):'')+
+      '</div>';
+  }
+
+  function mapsEvidence(p){
+    if(p.content_family!=='MAPS' || !p.evidence) return '';
+    var e=p.evidence;
+    function row(k,v){ return v?('<div><span class="muted">'+esc(k)+':</span> '+esc(String(v))+'</div>'):''; }
+    var prec=e.url_precision==='record'
+      ? '<span class="t-real">record-precision</span>'
+      : '<span class="t-persist">dataset-precision'+(e.case_number?(' · case '+esc(e.case_number)):'')+'</span>';
+    return '<details style="margin:0 0 10px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">'+
+      'Map 1 evidence — project, location, provenance</summary>'+
+      '<div style="font-size:12px;line-height:1.6;background:var(--panel2);border:1px solid var(--line);'+
+      'border-radius:8px;padding:10px;margin-top:6px">'+
+        row('Project', e.project_name)+
+        row('Jurisdiction (the only place claim)', e.jurisdiction)+
+        row('Address (source-supplied)', e.address)+
+        row('Lifecycle', e.status)+
+        row('Category', e.type_raw && e.type_raw!==e.type ? (e.type_raw+' / '+e.type) : e.type)+
+        row('Date', e.date_kind && e.submitted_at ? (e.date_kind+' '+String(e.submitted_at).slice(0,10)) : null)+
+        '<div><span class="muted">Evidence tier:</span> '+prec+'</div>'+
+        row('Registry', e.registry_id)+
+        row('Why it qualified', e.eligibility_reason)+
+        row('Dedupe identity', e.dedupe_key)+
+        row('Visual', (e.visual&&e.visual.status)||'none')+
+        (e.visual&&e.visual.note?('<div class="muted" style="margin-top:4px">'+esc(e.visual.note)+'</div>'):'')+
+        (e.map_destination?('<div><span class="muted">Map 1 destination:</span> <a href="'+esc(e.map_destination)+
+          '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||e.map_zip)+' ↗</a></div>'):'')+
+        (e.geography_note?('<div style="margin-top:6px;color:var(--muted);border-left:3px solid var(--persist);'+
+          'padding-left:8px">'+esc(e.geography_note)+'</div>'):'')+
+      '</div></details>';
+  }
+
   function blueskyRow(p){
     var n=graphemeLen(p.post_text), over=n>300;
     var tags=(p.hashtags||[]).map(function(t){return '#'+t;}).join(' ');
     var when=p.scheduled_slot?('<span class="t-real">scheduled '+esc(fmtSlot(p.scheduled_slot))+'</span>'):'<span class="muted">unscheduled</span>';
     var statusTag=p.status==='approved'?'<span class="tile-tag t-real">approved</span>':'<span class="tile-tag t-persist">draft</span>';
+    // MAPS and ALERTS are separate content families with different factual contracts;
+    // the founder must be able to tell which one they are fact-checking at a glance.
+    var fam=(p.content_family==='MAPS')
+      ? '<span class="tile-tag" style="background:#e7f0fb;color:#1d4f8a;border:1px solid #b9d3f0">MAPS · development</span>'
+      : '<span class="tile-tag" style="background:#eef3ef;color:#2f5a44;border:1px solid #cadcd2">ALERTS · community intelligence</span>';
     return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
-        '<div>'+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
+        '<div>'+fam+' '+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
         '<div style="font-variant-numeric:tabular-nums;'+(over?'color:var(--persist);font-weight:700':'color:var(--muted)')+'">'+n+'/300</div>'+
       '</div>'+
       '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
         (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+
         ((p.embed&&p.embed.uri)?(' &nbsp;·&nbsp; <a href="'+esc(p.embed.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">post links to ↗</a> (link card)'):' &nbsp;·&nbsp; <span style="color:var(--persist)">NO site link on this draft</span>')+
-        (p.image_bucket_path?' &nbsp;·&nbsp; <span class="t-real">📷 real screenshot attached</span>':' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>')+'</div>'+
+        visualStatus(p)+'</div>'+
+      mapsVisual(p)+
+      mapsEvidence(p)+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--accent);color:#fff">Approve</button>':'')+
+        (p.status!=='approved'
+          ? ('<button class="bsky-btn" data-act="approve"'+
+             // Locked until bskyRenderImage reports the exact image painted. Rendered
+             // locked-by-default so a slow or failing download can never leave it open.
+             (mapsImageRequired(p)
+               ? ' data-gate="image" disabled title="Approve is locked until the exact Map image this post would publish is visible above." style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
+               : ' style="background:var(--accent);color:#fff"')+
+             '>Approve</button>')
+          : '')+
         '<button class="bsky-btn" data-act="edit" style="background:#e4e8e4;color:#16211c">Edit</button>'+
         '<button class="bsky-btn" data-act="skip" style="background:#fbeceb;color:#c23b34">Skip</button>'+
       '</div></div>';
@@ -684,13 +849,17 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var rows=r.data||[];
       // Stash full rows so the edit modal can preview embed data (link card /
       // image), which lives outside post_text and isn't in the rendered DOM.
+      bskyReleaseBlobs();   // revoke last render's object URLs before re-creating them
       _bskyRows={}; rows.forEach(function(p){ _bskyRows[p.id]=p; });
       // metrics strip
       var today=new Date(); today.setHours(0,0,0,0);
       var startWeek=new Date(Date.now()-7*864e5);
       var qToday=rows.filter(function(p){ return new Date(p.created_at)>=today; }).length;
       var mp=document.getElementById('bsky-metrics');
+      var nMaps=rows.filter(function(p){return p.content_family==='MAPS';}).length;
       if(mp) mp.innerHTML=liveTile('In queue', rows.length, 'draft + approved')+
+        liveTile('MAPS · development', nMaps, 'from Map 1 project data')+
+        liveTile('ALERTS · community', rows.length-nMaps, 'from notices / meetings')+
         liveTile('Queued today', qToday, 'new drafts')+
         liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post');
       body.innerHTML=rows.length?rows.map(blueskyRow).join(''):'<div class="muted">No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.</div>';
@@ -700,6 +869,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   async function blueskyAction(id, act){
     try{
       if(act==='approve'){
+        // Approval-integrity gate, checked again here and not only on the button: a
+        // MAPS post configured to publish an image must never be approved on a preview
+        // that failed to show it.
+        var gr=_bskyRows[id]||null;
+        if(mapsImageRequired(gr) && !_bskyImgOk[id]){
+          alert('This post would publish the Map image stored at\n'+gr.image_bucket_path+
+                '\n\nThat image has not displayed in this preview, so you would be approving '+
+                'something you have not seen. Approve is blocked until it renders.');
+          return;
+        }
         var r=await window.hsClient.rpc('hs_approve_social_post',{p_id:id});
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
       } else if(act==='skip'){
@@ -722,41 +901,107 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     $('bsky-prev-text').textContent=ta.value;
   }
   function bskyHost(u){ try{ return new URL(u).host; }catch(e){ return u||''; } }
+  // WHAT THE PUBLISHER ACTUALLY SENDS, read out of bluesky/publish-worker.mjs so the
+  // founder is never shown a field Bluesky will not receive:
+  //   record = { text: RichText(post_text), facets: auto-detected, createdAt }
+  //   record.embed = app.bsky.embed.external { uri, title, description, thumb? }
+  //     -- thumb = the bytes of social-images/<image_bucket_path>, uploadBlob'd.
+  // TWO HONEST GAPS, both verified by absence in that file (0 occurrences each):
+  //   * `hashtags` is NEVER read. Whatever the column holds is not published unless it
+  //     is inside post_text. The panel says so rather than implying otherwise.
+  //   * no ALT TEXT is ever sent. app.bsky.embed.external carries no alt for its thumb,
+  //     so there is no value to mirror; inventing one in the preview would be a lie.
+  function bskyPayloadPanel(p){
+    if(!p) return '';
+    var e=(p.embed)||{};
+    var tags=(p.hashtags||[]);
+    var row=function(k,v,warn){
+      return '<div style="display:flex;gap:8px;padding:3px 0;border-top:1px solid var(--line)">'+
+        '<div style="flex:0 0 116px;color:var(--muted);font-size:11px;text-transform:uppercase;'+
+        'letter-spacing:.04em;padding-top:1px">'+esc(k)+'</div>'+
+        '<div style="flex:1;font-size:12px;'+(warn?'color:var(--persist)':'')+'">'+v+'</div></div>';
+    };
+    var imgLine = p.image_bucket_path
+      ? ('<span id="bsky-payload-imgstate">resolving…</span> &nbsp;<span class="muted">'+
+         esc(p.image_bucket_path)+'</span>')
+      : '<span style="color:var(--persist)">none — nothing is attached to this post</span>';
+    return '<div style="margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">'+
+      '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);'+
+      'margin-bottom:2px">Exact payload the publisher will send</div>'+
+      row('embed', (p.embed_kind==='external'&&e.uri)
+            ? '<code>app.bsky.embed.external</code> — one card. The Map screenshot rides as its '+
+              '<code>thumb</code>; there is no separate image embed.'
+            : 'none — plain text only', !(p.embed_kind==='external'&&e.uri))+
+      row('text', 'the '+graphemeLen(p.post_text||'')+'-grapheme body above, verbatim '+
+            '<span class="muted">(the publisher auto-detects link/tag facets; it never rewrites words)</span>')+
+      row('hashtags', tags.length
+            ? ('<span style="color:var(--persist)">'+esc(tags.map(function(t){return '#'+t;}).join(' '))+
+               ' — STORED BUT NOT PUBLISHED.</span> The publisher builds the record from '+
+               'post_text only; it never reads the hashtags column.')
+            : 'none stored, and none would be sent')+
+      row('link', e.uri?('<a href="'+esc(e.uri)+'" target="_blank" rel="noopener" '+
+            'style="color:var(--accent)">'+esc(e.uri)+' ↗</a>'):'none', !e.uri)+
+      row('card title', e.title?esc(e.title):'(empty)')+
+      row('card text', e.description?esc(e.description):'(empty)')+
+      row('image', imgLine, !p.image_bucket_path)+
+      row('alt text', '<span style="color:var(--persist)">none is sent.</span> '+
+            'app.bsky.embed.external has no alt field for its thumb, so HomeSignal has '+
+            'no alt value to publish. Payload defect, reported not papered over.')+
+      '<div class="muted" style="font-size:11px;margin-top:6px;border-top:1px solid var(--line);'+
+      'padding-top:5px">Bluesky controls its own crop, fonts and spacing; every field above is '+
+      'HomeSignal’s and is exact.</div></div>';
+  }
+
   function bskyRenderPreviewCard(p){
     var card=$('bsky-prev-card'), note=$('bsky-prev-note');
     var e=(p&&p.embed)||{};
+    var label=document.querySelector('#bsky-edit-overlay .bsky-prev-label');
+    if(label){
+      label.textContent = (p && mapsImageRequired(p))
+        ? 'Bluesky preview — the exact post, with the exact image it will publish'
+        : 'Bluesky preview — this is the actual post';
+    }
     if(p && p.embed_kind==='external' && e.uri){
-      var img=e.thumb||e.image||e.image_url||null; // direct URL if the embed ever carries one
       card.innerHTML='<div class="bsky-prev-card">'+
-        (img?('<img src="'+esc(img)+'" alt="link card image">'):'<div id="bsky-prev-img-slot"></div>')+
+        '<div id="bsky-prev-img-slot"></div>'+
         '<div class="bsky-prev-card-body">'+
           '<div class="bsky-prev-card-title">'+esc(e.title||'')+'</div>'+
           '<div class="bsky-prev-card-desc">'+esc(e.description||'')+'</div>'+
           '<div class="bsky-prev-card-host">'+esc(bskyHost(e.uri))+' &nbsp;·&nbsp; <a href="'+esc(e.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">open link ↗</a></div>'+
-        '</div></div>';
-      if(img){ note.textContent=''; }
-      else if(p.image_bucket_path){
-        // Real live-page screenshot in the private social-images bucket — fetch an
-        // admin signed URL and drop it into the card top, like Bluesky renders it.
-        note.textContent='Loading the real screenshot…';
-        (function(pid, key){
-          window.hsClient.storage.from('social-images').createSignedUrl(key, 600).then(function(r){
-            if(bskyEditId!==pid) return; // modal moved on to another post
-            var slot=document.getElementById('bsky-prev-img-slot');
-            if(r && r.data && r.data.signedUrl && slot){
-              slot.outerHTML='<img src="'+esc(r.data.signedUrl)+'" alt="real live-page screenshot">';
-              $('bsky-prev-note').textContent='Real screenshot of the live page — posts as the link card image.';
+        '</div></div>'+bskyPayloadPanel(p);
+      var slot=document.getElementById('bsky-prev-img-slot');
+      if(p.image_bucket_path){
+        note.textContent='Downloading the exact image object the publisher would upload…';
+        (function(pid){
+          bskyRenderImage(slot, p, null, function(ok){
+            if(bskyEditId!==pid) return;            // modal moved on to another post
+            var st=document.getElementById('bsky-payload-imgstate');
+            if(ok){
+              $('bsky-prev-note').textContent='This is the exact image object '
+                +'(social-images/'+p.image_bucket_path+') that the publisher downloads and '
+                +'uploads as the link card thumb. Same bucket, same path, same bytes.';
+              if(st) st.outerHTML='<span class="t-real">shown above — the exact object</span>';
             } else {
-              $('bsky-prev-note').textContent='A real screenshot is attached ('+key+') but the preview could not load it'+(r&&r.error?' — '+(r.error.message||''):'')+'. It will still post as the card image.';
+              $('bsky-prev-note').textContent='The attached image could NOT be read, so it '
+                +'cannot be reviewed. Approve stays locked for this draft.';
+              if(st) st.outerHTML='<span style="color:var(--persist)">UNREADABLE</span>';
             }
-          }).catch(function(){ $('bsky-prev-note').textContent='A real screenshot is attached but the preview could not load it. It will still post as the card image.'; });
-        })(p.id, p.image_bucket_path);
-      }
-      else{
-        note.textContent='No image on this draft yet — it posts as text + this link card. (Screenshots are captured from the live page by the engine; never a generated graphic.)';
+            bskyApplyApprovalGate(pid);
+          });
+        })(p.id);
+      } else {
+        // CASE C. No placeholder, no stand-in graphic: the card is shown with an empty
+        // image area and the absence is stated, because a draft with no visual must not
+        // look publication-ready.
+        if(slot) slot.outerHTML='<div style="padding:10px 12px;border-bottom:1px solid var(--line);'+
+          'font-size:12px;color:var(--persist)">NO IMAGE — this post publishes as text + a bare '+
+          'link card. Bluesky may render its own OpenGraph thumbnail for the destination; '+
+          'HomeSignal sends none.</div>';
+        note.textContent='No image on this draft. Nothing is attached, and nothing is '+
+          'substituted here to make it look complete.';
       }
     } else {
-      card.innerHTML='';
+      card.innerHTML=bskyPayloadPanel(p);
       note.textContent='No link card on this draft — it posts as plain text only.';
     }
   }

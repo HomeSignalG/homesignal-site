@@ -171,12 +171,10 @@ console.log('\nB. projects()/facilities() read through the RPC — one payload, 
     'B12 guardrail #3 holds: development read excludes facility rows');
 }
 
-console.log('\nC. the caller still refuses to render an incomplete read');
-{
-  const maps = readFileSync(new URL('../maps.html', import.meta.url), 'utf8');
-  ok(/projects\.complete === false/.test(maps) && /throw new Error\('incomplete app_projects read'\)/.test(maps),
-    'C1 maps.html still throws on complete===false — the honest load-error path survives the refactor');
-}
+// C1 REMOVED 2026-09-04. It asserted that maps.html (the retired second map) throws on
+// complete===false. That page is now a redirect stub, so the assertion had no subject. The
+// CONTRACT it guarded — lib/data.js marking a windowed read incomplete rather than silently
+// returning a prefix — is still pinned by section B above, which is the half that matters.
 {
   delete require.cache[require.resolve('../lib/data.js')];
   global.window = {

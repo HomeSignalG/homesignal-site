@@ -1,0 +1,134 @@
+name: n5-spatial-rpc-suite
+
+# EXECUTABLE PostgreSQL + PostGIS proof for public.n5_projects_within_radius()
+# (docs/n5-spatial-read-rpc.sql, PR #1015 revision 2).
+#
+# The static suite (test/n5-spatial-read-rpc.test.mjs) asserts against the TEXT of the
+# DDL because the sandbox has no database. Text cannot prove that the lifecycle gate
+# actually refuses mid-sweep, that has_more flips at exactly the right boundary, or that
+# a home inside a polygon returns distance 0. This job executes the SHIPPED DDL verbatim
+# against a real PostGIS and proves those behaviours, including negative controls that
+# demonstrate each gate is load-bearing rather than decorative.
+#
+# The target is a THROWAWAY service container created for this job and destroyed with it.
+# It holds no credentials, can reach no Supabase project, and NOTHING here touches
+# production: the RPC is never created in, nor executed against, the live database.
+#
+# Reported, NOT required: a normal job with no continue-on-error on the gate step, so a
+# failure shows as a RED CHECK - a suite that cannot go red proves nothing.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/n5-spatial-read-rpc.sql'
+      - 'test/n5_spatial_pg/**'
+      - 'test/n5-spatial-read-rpc.test.mjs'
+      - '.github/workflows/n5-spatial-rpc-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spatial-rpc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Production runs PostgreSQL 17.6 / PostGIS 3.3.7 (measured 2026-09-03). Proving the
+    # function only on 16 would leave the production MAJOR version untested, so both run.
+    # The PostGIS minor differs from production's 3.3.7 by necessity (no published image
+    # pairs PG17 with PostGIS 3.3); every spatial function this RPC uses - ST_DWithin,
+    # ST_Distance, ST_Transform, ST_Expand, ST_SetSRID, ST_MakePoint, ST_GeometryType and
+    # the geography cast - predates 3.0.
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgis/postgis:16-3.4
+          - postgis/postgis:17-3.5
+    name: spatial-rpc (${{ matrix.image }})
+    services:
+      postgres:
+        image: ${{ matrix.image }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: n5_rpc_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: a Supabase credential is visible to this job. This suite must only"
+            echo "ever address the disposable container."
+            exit 1
+          fi
+          echo "No Supabase credential in the environment."
+
+      - name: Install the driver and psql (CI-only; the repo stays dependency-free)
+        run: |
+          pip install --quiet psycopg2-binary
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      # An instrument must prove it ran before its silence counts as evidence.
+      - name: Prove the disposable PostGIS target is real
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d n5_rpc_disposable -c "create extension if not exists postgis;"
+          echo "POSTGRESQL: $(psql -h localhost -U postgres -d n5_rpc_disposable -tAc 'select version();')"
+          echo "POSTGIS:    $(psql -h localhost -U postgres -d n5_rpc_disposable -tAc 'select postgis_full_version();')"
+          psql -h localhost -U postgres -d n5_rpc_disposable -tAc "select 1 from pg_extension where extname='postgis';" | grep -q 1
+
+      - name: Run the executable spatial RPC contract suite
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_rpc_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_spatial_pg/run_suite.py 2>&1 | tee /tmp/n5-rpc-suite.log
+        continue-on-error: true
+        id: suite
+
+      - name: Run the STATIC contract guards (same commit, no database)
+        run: node test/n5-spatial-read-rpc.test.mjs
+        continue-on-error: true
+        id: static
+
+      - name: Publish the receipt
+        if: always()
+        run: |
+          {
+            echo '## N5 spatial read RPC — executable receipt'
+            echo ''
+            echo '```'
+            sed -n '/^=\{20,\}$/,$p' /tmp/n5-rpc-suite.log | head -60
+            echo '```'
+            echo ''
+            echo '### Failing assertions'
+            echo '```'
+            grep '^FAIL' /tmp/n5-rpc-suite.log || echo '(none)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^(PASS|FAIL)' /tmp/n5-rpc-suite.log | tail -120
+
+      - name: Fail the job if any assertion failed
+        if: steps.suite.outcome != 'success' || steps.static.outcome != 'success'
+        run: |
+          echo "executable=${{ steps.suite.outcome }} static=${{ steps.static.outcome }}"
+          echo "See the job summary for the failing assertions."
+          exit 1

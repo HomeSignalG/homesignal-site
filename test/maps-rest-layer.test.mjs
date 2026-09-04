@@ -58,28 +58,10 @@ ok(typeof fc.features[0].properties.col === 'string' && fc.features[0].propertie
 ok(fc.features[1].properties.fac === 1 && fc.features[0].properties.fac === 0,
    'facility rest points flagged for the facility-detail click dispatch');
 
-// --- maps.html wiring pinned at source (repo convention) ---
-const page = fs.readFileSync(new URL('../maps.html', import.meta.url), 'utf8');
-ok(/addSource\('hs-rest'/.test(page) && /cluster:\s*true/.test(page),
-   'maps.html: GL clustered hs-rest source registered');
-ok(/hs-rest-cluster/.test(page) && /hs-rest-pt/.test(page),
-   'maps.html: cluster + unclustered point layers exist');
-ok(/getClusterExpansionZoom/.test(page), 'maps.html: clusters zoom-expand on click');
-ok(/restFeatureCollection\(/.test(page) && /setData\(/.test(page),
-   'maps.html: drawGL feeds the rest layer via setData(restFeatureCollection(...))');
-// The Leaflet fallback used to draw the rest layer as canvas circleMarkers, which can
-// express only COLOUR — so every record past the lettered head became a circle whatever
-// its type. It now draws the same HS.markerSVG a lettered pin uses, so shape survives.
-ok(!/circleMarker\(/.test(page),
-   'maps.html: Leaflet fallback no longer flattens the rest layer to circleMarkers');
-ok(/HS\.markerSVG\(mk\.shape, mk\.color, '', 20\)/.test(page),
-   'maps.html: Leaflet fallback draws each rest record with its resolved shape');
-ok(/All records on file/.test(page) && /allRecMore/.test(page),
-   'maps.html: the complete chunk-rendered "All records on file" list exists');
-ok(/complete === false[\s\S]{0,200}incomplete app_projects read/.test(page),
-   'maps.html: a partial windowed read throws to the honest error state (never a silent prefix)');
-ok(/devTotal:\s*projects\.length/.test(page) && /facTotal:\s*facilities\.length/.test(page),
-   'maps.html: __HS_MAP exposes the true totals for CI completeness assertions');
-ok(/facRows\.find/.test(page), 'maps.html: deep links resolve against ALL facilities, not the mapped nearest-24');
+// REMOVED 2026-09-04 with the retirement of the second map. Everything below this point
+// read maps.html and pinned THAT page's GL clustered source, its Leaflet fallback, its
+// "All records on file" list and its __HS_MAP totals hook. The page is now a redirect stub,
+// so the assertions had no subject. The lib/map.js half above — restFeatureCollection's
+// coordinate coercion, resolved colour and facility flagging — is untouched and still runs.
 
 process.exit(fails ? 1 : 0);

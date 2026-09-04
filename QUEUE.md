@@ -40,32 +40,71 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-04 — 🔴 NEW ITEM (Rule 16): the authoritative cutover does NOT reach the public ZIP page
+### 2026-09-04 — MAP 1 ZIP DELIVERY: CLOSED ON `main`, and the card grain is PROVEN
 
-**Evidence: `docs/maps-coverage/N5-DELIVERY-GAP-ZIP-PAGE.md`.** Recorded as a new queue item
-rather than folded into the cutover work in flight, per Rule 16. Nothing was changed.
+**The delivery gap this branch measured is CLOSED — by `main`, not by this branch.** The gap was
+real when measured (`docs/maps-coverage/N5-DELIVERY-GAP-ZIP-PAGE.md` keeps the receipt): the RPC
+`public.app_projects_for_zip` was authoritative for 10,821 ZIPs while `homesignalmap.html` ZIP
+mode still read `public.development_reports`, the legacy 3-mile centroid-radius cache. `main`
+shipped `lib/zip-authoritative.js` for it while this branch was building a second implementation.
+**This branch's duplicate page implementation was dropped rather than merged** (commit `005f813`);
+`main`'s stands.
 
-`production_geography_verified = 10,821` is true of the RPC `public.app_projects_for_zip`.
-`homesignalmap.html` ZIP mode reads `public.development_reports` directly (line 1077 → 1118 →
-1313) and contains **0** occurrences of `app_projects_for_zip`, so the pages still render the
-legacy 3-mile centroid-radius set.
+**The one remaining delivery question — does a multi-marker project produce duplicate resident
+cards? — is answered NO.** Measured against the LIVE site, `verify-map1-card-grain` run
+`33930018814`, `https://homesignal.net`:
 
-Measured over the 10,821 cut-over ZIPs (control: all 10,821 have a cached report): **8,857
-disagree**; the pages serve **1,363,148** development rows against **406,196** authoritative
-projects; **3,465** had their cache rewritten by the refresh cron in the last 24 h. Dated
-instance — ZIP 10804, cache refreshed 2026-09-04 21:32Z, 47 development records against an
-authoritative membership of 1.
+| ZIP | development sites | unique project refs | max markers on one project | rails |
+|---|---:|---:|---:|---|
+| 76135 | 158 | 116 | 7 | 24 rows, 0 repeated project |
+| 76104 | 469 drawn of 479 (10 withheld) | 456 | — | clean |
+| 20742 | 0 | 0 | — | clean |
+| 10804 | 1 | 1 | — | clean |
 
-Wrong in BOTH directions on a 150-ZIP sample: **1,784 of 3,016 shown records lie outside the
-ZCTA** and **228 of 1,460 authoritative projects are missing from the page**. So filtering the
-cache to the authoritative set fixes one direction and leaves the other broken.
+Selecting markers does not create persistent cards (rails 24 → 24), and the headline count stays
+project-grained (`cDev` 66 · markers 159 · projects 116). **THE GRAIN IS THE MARKER; THE CARD IS
+THE PROJECT** — `main`'s implementation holds that invariant.
 
-`geo.maps_zip_export.served_development_rows` / `served_facility_rows` — the two columns that
-measure what is SERVED — are NULL on all 12,722 rows, which is why no instrument reported this.
+- ⚠️ **LATENT, not live: the rails hold by ordering plus the 12-row cap, not by de-duplication.**
+  With the cap removed, 76135 shows 12 TxDOT projects repeating up to ×7 and 76104 shows 6 up to
+  ×6. Nothing a resident sees today is wrong. **Recorded, not fixed** — raising or removing a rail
+  cap without adding a de-dup first would introduce the duplication.
+- The probe is committed and re-runnable: `scripts/probe-map1-card-grain.mjs` +
+  `.github/workflows/verify-map1-card-grain.yml` (defaults to serving the tree; `site_base` points
+  it at production).
 
-**Depends on:** nothing. **Blocks:** any coverage claim about Map 1, the final 12,722-page
-reconciliation, and SEO. **Not started** — it changes what every resident sees on 12,722 pages,
-which is a founder gate.
+### 2026-09-04 — ALERTS SEO: LIVE AND PROVEN. Pages source is GitHub Actions
+
+**`/community/<zip>/` is LIVE.** The founder switched the Pages source to **GitHub Actions**;
+the existing `pages.yml` was re-dispatched on `main` @ `09ba9f2` and `actions/deploy-pages@v4`
+deployed at **16:55:42Z** (run 33897571247, deployment 6269007025).
+
+**Persistence proven, not assumed:** the legacy `pages-build-deployment` workflow's last run
+ever is **#900 at 16:13:58Z — before the switch**; a push to `main` afterwards produced no new
+run of it and did not supersede the Actions deployment. ⚠️ A green `deploy-pages` job is NOT
+evidence of the setting (it succeeds in legacy mode too — the 15:58Z retraction in
+`docs/alerts-seo-build-2026-09-04.md` §11); the *absence of that firing* is.
+
+**Fresh Rule F 16:58:06Z: 12,722 canonical · PASS 7,643 · FAIL 5,079** (was 7,256 / 5,466 —
+normal ingestion, not forced). Served sitemap: 7,643 canonical / 0 legacy, reconciled.
+
+- **Production proof: `verify-zip-pages-live` run 33897988781 — 162 passed, 0 failed** (and
+  run 33891407719 before the switch, same result), plus a `pg_net` initial-HTML capture (the sandbox has no egress to
+  homesignal.net). Both are in `docs/alerts-seo-build-2026-09-04.md` §11. Nothing about the
+  implementation is unproven; only the hosting switch is missing.
+- **`pages.yml` is the implementation.** Do not create a Pages workflow from GitHub's suggested
+  Jekyll/static templates.
+- 📌 **OPEN FOLLOW-UP (not blocking):** `scripts/gen_sitemap.py` still writes the committed
+  `sitemap.xml` with the legacy `community.html?zip=` URLs; the artifact rewrite replaces that
+  half at build time, so what is SERVED is correct (7,256 canonical / 0 legacy, measured) while
+  the committed file is not what ships. Retiring its community half is a small, separate change.
+- Re-measured 2026-09-04 15:45:37Z, after deployment: 12,722 canonical ZIPs, Rule F
+  **PASS 7,256 / FAIL 5,466**;
+  vs the development gate — both 6,727 · Alerts-only 529 · development-only 4,975 ·
+  neither 491.
+- Full receipt, publication policy, frozen controls A–J: **`docs/alerts-seo-build-2026-09-04.md`**.
+- Rule F, the crawler ground truth and the geography certification are unchanged:
+  `docs/crawler-ground-truth-2026-09-03.md`.
 
 ### 2026-09-03 — DECISION RECORDED: no tier increase, and the reconciliation that closes it
 
@@ -402,6 +441,15 @@ intersecting it, independent of what the legacy method guessed. Nothing in the r
 the shard builder cannot, because `join proj` removes the candidates before the predicate runs.
 **Do not run more shards until that pass is scoped — throughput is not the constraint, search
 shape is** (founder, 2026-09-02).
+
+> ⚖️ **SUPERSEDED 2026-09-03 by the BOUNDARY-FIRST section above** — the pass was scoped, measured
+> on one prefix, and the disk question closed, so shard building resumed under it. **State as of
+> 2026-09-04: 542 of 544 shards built.** The two outstanding, **284 and 300, are NOT started, and
+> the reason is disk, not shape** — free space is ~2,108 MB against the founder's hard 2,048 MB
+> floor, i.e. ~60 MB of headroom. Do not start them, and do not obtain headroom by any of the
+> prohibited routes (no WAL surgery, no `VACUUM FULL` on `app_projects`, no speculative REINDEX, no
+> deletion of authoritative geometry / membership / markers / preservation evidence, no retiring
+> Map 2 for disk, no paid storage without authorization).
 
 
 ### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)

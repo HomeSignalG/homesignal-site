@@ -40,28 +40,28 @@ ok(resolveViewedZip({ urlZip: '84101', myZip: '90210', defaultZip: DEF }) === '8
   'explicit ?zip=84101 wins for this page load even when myZip is saved');
 ok(resolveViewedZip({ defaultZip: DEF }) === DEF,
   'default remains 78617 when no viewed or saved ZIP exists');
-ok(navHref('maps.html', '84101') === 'maps.html?zip=84101',
-  'navHref carries zip on Maps link');
+ok(navHref('alerts.html', '84101') === 'alerts.html?zip=84101',
+  'navHref carries zip on a nav link');
 ok(navHref('homesignalmap.html', '84101') === 'homesignalmap.html?zip=84101',
   'navHref carries zip on Development tracker link');
-ok(navHref('maps.html', null) === 'maps.html',
-  'missing ZIP → bare maps.html (graceful fallback, no invented zip)');
-ok(navHref('maps.html', 'abc') === 'maps.html',
-  'invalid ZIP → bare maps.html');
-ok(navHref('maps.html', '84101').indexOf('78617') === -1,
+ok(navHref('homesignalmap.html', null) === 'homesignalmap.html',
+  'missing ZIP → bare page (graceful fallback, no invented zip)');
+ok(navHref('homesignalmap.html', 'abc') === 'homesignalmap.html',
+  'invalid ZIP → bare page');
+ok(navHref('homesignalmap.html', '84101').indexOf('78617') === -1,
   'navHref does not substitute the sample ZIP when a different ZIP is passed');
-ok(navHref('maps.html', DEF) === 'maps.html?zip=78617',
+ok(navHref('homesignalmap.html', DEF) === 'homesignalmap.html?zip=78617',
   'navHref encodes an explicitly passed default ZIP');
 ok(pageHref('alerts.html', { zip: '84101', band: 'open' }) === 'alerts.html?zip=84101&band=open',
   'pageHref preserves zip + deep-link params');
 
-// --- map cross-navigation (maps.html ↔ homesignalmap.html) ---
+// --- ONE map (the second map was retired 2026-09-04) ---
 ok(navHref('homesignalmap.html', '90210') === 'homesignalmap.html?zip=90210',
-  'maps.html → homesignalmap.html preserves ZIP');
-ok(navHref('maps.html', '90210') === 'maps.html?zip=90210',
-  'homesignalmap.html → maps.html preserves ZIP');
-ok(MAP_PAGES.indexOf('maps.html') >= 0 && MAP_PAGES.indexOf('homesignalmap.html') >= 0,
-  'MAP_PAGES lists both map experiences');
+  'the primary map preserves ZIP');
+ok(MAP_PAGES.length === 1 && MAP_PAGES[0] === 'homesignalmap.html',
+  'MAP_PAGES lists exactly ONE map experience');
+ok(MAP_PAGES.indexOf('maps.html') < 0 && ZIP_NAV_PAGES.indexOf('maps.html') < 0,
+  'the retired map is in neither page list');
 ok(ZIP_NAV_PAGES.indexOf('homesignalmap.html') >= 0,
   'ZIP_NAV_PAGES includes homesignalmap.html for cross-link stamping');
 
@@ -80,8 +80,13 @@ ok(/Object\.defineProperty\(state,\s*'zip'/.test(shell),
   'shell.js zip is a setter (community deep link + repaint)');
 ok(/function paintNavHrefs/.test(shell), 'shell.js defines paintNavHrefs');
 ok(/paintNavHrefs\(\)/.test(shell), 'shell.js calls paintNavHrefs from topbar');
-ok(ZIP_NAV_PAGES.indexOf('maps.html') >= 0 && ZIP_NAV_PAGES.indexOf('development.html') >= 0,
-  'ZIP_NAV_PAGES includes Maps and Development');
+ok(ZIP_NAV_PAGES.indexOf('homesignalmap.html') >= 0 && ZIP_NAV_PAGES.indexOf('development.html') >= 0,
+  'ZIP_NAV_PAGES includes the map and Development');
+// Carried over from test/maps-zip-preservation.test.mjs, which was retired with the second
+// map: this is the only assertion in the suite pinning the SHARED location flow, and it is
+// about shell.js, not about the retired page.
+ok(/const z = \$\('locZip'\); z\.value = ''/.test(shell),
+  'shell.js openLoc still blanks #locZip by default — the shared flow is unchanged');
 ok(/data-znav/.test(shell), 'shell.js stamps in-page links via data-znav');
 ok(/LS\.set\('myZip',\s*zip\)/.test(shell),
   'followCommunity still writes myZip (saved area unchanged by view-only browse)');
@@ -99,36 +104,47 @@ const devPage = fs.readFileSync(new URL('../development.html', import.meta.url),
 const dash = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
 const today = fs.readFileSync(new URL('../today.html', import.meta.url), 'utf8');
 const howItWorks = fs.readFileSync(new URL('../how-it-works.html', import.meta.url), 'utf8');
-const comm = fs.readFileSync(new URL('../community.html', import.meta.url), 'utf8');
+// The community page runtime was extracted from community.html's inline block into
+// lib/community-page.js (Alerts SEO unit) so the generated /community/<zip>/ documents
+// and the legacy page share ONE implementation. These assertions follow the code; they
+// are unchanged in substance.
+const comm = fs.readFileSync(new URL('../lib/community-page.js', import.meta.url), 'utf8');
 
-ok(/data-znav="homesignalmap\.html"/.test(mapsHtml),
-  'maps.html cross-link targets homesignalmap.html with data-znav');
-ok(/data-znav="maps\.html"/.test(devMapHtml),
-  'homesignalmap.html cross-link targets maps.html with data-znav');
+// The retired map is a redirect stub, and the primary map no longer advertises it.
+ok(/location\.replace\('\/homesignalmap\.html'/.test(mapsHtml) && !/<template id="hs-content">/.test(mapsHtml),
+  'the retired map is a redirect stub to the primary map, not a second map experience');
+ok(!/data-znav="maps\.html"/.test(devMapHtml) && !/href="maps\.html"/.test(devMapHtml),
+  'the primary map no longer cross-links to the retired map');
 ok(/hasViewedZipContext/.test(devMapHtml),
   'homesignalmap boot reuses shell ZIP context (no sample auto-load)');
-ok(/HS\.navHref\('maps\.html',\s*S\.zip\)/.test(devPage),
+ok(/HS\.navHref\('homesignalmap\.html',\s*S\.zip\)/.test(devPage),
   'development.html "See it on the map" uses HS.navHref with active ZIP');
-ok(!/location\.href='maps\.html'/.test(devPage),
-  'development.html does not hardcode bare maps.html');
-ok(/data-znav="maps\.html"/.test(dash),
+ok(/data-znav="homesignalmap\.html"/.test(dash),
   'dashboard map links use data-znav');
-ok(/nav\('maps\.html',\s*mapCtx\(\)\)/.test(dash) || /HS\.navHref\('maps\.html',\s*S\.zip\)/.test(dash),
+ok(/nav\('homesignalmap\.html',\s*mapCtx\(\)\)/.test(dash),
   'dashboard map click preserves ZIP via pageHref/navHref');
-ok(/data-znav="maps\.html"/.test(today),
+ok(/data-znav="homesignalmap\.html"/.test(today),
   'today.html Map link uses data-znav');
+// No active runtime entry point may still send a resident to the retired map.
+[['development.html', devPage], ['dashboard.html', dash], ['today.html', today],
+ ['partials/shell.html', fs.readFileSync(new URL('../partials/shell.html', import.meta.url), 'utf8')],
+ ['lib/onboarding.js', fs.readFileSync(new URL('../lib/onboarding.js', import.meta.url), 'utf8')]
+].forEach(function (pair) {
+  ok(!/href="maps\.html"|'maps\.html'|"maps\.html"/.test(pair[1]),
+    pair[0] + ' no longer routes anyone to the retired map');
+});
 ok(/parseZipFromAddress/.test(devMapHtml) && /HS\.state\.zip\s*=\s*addrZip/.test(devMapHtml),
   'homesignalmap address search syncs App-map ZIP from geocoded address');
 ok(/data-znav="homesignalmap\.html"/.test(howItWorks),
   'how-it-works.html development map link preserves viewed ZIP via data-znav');
 ok(/View Development Map/.test(comm),
-  'community.html has View Development Map link');
+  'community page runtime has View Development Map link');
 ok(/HS\.navHref\('homesignalmap\.html',\s*zip\)/.test(comm),
-  'community.html View Development Map uses HS.navHref with current zip');
+  'community page runtime View Development Map uses HS.navHref with current zip');
 ok(/data-znav="homesignalmap\.html"/.test(comm),
-  'community.html View Development Map carries data-znav for ZIP stamping');
+  'community page runtime View Development Map carries data-znav for ZIP stamping');
 ok(!/homesignalmap\.html\?zip=78617/.test(comm),
-  'community.html does not hardcode sample ZIP in development map link');
+  'community page runtime does not hardcode sample ZIP in development map link');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll navigation-zip assertions passed.');
