@@ -1,8 +1,16 @@
 # HomeSignal — robots.txt
-# New layout is live site-wide. Only the homepage, Utah community pages, and the
-# development-tracker pages are advertised to search (see sitemap.xml + the per-page
-# noindex in community.html for non-Utah). The logged-in/personal app surfaces and
-# one-off utility pages are never indexed.
+# New layout is live site-wide. What is advertised to search comes from sitemap.xml plus
+# each page's own robots directive; the logged-in/personal app surfaces and one-off utility
+# pages are never indexed.
+#   /community/<zip>/  the canonical ZIP community page. One generated document per canonical
+#                      ZIP, robots decided at build time from the Alerts substance rule
+#                      (docs/alerts-seo-build-2026-09-04.md). Crawlable — do NOT Disallow.
+#   community.html     the legacy query-string page. Permanently noindex, with a canonical
+#                      pointing at /community/<zip>/. Deliberately NOT Disallowed: a
+#                      disallowed URL is never fetched, so its canonical and noindex are
+#                      never read and the consolidation never happens.
+#   homesignalmap.html the development/permits page, gated separately on
+#                      app_community_meta.indexable (page-purpose separation).
 User-agent: *
 Allow: /
 Disallow: /dashboard.html
