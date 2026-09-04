@@ -39,6 +39,12 @@ const base = 'http://127.0.0.1:' + server.address().port;
 // ── fixtures ────────────────────────────────────────────────────────────────────────────────
 const GEO = { match: { matchedAddress: '2200 CALDWELL LN, DEL VALLE, TX, 78617',
   lat: 30.215054966235, lng: -97.53885104845, zip: '78617', city: 'DEL VALLE', state: 'TX' } };
+// A SECOND address, 20 miles away. Used to prove that changing address replaces the previous
+// home's development population rather than carrying it onto the new home.
+const GEO2 = { match: { matchedAddress: '100 MAIN ST, BASTROP, TX, 78602',
+  lat: 30.110300000000, lng: -97.31500000000, zip: '78602', city: 'BASTROP', state: 'TX' } };
+let DELAY = {};          // per-radius RPC delay in ms
+let GEO_DELAY = 0;       // delay applied to the FIRST address's geocode only
 // what the report engine returns: facilities + one area notice + its OWN development point
 // (which address mode must replace with canonical results).
 const REPORT = {
@@ -87,6 +93,12 @@ const RPC_ROWS = {
       marker_lat: 30.23500, marker_lng: -97.51500, has_more: true }
   ]
 };
+// what the canonical corpus returns around the SECOND address - a disjoint set, so the two
+// populations can never be confused for one another.
+const RPC_ROWS_2 = { 1: [
+  { source_key: 'socrata:bastrop:CASE-9001', feature_id: 'pt:1', registry_id: 'bastrop-cases',
+    provenance: 'proven_stored_point', distance_mi: 0.4, geometry_type: 'ST_Point',
+    marker_lat: 30.11500, marker_lng: -97.31800, has_more: false } ] };
 const PROJECTS = [
   { source_key: 'socrata:data.austintexas.gov:mavg-96ck:SP-2021-0320D', name: 'Caldwell Lane',
     type: 'Industrial', status: 'Approved', registry_id: 'austin-site-plan-cases',
@@ -99,6 +111,10 @@ const PROJECTS = [
   { source_key: 'arcgis:txdot-projects-info-all:99001', name: 'SH 71 corridor improvements',
     type: 'Infrastructure', status: 'Proposed', registry_id: 'txdot-projects-info-all',
     source_ref: 'https://www.txdot.gov/projects/99001', submitted_at: '2025-03-04',
+    date_kind: 'filed', impact_score: null, impact_dimensions: null },
+  { source_key: 'socrata:bastrop:CASE-9001', name: 'Bastrop mixed-use block',
+    type: 'Commercial', status: 'Proposed', registry_id: 'bastrop-cases',
+    source_ref: 'https://example.gov/bastrop/9001', submitted_at: '2026-02-02',
     date_kind: 'filed', impact_score: null, impact_dimensions: null }
 ];
 const ZIP_ROW = [{ zip: '78617', home_lat: 30.1745, home_lng: -97.6134,
@@ -123,13 +139,21 @@ await page.route('**/*', async (route) => {
   const post = () => { try { return JSON.parse(route.request().postData() || '{}'); } catch { return {}; } };
   if (url.startsWith(base)) return route.continue();
   if (url.includes('/functions/v1/geocode-address')) {
-    calls.push({ kind: 'geocode', body: post() });
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(GEO) });
+    const b = post();
+    calls.push({ kind: 'geocode', body: b });
+    // a second address, so an address CHANGE can be proven to replace the previous population
+    const g = /BASTROP/i.test(String(b.address || '')) ? GEO2 : GEO;
+    if (GEO_DELAY && g === GEO) await new Promise(r => setTimeout(r, GEO_DELAY));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g) });
   }
   if (url.includes('/rpc/n5_projects_within_radius')) {
     const b = post();
     calls.push({ kind: 'rpc', body: b });
-    const rows = RPC_ROWS[b.p_radius_mi] || [];
+    const rows = (b.p_lat === GEO2.match.lat ? RPC_ROWS_2 : RPC_ROWS)[b.p_radius_mi] || [];
+    // DELAY[radius] lets a test make an EARLIER request finish LAST - the only way to prove
+    // the stale-response guard behaviourally rather than by reading the source.
+    const wait = DELAY[b.p_radius_mi] || 0;
+    if (wait) await new Promise(r => setTimeout(r, wait));
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
   }
   if (url.includes('/functions/v1/get-address-report')) {
@@ -281,6 +305,78 @@ ok(!s.some(x => x.n5), 'N — no address-radius result leaks into ZIP mode', s.m
 ok(!calls.some(c => c.kind === 'rpc'), 'N — returning to ZIP mode makes no N5 call');
 const zipFresh = await page.textContent('#freshLine');
 ok(!/canonical project/.test(zipFresh || ''), 'N — the address-radius note does not survive into ZIP mode: ' + zipFresh);
+
+// ══════════════ 5. STALE ASYNC RESPONSE — an earlier request must not win ══════════════
+// The strongest form of the guard: request A (5 mi) is made SLOW and request B (2 mi) fast, so
+// A resolves AFTER B. B is the newer selection, so B must own the page. Proving this by reading
+// the source would only show that a ticket exists; this shows it is checked.
+await page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#addr', { timeout: 15000 });
+RPC_ROWS[5] = [
+  { source_key: 'socrata:stale:SHOULD-NOT-RENDER', feature_id: 'pt:1', registry_id: 'stale',
+    provenance: 'proven_stored_point', distance_mi: 4.9, geometry_type: 'ST_Point',
+    marker_lat: 30.2800, marker_lng: -97.6000, has_more: false }
+];
+PROJECTS.push({ source_key: 'socrata:stale:SHOULD-NOT-RENDER', name: 'STALE 5-MILE RESULT',
+  type: 'Commercial', status: 'Proposed', registry_id: 'stale',
+  source_ref: 'https://example.gov/stale/1', submitted_at: '2026-01-01',
+  date_kind: 'filed', impact_score: null, impact_dimensions: null });
+DELAY = { 5: 2500 };                       // the EARLIER request finishes last
+calls.length = 0;
+await page.click('#radSel button[data-r="1"]');
+await page.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
+await page.click('#go');
+await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_feature_id), { timeout: 20000 });
+await page.click('#radSel button[data-r="5"]');          // A: slow
+await page.waitForTimeout(300);
+await page.click('#radSel button[data-r="2"]');          // B: fast, and NEWER
+await page.waitForFunction(() => (window.__HS_SITES || []).filter(s => s.n5_feature_id).length === 3, { timeout: 20000 });
+await page.waitForTimeout(3500);                          // let the slow 5-mi response land
+s = await sites();
+const radii = calls.filter(c => c.kind === 'rpc').map(c => c.body.p_radius_mi);
+ok(radii.includes(5) && radii.includes(2), 'both radius requests were actually issued', radii);
+ok(!s.some(x => x.label === 'STALE 5-MILE RESULT'),
+  '15 — the EARLIER (5 mi) response resolved last and did NOT overwrite the newer 2 mi result',
+  s.map(x => x.label));
+ok(s.filter(x => x.n5).length === 3 && s.some(x => x.n5 === 'f:7'),
+  '16 — the newer radius selection owns the population', s.filter(x => x.n5).map(x => x.n5));
+const staleFresh = await page.textContent('#freshLine');
+ok(/within 2 miles/.test(staleFresh || ''),
+  '15 — and the completeness note describes the NEWER radius: ' + staleFresh);
+DELAY = {};
+
+// ══════════════ 6. ADDRESS CHANGE — the previous home's projects must not persist ══════════════
+calls.length = 0;
+await page.click('#radSel button[data-r="1"]');
+await page.waitForFunction(() => (window.__HS_SITES || []).filter(s => s.n5_feature_id).length === 2, { timeout: 20000 });
+s = await sites();
+ok(s.some(x => x.label === 'Caldwell Lane'), 'first address population is on screen');
+await page.fill('#addr', '100 Main St, Bastrop, TX 78602');
+await page.click('#go');
+await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.label === 'Bastrop mixed-use block'), { timeout: 20000 });
+s = await sites();
+const geo2 = calls.filter(c => c.kind === 'geocode').pop();
+const rpc3 = calls.filter(c => c.kind === 'rpc').pop();
+ok(geo2 && /Bastrop/i.test(geo2.body.address), '10 — the new address is re-geocoded');
+ok(rpc3 && rpc3.body.p_lat === GEO2.match.lat && rpc3.body.p_lng === GEO2.match.lng,
+  '10 — the NEW home coordinates are what reach the RPC', rpc3 && rpc3.body);
+ok(!s.some(x => x.label === 'Caldwell Lane') && !s.some(x => x.label === 'Riverside Resort'),
+  '14 — the previous address\'s development population is gone', s.map(x => x.label));
+ok(s.filter(x => x.n5).length === 1, '14 — only the new home\'s canonical results remain');
+
+// ══════════════ 7. GEOCODER NO-MATCH — nothing stale is left standing ══════════════
+calls.length = 0;
+await page.route('**/functions/v1/geocode-address', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ match: null }) }));
+await page.fill('#addr', 'not a real address at all');
+await page.click('#go');
+await page.waitForFunction(() => /couldn't find that address/i.test(document.getElementById('status')?.textContent || ''), { timeout: 15000 })
+  .catch(() => {});
+const nm = await page.textContent('#status');
+ok(/couldn't find that address/i.test(nm || ''), '16 — a geocoder no-match says so honestly: ' + nm);
+ok(!calls.some(c => c.kind === 'rpc'), '16 — and no radius query is issued for an unplaceable address');
+ok(!(await page.evaluate(() => !!document.getElementById('go').disabled)),
+  '16 — the search button is re-enabled so the resident can try again');
 
 await browser.close();
 server.close();
