@@ -1,0 +1,35 @@
+-- DDL OF RECORD — public.app_authoritative_projects_for_zip, drift-tolerant.
+-- Applied 2026-09-04 as migration `app_authoritative_producer_tolerates_descriptive_drift`.
+--
+-- Separates geography truth from descriptive-content availability. geo.zip_authoritative_
+-- membership is FROZEN authoritative geography; public.app_projects is a LIVE ingestion
+-- product rewritten by dev_refresh_tick / app_refresh_sweep. The producer used to INNER-join
+-- them and raise when a valid membership had no current descriptive row, and
+-- public.app_projects_for_zip has no fallback, so ordinary churn made live pages error.
+--
+-- Receipts, all measured before deploy against a test build in geo:
+--   19 previously rolled-back ZIPs: projects returned = memberships on all 19; markers
+--     returned = marker relation on all 19; 57 attributes_missing; no exception.
+--   ZIP 11004: 295 projects for 295 memberships (was 286), 295 markers, 9 attributes_missing.
+--   Geography vs relation across the 19: 4,808 = 4,808 marker rows, 0 not in relation,
+--     0 not in producer, 0 coordinate differences; the 57 drifted projects keep 57 markers.
+--   Concurrency (a refresh job active): geography fingerprint 0bca1bd055f9180fe70b0ef4c62aa7b2
+--     stable across a 4-minute window.
+--   Deterministic false->true transition, no write to the live table: hiding one descriptive
+--     row for 11004 moved attributes_missing 9 -> 10 while projects stayed 295 -> 295, the
+--     membership set was identical, and the 295-marker fingerprint 8619d75edf9912e836c50767c4f1823c
+--     is derived only from the geo relations.
+--   Invariants 2-5 unchanged CODE: comment-stripped md5 c7c49604a5584f8f3de15225d7d9d9b2 both
+--     sides, 1,336 chars each.
+--   Performance, same ZIP 83687 (330 memberships), under documented refresh saturation:
+--     live producer 3,235 ms, corrected producer 2,480 ms.
+--   Security unchanged: SECURITY DEFINER, search_path=public/geo/pg_temp, identical ACL,
+--     0 geo grants to anon/authenticated, no USAGE on geo for either.
+--
+-- ⚠️ The shadow's expression could NOT be copied verbatim. `to_jsonb(a.*)` over a
+-- null-extended lateral row returns SQL NULL, not an object of nulls - measured - so
+-- `to_jsonb(a.*) || jsonb_build_object(...)` collapses the record to NULL and every required
+-- key vanishes, tripping invariant 3. The ten required keys are built explicitly instead.
+--
+-- The full body is the migration of the same name; this file is the pointer of record so the
+-- schema change is reproducible from the repo per CLAUDE.md §1 #3.

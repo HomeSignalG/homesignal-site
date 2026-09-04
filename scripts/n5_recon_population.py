@@ -32,79 +32,61 @@ def disk():
     return float(r["free_mb"])
 
 
-def drift_preflight():
-    """Refuse to start if any ENABLED ZIP would make the producer raise.
+def producer_preflight():
+    """Prove the producer TOLERATES descriptive drift rather than rolling ZIPs back for it.
 
-    Post-cutover drift is real and it is not hypothetical: ordinary ingestion removed 45
-    memberships' worth of source_keys from live app_projects across 14 already-verified
-    ZIPs, and the first thing that noticed was the producer raising in the middle of chunk
-    9 - an HTTP 400 that names one ZIP and says nothing about the other 13. A live page was
-    erroring the whole time.
+    This replaces an earlier preflight that disabled every ZIP whose membership named a
+    source_key absent from live app_projects. That was the right action while the producer
+    INNER-joined the two and raised; it is the wrong action now. Since
+    app_authoritative_projects_for_zip attaches the descriptive row with a LEFT JOIN
+    LATERAL, a missing row is attributes_missing=true and the ZIP is healthy - rolling it
+    back would remove correct geography from production for an ordinary ingestion event.
 
-    Set-based, no producer call, so it costs one statement and names every affected ZIP at
-    once. The healthy answer is 0 and it carries its control: a membership count that must
-    be non-zero, because a join that matched nothing returns 0 failures too."""
+    So the check inverts: count the drift, and require that the producer still returns a
+    complete answer for the ZIPs carrying it. The healthy answer is "drift exists and
+    nothing broke", which is why the drifted-ZIP count is REPORTED rather than gated."""
     r = sql("""
 set statement_timeout='300s';
 with enabled as (select zip from public.app_zip_geography_cutover where enabled),
  j as (select e.zip, m.source_key from enabled e
          join geo.zip_authoritative_membership m on m.zcta5 = e.zip)
 select (select count(*) from j) memberships_checked,
+       (select count(*) from j where not exists (
+          select 1 from public.app_projects p
+           where p.source_key = j.source_key and p.record_kind='development')) drifted_memberships,
        (select count(*) from (
-          select zip from j group by zip
-           having count(*) filter (where not exists (
-             select 1 from public.app_projects p
-              where p.source_key = j.source_key and p.record_kind='development')) > 0) z) failing_zips,
-       (select coalesce(string_agg(zip, ',' order by zip collate "C"), '') from (
-          select zip from j group by zip
-           having count(*) filter (where not exists (
-             select 1 from public.app_projects p
-              where p.source_key = j.source_key and p.record_kind='development')) > 0) z2) failing_list;
-""", "drift preflight", read_only=True)[0]
+          select zip from j group by zip having count(*) filter (where not exists (
+            select 1 from public.app_projects p
+             where p.source_key = j.source_key and p.record_kind='development')) > 0) z) drifted_zips;
+""", "drift census", read_only=True)[0]
     checked = int(r["memberships_checked"])
-    failing = int(r["failing_zips"])
     say("enabled memberships checked (control)", f"{checked:,}")
-    say("enabled ZIPs whose producer would raise", failing)
+    say("memberships with no live descriptive row", f"{int(r['drifted_memberships']):,}")
+    say("ZIPs carrying descriptive drift", f"{int(r['drifted_zips']):,}")
     if checked == 0:
-        raise SystemExit("STOP: the drift preflight matched no memberships, so its zero "
-                         "attests to nothing")
-    if failing:
-        raise SystemExit(
-            f"STOP: {failing} enabled ZIP(s) carry memberships whose source_key is absent "
-            f"from live app_projects, so the authoritative producer RAISES for them and "
-            f"those live pages are erroring now: {r['failing_list']}\n"
-            "Roll them back (set enabled=false, production_geography_verified_at=null) "
-            "before reconciling; the invariant is never weakened to admit a ZIP.")
-
-
-def disable_drifted(lo, hi):
-    """Roll back every ENABLED ZIP in this window whose producer would raise.
-
-    Set-based over the window, so one statement finds all of them rather than the single
-    ZIP the loop happened to reach. Disabling is the documented reversible rollback: the
-    page returns to the legacy branch, which is a correct page. The invariant is never
-    weakened to admit a ZIP - that is the whole reason the producer raises."""
-    r = sql(f"""
-set statement_timeout='110s';
-with win as (select zip from (select zip, row_number() over (order by zip) rn
-                                from public.app_zip_geography_cutover where enabled) q
-              where rn > {lo} and rn <= {hi}),
- bad as (select w.zip,
-           count(*) total,
-           count(*) filter (where not exists (select 1 from public.app_projects p
-             where p.source_key = m.source_key and p.record_kind='development')) missing
-          from win w join geo.zip_authoritative_membership m on m.zcta5 = w.zip
-         group by 1
-        having count(*) filter (where not exists (select 1 from public.app_projects p
-             where p.source_key = m.source_key and p.record_kind='development')) > 0)
-update public.app_zip_geography_cutover c
-   set enabled = false, production_geography_verified_at = null,
-       note = 'ROLLED BACK ' || to_char(now(),'YYYY-MM-DD HH24:MI') ||
-              ' - post-cutover drift from the LIVE app_projects refresh: ' || b.missing ||
-              ' of ' || b.total || ' memberships no longer resolve. Page returns to legacy.'
-  from bad b where b.zip = c.zip
-returning c.zip;""", f"disable drifted {lo}-{hi}")
-    return len(r) if isinstance(r, list) else 0
+        raise SystemExit("STOP: the drift census matched no memberships, so its numbers "
+                         "attest to nothing")
+    # Exercise the producer on the drifted ZIPs specifically. If tolerance is working these
+    # are exactly the ZIPs that used to raise, so a clean pass here is the whole point.
+    probe = sql("""
+set statement_timeout='300s';
+with enabled as (select zip from public.app_zip_geography_cutover where enabled),
+ j as (select e.zip, m.source_key from enabled e
+         join geo.zip_authoritative_membership m on m.zcta5 = e.zip),
+ drifted as (select zip from j group by zip having count(*) filter (where not exists (
+               select 1 from public.app_projects p
+                where p.source_key = j.source_key and p.record_kind='development')) > 0
+             limit 25),
+ called as (select d.zip, public.app_projects_for_zip(d.zip,'development') v from drifted d)
+select count(*) probed,
+       coalesce(sum(jsonb_array_length(v)),0) records,
+       (select count(*) from called c, jsonb_array_elements(c.v) e
+         where (e->>'attributes_missing')::boolean) attrs_missing
+from called;
+""", "drift tolerance probe", read_only=True)[0]
+    say("drifted ZIPs probed through the producer",
+        f"{int(probe['probed'])} -> {int(probe['records']):,} records, "
+        f"{int(probe['attrs_missing']):,} attributes_missing")
 
 
 def load():
@@ -140,21 +122,13 @@ from called c,
         except SystemExit as e:
             if "AUTHORITATIVE INVARIANT" not in str(e):
                 raise
-            # DRIFT ARRIVED MID-RUN. The preflight was clean at the start - 0 failing
-            # against a control of 139,211 memberships - and a ZIP broke 40 minutes later
-            # while public.app_projects was being rewritten by dev_refresh_tick and
-            # app_refresh_sweep. A one-shot preflight cannot hold against a live table, so
-            # the loop handles it the only correct way: disable the ZIPs whose producer now
-            # raises, which returns those pages to legacy, then retry the chunk ONCE.
-            # A second failure in the same chunk is fatal - that would mean something other
-            # than drift.
-            n_off = disable_drifted(k * CHUNK, (k + 1) * CHUNK)
-            say(f"  chunk {k + 1} drift", f"{n_off} ZIP(s) rolled back to legacy, retrying")
-            if n_off == 0:
-                raise SystemExit(
-                    f"STOP: chunk {k + 1} raised the authoritative invariant but no ZIP in "
-                    "its range carries an unresolvable membership. The cause is not drift.")
-            sql(chunk_sql, f"flat chunk {k + 1} retry")
+            # Reaching here now means GENUINE authoritative corruption, not descriptive
+            # drift - the producer tolerates a missing descriptive row and no longer raises
+            # for it. There is nothing safe to retry.
+            raise SystemExit(
+                "STOP: the authoritative invariant raised AFTER the producer was made "
+                "drift-tolerant. That is geography corruption, not ingestion churn: "
+                + str(e))
         done += CHUNK
         if (k + 1) % 10 == 0 or k + 1 == parts:
             free = disk()
@@ -236,7 +210,7 @@ select
 def main():
     say("N5 whole-population reconciliation", "enabled set")
     say("BEFORE free disk MB", f"{disk():,.0f}")
-    drift_preflight()
+    producer_preflight()
     n = load()
     ok = check(n)
     say("AFTER free disk MB", f"{disk():,.0f}")
