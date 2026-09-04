@@ -87,7 +87,7 @@ await page.click('#go');
 await page.waitForFunction(() => {
   const t = document.getElementById('status');
   return (window.__HS_SITES || []).length > 0 || /couldn't|error/i.test(t ? t.textContent : '');
-}, { timeout: 90000 });
+}, null, { timeout: 90000 });
 await page.waitForTimeout(2500);
 
 const geo = calls.find(c => c.kind === 'geocode');
@@ -217,7 +217,7 @@ if (rows2.some(r => r.has_more === true)) {
 // ═══════════ 8. LIVE ZIP REGRESSION ═══════════
 calls.length = 0;
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 await page.waitForTimeout(4000);
 s = await sites();
 ok(calls.some(c => c.kind === 'zipcache'), '8 — ZIP mode reads the entire-ZIP cached report');
@@ -245,7 +245,7 @@ ok(page.url().indexOf('homesignalmap.html') >= 0,
   '10 — a resident on the old URL lands on the primary map: ' + page.url());
 ok(page.url().indexOf('zip=' + ZIP) >= 0,
   '10 — the old URL keeps its ZIP across the forward, so the bookmark still works');
-await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 ok((await page.locator('#map, #mapInner').count()) >= 1, '10 — and the primary map renders there');
 
 // The normal user path: no live page may still offer the retired map as a destination.
@@ -262,12 +262,15 @@ ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(nav),
 // ═══════════ 11. ZIP MODE IS THE WHOLE ZIP — no centroid, no radius ═══════════
 // The invariant: a ZIP search represents the ENTIRE actual ZIP/ZCTA geography and never
 // substitutes a circle around a point. Proven against the deployed page and the real RPC.
-const authRes = await fetch(BASE + '/rest/v1/rpc/app_zip_projects_markers', { method: 'POST' })
-  .catch(() => null);   // the page calls Supabase directly; this is only a reachability nudge
-void authRes;
+const zlib = await (await fetch(BASE + '/lib/zip-authoritative.js', { cache: 'no-store' })).text();
+ok(/zipAuthSitesFrom/.test(zlib) && /not_measured/.test(zlib),
+  '11 — lib/zip-authoritative.js is deployed');
+const zpage = await (await fetch(BASE + '/homesignalmap.html', { cache: 'no-store' })).text();
+ok(/rpc\/app_zip_projects_markers/.test(zpage),
+  '11 — the deployed page reads authoritative whole-ZIP geography');
 
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 await page.waitForTimeout(4000);
 const zsites = await page.evaluate(() => (window.__HS_SITES || []).map(s => ({
   rel: s.relevance, scope: s.scope, auth: s.zip_authoritative === true,
@@ -301,7 +304,7 @@ await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', t
 await page.waitForSelector('#addr', { timeout: 30000 });
 await page.fill('#addr', ADDRESS);
 await page.click('#go');
-await page.waitForFunction(() => (window.__HS_SITES || []).length > 0, { timeout: 90000 });
+await page.waitForFunction(() => (window.__HS_SITES || []).length > 0, null, { timeout: 90000 });
 ok(await page.locator('#radSel').isVisible(),
   '11 — an address search restores the radius control (address mode is untouched)');
 
