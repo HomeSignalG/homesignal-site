@@ -81,5 +81,20 @@ if (GN.placeName('Box Elder', 'UT') !== 'Box Elder County') failures.push('place
 if (!MAP.configured_zips.includes('21201')) failures.push('containment: Baltimore city ZIP 21201 should be configured');
 if (MAP.configured_zips.includes('21204'))  failures.push('containment: Baltimore COUNTY ZIP 21204 must not be configured');
 
+// ── STATIC WIRING: the page must actually USE this module ────────────────────────────
+// A pure function that nothing calls is the vacuous shape at the integration level: the
+// unit tests above would stay green while community.html rendered nothing again.
+const page = readFileSync(join(root, 'community.html'), 'utf8');
+if (!/<script[^>]+src=["']lib\/gov-notice-copy\.js["']/.test(page)) failures.push('wiring: community.html does not load lib/gov-notice-copy.js');
+if (!page.includes('HS.govNoticeCopy.build(')) failures.push('wiring: community.html never calls build()');
+if (!/fetch\(['"]lib\/generated\/gov-notice-coverage\.json['"]\)/.test(page)) failures.push('wiring: community.html never fetches the coverage map');
+if (!/govNoticeState\.label/.test(page) || !/govNoticeState\.text/.test(page)) failures.push('wiring: community.html never renders the returned copy');
+// the map must be read only when the section is empty (a page with notices pays nothing)
+if (!/if \(!notices\.length\)[\s\S]{0,400}gov-notice-coverage\.json/.test(page))
+  failures.push('wiring: the coverage map is fetched even when the section has notices');
+// the empty branch must be reachable: the render must be conditional on notices.length
+if (!/notices\.length\s*\n?\s*\?\s*notices\.slice\(0,2\)/.test(page))
+  failures.push('wiring: the notices render is not conditional, so the empty state is unreachable');
+
 if (failures.length) { console.error(failures.map((f) => 'FAIL ' + f).join('\n')); process.exit(1); }
 console.log(`ok  gov-notice-copy: ${MAP._counts.configured} configured / ${MAP._counts.unconfigured} unconfigured of 12,722`);
