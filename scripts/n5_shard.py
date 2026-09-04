@@ -588,6 +588,23 @@ select (select count(*) from legacy) legacy_pairs,
 
 # ---------------------------------------------------------------- one shard
 
+def freeze_buckets(z3):
+    """The prefix's ten ZIP4 buckets: z3 followed by each digit, in order.
+
+    EQUALITY on left(zip,4), never a range. A range needs an ORDER, and this database
+    collates en_US.UTF-8 while the bound characters would be chosen by codepoint - the
+    same mismatch CLAUDE.md rule 9 records, where a fingerprint reported drift on
+    identical data. Ten equalities on digits have no ordering in them at all.
+
+    Totality is not assumed from this list: every ZIP in the four remaining prefixes was
+    measured to be exactly five digits with no NULL (634,490 rows, 0 exceptions), and the
+    manifest checksum gate below re-proves it per shard - a missed bucket shows up as a
+    pairs/checksum mismatch and halts as FREEZE_DRIFT.
+    """
+    return [f"{z3}{d}" for d in range(10)]
+
+
+
 def run_shard(z3):
     say("", "")
     say("=" * 48, "")
@@ -599,15 +616,42 @@ def run_shard(z3):
         f"{man['projects']} / {man['pairs']} / {man['zips']}")
 
     # 1 - FREEZE this shard's slice of the frozen baseline
+    #
+    # ONE STATEMENT PER ZIP4 BUCKET, not one for the whole prefix. The single-statement
+    # form fit 540 shards and then stopped fitting: shard 662 (148,286 pairs, 1.56x shard
+    # 571's 95,182) halted three times at the ~120 s statement ceiling with the insert
+    # rolled back each time - geo.n5_frozen for that prefix stayed 0, so the failure was
+    # clean, only never-ending. An index on preservation.app_project_identity took the
+    # planner cost 181,525 -> 38,407 and it STILL did not fit, because the cost that
+    # remains is per-ROW (the app_projects lookup and the write), not the scan; two
+    # concurrent crons (app_refresh_sweep, dev_refresh_tick) were enough to spend the rest.
+    #
+    # The predicate carries BOTH left(zip,3) and left(zip,4). The second is what makes each
+    # bucket's own value an index cond so no bucket heap-fetches another's rows; the first
+    # is what lets the planner USE the partial index at all - it cannot prove
+    # left(zip,4)='6620' implies left(zip,3) in ('284','300','303','662'), and with the
+    # ZIP4 predicate alone it went straight back to the seq scan (verified by EXPLAIN,
+    # cost 181,525, before the redundant-looking line was added). Redundant to a reader,
+    # load-bearing to the planner.
+    #
+    # Ten equalities, not a range: a range would need an order, and the DB collates
+    # en_US.UTF-8 while the bounds would be chosen by codepoint (CLAUDE.md rule 9).
+    #
+    # Fails safe: the delete runs once, before any chunk, so a chunk that fails leaves a
+    # PARTIAL slice - and the checksum gate immediately below compares projects, pairs and
+    # the order-independent checksum against the manifest, so a partial slice halts as
+    # FREEZE_DRIFT rather than being built on. The next run deletes and redoes it.
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "clear frozen")
-    sql(f"""insert into geo.n5_frozen (z3,source_key,zip,source_seq,registry_id,treatment,lat,lng,source_key_basis)
-            select {lit(z3)}, i.source_key, i.zip, i.source_seq,
-                   coalesce(i.registry_id,'(null)'), a.treatment, i.lat, i.lng, p.source_key_basis
-              from preservation.app_project_identity i
-              join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
-              left join public.app_projects p on p.id = i.app_project_id
-             where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
-               and left(i.zip,3)={lit(z3)};""", "freeze")
+    for z4 in freeze_buckets(z3):
+        sql(f"""set statement_timeout='110s';
+                insert into geo.n5_frozen (z3,source_key,zip,source_seq,registry_id,treatment,lat,lng,source_key_basis)
+                select {lit(z3)}, i.source_key, i.zip, i.source_seq,
+                       coalesce(i.registry_id,'(null)'), a.treatment, i.lat, i.lng, p.source_key_basis
+                  from preservation.app_project_identity i
+                  join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+                  left join public.app_projects p on p.id = i.app_project_id
+                 where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
+                   and left(i.zip,3) = {lit(z3)} and left(i.zip,4) = {lit(z4)};""", f"freeze {z4}")
     # The whole table was just replaced, so its planner statistics describe the PREVIOUS
     # shard until autoanalyze happens to catch up. Cheap here, and it removes the
     # stale-statistics class of plan blow-up on the dense shards. Hardening: it is not

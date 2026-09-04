@@ -158,4 +158,24 @@ ok(ids3 == set(ids1),
 ok(all(f.endswith("#0") or f.endswith("#1") for _, f in ids1),
    "indices are per-identity (#0/#1), not a global counter")
 
+
+# ── the freeze buckets: the ONE thing that decides whether a shard's slice is total ──
+# The manifest checksum gate catches a missed bucket at run time, but only after paying
+# the whole freeze. These assertions catch it offline, and they pin the two properties the
+# comment in n5_shard.py claims: exactly the ten digits, and no ordering anywhere in it.
+B = M.freeze_buckets("662")
+ok(B == ["6620", "6621", "6622", "6623", "6624", "6625", "6626", "6627", "6628", "6629"],
+   "freeze_buckets('662') is the ten ZIP4 values, in digit order")
+ok(len(B) == len(set(B)) == 10, "ten buckets, no duplicate - a duplicate would double-insert")
+ok(all(b[:3] == "662" for b in B), "every bucket stays inside its own prefix")
+ok({b[3] for b in B} == set("0123456789"),
+   "the ten buckets cover every 4th digit, so a 5-digit ZIP cannot fall outside them")
+ok(M.freeze_buckets("009")[0] == "0090",
+   "a leading-zero prefix keeps its zeros - '009' must not become '9'")
+# The bug this replaces: a RANGE form whose last upper bound was the prefix's arithmetic
+# successor. For '999' that is '1000', and '99900' > '1000' as text, so the final chunk
+# selected NOTHING. Equality on digits cannot express that mistake.
+ok(M.freeze_buckets("999") == ["999" + d for d in "0123456789"],
+   "prefix 999 gets ten real buckets, not a range that collapses to empty")
+
 sys.exit(1 if fails else 0)
