@@ -121,7 +121,20 @@ SQL_MAX_ATTEMPTS = 6
 SQL_BACKOFF_S = (2, 5, 15, 30, 60)
 
 
-def sql(query, tag=""):
+class SQLPayloadTooLarge(Exception):
+    """HTTP 413 - the STATEMENT was too big, not the data wrong.
+
+    Raised only when a caller passes raise_413=True, so a batch writer can split and
+    retry instead of dying. Every other caller keeps the old fail-closed behaviour: a
+    413 it did not plan for still stops the run.
+
+    This exists because guessing a byte budget does not work - the first attempt at
+    fixing shard 891 picked 4 MB and still got 413. The limit is the server's to state;
+    the client's job is to react to it, not to predict it.
+    """
+
+
+def sql(query, tag="", raise_413=False):
     token = os.environ["SUPABASE_ACCESS_TOKEN"]
     for attempt in range(1, SQL_MAX_ATTEMPTS + 1):
         req = urllib.request.Request(
@@ -133,6 +146,8 @@ def sql(query, tag=""):
             with urllib.request.urlopen(req, timeout=900) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
+            if e.code == 413 and raise_413:
+                raise SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
             if e.code not in SQL_RETRY_STATUS or attempt == SQL_MAX_ATTEMPTS:
                 raise SystemExit(
                     f"STOP: SQL {tag} failed HTTP {e.code} on attempt {attempt}\n"

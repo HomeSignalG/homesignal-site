@@ -1,27 +1,15 @@
-"""Offline proof that the n5_geom insert batches by BYTES as well as row count.
+"""Offline proof that insert_batched SPLITS on HTTP 413 and never loses a row.
 
-No network, no DB: the batching loop is reproduced from n5_shard.py and driven over
-synthetic rows. It asserts the three properties that matter, because the failure this
-guards against (HTTP 413 on shard 891) was a statement that looked fine by row count.
+No network, no DB: n3_pilot.sql is replaced with a fake server that refuses any statement
+over a secret size. The point is that the client does NOT know that size - the first fix
+for shard 891 guessed a 4 MB budget and got 413 again - so the test asserts the client
+adapts to whatever the server enforces.
 """
-import sys
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault("SUPABASE_ACCESS_TOKEN", "test-token-not-a-secret")
 
-MAX_BYTES = 4_000_000
-MAX_ROWS = 25
-
-
-def batches(rows):
-    """The shipped loop, returning the statements it would send."""
-    out, batch, nbytes = [], [], 0
-    for r in rows:
-        rb = len(r.encode("utf-8"))
-        if batch and (nbytes + rb > MAX_BYTES or len(batch) >= MAX_ROWS):
-            out.append(list(batch)); batch.clear(); nbytes = 0
-        batch.append(r); nbytes += rb
-    if batch:
-        out.append(list(batch))
-    return out
-
+import n3_pilot as N
 
 fails = 0
 def ok(c, name):
@@ -29,34 +17,68 @@ def ok(c, name):
     print(("PASS" if c else "FAIL") + " - " + name)
     if not c: fails += 1
 
+SENT = []
+LIMIT = 50_000          # the server's secret limit; the client never sees this number
 
-# 1. Many tiny rows: the ROW cap governs, exactly as before this change.
-tiny = ["x" * 40 for _ in range(100)]
-b = batches(tiny)
-ok(all(len(x) <= MAX_ROWS for x in b), "tiny rows never exceed the row cap")
-ok(sum(len(x) for x in b) == 100, "tiny rows: nothing dropped (100)")
-ok(len(b) == 4, "100 tiny rows -> 4 statements of 25 (got %d)" % len(b))
+def fake_sql(query, tag="", raise_413=False):
+    if len(query) > LIMIT:
+        if raise_413:
+            raise N.SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
+        raise SystemExit("413")
+    SENT.append(query)
+    return []
 
-# 2. Dense polygons: the BYTE cap governs and fires BEFORE 25 rows.
-#    This is the shard-891 shape - each row big enough that 25 would blow the limit.
-big = ["p" * 500_000 for _ in range(25)]
-b = batches(big)
-ok(all(sum(len(r.encode()) for r in x) <= MAX_BYTES for x in b),
-   "dense rows: every statement is within the byte budget")
-ok(max(len(x) for x in b) < MAX_ROWS, "dense rows: byte cap fired before the row cap")
-ok(sum(len(x) for x in b) == 25, "dense rows: nothing dropped (25)")
+N.sql = fake_sql
+import n5_shard as S
+S.sql = fake_sql
+S.say = lambda k, v: None
 
-# 3. A single row larger than the whole budget is SENT ALONE, never dropped.
-huge = ["z" * (MAX_BYTES + 10)]
-b = batches(huge)
-ok(len(b) == 1 and len(b[0]) == 1, "an over-budget row is sent alone, not dropped")
+PFX, SFX = "insert into t values ", " on conflict do nothing;"
 
-# 4. Mixed traffic: order preserved exactly, nothing lost.
-mixed = ["a" * 10, "b" * 3_000_000, "c" * 10, "d" * 3_000_000, "e" * 10]
-b = batches(mixed)
-flat = [r for x in b for r in x]
-ok(flat == mixed, "mixed rows: order preserved and nothing lost")
-ok(all(sum(len(r.encode()) for r in x) <= MAX_BYTES or len(x) == 1 for x in b),
-   "mixed rows: every statement within budget unless it is a single over-budget row")
+def run(rows):
+    SENT.clear()
+    S.insert_batched(PFX, rows, SFX, "test")
+    # every statement the fake server accepted must be within its limit
+    return SENT
+
+# 1. Rows small enough that the 25-row cap governs; no splitting needed.
+rows = ["(%d,'%s')" % (i, "x" * 100) for i in range(100)]
+sent = run(rows)
+ok(all(len(q) <= LIMIT for q in sent), "small rows: every statement accepted within limit")
+ok(sum(q.count("),(") + 1 for q in sent) == 100, "small rows: all 100 rows sent")
+ok(len(sent) == 4, "small rows: 4 statements of 25 (got %d)" % len(sent))
+
+# 2. Dense rows - the shard-891 shape. 25 would blow the limit, so it must SPLIT.
+rows = ["(%d,'%s')" % (i, "p" * 8_000) for i in range(25)]
+sent = run(rows)
+ok(all(len(q) <= LIMIT for q in sent), "dense rows: client adapted to the server's limit")
+ok(sum(q.count("),(") + 1 for q in sent) == 25, "dense rows: all 25 rows sent, none dropped")
+ok(len(sent) > 1, "dense rows: it actually split (got %d statements)" % len(sent))
+
+# 3. ORDER is preserved across the split - a reordering would corrupt first_z3 provenance.
+rows = ["(%d,'%s')" % (i, "q" * 6_000) for i in range(30)]
+sent = run(rows)
+seq = []
+for q in sent:
+    body = q[len(PFX):-len(SFX)]
+    seq += [int(p.split(",")[0].lstrip("(")) for p in body.split("),(")]
+ok(seq == list(range(30)), "split preserves row order exactly")
+
+# 4. A single row the server will never accept is a HARD ERROR, never skipped.
+try:
+    S.insert_batched(PFX, ["(1,'%s')" % ("z" * (LIMIT * 2))], SFX, "test")
+    ok(False, "an unsplittable oversize row raises")
+except SystemExit as e:
+    ok("SINGLE row" in str(e), "an unsplittable oversize row raises and says so")
+
+# 5. Non-413 failures still fail closed (raise_413 only softens 413).
+def fake_500(query, tag="", raise_413=False):
+    raise SystemExit("STOP: SQL %s failed HTTP 500" % tag)
+S.sql = fake_500
+try:
+    S.insert_batched(PFX, ["(1,'a')"], SFX, "test")
+    ok(False, "a non-413 error still stops the run")
+except SystemExit as e:
+    ok("500" in str(e), "a non-413 error still stops the run")
 
 sys.exit(1 if fails else 0)

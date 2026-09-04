@@ -29,6 +29,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import (  # noqa: E402  - one implementation, imported not re-derived
     sql, http, esri, lit, read_dbf, read_shp_polygons, rings_to_multipolygon_wkt,
+    SQLPayloadTooLarge,
     paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL, TIGER_SHA256,
     CANON_SRID, UA, STATS,
 )
@@ -64,6 +65,38 @@ def say(k, v):
 def one(rows, col):
     return rows[0][col] if rows else None
 
+
+
+def insert_batched(prefix, rows, suffix, tag, start=25):
+    """Send `rows` as INSERT statements, SPLITTING whenever the server says 413.
+
+    WHY ADAPTIVE RATHER THAN A BYTE BUDGET: shard 891 first failed with a 25-ROW cap
+    (a polygon WKT is tens of thousands of chars, so 25 dense rings is megabytes). The
+    first fix guessed a 4 MB budget and got 413 AGAIN - the guess was simply wrong, and
+    a comment claiming it was "measured" made it look verified when it was not. The
+    server knows its own limit; the client's job is to react to it.
+
+    On 413 the batch is halved and retried, down to a single row. A SINGLE row that is
+    still refused is a hard error - never skipped, because silently dropping geometry
+    would look exactly like a successful load.
+
+    Row ORDER is preserved and every row is sent exactly once; the halving only changes
+    how they are grouped.
+    """
+    i, size = 0, max(1, start)
+    while i < len(rows):
+        chunk = rows[i:i + size]
+        try:
+            sql(prefix + ",".join(chunk) + suffix, tag, raise_413=True)
+        except SQLPayloadTooLarge:
+            if len(chunk) == 1:
+                raise SystemExit(
+                    f"STOP: {tag} refused a SINGLE row as 413 ({len(chunk[0])} chars). "
+                    "Not skipped - one row cannot be split further.")
+            size = max(1, len(chunk) // 2)
+            say(f"{tag} 413 - splitting batch", f"{len(chunk)} -> {size}")
+            continue
+        i += size
 
 def load_registry():
     reg = json.load(open(REG_PATH))
@@ -141,13 +174,8 @@ def load_boundaries(z3, zips):
         wkt = rings_to_multipolygon_wkt(rings, zc)
         vals.append(f"({lit(z3)},{lit(zc)},ST_GeomFromText({lit(wkt)},{CANON_SRID}))")
         loaded += 1
-        if len(vals) >= 25:
-            sql("insert into geo.n5_zcta (z3,zcta5,geom) values " + ",".join(vals)
-                + " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
-            vals = []
-    if vals:
-        sql("insert into geo.n5_zcta (z3,zcta5,geom) values " + ",".join(vals)
-            + " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
+    insert_batched("insert into geo.n5_zcta (z3,zcta5,geom) values ", vals,
+                   " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
     r = sql(f"select count(*) n, count(*) filter (where not ST_IsValid(geom)) bad, "
             f"coalesce(sum(ST_NPoints(geom)),0) pts from geo.n5_zcta where z3={lit(z3)};", "zcta chk")
     return loaded, sorted(set(missing)), int(r[0]["n"]), int(r[0]["bad"]), int(r[0]["pts"])
@@ -304,37 +332,10 @@ def fetch_features(rid, entry, keys, z3):
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
                         f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
                         f"'recovered_authoritative')")
-    # Batch by BYTES, not by row count. 25 rows was a count-only cap, and a single polygon
-    # WKT runs to tens of thousands of characters - so 25 dense rings is megabytes and the
-    # Management API answers HTTP 413 "request entity too large". That is what halted shard
-    # 891 (45 ZIPs / 28,596 boundary vertices) with the batch already assembled.
-    #
-    # 413 is deliberately NOT retried by sql() - only 429 is - so the shard stopped clean
-    # and reverted rather than half-committing. The fix belongs here, in how the statement
-    # is sized, not in the retry policy.
-    #
-    # Row count stays capped too: the byte budget alone would send one enormous statement
-    # for many tiny points, and the count cap alone is what just failed. Both, and-not-or.
-    _MAX_BYTES = 4_000_000   # well under the observed limit, measured on the real payload
-    _MAX_ROWS = 25
-    batch, nbytes = [], 0
-    def _flush():
-        if not batch:
-            return
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
-            "invalid_reason,first_z3,provenance) values " + ",".join(batch)
-            + " on conflict (source_key,feature_id) do nothing;", "geom ins")
-        batch.clear()
-    for r in rows:
-        rb = len(r.encode("utf-8"))
-        # A single row wider than the budget cannot be split - send it alone and let the
-        # server be the judge, rather than silently dropping it.
-        if batch and (nbytes + rb > _MAX_BYTES or len(batch) >= _MAX_ROWS):
-            _flush()
-            nbytes = 0
-        batch.append(r)
-        nbytes += rb
-    _flush()
+    insert_batched(
+        "insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
+        "invalid_reason,first_z3,provenance) values ", rows,
+        " on conflict (source_key,feature_id) do nothing;", "geom ins")
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
             "bytes_in": STATS["bytes_in"] - b0, "requests": STATS["requests"] - r0}
