@@ -71,6 +71,21 @@ try:
 except SystemExit as e:
     ok("SINGLE row" in str(e), "an unsplittable oversize row raises and says so")
 
+# 4b. WITH a quarantine channel, an untransportable row is WRITTEN, not dropped, and the
+#     run continues over the remaining rows. This is the shard-891 case: one Las Vegas
+#     planning-case feature whose WKT is 11.3 MB, among rows that are otherwise fine.
+S.sql = fake_sql
+seen = []
+rows = ["(1,'ok-a')", "(2,'%s')" % ("Z" * (LIMIT * 3)), "(3,'ok-b')"]
+S.insert_batched(PFX, rows, SFX, "test", on_oversize=lambda r: seen.append(r))
+ok(len(seen) == 1 and seen[0] == rows[1], "oversize row handed to the quarantine channel")
+sent_rows = []
+for q in SENT[-10:]:
+    body = q[len(PFX):-len(SFX)]
+    sent_rows += body.split("),(")
+ok(any("ok-a" in r for r in sent_rows) and any("ok-b" in r for r in sent_rows),
+   "rows on BOTH sides of the quarantined row still sent - the run continued")
+
 # 5. Non-413 failures still fail closed (raise_413 only softens 413).
 def fake_500(query, tag="", raise_413=False):
     raise SystemExit("STOP: SQL %s failed HTTP 500" % tag)

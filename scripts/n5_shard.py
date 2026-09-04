@@ -67,7 +67,7 @@ def one(rows, col):
 
 
 
-def insert_batched(prefix, rows, suffix, tag, start=25):
+def insert_batched(prefix, rows, suffix, tag, start=25, on_oversize=None):
     """Send `rows` as INSERT statements, SPLITTING whenever the server says 413.
 
     WHY ADAPTIVE RATHER THAN A BYTE BUDGET: shard 891 first failed with a 25-ROW cap
@@ -90,9 +90,23 @@ def insert_batched(prefix, rows, suffix, tag, start=25):
             sql(prefix + ",".join(chunk) + suffix, tag, raise_413=True)
         except SQLPayloadTooLarge:
             if len(chunk) == 1:
-                raise SystemExit(
-                    f"STOP: {tag} refused a SINGLE row as 413 ({len(chunk[0])} chars). "
-                    "Not skipped - one row cannot be split further.")
+                # The SERVER has now proven this single row cannot be transported. That is
+                # a measurement, not a prediction - which is why the ceiling is not a
+                # constant anywhere in this file.
+                if on_oversize is None:
+                    # No quarantine channel (e.g. a ZCTA boundary, whose absence would
+                    # silently corrupt membership). Fail closed.
+                    raise SystemExit(
+                        f"STOP: {tag} refused a SINGLE row as 413 ({len(chunk[0])} chars) "
+                        "and this table has no quarantine channel. Not skipped.")
+                # Quarantine, don't stop (docs rule §8): the record is still WRITTEN, with
+                # its geometry marked unusable and the reason recorded, so it lands in the
+                # existing unresolved accounting instead of vanishing.
+                say(f"{tag} single row {len(chunk[0])} chars", "QUARANTINED (413)")
+                on_oversize(chunk[0])
+                i += 1
+                size = max(1, start)
+                continue
             size = max(1, len(chunk) // 2)
             say(f"{tag} 413 - splitting batch", f"{len(chunk)} -> {size}")
             continue
@@ -305,6 +319,7 @@ def fetch_features(rid, entry, keys, z3):
     # fabricated provenance value that looks like a ZIP3. Emit NULL instead.
     z3sql = lit(z3) if z3 else "null"
     rows, nfeat = [], 0
+    oversize = {}
     for sk, ft in feats:
         g = ft.get("geometry") or {}
         oid = str((ft.get("attributes") or {}).get(ident, "")).strip() + f"#{nfeat}"
@@ -329,13 +344,36 @@ def fetch_features(rid, entry, keys, z3):
         else:
             # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
             # thousands of characters and must not be re-escaped per quote.
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
-                        f"'recovered_authoritative')")
+            row = (f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
+                   f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
+                   f"'recovered_authoritative')")
+            rows.append(row)
+            # If the server later refuses this row alone as 413, it is written instead as
+            # outcome=3 with the reason - the same quarantine channel a malformed ring set
+            # uses. The record survives; only its geometry is marked unusable.
+            oversize[row] = (
+                f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,"
+                f"{lit('WKT_EXCEEDS_TRANSPORT_LIMIT:' + str(len(wkt)) + ' chars')},"
+                f"{z3sql},'recovered_authoritative')")
+    quarantined = []
+
+    def _quarantine(row_sql):
+        q = oversize.get(row_sql)
+        if q is None:
+            # Only a geometry row can be quarantined; anything else must not be swallowed.
+            raise SystemExit("STOP: geom ins oversize row has no quarantine form")
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
+            "invalid_reason,first_z3,provenance) values " + q
+            + " on conflict (source_key,feature_id) do nothing;", "geom quarantine")
+        quarantined.append(q)
+
     insert_batched(
         "insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
         "invalid_reason,first_z3,provenance) values ", rows,
-        " on conflict (source_key,feature_id) do nothing;", "geom ins")
+        " on conflict (source_key,feature_id) do nothing;", "geom ins",
+        on_oversize=_quarantine)
+    if quarantined:
+        say("features QUARANTINED as untransportable WKT", len(quarantined))
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
             "bytes_in": STATS["bytes_in"] - b0, "requests": STATS["requests"] - r0}
