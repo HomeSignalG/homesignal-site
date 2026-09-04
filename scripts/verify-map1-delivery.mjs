@@ -75,9 +75,14 @@ async function backend(zip) {
   };
 }
 
+// WAIT ON THE PAGE'S OWN SIGNAL, NOT ON 'load'. This page pulls OSM/Esri map tiles, so the load
+// event can be minutes away or never arrive on a runner - the first run of this gate spent its
+// whole 30-minute budget in page.goto and returned no verdict at all, which is worse than a
+// failure. domcontentloaded plus __HS_VERIFY (which the page publishes only after it has finished
+// rendering) waits for exactly the thing being measured.
 async function pageState(page, url) {
-  await page.goto(url, { waitUntil: 'load', timeout: 90000 });
-  await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES), null, { timeout: 45000 });
   return page.evaluate(() => ({
     v: window.__HS_VERIFY,
     sites: window.__HS_SITES.length,
@@ -92,13 +97,18 @@ const ZIPS = (process.env.ZIPS || '10804,76104,76135,20742,01004').split(',').ma
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// A page error is the most likely cause of a missing __HS_VERIFY, and without this the failure
+// would read as an unexplained timeout.
+const pageErrors = [];
+page.on('pageerror', (e) => pageErrors.push(String(e.message || e)));
+page.on('console', (m) => { if (m.type() === 'error') pageErrors.push('console: ' + m.text()); });
 console.log(`Map 1 delivery gate — ${ZIPS.length} ZIP(s) against ${SITE_BASE}\n`);
 
 for (const zip of ZIPS) {
   const b = await backend(zip);
   let p;
   try { p = await pageState(page, zipUrl(zip)); }
-  catch (e) { ok(false, `${zip}: page loaded`, String(e.message || e)); continue; }
+  catch (e) { ok(false, `${zip}: page loaded`, String(e.message || e) + (pageErrors.length ? ' | ' + pageErrors.slice(-3).join(' ; ') : '')); pageErrors.length = 0; continue; }
   console.log(`\n── ${zip} (${b.geographyState}) ──`);
   ok(p.v.geographyState === b.geographyState,
      `${zip}: the page resolved the same geography state as the backend`,
@@ -148,8 +158,9 @@ for (const zip of ZIPS) {
   const addr = process.env.ADDR || '2200 Caldwell Ln, Del Valle, TX 78617';
   const url = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(addr)}`;
   try {
-    await page.goto(url, { waitUntil: 'load', timeout: 90000 });
-    await page.waitForFunction(() => window.__HS_VERIFY, null, { timeout: 90000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    // Address mode calls the live edge function, which is slower than a cached ZIP read.
+    await page.waitForFunction(() => window.__HS_VERIFY, null, { timeout: 120000 });
     const st = await page.evaluate(() => ({
       geographyState: window.__HS_VERIFY.geographyState,
       zipMode: document.body.classList.contains('zipmode'),
