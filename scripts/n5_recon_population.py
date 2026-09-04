@@ -77,6 +77,36 @@ select (select count(*) from j) memberships_checked,
             "before reconciling; the invariant is never weakened to admit a ZIP.")
 
 
+def disable_drifted(lo, hi):
+    """Roll back every ENABLED ZIP in this window whose producer would raise.
+
+    Set-based over the window, so one statement finds all of them rather than the single
+    ZIP the loop happened to reach. Disabling is the documented reversible rollback: the
+    page returns to the legacy branch, which is a correct page. The invariant is never
+    weakened to admit a ZIP - that is the whole reason the producer raises."""
+    r = sql(f"""
+set statement_timeout='110s';
+with win as (select zip from (select zip, row_number() over (order by zip) rn
+                                from public.app_zip_geography_cutover where enabled) q
+              where rn > {lo} and rn <= {hi}),
+ bad as (select w.zip,
+           count(*) total,
+           count(*) filter (where not exists (select 1 from public.app_projects p
+             where p.source_key = m.source_key and p.record_kind='development')) missing
+          from win w join geo.zip_authoritative_membership m on m.zcta5 = w.zip
+         group by 1
+        having count(*) filter (where not exists (select 1 from public.app_projects p
+             where p.source_key = m.source_key and p.record_kind='development')) > 0)
+update public.app_zip_geography_cutover c
+   set enabled = false, production_geography_verified_at = null,
+       note = 'ROLLED BACK ' || to_char(now(),'YYYY-MM-DD HH24:MI') ||
+              ' - post-cutover drift from the LIVE app_projects refresh: ' || b.missing ||
+              ' of ' || b.total || ' memberships no longer resolve. Page returns to legacy.'
+  from bad b where b.zip = c.zip
+returning c.zip;""", f"disable drifted {lo}-{hi}")
+    return len(r) if isinstance(r, list) else 0
+
+
 def load():
     """Materialise the producer's answer for every enabled ZIP, in bounded chunks.
 
@@ -92,7 +122,7 @@ def load():
     done = 0
     for k in range(parts):
         t = time.time()
-        sql(f"""set statement_timeout='110s';
+        chunk_sql = f"""set statement_timeout='110s';
 with e as (select zip, row_number() over (order by zip) rn
              from public.app_zip_geography_cutover where enabled),
  called as (select e.zip, public.app_projects_for_zip(e.zip,'development') j
@@ -104,7 +134,27 @@ select c.zip, r->>'source_key',
 from called c,
      lateral jsonb_array_elements(c.j) r,
      lateral jsonb_array_elements(coalesce(r->'_markers','[]'::jsonb))
-             with ordinality m(v, ord);""", f"flat chunk {k + 1}")
+             with ordinality m(v, ord);"""
+        try:
+            sql(chunk_sql, f"flat chunk {k + 1}")
+        except SystemExit as e:
+            if "AUTHORITATIVE INVARIANT" not in str(e):
+                raise
+            # DRIFT ARRIVED MID-RUN. The preflight was clean at the start - 0 failing
+            # against a control of 139,211 memberships - and a ZIP broke 40 minutes later
+            # while public.app_projects was being rewritten by dev_refresh_tick and
+            # app_refresh_sweep. A one-shot preflight cannot hold against a live table, so
+            # the loop handles it the only correct way: disable the ZIPs whose producer now
+            # raises, which returns those pages to legacy, then retry the chunk ONCE.
+            # A second failure in the same chunk is fatal - that would mean something other
+            # than drift.
+            n_off = disable_drifted(k * CHUNK, (k + 1) * CHUNK)
+            say(f"  chunk {k + 1} drift", f"{n_off} ZIP(s) rolled back to legacy, retrying")
+            if n_off == 0:
+                raise SystemExit(
+                    f"STOP: chunk {k + 1} raised the authoritative invariant but no ZIP in "
+                    "its range carries an unresolvable membership. The cause is not drift.")
+            sql(chunk_sql, f"flat chunk {k + 1} retry")
         done += CHUNK
         if (k + 1) % 10 == 0 or k + 1 == parts:
             free = disk()
