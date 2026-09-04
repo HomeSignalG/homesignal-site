@@ -259,6 +259,52 @@ const nav = await (await fetch(BASE + '/partials/shell.html', { cache: 'no-store
 ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(nav),
   '10 — the global nav Maps entry points at the primary map');
 
+// ═══════════ 11. ZIP MODE IS THE WHOLE ZIP — no centroid, no radius ═══════════
+// The invariant: a ZIP search represents the ENTIRE actual ZIP/ZCTA geography and never
+// substitutes a circle around a point. Proven against the deployed page and the real RPC.
+const authRes = await fetch(BASE + '/rest/v1/rpc/app_zip_projects_markers', { method: 'POST' })
+  .catch(() => null);   // the page calls Supabase directly; this is only a reachability nudge
+void authRes;
+
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForTimeout(4000);
+const zsites = await page.evaluate(() => (window.__HS_SITES || []).map(s => ({
+  rel: s.relevance, scope: s.scope, auth: s.zip_authoritative === true,
+  ref: s.zip_project_ref || null, rule: s.zip_marker_rule || null,
+  dist: s.distance_mi, e: s.e, n: s.n, rid: s.registry_id, url: s.record_url })));
+const zdev = zsites.filter(x => x.scope === 'point' && x.rel === 'development');
+info('ZIP-mode sites rendered', zsites.length);
+info('ZIP-mode development points', zdev.length);
+info('...of which authoritative', zdev.filter(x => x.auth).length);
+ok(zdev.length > 0 && zdev.every(x => x.auth),
+  '11 — EVERY development point in ZIP mode comes from authoritative whole-ZIP geography',
+  zdev.filter(x => !x.auth).slice(0, 3));
+ok(zdev.every(x => x.dist === undefined || x.dist === null),
+  '11 — no ZIP-mode development point carries a radius distance (there is no HOME to measure from)');
+ok(zdev.every(x => x.rid === undefined || x.rid === null),
+  '11 — no authoritative project carries registry_id, so none is mistaken for an EPA facility');
+ok(zdev.every(x => !!x.url), '11 — every rendered ZIP-mode project keeps its official record link');
+info('distinct authoritative projects', new Set(zdev.map(x => x.ref)).size);
+info('marker rules in use', Array.from(new Set(zdev.map(x => x.rule))).slice(0, 4).join(' | '));
+
+// The radius control must not be offered in ZIP mode - a circle needs an address-derived centre.
+ok(!(await page.locator('#radSel').isVisible().catch(() => false)),
+  '11 — the radius control is NOT offered in ZIP mode');
+const zipLine = await page.textContent('#freshLine');
+info('ZIP completeness line', zipLine);
+ok(/whole of ZIP|whole ZIP|not measured yet/i.test(zipLine || ''),
+  '11 — the page states what was measured across the WHOLE ZIP', zipLine);
+
+// ...and address mode still gets its radius back, on the same deployed page.
+await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForSelector('#addr', { timeout: 30000 });
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => (window.__HS_SITES || []).length > 0, { timeout: 90000 });
+ok(await page.locator('#radSel').isVisible(),
+  '11 — an address search restores the radius control (address mode is untouched)');
+
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
 console.log('='.repeat(78));
