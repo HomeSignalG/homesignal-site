@@ -4,6 +4,24 @@ name: n5-rpc-apply
 #     docs/n5-spatial-read-rpc.sql  ->  public.n5_projects_within_radius(
 #         double precision, double precision, numeric, integer)
 #
+# RE-POINTED 2026-09-04 AT REVISION 3 (marker_lat / marker_lng). STILL DISARMED - this
+# edit is a re-point plus wider verification, NOT an authorization to install. The arm
+# file does not match EXPECTED_ARM, so the job stops before any database contact.
+#
+# TWO THINGS REVISION 3 CHANGES ABOUT THIS WORKFLOW:
+#   1. The DDL now begins with `drop function if exists ...(<the exact 4-arg signature>)`,
+#      because adding columns to RETURNS TABLE changes the return type and PostgreSQL
+#      cannot `create or replace` through that. The apply already runs the whole file under
+#      --single-transaction, so the drop, the create, the comment, the revoke and the grant
+#      commit together or not at all.
+#   2. The gate-failure path below drops the function by signature. Under revision 2 that
+#      restored nothing and removed the new function; under revision 3 it leaves production
+#      with NO n5_projects_within_radius at all, because the old one is already gone. That
+#      is accepted deliberately: NOTHING IN PRODUCTION CALLS THIS FUNCTION YET (Map 1 does
+#      not), so "absent" is a safe terminal state and re-running the unit re-installs it. A
+#      restore-the-previous-revision path is not built, because an untested rollback path is
+#      worse than a known-safe absence.
+#
 # Founder-authorized 2026-09-03 for INSTALLATION + INSTALLATION VERIFICATION ONLY.
 # IT DOES NOT EXECUTE THE RPC. There is no call to n5_projects_within_radius anywhere in
 # this workflow; every post-install check is a CATALOG read. The 0.5-mile proof is a
@@ -33,9 +51,9 @@ permissions:
 
 env:
   # Must equal .github/n5-rpc-apply-arm or the job stops before touching the database.
-  EXPECTED_ARM: arm-2026-09-03-rpc-install
-  AUTHORIZED_COMMIT: 361941d4aaf77766368ce64834e42e918b5bea55
-  EXPECTED_DDL_SHA: 2b1b80995cb1419a35cfa8d0ba64e975fac91779a84b163e0eef2a319f80b764
+  EXPECTED_ARM: arm-2026-09-04-rpc-rev3-install
+  AUTHORIZED_COMMIT: 15e45ee7d6e5ada95c52824cba7a8755a97ba3f0
+  EXPECTED_DDL_SHA: 33fdb5d7025d4eee5dcc26e854f1f01d6c73ae4e7e4d016ba6f283f7b2557c02
   SIG: double precision, double precision, numeric, integer
 
 jobs:
@@ -257,6 +275,14 @@ jobs:
           case "$CFG" in *search_path=public*) ;; *) echo "GATE FAILED: proconfig=$CFG"; fail=1;; esac
           [ "$ARGS" = "p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer" ] \
             || { echo "GATE FAILED: identity args = $ARGS"; fail=1; }
+          # REVISION 3: the public column contract is gated in full and IN ORDER. A marker
+          # column that arrived in the wrong position would still "contain marker_lat", so a
+          # substring test is not enough - callers read this positionally.
+          EXPECT_RES="TABLE(source_key text, feature_id text, registry_id text, provenance text, distance_mi double precision, geometry_type text, marker_lat double precision, marker_lng double precision, has_more boolean)"
+          [ "$RES" = "$EXPECT_RES" ] || {
+            echo "GATE FAILED: result type"
+            echo "  expected: $EXPECT_RES"
+            echo "  actual  : $RES"; fail=1; }
           if [ "$fail" != "0" ]; then
             echo "REMOVING the just-created function using its exact signature, then stopping."
             psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off \
@@ -311,12 +337,40 @@ jobs:
               'hard_max_2000='                  || (position('v_max_rows  constant integer := 2000' in b) > 0),
               'limit_plus_one='                 || (position('limit p_limit + 1' in b) > 0),
               'has_more='                       || (position('as has_more' in b) > 0),
-              'deterministic_order='            || (position('order by h.distance_mi, h.source_key, h.feature_id' in b) > 0),
+              'deterministic_order_page='       || (position('order by h.distance_mi, h.source_key, h.feature_id' in b) > 0),
+              'deterministic_order_final='      || (position('order by pl.distance_mi, pl.source_key, pl.feature_id' in b) > 0),
               'true_geometry_dwithin='          || (position('st_dwithin(st_transform(g.geom, 4326)::geography' in b) > 0),
               'true_geometry_distance='         || (position('st_distance(st_transform(g.geom, 4326)::geography' in b) > 0),
               'grain_source_key_feature_id='    || ((position('g.source_key' in b) > 0) and (position('g.feature_id' in b) > 0)),
               'NO_distinct_on='                 || (position('distinct on' in lower(b)) = 0),
-              'NO_representative_point='        || ((position('st_centroid' in lower(b)) = 0) and (position('st_pointonsurface' in lower(b)) = 0) and (position('n5_rep_point' in lower(b)) = 0)),
+              -- REVISION 3: ST_PointOnSurface is now used, in the MARKER derivation only.
+              -- What must stay true is that nothing substitutes a derived point for the true
+              -- geometry in the region that FILTERS and MEASURES, so these are positional:
+              -- everything after 'limit p_limit + 1' is post-filter.
+              'NO_centroid='                    || (position('st_centroid' in lower(b)) = 0),
+              'NO_rep_point='                   || (position('n5_rep_point' in lower(b)) = 0),
+              'NO_bbox_centre='                 || ((position('st_envelope' in lower(b)) = 0) and (position('st_boundingdiagonal' in lower(b)) = 0)),
+              -- Counting occurrences would be WRONG here and was measured wrong before this
+              -- shipped: prosrc keeps the body's own comments, and the comment above the
+              -- polygon branch names ST_PointOnSurface, so an "appears exactly once" test
+              -- reports false on a correct function and would abort a valid install. The
+              -- property that actually matters is comment-insensitive: NO occurrence exists
+              -- before the end of the filter region.
+              'NO_pointonsurface_in_filter='    || (position('st_pointonsurface' in left(lower(b), position('limit p_limit + 1' in lower(b)))) = 0),
+              'pointonsurface_is_used='         || (position('st_pointonsurface' in lower(b)) > 0),
+              'marker_after_filter='            || (position('marker' in lower(b)) > position('limit p_limit + 1' in lower(b))),
+              'marker_after_page_limit='        || (position('marked as (' in lower(b)) > position('limit p_limit' in lower(b))),
+              'marker_lat_in_result_type='      || (position('marker_lat double precision' in pg_get_function_result(o)) > 0),
+              'marker_lng_in_result_type='      || (position('marker_lng double precision' in pg_get_function_result(o)) > 0),
+              'marker_from_same_identity='      || ((position('g.source_key = p.source_key' in b) > 0) and (position('g.feature_id = p.feature_id' in b) > 0)),
+              'marker_join_is_LEFT='            || (position('left join geo.n5_geom g' in b) > 0),
+              'marker_lat_is_ST_Y='             || (position('st_y(pl.marker4326) as marker_lat' in b) > 0),
+              'marker_lng_is_ST_X='             || (position('st_x(pl.marker4326) as marker_lng' in b) > 0),
+              'marker_point_is_own_geometry='   || (position('when t.g_type = ''POINT'' then t.g_geom' in b) > 0),
+              'marker_line_is_a_vertex='        || ((position('st_dumppoints(t.principal)' in b) > 0) and (position('st_lineinterpolatepoint(t.principal, 0.5)' in b) > 0)),
+              'marker_polygon_repairs_invalid=' || (position('st_collectionextract(st_makevalid(t.principal), 3)' in b) > 0),
+              'marker_srid_fails_closed='       || ((position('public.spatial_ref_sys srs' in b) > 0) and (position('end as marker4326' in b) > 0)),
+              'marker_never_measures='          || ((position('st_dwithin' in lower(b)) < position('marker' in lower(b))) and ((length(lower(b)) - length(replace(lower(b), 'st_dwithin', ''))) / length('st_dwithin') = 1)),
               'NO_app_projects='                || (position('app_projects' in b) = 0),
               'NO_n5_association='              || (position('n5_association' in b) = 0),
               'NO_dynamic_sql='                 || ((position('execute format' in lower(b)) = 0) and (position('quote_ident' in lower(b)) = 0))
