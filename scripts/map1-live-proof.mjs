@@ -71,7 +71,17 @@ ok(errors.length === 0, '4 — the page loads with no fatal client error', error
 
 // ═══════════ 5+6. ONE LIVE ADDRESS SEARCH ═══════════
 calls.length = 0; rpcResponses.length = 0;
-await page.click(`#radSel button[data-r="${R1}"]`);
+// The radius row lives INSIDE #results, which the page keeps display:none until a
+// search has produced something (`.results{display:none}`, unchanged by this feature).
+// So a real resident cannot touch the radius before searching, and neither may this
+// proof — clicking a control the user cannot see would be proving a flow nobody has.
+// The first search therefore runs at whatever radius the page is already showing; we
+// read that off the page and assert the RPC is sent the radius the page displays.
+const R1ACTIVE = await page.evaluate(() => {
+  const b = document.querySelector('#radSel button.on');
+  return b ? Number(b.getAttribute('data-r')) : null;
+});
+ok(R1ACTIVE === R1, '5 — the page opens on the requested initial radius', R1ACTIVE);
 await page.fill('#addr', ADDRESS);
 await page.click('#go');
 await page.waitForFunction(() => {
