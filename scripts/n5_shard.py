@@ -381,6 +381,16 @@ def fetch_features(rid, entry, keys, z3):
 
 # ---------------------------------------------------------------- association
 
+# The per-shard association CTE chain does the spatial work for every legacy pair, and
+# the remaining shards are the dense metros: 761 (Fort Worth / TxDOT) carries 13,590
+# projects / 15,677 pairs and hit the DEFAULT statement timeout -
+#   ERROR: 57014: canceling statement due to statement timeout
+# That is a time limit on correct work, not a defect in the query, so the fix is to give
+# the heavy statements a longer budget rather than to simplify what they check. Each
+# Management API request is its own session, so a plain SET applies to that request only.
+HEAVY_TIMEOUT_SQL = "set statement_timeout = '600s';\n"
+
+
 def build_associations(z3):
     """One evidence row per frozen legacy pair, plus geometry-only additions.
 
@@ -426,7 +436,7 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 
 
 def associate(z3):
-    q = build_associations(z3) + """
+    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + """
 insert into geo.n5_association (source_key, zip, evidence)
 select source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
 on conflict do nothing;"""
@@ -434,7 +444,7 @@ on conflict do nothing;"""
 
 
 def shard_counts(z3):
-    q = build_associations(z3) + """
+    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + """
 select (select count(*) from legacy) legacy_pairs,
        (select count(*) from cls where ev=1) v1,
        (select count(*) from cls where ev=2) v2,
