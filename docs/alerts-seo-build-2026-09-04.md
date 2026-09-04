@@ -419,6 +419,49 @@ sites load**, the address search box is present, no uncaught errors.
 
 ---
 
+## 12 · REDEPLOYED AFTER THE REAL SOURCE CHANGE — 2026-09-04 16:55:42Z
+
+The founder switched *Settings → Pages → Build and deployment → Source* to **GitHub Actions**
+(visually confirmed: the branch/root controls are gone, "GitHub Pages source saved.",
+`homesignal.net` still the custom domain, no DNS or vendor change). §11's blocker is closed.
+
+| | |
+|---|---|
+| `main` at deploy | **`09ba9f2`** (Map 1 receipt #1026 — another session, no SEO surface touched) |
+| trigger | `workflow_dispatch` on the **existing** `pages.yml`; no new workflow, no Jekyll/static template |
+| build | run **33897571247**, job 101103719871, **success** 16:52:56 → 16:55:26Z |
+| deploy | job 101104457739, `actions/deploy-pages@v4`, **success** 16:55:33 → 16:55:39Z |
+| deployment | id **6269007025**, via the `github-actions` app, **success 16:55:42Z** |
+| build stats | 12,722 documents · Rule F **7,643 / 5,079** · 49.7 MB ZIP HTML (avg 4,099 B, max 8,487 B) · site 133 MB · candidate proof 63 passed, 0 failed |
+
+**Rule F moved and was not forced.** Fresh server-side measurement at **16:58:06Z**: 12,722
+canonical · **PASS 7,643 · FAIL 5,079** (both 7,107 · Alerts-only 536 · development-only 4,596 ·
+neither 483). The previous unit's 7,256 / 5,466 is superseded by normal ingestion. The
+generator and the SQL — two implementations, two interfaces — agree exactly, again.
+
+**Production sitemap reconciles to the new number:** 7,643 canonical `/community/<zip>/` URLs,
+**0** legacy `community.html?zip=`, development half intact. Instrument line:
+`SITEMAP_CANONICAL_COUNT=7643`.
+
+**Production proof:** `verify-zip-pages-live` run **33897988781 — 162 passed, 0 failed**, plus a
+`pg_net` initial-HTML capture. 01034 is byte-for-byte the document served in the first window
+(md5 `a6e5afd87cad` both times) — the build is deterministic across deployments.
+
+### 12.1 · THE PERSISTENCE GATE — the legacy branch pipeline no longer runs
+
+This is the condition that superseded the first deployment, so it is tested rather than assumed:
+
+- **Last `pages-build-deployment` run ever: #900, `09ba9f2`, 16:13:58Z** — *before* the source
+  change. Runs 896–900 all fired on pushes to `main` while the source was still a branch.
+- After the switch, a push to `main` (the merge of this receipt) produced **no new run of that
+  workflow**, and deployment **6269007025 stayed the active one**. The canonical pages survived
+  a push to `main` — exactly what did not happen at 15:54.
+- The earlier lesson holds and is why this is measured this way: **a green `deploy-pages` job is
+  not evidence of the setting** (§11 retraction). The evidence is the *absence of a firing* of
+  `dynamic/pages/pages-build-deployment` plus the pages still answering 200 afterwards.
+
+---
+
 ## 10 · What remains
 
 ### 🛑 THE ONE REMAINING ACTION — and how to tell whether it took
