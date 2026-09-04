@@ -152,26 +152,46 @@ for (const zip of ZIPS) {
      `page ${p.fac} · cache ${b.cachedFacilities}`);
 }
 
-// ADDRESS MODE stays a separate contract: a geocoded HOME plus a chosen radius, never ZIP
-// membership. Proven by loading it and checking the page did NOT take the ZIP-mode path.
+// ADDRESS MODE stays a separate contract, and this proves it at the REQUEST, which is where the
+// two modes would actually get conflated: a street address the resident typed, a radius the
+// resident chose, and NO ZIP in the payload. Asserting the request rather than the render also
+// makes the gate independent of how long the live edge function takes to answer.
+//
+// ⚠️ `?addr=` is NOT address mode - boot() routes it to loadProperty(), the property page. Driving
+// the real form is the only way to exercise the address contract, and the first two runs failed
+// here purely because the verifier used the URL parameter. The page was never at fault.
 {
-  const addr = process.env.ADDR || '2200 Caldwell Ln, Del Valle, TX 78617';
-  const url = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(addr)}`;
+  const addr = process.env.ADDR || '20 North Main Street, Brigham City, UT 84302';
+  const RADIUS = 2;                       // explicitly CHOSEN, so "user-selected" is what is tested
+  console.log('\n── address mode ──');
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    // Address mode calls the live edge function, which is slower than a cached ZIP read.
-    await page.waitForFunction(() => window.__HS_VERIFY, null, { timeout: 120000 });
+    let sent = null;
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && r.url().includes('/functions/v1/get-address-report')) {
+        try { sent = JSON.parse(r.postData() || '{}'); } catch (_e) { sent = { unparseable: true }; }
+      }
+    });
+    await page.goto(`${SITE_BASE}/homesignalmap.html`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForSelector('#addr', { timeout: 30000 });
+    await page.click(`#radSel button[data-r="${RADIUS}"]`);
+    await page.fill('#addr', addr);
+    await page.click('#go');
+    // The request is dispatched by the submit handler; give it a moment to leave.
+    for (let i = 0; i < 60 && !sent; i++) await page.waitForTimeout(250);
+
+    ok(!!sent, 'address mode issued a live address request');
+    ok(!!(sent && typeof sent.address === 'string' && sent.address.trim() === addr),
+       'the request carries the street address the resident typed', sent && sent.address);
+    ok(!!(sent && sent.radius_mi === RADIUS),
+       'the request carries the radius the resident selected', sent && String(sent.radius_mi));
+    ok(!!(sent && sent.zip === undefined),
+       'the request carries NO zip — ZIP membership is never the basis for an address search');
     const st = await page.evaluate(() => ({
-      geographyState: window.__HS_VERIFY.geographyState,
       zipMode: document.body.classList.contains('zipmode'),
-      radius: (document.getElementById('withinLbl') || {}).textContent || '',
+      within: (document.getElementById('withinLbl') || {}).textContent || '',
     }));
-    console.log('\n── address mode ──');
-    ok(st.zipMode === false, 'address mode is not ZIP mode');
-    ok(st.geographyState === null, 'address mode never resolves a ZIP geography state',
-       String(st.geographyState));
-    ok(/within/i.test(st.radius), 'address mode still labels a radius around the home', st.radius.trim());
-  } catch (e) { ok(false, 'address mode loaded', String(e.message || e)); }
+    ok(st.zipMode === false, 'the page left ZIP mode for an address search');
+  } catch (e) { ok(false, 'address mode exercised', String(e.message || e)); }
 }
 
 await browser.close();
