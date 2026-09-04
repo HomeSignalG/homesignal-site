@@ -32,6 +32,51 @@ def disk():
     return float(r["free_mb"])
 
 
+def drift_preflight():
+    """Refuse to start if any ENABLED ZIP would make the producer raise.
+
+    Post-cutover drift is real and it is not hypothetical: ordinary ingestion removed 45
+    memberships' worth of source_keys from live app_projects across 14 already-verified
+    ZIPs, and the first thing that noticed was the producer raising in the middle of chunk
+    9 - an HTTP 400 that names one ZIP and says nothing about the other 13. A live page was
+    erroring the whole time.
+
+    Set-based, no producer call, so it costs one statement and names every affected ZIP at
+    once. The healthy answer is 0 and it carries its control: a membership count that must
+    be non-zero, because a join that matched nothing returns 0 failures too."""
+    r = sql("""
+set statement_timeout='300s';
+with enabled as (select zip from public.app_zip_geography_cutover where enabled),
+ j as (select e.zip, m.source_key from enabled e
+         join geo.zip_authoritative_membership m on m.zcta5 = e.zip)
+select (select count(*) from j) memberships_checked,
+       (select count(*) from (
+          select zip from j group by zip
+           having count(*) filter (where not exists (
+             select 1 from public.app_projects p
+              where p.source_key = j.source_key and p.record_kind='development')) > 0) z) failing_zips,
+       (select coalesce(string_agg(zip, ',' order by zip collate "C"), '') from (
+          select zip from j group by zip
+           having count(*) filter (where not exists (
+             select 1 from public.app_projects p
+              where p.source_key = j.source_key and p.record_kind='development')) > 0) z2) failing_list;
+""", "drift preflight", read_only=True)[0]
+    checked = int(r["memberships_checked"])
+    failing = int(r["failing_zips"])
+    say("enabled memberships checked (control)", f"{checked:,}")
+    say("enabled ZIPs whose producer would raise", failing)
+    if checked == 0:
+        raise SystemExit("STOP: the drift preflight matched no memberships, so its zero "
+                         "attests to nothing")
+    if failing:
+        raise SystemExit(
+            f"STOP: {failing} enabled ZIP(s) carry memberships whose source_key is absent "
+            f"from live app_projects, so the authoritative producer RAISES for them and "
+            f"those live pages are erroring now: {r['failing_list']}\n"
+            "Roll them back (set enabled=false, production_geography_verified_at=null) "
+            "before reconciling; the invariant is never weakened to admit a ZIP.")
+
+
 def load():
     """Materialise the producer's answer for every enabled ZIP, in bounded chunks.
 
@@ -141,6 +186,7 @@ select
 def main():
     say("N5 whole-population reconciliation", "enabled set")
     say("BEFORE free disk MB", f"{disk():,.0f}")
+    drift_preflight()
     n = load()
     ok = check(n)
     say("AFTER free disk MB", f"{disk():,.0f}")
