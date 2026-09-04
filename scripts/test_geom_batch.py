@@ -41,12 +41,24 @@ def run(rows):
     # every statement the fake server accepted must be within its limit
     return SENT
 
-# 1. Rows small enough that the 25-row cap governs; no splitting needed.
+# 1. Small rows. The first batch is sized from the MEAN row length rather than a
+#    constant, so 100 short rows ride in ONE statement instead of four - which is the
+#    whole point: a fixed 25 charges every load the cost of the worst row in the corpus.
 rows = ["(%d,'%s')" % (i, "x" * 100) for i in range(100)]
 sent = run(rows)
 ok(all(len(q) <= LIMIT for q in sent), "small rows: every statement accepted within limit")
 ok(sum(q.count("),(") + 1 for q in sent) == 100, "small rows: all 100 rows sent")
-ok(len(sent) == 4, "small rows: 4 statements of 25 (got %d)" % len(sent))
+ok(len(sent) == 1, "small rows: grouped into 1 statement, not 4 of 25 (got %d)" % len(sent))
+
+# 1b. The size is DERIVED, not fixed: longer rows must yield a smaller first batch, and a
+#     single untransportable row must not propose a batch of more than one.
+ok(S.initial_batch_rows(["x" * 150] * 1000) > S.initial_batch_rows(["x" * 40_000] * 100),
+   "a longer row yields a smaller first batch")
+ok(S.initial_batch_rows(["x" * 11_346_221]) == 1,
+   "an 11 MB row proposes a batch of exactly 1")
+ok(S.initial_batch_rows([]) == 1, "no rows proposes 1, never 0")
+ok(S.initial_batch_rows(["x"] * 10_000) <= S.INSERT_MAX_ROWS,
+   "the row cap still bounds it however short the rows are")
 
 # 2. Dense rows - the shard-891 shape. 25 would blow the limit, so it must SPLIT.
 rows = ["(%d,'%s')" % (i, "p" * 8_000) for i in range(25)]

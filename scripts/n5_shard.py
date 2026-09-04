@@ -67,7 +67,29 @@ def one(rows, col):
 
 
 
-def insert_batched(prefix, rows, suffix, tag, start=25, on_oversize=None):
+# Target request size for the FIRST attempt. Not a ceiling and not a promise: the server
+# is still the authority, and a 413 halves the batch as before. It exists because a fixed
+# 25 rows is sized for the worst row in the corpus (an 11 MB polygon) and charges that
+# cost to every load - a 250,000-row point insert became ~10,000 sequential requests and
+# did not finish inside the job budget.
+INSERT_TARGET_BYTES = 2_000_000
+INSERT_MAX_ROWS = 1000
+
+
+def initial_batch_rows(rows, cap=INSERT_MAX_ROWS):
+    """First-attempt batch size, from the MEAN length of the rows actually in hand.
+
+    An earlier attempt at a byte budget failed because it was a guessed constant applied
+    blind, and one 11 MB row made it wrong. This is different in the two ways that
+    mattered: it reads the real rows rather than assuming their size, and the adaptive
+    413 halving that now exists is what actually enforces the limit."""
+    if not rows:
+        return 1
+    mean = max(1, sum(len(r) for r in rows) // len(rows))
+    return max(1, min(cap, INSERT_TARGET_BYTES // mean))
+
+
+def insert_batched(prefix, rows, suffix, tag, start=None, on_oversize=None):
     """Send `rows` as INSERT statements, SPLITTING whenever the server says 413.
 
     WHY ADAPTIVE RATHER THAN A BYTE BUDGET: shard 891 first failed with a 25-ROW cap
@@ -83,6 +105,10 @@ def insert_batched(prefix, rows, suffix, tag, start=25, on_oversize=None):
     Row ORDER is preserved and every row is sent exactly once; the halving only changes
     how they are grouped.
     """
+    if start is None:
+        start = initial_batch_rows(rows)
+        say(f"{tag} first batch", f"{start} rows (mean row "
+            f"{(sum(len(r) for r in rows) // max(1, len(rows))):,} chars)")
     i, size = 0, max(1, start)
     while i < len(rows):
         chunk = rows[i:i + size]
