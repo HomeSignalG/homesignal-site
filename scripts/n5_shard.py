@@ -197,6 +197,15 @@ def load_boundaries(z3, zips):
 
 # ---------------------------------------------------------------- recovery
 
+# Ceiling on the identity IN-list, independent of what a publisher declares: a big
+# maxRecordCount is not a promise about URL/body handling, and 250 identities is
+# already 19x the old fixed 10.
+BATCH_IDENT_MAX = 250
+# A publisher that fails this many identities in a row one-at-a-time is down, not
+# flaky; grinding 47,000 singles against it is not recovery.
+BATCH_SINGLE_FAIL_LIMIT = 25
+
+
 def recover_shard(z3, registry):
     """Recover authoritative geometry for RECOVERY-class projects in this shard.
 
@@ -296,17 +305,54 @@ def fetch_features(rid, entry, keys, z3):
         cases.setdefault(parts[2].strip(), k)
     want = sorted(cases)
     feats, unasked, errors = [], [], 0
-    for i in range(0, len(want), 10):
-        chunk = want[i:i + 10]
-        vals = ",".join(("'" + c.replace("'", "''") + "'") if quoted else c for c in chunk)
+    # BATCH SIZE COMES FROM THE PUBLISHER, NOT FROM A CONSTANT. It was a hardcoded 10,
+    # which is ~4,700 sequential POSTs for a 47k-project shard (722 / little-rock-permits)
+    # and does not finish inside the job budget. The request is a POST, so the 2,048-char
+    # GET ceiling never applied. One identity can map to SEVERAL features - multiplicity is
+    # deliberately preserved - so the identity chunk stays well under the record cap and the
+    # exceededTransferLimit guard below still decides, never this arithmetic.
+    declared = meta.get("maxRecordCount")
+    try:
+        declared = int(declared)
+    except (TypeError, ValueError):
+        declared = 0
+    chunk = max(10, min(BATCH_IDENT_MAX, declared // 4)) if declared > 0 else 10
+    say(f"  {rid} identity batch", f"{chunk} (publisher maxRecordCount {declared or 'undeclared'})")
+    i, singles_failed = 0, 0
+    while i < len(want):
+        part = want[i:i + chunk]
+        vals = ",".join(("'" + c.replace("'", "''") + "'") if quoted else c for c in part)
         j, why2 = http(url + "/query", {"where": f"{ident} IN ({vals})", "outFields": ident,
                                         "returnGeometry": "true", "outSR": str(CANON_SRID),
                                         "f": "json"}, method="POST")
         if j is None or esri(j):
+            # NARROW THE BLAST RADIUS BEFORE COUNTING A LOSS. At the old fixed 10 an error
+            # skipped 10 projects; at 250 it would silently skip 250, and a skipped project
+            # is not an error the reader sees - it is a project quietly reclassified from
+            # geometry_verified to legacy_unsupported. So halve and retry, and only give up
+            # on the ONE identity that actually fails.
+            if len(part) > 1:
+                chunk = max(1, len(part) // 2)
+                continue
             errors += 1
+            singles_failed += 1
+            if singles_failed > BATCH_SINGLE_FAIL_LIMIT:
+                return {"status": "PUBLISHER_UNREACHABLE",
+                        "reason": f"{singles_failed} consecutive single-identity failures "
+                                  f"({why2 or esri(j)}); refusing to grind the remaining "
+                                  f"{len(want) - i} identities",
+                        "bytes_in": STATS["bytes_in"] - b0,
+                        "requests": STATS["requests"] - r0}
+            i += 1
             continue
         if j.get("exceededTransferLimit"):
-            raise SystemExit(f"STOP: {rid} capped a batch; refusing a truncated recovery")
+            if len(part) == 1:
+                raise SystemExit(f"STOP: {rid} capped a SINGLE identity; refusing a "
+                                 f"truncated recovery")
+            chunk = max(1, len(part) // 2)
+            say(f"  {rid} transfer limit - halving batch", f"{len(part)} -> {chunk}")
+            continue
+        singles_failed = 0
         for ft in j.get("features") or []:
             echo = str((ft.get("attributes") or {}).get(ident))
             sk = cases.get(echo.strip())
@@ -314,6 +360,9 @@ def fetch_features(rid, entry, keys, z3):
                 unasked.append(echo)
                 continue
             feats.append((sk, ft))
+        i += len(part)
+        if len(want) > 2000 and (i // chunk) % 20 == 0:
+            say(f"  {rid} recovery progress", f"{i:,} / {len(want):,} identities")
     # A registry-wide acquisition has no originating shard, and `lit(None)` would write
     # the literal string 'None' into a char(3) column rather than SQL NULL - i.e. a
     # fabricated provenance value that looks like a ZIP3. Emit NULL instead.

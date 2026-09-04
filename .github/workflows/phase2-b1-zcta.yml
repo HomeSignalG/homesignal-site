@@ -117,6 +117,12 @@ jobs:
       - name: 'Self-test: n5_geom inserts batch by bytes as well as rows'
         run: python3 scripts/test_geom_batch.py
 
+      # Also unconditional and offline. The recovery fetch decides how many identities
+      # ride in one publisher request; a batcher that skips a range on error or accepts a
+      # truncated response would look exactly like a shard with less geometry to find.
+      - name: 'Self-test: recovery batches from the publisher and loses no identity'
+        run: python3 scripts/test_recovery_batching.py
+
       - name: Validate (no database credential in scope)
         if: ${{ github.event.inputs.mode == 'validate' }}
         env:
