@@ -59,10 +59,14 @@ ok(/screen-pixel|SCREEN PIXELS/i.test(GEN) && /46px/.test(GEN),
 ok(/COORD_EPS\s*=\s*1e-5/.test(GEN), 'marker matching is a coordinate identity test');
 ok(/no drawn marker for this project/.test(GEN),
   'no matching marker is an honest failure, not a fallback image');
-ok(/x\.s\.source_id === sourceKey/.test(GEN),
-  'the marker join is the source id — the same string app_projects.source_key holds');
-ok(/coord_agrees/.test(GEN),
-  'and the record\u2019s own coordinates must still agree with the project\u2019s');
+ok(/zip_project_ref \|\| s\.source_id/.test(GEN),
+  'the marker join accepts BOTH names the page uses for the project key');
+ok(/zip_project_ref/.test(readFileSync(new URL('../lib/zip-authoritative.js', import.meta.url), 'utf8')),
+  'and zip_project_ref really is what the authoritative path emits');
+ok(/deltaM > 500/.test(GEN),
+  'the drawn marker may carry better geometry than the stored point, but the delta is bounded');
+ok(/marker_vs_stored_point_m/.test(GEN),
+  'and that delta is recorded in the evidence rather than hidden');
 ok(/__hsMarkerSettle/.test(GEN),
   'the capture waits for the draw to SETTLE, not merely to start');
 ok(/live coordinates differ from the draft evidence/.test(GEN),
@@ -114,6 +118,13 @@ ok(/function mapsVisual\(p\)\{\s*\n\s*if\(p\.content_family!=='MAPS'/.test(DASH)
 // ── the Alerts visual path is a different module and is untouched here ───────────────
 ok(!/screenshot-alert|captureItem/.test(GEN_CODE),
   'the Maps generator does not reach into the Alerts screenshot module');
+
+ok(/app_zip_projects_markers/.test(GEN),
+  'the generator asks the AUTHORITATIVE whole-ZIP set whether the project is drawn at all');
+ok(/boundary_complete/.test(GEN),
+  'and reports a not-yet-computed ZIP boundary as the reason rather than a browser failure');
+ok(/authoritative_zip_status/.test(GEN),
+  'the authoritative status is recorded in the evidence of every real visual');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

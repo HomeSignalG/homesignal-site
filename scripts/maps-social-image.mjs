@@ -74,6 +74,30 @@ async function pendingDrafts() {
 }
 
 /**
+ * Is this project actually drawn on its ZIP page? Map 1's ZIP mode now renders development
+ * from AUTHORITATIVE whole-ZIP membership (app_zip_projects_markers), which REPLACES the
+ * cached report's development points. A ZIP whose boundary is not yet computed reports
+ * status 'unknown' and renders no development at all, and a project outside the ZCTA is
+ * absent even where the boundary is complete. Asking first turns a browser round-trip that
+ * could only fail into a precise, cheap reason — and it consumes the geography contract
+ * rather than second-guessing it.
+ */
+async function authoritativePresence(zip, sourceKey) {
+  const r = await fetch(`${SB}/rest/v1/rpc/app_zip_projects_markers`, {
+    method: 'POST', headers: H,
+    body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
+  });
+  if (!r.ok) return { status: `rpc ${r.status}`, present: false, markers: null };
+  const j = await r.json();
+  const markers = Array.isArray(j?.markers) ? j.markers : null;
+  return {
+    status: j?.status || 'unknown',
+    markers: markers ? markers.length : null,
+    present: !!markers && markers.some((m) => m && m.project_ref === sourceKey),
+  };
+}
+
+/**
  * Re-read the LIVE project row. The draft's evidence is a snapshot taken when the
  * candidate was written; an image must be generated from what the corpus says now, and a
  * project whose coordinates have moved or vanished must not receive a stale picture.
@@ -116,53 +140,61 @@ async function capture(page, draft, proj) {
   const drew = await page.evaluate(() => (window.siteMarkers || []).length);
   if (!drew) return { ok: false, reason: 'map drew no markers for this ZIP' };
 
-  // Find the marker the page drew for THIS project. The join is the SOURCE ID: a cached
-  // site carries source_id (e.g. "carto:phl.carto.com:permits:ZP-2026-008877"), which is
-  // byte-identical to app_projects.source_key — the same string both sides were built from.
-  // Coordinates are the CORROBORATION, not the key, because siteLL() may return a fanned
-  // DISPLAY position (_mLat/_mLng) for co-located points, so a marker's drawn latlng is not
-  // always its record's latlng.
-  const found = await page.evaluate(([sourceKey, lat, lng, eps]) => {
-    const near = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < eps;
+  // Find the marker the page drew for THIS project. The join is the PROJECT KEY, which the
+  // page carries under two names depending on which half of ZIP mode drew the site:
+  //   zip_project_ref — authoritative whole-ZIP development (lib/zip-authoritative.js), the
+  //                     path that now REPLACES the cached report's development points;
+  //   source_id       — the cached development_reports site (facilities, area notices).
+  // Both are byte-identical to app_projects.source_key. Coordinates are corroboration and
+  // never the key: siteLL() may return a fanned DISPLAY position for co-located points, so a
+  // marker's drawn latlng is not always its record's latlng.
+  const found = await page.evaluate(([sourceKey]) => {
     const list = window.siteMarkers || [];
     const sites = window.__HS_SITES || [];
-    let idx = list.findIndex((x) => x && x.s && x.s.source_id === sourceKey);
-    let how = 'source_id';
-    if (idx < 0) {                       // fall back to the record's own coordinates
-      idx = list.findIndex((x) => x && x.s && near(x.s.lat, lat) && near(x.s.lng, lng));
-      how = 'coordinates';
-    }
+    const keyOf = (s) => (s && (s.zip_project_ref || s.source_id)) || null;
+    const idx = list.findIndex((x) => x && keyOf(x.s) === sourceKey);
     if (idx < 0) {
       return {
         found: false, total: list.length, sites: sites.length,
-        inCache: sites.some((s) => s && (s.source_id === sourceKey || (near(s.lat, lat) && near(s.lng, lng)))),
+        inCache: sites.some((s) => keyOf(s) === sourceKey),
+        authoritative: sites.some((s) => s && s.zip_project_ref),
       };
     }
     const hit = list[idx];
     const ll = hit.m.getLatLng();
     return {
-      found: true, idx, how, total: list.length, sites: sites.length,
+      found: true, idx, total: list.length, sites: sites.length,
+      how: hit.s.zip_project_ref ? 'zip_project_ref (authoritative whole-ZIP)' : 'source_id (cached report)',
       label: (hit.s && (hit.s.label || hit.s.title)) || '',
       site_lat: hit.s.lat, site_lng: hit.s.lng,
       lat: ll.lat, lng: ll.lng,
       fanned: hit.s._mLat != null,
-      coord_agrees: near(hit.s.lat, lat) && near(hit.s.lng, lng),
       record_url: (hit.s && hit.s.record_url) || null,
     };
-  }, [proj.source_key, proj.lat, proj.lng, COORD_EPS]);
+  }, [proj.source_key]);
 
   if (!found.found) {
     return {
       ok: false,
       reason: `no drawn marker for this project (${found.total} markers drawn, `
-        + `${found.sites} sites in the ZIP report, present in that report: ${found.inCache})`,
+        + `${found.sites} sites rendered, authoritative set present: ${found.authoritative}, `
+        + `project present in it: ${found.inCache})`,
     };
   }
-  // Whichever way it was found, the record's OWN coordinates must be the project's. A
-  // marker matched by source_id whose coordinates disagree is a different record.
-  if (!found.coord_agrees) {
-    return { ok: false, reason: `matched by ${found.how} but the record's coordinates differ from the project's` };
+
+  // THE MARKER'S COORDINATES ARE THE MAP'S, AND THEY WIN. Where whole-ZIP membership is
+  // authoritative, the marker is derived from the project's real geometry (POINT_AUTHORITATIVE,
+  // POLYGON_COMPONENT_POINT_ON_SURFACE …) and is MORE authoritative than app_projects.lat/lng.
+  // Demanding equality would reject exactly the better geometry, so the delta is measured and
+  // RECORDED instead — and bounded, because a pin a kilometre from the address the post
+  // quotes would make the image and the text disagree.
+  const dLat = found.site_lat - proj.lat;
+  const dLng = (found.site_lng - proj.lng) * Math.cos(proj.lat * Math.PI / 180);
+  const deltaM = Math.round(Math.hypot(dLat, dLng) * 111320);
+  if (deltaM > 500) {
+    return { ok: false, reason: `the drawn marker is ${deltaM} m from the project's stored point — too far to caption honestly` };
   }
+  found.delta_m = deltaM;
 
   // Frame on the PROJECT's own coordinates. The map instance is reached through the
   // marker Leaflet already attached it to — no new map is created and no public URL
@@ -221,7 +253,7 @@ async function capture(page, draft, proj) {
   return {
     ok: true, file,
     marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
-      of: found.total, how: found.how, fanned: found.fanned },
+      of: found.total, how: found.how, fanned: found.fanned, delta_m: found.delta_m },
     framed: { zoom: framed.zoom, center: framed.center },
     checks: clean,
   };
@@ -268,6 +300,16 @@ async function main() {
       continue;
     }
 
+    const auth = await authoritativePresence(d.zip, proj.source_key);
+    if (!auth.present) {
+      const why = auth.status !== 'boundary_complete'
+        ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
+        : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
+      results.push({ id: d.id, label, ok: false, reason: why });
+      if (!DRY) await recordFailure(d, why);
+      continue;
+    }
+
     let r;
     try { r = await capture(page, d, proj); }
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
@@ -280,6 +322,7 @@ async function main() {
 
     const objectPath = `maps/${d.zip}/${String(proj.id)}.png`;
     if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, file: r.file, marker: r.marker }); continue; }
+    r.authMarkers = auth.markers;
     await upload(objectPath, r.file);
     await attach(d, objectPath, r, proj);
     results.push({ id: d.id, label, ok: true, path: objectPath, marker: r.marker, framed: r.framed });
@@ -307,8 +350,11 @@ async function attach(draft, objectPath, r, proj) {
     marker_label: r.marker.label,
     matched_by: r.marker.how,
     marker_display_fanned: r.marker.fanned,
+    marker_vs_stored_point_m: r.marker.delta_m,
     markers_on_map: r.marker.of,
     framed_zoom: r.framed.zoom,
+    authoritative_zip_status: 'boundary_complete',
+    authoritative_markers_in_zip: r.authMarkers,
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
     popup_open: r.checks.popupOpen,
