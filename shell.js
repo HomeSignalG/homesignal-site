@@ -145,6 +145,10 @@
     activePropId: LS.get('activeProp', null),
     follows: new Set(LS.get('follows', [])),
     dismissed: new Set(LS.get('dismissed', [])),
+    // What the CURRENT PAGE is showing, in its own words (HS.setViewLabel). Distinct from
+    // activeProperty (the saved home) and from zip (the viewed area's code). Never persisted.
+    viewLabel: '',
+    viewLabelPrecise: false,   // true when viewLabel names a searched address, not an area
     topicPrefs: {},   // hydrated in boot() — server for signed-in, localStorage for anonymous
     get activeProperty() {
       // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
@@ -840,23 +844,59 @@
       stamp(a, a.getAttribute('data-znav'));
     });
   }
+  // WHAT THE PAGE IS CURRENTLY SHOWING, in the page's own authoritative words.
+  // In-memory only and never persisted, so it cannot outlive the load that set it —
+  // a fresh page starts with no view label and falls back to the viewed ZIP.
+  // Map 1 supplies "Denver (80210)" in ZIP mode and the searched address in address
+  // mode; every other page falls back to "ZIP <viewed zip>", which is already honest.
+  // opts.precise marks a label that names a SPECIFIC place the resident asked for (a
+  // searched street address) rather than the area they are browsing. A precise view
+  // outranks the saved home even inside the home's own ZIP: someone who searches
+  // 2200 Caldwell Ln must not be told they are looking at 13313 Coomes Dr just because
+  // both sit in 78617. An AREA label does not outrank it — on your home's own ZIP the
+  // control still says "Your home", which is the affordance residents rely on.
+  HS.setViewLabel = function (label, opts) {
+    const t = label == null ? '' : String(label).trim();
+    const precise = !!(opts && opts.precise);
+    if (t === state.viewLabel && precise === state.viewLabelPrecise) return;
+    state.viewLabel = t;
+    state.viewLabelPrecise = precise;
+    paintTopbar();
+  };
+  function viewedLabel() { return state.viewLabel || ('ZIP ' + state.zip); }
+
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
       // A saved home is labeled AS the home ("Your home · <street>") — a bare
       // street line never said which address the app had on file. The full
       // logged address (street, city, state ZIP) rides in the hover tooltip.
-      // A saved ZIP shows "ZIP <zip>"; otherwise the visitor is on the default
-      // Del Valle sample, so flag it clearly.
+      //
+      // SAVED HOME IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
+      // print the saved home on every page regardless of what the page was showing,
+      // so a resident with a Del Valle home browsing ?zip=80210 read
+      // "Your home · 13313 COOMES DR" beside a Denver map — two locations side by
+      // side with nothing saying which one the page was about (founder-observed on
+      // production, 2026-09-04). The home is named as the current context only when
+      // the page is actually showing its ZIP — the same gate HS.realHome() already
+      // applies to the page-level context line. Otherwise the control names the
+      // CURRENT VIEW. Nothing about the saved home changes: it stays saved, stays
+      // active, and stays one tap away in the switcher (and the tooltip still names it).
       const myZip = LS.get('myZip', null);
-      $('locLabel').textContent = p ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
-        : (myZip ? ('ZIP ' + myZip)
-        : (HS.isSample()
-          ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
-          : ('ZIP ' + state.zip)));
+      const homeIsCurrent = !!(p && String(p.zip) === String(state.zip) && !state.viewLabelPrecise);
+      $('locLabel').textContent = (p && homeIsCurrent)
+        ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
+        : ((p || myZip)
+          ? ('Viewing · ' + viewedLabel())
+          : (HS.isSample()
+            ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
+            : ('Viewing · ' + viewedLabel())));
       const locWrap = $('locLabel').closest('.loc');
       if (locWrap) locWrap.title = p
-        ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
+        ? (homeIsCurrent
+          ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
+          : ('Viewing ' + viewedLabel() + ' — your saved home is still '
+             + HS.homeAddressLine(p) + '. Tap to switch.'))
         : 'Tap to set your area';
     }
     const av = $('hs-avatar');
