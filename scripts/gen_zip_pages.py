@@ -45,37 +45,48 @@ def _anon_key():
     return m.group(1)
 
 
-def fetch_all(path, key, select, extra=""):
-    """Keyset-free offset pagination. PostgREST silently caps an unbounded select at 1000
-    rows, and the rows it drops are the newest - so every read here is paginated."""
-    out, off = [], 0
+def fetch_all(path, key, select, extra="", keyset="id"):
+    """KEYSET pagination, not OFFSET. PostgREST silently caps an unbounded select at 1000
+    rows, and the rows it drops are the newest - so every read must page. It must page on a
+    KEY, though: `offset=132000` against app_changes makes Postgres walk 132,000 rows to
+    throw them away, which turned this build into an 11-minute job. Same lesson the live
+    verifiers already learned. The keyset column is always in `select` so the cursor exists.
+    """
+    cols = select if keyset in select.split(",") else f"{keyset},{select}"
+    out, last = [], None
     while True:
-        url = f"{SUPA}/rest/v1/{path}?select={select}{extra}&limit={STEP}&offset={off}"
+        cur = f"&{keyset}=gt.{urllib.parse.quote(str(last))}" if last is not None else ""
+        url = (f"{SUPA}/rest/v1/{path}?select={cols}{extra}{cur}"
+               f"&order={keyset}.asc&limit={STEP}")
         req = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
         with urllib.request.urlopen(req, timeout=120) as r:
             page = json.loads(r.read().decode("utf-8"))
+        if not page:
+            return out
         out.extend(page)
+        last = page[-1][keyset]
         if len(page) < STEP:
             return out
-        off += STEP
 
 
 def fetch_data(key, now_iso):
     d = {}
-    d["zips"] = [r["zip"] for r in fetch_all("canonical_zip_registry", key, "zip", "&order=zip.asc")]
+    d["zips"] = [r["zip"] for r in fetch_all("canonical_zip_registry", key, "zip", keyset="zip")]
     d["meta"] = fetch_all("app_community_meta", key,
-                          "zip,name,county,state,data_quality,indexable", "&order=zip.asc")
+                          "zip,name,county,state,data_quality,indexable", keyset="zip")
     d["changes"] = fetch_all("app_changes", key,
-                             "zip,community_id,category,title,source_ref,occurred_at",
-                             "&order=zip.asc,occurred_at.desc")
-    d["agency"] = fetch_all("alerts", key, "source_url,agency_name",
-                            "&category=eq.local_news&order=source_url.asc")
-    d["retractions"] = fetch_all("local_news_geo_retractions", key, "community_id,source_url",
-                                 "&active=is.true")
-    d["communities"] = fetch_all("communities", key, "id,parent_id,level,zip_codes",
-                                 "&order=id.asc")
-    d["meetings"] = fetch_all("meetings", key, "community_id,title,meeting_date,category,source_url",
-                              f"&meeting_date=gte.{urllib.parse.quote(now_iso)}&order=meeting_date.asc")
+                             "id,zip,community_id,category,title,source_ref,occurred_at")
+    d["agency"] = fetch_all("alerts", key, "id,source_url,agency_name",
+                            "&category=eq.local_news")
+    # keyset MUST be unique: `gt.` on a non-unique column skips the rest of a tied group
+    # the moment a page fills. alert_id is one row per retraction; community_id is not.
+    d["retractions"] = fetch_all("local_news_geo_retractions", key,
+                                 "alert_id,community_id,source_url", "&active=is.true",
+                                 keyset="alert_id")
+    d["communities"] = fetch_all("communities", key, "id,parent_id,level,zip_codes")
+    d["meetings"] = fetch_all("meetings", key,
+                              "id,community_id,title,meeting_date,category,source_url",
+                              f"&meeting_date=gte.{urllib.parse.quote(now_iso)}")
     return d
 
 

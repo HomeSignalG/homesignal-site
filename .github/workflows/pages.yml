@@ -78,9 +78,44 @@ jobs:
           fi
           echo "git is clean of generated ZIP documents"
 
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
+
+      - name: Candidate crawler proof (initial HTML + JS + Googlebot UAs)
+        env:
+          SITE_DIR: _site
+          # Frozen controls: 07010 is Alerts PASS with development FAIL (proves Alerts alone
+          # can qualify a community page); 01002 is Alerts FAIL with development PASS (proves
+          # a development-positive ZIP no longer drags a thin Alerts page into the index).
+          CONTROLS: '{"pass_zip":"07010","fail_zip":"01002"}'
+        run: node scripts/prove-zip-pages.mjs
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
+      - name: Report build stats
+        if: always()
+        run: |
+          echo "----- BUILD STATS -----"
+          python3 - <<'EOF'
+          import json, os
+          m = json.load(open('_site/zip-pages-manifest.json'))
+          tot = n = mx = 0
+          for root, _, files in os.walk('_site/community'):
+              for f in files:
+                  b = os.path.getsize(os.path.join(root, f)); tot += b; n += 1; mx = max(mx, b)
+          print('documents       :', m['documents'])
+          print('rule F pass     :', m['rule_f_pass'])
+          print('rule F fail     :', m['rule_f_fail'])
+          print('indexable zips  :', len(m['indexable_zips']))
+          print('html files      :', n)
+          print('uncompressed    : %.1f MB' % (tot/1048576))
+          print('avg html bytes  :', tot // max(n,1))
+          print('max html bytes  :', mx)
+          EOF
+          echo "site total: $(du -sh _site | cut -f1)"
+          echo "----- END BUILD STATS -----"
 
   deploy:
     # Only main deploys. Requires the repository Pages Source = "GitHub Actions".
