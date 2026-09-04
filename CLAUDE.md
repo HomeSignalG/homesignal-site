@@ -592,25 +592,28 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 - **GitHub Pages**, static. Merging to `main` publishes the site. Data/content
   changes (new communities, alerts) go live via **Supabase / ingest**, not a repo
   push — that's the whole point of §0.
-- 🛑 **THE DEPLOYMENT SOURCE IS STILL "Deploy from a branch" — measured 2026-09-04 15:58Z,
-  and this is the one thing blocking the Alerts SEO pages** (receipts:
-  `docs/alerts-seo-build-2026-09-04.md` §11, including the retraction of the earlier
-  "it's switched" claim).
-  - **The artifact deploys and serves — for as long as nothing pushes to `main`.**
-    `actions/deploy-pages@v4` succeeds in legacy mode too (a workflow with `pages: write` can
-    create a Pages deployment through the API), so a green `deploy` job is **NOT** evidence of
-    the setting. `/community/<zip>/` was live 15:42:39Z → 15:54:24Z and is **404 again**.
-  - **The discriminator is a FIRING, not a success:** GitHub's dynamic
-    `pages-build-deployment` workflow runs on a push to `main` **only** while the source is a
-    branch. It ran on all three pushes today (runs 896/897/898). While those runs keep
-    appearing, the setting is not in effect.
-  - **Do not "fix" this by re-dispatching `pages.yml`.** That restores the pages only until
-    the next push to `main`, and advertises 7,256 canonical URLs that then 404.
-  `pages.yml` is built, gated and proven; its artifact carries **one generated document per
-  canonical ZIP** at `/community/<zip>/`. Once the source is genuinely switched, a red `pages`
-  build means **the site does not update** — treat it as a deploy failure then.
-  - **What the 12-minute live window proved** (Measured through `pg_net` while the artifact was
-    the active deployment): 01034 → HTTP 200, 3,912 bytes,
+- ✅ **THE DEPLOYMENT SOURCE IS "GitHub Actions", switched by the founder and PROVEN TO
+  PERSIST — 2026-09-04 16:55:42Z** (receipts: `docs/alerts-seo-build-2026-09-04.md` §11–§12;
+  §11 retains the retraction of an earlier, wrongly-inferred "it's switched" claim).
+  - **A red `pages` build now means the site does not update.** Before the switch a red run was
+    cosmetic. Treat it as a deploy failure.
+  - **How to tell the source is still right, without trusting the settings page or a green
+    job:** after any push to `main`, look for a run named **"pages build and deployment"**. Its
+    *presence* means the source has reverted to a branch. Its last run ever was **#900,
+    16:13:58Z**, before the switch.
+  - ⚠️ **`actions/deploy-pages@v4` succeeds in legacy mode too** (a workflow holding
+    `pages: write` can create a Pages deployment through the API), which is why a green
+    `deploy` job proves nothing about the setting on its own. That mistake was made and
+    corrected on 2026-09-04 — see §11 of the receipt.
+  - **Measured live after the switch:** 01034 → HTTP 200, `index, follow`, self-canonical,
+    ZIP-specific title/H1, 6 local-news items in the initial bytes; 01002 → 200,
+    `noindex, follow`, honest empty sections; sitemap **7,643 canonical / 0 legacy**,
+    reconciling to the Rule F PASS measured the same minute.
+  `pages.yml` is the implementation — **do not create a new Pages workflow from GitHub's
+  suggested Jekyll/static templates.** Its artifact carries **one generated document per
+  canonical ZIP** at `/community/<zip>/`.
+  - **Earlier receipt, from the 12-minute window before the switch took effect** (measured
+    through `pg_net`): 01034 → HTTP 200, 3,912 bytes,
     `index, follow`, self-canonical, ZIP-specific title and H1, 6 real local-news items in the
     initial bytes; 01002 → 200, `noindex, follow`, honest empty sections. Production sitemap:
     **7,256 canonical community URLs, 0 legacy, 0 duplicates**, development half untouched at

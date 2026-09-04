@@ -40,27 +40,27 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-04 — ALERTS SEO: PROVEN IN PRODUCTION, THEN SUPERSEDED. Pages source is STILL branch-mode
+### 2026-09-04 — ALERTS SEO: LIVE AND PROVEN. Pages source is GitHub Actions
 
-**`/community/<zip>/` was live for 12 minutes and is 404 again.** PR #1023 merged as
-`f7e448a`, `pages.yml` built it and `actions/deploy-pages@v4` deployed at **15:42:39Z**
-(run 33890821625, deployment 6267785306) — then the legacy `pages-build-deployment` ran on the
-next two pushes to `main` (#1015 at 15:53:57Z, #1024 at 15:56:16Z) and its **branch** build
-superseded the artifact. Measured 15:58Z: `/community/01034/` **404**, sitemap back to 0
-canonical / 11,701 legacy URLs.
+**`/community/<zip>/` is LIVE.** The founder switched the Pages source to **GitHub Actions**;
+the existing `pages.yml` was re-dispatched on `main` @ `09ba9f2` and `actions/deploy-pages@v4`
+deployed at **16:55:42Z** (run 33897571247, deployment 6269007025).
 
-⛔ **BLOCKED on one repository setting, and a green deploy job does NOT prove it.**
-`actions/deploy-pages@v4` succeeds in legacy mode too. The discriminator is that GitHub's
-dynamic `pages-build-deployment` workflow **only exists while the source is a branch** — and it
-ran on all three pushes today (runs 896/897/898). The `/repos/.../pages` API is 403 through the
-egress proxy, so the setting cannot be read or changed from here.
+**Persistence proven, not assumed:** the legacy `pages-build-deployment` workflow's last run
+ever is **#900 at 16:13:58Z — before the switch**; a push to `main` afterwards produced no new
+run of it and did not supersede the Actions deployment. ⚠️ A green `deploy-pages` job is NOT
+evidence of the setting (it succeeds in legacy mode too — the 15:58Z retraction in
+`docs/alerts-seo-build-2026-09-04.md` §11); the *absence of that firing* is.
 
-- **Production proof, taken inside the live window: `verify-zip-pages-live` run 33891407719 —
-  162 passed, 0 failed**, plus a `pg_net` initial-HTML capture (the sandbox has no egress to
+**Fresh Rule F 16:58:06Z: 12,722 canonical · PASS 7,643 · FAIL 5,079** (was 7,256 / 5,466 —
+normal ingestion, not forced). Served sitemap: 7,643 canonical / 0 legacy, reconciled.
+
+- **Production proof: `verify-zip-pages-live` run 33897988781 — 162 passed, 0 failed** (and
+  run 33891407719 before the switch, same result), plus a `pg_net` initial-HTML capture (the sandbox has no egress to
   homesignal.net). Both are in `docs/alerts-seo-build-2026-09-04.md` §11. Nothing about the
   implementation is unproven; only the hosting switch is missing.
-- **Do not re-dispatch `pages.yml` to "fix" it** — that restores the pages only until the next
-  push to `main` and advertises 7,256 URLs that then 404.
+- **`pages.yml` is the implementation.** Do not create a Pages workflow from GitHub's suggested
+  Jekyll/static templates.
 - 📌 **OPEN FOLLOW-UP (not blocking):** `scripts/gen_sitemap.py` still writes the committed
   `sitemap.xml` with the legacy `community.html?zip=` URLs; the artifact rewrite replaces that
   half at build time, so what is SERVED is correct (7,256 canonical / 0 legacy, measured) while
