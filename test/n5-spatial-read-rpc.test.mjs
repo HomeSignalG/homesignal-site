@@ -1,5 +1,10 @@
 // N5 bounded spatial read RPC — STATIC guards for public.n5_projects_within_radius().
 //
+// REVISION 3 (2026-09-04) adds marker_lat / marker_lng — PRESENTATION-ONLY coordinates
+// derived from each returned row's OWN geometry. Section 13 below is the guard that they
+// stay presentation-only: the marker must be derived AFTER the spatial filter, the
+// ordering and the page limit, and must never appear in the filter region at all.
+//
 // REVISION 2 (2026-09-03). Founder decision: Map 1 radius mode means "ANY CANONICAL
 // PHYSICALLY LOCATED PROJECT GEOMETRY NEAR THIS HOME", so the corpus includes BOTH
 // proven_stored_point and recovered_authoritative, and `provenance` is a returned column
@@ -123,8 +128,33 @@ ok(/st_dwithin\(st_transform\(g\.geom, 4326\)::geography/.test(code),
   'radius test runs ST_DWithin against the true stored geometry in geography metres');
 ok(/st_distance\(st_transform\(g\.geom, 4326\)::geography/.test(code),
   'distance is measured from the true stored geometry');
-ok(!/st_centroid|st_pointonsurface|n5_rep_point/i.test(code),
-  'NO centroid / point-on-surface / representative-point substitution');
+// REVISION 3: ST_PointOnSurface now appears — in the MARKER derivation only. The
+// assertion that matters is therefore regional, not global: nothing may substitute a
+// derived point for the true geometry in the part of the function that FILTERS and
+// MEASURES. Region boundaries are the anchors of the query itself.
+const iHit = code.indexOf('with hit as materialized');
+const iPlusOne = code.indexOf('limit p_limit + 1');
+ok(iHit > 0 && iPlusOne > iHit, 'the spatial filter region can be located in the shipped code');
+const filterRegion = code.slice(iHit, iPlusOne);
+const markerRegion = code.slice(iPlusOne);
+ok(!/st_centroid|n5_rep_point/i.test(code),
+  'NO centroid and NO representative-point reducer anywhere in the function');
+ok(!/st_envelope|st_boundingdiagonal|box2d|st_xmin/i.test(code),
+  'NO bounding-box centre anywhere (a bbox centre is not a point of the geometry)');
+ok(!/st_pointonsurface/i.test(filterRegion),
+  'NO point-on-surface substitution in the FILTER region (distance is measured on true geometry)');
+// The function COMMENT documents the polygon rule in prose, so count occurrences in
+// the EXECUTABLE body only — asserting over the prose would fail on the documentation,
+// the same false-failure this file's header warns about.
+const execBody = code.replace(fnComment, '');
+ok((execBody.match(/st_pointonsurface/gi) || []).length === 1,
+  'ST_PointOnSurface appears exactly once in the executable body, in the marker derivation');
+ok(/ST_PointOnSurface of its largest part, never a centroid/.test(fnComment),
+  'the function comment states the polygon marker rule and that it is not a centroid');
+ok(/PRESENTATION ONLY/.test(fnComment) && /never used to filter or to measure/.test(fnComment),
+  'the function comment states the marker is presentation-only and never filters or measures');
+ok(/not the nearest point|generally NOT the nearest point/i.test(fnComment),
+  'the function comment warns the marker is not the nearest point of the geometry');
 ok(/\/ 1609\.344/.test(code), 'metres are converted to miles with the exact factor 1609.344');
 ok(/st_transform\(v_home4326, 4269\)/.test(code) && /st_setsrid\(st_makepoint\(p_lng, p_lat\), 4326\)/.test(code),
   'home point is built in 4326 and transformed to the stored SRID 4269 for the prefilter');
@@ -153,7 +183,11 @@ ok(/limit p_limit \+ 1/.test(code),
 ok(/\(\(select count\(\*\) from hit\) > p_limit\) as has_more/.test(code),
   'has_more is computed from that extra row, not from rows == limit');
 ok(/with hit as materialized/.test(code), 'the CTE is MATERIALIZED so it is computed exactly once');
-ok(/limit p_limit;/.test(code), 'at most p_limit rows are returned to the caller');
+// REVISION 3: the page limit moved into its own CTE, so the marker derivation can
+// only ever run over rows the caller actually receives.
+ok(/from hit h\n\s*order by h\.distance_mi, h\.source_key, h\.feature_id\n\s*limit p_limit\n/.test(code),
+  'at most p_limit rows are returned to the caller (bounded in the page CTE)');
+ok(!/limit v_max_rows|limit 2000/.test(code), 'no hard-coded row limit anywhere');
 ok(/v_max_rows\s+constant integer\s*:=\s*2000/.test(code), 'a hard server maximum bounds any caller request');
 ok(!/limit v_max_rows/.test(code), 'the bare unconditional LIMIT of revision 1 is gone');
 ok(/order by distance_mi, source_key, feature_id[\s\S]{0,80}limit p_limit \+ 1/.test(code),
@@ -179,7 +213,96 @@ ok(geoReads.join(',') === 'geo.n5_geom,geo.n5_point_reject,geo.n5_verdict_manife
   'reads exactly three geo tables: n5_geom, n5_point_reject, n5_verdict_manifest — ' + geoReads.join(','));
 ok(!/n5_association|n5_frozen|n5_shard|n5_zcta|n5_a3_/.test(code),
   'does not read the association/frozen/shard/A3 tables');
-ok(!/insert into|update |delete from|create table|alter table|drop /i.test(code),
+const drops = (code.match(/^\s*drop .*$/gim) || []).map((l) => l.trim());
+ok(drops.length === 1 &&
+   drops[0] === `drop function if exists public.n5_projects_within_radius(${sig});`,
+  'the ONLY drop in the file is this function\'s own signature — ' + JSON.stringify(drops));
+ok(!/insert into|update |delete from|create table|alter table|drop table|drop schema|truncate/i.test(code),
   'the function performs no writes of any kind');
+
+// ---- 13. MARKER POSITION — presentation only, derived from THIS row's geometry ----
+// The named contract: marker_lat / marker_lng (MARKER, not DISPLAY, not LOCATION).
+ok(/marker_lat\s+double precision,/.test(code), 'marker_lat is a column of the RETURNS TABLE');
+ok(/marker_lng\s+double precision,/.test(code), 'marker_lng is a column of the RETURNS TABLE');
+ok(!/\bdisplay_lat\b|\bdisplay_lng\b/.test(code),
+  'the columns are named marker_*, never display_* (a marker is not a claim about location)');
+// the public contract's column ORDER, asserted as one block so a reorder cannot slip through
+const retTable = (code.match(/returns table \(([\s\S]*?)\)\nlanguage plpgsql/) || ['', ''])[1];
+const retCols = retTable.split('\n').map((l) => l.replace(/--.*$/, '').trim())
+  .filter(Boolean).map((l) => l.split(/\s+/)[0]);
+ok(retCols.join(',') === 'source_key,feature_id,registry_id,provenance,distance_mi,geometry_type,marker_lat,marker_lng,has_more',
+  'RETURNS TABLE column order is exactly the agreed contract — ' + retCols.join(','));
+
+// DERIVATION ORDER. The marker must be computed after filtering, ordering and paging.
+const iPage = code.indexOf('page as (');
+const iMarked = code.indexOf('marked as (');
+const iPlaced = code.indexOf('placed as (');
+ok(iPage > iPlusOne, 'the page CTE comes AFTER the bounded spatial fetch');
+ok(iMarked > iPage && iPlaced > iMarked,
+  'marker derivation and CRS placement both come AFTER the page limit');
+ok(/from hit h[\s\S]{0,160}limit p_limit\n/.test(code),
+  'the page is fixed by limit p_limit before any marker work');
+
+// THE MARKER MAY NOT INFLUENCE THE ANSWER.
+ok(!/marker/i.test(filterRegion),
+  'the FILTER region mentions no marker at all — it cannot change which rows return');
+ok(!/st_dump|st_dumppoints|st_lineinterpolatepoint|st_makevalid|st_collectionextract/i.test(filterRegion),
+  'no marker-derivation primitive appears in the FILTER region');
+ok(!/st_dwithin|st_distance\(st_transform/i.test(markerRegion),
+  'the marker region runs no ST_DWithin and no distance measurement against the home point');
+ok(!/marker[\s\S]{0,200}order by (?!pl\.distance_mi)/i.test(
+     code.slice(iMarked)) || /order by pl\.distance_mi, pl\.source_key, pl\.feature_id/.test(code),
+  'final ordering is still distance_mi, source_key, feature_id — never the marker');
+
+// THE ONLY INPUT IS THIS ROW'S OWN GEOMETRY.
+ok(/left join geo\.n5_geom g\n\s*on g\.source_key = p\.source_key\n\s*and g\.feature_id = p\.feature_id/.test(code),
+  'marker geometry is joined on the SAME (source_key, feature_id) the row returns');
+ok(/left join geo\.n5_geom/.test(code),
+  'that join is a LEFT join — a row can lose its marker but can never be dropped by it');
+ok(!/app_properties|source_ref|source_seq|n5_association|rep_lat|rep_lng/i.test(markerRegion),
+  'marker is NOT hydrated from app_properties / source_ref / source_seq / association / rep point');
+ok(!/app_projects/.test(markerRegion),
+  'marker is NOT hydrated from app_projects representative coordinates');
+
+// PER-TYPE DERIVATION, each branch as measured.
+ok(/when t\.g_type = 'POINT' then t\.g_geom/.test(code),
+  'a POINT is its own marker — no derivation, no approximation');
+ok(/st_dumppoints\(t\.principal\)[\s\S]{0,220}st_lineinterpolatepoint\(t\.principal, 0\.5\)/.test(code),
+  'a line marker is a VERTEX of the principal part, chosen nearest that part\'s length midpoint');
+ok(/order by st_distance\(dp\.geom, st_lineinterpolatepoint\(t\.principal, 0\.5\)\),\n\s*dp\.path\[1\]/.test(code),
+  'the interpolated midpoint is only an ORDERING key, and vertex index breaks ties deterministically');
+ok(!/then st_lineinterpolatepoint|as marker_geom[\s\S]{0,40}st_lineinterpolatepoint/i.test(code),
+  'the interpolated midpoint is never itself returned as the marker (measured: 0/200 ST_Intersects)');
+ok(/st_pointonsurface\(v\.g\)/.test(code),
+  'a polygon marker is ST_PointOnSurface — guaranteed on the surface, unlike a centroid');
+ok(/st_isvalid\(t\.principal\) then t\.principal[\s\S]{0,140}st_collectionextract\(st_makevalid\(t\.principal\), 3\)/.test(code),
+  'an invalid polygon is repaired before the marker is taken (4 such rows exist in the corpus)');
+ok(/when v\.g is null or st_isempty\(v\.g\) then null/.test(code),
+  'an empty repair yields NULL rather than a fabricated point');
+ok(/st_area\(d\.geom\)[\s\S]{0,90}st_length\(d\.geom\)[\s\S]{0,60}end desc,\n\s*d\.path\[1\]/.test(code),
+  'the principal part is the largest by area (polygonal) or length (linear), tie-broken deterministically');
+
+// FAIL CLOSED, in both the geometry class and the CRS.
+ok(/else null\n\s*end as marker_geom/.test(code),
+  'an unrecognised geometry class yields NO marker rather than an approximated one');
+ok(/when st_srid\(m\.marker_geom\) = 4326 then m\.marker_geom/.test(code),
+  'a marker already in 4326 is used as-is');
+ok(/exists \(select 1 from public\.spatial_ref_sys srs[\s\S]{0,120}st_transform\(m\.marker_geom, 4326\)/.test(code),
+  'a non-4326 marker is transformed only when its SRID is actually registered');
+ok(/else null\n\s*end as marker4326/.test(code),
+  'an unknown or unregistered SRID yields a NULL marker, never an untransformed coordinate');
+ok(/st_y\(pl\.marker4326\) as marker_lat/.test(code),
+  'marker_lat is ST_Y (latitude), not ST_X');
+ok(/st_x\(pl\.marker4326\) as marker_lng/.test(code),
+  'marker_lng is ST_X (longitude), not ST_Y');
+
+// ---- 14. the return type changes, so the DDL must DROP before it creates ----------
+ok(new RegExp(`drop function if exists public\\.n5_projects_within_radius\\(${sig}\\);`).test(code),
+  'the DDL drops the old 4-arg function first (a return-type change cannot be REPLACEd)');
+const iDrop = code.indexOf('drop function if exists');
+const iCreate = code.indexOf('create or replace function public.n5_projects_within_radius');
+ok(iDrop > 0 && iCreate > iDrop, 'the drop precedes the create');
+ok(code.indexOf('grant execute on function') > iCreate,
+  'grants are re-applied after the drop+create (a drop revokes them)');
 
 process.exit(fails ? 1 : 0);

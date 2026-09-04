@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EXECUTABLE suite for public.n5_projects_within_radius() — revision 2.
+"""EXECUTABLE suite for public.n5_projects_within_radius() — revision 3.
 
 Runs the SHIPPED docs/n5-spatial-read-rpc.sql against a disposable PostGIS and
 exercises the CONTRACT, not a paraphrase of it: the DDL file is read from disk and
@@ -10,6 +10,13 @@ guard (the sandbox has no database). Static text cannot prove that the lifecycle
 actually refuses mid-sweep, that has_more flips at the right boundary, or that a
 polygon returns distance 0 when the home is inside it. Those are behavioural claims
 and they are proven here, on a real PostGIS, or not at all.
+
+REVISION 3 adds marker_lat / marker_lng. The claim that matters — "the marker lies ON
+the geometry of the very row that was returned" — is a spatial predicate, so it is
+proven here by joining each returned row back to geo.n5_geom and running ST_Intersects
+against the coordinate the function actually emitted. Three mutation controls then
+prove those assertions are load-bearing: swapping ST_X/ST_Y, replacing the polygon
+rule with ST_Centroid, and widening the marker join off (source_key, feature_id).
 
 Exit code is 0 only if every assertion passes.
 """
@@ -165,6 +172,26 @@ def seed(cur):
     ins("proj:rejected", "pt:1", "proven_stored_point", "POINT(-71.0578 42.3601)")
     cur.execute("insert into geo.n5_point_reject (source_key, reason, verdict_snapshot_id)"
                 " values ('proj:rejected','MULTI_COORD_UNRESOLVED',%s);", (SNAP,))
+    # --- MARKER fixtures (revision 3), all inside 1 mile.
+    # A CONCAVE "C" polygon whose CENTROID falls in the opening — i.e. outside the
+    # polygon. This is what makes the ST_Centroid mutation control below meaningful
+    # rather than decorative, and the suite asserts the centroid really is outside.
+    ins("proj:concave", "f:1", "recovered_authoritative",
+        "POLYGON((-71.0600 42.3595,-71.0570 42.3595,-71.0570 42.3598,"
+        "-71.0594 42.3598,-71.0594 42.3604,-71.0570 42.3604,"
+        "-71.0570 42.3607,-71.0600 42.3607,-71.0600 42.3595))", snap=None)
+    # An INVALID polygon — a bowtie, i.e. "Ring Self-intersection", which is exactly
+    # the invalidity the 4 invalid rows in the production corpus carry (measured
+    # 2026-09-04: all four are CTDOT project work areas with ring self-intersections).
+    ins("proj:bowtie", "f:1", "recovered_authoritative",
+        "POLYGON((-71.0620 42.3595,-71.0610 42.3595,-71.0620 42.3606,"
+        "-71.0610 42.3606,-71.0620 42.3595))", snap=None)
+    # A geometry class the marker rule does NOT cover. It must still be RETURNED (the
+    # eligibility predicate does not exclude it) and must carry a NULL marker — fail
+    # closed, never an approximated point, and never a dropped row.
+    ins("proj:mpoint", "f:1", "recovered_authoritative",
+        "MULTIPOINT((-71.0586 42.3598),(-71.0585 42.3599))", snap=None)
+
     # --- REJECTED identity that carries RECOVERED geometry: must be KEPT.
     ins("proj:rejectedrec", "f:1", "recovered_authoritative",
         "POINT(-71.0577 42.3601)", snap=None)
@@ -181,7 +208,7 @@ def main():
     plain = conn.cursor()
 
     print("=" * 78)
-    print("N5 SPATIAL READ RPC — EXECUTABLE CONTRACT SUITE (revision 2)")
+    print("N5 SPATIAL READ RPC — EXECUTABLE CONTRACT SUITE (revision 3)")
     ver = q(plain, "select version(), postgis_full_version();")[0]
     print("server : %s" % ver[0].split(",")[0])
     print("postgis: %s" % ver[1].split(" ")[0:3])
@@ -270,9 +297,10 @@ def main():
           "recovered_at" not in cols, sorted(cols))
     check("outcome is NOT exposed (pinned to 1 by the predicate)",
           "outcome" not in cols, sorted(cols))
-    check("result contract is exactly the intended 7 columns",
+    check("result contract is exactly the intended 9 columns",
           cols == {"source_key", "feature_id", "registry_id", "provenance",
-                   "distance_mi", "geometry_type", "has_more"}, sorted(cols))
+                   "distance_mi", "geometry_type", "marker_lat", "marker_lng",
+                   "has_more"}, sorted(cols))
 
     # ============================== EXCLUSIONS ==================================
     print("-" * 78)
@@ -306,9 +334,9 @@ def main():
     check("POLYGON geometry is handled", gtypes.get(("proj:poly", "f:1")) == "ST_Polygon", present)
     check("MULTIPOLYGON geometry is handled",
           gtypes.get(("proj:multi", "f:3")) == "ST_MultiPolygon", present)
-    check("all five geometry types survive in ONE result set",
+    check("all six geometry types survive in ONE result set",
           present == {"ST_Point", "ST_LineString", "ST_MultiLineString",
-                      "ST_Polygon", "ST_MultiPolygon"}, present)
+                      "ST_Polygon", "ST_MultiPolygon", "ST_MultiPoint"}, present)
     # the polygon CONTAINS the home -> distance must be 0, not a centroid distance
     polyd = keys["proj:poly"]["distance_mi"]
     check("home INSIDE a polygon returns distance 0 (not a centroid distance)",
@@ -431,9 +459,23 @@ def main():
     ddl_code = "\n".join(l for l in ddl_text.split("\n") if not l.strip().startswith("--"))
     check("the shipped predicate keeps the && prefilter in the NATIVE srid (4269)",
           "st_expand(v_home4269" in ddl_code, None)
-    check("no ST_Centroid / ST_PointOnSurface / n5_rep_point in the shipped code",
-          not any(t in ddl_code.lower() for t in
-                  ("st_centroid", "st_pointonsurface", "n5_rep_point")), None)
+    # REVISION 3: ST_PointOnSurface is now used — in the MARKER derivation only. What
+    # must stay true is that nothing substitutes a derived point for the true geometry
+    # in the region that FILTERS and MEASURES, so the check is regional.
+    low = ddl_code.lower()
+    i_hit = low.index("with hit as materialized")
+    i_end = low.index("limit p_limit + 1")
+    filter_region = low[i_hit:i_end]
+    check("no ST_Centroid and no n5_rep_point anywhere in the shipped code",
+          not any(t in low for t in ("st_centroid", "n5_rep_point")), None)
+    check("no bounding-box centre anywhere (a bbox centre is not a point of the geometry)",
+          not any(t in low for t in ("st_envelope", "st_boundingdiagonal")), None)
+    check("no ST_PointOnSurface in the FILTER region (distance stays on true geometry)",
+          "st_pointonsurface" not in filter_region, None)
+    check("no marker-derivation primitive in the FILTER region",
+          not any(t in filter_region for t in
+                  ("st_dump", "st_dumppoints", "st_lineinterpolatepoint",
+                   "st_makevalid", "st_collectionextract", "marker")), None)
     check("no distinct on (source_key) in the shipped code",
           "distinct on" not in ddl_code.lower(), None)
     check("the shipped code reads app_projects nowhere", "app_projects" not in ddl_code, None)
@@ -453,6 +495,129 @@ def main():
                    " 'public.n5_projects_within_radius(double precision,double precision,"
                    "numeric,integer)', 'EXECUTE');")[0][0]
     check("EXECUTE is revoked from PUBLIC", pub is False, pub)
+
+    # ============================== MARKER POSITION =============================
+    print("-" * 78)
+    print("MARKER POSITION (presentation only — derived from THIS row's own geometry)")
+    # The marker is emitted in 4326 while the corpus is stored in 4269. Comparing it to
+    # the stored geometry therefore needs a round trip, and the round trip is asserted
+    # rather than assumed: PostGIS treats NAD83<->WGS84 as a null transform, so this is
+    # lossless — measured byte-identical on 500 production rows, 2026-09-04. If a PostGIS
+    # build ever changed that, this check goes red instead of the marker checks below
+    # failing for a reason that has nothing to do with the marker.
+    rt = q(plain, """
+        select count(*) as n,
+               count(*) filter (where st_asewkb(geom) =
+                       st_asewkb(st_transform(st_transform(geom,4326),4269))) as same
+          from geo.n5_geom where geom is not null;""")[0]
+    check("the 4269<->4326 round trip is lossless, so marker comparison is exact",
+          rt[0] > 0 and rt[0] == rt[1], rt)
+
+    MARKER_SQL = """
+      select r.source_key, r.feature_id, r.geometry_type,
+             r.marker_lat, r.marker_lng, r.distance_mi,
+             (r.marker_lat is not null and r.marker_lng is not null) as has_marker,
+             st_intersects(g.geom, st_transform(
+                 st_setsrid(st_makepoint(r.marker_lng, r.marker_lat), 4326),
+                 st_srid(g.geom))) as on_geom,
+             st_distance(g.geom, st_transform(
+                 st_setsrid(st_makepoint(r.marker_lng, r.marker_lat), 4326),
+                 st_srid(g.geom))) as dist_deg,
+             st_distance(st_setsrid(st_makepoint(%(lng)s, %(lat)s),4326)::geography,
+                 st_setsrid(st_makepoint(r.marker_lng, r.marker_lat),4326)::geography)
+                 / 1609.344 as marker_mi
+        from public.n5_projects_within_radius(%(lat)s,%(lng)s,5,500) r
+        join geo.n5_geom g
+          on g.source_key = r.source_key and g.feature_id = r.feature_id
+       order by r.distance_mi, r.source_key, r.feature_id;"""
+    mk = {(r["source_key"], r["feature_id"]): r
+          for r in q(cur, MARKER_SQL, {"lat": HOME_LAT, "lng": HOME_LNG})}
+    check("the marker probe returned every radius row", len(mk) == len(full), (len(mk), len(full)))
+
+    withm = [r for r in mk.values() if r["has_marker"]]
+    check("every geometry class the rule covers produced a marker",
+          len(withm) == len(mk) - 1, (len(withm), len(mk)))
+    check("EVERY marker lies ON the geometry of the row that returned it (ST_Intersects)",
+          all(r["on_geom"] for r in withm),
+          [k for k, r in mk.items() if r["has_marker"] and not r["on_geom"]])
+    check("  and at distance EXACTLY 0 from it",
+          all(r["dist_deg"] == 0 for r in withm),
+          max((r["dist_deg"] for r in withm), default=None))
+
+    # lat/lng not transposed. Every fixture sits within a few hundred metres of home, so
+    # a swap moves the marker to (-71, 42) — off the planet's populated grid entirely.
+    check("marker_lat is LATITUDE (all fixtures near 42.36, not -71.06)",
+          all(42.34 < r["marker_lat"] < 42.38 for r in withm),
+          sorted({round(r["marker_lat"], 3) for r in withm}))
+    check("marker_lng is LONGITUDE (every fixture in -71.10..-71.00, never 42.36)",
+          all(-71.10 < r["marker_lng"] < -71.00 for r in withm),
+          sorted({round(r["marker_lng"], 3) for r in withm}))
+
+    # a point is its own marker, exactly
+    same_pt = q(plain, """
+        select count(*) from public.n5_projects_within_radius(%s,%s,5,500) r
+          join geo.n5_geom g on g.source_key = r.source_key and g.feature_id = r.feature_id
+         where geometrytype(g.geom) = 'POINT'
+           and st_asewkb(st_transform(g.geom, 4326)) <>
+               st_asewkb(st_setsrid(st_makepoint(r.marker_lng, r.marker_lat), 4326));""",
+        (HOME_LAT, HOME_LNG))[0][0]
+    check("a POINT row's marker IS that stored point, exactly (0 rows differ)", same_pt == 0, same_pt)
+
+    # a line marker is an actual VERTEX, not an interpolated position
+    vtx = q(plain, """
+        select count(*) filter (where v.hit) as on_vertex, count(*) as n
+          from public.n5_projects_within_radius(%s,%s,5,500) r
+          join geo.n5_geom g on g.source_key = r.source_key and g.feature_id = r.feature_id
+          join lateral (select bool_or(st_asewkb(dp.geom) =
+                   st_asewkb(st_transform(st_setsrid(
+                       st_makepoint(r.marker_lng, r.marker_lat),4326), st_srid(g.geom)))) as hit
+                 from st_dumppoints(g.geom) dp) v on true
+         where geometrytype(g.geom) in ('LINESTRING','MULTILINESTRING');""",
+        (HOME_LAT, HOME_LNG))[0]
+    check("a LINE row's marker is an actual VERTEX of that line, not an interpolated point",
+          vtx[1] > 0 and vtx[0] == vtx[1], vtx)
+
+    # concave polygon: the marker is inside, and the CENTROID provably is not
+    con = mk[("proj:concave", "f:1")]
+    cen = q(plain, "select st_contains(geom, st_centroid(geom)), st_isvalid(geom)"
+                   " from geo.n5_geom where source_key='proj:concave';")[0]
+    check("the concave fixture's CENTROID falls OUTSIDE it (so the control below is real)",
+          cen[0] is False and cen[1] is True, cen)
+    check("the concave polygon's marker is nonetheless ON the polygon",
+          con["on_geom"] and con["dist_deg"] == 0, con)
+
+    # invalid geometry is repaired, not skipped and not guessed
+    bow = mk[("proj:bowtie", "f:1")]
+    binv = q(plain, "select st_isvalid(geom), st_isvalidreason(geom)"
+                    " from geo.n5_geom where source_key='proj:bowtie';")[0]
+    check("the bowtie fixture really is INVALID (ring self-intersection)",
+          binv[0] is False and "Self-intersection" in (binv[1] or ""), binv)
+    check("an INVALID polygon still yields a marker, and it lies on the original geometry",
+          bow["has_marker"] and bow["on_geom"] and bow["dist_deg"] == 0, bow)
+
+    # an uncovered geometry class fails CLOSED to NULL — the row survives, the marker does not
+    mp = mk[("proj:mpoint", "f:1")]
+    check("a geometry class with no marker rule is STILL RETURNED", mp is not None, mp)
+    check("  and its marker is NULL rather than an approximated point",
+          mp["marker_lat"] is None and mp["marker_lng"] is None, mp)
+
+    # the marker is NOT the distance answer, and this is demonstrated rather than asserted
+    check("marker distance differs from distance_mi on an area geometry "
+          "(they answer different questions)",
+          con["marker_mi"] > con["distance_mi"] + 1e-9,
+          (con["distance_mi"], con["marker_mi"]))
+
+    # determinism
+    m2 = {(r["source_key"], r["feature_id"]): (r["marker_lat"], r["marker_lng"])
+          for r in q(cur, MARKER_SQL, {"lat": HOME_LAT, "lng": HOME_LNG})}
+    check("repeated calls return byte-identical marker coordinates",
+          m2 == {k: (r["marker_lat"], r["marker_lng"]) for k, r in mk.items()})
+
+    # the marker cannot change the RESULT SET
+    check("row identity and order are unchanged by marker derivation",
+          [(r["source_key"], r["feature_id"]) for r in full] ==
+          [(k[0], k[1]) for k in mk.keys()],
+          None)
 
     # ---- NEGATIVE CONTROLS: the suite must FAIL on a weakened function ---------
     print("-" * 78)
@@ -485,6 +650,50 @@ def main():
     back = {r["source_key"] for r in call(cur, radius=5, limit=500)}
     check("restoring the shipped DDL excludes it again", "proj:rejected" not in back,
           sorted(back))
+
+    # (d) SWAP ST_X / ST_Y -> marker_lat becomes a longitude
+    weak3 = ddl_exec.replace("st_y(pl.marker4326) as marker_lat,\n"
+                             "         st_x(pl.marker4326) as marker_lng",
+                             "st_x(pl.marker4326) as marker_lat,\n"
+                             "         st_y(pl.marker4326) as marker_lng")
+    check("the X/Y mutation actually changed the DDL", weak3 != ddl_exec)
+    plain.execute(weak3)
+    swapped = call(cur, radius=5, limit=500)
+    lats = [r["marker_lat"] for r in swapped if r["marker_lat"] is not None]
+    check("swapping ST_X/ST_Y is DETECTED (marker_lat stops being a latitude)",
+          bool(lats) and all(l < -70 for l in lats), lats[:3])
+    plain.execute(ddl_exec)
+
+    # (e) POLYGON RULE -> ST_Centroid: the concave fixture's marker leaves the polygon
+    weak4 = ddl_exec.replace("else st_pointonsurface(v.g) end", "else st_centroid(v.g) end")
+    check("the centroid mutation actually changed the DDL", weak4 != ddl_exec)
+    plain.execute(weak4)
+    cmk = {(r["source_key"], r["feature_id"]): r
+           for r in q(cur, MARKER_SQL, {"lat": HOME_LAT, "lng": HOME_LNG})}
+    check("using ST_Centroid for polygons puts the marker OFF the geometry "
+          "(control proves ST_PointOnSurface is load-bearing)",
+          cmk[("proj:concave", "f:1")]["on_geom"] is False,
+          cmk[("proj:concave", "f:1")])
+    plain.execute(ddl_exec)
+    rmk = {(r["source_key"], r["feature_id"]): r
+           for r in q(cur, MARKER_SQL, {"lat": HOME_LAT, "lng": HOME_LNG})}
+    check("restoring the shipped DDL puts it back ON the geometry",
+          rmk[("proj:concave", "f:1")]["on_geom"] is True, rmk[("proj:concave", "f:1")])
+
+    # (f) WIDEN THE MARKER JOIN off (source_key, feature_id): a project with three
+    # geometries would hydrate its marker from a sibling feature, which is exactly the
+    # substitution the founder ruled out. It shows up as row multiplication.
+    weak5 = ddl_exec.replace("and g.feature_id = p.feature_id",
+                             "and g.feature_id is not null")
+    check("the join-grain mutation actually changed the DDL", weak5 != ddl_exec)
+    plain.execute(weak5)
+    blown = call(cur, radius=5, limit=500)
+    check("widening the marker join off feature_id is DETECTED (rows multiply)",
+          len(blown) > len(full), (len(blown), len(full)))
+    plain.execute(ddl_exec)
+    restored = call(cur, radius=5, limit=500)
+    check("restoring the shipped DDL restores the exact row count",
+          len(restored) == len(full), (len(restored), len(full)))
 
     print("=" * 78)
     print("TOTAL %d  PASS %d  FAIL %d" % (_n, _pass, _fail))

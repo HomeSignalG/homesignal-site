@@ -1102,3 +1102,111 @@ marker on the primary map is exactly that.
 
 No Map 1 edit, no RPC change, no new backend, no grant/RLS change, no production call in this unit
 beyond read-only catalog and `app_projects` inspection. Map 2 untouched. PR #1015/#1016 DRAFT.
+
+---
+
+## 21. MARKER-POSITION CONTRACT REVISION (revision 3) — **ARTIFACT + TESTS ONLY**, 2026-09-04
+
+Founder unit: revise the RPC artifact so a returned row carries a drawable coordinate. **Nothing
+was installed and nothing was executed against production in this unit** — the production RPC is
+still revision 2 (`prosrc` md5 `e1bb67c604aaaa4e1ab541ee32bc82ea`, 7 columns, no marker). Map 1
+was not touched.
+
+Note on §20's proposal: it named the columns `display_lat`/`display_lng` and suggested
+`ST_LineInterpolatePoint` for lines. The founder named the columns **`marker_lat`/`marker_lng`**,
+and the line rule changed on measurement (below). §20's text stands as the dated record of what was
+proposed; this section is what was built.
+
+### 21.1 Premises re-verified before any DDL was written (read-only)
+
+| claim | result |
+|---|---|
+| production returns no coordinate today | `TABLE(source_key, feature_id, registry_id, provenance, distance_mi, geometry_type, has_more)` — no marker column |
+| eligible geometry classes | POINT 724,301 · MULTILINESTRING 10,444 · MULTIPOLYGON 9,125 = **743,870** |
+| no other class exists | 0 MultiPoint, 0 GeometryCollection, 0 singular LineString/Polygon |
+| CRS | **every** eligible row SRID 4269; `spatial_ref_sys` carries 4269 and 4326 (EPSG) |
+| empty geometry | 0 |
+| invalid geometry | 4 (all MULTIPOLYGON, all "Ring Self-intersection", CTDOT work areas) |
+
+The corpus is LIVE (founder ruling, option (a)), so these counts moved during the unit — lines read
+10,435 then 10,444, points 718,278 then 724,301. Every figure is point-in-time and none is hard-coded
+into the function.
+
+### 21.2 The line rule was decided by measurement, and the obvious answer lost
+
+Measured on 200 real MULTILINESTRINGs:
+
+| candidate | `ST_Intersects(geom, marker)` | max `ST_Distance` | mean offset from the length midpoint |
+|---|---|---|---|
+| `ST_LineInterpolatePoint(part, 0.5)` | **0 / 200** | 7.1e-15° | 0 (it *is* the midpoint) |
+| `ST_ClosestPoint(part, that midpoint)` | **0 / 200** | 3.6e-15° | ~0 |
+| `ST_PointOnSurface(part)` | 200 / 200 | 0 | 95.5 m · >50 m: 104/200 · >500 m: 5/200 |
+| **vertex nearest that midpoint** (shipped) | **200 / 200** | **0** | **47.8 m · >50 m: 50/200 · >500 m: 2/200** |
+
+The interpolated point misses by ~1e-14 degrees — floating-point representability, not a placement
+error — but the exact-arithmetic predicate correctly reports false, and snapping does not repair it.
+Only an actual stored vertex satisfies membership exactly. Between the two candidates that do,
+the explicit rule is measurably better centred, so it ships. **Disclosed cost:** on a long
+sparse-vertex line the vertex can sit up to **2,215 m** from the midpoint (line parts average 7.2 km,
+max 51.5 km). It is still a point *of* the feature; `distance_mi` remains the distance answer.
+
+### 21.3 Corpus-wide verification of the shipped derivation (read-only)
+
+Marker is a POINT, never NULL, never empty, `ST_Intersects` true and `ST_Distance` **exactly 0**:
+
+* MULTILINESTRING **10,435 / 10,435** — whole eligible line corpus
+* MULTIPOLYGON **9,125 / 9,125** — whole eligible polygon corpus, including all 4 invalid rows
+* re-run with the exact shipped expression at the worst-case page size (`p_limit = 2000`):
+  **2,000 / 2,000** lines and **2,000 / 2,000** polygons (again including all 4 invalid rows)
+
+Also verified: `&&`, geography `ST_DWithin` and `ST_Distance` all succeed on the 4 invalid rows
+(distance 0.0000 m from their own repaired interior point), so an invalid polygon cannot break the
+query; and the 4269↔4326 round trip is **byte-identical** on 500 rows, so an emitted marker can be
+compared back to stored geometry exactly.
+
+### 21.4 What the contract now is
+
+`RETURNS TABLE (source_key, feature_id, registry_id, provenance, distance_mi, geometry_type,
+marker_lat, marker_lng, has_more)` — the founder's stated order, implementable as stated.
+
+* derived from `g.geom` of the row being returned, joined on `(source_key, feature_id)`, **LEFT** so
+  a row can lose its marker but can never be dropped by marker derivation;
+* computed in CTEs that run **after** the spatial filter, the ordering and the page limit — so at
+  most `p_limit` markers are ever derived and a marker cannot change which rows return or in what
+  order;
+* emitted in EPSG:4326, fail-closed on SRID 0 or an SRID absent from `spatial_ref_sys` (NULL, never
+  an untransformed coordinate presented as WGS84);
+* NULL for any geometry class the rule does not cover.
+
+⛔ **Installing this requires `DROP FUNCTION` first** — adding columns changes the return type and
+PostgreSQL cannot `create or replace` through that. The drop is in the file, and it revokes grants,
+which the file's GRANTS section re-applies. That is an installation-unit concern; not done here.
+
+### 21.5 Test results
+
+| suite | where | result |
+|---|---|---|
+| `test/n5-spatial-read-rpc.test.mjs` (static) | sandbox | **123 / 123** |
+| `test/n5_spatial_pg/run_suite.py` (executable) | disposable local **PostgreSQL 16.13 / PostGIS 3.4.2** (the `postgis:16-3.4` matrix leg), unix socket, no credentials, destroyed after | **107 / 107** |
+| `node scripts/run-unit-tests.mjs` | sandbox | **141 / 141 files** |
+
+New executable fixtures: a **concave "C" polygon whose centroid provably falls outside it**, an
+**invalid bowtie** (the production invalidity class), and a **MULTIPOINT** (a class the rule does not
+cover). New behavioural assertions include: every marker `ST_Intersects` its own row's geometry at
+distance exactly 0; a POINT row's marker is byte-identical to the stored point; a LINE row's marker
+is an actual vertex; the MULTIPOINT row is still returned with a NULL marker; `marker_lat` is a
+latitude and `marker_lng` a longitude; and marker-to-home distance differs from `distance_mi` on an
+area geometry — the two answer different questions.
+
+Three mutation controls prove those assertions are load-bearing, each flipping the suite red and
+then restored green:
+
+1. swap `ST_X`/`ST_Y` → `marker_lat` stops being a latitude;
+2. polygon rule → `ST_Centroid` → the concave fixture's marker leaves the polygon;
+3. widen the marker join off `feature_id` → rows multiply (a project would hydrate its marker from a
+   sibling feature — exactly the substitution the founder ruled out).
+
+### 21.6 Nothing else was touched
+
+No production install, no production RPC invocation, no Map 1 edit, no grant/RLS/ownership change,
+no new backend surface. PR #1015 / #1016 remain DRAFT.

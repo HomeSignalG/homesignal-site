@@ -24,6 +24,32 @@
 -- language for it than "the snapshot's stored coordinate".
 --
 -- ----------------------------------------------------------------------------
+-- REVISION 3 (2026-09-04) — MARKER POSITION. Revision 2 returned no coordinate at
+-- all, so Map 1 could not place a returned row on the map: it had identity,
+-- provenance, distance and geometry type, and nothing to draw. Revision 3 adds
+-- `marker_lat` / `marker_lng`, derived from the SAME geometry whose
+-- (source_key, feature_id) the row returns.
+--
+-- ⚠️ MARKER, NOT LOCATION, AND NOT DISTANCE. These two columns are PRESENTATION
+-- ONLY — where to draw one pin for this feature. They are:
+--     * NEVER used to filter (ST_DWithin) or to measure (ST_Distance). Both still
+--       run against the TRUE geometry, exactly as in revision 2, and the marker is
+--       derived AFTER the radius filter, the ordering and the page limit have all
+--       been applied. A marker cannot change which rows come back or in what order.
+--     * NEVER hydrated from app_projects, app_properties, source_ref, source_seq, a
+--       ZIP association, another feature_id, or any representative project point.
+--       The ONLY input is g.geom of the row being returned.
+--     * NOT the answer to "how far is this project" — `distance_mi` is, and for a
+--       polygon or a long line the nearest point of the geometry is generally NOT
+--       the marker. See the disclosed property under MARKER POSITION below.
+--
+-- ⛔ THIS REVISION CANNOT BE APPLIED WITH `create or replace` ALONE. Adding columns
+-- to RETURNS TABLE changes the function's return type, which PostgreSQL refuses to
+-- replace ("cannot change return type of existing function"). The DROP below is
+-- therefore load-bearing, and it revokes the existing grants — which is why the
+-- GRANTS section at the foot of this file re-applies them.
+--
+-- ----------------------------------------------------------------------------
 -- REVISION 2 (2026-09-03) — WHAT CHANGED AND WHY. Revision 1 (PR #1015,
 -- 2026-09-02) was written when geo.n5_geom held RECOVERY geometry only, and its
 -- assumptions are now obsolete. The canonical corpus has since been published
@@ -192,8 +218,86 @@
 -- 1540.6 m — i.e. distance to the polygon EDGE, not to a centroid.
 -- Geometry types present, measured 2026-09-03: proven ST_Point 718,278;
 -- recovered ST_MultiPolygon 9,083, ST_MultiLineString 8,177, ST_Point 6,023.
--- No ST_Centroid, no ST_PointOnSurface, and no geo.n5_rep_point() (the
--- representative-point reducer used by the A3 shadow path) appears below.
+-- Re-measured 2026-09-04 across the whole eligible corpus (the RECOVERY corpus is
+-- LIVE and point-in-time by founder ruling, so these numbers move): POINT 724,301,
+-- MULTILINESTRING 10,444, MULTIPOLYGON 9,125 — 743,870 rows, every one SRID 4269,
+-- zero empty geometries, and NO MultiPoint, GeometryCollection or singular
+-- LineString/Polygon anywhere.
+-- No ST_Centroid and no geo.n5_rep_point() (the representative-point reducer used
+-- by the A3 shadow path) appears below, in ANY region of the function.
+-- ST_PointOnSurface appears in exactly ONE place — the polygon branch of the MARKER
+-- derivation, which runs after filtering and can never influence a distance. It is
+-- absent from the spatial filter region.
+--
+-- ----------------------------------------------------------------------------
+-- MARKER POSITION — one drawable point per returned feature, derived from that
+-- feature's own geometry. Every rule below was chosen against measurement, not
+-- preference, and the measurements are live against the canonical corpus.
+--
+-- THE RULE
+--   principal part := the largest part of the geometry (ST_Dump ordered by
+--                     ST_Area desc for polygonal input, ST_Length desc for linear,
+--                     tie-broken by dump path — deterministic either way)
+--   POINT ................. the geometry itself
+--   LINESTRING /
+--   MULTILINESTRING ....... the VERTEX of the principal part nearest that part's
+--                           length midpoint (ST_LineInterpolatePoint(part, 0.5)),
+--                           tie-broken by vertex index
+--   POLYGON /
+--   MULTIPOLYGON .......... ST_PointOnSurface of the principal part; if that part
+--                           is invalid it is repaired first with ST_MakeValid and
+--                           ST_CollectionExtract(..., 3), and an empty repair
+--                           yields NULL rather than a guess
+--   anything else ......... NULL — a geometry class this function has never seen
+--                           gets no marker, it does not get an approximated one
+--
+-- 🔑 WHY A VERTEX FOR LINES, AND NOT THE INTERPOLATED MIDPOINT. The midpoint is the
+-- obvious answer and it FAILS the "the marker lies on this geometry" test. Measured
+-- 2026-09-04 on 200 real MULTILINESTRINGs from the corpus:
+--     ST_LineInterpolatePoint(part, 0.5)          ST_Intersects   0 / 200
+--     ST_ClosestPoint(part, that midpoint)        ST_Intersects   0 / 200
+--     the vertex nearest that midpoint            ST_Intersects 200 / 200
+-- The interpolated point misses by at most 7.1e-15 degrees (ST_Distance) — it is a
+-- floating-point representability residue, not a placement error: the point at
+-- parameter 0.5 of a segment is in general not exactly collinear with that segment
+-- in double precision, so the exact-arithmetic predicate correctly says false.
+-- Snapping with ST_ClosestPoint does not repair it (3.6e-15 degrees, still 0/200).
+-- Only an actual stored VERTEX satisfies the predicate exactly, at distance 0.
+--
+-- WHY NOT ST_PointOnSurface FOR LINES TOO (it would be one uniform rule). It also
+-- guarantees membership — 200/200, distance 0, because GEOS returns a vertex — but
+-- it is measurably the worse marker. Offset from the line's length midpoint, same
+-- 200 features:
+--     ST_PointOnSurface   mean  95.5 m   >50 m: 104/200   >500 m: 5/200
+--     nearest vertex      mean  47.8 m   >50 m:  50/200   >500 m: 2/200
+-- Same guarantee, worse centring, so the explicit rule wins. It is also stable
+-- across PostGIS versions in a way GEOS's interior-point choice is not.
+--
+-- ⚠️ DISCLOSED PROPERTY, NOT HIDDEN. On a long, sparse-vertex line the nearest
+-- vertex can sit well away from the middle: worst case measured 2,215 m, on a
+-- corpus whose line parts average 7.2 km and reach 51.5 km. The marker is still a
+-- point OF the feature, and `distance_mi` remains the distance to the nearest point
+-- of the true geometry — so a caller must never derive distance from the marker,
+-- nor describe the marker as "the project's location". One pin on a 51 km highway
+-- is arbitrary wherever it is placed; this one is at least provably on the road.
+--
+-- VERIFIED ON THE REAL CORPUS, 2026-09-04 — the marker lies ON the geometry
+-- (ST_Intersects true AND ST_Distance exactly 0), is a POINT, is never NULL and is
+-- never empty:
+--     MULTILINESTRING   10,435 / 10,435   (whole eligible line corpus)
+--     MULTIPOLYGON       9,125 /  9,125   (whole eligible polygon corpus,
+--                                          including all 4 invalid geometries)
+-- and re-run with the EXACT expression shipped below, at the worst-case page size
+-- this function can ever emit (p_limit = v_max_rows = 2,000): 2,000/2,000 on lines
+-- and 2,000/2,000 on polygons, the polygon batch again including all 4 invalid rows.
+-- Points are the identity case and need no derivation.
+--
+-- CRS. The marker is emitted in EPSG:4326 as plain lat/lng, because that is what a
+-- web map consumes. The corpus is uniformly SRID 4269 today, so the transform runs;
+-- it is nonetheless guarded and FAILS CLOSED — SRID 0, or an SRID absent from
+-- spatial_ref_sys, yields a NULL marker rather than an untransformed coordinate
+-- silently presented as WGS84. A NULL marker is an honest "cannot place this"; a
+-- wrong one is a lie a map cannot detect.
 --
 -- ----------------------------------------------------------------------------
 -- PERFORMANCE — uses the EXISTING index; no new index is created
@@ -211,6 +315,11 @@
 -- work, so cost tracks LOCAL feature density, not national table size.
 -- ============================================================================
 
+-- The return type changes in revision 3 (marker_lat / marker_lng), and PostgreSQL
+-- cannot REPLACE a function's return type. Dropping by the EXACT 4-argument
+-- signature is therefore required, and is why the grants are re-applied below.
+drop function if exists public.n5_projects_within_radius(double precision, double precision, numeric, integer);
+
 create or replace function public.n5_projects_within_radius(
   p_lat        double precision,
   p_lng        double precision,
@@ -224,6 +333,11 @@ returns table (
   provenance    text,
   distance_mi   double precision,
   geometry_type text,
+  -- PRESENTATION ONLY. Where to draw this feature's pin, in EPSG:4326, derived from
+  -- this row's own geometry. NULL when no marker can be derived honestly. Never an
+  -- input to any filter or distance, and never "the project's location".
+  marker_lat    double precision,
+  marker_lng    double precision,
   has_more      boolean
 )
 language plpgsql
@@ -357,17 +471,104 @@ begin
                       v_home4326::geography, v_meters)
      order by distance_mi, source_key, feature_id
      limit p_limit + 1
+  ),
+  -- ---- PAGE. The caller's page, fixed BEFORE any marker work happens, so marker
+  -- derivation is bounded by p_limit and can never touch a row that was filtered out.
+  page as (
+    select h.source_key   as source_key,
+           h.feature_id   as feature_id,
+           h.registry_id  as registry_id,
+           h.provenance   as provenance,
+           h.distance_mi  as distance_mi,
+           h.geometry_type as geometry_type
+      from hit h
+     order by h.distance_mi, h.source_key, h.feature_id
+     limit p_limit
+  ),
+  -- ---- PRINCIPAL PART. The largest part of THIS row's own geometry: by area for
+  -- polygonal input, by length for linear. LEFT JOINs throughout, so a row can lose
+  -- its marker but can never be dropped from the result by marker derivation.
+  part as (
+    select p.source_key, p.feature_id, p.registry_id, p.provenance,
+           p.distance_mi, p.geometry_type,
+           g.geom              as g_geom,
+           geometrytype(g.geom) as g_type,
+           lp.geom             as principal
+      from page p
+      left join geo.n5_geom g
+             on g.source_key = p.source_key
+            and g.feature_id = p.feature_id
+      left join lateral (
+        select d.geom
+          from st_dump(g.geom) d
+         where geometrytype(g.geom) in ('LINESTRING','MULTILINESTRING','POLYGON','MULTIPOLYGON')
+         order by case when geometrytype(g.geom) in ('POLYGON','MULTIPOLYGON')
+                       then st_area(d.geom)
+                       else st_length(d.geom)
+                  end desc,
+                  d.path[1]
+         limit 1
+      ) lp on true
+  ),
+  -- ---- MARKER. Derived from g_geom and NOTHING else. See MARKER POSITION above for
+  -- the measurements behind each branch; the else-branch fails CLOSED to NULL.
+  marked as (
+    select t.source_key, t.feature_id, t.registry_id, t.provenance,
+           t.distance_mi, t.geometry_type,
+           case
+             when t.g_geom is null or st_isempty(t.g_geom) then null
+             -- a point IS its own marker; no derivation, no approximation
+             when t.g_type = 'POINT' then t.g_geom
+             when t.principal is null then null
+             -- the vertex nearest the principal part's length midpoint. An
+             -- interpolated midpoint is NOT used: measured 0/200 on ST_Intersects.
+             when t.g_type in ('LINESTRING','MULTILINESTRING') then (
+               select dp.geom
+                 from st_dumppoints(t.principal) dp
+                order by st_distance(dp.geom, st_lineinterpolatepoint(t.principal, 0.5)),
+                         dp.path[1]
+                limit 1)
+             -- ST_PointOnSurface is guaranteed to lie ON the surface, unlike a
+             -- centroid, which for a concave or multipart polygon can fall outside
+             -- it entirely. An invalid ring is repaired first; an empty repair
+             -- yields NULL rather than a fabricated point.
+             when t.g_type in ('POLYGON','MULTIPOLYGON') then (
+               select case when v.g is null or st_isempty(v.g) then null
+                           else st_pointonsurface(v.g) end
+                 from (select case when st_isvalid(t.principal) then t.principal
+                                   else st_collectionextract(st_makevalid(t.principal), 3)
+                              end as g) v)
+             else null
+           end as marker_geom
+      from part t
+  ),
+  -- ---- CRS. To 4326 for the web map, guarded and FAIL CLOSED: an unknown or
+  -- unregistered SRID yields NULL, never an untransformed coordinate labelled WGS84.
+  placed as (
+    select m.source_key, m.feature_id, m.registry_id, m.provenance,
+           m.distance_mi, m.geometry_type,
+           case
+             when m.marker_geom is null or st_isempty(m.marker_geom) then null
+             when st_srid(m.marker_geom) = 4326 then m.marker_geom
+             when st_srid(m.marker_geom) > 0
+              and exists (select 1 from public.spatial_ref_sys srs
+                           where srs.srid = st_srid(m.marker_geom))
+                  then st_transform(m.marker_geom, 4326)
+             else null
+           end as marker4326
+      from marked m
   )
-  select h.source_key,
-         h.feature_id,
-         h.registry_id,
-         h.provenance,
-         h.distance_mi,
-         h.geometry_type,
+  select pl.source_key,
+         pl.feature_id,
+         pl.registry_id,
+         pl.provenance,
+         pl.distance_mi,
+         pl.geometry_type,
+         st_y(pl.marker4326) as marker_lat,
+         st_x(pl.marker4326) as marker_lng,
          ((select count(*) from hit) > p_limit) as has_more
-    from hit h
-   order by h.distance_mi, h.source_key, h.feature_id   -- nearest first; deterministic ties
-   limit p_limit;
+    from placed pl
+   order by pl.distance_mi, pl.source_key, pl.feature_id;  -- nearest first; deterministic ties
 end
 $fn$;
 
@@ -381,7 +582,14 @@ comment on function public.n5_projects_within_radius(double precision, double pr
   'source_key. Refuses to serve unless exactly one snapshot is READY with canonical_synced_at set, '
   'so a query during the canonical sweep raises instead of returning a partial corpus. Result size '
   'is caller-bounded (p_limit, default 500, server maximum 2000) and `has_more` states explicitly '
-  'whether further matching geometry exists — do not infer truncation from the row count.';
+  'whether further matching geometry exists — do not infer truncation from the row count. '
+  'marker_lat/marker_lng are PRESENTATION ONLY: one drawable point derived from that same row''s '
+  'geometry (a point is itself; a line uses the vertex nearest its longest part''s midpoint; a '
+  'polygon uses ST_PointOnSurface of its largest part, never a centroid), emitted in EPSG:4326 and '
+  'NULL when none can be derived honestly. They are never used to filter or to measure — '
+  'distance_mi is measured against the true geometry, so for a polygon or a long line the marker '
+  'is generally NOT the nearest point. Do not treat the marker as the project''s location, and do '
+  'not compute distance from it.';
 
 -- ---- GRANTS -----------------------------------------------------------------
 -- Narrowest surface: the function is callable by the public site (anon key), and
