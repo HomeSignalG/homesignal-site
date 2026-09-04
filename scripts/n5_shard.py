@@ -304,9 +304,37 @@ def fetch_features(rid, entry, keys, z3):
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
                         f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
                         f"'recovered_authoritative')")
-    for i in range(0, len(rows), 25):
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,provenance) values "
-            + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
+    # Batch by BYTES, not by row count. 25 rows was a count-only cap, and a single polygon
+    # WKT runs to tens of thousands of characters - so 25 dense rings is megabytes and the
+    # Management API answers HTTP 413 "request entity too large". That is what halted shard
+    # 891 (45 ZIPs / 28,596 boundary vertices) with the batch already assembled.
+    #
+    # 413 is deliberately NOT retried by sql() - only 429 is - so the shard stopped clean
+    # and reverted rather than half-committing. The fix belongs here, in how the statement
+    # is sized, not in the retry policy.
+    #
+    # Row count stays capped too: the byte budget alone would send one enormous statement
+    # for many tiny points, and the count cap alone is what just failed. Both, and-not-or.
+    _MAX_BYTES = 4_000_000   # well under the observed limit, measured on the real payload
+    _MAX_ROWS = 25
+    batch, nbytes = [], 0
+    def _flush():
+        if not batch:
+            return
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
+            "invalid_reason,first_z3,provenance) values " + ",".join(batch)
+            + " on conflict (source_key,feature_id) do nothing;", "geom ins")
+        batch.clear()
+    for r in rows:
+        rb = len(r.encode("utf-8"))
+        # A single row wider than the budget cannot be split - send it alone and let the
+        # server be the judge, rather than silently dropping it.
+        if batch and (nbytes + rb > _MAX_BYTES or len(batch) >= _MAX_ROWS):
+            _flush()
+            nbytes = 0
+        batch.append(r)
+        nbytes += rb
+    _flush()
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
             "bytes_in": STATS["bytes_in"] - b0, "requests": STATS["requests"] - r0}

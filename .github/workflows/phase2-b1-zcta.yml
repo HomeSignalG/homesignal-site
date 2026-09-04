@@ -112,6 +112,11 @@ jobs:
       - name: 'Self-test: sql() retries 429 only and still fails closed'
         run: python3 scripts/test_sql_retry.py
 
+      # Also unconditional and offline. The geometry insert is what halted shard 891 with
+      # HTTP 413, and a batcher that silently drops a row would look exactly like success.
+      - name: 'Self-test: n5_geom inserts batch by bytes as well as rows'
+        run: python3 scripts/test_geom_batch.py
+
       - name: Validate (no database credential in scope)
         if: ${{ github.event.inputs.mode == 'validate' }}
         env:
