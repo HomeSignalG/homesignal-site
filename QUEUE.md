@@ -40,6 +40,26 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-04 — ALERTS SEO: implementation complete, ONE founder setting remains
+
+**`/community/<zip>/` is built and gated but NOT deployed.** `.github/workflows/pages.yml`
+produces the Pages artifact (whole site + one generated document per canonical ZIP); its
+`deploy` job is gated on `main` **and** on the repository setting *Settings → Pages → Build
+and deployment → Source = **GitHub Actions***, which cannot be changed from CI.
+
+- **Until a human flips that setting, nothing changes in production.** Branch deployment
+  still serves the site (proof: `pages-build-deployment` run 895, `main` @ `36b5ebe`,
+  2026-09-04 12:09:58Z, success). `404.html` forwards the pretty path; the committed
+  `sitemap.xml` keeps the legacy URLs; the artifact's own sitemap carries the canonical ones.
+- **Do not "fix" `scripts/gen_sitemap.py`** to emit `/community/<zip>/` before the flip —
+  that would advertise ~7,000 URLs that 404. Its docstring says why.
+- Measured 2026-09-04 14:26:44Z: 12,722 canonical ZIPs, Rule F **PASS 7,256 / FAIL 5,466**;
+  vs the development gate — both 6,727 · Alerts-only 529 · development-only 4,975 ·
+  neither 491.
+- Full receipt, publication policy, frozen controls A–J: **`docs/alerts-seo-build-2026-09-04.md`**.
+- Rule F, the crawler ground truth and the geography certification are unchanged:
+  `docs/crawler-ground-truth-2026-09-03.md`.
+
 ### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)
 
 Cursor has been retired from this project; **Claude Code is the only agent going forward.** Two
