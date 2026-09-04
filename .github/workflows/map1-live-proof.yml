@@ -107,6 +107,21 @@ jobs:
           set -o pipefail
           node scripts/map1-live-proof.mjs 2>&1 | tee /tmp/proof.log
 
+      # The MARKET-READINESS GATE runs in the same session: the proof above certifies the
+      # geographic contracts, this asks the user-level question - does what the resident READS
+      # agree with what the map DRAWS. Dispatched through this workflow because GitHub only
+      # offers workflow_dispatch for files present on the default branch; the run executes the
+      # dispatched ref's copy, so the branch's own gate script is what actually runs.
+      - name: MARKET-READINESS GATE - Map 1 as a resident uses it
+        if: always()
+        env:
+          BASE: ${{ env.BASE }}
+          ADDRESS: ${{ inputs.address }}
+          ZIP: ${{ inputs.zip }}
+        run: |
+          set -o pipefail
+          node scripts/map1-ux-gate.mjs 2>&1 | tee -a /tmp/proof.log
+
       - name: Publish the receipt
         if: always()
         run: |
