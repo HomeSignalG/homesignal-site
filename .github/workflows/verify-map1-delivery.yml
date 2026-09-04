@@ -22,6 +22,10 @@ on:
         description: 'Where to load the page from (default: the checked-out tree on localhost)'
         required: false
         default: ''
+      probe:
+        description: "Set to 'card-grain' to measure one-project-one-card instead of the full gate"
+        required: false
+        default: ''
   push:
     # The working branch is listed alongside main ON PURPOSE. A brand-new workflow cannot be
     # dispatched on a feature branch (workflow_dispatch resolves against the default branch), and
@@ -53,8 +57,17 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
           curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
       - name: Verify the public Map 1 delivery path
+        if: ${{ inputs.probe != 'card-grain' }}
         env:
           SITE_BASE: ${{ inputs.site_base != '' && inputs.site_base || 'http://localhost:8099' }}
           ZIP_PATH: '/homesignalmap.html?zip={zip}'
           ZIPS: ${{ inputs.zips }}
         run: node scripts/verify-map1-delivery.mjs
+      # Markers may exceed projects - that is geography. Cards may not. This measures the two
+      # SEPARATELY on whatever build is being pointed at, which is why it is its own step.
+      - name: Probe the card grain (one project = one card)
+        if: ${{ inputs.probe == 'card-grain' }}
+        env:
+          SITE_BASE: ${{ inputs.site_base != '' && inputs.site_base || 'http://localhost:8099' }}
+          ZIPS: ${{ inputs.zips }}
+        run: node scripts/probe-map1-card-grain.mjs
