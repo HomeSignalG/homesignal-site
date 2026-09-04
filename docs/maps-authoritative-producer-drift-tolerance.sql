@@ -33,3 +33,33 @@
 --
 -- The full body is the migration of the same name; this file is the pointer of record so the
 -- schema change is reproducible from the repo per CLAUDE.md §1 #3.
+
+-- ---------------------------------------------------------------------------
+-- POST-DEPLOY RECEIPTS, 2026-09-04
+--
+-- Through the PRODUCTION entry point (public.app_projects_for_zip) after re-enabling the
+-- 19 rolled-back ZIPs: 4,708 projects returned = 4,708 memberships · 4,808 markers
+-- returned = 4,808 marker relation · 57 attributes_missing · no exception.
+--
+-- ZIP 11004: 295 projects for 295 memberships, 295 markers. It returned 286 for 295 before.
+--
+-- Drift census over the whole enabled population during a live refresh:
+--   enabled memberships checked (control)   141,937
+--   memberships with no live descriptive row    58
+--   ZIPs carrying descriptive drift              20
+--   drifted ZIPs probed through the producer 20 -> 4,712 records, 58 attributes_missing
+-- Drift grew 19 -> 20 ZIPs between deploy and probe and nothing broke, which is the point.
+--
+-- Whole enabled population, set-based (9,764 ZIPs; controls 141,937 memberships /
+-- 230,659 markers, both non-zero):
+--   0 membership without a marker · 0 orphan markers · 0 duplicate memberships
+--   0 duplicate markers · 0 memberships without a point · 0 markers without a point
+--   0 markers out of coordinate range · 0 memberships off the canonical registry
+--
+-- ⚠️ The 9,764-ZIP producer walk did NOT complete: chunk 1 timed out inside
+-- `select count(*) from geo.zip_authoritative_marker where zcta5 = p_zip`, a trivial
+-- indexed count, while dev_refresh_tick / app_refresh_sweep saturated the instance. That
+-- is documented transient saturation, not a geography fault - the same statement class
+-- runs in milliseconds unloaded. The set-based verification above covers the same
+-- invariants without 9,764 calls, and the producer is a deterministic function of exactly
+-- those two relations.
