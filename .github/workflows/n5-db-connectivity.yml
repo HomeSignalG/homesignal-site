@@ -1,0 +1,238 @@
+name: n5-db-connectivity
+
+# SELECT-ONLY production PG-wire connectivity proof for the N5 canonical-geometry migration.
+# It applies nothing and modifies nothing. One deliberate write is attempted, and it MUST be
+# refused; a refusal is the proof, a success is a job failure.
+#
+# ── INCIDENT RECORD — run 33781209601 attempt 2, 2026-09-03 17:13Z — DO NOT DELETE ──────────
+# The FIRST version of this workflow established read-only mode with
+# `PGOPTIONS=-c default_transaction_read_only=on`. That FAILED SILENTLY: Supavisor does not
+# forward the `options` startup parameter, so the server never applied it. The job printed
+# `default_read_only | off` and then, because nothing gated the probe on that value, executed
+#     create temporary table n5_readonly_probe (x int);
+# which SUCCEEDED. That was one unintended DDL statement against production, contrary to the
+# standing NO-DDL constraint.
+#   Measured impact: the object lived only in that session's temp schema and was dropped when
+#   psql disconnected. Verified afterwards: probe_object_anywhere = 0; canonical 718,278;
+#   rejects 5,171; verdict_snapshot_id absent; reject PK (source_key, reason); 0 lifecycle
+#   objects. Nothing persisted and no user data was touched. It remains a real violation.
+#   The job still reported SUCCESS, because nothing asserted on the probe's outcome.
+# Two lessons are encoded below and must not be softened:
+#   (a) a safety layer that can be silently stripped in transit is not a safety layer — the
+#       read-only mode is now set SERVER-SIDE, in-session, where the pooler cannot remove it;
+#   (b) a probe whose result nothing asserts on is not a proof — the probe now FAILS THE JOB
+#       when it succeeds, and is UNREACHABLE unless read-only mode was affirmatively observed.
+# The second defect that run exposed: `pg_stat_ssl` reports the POOLER's connection to
+# Postgres, not ours, so it read `ssl = f` on a TLS client connection. Client-side TLS
+# evidence now comes from `\conninfo`, and is a hard gate rather than a printed curiosity.
+# ────────────────────────────────────────────────────────────────────────────────────────────
+#
+# FAIL-CLOSED ORDER, enforced by ON_ERROR_STOP=1 inside a SINGLE psql session (a second psql
+# invocation would be a different session, and session read-only mode would not carry):
+#   connect -> establish session read-only -> ASSERT default_transaction_read_only='on'
+#   -> connection/session/TLS facts -> SELECT-only production checks
+#   -> and only then the deliberate write-protection probe.
+# The assertion raises, so psql exits before ever reading the probe statement.
+
+on:
+  # TRIGGER NOTE: workflow_dispatch alone is not enough. GitHub only registers a dispatchable
+  # workflow once its FILE exists on the default branch, so this could not be dispatched from
+  # the PR branch (HTTP 404) and #1016 must not be merged before the migration is applied. The
+  # pull_request trigger is scoped to this file's own path, so it fires when the workflow
+  # changes and otherwise never, and it can be re-run on demand from the Actions UI. Secrets
+  # are available to same-repo pull_request runs; this repo takes no fork PRs.
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-db-connectivity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Presence only. Prints SET / NOT SET, never the value.
+      - name: Is a PG-wire credential provisioned?
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL: NOT SET"
+            echo "CREDENTIAL PROVISIONING REQUIRED - founder action."
+            exit 1
+          fi
+          echo "SUPABASE_DB_URL: SET (value never printed)"
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
+
+      # 6543 is transaction-mode pooling: session state is not guaranteed there, so SET LOCAL,
+      # multi-statement transactions and transactional DDL cannot be relied on.
+      - name: Assert the endpoint shape (port only - no host, user or password printed)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, sys
+          from urllib.parse import urlparse
+          u = urlparse(os.environ["SUPABASE_DB_URL"])
+          host = (u.hostname or "")
+          print(f"client-side port            : {u.port}")
+          print(f"host is a Supavisor pooler  : {host.endswith('pooler.supabase.com')}")
+          print(f"host is the direct endpoint : {host.endswith('.supabase.co')}")
+          if u.port == 6543:
+              sys.exit("STOP: port 6543 is TRANSACTION-mode pooling. Use session mode on 5432.")
+          if u.port not in (5432, None):
+              sys.exit(f"STOP: unexpected port {u.port}; expected 5432.")
+          PY
+
+      - name: SELECT-only connectivity, identity, session semantics and write-protection proof
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require          # libpq aborts rather than connect unencrypted
+        run: |
+          set -euo pipefail
+          # The script is written to a file FIRST. `psql -f - ... | tee log <<'SQL'` attaches
+          # the heredoc to tee, not to psql, so psql would receive no script at all - caught
+          # by reading the pipeline rather than by it failing loudly.
+          cat > /tmp/n5-probe.sql <<'SQL'
+          \echo '--- 0. CLIENT-SIDE connection evidence (TLS) ------------------------------'
+          \echo '     pg_stat_ssl is NOT used: through a pooler it reports the POOLER''s'
+          \echo '     connection to Postgres, not ours, and read ssl=f on a TLS client link.'
+          \conninfo
+
+          \echo ''
+          \echo '--- 1. ESTABLISH READ-ONLY MODE SERVER-SIDE (the pooler cannot strip this) -'
+          set session characteristics as transaction read only;
+
+          \echo '--- 2. HARD GATE: the write probe is unreachable unless this observes ON ---'
+          do $ro$
+          begin
+            if current_setting('default_transaction_read_only') <> 'on' then
+              raise exception
+                'STOP: read-only mode NOT established (default_transaction_read_only=%). '
+                'Aborting BEFORE the write-protection probe, which is therefore never read.',
+                current_setting('default_transaction_read_only');
+            end if;
+            raise notice 'READ-ONLY MODE OBSERVED ON - the probe below is now authorized';
+          end $ro$;
+
+          select 1 as select_one,
+                 current_setting('default_transaction_read_only') as default_read_only,
+                 current_setting('transaction_read_only')         as transaction_read_only;
+
+          \echo ''
+          \echo '--- 3. server identity ----------------------------------------------------'
+          select current_database() as db, inet_server_port() as server_port,
+                 current_setting('cluster_name', true) as cluster,
+                 version() as postgresql, postgis_full_version() as postgis;
+
+          \echo '--- 4. this is the INTENDED production database (N5 fingerprint) ----------'
+          select (select count(*) from geo.n5_geom where provenance='proven_stored_point') as canonical_proven,
+                 (select count(*) from geo.n5_point_reject)                                as rejects,
+                 (select count(*) from geo.n5_shard)                                       as shards,
+                 (select min(detail->>'snapshot') from geo.n5_point_reject)                as reject_snapshot;
+
+          \echo '--- 5. migration pre-state classification (expect A_LEGACY) ---------------'
+          select (select exists (select 1 from information_schema.columns
+                    where table_schema='geo' and table_name='n5_geom'
+                      and column_name='verdict_snapshot_id'))            as has_verdict_snapshot_id,
+                 (select exists (select 1 from pg_constraint
+                    where conname='n5_geom_verdict_snapshot_ck'))        as has_biconditional,
+                 (select exists (select 1 from pg_constraint
+                    where conname='n5_geom_pt_namespace_ck'))            as has_pt_namespace,
+                 (select pg_get_constraintdef(c.oid) from pg_constraint c
+                   where c.conrelid='geo.n5_point_reject'::regclass and c.contype='p') as reject_pk,
+                 (select pg_get_constraintdef(c.oid) from pg_constraint c
+                   where c.conrelid='geo.n5_association'::regclass and c.contype='p')  as association_pk,
+                 (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                   where n.nspname='geo' and c.relname in ('n5_point_reject_archive',
+                         'n5_proven_verdict','n5_verdict_manifest','n5_association_stage')) as lifecycle_objects;
+
+          \echo '--- 6. SESSION semantics: a bare SET must survive to the NEXT statement ---'
+          set application_name = 'n5-preflight-session-probe';
+          select current_setting('application_name') as app_name_persisted_across_statements;
+
+          \echo '--- 7. the migration timeout policy on THIS transport ---------------------'
+          \echo '     NOTE: this path''s session default statement_timeout is 2min, so the'
+          \echo '     migration''s SET LOCAL is REQUIRED - without it the 718,278-row UPDATE'
+          \echo '     would be cancelled at 2 minutes.'
+          begin;
+            set local lock_timeout      = '5s';
+            set local statement_timeout = '15min';
+            select current_setting('lock_timeout')      as lock_timeout_in_txn,
+                   current_setting('statement_timeout') as statement_timeout_in_txn;
+          commit;
+          select current_setting('lock_timeout')      as lock_timeout_after_commit,
+                 current_setting('statement_timeout') as statement_timeout_after_commit;
+
+          \echo '--- 8. writer quiescence AT THIS INSTANT (evidence only, re-check at apply)'
+          select now() as measured_at_utc,
+                 (select count(*) from pg_stat_activity
+                   where state <> 'idle' and pid <> pg_backend_pid()
+                     and query ilike '%n5\_%')                                 as active_n5_queries,
+                 (select count(*) from pg_locks l
+                    join pg_class c on c.oid = l.relation
+                    join pg_namespace n on n.oid = c.relnamespace
+                   where n.nspname='geo'
+                     and c.relname in ('n5_geom','n5_point_reject','n5_association')
+                     and l.pid <> pg_backend_pid())                            as n5_relation_locks,
+                 (select count(*) from geo.n5_shard where state='running')     as shards_running,
+                 (select count(*) from pg_replication_slots where not active)  as inactive_repl_slots;
+
+          \echo ''
+          \echo '--- 9. WRITE-PROTECTION PROBE - reached only because step 2 observed ON ---'
+          \echo '     Required result: SQLSTATE 25006 read_only_sql_transaction.'
+          \echo '     A SUCCESS here FAILS THE JOB. Only the already-designed TEMP operation'
+          \echo '     is attempted; no permanent DDL and no DML, ever, and no second attempt.'
+          do $probe$
+          begin
+            execute 'create temporary table n5_readonly_probe (x int)';
+            raise exception
+              'FAIL: the TEMP DDL SUCCEEDED. Read-only mode did not protect this session. '
+              'Aborting now - no further statements, no second write attempt. (This RAISE '
+              'also rolls the attempted object back, so nothing persists either way.)';
+          exception
+            when read_only_sql_transaction then
+              raise notice
+                'PASS: TEMP DDL rejected with SQLSTATE % (read_only_sql_transaction)', sqlstate;
+          end $probe$;
+
+          \echo '--- 10. no probe object survives anywhere ---------------------------------'
+          select count(*) as probe_object_anywhere
+            from pg_class c join pg_namespace n on n.oid = c.relnamespace
+           where c.relname = 'n5_readonly_probe';
+
+          \echo '--- 11. canonical production pre-state UNCHANGED after the probe ----------'
+          select (select count(*) from geo.n5_geom where provenance='proven_stored_point') as canonical_proven,
+                 (select count(*) from geo.n5_point_reject)                                as rejects,
+                 (select exists (select 1 from information_schema.columns
+                    where table_schema='geo' and table_name='n5_geom'
+                      and column_name='verdict_snapshot_id'))                              as has_verdict_snapshot_id;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off \
+               -f /tmp/n5-probe.sql 2>&1 | tee /tmp/n5-conninfo.log
+          # set -o pipefail is in force, so a non-zero psql exit fails this step.
+
+      # An instrument must prove it ran. TLS is a HARD GATE, not a printed curiosity.
+      - name: Assert client-side TLS was actually negotiated
+        run: |
+          set -euo pipefail
+          if grep -q 'SSL connection (protocol:' /tmp/n5-conninfo.log; then
+            grep 'SSL connection (protocol:' /tmp/n5-conninfo.log
+            echo "CLIENT-SIDE TLS: PASS"
+          else
+            echo "STOP: \\conninfo reported no SSL connection on the client link."
+            exit 1
+          fi

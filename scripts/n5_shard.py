@@ -33,7 +33,111 @@ from n3_pilot import (  # noqa: E402  - one implementation, imported not re-deri
     CANON_SRID, UA, STATS,
 )
 
-SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
+# SNAPSHOT is REQUIRED and has no default. A default silently selects one eligibility
+# universe: once a second snapshot exists, an unset variable would quietly process the old
+# one and mark shards done against it. Fail before any freeze/recovery/materialization work.
+SNAPSHOT = os.environ.get("SNAPSHOT", "").strip()
+
+
+# ---------------------------------------------------------------- PG-wire transport
+#
+# WHY THIS EXISTS. `publish-verdict` rebuilds the verdict with a single full pass over the
+# 1,125 MB preservation.app_project_identity. Through n3_pilot.sql() -> the Supabase
+# Management API that statement is CANCELLED at 120 s by a server-side statement_timeout the
+# caller cannot raise: production run 33787011485 failed at ~121 s with
+#     ERROR: 57014: canceling statement due to statement timeout
+# leaving the manifest BUILDING with 0 verdict rows (fail-closed, exactly as designed).
+#
+# THE DERIVATION IS NOT THE PROBLEM AND IS NOT TOUCHED. refresh_proven_verdict_sql() and
+# validate_verdict_completeness() are byte-for-byte unchanged. Only the pipe changes: the same
+# SQL is executed over the verified PG-wire SESSION POOLER (:5432, TLS), where the migration
+# already proved a 122 s transaction runs under a transaction-local timeout.
+#
+# ONE TRANSACTION PER CALL, deliberately. publish_verdict()'s own contract is that it does NOT
+# depend on the rebuild being one transaction - "a partially rebuilt verdict fails the
+# completeness check, records FAILED, and never reaches READY. The barrier is the state
+# machine, not the transport." One call = one transaction is exactly the Management API's
+# semantics, so this transport is SEMANTICALLY IDENTICAL to the one it replaces. Wrapping the
+# whole publish in a single transaction would CHANGE those semantics - the FAILED marker would
+# roll back with the work it is meant to record - so it is deliberately not done.
+#
+# NO HTTP FALLBACK and NO RETRY: a failure raises SystemExit exactly as n3_pilot.sql() does.
+
+def _pg_wire_sql(query, tag=""):
+    """Execute one lifecycle statement group over psql on the session pooler.
+
+    Returns rows as a list of dicts, matching n3_pilot.sql()'s shape. A single SELECT (no
+    internal ';') is wrapped in json_agg so its rows come back; anything else is executed for
+    effect and returns [] - which is what every non-SELECT call site here expects.
+
+    The credential is passed through the child ENVIRONMENT, never as an argv item (argv is
+    visible in `ps`), and is never logged.
+    """
+    import subprocess
+    from urllib.parse import urlparse, unquote
+
+    dsn = os.environ.get("SUPABASE_DB_URL", "").strip()
+    if not dsn:
+        raise SystemExit("STOP: N5_TRANSPORT=pgwire requires SUPABASE_DB_URL.")
+    u = urlparse(dsn)
+    if u.port == 6543:
+        raise SystemExit("STOP: port 6543 is TRANSACTION-mode pooling; session state is not "
+                         "guaranteed. Use the session pooler on 5432.")
+
+    body = query.strip()
+    core = body.rstrip().rstrip(";")
+    single_select = (";" not in core) and core.lower().lstrip().startswith(("select", "with"))
+    stmt = ("select coalesce(json_agg(t)::text, '[]') from (%s) t;" % core) if single_select \
+        else (core + ";")
+
+    script = ("begin;\n"
+              "set local lock_timeout = '5s';\n"
+              "set local statement_timeout = '15min';\n"
+              + stmt + "\ncommit;\n")
+
+    env = dict(os.environ)
+    env.update({"PGHOST": u.hostname or "", "PGDATABASE": (u.path or "/postgres").lstrip("/"),
+                "PGSSLMODE": env.get("PGSSLMODE", "require"), "PGCONNECT_TIMEOUT": "30"})
+    if u.port:
+        env["PGPORT"] = str(u.port)
+    if u.username:
+        env["PGUSER"] = unquote(u.username)
+    if u.password:
+        env["PGPASSWORD"] = unquote(u.password)
+
+    p = subprocess.run(["psql", "-X", "-v", "ON_ERROR_STOP=1", "-q", "-A", "-t",
+                        "-P", "pager=off", "-f", "-"],
+                       input=script, env=env, text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        raise SystemExit("STOP: SQL %s failed over PG-wire (exit %d)\n%s"
+                         % (tag, p.returncode, (p.stderr or "")[-3000:]))
+    if not single_select:
+        return []
+    out = (p.stdout or "").strip()
+    try:
+        return json.loads(out) if out else []
+    except ValueError:
+        raise SystemExit("STOP: SQL %s returned unparseable output over PG-wire" % tag)
+
+
+# Opt-in and explicit. Unset, every existing caller keeps the Management API transport, so no
+# other command's behaviour changes.
+if os.environ.get("N5_TRANSPORT", "").strip() == "pgwire":
+    sql = _pg_wire_sql
+
+
+def require_snapshot():
+    """Refuse to do any work without an explicit SNAPSHOT.
+
+    Enforced HERE and not at module scope: raising on import would break every consumer that
+    merely imports this module (tests and tooling do), and the contract is 'fail before
+    freeze/recovery/materialization/association work', not 'fail on import'."""
+    if not SNAPSHOT:
+        raise SystemExit(
+            "STOP: SNAPSHOT must be set explicitly - there is no default. Pass the frozen input "
+            "snapshot this run processes, e.g. SNAPSHOT=phase1-2026-09-01.")
+    return SNAPSHOT
 Z3_ENV = os.environ.get("Z3", "AUTO").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
 DISK_FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
@@ -63,6 +167,13 @@ def say(k, v):
 
 def one(rows, col):
     return rows[0][col] if rows else None
+
+
+def first(rows):
+    """The whole first row, or None. NOT one(rows, None): one() treats its second argument as
+    a dictionary KEY, so one(rows, None) evaluates rows[0][None] and raises KeyError(None) on
+    any non-empty result. Two callers want the row itself rather than one column of it."""
+    return rows[0] if rows else None
 
 
 def load_registry():
@@ -161,7 +272,9 @@ def recover_shard(z3, registry):
     Publisher feature multiplicity is preserved (one row per source_key x OBJECTID) and a
     recovered feature is keyed by the FROZEN identity we asked for, never by the string the
     publisher echoes back - the N4 trailing-space defect. Geometry already in geo.n5_geom
-    from an earlier shard is a cache HIT and is not refetched."""
+    from an earlier shard is REUSED rather than refetched. That reuse is a side benefit:
+    geo.n5_geom is PERMANENT CANONICAL PRODUCT GEOMETRY, not a build cache - see the table
+    comment in docs/n5-canonical-geometry-provenance.sql."""
     rows = sql(f"""select registry_id,
                           count(distinct source_key) filter (where source_key_basis is null
                               or source_key_basis not in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) recoverable,
@@ -189,7 +302,8 @@ def recover_shard(z3, registry):
                            "unstable": n_unstable})
             continue
         cached = {x["source_key"] for x in sql(
-            "select distinct source_key from geo.n5_geom where source_key in ("
+            "select distinct source_key from geo.n5_geom "
+            "where provenance='recovered_authoritative' and source_key in ("
             + ",".join(lit(k) for k in keys) + ");", "cache probe")}
         todo = [k for k in keys if k not in cached]
         st = {"registry_id": rid, "status": "OK", "projects": len(keys),
@@ -282,14 +396,17 @@ def fetch_features(rid, entry, keys, z3):
         nfeat += 1
         if not wkt:
             reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)})")
+            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)},"
+                        f"'recovered_authoritative')")
         else:
             # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
             # thousands of characters and must not be re-escaped per quote.
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)})")
+                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)},"
+                        f"'recovered_authoritative')")
     for i in range(0, len(rows), 25):
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3) values "
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,"
+            "provenance) values "
             + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
@@ -300,6 +417,17 @@ def fetch_features(rid, entry, keys, z3):
 
 def build_associations(z3):
     """One evidence row per frozen legacy pair, plus geometry-only additions.
+
+    THE `pt` PATH READS THE PROJECT-GLOBAL VERDICT, not the shard-local frozen slice. Canonical
+    geometry and association construction must agree: it must be impossible for
+    geo.n5_geom to hold MULTI_COORD_UNRESOLVED while this CTE still supplies that project's
+    shard-local point(s). This is an EXPECTED SEMANTIC CORRECTION, not the old
+    zero-change invariant - a globally multi-coordinate project now contributes NO point here,
+    where the shard-local version would have contributed one per distinct in-shard pair.
+    Measured before any execution (2026-09-02): for the 13 COMPLETED shards the impact is ZERO
+    (they contain 1 PROVEN source_key, globally single-coordinate). For shard 760 it is
+    NONZERO - 29 projects are single-coordinate locally but multi-coordinate globally, and
+    global multi rises 579 -> 609.
 
     Membership is exact ST_Intersects against authoritative geometry. No centroid, no
     radius, no bounding box, no nearest-ZIP, no buffer, no simplification, no snapping,
@@ -313,9 +441,10 @@ proj as (select source_key, max(treatment) treatment,
                 bool_or(source_key_basis in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) unstable
            from fr group by source_key),
 bnd as (select zcta5, geom from geo.n5_zcta where z3={lit(z3)}),
-pt as (select distinct fr.source_key, ST_SetSRID(ST_MakePoint(fr.lng, fr.lat), {CANON_SRID}) g
-         from fr join proj p using (source_key)
-        where p.treatment='PROVEN' and fr.lat is not null and fr.lng is not null),
+pt as (select v.source_key, ST_SetSRID(ST_MakePoint(v.lng, v.lat), {CANON_SRID}) g
+         from geo.n5_proven_verdict v
+         join proj p on p.source_key = v.source_key
+        where v.snapshot_id={lit(SNAPSHOT)} and v.verdict='ELIGIBLE' and p.treatment='PROVEN'),
 rec as (select g.source_key, g.geom g
           from geo.n5_geom g join proj p on p.source_key=g.source_key
          where p.treatment='RECOVERY' and g.geom is not null),
@@ -342,12 +471,666 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 """
 
 
+# ------------------------------------------------- PROVEN point materialization
+
+def assert_frozen_input_present():
+    """The frozen INPUT baseline must exist as ROWS, not merely as a declared snapshot id.
+
+    geo.n5_snapshot is a declaration; preservation.app_project_identity is the baseline. They
+    can disagree: geo.n5_snapshot carries 'n5-2026-09-02T173042Z', which has ZERO rows in
+    preservation.app_project_identity and is referenced by no shard. Validating against the
+    declaration alone would let that orphan be published - producing an empty verdict that is
+    internally consistent (expected 0 == verdict 0) and would then sweep every canonical
+    proven point out of existence as 'absent from the snapshot'.
+
+    So the check is on the INPUT RELATION. An orphan fails here, before a manifest row exists."""
+    require_snapshot()
+    row = sql(f"""select
+        (select count(*) from geo.n5_snapshot where snapshot_id={lit(SNAPSHOT)}) declared,
+        (select count(*) from preservation.app_project_identity
+          where snapshot_id={lit(SNAPSHOT)} and record_kind='development') input_rows;""",
+              "frozen input")[0]
+    if int(row["declared"]) == 0:
+        raise SystemExit(f"STOP: snapshot {SNAPSHOT} is not declared in geo.n5_snapshot.")
+    if int(row["input_rows"]) == 0:
+        raise SystemExit(
+            f"STOP: snapshot {SNAPSHOT} has ZERO rows in preservation.app_project_identity "
+            f"(record_kind='development'). ORPHAN / INPUT BASELINE ABSENT / NOT CONSUMABLE. "
+            f"Publishing it would build an empty verdict and sweep the canonical corpus away.")
+    return row
+
+
+def assert_snapshot_consumable():
+    """Refuse to run unless THIS run's exact snapshot is published and canonically synced.
+
+    Two distinct gates, because they are two different claims:
+      state='READY'           -> the global verdict is complete and safe to READ.
+      canonical_synced_at set -> the global canonical-point sweep for that snapshot has run,
+                                 so geo.n5_geom's proven corpus matches this eligibility
+                                 universe.
+    A shard requires BOTH. Consuming a READY-but-unsynced verdict would build associations
+    from one universe while canonical geometry still held the previous one.
+
+    THREE claims, not two: the frozen INPUT must also still exist as ROWS. Declaration and
+    baseline can disagree - geo.n5_snapshot carries an orphan with zero rows in
+    preservation.app_project_identity - and a shard that trusted the declaration alone would
+    build associations against a baseline that is not there.
+
+    No MAX(snapshot_id), no 'latest', no fallback, no partial BUILDING read, no FAILED read,
+    and no shard-local coordinate fallback (that path no longer exists)."""
+    require_snapshot()
+    row = sql(f"""select
+        (select count(*) from geo.n5_snapshot where snapshot_id={lit(SNAPSHOT)}) input_exists,
+        (select count(*) from preservation.app_project_identity
+          where snapshot_id={lit(SNAPSHOT)} and record_kind='development') input_rows,
+        (select state from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)}) state,
+        (select canonical_synced_at is not null from geo.n5_verdict_manifest
+          where snapshot_id={lit(SNAPSHOT)}) synced,
+        (select verdict_rows from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)}) vrows,
+        (select expected_source_keys from geo.n5_verdict_manifest
+          where snapshot_id={lit(SNAPSHOT)}) expected;""", "snapshot gate")[0]
+    if int(row["input_exists"]) == 0:
+        raise SystemExit(f"STOP: snapshot {SNAPSHOT} is not present in geo.n5_snapshot. It is "
+                         f"not a known frozen input baseline.")
+    if int(row["input_rows"]) == 0:
+        raise SystemExit(f"STOP: snapshot {SNAPSHOT} is declared but has ZERO rows in "
+                         f"preservation.app_project_identity. ORPHAN / INPUT BASELINE ABSENT / "
+                         f"NOT CONSUMABLE - the declaration is not the baseline.")
+    if row["state"] is None:
+        raise SystemExit(f"STOP: no verdict manifest for snapshot {SNAPSHOT}. The global PROVEN "
+                         f"verdict has never been built for it.")
+    if str(row["state"]) != "READY":
+        raise SystemExit(f"STOP: verdict for snapshot {SNAPSHOT} is state={row['state']}, not "
+                         f"READY. A BUILDING or FAILED verdict is never consumable.")
+    if not row["synced"]:
+        raise SystemExit(f"STOP: verdict for snapshot {SNAPSHOT} is READY but its canonical "
+                         f"point sweep has not completed (canonical_synced_at is null). "
+                         f"Shards may not consume it yet.")
+    if row["expected"] is None or int(row["vrows"]) != int(row["expected"]):
+        raise SystemExit(f"STOP: verdict manifest for {SNAPSHOT} is internally inconsistent - "
+                         f"verdict_rows={row['vrows']} expected_source_keys={row['expected']}.")
+    return row
+
+
+def validate_verdict_completeness():
+    """Completeness reconciliation. A snapshot cannot become READY unless this returns clean.
+
+    The authoritative PROVEN population is recomputed from the same snapshot, never taken from
+    a prior receipt. 723,449 is evidence from 2026-09-02, not logic."""
+    return sql(f"""
+with auth as (
+  select distinct i.source_key
+    from preservation.app_project_identity i
+    join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+   where a.treatment='PROVEN' and i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'),
+v as (select source_key, verdict, ncoord, lat, lng from geo.n5_proven_verdict
+       where snapshot_id={lit(SNAPSHOT)})
+select (select count(*) from auth) expected_source_keys,
+       (select count(*) from v) verdict_rows,
+       (select count(distinct source_key) from v) verdict_distinct,
+       (select count(*) from (select source_key from auth except select source_key from v) t) missing,
+       (select count(*) from (select source_key from v except select source_key from auth) t) extra,
+       (select count(*) from v where verdict='ELIGIBLE') eligible_rows,
+       (select count(*) from v where verdict<>'ELIGIBLE') rejected_rows,
+       (select count(*) from v where verdict='MULTI_COORD_UNRESOLVED') multi_coord,
+       (select jsonb_object_agg(verdict, n) from
+          (select verdict, count(*) n from v group by verdict) z) reject_counts,
+       -- MALFORMED rows must be impossible, not merely unlikely. The table's CHECK enforces
+       -- the ELIGIBLE contract, but this migration is not applied yet, so completeness proves
+       -- it independently rather than trusting a constraint that may not exist.
+       (select count(*) from v
+         where (verdict = 'ELIGIBLE'
+                and (ncoord is distinct from 1 or lat is null or lng is null))
+            or (verdict <> 'ELIGIBLE' and (lat is not null or lng is not null)
+                and verdict not in ('NULL_ISLAND','INVALID_COORD'))) malformed,
+       (select count(*) from v where verdict not in (
+          'ELIGIBLE','NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND',
+          'INVALID_COORD','MULTI_COORD_UNRESOLVED')) bad_verdict_value,
+       (select md5(string_agg(source_key||'|'||verdict, ',' order by source_key collate "C"))
+          from v) fingerprint;""", "verdict completeness")[0]
+
+
+def global_canonical_sweep_sql():
+    """The S1->S2 global canonical sweep. SET-BASED, project-global, order-independent.
+
+    EXECUTED BY EXACTLY ONE CALLER - sync_canonical(), the `sync-canonical` command. Never by
+    a shard: shard processing is NOT responsible for snapshot transition, because a project
+    that DISAPPEARS from the new PROVEN population is visited by no shard, so its stale pt:1
+    would otherwise survive forever as if still eligible.
+
+    Three set operations, each keyed on source_key alone - no z3, no shard order, no
+    application-side row loop (723,449 HTTP operations is not an implementation):
+      1 ELIGIBLE in S2      -> upsert pt:1 with the S2 coordinate and verdict_snapshot_id=S2.
+      2 INELIGIBLE in S2    -> delete its pt:1 and replace its current reject with the S2 reason.
+      3 ABSENT from S2      -> delete any proven point whose source_key has no S2 verdict row
+                               at all (treatment change, or dropped from the population).
+    Every statement is a no-op when already applied, so rerunning converges. RECOVERY geometry
+    is never touched: each delete filters provenance='proven_stored_point'.
+
+    PUBLICATION BARRIER: sync_canonical() runs this only after state='READY', and NULLs
+    canonical_synced_at before the first statement executes. Until that timestamp is (re)set,
+    assert_snapshot_consumable() refuses the snapshot, so no shard can observe a half-swept
+    corpus. The statements need not share one transaction - the barrier is canonical_synced_at,
+    which is why invalidation precedes mutation rather than following it."""
+    return [
+        (f"""insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
+                                      invalid_reason, first_z3, provenance, verdict_snapshot_id)
+             select v.source_key, coalesce(v.registry_id,'(null)'), 'pt:1', 1,
+                    ST_SetSRID(ST_MakePoint(v.lng, v.lat), {CANON_SRID}), null, null,
+                    'proven_stored_point', {lit(SNAPSHOT)}
+               from geo.n5_proven_verdict v
+              where v.snapshot_id={lit(SNAPSHOT)} and v.verdict='ELIGIBLE'
+             on conflict (source_key, feature_id) do update
+                set geom = excluded.geom, registry_id = excluded.registry_id,
+                    verdict_snapshot_id = excluded.verdict_snapshot_id, recovered_at = now();""",
+         "sweep upsert eligible"),
+        (f"""delete from geo.n5_geom g using geo.n5_proven_verdict v
+              where v.snapshot_id={lit(SNAPSHOT)} and v.verdict<>'ELIGIBLE'
+                and g.source_key=v.source_key and g.feature_id='pt:1'
+                and g.provenance='proven_stored_point';""", "sweep delete ineligible"),
+        (f"""delete from geo.n5_geom g
+              where g.provenance='proven_stored_point' and g.feature_id='pt:1'
+                and not exists (select 1 from geo.n5_proven_verdict v
+                                 where v.snapshot_id={lit(SNAPSHOT)} and v.source_key=g.source_key);""",
+         "sweep delete absent"),
+        (f"""insert into geo.n5_point_reject (source_key, registry_id, lat, lng, reason,
+                                              observed_in_z3, verdict_snapshot_id)
+             select v.source_key, v.registry_id, v.lat, v.lng, v.verdict, null, {lit(SNAPSHOT)}
+               from geo.n5_proven_verdict v
+              where v.snapshot_id={lit(SNAPSHOT)} and v.verdict<>'ELIGIBLE'
+             on conflict (source_key) do update
+                set reason=excluded.reason, registry_id=excluded.registry_id,
+                    lat=excluded.lat, lng=excluded.lng,
+                    verdict_snapshot_id=excluded.verdict_snapshot_id, rejected_at=now();""",
+         "sweep reject sync"),
+        (f"""delete from geo.n5_point_reject r using geo.n5_proven_verdict v
+              where v.snapshot_id={lit(SNAPSHOT)} and v.verdict='ELIGIBLE'
+                and r.source_key=v.source_key;""", "sweep reject clear"),
+        # 4  ABSENT from S2 -> drop the stale reject too. Without this a project that left the
+        #    PROVEN population keeps asserting a CURRENT reason forever, and post-sweep reject
+        #    set equality (rejected-not-ineligible) could never reach zero.
+        (f"""delete from geo.n5_point_reject r
+              where not exists (select 1 from geo.n5_proven_verdict v
+                                 where v.snapshot_id={lit(SNAPSHOT)} and v.source_key=r.source_key);""",
+         "sweep reject drop absent"),
+    ]
+
+
+def refresh_proven_verdict_sql():
+    """Rebuild the PROJECT-GLOBAL PROVEN verdict from the authoritative frozen baseline.
+
+    AUTHORITATIVE SOURCE: preservation.app_project_identity, filtered to the run snapshot and
+    record_kind='development', joined to geo.n5_accepted_source for the registry verdict. This
+    is the relation that yields the corrected 723,449 PROVEN source_key population. Global
+    multiplicity is NOT derived from ZIP3-local geo.n5_frozen, and NOT from app_projects page
+    rows (3.21 rows per project - a page-materialization count, not project grain).
+
+    NOT RUN AUTOMATICALLY, AND NOT BY A SHARD. Its only caller is publish_verdict(), the
+    `publish-verdict` command, which an operator invokes deliberately: this is a full pass
+    over a 1,125 MB table - see REMAINING APPLY GATES in PR #1016.
+
+    Coordinate pairs are DISTINCT OBSERVED pairs: both values non-null on the SAME row, so a
+    latitude from one row can never be paired with a longitude from another.
+
+    ⚠️ `cnt` IS A LEFT JOIN AGAINST A GROUPED AGGREGATE, AND THE COALESCE IS LOAD-BEARING.
+    It was a correlated subquery - `(select count(*) from pairs q where q.source_key =
+    p.source_key)` - which re-scanned `pairs` once per PROVEN project, 723,449 times. That form
+    could not complete: production run 33787011485 was cancelled at 120s by the Management
+    API's ceiling (SQLSTATE 57014), and run 33789161115, over PG-wire with a 15-minute
+    transaction-local budget, ran the FULL 15 minutes and was cancelled too. The set-based form
+    computes the identical relation in one pass.
+
+    A correlated `count(*)` over an empty set yields **0**, not NULL. An INNER JOIN to `pc`
+    would instead DROP every project with no usable coordinate pair - silently deleting the
+    NULL_COORD verdict, which is 294 of production's 5,171 rejects. Hence `left join` +
+    `coalesce(..., 0)`. Nothing else about the derivation changed; the two forms are proven
+    row-for-row equal (source_key, ncoord, verdict, lat, lng) by the OLD-VS-NEW DERIVATION
+    group in test/n5_pg/run_suite.py."""
+    return f"""
+delete from geo.n5_proven_verdict where snapshot_id={lit(SNAPSHOT)};
+insert into geo.n5_proven_verdict (snapshot_id, source_key, registry_id, ncoord, lat, lng, verdict)
+with src as (
+  select i.source_key, coalesce(i.registry_id,'(null)') registry_id, i.lat, i.lng
+    from preservation.app_project_identity i
+   where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'),
+verdict_reg as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
+proven as (select distinct s.source_key, s.registry_id from src s
+            where exists (select 1 from verdict_reg v where v.registry_id = s.registry_id)),
+pairs as (select distinct source_key, lat, lng from src
+           where lat is not null and lng is not null),
+pc as (select source_key, count(*) ncoord from pairs group by source_key),
+cnt as (select p.source_key, coalesce(pc.ncoord, 0) ncoord
+          from proven p left join pc on pc.source_key = p.source_key),
+sel as (select pr.source_key, pr.lat, pr.lng
+          from pairs pr join cnt c on c.source_key=pr.source_key and c.ncoord=1)
+select {lit(SNAPSHOT)}, p.source_key, p.registry_id, c.ncoord, sl.lat, sl.lng,
+       case when c.ncoord > 1                            then 'MULTI_COORD_UNRESOLVED'
+            when c.ncoord = 0                            then 'NULL_COORD'
+            when sl.lat not between -90 and 90
+              or sl.lng not between -180 and 180         then 'INVALID_COORD'
+            when abs(sl.lat) < 1e-9 and abs(sl.lng) < 1e-9 then 'NULL_ISLAND'
+            else 'ELIGIBLE' end
+  from proven p join cnt c using (source_key) left join sel sl using (source_key);"""
+
+
+# ------------------------------------------------- verdict publication pipeline
+#
+# THE ONLY VALID ORDER. Each arrow is a barrier, not a suggestion:
+#
+#   BUILDING -> BUILD VERDICT -> VALIDATE -> RECORD COMPLETENESS -> READY
+#            -> CANONICAL SWEEP -> VERIFY CANONICAL SETS -> CANONICAL SYNC COMPLETE
+#
+# Two commands implement it, split exactly where the two claims differ:
+#   publish_verdict()  BUILDING .. READY               "the verdict is complete and readable"
+#   sync_canonical()   sweep .. canonical_synced_at     "canonical geometry matches that verdict"
+# A shard requires BOTH (assert_snapshot_consumable). Nothing else writes either state.
+
+
+def publish_verdict():
+    """BUILDING -> BUILD -> VALIDATE -> RECORD COMPLETENESS -> READY, for THIS snapshot only.
+
+    SET-REPLACEMENT SEMANTICS, snapshot-scoped: every write below is filtered to SNAPSHOT, so
+    republishing S1 cannot read, alter or invalidate S2's verdict. There is no truncate.
+
+    FAIL-CLOSED: the manifest is reset to BUILDING with canonical_synced_at NULL as the FIRST
+    durable act, so an interrupted publish leaves a snapshot that assert_snapshot_consumable()
+    refuses. READY is written once, at the end, in the same statement that records the metrics
+    the READY constraint requires - it is never claimed ahead of the evidence for it.
+
+    The verdict rebuild's delete+insert is one HTTP call, but this function does NOT depend on
+    that being one transaction: a partially rebuilt verdict fails the completeness check below
+    (missing/extra/closure), records FAILED, and never reaches READY. The barrier is the state
+    machine, not the transport."""
+    require_snapshot()
+    assert_frozen_input_present()
+
+    # 1 - BUILDING. Clears every completeness metric and the canonical sync barrier: a stale
+    #     READY must never survive a rebuild of the verdict underneath it.
+    sql(f"""insert into geo.n5_verdict_manifest
+              (snapshot_id, state, expected_source_keys, verdict_rows, eligible_rows,
+               reject_counts, fingerprint, started_at, completed_at, canonical_synced_at)
+            values ({lit(SNAPSHOT)}, 'BUILDING', null, null, null, null, null, now(), null, null)
+            on conflict (snapshot_id) do update
+               set state='BUILDING', expected_source_keys=null, verdict_rows=null,
+                   eligible_rows=null, reject_counts=null, fingerprint=null,
+                   started_at=now(), completed_at=null, canonical_synced_at=null;""",
+        "manifest BUILDING")
+    say("verdict state", f"BUILDING  ({SNAPSHOT})")
+
+    # 2 - BUILD. Full snapshot-scoped set replacement of the verdict rows.
+    sql(refresh_proven_verdict_sql(), "build verdict " + SNAPSHOT)
+
+    # 3 - VALIDATE. Completeness is ENFORCED here, not merely reported.
+    v = validate_verdict_completeness()
+    for k in ("expected_source_keys", "verdict_rows", "eligible_rows", "rejected_rows",
+              "missing", "extra", "multi_coord", "malformed", "bad_verdict_value"):
+        say("  " + k, v[k])
+    problems = []
+    if v["expected_source_keys"] is None or int(v["expected_source_keys"]) == 0:
+        problems.append("expected_source_keys is null/zero - the frozen input yielded no "
+                        "PROVEN population")
+    if int(v["missing"]) != 0:
+        problems.append(f"{v['missing']} authoritative source_key(s) have no verdict row")
+    if int(v["extra"]) != 0:
+        problems.append(f"{v['extra']} verdict row(s) are not in the authoritative population")
+    if int(v["verdict_rows"]) != int(v["verdict_distinct"]):
+        problems.append(f"verdict rows {v['verdict_rows']} != distinct source_keys "
+                        f"{v['verdict_distinct']}")
+    if int(v["verdict_rows"]) != int(v["expected_source_keys"] or -1):
+        problems.append(f"verdict_rows {v['verdict_rows']} != expected "
+                        f"{v['expected_source_keys']}")
+    if int(v["eligible_rows"]) + int(v["rejected_rows"]) != int(v["verdict_rows"]):
+        problems.append("eligible + rejected does not close on verdict_rows")
+    if v["fingerprint"] is None:
+        problems.append("fingerprint is null")
+    if v["reject_counts"] is None:
+        problems.append("reject_counts is null")
+    if int(v["malformed"]) != 0:
+        problems.append(f"{v['malformed']} verdict row(s) are malformed for their own verdict")
+    if int(v["bad_verdict_value"]) != 0:
+        problems.append(f"{v['bad_verdict_value']} verdict row(s) carry a value outside the "
+                        f"declared vocabulary")
+    if problems:
+        # FAILED is safe to record: canonical_synced_at is already NULL, so the snapshot stays
+        # unconsumable either way. If even this write fails, the row remains BUILDING - also
+        # unconsumable. There is no path from here that reaches READY.
+        sql(f"""update geo.n5_verdict_manifest set state='FAILED', completed_at=now()
+                 where snapshot_id={lit(SNAPSHOT)};""", "manifest FAILED")
+        raise SystemExit("STOP: verdict completeness FAILED for " + SNAPSHOT + " - "
+                         + "; ".join(problems) + ". State=FAILED, canonical_synced_at NULL, "
+                         "no sweep performed.")
+
+    # 4 - RECORD COMPLETENESS **and** transition to READY in ONE statement. Recording the
+    #     metrics in a separate earlier statement would leave a window in which they are
+    #     durable but the state is not, and the constraint that ties them together is the
+    #     only thing keeping "READY" honest.
+    sql(f"""update geo.n5_verdict_manifest
+               set state='READY', completed_at=now(),
+                   expected_source_keys={int(v['expected_source_keys'])},
+                   verdict_rows={int(v['verdict_rows'])},
+                   eligible_rows={int(v['eligible_rows'])},
+                   reject_counts={lit(json.dumps(v['reject_counts']))}::jsonb,
+                   fingerprint={lit(v['fingerprint'])}
+             where snapshot_id={lit(SNAPSHOT)} and state='BUILDING';""", "manifest READY")
+    # READ BACK from the DB and reconcile the STORED metrics against the derivation. A count
+    # computed and a count durably written are different facts (CLAUDE.md rule 8): a truncated
+    # or garbled jsonb write would otherwise sit under a READY row looking authoritative.
+    chk = sql(f"""select state, canonical_synced_at is null unsynced, verdict_rows, fingerprint,
+                    (select sum(value::bigint) from jsonb_each_text(reject_counts)) count_sum,
+                    coalesce((reject_counts->>'ELIGIBLE')::bigint, 0) stored_eligible
+                    from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)};""",
+              "manifest verify")[0]
+    if str(chk["state"]) != "READY":
+        raise SystemExit(f"STOP: manifest for {SNAPSHOT} did not reach READY (state="
+                         f"{chk['state']}). Another writer changed it mid-publish.")
+    if int(chk["count_sum"] or -1) != int(v["verdict_rows"]):
+        raise SystemExit(f"STOP: stored reason counts for {SNAPSHOT} sum to {chk['count_sum']}, "
+                         f"not verdict_rows {v['verdict_rows']}. The written metrics do not "
+                         f"reconcile with the derivation.")
+    if int(chk["stored_eligible"]) != int(v["eligible_rows"]):
+        raise SystemExit(f"STOP: stored ELIGIBLE count {chk['stored_eligible']} != "
+                         f"eligible_rows {v['eligible_rows']} for {SNAPSHOT}.")
+    if str(chk["fingerprint"]) != str(v["fingerprint"]):
+        raise SystemExit(f"STOP: stored fingerprint for {SNAPSHOT} does not match the "
+                         f"derivation. The manifest was not written as computed.")
+    say("verdict state", "READY  (canonical sweep NOT yet run)")
+    say("verdict fingerprint", v["fingerprint"])
+    return v
+
+
+def verify_canonical_geometry_sets():
+    """Post-sweep SET EQUALITY between the verdict's ELIGIBLE set and canonical proven points.
+
+    Both directions, plus coordinate equality and snapshot attribution. A one-directional
+    check passes while canonical geometry still holds points the new verdict rejects."""
+    return sql(f"""
+with elig as (select source_key, lat, lng from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict='ELIGIBLE'),
+     -- The slot is claimed by EITHER marker, deliberately: an OR (not an AND) also catches a
+     -- recovered row squatting 'pt:1' and a proven row filed under some other feature_id.
+     -- Relying on the biconditional CHECK would verify the constraint, not the sweep - and
+     -- that constraint is not applied yet.
+     can  as (select source_key, feature_id, provenance, geom, verdict_snapshot_id
+                from geo.n5_geom
+               where provenance='proven_stored_point' or feature_id='pt:1')
+select (select count(*) from (select source_key from elig
+                              except select source_key from can) t) eligible_not_canonical,
+       (select count(*) from (select source_key from can
+                              except select source_key from elig) t) canonical_not_eligible,
+       (select count(*) from elig e join can c using (source_key)
+         where c.geom is null
+            or abs(ST_X(c.geom) - e.lng) > 1e-9
+            or abs(ST_Y(c.geom) - e.lat) > 1e-9) coord_mismatch,
+       (select count(*) from can where feature_id is distinct from 'pt:1') wrong_feature_id,
+       (select count(*) from can
+         where provenance is distinct from 'proven_stored_point') wrong_provenance,
+       (select count(*) from can
+         where verdict_snapshot_id is distinct from {lit(SNAPSHOT)}) wrong_snapshot;""",
+               "verify geometry sets")[0]
+
+
+def verify_canonical_reject_sets():
+    """Post-sweep SET EQUALITY between the verdict's INELIGIBLE set and the reject ledger.
+
+    Both directions, reason equality, snapshot attribution, and the cross-check that no
+    ELIGIBLE project is simultaneously carrying a rejection."""
+    return sql(f"""
+with inel as (select source_key, verdict from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict<>'ELIGIBLE'),
+     elig as (select source_key from geo.n5_proven_verdict
+               where snapshot_id={lit(SNAPSHOT)} and verdict='ELIGIBLE'),
+     rej  as (select source_key, reason, verdict_snapshot_id from geo.n5_point_reject)
+select (select count(*) from (select source_key from inel
+                              except select source_key from rej) t) ineligible_not_rejected,
+       (select count(*) from (select source_key from rej
+                              except select source_key from inel) t) rejected_not_ineligible,
+       (select count(*) from inel i join rej r using (source_key)
+         where r.reason is distinct from i.verdict) reason_mismatch,
+       (select count(*) from rej
+         where verdict_snapshot_id is distinct from {lit(SNAPSHOT)}) wrong_snapshot,
+       (select count(*) from elig e join rej r using (source_key)) eligible_still_rejected;""",
+               "verify reject sets")[0]
+
+
+def sync_canonical():
+    """CANONICAL SWEEP -> VERIFY CANONICAL SETS -> CANONICAL SYNC COMPLETE.
+
+    THE ONLY WRITER OF canonical_synced_at ANYWHERE. It is set in exactly one statement, at
+    the end, only after both set-equality verifications return all zeroes.
+
+    INVALIDATION IS THE FIRST DURABLE ACT of every attempt, before any mutation. The moment
+    the corpus starts moving, the previous 'synced' claim is false - so it is retracted first
+    rather than left standing while the sweep runs. Deliberately NOT a finally/cleanup path: a
+    process killed mid-sweep never reaches finally, and the whole point is that a half-swept
+    corpus must not remain marked synced."""
+    require_snapshot()
+    man = sql(f"""select state, expected_source_keys, verdict_rows
+                    from geo.n5_verdict_manifest where snapshot_id={lit(SNAPSHOT)};""",
+              "sync manifest")
+    if not man:
+        raise SystemExit(f"STOP: no verdict manifest for {SNAPSHOT}. Publish the verdict first.")
+    man = man[0]
+    if str(man["state"]) != "READY":
+        raise SystemExit(f"STOP: verdict for {SNAPSHOT} is state={man['state']}, not READY. "
+                         f"The canonical sweep may only run against a published verdict.")
+    if man["expected_source_keys"] is None or \
+            int(man["verdict_rows"]) != int(man["expected_source_keys"]):
+        raise SystemExit(f"STOP: manifest for {SNAPSHOT} is internally inconsistent - "
+                         f"verdict_rows={man['verdict_rows']} "
+                         f"expected={man['expected_source_keys']}.")
+
+    # INVALIDATE FIRST - before a single row of canonical geometry moves.
+    sql(f"""update geo.n5_verdict_manifest set canonical_synced_at=null
+             where snapshot_id={lit(SNAPSHOT)};""", "sync invalidate")
+    say("canonical_synced_at", "NULL (invalidated before sweep)")
+
+    for stmt, tag in global_canonical_sweep_sql():
+        sql(stmt, tag)
+
+    g = verify_canonical_geometry_sets()
+    r = verify_canonical_reject_sets()
+    GEOM_CHECKS = ("eligible_not_canonical", "canonical_not_eligible", "coord_mismatch",
+                   "wrong_feature_id", "wrong_provenance", "wrong_snapshot")
+    for k in GEOM_CHECKS:
+        say("  geometry " + k, g[k])
+    for k in ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
+              "wrong_snapshot", "eligible_still_rejected"):
+        say("  reject " + k, r[k])
+    bad = [f"geometry.{k}={g[k]}" for k in GEOM_CHECKS if int(g[k]) != 0]
+    bad += [f"reject.{k}={r[k]}" for k in
+            ("ineligible_not_rejected", "rejected_not_ineligible", "reason_mismatch",
+             "wrong_snapshot", "eligible_still_rejected") if int(r[k]) != 0]
+    if bad:
+        raise SystemExit("HALT: canonical sets do not match the verdict for " + SNAPSHOT
+                         + " - " + "; ".join(bad) + ". canonical_synced_at REMAINS NULL, so "
+                         "no shard can consume this snapshot. Investigate before retrying.")
+
+    sql(f"""update geo.n5_verdict_manifest set canonical_synced_at = now()
+             where snapshot_id={lit(SNAPSHOT)} and state='READY';""", "canonical sync complete")
+    done = sql(f"""select canonical_synced_at is not null synced from geo.n5_verdict_manifest
+                    where snapshot_id={lit(SNAPSHOT)};""", "sync verify")[0]
+    if not done["synced"]:
+        raise SystemExit(f"STOP: canonical sync for {SNAPSHOT} did not commit; the snapshot "
+                         f"remains unconsumable.")
+    say("canonical_synced_at", "SET - shards may now consume " + SNAPSHOT)
+    return {"geometry": g, "rejects": r}
+
+
+def materialize_proven_points(z3):
+    """Bring canonical PROVEN geometry and current reject state into line with the GLOBAL verdict.
+
+    OWNERSHIP: a canonical proven_stored_point is owned by source_key, never by z3. Measured
+    2026-09-02: 72,856 of 723,449 PROVEN source_keys (10.1%) appear in more than one z3 - up to
+    12 shards, 217 page ZIPs. So nothing here is keyed, filtered or deleted by z3.
+
+    ORDER INDEPENDENCE: every write below is a function of (source_key, global verdict) alone.
+    The verdict is shard-independent, so shard A and shard B compute the identical action for a
+    shared source_key, and each action is idempotent (upsert / delete-if-present). Processing
+    A then B therefore leaves exactly the state of B then A.
+
+    JURISDICTION: deliberately absent. There is no authoritative project-level jurisdiction in
+    the corpus - preservation.app_project_identity.zip is the ZIP PAGE a project was
+    materialized onto (up to 217 per project), not an address ZIP. Validating against it, or
+    against 'any ZCTA in the shard', would fabricate a check from the wrong field.
+    OUTSIDE_JURISDICTION stays reserved in the vocabulary and is NEVER emitted by v1."""
+    # A row-count check is NOT a readiness check: a half-built snapshot has rows > 0 and would
+    # pass it. Require the published state instead.
+    assert_snapshot_consumable()
+
+    scope = f"""
+with slice as (select distinct source_key from geo.n5_frozen
+                where z3={lit(z3)} and treatment='PROVEN'),
+v as (select vv.* from geo.n5_proven_verdict vv join slice s using (source_key)
+       where vv.snapshot_id={lit(SNAPSHOT)})"""
+
+    # ELIGIBLE -> insert, or UPDATE the geometry if the authoritative coordinate changed.
+    sql(scope + """
+insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
+                         invalid_reason, first_z3, provenance, verdict_snapshot_id)
+select v.source_key, coalesce(v.registry_id,'(null)'), 'pt:1', 1,
+       ST_SetSRID(ST_MakePoint(v.lng, v.lat), """ + str(CANON_SRID) + f"""),
+       null, {lit(z3)}, 'proven_stored_point', {lit(SNAPSHOT)}
+  from v where v.verdict='ELIGIBLE'
+on conflict (source_key, feature_id) do update
+   set geom = excluded.geom, registry_id = excluded.registry_id,
+       verdict_snapshot_id = excluded.verdict_snapshot_id, recovered_at = now();""",
+        "proven upsert " + z3)
+
+    # INELIGIBLE -> remove any stale canonical point. Scoped to this source_key AND to the
+    # proven slot, so RECOVERY geometry is never touched and no other project is affected.
+    sql(scope + """
+delete from geo.n5_geom g
+ using v
+ where g.source_key = v.source_key and g.feature_id = 'pt:1'
+   and g.provenance = 'proven_stored_point' and v.verdict <> 'ELIGIBLE';""",
+        "proven prune " + z3)
+
+    # CURRENT reject state: an eligible project must hold no reject row at all, and an
+    # ineligible one holds exactly its current reason. Both directions, so a fixed project
+    # stops reporting a stale reason and a newly broken one starts reporting the real one.
+    sql(scope + """
+delete from geo.n5_point_reject r using v
+ where r.source_key = v.source_key and v.verdict = 'ELIGIBLE';""",
+        "reject clear " + z3)
+    sql(scope + f"""
+insert into geo.n5_point_reject (source_key, registry_id, lat, lng, reason,
+                                 observed_in_z3, verdict_snapshot_id)
+select v.source_key, v.registry_id, v.lat, v.lng, v.verdict, {lit(z3)}, {lit(SNAPSHOT)}
+  from v where v.verdict <> 'ELIGIBLE'
+on conflict (source_key) do update
+   set reason = excluded.reason, registry_id = excluded.registry_id,
+       lat = excluded.lat, lng = excluded.lng, observed_in_z3 = excluded.observed_in_z3,
+       verdict_snapshot_id = excluded.verdict_snapshot_id, rejected_at = now();""",
+        "reject write " + z3)
+
+    return first(sql(scope + """
+select (select count(*) from v where verdict='ELIGIBLE') materialized,
+       (select count(*) from v where verdict<>'ELIGIBLE') rejected;""",
+                     "proven counts " + z3))
+
+
+FEATURE_ID_PT1_DOC = "pt:1"
+
+
+# ------------------------------------------------- stage / reconcile / swap
+
+def stage_associations(z3):
+    """Build this shard's complete candidate output WITHOUT touching the authoritative set."""
+    sql(f"delete from geo.n5_association_stage where z3={lit(z3)};", "stage clear " + z3)
+    q = build_associations(z3) + f"""
+insert into geo.n5_association_stage (z3, source_key, zip, evidence)
+select {lit(z3)}, source_key, zip::char(5), ev
+  from (select * from cls union all select * from adds) z;"""
+    # Deliberately NO `on conflict`: the stage PK (z3, source_key, zip) enforces one class per
+    # pair, so a run that would produce two evidence values for one pair fails HERE instead of
+    # corrupting production.
+    sql(q, "stage " + z3)
+
+
+def reconcile_stage(z3):
+    """Verify the staged set before anything authoritative is touched."""
+    return first(sql(f"""select
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)}) staged,
+        (select count(distinct (source_key, zip)) from geo.n5_association_stage
+          where z3={lit(z3)}) staged_pairs,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=1) s1,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=2) s2,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=3) s3,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=4) s4,
+        (select count(*) from geo.n5_association where left(zip,3)={lit(z3)}) prior,
+        (select count(*) from geo.n5_geom where first_z3={lit(z3)}
+           and provenance='recovered_authoritative') geom_recovered,
+        (select count(*) from geo.n5_geom where first_z3={lit(z3)}
+           and provenance='proven_stored_point') geom_proven,
+        (select count(*) from geo.n5_point_reject
+          where observed_in_z3={lit(z3)}) rejects,
+        (select count(*) from (
+            select source_key, zip, evidence from geo.n5_association_stage where z3={lit(z3)}
+            except
+            select source_key, zip, evidence from geo.n5_association
+             where left(zip,3)={lit(z3)}) d) staged_not_prior,
+        (select count(*) from (
+            select source_key, zip, evidence from geo.n5_association
+             where left(zip,3)={lit(z3)}
+            except
+            select source_key, zip, evidence from geo.n5_association_stage
+             where z3={lit(z3)}) d) prior_not_staged;""",
+                     "reconcile " + z3))
+
+
+def swap_shard(z3):
+    """Atomically replace this shard's authoritative association set.
+
+    One DO block = one statement = one transaction. The old authoritative rows survive until
+    this commits, so a failure before or during the swap leaves production untouched. The
+    boundary left(zip,3)=z3 is exact: association ZIPs can only come from geo.n5_zcta rows
+    loaded for this shard, and that partition was verified against all 13 completed shards."""
+    z = lit(z3)
+    body = ("do $swap$\n"
+            "begin\n"
+            "  delete from geo.n5_association where left(zip,3)=" + z + ";\n"
+            "  insert into geo.n5_association (source_key, zip, evidence)\n"
+            "    select source_key, zip, evidence from geo.n5_association_stage"
+            " where z3=" + z + ";\n"
+            "  delete from geo.n5_association_stage where z3=" + z + ";\n"
+            "end\n"
+            "$swap$;")
+    sql(body, "swap " + z3)
+
+
+# A REBUILD of an already-populated shard must not change association semantics. Persisting a
+# PROVEN point cannot add, remove or reclassify a pair, because those points already
+# participate through the `pt` CTE. So for a rebuild, ANY membership or evidence delta HALTS
+# BEFORE THE SWAP - it is not printed and swapped anyway. A deliberately authorized semantic
+# change sets ALLOW_ASSOCIATION_DELTA=1 explicitly; the invariant is never weakened silently.
+ALLOW_ASSOCIATION_DELTA = os.environ.get("ALLOW_ASSOCIATION_DELTA", "0").strip() == "1"
+
+
 def associate(z3):
-    q = build_associations(z3) + """
-insert into geo.n5_association (source_key, zip, evidence)
-select source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
-on conflict do nothing;"""
-    sql(q, "associate " + z3)
+    """Stage -> reconcile -> swap. Rerunning is idempotent: staging clears its own z3 first
+    and the swap is a full scoped replacement, never an append.
+
+    GATED DIRECTLY, not by its caller. build_associations reads geo.n5_proven_verdict for the
+    run snapshot, so this function is a consumer of the published verdict in its own right; a
+    gate that lives only in run_shard protects nothing if associate() is ever called from a
+    repair path, a notebook, or a future driver."""
+    assert_snapshot_consumable()
+    stage_associations(z3)
+    rc = reconcile_stage(z3)
+    if int(rc["staged"]) != int(rc["staged_pairs"]):
+        raise SystemExit(f"STOP: shard {z3} staged {rc['staged']} rows for "
+                         f"{rc['staged_pairs']} distinct pairs - refusing to swap.")
+    prior = int(rc["prior"])
+    drift = int(rc["staged_not_prior"]) + int(rc["prior_not_staged"])
+    if prior > 0 and drift and not ALLOW_ASSOCIATION_DELTA:
+        raise SystemExit(
+            f"STOP: shard {z3} rebuild changes associations - staged {rc['staged']} vs prior "
+            f"{prior}; {rc['staged_not_prior']} staged-not-prior, {rc['prior_not_staged']} "
+            f"prior-not-staged (evidence 1/2/3/4 staged {rc['s1']}/{rc['s2']}/{rc['s3']}/"
+            f"{rc['s4']}). Persisting PROVEN points must not alter association semantics. "
+            f"Refusing to swap. Set ALLOW_ASSOCIATION_DELTA=1 only for an authorized change.")
+    swap_shard(z3)
+    return rc
 
 
 def shard_counts(z3):
@@ -375,6 +1158,10 @@ def run_shard(z3):
                    where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest")[0]
     say("manifest projects / pairs / zips",
         f"{man['projects']} / {man['pairs']} / {man['zips']}")
+
+    # 0 - SNAPSHOT GATE. Refuse before any freeze/recovery/materialization/association work
+    #     unless THIS run's exact snapshot is READY and canonically synchronized.
+    assert_snapshot_consumable()
 
     # 1 - FREEZE this shard's slice of the frozen baseline
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "clear frozen")
@@ -414,7 +1201,7 @@ def run_shard(z3):
     if bad:
         return halt(z3, "INVALID_BOUNDARY", {"invalid": bad})
 
-    # 3 - RECOVER (cache is cross-shard; hit rate is measured, not assumed)
+    # 3 - RECOVER (geometry reuse is cross-shard; hit rate is measured, not assumed)
     rec = recover_shard(z3, load_registry())
     for r in rec:
         say(f"  recovery {r['registry_id']}",
@@ -426,9 +1213,18 @@ def run_shard(z3):
         if r.get("unasked_echoes"):
             say("    identities echoed but never asked for", r["unasked_echoes"])
 
-    # 4 - ASSOCIATE
+    # 3b - MATERIALIZE fidelity-proven stored points into canonical geometry.
+    #      ZERO NEW ASSOCIATION SEMANTICS: these points already participate through the `pt`
+    #      CTE in build_associations. This only makes them durable. Association output must
+    #      therefore be unchanged by this step - that is the invariant the receipt checks.
+    pts = materialize_proven_points(z3)
+    say("proven points materialized / rejected",
+        f"{pts['materialized']} / {pts['rejected']}")
+
+    # 4 - ASSOCIATE (stage -> reconcile -> swap)
     before = shard_counts(z3)
-    associate(z3)
+    rc = associate(z3)
+    say("staged / prior associations", f"{rc['staged']} / {rc['prior']}")
     got = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
                       "assoc n"), "n"))
     say("", "")
@@ -472,7 +1268,11 @@ def run_shard(z3):
     say("VERIFIED CLEAN", "yes" if verified else "NO")
 
     # 6 - DISCARD the per-shard disposable working set (boundaries + frozen slice).
-    #     geo.n5_geom is deliberately NOT discarded: it is the cross-shard geometry cache.
+    #     geo.n5_geom is deliberately NOT discarded, and NOT because it is a cache. It is
+    #     PERMANENT CANONICAL PRODUCT GEOMETRY - the authoritative spatial corpus behind Map 1
+    #     address/radius reads. It incidentally enables geometry reuse across shards, but that
+    #     does NOT make it disposable. It MUST NOT be reclaimed, truncated, or dropped to
+    #     recover disk: reclaiming it deletes the product's spatial corpus.
     sql(f"delete from geo.n5_zcta where z3={lit(z3)};", "drop zcta")
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "drop frozen")
     left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left"), "n"))
@@ -495,7 +1295,11 @@ def run_shard(z3):
               "boundaries": nb, "boundary_missing": len(missing),
               "recovery": rec, "fingerprint": fp1,
               "second_run_inserts": n2 - got, "phantom": phantom,
-              "free_mb": round(free, 1), "verified": verified, "disk_ok": disk_ok}
+              "free_mb": round(free, 1), "verified": verified, "disk_ok": disk_ok,
+              # Input snapshot and verdict snapshot are the same identifier in this
+              # architecture; recording it proves WHICH eligibility universe produced these
+              # associations, without widening 20,170 association rows.
+              "verdict_snapshot_id": SNAPSHOT}
 
     # ADVANCE ONLY IF VERIFIED CLEAN **AND** DISK ABOVE FLOOR. Both, and-not-or.
     if verified and disk_ok:
@@ -604,6 +1408,14 @@ def main():
     if not todo:
         raise SystemExit("STOP: no shards selected")
 
+    # SNAPSHOT GATE BEFORE ANY DURABLE MUTATION, including the shard status flag. Marking a
+    # shard 'running' and only then discovering the snapshot is unpublished leaves a shard
+    # stranded in 'running' - neither done nor halted - which a resume silently skips while
+    # the run reports no failure. run_shard() re-asserts the same gate; this one exists so
+    # the refusal happens before the first write rather than after it.
+    assert_snapshot_consumable()
+    say("snapshot gate", f"{SNAPSHOT} READY and canonically synced")
+
     done = 0
     for z3 in todo:
         sql(f"update geo.n5_shard set state='running', started_at=now() "
@@ -626,13 +1438,36 @@ def main():
     rem = one(sql(f"select count(*) n from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} "
                   f"and state='pending';", "rem"), "n")
     say("shards still pending", rem)
-    cache = sql("select count(*) feats, count(distinct source_key) projects, "
-                "pg_size_pretty(pg_total_relation_size('geo.n5_geom')) sz from geo.n5_geom;", "cache")[0]
-    say("geometry cache", f"{cache['feats']} features / {cache['projects']} projects / {cache['sz']}")
+    corpus = sql("select count(*) feats, count(distinct source_key) projects, "
+                 "pg_size_pretty(pg_total_relation_size('geo.n5_geom')) sz from geo.n5_geom;",
+                 "corpus")[0]
+    say("canonical geometry corpus (NOT reclaimable)",
+        f"{corpus['feats']} features / {corpus['projects']} projects / {corpus['sz']}")
     say("publisher requests this run", STATS["requests"])
     say("publisher bytes this run", f"{STATS['bytes_in']:,}")
     return 0
 
 
+COMMANDS = {
+    # ONE entry point per publication act. The order between them is enforced by state, not by
+    # documentation: sync-canonical refuses a non-READY verdict, and shards refuse an unsynced
+    # one, so running them out of order fails rather than half-publishes.
+    "publish-verdict": publish_verdict,   # BUILDING -> BUILD -> VALIDATE -> RECORD -> READY
+    "sync-canonical": sync_canonical,     # invalidate -> sweep -> verify sets -> synced
+    "shards": main,                       # consume a published+synced snapshot, shard by shard
+}
+
+
+def cli(argv):
+    cmd = (argv[1] if len(argv) > 1 else "shards").strip()
+    if cmd not in COMMANDS:
+        raise SystemExit("STOP: unknown command %r. One of: %s"
+                         % (cmd, ", ".join(sorted(COMMANDS))))
+    require_snapshot()
+    say("command", cmd)
+    rc = COMMANDS[cmd]()
+    return rc if isinstance(rc, int) else 0
+
+
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(cli(sys.argv) or 0)

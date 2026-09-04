@@ -1,0 +1,387 @@
+name: n5-publish-verdict
+
+# Publishes the N5 PROVEN verdict for ONE snapshot using the COMMITTED lifecycle
+# implementation, unmodified:
+#     SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py publish-verdict
+#
+# Founder-authorized 2026-09-03 for publish-verdict ONLY. It does NOT run sync-canonical,
+# the canonical sweep, any shard, 760, reclamation, B4, #1015, a radius RPC, or an RLS change,
+# and it does not merge anything. READY means the verdict is complete and readable; it does
+# NOT authorize downstream synchronization. canonical_synced_at must remain NULL.
+#
+# Transport: publish-verdict talks through n3_pilot.sql() -> the Supabase Management API, one
+# call per implicit transaction. That is what this pipeline is DESIGNED for and is not the
+# migration case: publish_verdict()'s own docstring records that it does not depend on the
+# rebuild being one transaction - a partially rebuilt verdict fails the completeness check,
+# records FAILED and never reaches READY. The barrier is the state machine, not the transport.
+# The precheck and post-state verification run read-only over the PG-wire session pooler.
+#
+# NO RETRY. If it fails or the manifest becomes FAILED, the job stops and reports; production
+# tables are never repaired by hand.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - '.github/workflows/n5-publish-verdict.yml'
+
+permissions:
+  contents: read
+
+env:
+  SNAPSHOT: phase1-2026-09-01
+  # ARMING TOKEN. Must equal the contents of .github/n5-publish-arm or the job stops before
+  # touching the database. WHY: `pull_request` + `paths:` filters on the PR's WHOLE diff, not
+  # on the individual push, so once this workflow file is part of the PR every subsequent
+  # commit - including a receipt-only doc commit - re-triggers it. That produced two
+  # unintended publish attempts (runs 33787551271 and 33790964577, the latter cancelled
+  # mid-flight). A path filter is not an arming mechanism; this is.
+  EXPECTED_ARM: arm-2026-09-03-optimized-derivation
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse to touch the database unless deliberately armed
+        id: arm
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/n5-publish-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED (file token does not match EXPECTED_ARM)."
+            echo "No database contact. This is how a receipt-only commit is prevented from"
+            echo "re-triggering a publication. To arm, set both to the same new token."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: Identify the EXACT committed implementation being executed
+        run: |
+          set -euo pipefail
+          echo "commit            : $(git rev-parse HEAD)"
+          echo "n5_shard.py blob  : $(git rev-parse HEAD:scripts/n5_shard.py)"
+          echo "n3_pilot.py blob  : $(git rev-parse HEAD:scripts/n3_pilot.py)"
+          sha256sum scripts/n5_shard.py scripts/n3_pilot.py
+          git status --porcelain scripts/ || true
+          test -z "$(git status --porcelain scripts/)" || { echo "ABORT: scripts/ is dirty"; exit 1; }
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: PRECHECK (READ-ONLY over the PG-wire session pooler, fail-closed)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/pre.sql <<'SQL'
+          \conninfo
+          set session characteristics as transaction read only;
+          -- this transport's session default statement_timeout is 2min; the derivation needs more
+          set statement_timeout = '15min';
+          do $ro$ begin
+            if current_setting('default_transaction_read_only') <> 'on' then
+              raise exception 'ABORT: precheck session is not read-only'; end if;
+          end $ro$;
+
+          do $pre$
+          declare
+            bad text := '';
+            snap text := 'phase1-2026-09-01';
+            n_ident bigint; n_reg bigint; n_snapreg bigint;
+            n_deriv bigint; n_dist bigint; n_dup bigint; n_elig bigint;
+            n_canon bigint; n_rej bigint; n_man bigint; n_build bigint; n_vrows bigint;
+            n_run bigint; n_pub bigint; db text;
+          begin
+            select current_database() into db;
+            if db <> 'postgres' then bad := bad || ' [unexpected database ' || db || ']'; end if;
+            select count(*) into n_canon from geo.n5_geom where provenance='proven_stored_point';
+            if n_canon <> 718278 then bad := bad || ' [not the intended DB / canonical=' || n_canon || ']'; end if;
+
+            select count(*) into n_snapreg from geo.n5_snapshot where snapshot_id = snap;
+            if n_snapreg <> 1 then bad := bad || ' [snapshot ' || snap || ' not registered]'; end if;
+            select count(*) into n_ident from preservation.app_project_identity
+              where snapshot_id = snap and record_kind='development';
+            if n_ident = 0 then bad := bad || ' [no preservation rows for the snapshot]'; end if;
+            select count(*) into n_reg from geo.n5_accepted_source where treatment='PROVEN';
+            if n_reg = 0 then bad := bad || ' [no PROVEN accepted-source inputs]'; end if;
+
+            -- derivation: uniqueness, population, eligibility. GROUP BY form (the committed
+            -- implementation uses a correlated subquery; this is an independent re-derivation).
+            with src as (
+              select i.source_key, coalesce(i.registry_id,'(null)') registry_id, i.lat, i.lng
+                from preservation.app_project_identity i
+                join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+               where a.treatment='PROVEN' and i.snapshot_id = snap and i.record_kind='development'),
+            du    as (select distinct source_key, registry_id from src),
+            pairs as (select distinct source_key, lat, lng from src where lat is not null and lng is not null),
+            pc    as (select source_key, count(*) c from pairs group by source_key),
+            elig  as (select p.source_key from pairs p join pc using (source_key) where pc.c = 1)
+            select (select count(*) from du),
+                   (select count(distinct source_key) from src),
+                   (select count(*) from (select source_key from du group by 1 having count(*)<>1) t),
+                   (select count(*) from elig)
+              into n_deriv, n_dist, n_dup, n_elig;
+            if n_dup <> 0 then bad := bad || ' [derivation NOT unique: ' || n_dup || ']'; end if;
+            if n_deriv <> 723449 or n_dist <> 723449 then
+              bad := bad || ' [authoritative population ' || n_deriv || '/' || n_dist || ' <> 723449]'; end if;
+            if n_elig <> 718278 then bad := bad || ' [eligible ' || n_elig || ' <> 718278]'; end if;
+
+            select count(*) into n_rej from geo.n5_point_reject;
+            if n_elig + n_rej <> n_dist then
+              bad := bad || ' [partition does not close: ' || n_elig || '+' || n_rej || '<>' || n_dist || ']'; end if;
+            if n_canon <> n_elig then bad := bad || ' [canonical <> eligible]'; end if;
+
+            -- THE KNOWN STALE BUILDING ROW from failed Management-API run 33787011485.
+            -- It must be EXACTLY the empty failed-attempt shape: state BUILDING, every metric
+            -- NULL, canonical_synced_at NULL, zero verdict rows. Anything else - a completed
+            -- metric, a fingerprint, a sync timestamp, any verdict row - means this is not the
+            -- state we were authorized to restart, and the job stops rather than cleaning up.
+            select count(*) into n_man from geo.n5_verdict_manifest where snapshot_id = snap;
+            select count(*) into n_build from geo.n5_verdict_manifest where state='BUILDING';
+            select count(*) into n_vrows from geo.n5_proven_verdict where snapshot_id = snap;
+            if n_man <> 1 or n_build <> 1 then
+              bad := bad || ' [expected exactly one BUILDING manifest, found man=' || n_man
+                         || ' building=' || n_build || ']'; end if;
+            if n_vrows <> 0 then bad := bad || ' [verdict rows already present: ' || n_vrows || ']'; end if;
+            if exists (select 1 from geo.n5_verdict_manifest
+                        where snapshot_id = snap
+                          and (state <> 'BUILDING'
+                            or expected_source_keys is not null or verdict_rows is not null
+                            or eligible_rows is not null or reject_counts is not null
+                            or fingerprint is not null or completed_at is not null
+                            or canonical_synced_at is not null)) then
+              bad := bad || ' [the BUILDING manifest is NOT the empty failed-attempt shape - '
+                         || 'it carries completed metrics; NOT cleaning it up]'; end if;
+            if (select count(*) from geo.n5_verdict_manifest where snapshot_id <> snap) <> 0 then
+              bad := bad || ' [an unexpected manifest exists for another snapshot]'; end if;
+
+            select count(*) into n_run from geo.n5_shard where state='running';
+            if n_run <> 0 then bad := bad || ' [' || n_run || ' shard(s) running]'; end if;
+            select count(*) into n_pub from pg_stat_activity
+              where pid <> pg_backend_pid() and state <> 'idle'
+                and (query ilike '%n5_proven_verdict%' or query ilike '%n5_verdict_manifest%');
+            if n_pub <> 0 then bad := bad || ' [another publish-verdict appears to be running]'; end if;
+
+            if bad <> '' then raise exception 'PRECHECK ABORT -%. Nothing was published.', bad; end if;
+            raise notice 'PRECHECK PASSED - snapshot %, authoritative %, eligible %, rejects %, no manifest, no verdict rows, quiescent',
+                         snap, n_dist, n_elig, n_rej;
+          end $pre$;
+          select now() as precheck_at_utc;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/pre.sql
+
+      - name: LIVE EQUIVALENCE + PERFORMANCE of the OPTIMIZED derivation (READ-ONLY)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SNAPSHOT: phase1-2026-09-01
+        run: |
+          set -euo pipefail
+          # The SELECT is taken from the SHIPPED function, never retyped, so this measures the
+          # exact SQL publish-verdict will run. The already-proven canonical geometry and reject
+          # ledger are the semantic oracle; the OLD derivation is deliberately NOT re-run,
+          # because it cannot finish inside any budget we are permitted to grant it.
+          python3 scripts/n5_live_equivalence_sql.py > /tmp/live_equiv.sql
+          head -3 /tmp/live_equiv.sql
+          echo "derivation start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          T0=$(date -u +%s)
+          # -q is REQUIRED. Without it psql echoes a "SET" command tag for each of the two
+          # session settings at the top of the script, `read` consumes the FIRST line, and
+          # every metric parses as empty with rows="SET". Observed on run 33800801237: the
+          # derivation itself succeeded in 54s and only the capture was wrong. `tail -1` is
+          # belt-and-braces so a future added statement cannot reintroduce the same class.
+          OUT=$(psql "$SUPABASE_DB_URL" -X -q -tA -F'|' -v ON_ERROR_STOP=1 -P pager=off \
+                     -f /tmp/live_equiv.sql | grep -v '^$' | tail -1)
+          T1=$(date -u +%s)
+          ELAPSED=$((T1-T0))
+          echo "derivation end   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "OPTIMIZED DERIVATION ELAPSED: ${ELAPSED}s (transaction budget 900s)"
+          IFS='|' read -r ROWS DIST DUPS ELIG REJ MULTI NULLC ENC CNE RNL LNR CMM <<< "$OUT"
+          echo "rows=$ROWS distinct=$DIST duplicates=$DUPS eligible=$ELIG rejected=$REJ"
+          echo "MULTI_COORD_UNRESOLVED=$MULTI NULL_COORD=$NULLC"
+          echo "elig_not_canon=$ENC canon_not_elig=$CNE rej_not_ledger=$RNL ledger_not_rej=$LNR coord_mismatch=$CMM"
+          fail=0
+          chk() { [ "$2" = "$3" ] || { echo "ABORT: $1 = $2, expected $3"; fail=1; }; }
+          chk rows "$ROWS" 723449
+          chk distinct "$DIST" 723449
+          chk duplicates "$DUPS" 0
+          chk eligible "$ELIG" 718278
+          chk rejected "$REJ" 5171
+          chk MULTI_COORD_UNRESOLVED "$MULTI" 4877
+          chk NULL_COORD "$NULLC" 294
+          chk elig_not_canon "$ENC" 0
+          chk canon_not_elig "$CNE" 0
+          chk rej_not_ledger "$RNL" 0
+          chk ledger_not_rej "$LNR" 0
+          chk coord_mismatch "$CMM" 0
+          [ "$ELAPSED" -lt 600 ] || { echo "ABORT: ${ELAPSED}s is too close to the 900s budget"; fail=1; }
+          [ "$fail" = "0" ] || exit 1
+          echo "LIVE EQUIVALENCE PASS - the optimized derivation reproduces the proven state exactly"
+
+      - name: PUBLISH VERDICT (committed implementation, exactly once, no retry)
+        id: publish
+        env:
+          # PG-WIRE ONLY. SUPABASE_ACCESS_TOKEN is deliberately NOT provided: if anything in
+          # this path fell back to the Management API it would raise KeyError instead of
+          # silently succeeding on the transport that already failed with 57014.
+          N5_TRANSPORT: pgwire
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SNAPSHOT: phase1-2026-09-01
+        run: |
+          set -euo pipefail
+          psql --version
+          echo "START  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          START=$(date -u +%s)
+          SNAPSHOT=phase1-2026-09-01 python3 scripts/n5_shard.py publish-verdict
+          END=$(date -u +%s)
+          echo "END    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "elapsed: $((END-START))s"
+
+      - name: POST-STATE (READ-ONLY) - verdict, manifest, and geometry NOT mutated
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          cat > /tmp/post.sql <<'SQL'
+          set session characteristics as transaction read only;
+          set statement_timeout = '15min';
+          do $post$
+          declare
+            bad text := ''; snap text := 'phase1-2026-09-01';
+            v_rows bigint; v_dist bigint; v_elig bigint; v_rej bigint; v_dup bigint;
+            miss bigint; extra bigint; e_not_canon bigint; canon_not_e bigint;
+            r_not_rej bigint; rej_not_r bigint;
+            m_state text; m_exp bigint; m_vrows bigint; m_elig bigint; m_fp text;
+            m_rc jsonb; m_done timestamptz; m_sync timestamptz;
+            g_total bigint; g_canon bigint; g_recov bigint; g_md5 text; n_assoc bigint;
+            rc_sum bigint;
+          begin
+            -- ---------- VERDICT ----------
+            select count(*), count(distinct source_key),
+                   count(*) filter (where verdict='ELIGIBLE'),
+                   count(*) filter (where verdict<>'ELIGIBLE')
+              into v_rows, v_dist, v_elig, v_rej
+              from geo.n5_proven_verdict where snapshot_id = snap;
+            select count(*) into v_dup from (select source_key from geo.n5_proven_verdict
+              where snapshot_id = snap group by 1 having count(*)<>1) t;
+            if v_rows <> v_dist then bad := bad || ' [verdict rows <> distinct source_keys]'; end if;
+            if v_dup <> 0 then bad := bad || ' [' || v_dup || ' duplicate source_key in snapshot]'; end if;
+            if v_elig + v_rej <> v_rows then bad := bad || ' [eligible+rejected does not close]'; end if;
+            if v_rows <> 723449 then bad := bad || ' [verdict rows ' || v_rows || ' <> 723449]'; end if;
+            if v_elig <> 718278 then bad := bad || ' [eligible ' || v_elig || ' <> 718278]'; end if;
+            if v_rej  <> 5171   then bad := bad || ' [rejected ' || v_rej || ' <> 5171]'; end if;
+
+            with src as (
+              select distinct i.source_key
+                from preservation.app_project_identity i
+                join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+               where a.treatment='PROVEN' and i.snapshot_id = snap and i.record_kind='development')
+            select (select count(*) from (select source_key from src
+                      except select source_key from geo.n5_proven_verdict where snapshot_id=snap) t),
+                   (select count(*) from (select source_key from geo.n5_proven_verdict where snapshot_id=snap
+                      except select source_key from src) t)
+              into miss, extra;
+            if miss <> 0 then bad := bad || ' [' || miss || ' authoritative source_key(s) MISSING from the verdict]'; end if;
+            if extra <> 0 then bad := bad || ' [' || extra || ' EXTRA verdict row(s) not in the population]'; end if;
+
+            select (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict='ELIGIBLE'
+                      except select source_key from geo.n5_geom where provenance='proven_stored_point') t),
+                   (select count(*) from (select source_key from geo.n5_geom where provenance='proven_stored_point'
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict='ELIGIBLE') t),
+                   (select count(*) from (select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict<>'ELIGIBLE'
+                      except select source_key from geo.n5_point_reject) t),
+                   (select count(*) from (select source_key from geo.n5_point_reject
+                      except select source_key from geo.n5_proven_verdict
+                      where snapshot_id=snap and verdict<>'ELIGIBLE') t)
+              into e_not_canon, canon_not_e, r_not_rej, rej_not_r;
+            if e_not_canon <> 0 or canon_not_e <> 0 then
+              bad := bad || ' [ELIGIBLE set <> canonical PROVEN set: ' || e_not_canon || '/' || canon_not_e || ']'; end if;
+            if r_not_rej <> 0 or rej_not_r <> 0 then
+              bad := bad || ' [rejected set <> current reject set: ' || r_not_rej || '/' || rej_not_r || ']'; end if;
+
+            -- reason agreement between the verdict and the reject ledger
+            if exists (
+              select 1 from
+                (select verdict r, count(*) n from geo.n5_proven_verdict
+                  where snapshot_id=snap and verdict<>'ELIGIBLE' group by 1) a
+              full join
+                (select reason r, count(*) n from geo.n5_point_reject group by 1) b using (r)
+               where a.n is distinct from b.n) then
+              bad := bad || ' [reject reason counts disagree between verdict and reject ledger]'; end if;
+
+            -- ---------- MANIFEST ----------
+            select state, expected_source_keys, verdict_rows, eligible_rows, fingerprint,
+                   reject_counts, completed_at, canonical_synced_at
+              into m_state, m_exp, m_vrows, m_elig, m_fp, m_rc, m_done, m_sync
+              from geo.n5_verdict_manifest where snapshot_id = snap;
+            if m_state is distinct from 'READY' then bad := bad || ' [manifest state ' || coalesce(m_state,'<absent>') || ']'; end if;
+            if m_exp   is distinct from v_rows then bad := bad || ' [expected_source_keys <> verdict rows]'; end if;
+            if m_vrows is distinct from v_rows then bad := bad || ' [manifest verdict_rows wrong]'; end if;
+            if m_elig  is distinct from v_elig then bad := bad || ' [manifest eligible_rows wrong]'; end if;
+            if m_fp is null then bad := bad || ' [fingerprint not populated]'; end if;
+            if m_rc is null then bad := bad || ' [reject_counts not populated]'; end if;
+            if m_done is null then bad := bad || ' [READY timestamp not populated]'; end if;
+            if m_sync is not null then bad := bad || ' [canonical_synced_at is NOT NULL - downstream sync was not authorized]'; end if;
+            select sum(value::bigint) into rc_sum from jsonb_each_text(m_rc);
+            if rc_sum is distinct from v_rows then bad := bad || ' [reject_counts sum ' || coalesce(rc_sum,-1) || ' <> verdict rows]'; end if;
+            if coalesce((m_rc->>'ELIGIBLE')::bigint,-1) <> v_elig then bad := bad || ' [reject_counts ELIGIBLE wrong]'; end if;
+
+            -- ---------- GEOMETRY MUST NOT HAVE CHANGED ----------
+            select count(*) into g_total from geo.n5_geom;
+            select count(*) into g_canon from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into g_recov from geo.n5_geom where provenance='recovered_authoritative';
+            select md5(string_agg(source_key||'|'||feature_id||'|'||ST_X(geom)::text||'|'||ST_Y(geom)::text,
+                       chr(10) order by source_key collate "C", feature_id collate "C"))
+              into g_md5 from geo.n5_geom where provenance='proven_stored_point';
+            select count(*) into n_assoc from geo.n5_association;
+            if g_total <> 741562 then bad := bad || ' [geometry total changed: ' || g_total || ']'; end if;
+            if g_canon <> 718278 then bad := bad || ' [canonical changed: ' || g_canon || ']'; end if;
+            if g_recov <> 23284  then bad := bad || ' [recovered changed: ' || g_recov || ']'; end if;
+            if g_md5 <> 'bbda250fc30ee0b3aa3f46a259392aa3' then
+              bad := bad || ' [CANONICAL GEOMETRY FINGERPRINT CHANGED - publish-verdict mutated geometry]'; end if;
+            if n_assoc <> 20170 then bad := bad || ' [association changed: ' || n_assoc || ']'; end if;
+
+            if bad <> '' then raise exception 'POST-STATE VERIFICATION FAILED -%', bad; end if;
+            raise notice 'POST-STATE VERIFIED - verdict complete, manifest READY, canonical_synced_at NULL, geometry untouched';
+          end $post$;
+
+          select snapshot_id, state, expected_source_keys, verdict_rows, eligible_rows,
+                 reject_counts, fingerprint, started_at, completed_at, canonical_synced_at
+            from geo.n5_verdict_manifest where snapshot_id='phase1-2026-09-01';
+
+          select verdict, count(*) from geo.n5_proven_verdict
+           where snapshot_id='phase1-2026-09-01' group by 1 order by 2 desc;
+          SQL
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -f /tmp/post.sql
+          echo "POST-STATE PASS"
+
+      # Gated on the ARMING GATE having PASSED. Without this the reporter still opened a
+      # (read-only) connection on a disarmed run, which contradicts the property the arming
+      # gate exists to guarantee: while disarmed, an ordinary commit reaches the database in
+      # NO way at all. Observed on run 33794183150 and corrected here.
+      - name: On failure - report manifest state, DO NOT repair
+        if: failure() && steps.arm.outcome == 'success'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -P pager=off -c "
+            set session characteristics as transaction read only;
+            select snapshot_id, state, verdict_rows, eligible_rows, fingerprint,
+                   canonical_synced_at, started_at, completed_at
+              from geo.n5_verdict_manifest;
+            select count(*) as verdict_rows_present from geo.n5_proven_verdict;"
+          echo "Reported only. No table was repaired. No retry."
