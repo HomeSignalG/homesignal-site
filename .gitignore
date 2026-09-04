@@ -3,3 +3,8 @@
 .claude/settings.local.json
 __pycache__/
 _site/
+
+# Local-only: the repo ships no package.json and no bundler (CLAUDE.md §4). node_modules
+# exists only when a session installs a dev dependency to run an offline browser proof
+# (test/map1-address-radius.browser.mjs needs playwright-core + the pinned leaflet build).
+node_modules/

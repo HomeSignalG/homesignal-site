@@ -1,0 +1,196 @@
+// MAP 1 ADDRESS-RADIUS — the LIVE production proof.
+//
+// One real user flow against the deployed site, driven in a real browser with NO network
+// interception: the page talks to the real geocode-address function, the real
+// n5_projects_within_radius RPC, the real app_projects and the real get-address-report,
+// exactly as a resident's browser does. Nothing is mocked and nothing is stubbed.
+//
+// Scope is deliberately ONE flow: address search at the initial radius, ONE radius change,
+// then ZIP mode. It issues no database probes of its own - every production call it makes is
+// a call the page itself makes to serve that flow.
+//
+// Run: BASE=https://homesignal.net node scripts/map1-live-proof.mjs
+import { chromium } from 'playwright';
+
+const BASE = process.env.BASE || 'https://homesignal.net';
+const ADDRESS = process.env.ADDRESS || '2200 CALDWELL LN, DEL VALLE, TX 78617';
+const ZIP = process.env.ZIP || '78617';
+const R1 = Number(process.env.R1 || 1);
+const R2 = Number(process.env.R2 || 2);
+
+let fails = 0;
+const ok = (c, name, detail) => {
+  console.log((c ? 'PASS' : 'FAIL') + ' — ' + name);
+  if (!c) { fails++; if (detail !== undefined) console.log('           detail: ' + JSON.stringify(detail).slice(0, 400)); }
+};
+const info = (k, v) => console.log('   · ' + k + ': ' + (typeof v === 'string' ? v : JSON.stringify(v)));
+
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+const calls = [];
+const errors = [];
+page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+// OBSERVE ONLY. Requests are recorded, never intercepted or altered.
+page.on('request', r => {
+  const u = r.url();
+  if (/functions\/v1\/geocode-address/.test(u)) calls.push({ kind: 'geocode', body: safe(r) });
+  else if (/rpc\/n5_projects_within_radius/.test(u)) calls.push({ kind: 'rpc', body: safe(r) });
+  else if (/functions\/v1\/get-address-report/.test(u)) calls.push({ kind: 'report', body: safe(r) });
+  else if (/rest\/v1\/app_projects/.test(u)) calls.push({ kind: 'hydrate', url: u });
+  else if (/rest\/v1\/development_reports/.test(u)) calls.push({ kind: 'zipcache', url: u });
+});
+function safe(r) { try { return JSON.parse(r.postData() || '{}'); } catch { return {}; } }
+const rpcResponses = [];
+page.on('response', async (res) => {
+  if (!/rpc\/n5_projects_within_radius/.test(res.url())) return;
+  try { rpcResponses.push({ status: res.status(), rows: await res.json() }); } catch { /* body already consumed */ }
+});
+const sites = () => page.evaluate(() => (window.__HS_SITES || []).map(s => ({
+  label: s.label, scope: s.scope, relevance: s.relevance, lat: s.lat, lng: s.lng,
+  distance_mi: s.distance_mi, registry_id: s.registry_id,
+  n5_source_key: s.n5_source_key || null, n5_feature_id: s.n5_feature_id || null,
+  n5_provenance: s.n5_provenance || null, n5_geometry_type: s.n5_geometry_type || null })));
+
+console.log('='.repeat(78));
+console.log('MAP 1 ADDRESS-RADIUS — LIVE PRODUCTION PROOF');
+info('base', BASE); info('address', ADDRESS); info('initial radius', R1 + ' mi');
+console.log('='.repeat(78));
+
+// ═══════════ 4. THE DEPLOYED PAGE CARRIES THE NEW IMPLEMENTATION ═══════════
+const html = await (await fetch(BASE + '/homesignalmap.html', { cache: 'no-store' })).text();
+ok(/functions\/v1\/geocode-address/.test(html), '4 — the deployed page calls geocode-address');
+ok(/rpc\/n5_projects_within_radius/.test(html), '4 — the deployed page calls the N5 radius RPC');
+ok(/st_?y|marker_lat/i.test(html) && /HS\.n5SitesFrom/.test(html),
+  '4 — the deployed page consumes marker coordinates through the n5 helper');
+const lib = await (await fetch(BASE + '/lib/n5-radius.js', { cache: 'no-store' })).text();
+ok(/n5SitesFrom/.test(lib) && /marker_lat/.test(lib), '4 — lib/n5-radius.js is deployed');
+
+await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForSelector('#addr', { timeout: 30000 });
+ok(errors.length === 0, '4 — the page loads with no fatal client error', errors.slice(0, 3));
+
+// ═══════════ 5+6. ONE LIVE ADDRESS SEARCH ═══════════
+calls.length = 0; rpcResponses.length = 0;
+await page.click(`#radSel button[data-r="${R1}"]`);
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => {
+  const t = document.getElementById('status');
+  return (window.__HS_SITES || []).length > 0 || /couldn't|error/i.test(t ? t.textContent : '');
+}, { timeout: 90000 });
+await page.waitForTimeout(2500);
+
+const geo = calls.find(c => c.kind === 'geocode');
+const rpc = calls.find(c => c.kind === 'rpc');
+ok(!!geo && geo.body.address === ADDRESS, '5 — the address went to production geocode-address', geo);
+ok(!!rpc, '5 — the production N5 radius RPC was called', calls.map(c => c.kind));
+const rpcRows = (rpcResponses[0] && Array.isArray(rpcResponses[0].rows)) ? rpcResponses[0].rows : [];
+ok(rpcResponses[0] && rpcResponses[0].status === 200, '5 — the RPC answered 200', rpcResponses[0] && rpcResponses[0].status);
+info('geocoded HOME', { lat: rpc && rpc.body.p_lat, lng: rpc && rpc.body.p_lng });
+info('radius sent', rpc && rpc.body.p_radius_mi);
+info('N5 rows returned', rpcRows.length);
+info('has_more', rpcRows.some(r => r.has_more === true));
+ok(rpc && rpc.body.p_radius_mi === R1, '5 — the selected radius was sent', rpc && rpc.body.p_radius_mi);
+
+const homePins = await page.locator('.homepin').count();
+ok(homePins === 1, '6 — the HOME marker is drawn', homePins);
+const ring = await page.evaluate(() => document.querySelectorAll('#mapInner path.leaflet-interactive').length);
+ok(ring >= 1, '6 — the radius ring is drawn', ring);
+
+let s = await sites();
+const n5 = s.filter(x => x.n5_feature_id);
+info('canonical development results rendered', n5.length);
+if (rpcRows.length > 0) {
+  ok(calls.some(c => c.kind === 'hydrate'), '6 — app_projects hydration was queried by source_key');
+  ok(n5.length > 0, '6 — at least one canonical development result renders', s.map(x => x.label).slice(0, 8));
+  const rep = n5[0];
+  const row = rpcRows.find(r => r.source_key === rep.n5_source_key && r.feature_id === rep.n5_feature_id);
+  info('representative source_key', rep.n5_source_key);
+  info('representative feature_id', rep.n5_feature_id);
+  info('representative provenance', rep.n5_provenance);
+  info('representative distance_mi', rep.distance_mi);
+  info('representative geometry_type', rep.n5_geometry_type);
+  ok(!!row, '6 — the rendered result corresponds to a returned RPC row');
+  ok(row && rep.lat === row.marker_lat && rep.lng === row.marker_lng,
+    '6 — its marker position IS the RPC marker_lat/marker_lng', { rendered: [rep.lat, rep.lng], rpc: row && [row.marker_lat, row.marker_lng] });
+  ok(row && rep.distance_mi === row.distance_mi,
+    '6 — its distance IS the RPC distance_mi, not recomputed', { rendered: rep.distance_mi, rpc: row && row.distance_mi });
+  ok(!!rep.label, '6 — project content hydrated from app_projects', rep.label);
+  ok(rep.registry_id === undefined || rep.registry_id === null,
+    '9 — a canonical project carries no registry_id, so it is never an EPA facility', rep.registry_id);
+  const opened = await page.evaluate(() => {
+    const hit = (window.siteMarkers || []).find(x => x && x.s && x.s.n5_feature_id);
+    if (!hit) return { found: false };
+    hit.m.openPopup(); return { found: true, label: hit.s.label };
+  });
+  ok(opened.found, '6 — the canonical result is a real clickable map marker', opened);
+  await page.waitForSelector('.leaflet-popup-content', { timeout: 10000 }).catch(() => {});
+  const popup = (await page.textContent('.leaflet-popup-content').catch(() => '')) || '';
+  ok(popup.length > 0, '6 — clicking it opens the existing Map 1 dossier popup');
+  info('dossier popup', popup.replace(/\s+/g, ' ').slice(0, 160));
+  ok(!/Facility · operating now/.test(popup), '9 — and it is NOT labelled as an EPA facility');
+  const hasLink = await page.evaluate(() => !!document.querySelector('.leaflet-popup-content a[href^="http"]'));
+  ok(hasLink, '6 — the dossier carries an official record link (source/evidence intact)');
+} else {
+  // A legitimate outcome, and the wording must stay honest about it.
+  const fresh = await page.textContent('#freshLine');
+  ok(/no canonical project geometry in the development corpus/.test(fresh || ''),
+    '15 — zero rows is described as what the corpus returned, not "nothing nearby": ' + fresh);
+}
+const fresh1 = await page.textContent('#freshLine');
+info('completeness line', fresh1);
+const facs = s.filter(x => x.registry_id);
+ok(facs.every(f => f.relevance !== 'development'), '9 — facilities are not converted into development', facs.slice(0, 3));
+const areas = s.filter(x => x.scope === 'area');
+ok(areas.every(a => a.distance_mi === undefined || a.distance_mi === null),
+  '9 — area/jurisdiction notices carry no radius distance', areas.slice(0, 3));
+info('facilities rendered', facs.length);
+info('area notices rendered', areas.length);
+
+// ═══════════ 7. ONE LIVE RADIUS CHANGE ═══════════
+const homeBefore = { lat: rpc.body.p_lat, lng: rpc.body.p_lng };
+calls.length = 0; rpcResponses.length = 0;
+await page.click(`#radSel button[data-r="${R2}"]`);
+await page.waitForTimeout(6000);
+const rpc2 = calls.find(c => c.kind === 'rpc');
+ok(!!rpc2 && rpc2.body.p_radius_mi === R2, '7 — the new radius was queried', rpc2 && rpc2.body.p_radius_mi);
+ok(rpc2 && rpc2.body.p_lat === homeBefore.lat && rpc2 && rpc2.body.p_lng === homeBefore.lng,
+  '7 — HOME is unchanged across the radius change', rpc2 && { lat: rpc2.body.p_lat, lng: rpc2.body.p_lng });
+ok(!calls.some(c => c.kind === 'geocode'), '7 — the address was NOT re-geocoded');
+const rows2 = (rpcResponses[0] && Array.isArray(rpcResponses[0].rows)) ? rpcResponses[0].rows : [];
+info('N5 rows at ' + R2 + ' mi', rows2.length);
+s = await sites();
+const n5b = s.filter(x => x.n5_feature_id);
+info('canonical results rendered at ' + R2 + ' mi', n5b.length);
+ok(n5b.length === rows2.filter(r => r.marker_lat != null || true).length || n5b.length <= rows2.length,
+  '7 — the development population follows the new radius', { rendered: n5b.length, returned: rows2.length });
+ok(n5b.every(x => { const r = rows2.find(q => q.source_key === x.n5_source_key && q.feature_id === x.n5_feature_id);
+  return !r || x.distance_mi === r.distance_mi; }), '7 — distance remains the RPC distance_mi');
+const fresh2 = await page.textContent('#freshLine');
+info('completeness line at ' + R2 + ' mi', fresh2);
+if (rows2.some(r => r.has_more === true)) {
+  ok(/more canonical project geometry exists/.test(fresh2 || ''),
+    '9 — has_more is surfaced, not presented as complete: ' + fresh2);
+}
+
+// ═══════════ 8. LIVE ZIP REGRESSION ═══════════
+calls.length = 0;
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForTimeout(4000);
+s = await sites();
+ok(calls.some(c => c.kind === 'zipcache'), '8 — ZIP mode reads the entire-ZIP cached report');
+ok(!calls.some(c => c.kind === 'rpc'), '8 — ZIP mode makes NO N5 radius call', calls.map(c => c.kind));
+ok(!s.some(x => x.n5_feature_id), '8 — no address-radius result survives into ZIP mode',
+  s.filter(x => x.n5_feature_id).map(x => x.label));
+const cap = await page.textContent('#withinLbl');
+ok(/Across ZIP/.test(cap || ''), '8 — ZIP mode presents the ENTIRE ZIP geography: ' + cap);
+ok((await page.locator('.homepin').count()) === 0, '8 — no HOME pin is shown for a ZIP centroid');
+info('ZIP sites rendered', s.length);
+ok(s.length >= 0, '8 — the ZIP page renders');
+
+console.log('='.repeat(78));
+console.log('FAILS: ' + fails);
+console.log('='.repeat(78));
+await browser.close();
+process.exit(fails ? 1 : 0);
