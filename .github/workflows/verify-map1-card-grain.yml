@@ -1,4 +1,4 @@
-name: verify-map1-delivery
+name: verify-map1-card-grain
 
 # THE GATE THAT WAS MISSING. Map 1's ZIP page can pass every backend geography check and still
 # render the legacy 3-mile centroid-radius cache to residents — that is exactly what happened:
@@ -22,10 +22,6 @@ on:
         description: 'Where to load the page from (default: the checked-out tree on localhost)'
         required: false
         default: ''
-      probe:
-        description: "Set to 'card-grain' to measure one-project-one-card instead of the full gate"
-        required: false
-        default: ''
   push:
     # The working branch is listed alongside main ON PURPOSE. A brand-new workflow cannot be
     # dispatched on a feature branch (workflow_dispatch resolves against the default branch), and
@@ -35,9 +31,9 @@ on:
     branches: [main, claude/homesignal-zip-forensics-13xkmw]
     paths:
       - 'homesignalmap.html'
-      - 'lib/data.js'
-      - 'scripts/verify-map1-delivery.mjs'
-      - '.github/workflows/verify-map1-delivery.yml'
+      - 'lib/zip-authoritative.js'
+      - 'scripts/probe-map1-card-grain.mjs'
+      - '.github/workflows/verify-map1-card-grain.yml'
 
 jobs:
   verify:
@@ -56,17 +52,9 @@ jobs:
           python3 -m http.server 8099 >/tmp/http.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
           curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
-      - name: Verify the public Map 1 delivery path
-        if: ${{ inputs.probe != 'card-grain' }}
-        env:
-          SITE_BASE: ${{ inputs.site_base != '' && inputs.site_base || 'http://localhost:8099' }}
-          ZIP_PATH: '/homesignalmap.html?zip={zip}'
-          ZIPS: ${{ inputs.zips }}
-        run: node scripts/verify-map1-delivery.mjs
       # Markers may exceed projects - that is geography. Cards may not. This measures the two
-      # SEPARATELY on whatever build is being pointed at, which is why it is its own step.
+      # SEPARATELY, on whatever build it is pointed at, and never infers one from the other.
       - name: Probe the card grain (one project = one card)
-        if: ${{ inputs.probe == 'card-grain' }}
         env:
           SITE_BASE: ${{ inputs.site_base != '' && inputs.site_base || 'http://localhost:8099' }}
           ZIPS: ${{ inputs.zips }}

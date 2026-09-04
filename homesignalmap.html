@@ -519,12 +519,6 @@ HS.onReady(function(){
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
-  // ZIP-mode geography contract: 'authoritative' | 'not_measured' | 'pending'. Set from
-  // public.app_zip_geography_state before anything is rendered; unknown resolves to 'pending',
-  // so an unreadable state can never be mistaken for an authoritative one.
-  var GEO_STATE = null;
-  var GEO_NOTE = "";                               // honest sentence when the page cannot claim a full set
-  var GEO_AUTH = null;                             // what the authoritative splice actually did, for the verifier
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
   // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
@@ -644,11 +638,7 @@ HS.onReady(function(){
     siteMarkers.forEach(function(x){
       var s = x.s;
       if(!s || !s._fanN || s._fanN < 2 || typeof s.lat!=="number") return;
-      // A multi-marker authoritative project is never fanned (its markers are distinct real
-      // locations), so it carries no _fanN and returns above; x.ll is used here for everything
-      // else so the marker is re-placed against its own point rather than the site's.
-      var trueLL = (x.ll && typeof x.ll[0]==="number") ? x.ll : [s.lat, s.lng];
-      var base = map.latLngToLayerPoint(trueLL);                   // the TRUE shared location
+      var base = map.latLngToLayerPoint([s.lat, s.lng]);           // the TRUE shared location
       var ang = s._fanIdx*2.399963;                                 // golden angle
       var rpx = 12 + 11*Math.sqrt(s._fanIdx);                       // pixels — one dot-width per step out
       x.m.setLatLng(map.layerPointToLatLng(L.point(base.x + rpx*Math.cos(ang), base.y + rpx*Math.sin(ang))));
@@ -935,17 +925,6 @@ HS.onReady(function(){
     // was answering on 08-07 (1,978 of 2,133 came back with facilities) and 08-08 (9,005 of
     // 10,086). Extending the old text to all 1,722 would have traded a false zero for a false
     // explanation. Anything cohort-specific belongs in the flag, not in this string.
-    // A statement about what the page can and cannot claim GEOGRAPHICALLY outranks the facility
-    // note, because it is the difference between an incomplete page and a page making a false
-    // claim about which projects are in this ZIP. When both apply the resident sees both.
-    if(GEO_NOTE){
-      el.textContent = GEO_NOTE + (FAC_UNAVAILABLE
-        ? " Separately, EPA's facility service has been unreachable since 2026-08-09, so the "
-          + "facility count cannot be confirmed and is shown as unavailable rather than zero."
-        : "");
-      el.style.display = "";
-      return;
-    }
     if(FAC_UNAVAILABLE){
       el.textContent = "EPA's facility service has been unreachable since 2026-08-09, so the "
         + "facility count for this area cannot be confirmed and is shown as "
@@ -1094,81 +1073,17 @@ HS.onReady(function(){
     if(_cap){ _cap.textContent = "Development across ZIP " + zip; }
     var _addr = $("addr");
     if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
-    GEO_STATE = null; GEO_NOTE = "";                 // never carry a previous ZIP's claim forward
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
-    // GEOGRAPHY STATE decides where ZIP-mode DEVELOPMENT comes from. Three states, and the page
-    // fails closed on each (public.app_zip_geography_state, a view so no browser role is ever
-    // granted `geo`):
-    //   authoritative  serve the authoritative entire-ZIP project set from the proven production
-    //                  contract app_projects_for_zip. NEVER the legacy radius cache - not as a
-    //                  fallback, not on error, not for a measured-zero ZIP.
-    //   not_measured   no TIGER 2025 ZCTA exists, so the ZIP cannot be measured. Zero is not the
-    //                  answer and a 3-mile circle is not the ZIP: development is removed and the
-    //                  page says so.
-    //   pending        geography still being built; the cache continues, explicitly non-authoritative.
-    // Facilities are untouched in all three - they ride the cached report exactly as before.
-    var HDRS = { apikey:APIKEY, Authorization:"Bearer "+APIKEY };
-    var stateUrl = SUPABASE_URL + "/rest/v1/app_zip_geography_state?zip=eq." + encodeURIComponent(zip) +
-                   "&select=geography_state&limit=1";
-    var jget = function(u){ return fetch(u, { headers:HDRS })
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .catch(function(){ return null; }); };
-    Promise.all([ jget(url), jget(stateUrl) ])
-      .then(function(res){
-        var rows = res[0] || [];
-        // An unreadable state row must not be read as "authoritative" - unknown falls to pending.
-        var geoState = (res[1] && res[1][0] && res[1][0].geography_state) || "pending";
-        GEO_STATE = geoState;
+    fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
         if(rows && rows.length){
           var row = rows[0];
-          var base = { address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
-                       counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at,
-                       facUnavailable:!!row.facilities_unavailable, geoState:geoState };
-          if(geoState === "not_measured"){
-            var dropped = HS.dropUnmeasurableDevelopment(base.sites);
-            base.sites = dropped.sites;
-            base.authoritative = { unmeasurable:true, removed:dropped.removed };
-            GEO_NOTE = "This ZIP has no published 2025 Census ZCTA boundary, so HomeSignal cannot "
-              + "measure which development projects fall inside it. Rather than show projects "
-              + "picked by a circle drawn around a point - which is not this ZIP - we show none, "
-              + "and say so. Regulated facilities below are unaffected. "
-              + "Enter your street address for a precise view around your home.";
-            render(base);
-            return;
-          }
-          if(geoState !== "authoritative"){ render(base); return; }
-          // AUTHORITATIVE. app_projects_for_zip is the contract production verification already
-          // gates on, so the page and the gate now read the same thing.
-          fetch(SUPABASE_URL + "/rest/v1/rpc/app_projects_for_zip", {
-              method:"POST",
-              headers:{ "Content-Type":"application/json", apikey:APIKEY, Authorization:"Bearer "+APIKEY },
-              body: JSON.stringify({ p_zip: zip, p_kind: "development" }) })
-            .then(function(r){ if(!r.ok) throw new Error("rpc " + r.status); return r.json(); })
-            .then(function(recs){
-              if(!Array.isArray(recs)) throw new Error("rpc shape");
-              var sp = HS.spliceAuthoritativeDevelopment(base.sites, recs);
-              base.sites = sp.sites;
-              base.authoritative = sp;
-              if(sp.unlinkable > 0){
-                // Disclosed, never hidden: the anti-fabrication rule forbids rendering a record
-                // with no official link, so these are counted out loud instead of vanishing.
-                GEO_NOTE = sp.unlinkable + " project" + (sp.unlinkable===1?"":"s")
-                  + " inside this ZIP could not be shown because their official record link is "
-                  + "temporarily unavailable. They are counted here rather than dropped silently.";
-              }
-              render(base);
-            })
-            .catch(function(){
-              // FAIL CLOSED. An authoritative ZIP never falls back to legacy radius development.
-              base.sites = HS.dropUnmeasurableDevelopment(base.sites).sites;
-              base.authoritative = { failed:true };
-              GEO_NOTE = "Development records for this ZIP are temporarily unavailable. We do not "
-                + "substitute an approximate set, so none are shown right now. Regulated "
-                + "facilities below are unaffected.";
-              render(base);
-            });
+          render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
+                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at,
+                   facUnavailable:!!row.facilities_unavailable });
         } else {
           // No cached row yet → still a valid, empty page. Empty is valid (never fabricated), not an error.
           window.__HS_SITES = [];
@@ -1254,15 +1169,8 @@ HS.onReady(function(){
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
-    // Once DEVELOPMENT no longer comes from the cache, the cache's development-derived counters
-    // are stale by construction and must be recomputed from what is actually rendered. Only
-    // counts.facilities survives, because facilities still ride the cached report untouched.
-    var AUTH_DEV = ZIP_MODE && (data.geoState === "authoritative" || data.geoState === "not_measured");
-    GEO_AUTH = data.authoritative || null;
-    $("cDev").textContent  = AUTH_DEV ? prop.length
-      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
-    $("cOpen").textContent = AUTH_DEV ? open.length
-      : ((data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length);
+    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
     // Open-for-comment banner — rebuilt every render (clears between searches; works in both
@@ -1387,22 +1295,9 @@ HS.onReady(function(){
       bounds = [[home.lat+dLat, home.lng+dLng], [home.lat-dLat, home.lng-dLng]];
     }
     sites.forEach(function(s){
+      var ll = siteLL(s);
+      if(typeof ll[0]!=="number" || typeof ll[1]!=="number") return;
       if(!mappable(s)) return;
-      // ONE CARD PER PROJECT, MANY MARKERS WHERE THE GEOGRAPHY HAS THEM. An authoritative project
-      // whose geometry is a line or a polygon legitimately meets the ZIP in several places, and the
-      // authoritative marker relation carries each of them. Collapsing them back to one point would
-      // throw away measured geography; duplicating the project into several cards would misreport
-      // how many projects there are. So the CARD grain stays the project (window.__HS_SITES) and the
-      // MARKER grain follows _markers.
-      //   Exactly one marker (the overwhelming case) keeps siteLL(s), so the co-location fan and
-      //   every existing behaviour are untouched. Several markers are drawn at their own points and
-      //   are NOT fanned - they are genuinely distinct locations, not a stack.
-      var pts = [];
-      if(s.authoritative && s._markers && s._markers.length > 1){
-        s._markers.forEach(function(mk2){ pts.push([mk2.lat, mk2.lng]); });
-      } else {
-        pts.push(siteLL(s));
-      }
       var mk = HS.resolveTrackerMarker(s, frsRid);
       // A dot is solid+full-size ONLY when it's a precise point: an exact-location facility, or
       // a point geocode at rooftop/parcel quality. Area dots (jurisdiction-wide) and
@@ -1412,16 +1307,11 @@ HS.onReady(function(){
       var size = solidPoint ? 14 : 12;
       var svg = HS.markerSVG(mk.shape, mk.color, '', size);
       var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
-      pts.forEach(function(ll, i){
-        if(!ll || typeof ll[0]!=="number" || typeof ll[1]!=="number") return;
-        var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
-        m.bindPopup(popupHTML(s));
-        m.on("mouseover", function(){ this.openPopup(); });
-        // `ll` rides on the entry so the pixel fan re-places a marker against ITS OWN true point.
-        // Reading s.lat/s.lng there would drag every marker of a multi-marker project onto one spot.
-        siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, ll:ll, seq:i });
-        bounds.push(ll);
-      });
+      var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
+      m.bindPopup(popupHTML(s));
+      m.on("mouseover", function(){ this.openPopup(); });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s });
+      bounds.push(ll);
     });
     applyFilter();
     // animate:false so the zoom is final synchronously and the pixel fan lands on the settled zoom.
@@ -1438,27 +1328,10 @@ HS.onReady(function(){
     var vis = 0;
     siteMarkers.forEach(function(x){ if(x && x.m && layerGroup && layerGroup.hasLayer(x.m)) vis++; });
     var covEl = $("covNote");
-    // The counts a delivery gate has to be able to read WITHOUT trusting the backend:
-    //   geographyState      which contract this page served development under
-    //   devProjects         development CARDS rendered (one per project)
-    //   devMarkers          development MARKERS drawn (several per line/polygon project)
-    //   authoritativeDev    true only when those came from the authoritative contract
-    //   legacyDevelopment   true if any rendered development record came from the legacy cache
-    //   unlinkableProjects  authoritative projects withheld for having no official record link
-    var _dev = (window.__HS_SITES || []).filter(function(s){ return s && s.relevance === "development"; });
-    var _devMarkers = 0;
-    siteMarkers.forEach(function(x){ if(x && x.s && x.s.relevance === "development") _devMarkers++; });
     window.__HS_VERIFY = {
       mapMarkers: siteMarkers.length,
       visibleMarkers: vis,
       facilitiesOnly: FACILITIES_ONLY,
-      geographyState: GEO_STATE,
-      devProjects: _dev.length,
-      devMarkers: _devMarkers,
-      authoritativeDev: _dev.length > 0 && _dev.every(function(s){ return s.authoritative === true; }),
-      legacyDevelopment: _dev.some(function(s){ return s.authoritative !== true; }),
-      unlinkableProjects: (GEO_AUTH && GEO_AUTH.unlinkable) || 0,
-      developmentUnavailable: !!(GEO_AUTH && GEO_AUTH.failed),
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
     };
