@@ -87,8 +87,20 @@ jobs:
 
       - name: Commit the regenerated artifact back to this branch
         run: |
-          if git diff --quiet -- lib/generated/gov-notice-coverage.json; then
-            echo "artifact unchanged — nothing to commit"
+          # Compare the COVERAGE SET, not the file. `_measured_at` is rewritten on every
+          # generate, so a whole-file diff is never empty and this step would commit a
+          # timestamp-only churn commit on every run (observed: fcf6b14, whose only
+          # difference from f5ef452 was 19:05Z -> 19:10Z). `--check` already ignores the
+          # timestamp and compares configured_zips; this uses the same predicate, so the
+          # gate and the commit condition cannot disagree.
+          if node -e '
+            const { execSync } = require("child_process");
+            const prev = JSON.parse(execSync("git show HEAD:lib/generated/gov-notice-coverage.json").toString());
+            const next = require("./lib/generated/gov-notice-coverage.json");
+            process.exit(JSON.stringify(prev.configured_zips) === JSON.stringify(next.configured_zips) ? 0 : 1);
+          '; then
+            echo "coverage set unchanged — nothing to commit (timestamp churn discarded)"
+            git checkout -- lib/generated/gov-notice-coverage.json
             exit 0
           fi
           git config user.name  "github-actions[bot]"
