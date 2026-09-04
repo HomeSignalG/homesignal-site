@@ -50,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -58,7 +58,7 @@ on:
         default: 'AUTO'
         type: string
       max_shards:
-        description: 'n5-shard: how many shards this run may complete'
+        description: 'n5-shard: how many shards this run may complete · n5-recon: ZIPs per chunk'
         required: false
         default: '1'
         type: string
@@ -287,6 +287,15 @@ jobs:
           DISK_FLOOR_MB: '2048'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_a3_markers.py
+
+      - name: N5 - whole-population reconciliation of the ENABLED ZIP set
+        if: ${{ github.event.inputs.mode == 'n5-recon' }}
+        env:
+          MODE: n5-recon
+          RECON_CHUNK: ${{ github.event.inputs.max_shards }}
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_recon_population.py
 
       - name: N5 Unit A4 - create the measured-required source_key index
         if: ${{ github.event.inputs.mode == 'n5-a4-index' }}
