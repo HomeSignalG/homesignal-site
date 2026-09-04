@@ -112,6 +112,18 @@ jobs:
       # agree with what the map DRAWS. Dispatched through this workflow because GitHub only
       # offers workflow_dispatch for files present on the default branch; the run executes the
       # dispatched ref's copy, so the branch's own gate script is what actually runs.
+      # THE USER JOURNEY, live: navigation identity + location context, the two surfaces
+      # the founder's manual review found broken. Read-only, same public browser session.
+      - name: USER JOURNEY - which page am I on, and where am I looking?
+        if: always()
+        env:
+          BASE: ${{ env.BASE }}
+          ZIP: ${{ inputs.zip }}
+          ADDRESS: ${{ inputs.address }}
+        run: |
+          set -o pipefail
+          node scripts/map1-journey-live.mjs 2>&1 | tee -a /tmp/proof.log
+
       - name: MARKET-READINESS GATE - Map 1 as a resident uses it
         if: always()
         env:
