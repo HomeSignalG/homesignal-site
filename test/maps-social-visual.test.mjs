@@ -67,8 +67,8 @@ ok(/deltaM > 500/.test(GEN),
   'the drawn marker may carry better geometry than the stored point, but the delta is bounded');
 ok(/marker_vs_stored_point_m/.test(GEN),
   'and that delta is recorded in the evidence rather than hidden');
-ok(/__hsMarkerSettle/.test(GEN),
-  'the capture waits for the draw to SETTLE, not merely to start');
+ok(/waitForFunction\([\s\S]{0,240}zip_project_ref \|\| x\.s\.source_id\) === key/.test(GEN),
+  'the capture waits for THIS project\u2019s marker, not for a count to stop changing');
 ok(/live coordinates differ from the draft evidence/.test(GEN),
   'the live project row is re-read and must still agree with the draft');
 ok(/record_kind !== 'development'/.test(GEN), 'facilities can never be captured');

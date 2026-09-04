@@ -132,12 +132,21 @@ async function capture(page, draft, proj) {
       && Array.isArray(window.siteMarkers) && window.siteMarkers.length > 0,
     { timeout: 60000 },
   ).catch(() => {});
-  await page.waitForFunction(() => {
-    const n = (window.siteMarkers || []).length;
-    const prev = window.__hsMarkerSettle;
-    window.__hsMarkerSettle = n;
-    return prev === n && n > 0;          // two consecutive polls agree
-  }, { timeout: 60000, polling: 900 }).catch(() => {});
+  // Then wait for THIS PROJECT's marker specifically. A count that has stopped changing is
+  // not the same as the right draw having happened: ZIP mode issues the cached report and
+  // the authoritative whole-ZIP read together, and the authoritative merge — the one that
+  // carries zip_project_ref — can land after a first pass has already settled. Since the
+  // RPC has already confirmed the ZIP is boundary_complete AND this project is in its
+  // authoritative set, the marker must appear; waiting for the marker itself removes the
+  // race instead of guessing at a duration. Measured: settling on the count captured 1 of 7,
+  // because six reads landed on the pre-authoritative draw.
+  await page.waitForFunction(
+    (key) => (window.siteMarkers || []).some(
+      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key,
+    ),
+    proj.source_key,
+    { timeout: 90000, polling: 700 },
+  ).catch(() => {});
 
   const drew = await page.evaluate(() => (window.siteMarkers || []).length);
   if (!drew) return { ok: false, reason: 'map drew no markers for this ZIP' };
