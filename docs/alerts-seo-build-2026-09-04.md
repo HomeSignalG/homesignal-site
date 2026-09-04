@@ -32,6 +32,16 @@ during the deployment build, existing only inside the artifact, are not that. Th
 stated positively: **one shared implementation + a data-driven build → ZIP-specific
 deployment documents.** A build gate fails if `community/` ever becomes tracked by git.
 
+### One deliberate difference at flip time, stated rather than discovered later
+
+The artifact stages the repo minus `.git`, `.github`, `test/`, `docs/` and `node_modules`.
+Under branch deployment those trees are served publicly today (Pages serves whatever is on
+the branch), so switching the source **removes `homesignal.net/docs/…` and
+`homesignal.net/test/…` from the public site**. That is a tightening, not a regression — no
+shipped page links to either (checked: zero `href` references to `docs/` or `test/` across
+every `.html`/`.js` that ships) and they are internal engineering records, not product. It
+is recorded here because it happens at the flip, not at merge.
+
 ---
 
 ## 2 · Fresh measurement — the 12,722 cross-tab

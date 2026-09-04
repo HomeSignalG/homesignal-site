@@ -57,11 +57,14 @@ jobs:
                    ./ _site/
 
       - name: Generate one document per canonical ZIP
-        run: python3 scripts/gen_zip_pages.py --out _site
+        run: |
+          set -euo pipefail
+          python3 scripts/gen_zip_pages.py --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
 
       - name: Build gates
         run: |
           set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           test -f _site/zip-pages-manifest.json
           DOCS=$(find _site/community -mindepth 2 -name index.html | wc -l)
           echo "generated documents: $DOCS"
@@ -98,9 +101,12 @@ jobs:
 
       - name: Offline gates for the generated documents
         run: |
-          node test/zip-pages-seo.test.mjs
-          node test/zip-pages-no-point.test.mjs
-          node test/community-page-contract.test.mjs
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          for t in zip-pages-seo zip-pages-no-point community-page-contract; do
+            echo "--- test/$t.test.mjs"
+            node "test/$t.test.mjs" | tail -3
+          done
 
       - name: Install Playwright (chromium)
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
@@ -126,7 +132,10 @@ jobs:
             {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01002",
              "fail_dev_fail":"02543","local_news":"01001","weather_thin":"04401",
              "honest_empty":"02543","fanout":"22030","point_dense":"28468"}
-        run: node scripts/prove-zip-pages.mjs
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          node scripts/prove-zip-pages.mjs
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -135,6 +144,9 @@ jobs:
       - name: Report build stats
         if: always()
         run: |
+          echo "----- RECEIPTS (replayed: the artifact upload lists 12,722 paths and"
+          echo "      pushes every earlier step out of the retrievable log tail) -----"
+          cat "$RUNNER_TEMP/receipts.txt" || echo "NO RECEIPTS FILE — the gates did not run"
           echo "----- BUILD STATS -----"
           python3 - <<'EOF'
           import json, os
