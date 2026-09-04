@@ -566,3 +566,40 @@ No point inside a ZIP is required to make ZIP-page rendering work: every Alerts 
 keyed by ZIP set-membership or by jurisdiction chain, and the one place a centroid appears in
 the same function is a coordinate-sanity fence on a different product's records. The frozen
 design proceeds with corrections 1–4 and acceptance test 10 attached.
+
+---
+
+# CORRECTION — the "build hang" did not exist (2026-09-04)
+
+Commit `6946ed5` ("retry, backoff and a hard fetch deadline") states as fact that the pages
+build stalled because of **Supabase throttling from repeated full-corpus pulls**. That
+diagnosis is **withdrawn**. It explained a phenomenon that was not happening.
+
+**What actually happened.** Runs 3 and 4 appeared frozen at *"Generate one document per
+canonical ZIP"*, with the run-level `updated_at` pinned at the job's start time. On that
+reading three runs were cancelled. When run 4 was finally cancelled, its log became
+retrievable and showed the generation step had **completed normally at 00:52:43, about 96
+seconds in** — 12,722 documents, 7,071 / 5,651, 44.0 MB — and that the job was partway
+through `npm i playwright@1` when the cancel landed. Attempt 2 then did the same step in
+**26 seconds**. Nothing ever hung.
+
+**The real cause was the instrument.** GitHub's job/step API was stale by many minutes
+throughout this session, and `get_job_logs` returns HTTP 404 while a job is in flight — so
+"still on step 5" and "no logs" were indistinguishable from a stall. That trap was hit and
+noted three times earlier in the same session and then walked into anyway, at the cost of
+three cancelled healthy runs on an Actions budget this org has already exhausted twice.
+
+**Rules this re-earns, both already in CLAUDE.md:**
+- *An instrument must prove it ran before its silence counts as evidence.* A step reading
+  `in_progress` and a log reading 404 are **not** observations of a stalled job; they are
+  the absence of an observation. The only trustworthy terminal signals here are a run-level
+  `conclusion` and a log that actually downloads.
+- *A count/status is a LEAD, not a fact.* A causal story was built on the lead, shipped, and
+  reported as fact.
+
+**What stands, and why.** `6946ed5` itself is kept: 45s per request, five retries with
+exponential backoff, and a hard 900s fetch deadline are correct hardening for a **daily**
+job — a build that hangs really is worse than one that fails, and the generator previously
+had no retry and no budget. But it was **motivated by a phantom**, not by a measurement, and
+its commit message should be read with this correction attached. No throttling was ever
+observed: three separate runs each completed the full ~190k-row fetch in 25–96 seconds.
