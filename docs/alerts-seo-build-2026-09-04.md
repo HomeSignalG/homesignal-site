@@ -212,6 +212,75 @@ this build, and the full offline suite (which includes the maps suites) is green
 
 ---
 
+## 8b · Build receipts — run `33885422583`, job `101063880672`, head `4d1c530`, **success**
+
+Every line below is quoted from that run's log (the gates tee into a receipts file which the
+final step replays, because `upload-pages-artifact` lists all 12,722 generated paths and
+pushes every earlier step past the retrievable log tail — a gate whose result cannot be read
+is not a gate).
+
+```
+canonical registry: 12722 rows, 12722 distinct, 0 duplicates
+documents      : 12722
+rule F pass    : 7256
+rule F fail    : 5466
+artifact bytes : 51687277 (49.3 MB)
+avg html bytes : 4062
+max html bytes : 8487 (zip 84301)
+sitemap        : -11701 legacy community.html?zip= URLs, +7256 /community/<zip>/ URLs
+build seconds  : 95.1
+generated documents: 12722
+non-canonical path shapes: 0
+artifact size: 132M
+sitemap reconciled: 7256 community URLs == rule_f_pass 7256
+GATES OK
+```
+
+| measure | value |
+|---|---:|
+| generated ZIP documents | **12,722** |
+| ZIP HTML, uncompressed | **51,687,277 B (49.3 MB)** |
+| whole artifact, uncompressed | **132 MB** |
+| whole artifact, uploaded (tar.gz) | **7,766,955 B** |
+| average ZIP document | **4,062 B** |
+| largest ZIP document | **8,487 B** (84301, Brigham City UT) |
+| generation step | **95.1 s** |
+| whole build job | **2 m 06 s** (14:43:55 → 14:46:01Z) |
+| `deploy` job | **skipped** — not `main` |
+
+**The independent agreement that makes the count trustworthy:** the server-side SQL cross-tab
+(§2, PostgreSQL over the tables) and the generator (Python over PostgREST) are separate
+implementations of Rule F reading through different interfaces, and both return **7,256 /
+5,466**.
+
+Offline gates, in the same log: `zip-pages-seo` **60 passed, 0 failed** · `zip-pages-no-point`
+**19 passed, 0 failed** · `community-page-contract` **18 passed, 0 failed**.
+
+### Candidate crawler proof — 63 passed, 0 failed
+
+Over the built artifact, served locally, before any deployment exists:
+
+- `[01034]` HTTP 200 · `index, follow` in the **initial** HTML · canonical
+  `https://homesignal.net/community/01034/` · ZIP-specific H1 and title · meta description ·
+  all three Alerts headings present · real Alerts items present · no distance/HOME/centroid.
+- `[01002]` the same, with `noindex, follow`.
+- **Googlebot smartphone and Googlebot desktop receive byte-identical HTML** to a normal UA —
+  no cloaking. Two different ZIPs return different documents.
+- Controls **A / D / E / F / G / H / J** all pass, including *"E [01001] the local news that
+  qualifies this page is IN the page"*, *"F [04401] a weather-only/thin page stays noindex —
+  weather never carries Rule F"* with *"...while weather is still DISPLAYED"*, and
+  *"J [28468] the densest development ZIP leaks no point/radius/distance string"*.
+- A non-canonical ZIP path is a 404, never an indexable shell.
+- Sitemap: *"advertises exactly the Rule F pass set (7256 = 7256)"*, the legacy URL is gone,
+  the development half survives.
+- **Hydration does not corrupt the build-time contract:** on 01034, 01002 and 01001 the robots
+  directive is unchanged after JavaScript, the canonical, the ZIP identity and the title all
+  survive, and there are no uncaught page errors. Alerts substance survives on both shapes —
+  01034 keeps the build-time block (`ssr items 6`, the coverage-coming branch) while 01001
+  re-renders the tiles itself (`ssr items 0`, 3,577 characters).
+
+---
+
 ## 10 · What remains
 
 **The one-time repository setting: Settings → Pages → Build and deployment → Source =
