@@ -22,7 +22,7 @@
     <div class="cols">
       <div>
         <div class="block" style="padding:16px 18px">
-          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html" data-znav="maps.html" id="dashMapLink">Open full map →</a></div>
+          <div class="bt-row"><h2>What's changing around you</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashMapLink">Open full map →</a></div>
           <div class="mapwrap dash-mapwrap" id="dashMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
         </div>
         <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" data-znav="alerts.html" id="dashAllAlerts" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
@@ -39,7 +39,7 @@
           <div id="dashCommunities"></div>
         </div>
         <div class="block" id="dashWatchBlock">
-          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html" data-znav="maps.html" id="dashWatchMap">See on map →</a></div>
+          <div class="bt-row"><h2>Worth watching nearby</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashWatchMap">See on map →</a></div>
           <div class="chips" id="dashWatch"></div>
         </div>
         <div class="block">
@@ -108,7 +108,7 @@ HS.onReady(async function () {
     + (c && c.community_score != null ? HS.tpl.statTileLink(c.community_score, 'ZIP Score', 'g', nav('community.html', Object.assign({ focus: 'score' }, mapCtx()))) : '');
 
   // Stamp ZIP-aware header links (paintNavHrefs runs at boot; re-stamp after we know data).
-  var mapHref = nav('maps.html', mapCtx());
+  var mapHref = nav('homesignalmap.html', mapCtx());
   ['dashMapLink', 'dashWatchMap', 'dashAllAlerts', 'dashZipOpen', 'dashMeetingsHead'].forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;

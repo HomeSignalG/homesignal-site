@@ -9,6 +9,12 @@ name: verify-maps-uncap
 #   and payload/ready budgets hold on the densest cached ZIP (44127, 5,424).
 # VERIFICATION ONLY — touches no product data.
 
+# RETIRED 2026-09-04 with the second map. This workflow's subject was maps.html, which is
+# now a redirect stub to the one primary map, so its automatic triggers were removed: a
+# scheduled or push-triggered run could only ever fail, and a permanently-red check teaches
+# people to ignore red (the same reasoning unit-tests.yml records for its own trigger scoping).
+# workflow_dispatch is KEPT so the job and its script stay available and this is reversible.
+# The script itself is not deleted - it is the record of how that page was verified.
 on:
   workflow_dispatch:
     inputs:
@@ -16,13 +22,6 @@ on:
         description: 'Comma-separated ZIPs (typical,dense,densest)'
         required: false
         default: '85234,55407,44127'
-  # Cloud agents lack actions:write for manual dispatch (db-sql.yml precedent) —
-  # a push touching the verifier or its trigger file runs the check on that branch.
-  push:
-    paths:
-      - 'scripts/verify-maps-uncap.mjs'
-      - '.github/workflows/verify-maps-uncap.yml'
-      - 'verify/uncap-run.txt'
 
 jobs:
   verify:
