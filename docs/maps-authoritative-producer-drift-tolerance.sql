@@ -63,3 +63,27 @@
 -- runs in milliseconds unloaded. The set-based verification above covers the same
 -- invariants without 9,764 calls, and the producer is a deterministic function of exactly
 -- those two relations.
+
+-- ---------------------------------------------------------------------------
+-- BACKLOG CUTOVER AFTER THE FIX, 2026-09-04. production_geography_verified 8,363 -> 10,491.
+--
+-- The 305 measured-but-not-cut-over ZIPs were ALL held BLOCKED on frozen-vs-live drift -
+-- precisely the condition the corrected producer tolerates - so they were the first group,
+-- not a separate workstream. Verified through app_authoritative_projects_for_zip in five
+-- groups; the arithmetic closes exactly against the pre-computed control:
+--   62,809 projects = 62,809 memberships · 65,489 markers = 65,489 relation
+--   2,295 attributes_missing · no exception on any ZIP
+--
+-- Batch 21 (11 prefixes, 336 ZIPs) full pipeline, gates all zero, reconciled in 4 groups:
+--   72,013 projects = 72,013 memberships · 74,668 markers = 74,668 relation
+--   6,271 attributes_missing. Cost 62 MB for 66,465 evidence=1 rows (~0.93 MB/1,000).
+--
+-- Batch 22 (14 prefixes) is PARTIAL and deliberately so. The marker build stopped itself:
+--   STOP: free 1930.6 MB below the 2048.0 floor
+-- 12 of 14 prefixes completed markers; 761 and 890 have none and were NOT cut over. Of the
+-- 12, only the 86 ZIPs individually reconciled through the producer were cut over
+-- (39,486 projects = 39,486 memberships, 39,561 markers = 39,561 relation). The rest stay
+-- boundary_complete / measured-not-cut-over, which is an explicit honest state.
+--
+-- ⚠️ HARD STOP ON DISK. Free 1,131 MB against the 2,048 MB floor, db 8,412 MB and WAL
+-- 2,064 MB still draining from the marker build. No further growth operations were run.
