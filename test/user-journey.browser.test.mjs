@@ -16,12 +16,14 @@
 //
 // Run: node test/user-journey.browser.test.mjs
 import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
 let fails = 0;
 const ok = (c, name, detail) => {
   console.log((c ? 'PASS' : 'FAIL') + ' — ' + name);
@@ -123,12 +125,19 @@ await page.route('**/*', async (route) => {
   if (url.includes('/rest/v1/app_projects'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECTS) });
   if (url.includes('/rest/v1/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-  if (url.includes('leaflet@1.9.4/dist/leaflet.js'))
-    return route.fulfill({ status: 200, contentType: 'text/javascript',
-      body: await readFile(join(root, 'node_modules/leaflet/dist/leaflet.js'), 'utf8') });
-  if (url.includes('leaflet@1.9.4/dist/leaflet.css'))
-    return route.fulfill({ status: 200, contentType: 'text/css',
-      body: await readFile(join(root, 'node_modules/leaflet/dist/leaflet.css'), 'utf8') });
+  // Leaflet is REAL here — the HOME pin and the marker layer are what several of these
+  // assertions read. Served from a local copy when node can resolve one (the sandbox has
+  // no egress), and otherwise fetched from the CDN the page already names (CI runners have
+  // network but no leaflet install). If neither works the map simply fails to render and
+  // the assertions go red, which is the correct outcome — never a silent skip.
+  if (url.includes('leaflet@1.9.4/dist/leaflet.js') || url.includes('leaflet@1.9.4/dist/leaflet.css')) {
+    const css = url.endsWith('.css');
+    let local = null;
+    try { local = require.resolve('leaflet/dist/leaflet' + (css ? '.css' : '.js')); } catch (e) { local = null; }
+    if (!local) return route.continue();
+    return route.fulfill({ status: 200, contentType: css ? 'text/css' : 'text/javascript',
+      body: await readFile(local, 'utf8') });
+  }
   if (url.includes('cdn.jsdelivr.net')) {
     const kind = url.endsWith('.css') ? 'text/css' : 'text/javascript';
     return route.fulfill({ status: 200, contentType: kind, body: kind === 'text/css' ? '' : 'window.supabase=window.supabase||{createClient:function(){var q={select:function(){return q;},eq:function(){return q;},in:function(){return q;},order:function(){return q;},limit:function(){return q;},then:function(r){return Promise.resolve({data:[],error:null}).then(r);}};return{from:function(){return q;},rpc:function(){return Promise.resolve({data:null,error:null});},auth:{getSession:function(){return Promise.resolve({data:{session:null}});},onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};}}};}};' });
