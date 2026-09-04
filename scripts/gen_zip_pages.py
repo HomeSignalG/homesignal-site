@@ -35,6 +35,15 @@ WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
 ZIP_RE = re.compile(r"^[0-9]{5}$")
 
+# A build that HANGS is worse than a build that fails: the job burns its whole
+# timeout-minutes budget and reports nothing. Two consecutive runs stalled inside this
+# fetch after several full-corpus pulls in quick succession (throttling), so every request
+# now has a short timeout, bounded retries with exponential backoff, and the whole fetch
+# phase has a hard deadline that exits non-zero with the row count reached.
+REQ_TIMEOUT = 45          # seconds per request
+FETCH_BUDGET = 900        # seconds for the entire fetch phase
+DEADLINE = [float("inf")]  # set in main(); a list so fetch_all can read it without a global
+
 
 # ---------------------------------------------------------------- fetch (network half)
 def _anon_key():
@@ -59,8 +68,22 @@ def fetch_all(path, key, select, extra="", keyset="id"):
         url = (f"{SUPA}/rest/v1/{path}?select={cols}{extra}{cur}"
                f"&order={keyset}.asc&limit={STEP}")
         req = urllib.request.Request(url, headers={"apikey": key, "Authorization": f"Bearer {key}"})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            page = json.loads(r.read().decode("utf-8"))
+        page = None
+        for attempt in range(5):
+            if time.time() > DEADLINE[0]:
+                sys.exit(f"ERROR: fetch deadline exceeded on {path} after {len(out)} rows - "
+                         "failing loudly rather than hanging the job")
+            try:
+                with urllib.request.urlopen(req, timeout=REQ_TIMEOUT) as r:
+                    page = json.loads(r.read().decode("utf-8"))
+                break
+            except Exception as e:                     # transient: throttle, reset, timeout
+                if attempt == 4:
+                    sys.exit(f"ERROR: {path} failed after 5 attempts at offset {len(out)}: {e}")
+                back = 2 ** attempt
+                print(f"  retry {attempt+1}/4 on {path} after {type(e).__name__}: {e} "
+                      f"(sleeping {back}s)", flush=True)
+                time.sleep(back)
         if not page:
             return out
         out.extend(page)
@@ -292,6 +315,7 @@ def main():
     ap.add_argument("--now", help="ISO instant for the forward-meeting window (determinism)")
     a = ap.parse_args()
     t0 = time.time()
+    DEADLINE[0] = t0 + FETCH_BUDGET
     now_iso = a.now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     if a.fixture:
