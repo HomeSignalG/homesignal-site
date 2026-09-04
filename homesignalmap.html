@@ -1248,10 +1248,18 @@ HS.onReady(function(){
         if(!currentReq(token)) return;      // a newer search (or an address) already owns the page
         ZIP_AUTH = auth;
         var authSites = HS.zipAuthSitesFrom(auth);
+        // The cached report's development counters describe ITS centroid-radius development set,
+        // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
+        // Leaving them makes the headline tile contradict the map the resident is looking at
+        // (measured live on 78617: the tile read 48 while 55 were drawn). Drop them so render()
+        // recomputes from what is actually on screen. The facilities count is still the engine's
+        // and is still accurate, so it stays. Same guard address mode has always had.
+        var zipCounts = rows && rows.length ? (rows[0].counts || {}) : {};
+        delete zipCounts.development; delete zipCounts.proposed; delete zipCounts.comment_open;
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
-                   counts:row.counts||{},
+                   counts:zipCounts,
                    sites: HS.zipAuthMergeSites(row.sites||[], authSites),
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
@@ -1377,7 +1385,12 @@ HS.onReady(function(){
 
     // Facilities-only ZIP page (has EPA facilities, no planning items yet) → show the honest
     // coverage note so "0 planning items" doesn't read as "nothing is happening here."
-    var devCount = (data.counts && data.counts.development) != null ? data.counts.development : dev.length;
+    // FALLBACK MATTERS NOW: with the engine's development counter dropped (ZIP mode replaces its
+    // development set; address mode already did), this falls back for real. It must count what is
+    // RENDERED as development - the point records AND the area items - because a ZIP carrying
+    // hundreds of project POINTS and no area notices would otherwise compute 0 here and wrongly
+    // announce itself facilities-only / coverage-coming.
+    var devCount = (data.counts && data.counts.development) != null ? data.counts.development : (permits.length + dev.length);
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
     FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
     updateCovNote();

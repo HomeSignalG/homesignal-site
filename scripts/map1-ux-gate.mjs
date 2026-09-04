@@ -1,0 +1,172 @@
+// MAP 1 MARKET-READINESS GATE — the product check, driven as a resident would.
+//
+// This is NOT another backend certification. It opens the DEPLOYED page in a real browser,
+// does what a user does, and asks user-level questions: does the map load, do results render,
+// do the numbers agree with what is drawn, does clicking a marker explain itself, is the
+// control set right for the mode.
+//
+// It walks BOTH geographic contracts, which must never be conflated:
+//   ZIP MODE      = the entire actual ZIP/ZCTA geography, no radius.
+//   ADDRESS MODE  = the geocoded HOME + a user-selected radius.
+//
+// THE HEADLINE INVARIANT IT EXISTS TO PROTECT
+//
+//   The big number a resident reads must be a projection of what the map actually draws.
+//   The page states this contract itself, above #cDev: "it must equal the orange Proposed
+//   rail." A tile that says 48 over a map drawing 40 is not a rounding difference - it is the
+//   product telling the user something the evidence on screen contradicts, which is the
+//   fastest way to lose their trust in everything else on the page.
+//
+//   Address mode already protects it: when canonical results replace the report engine's own
+//   development set, it DELETES the engine's development counters so render() recomputes from
+//   what is on screen. That makes address mode a POSITIVE CONTROL here - the same assertion
+//   runs in both modes, and if it passes in address mode while failing in ZIP mode, the defect
+//   is specific and the fix is the pattern address mode already proves.
+//
+// Run: BASE=https://homesignal.net node scripts/map1-ux-gate.mjs
+import { chromium } from 'playwright';
+
+const BASE = process.env.BASE || 'https://homesignal.net';
+const ZIP = process.env.ZIP || '78617';
+const ADDRESS = process.env.ADDRESS || '2200 CALDWELL LN, DEL VALLE, TX 78617';
+
+let fails = 0;
+const ok = (c, name, detail) => {
+  console.log((c ? 'PASS' : 'FAIL') + ' — ' + name);
+  if (!c) { fails++; if (detail !== undefined) console.log('           detail: ' + JSON.stringify(detail).slice(0, 400)); }
+};
+const info = (k, v) => console.log('   · ' + k + ': ' + (typeof v === 'string' ? v : JSON.stringify(v)));
+
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+const errors = [];
+page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+
+// What a resident actually sees: the counter tiles, and the rails the map is drawn from.
+const readScreen = () => page.evaluate(() => {
+  const txt = (id) => { const el = document.getElementById(id); return el ? el.textContent.trim() : null; };
+  const num = (id) => { const t = txt(id); const n = Number(String(t).replace(/[^0-9.]/g, '')); return t === '—' ? 'unavailable' : (isFinite(n) ? n : null); };
+  const sites = window.__HS_SITES || [];
+  // The page's own predicates, mirrored so the rails are read the way it computes them.
+  const bucketOf = (t) => String(t || '').toLowerCase();
+  const devPoint = (s) => s.scope === 'point' && s.relevance === 'development';
+  const areaDev = (s) => s.scope === 'area' && s.relevance !== 'civic';
+  const proposed = sites.filter(s => (devPoint(s) || areaDev(s)) && bucketOf(s.type) === 'proposed');
+  return {
+    tile_proposed: num('cDev'),
+    tile_facilities: num('cFac'),
+    tile_open: num('cOpen'),
+    tile_total: num('cTot'),
+    rail_proposed: proposed.length,
+    sites_total: sites.length,
+    dev_points: sites.filter(devPoint).length,
+    facilities: sites.filter(s => s.scope === 'point' && s.relevance !== 'development').length,
+    freshLine: txt('freshLine'),
+    withinLbl: txt('withinLbl'),
+    status: txt('status'),
+    radiusVisible: (() => { const el = document.getElementById('radSel'); if (!el) return false;
+      const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
+    homePins: document.querySelectorAll('.homepin').length,
+    mapPresent: !!document.querySelector('#mapInner .leaflet-container, #map .leaflet-container')
+  };
+});
+
+console.log('='.repeat(78));
+console.log('MAP 1 — MARKET-READINESS GATE (product check, live)');
+info('base', BASE); info('zip', ZIP); info('address', ADDRESS);
+console.log('='.repeat(78));
+
+// ═══════════════════ A. ZIP MODE — the entire ZIP ═══════════════════
+// Opens the first DEVELOPMENT marker's real popup and reads it back.
+async function openDossier() {
+  return page.evaluate(async () => {
+    const ms = window.siteMarkers || [];
+    const hit = ms.find(x => x && x.s && x.s.scope === 'point' && x.s.relevance === 'development');
+    if (!hit) return null;
+    hit.m.openPopup();
+    await new Promise(r => setTimeout(r, 400));
+    const el = document.querySelector('.leaflet-popup-content');
+    return el ? { label: hit.s.label || null, text: el.textContent.trim().slice(0, 160),
+                  link: !!el.querySelector('a[href^="http"]') } : null;
+  });
+}
+
+console.log('\nA. ZIP MODE — a resident opens their ZIP');
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
+await page.waitForTimeout(4000);
+const z = await readScreen();
+info('screen', z);
+
+ok(errors.length === 0, 'A1 the page loads with no fatal client error', errors.slice(0, 3));
+ok(z.mapPresent, 'A2 the map renders');
+ok(z.sites_total > 0, 'A3 results appear', z.sites_total);
+ok(z.dev_points > 0, 'A4 development/projects appear', z.dev_points);
+ok(/Across ZIP/i.test(z.withinLbl || ''), 'A5 the page says it is showing the whole ZIP', z.withinLbl);
+ok(z.radiusVisible === false, 'A6 no radius control in ZIP mode (address-radius semantics do not leak)');
+ok(z.homePins === 0, 'A7 no HOME pin for a ZIP (a ZIP is not somebody’s home)');
+
+// THE HEADLINE NUMBER MUST DESCRIBE THE MAP.
+ok(z.tile_proposed === z.rail_proposed,
+  'A8 the "New projects proposed nearby" tile equals the Proposed set actually drawn',
+  { tile: z.tile_proposed, drawn: z.rail_proposed });
+ok(z.tile_total === z.sites_total,
+  'A9 the total tile equals the records actually rendered', { tile: z.tile_total, rendered: z.sites_total });
+
+// Marker -> dossier -> evidence: the page's primary interaction. Opened through the page's
+// OWN hook (window.siteMarkers), which homesignalmap.html exposes precisely so a proof can
+// open a specific marker's real popup "instead of guessing at DOM order". Guessing is what
+// the first version of this gate did, and it clicked the HOME pin in address mode and
+// something inert in ZIP mode - reporting a harness artifact as a product defect.
+const zPop = await openDossier();
+info('ZIP dossier', zPop);
+ok(!!zPop, 'A10 clicking a development marker opens its dossier', zPop);
+ok(!!(zPop && zPop.link), 'A11 the dossier carries an official record link (evidence stays reachable)', zPop);
+
+// ═══════════════════ B. ADDRESS MODE — HOME + radius ═══════════════════
+// Address mode already deletes the engine's development counters when canonical results
+// replace them, so B6 below is the POSITIVE CONTROL for A8: same assertion, known-good path.
+console.log('\nB. ADDRESS MODE — a resident searches their street address');
+await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForSelector('#addr', { timeout: 30000 });
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => {
+  const t = document.getElementById('status');
+  return (window.__HS_SITES || []).length > 0 || /couldn't|error/i.test(t ? t.textContent : '');
+}, null, { timeout: 120000 });
+await page.waitForTimeout(3000);
+const a = await readScreen();
+info('screen', a);
+
+ok(a.mapPresent, 'B1 the map renders for an address');
+ok(a.homePins === 1, 'B2 HOME is shown, so development is readable relative to the home', a.homePins);
+ok(a.radiusVisible === true, 'B3 the radius control is available in address mode');
+ok(a.sites_total > 0, 'B4 results appear', a.sites_total);
+ok(/Within/i.test(a.withinLbl || ''), 'B5 the page says results are within the chosen radius', a.withinLbl);
+ok(a.tile_proposed === a.rail_proposed,
+  'B6 POSITIVE CONTROL — the proposed tile equals the drawn set in address mode',
+  { tile: a.tile_proposed, drawn: a.rail_proposed });
+ok(!/Across ZIP/i.test(a.withinLbl || ''), 'B7 ZIP semantics do not leak into address mode', a.withinLbl);
+
+const aPop = await openDossier();
+info('address dossier', aPop);
+ok(!!aPop, 'B8 clicking a development marker opens its dossier in address mode', aPop);
+ok(!!(aPop && aPop.link), 'B8b ...carrying its official record link', aPop);
+
+// A radius change must actually change the answer, or the control is decorative.
+const before = a.sites_total;
+await page.click('#radSel button[data-r="2"]');
+await page.waitForTimeout(9000);
+const a2 = await readScreen();
+info('after switching to 2 miles', { before: before, after: a2.sites_total, within: a2.withinLbl });
+ok(/2 miles/i.test(a2.withinLbl || ''), 'B9 the page states the NEW radius', a2.withinLbl);
+ok(a2.tile_proposed === a2.rail_proposed,
+  'B10 the tile still equals the drawn set after a radius change',
+  { tile: a2.tile_proposed, drawn: a2.rail_proposed });
+
+console.log('='.repeat(78));
+console.log('FAILS: ' + fails);
+console.log('='.repeat(78));
+await browser.close();
+process.exit(fails ? 1 : 0);

@@ -1,4 +1,4 @@
-name: map1-live-proof
+name: map1-ux-gate
 
 # ONE live production proof of Map 1's address + radius search, driven in a real browser
 # against the DEPLOYED site. Nothing is mocked: the page talks to the real geocode-address
@@ -25,18 +25,12 @@ on:
       zip:
         description: 'ZIP for the entire-ZIP regression'
         default: '78617'
-      r1:
-        description: 'Initial radius (0.5 / 1 / 2 / 5)'
-        default: '1'
-      r2:
-        description: 'Radius to change to (0.5 / 1 / 2 / 5)'
-        default: '2'
 
 permissions:
   contents: read
 
 concurrency:
-  group: map1-live-proof
+  group: map1-ux-gate
   cancel-in-progress: false
 
 env:
@@ -101,32 +95,15 @@ jobs:
           BASE: ${{ env.BASE }}
           ADDRESS: ${{ inputs.address }}
           ZIP: ${{ inputs.zip }}
-          R1: ${{ inputs.r1 }}
-          R2: ${{ inputs.r2 }}
         run: |
           set -o pipefail
-          node scripts/map1-live-proof.mjs 2>&1 | tee /tmp/proof.log
-
-      # The MARKET-READINESS GATE runs in the same session: the proof above certifies the
-      # geographic contracts, this asks the user-level question - does what the resident READS
-      # agree with what the map DRAWS. Dispatched through this workflow because GitHub only
-      # offers workflow_dispatch for files present on the default branch; the run executes the
-      # dispatched ref's copy, so the branch's own gate script is what actually runs.
-      - name: MARKET-READINESS GATE - Map 1 as a resident uses it
-        if: always()
-        env:
-          BASE: ${{ env.BASE }}
-          ADDRESS: ${{ inputs.address }}
-          ZIP: ${{ inputs.zip }}
-        run: |
-          set -o pipefail
-          node scripts/map1-ux-gate.mjs 2>&1 | tee -a /tmp/proof.log
+          node scripts/map1-ux-gate.mjs 2>&1 | tee /tmp/proof.log
 
       - name: Publish the receipt
         if: always()
         run: |
           {
-            echo '## Map 1 address-radius - LIVE production proof'
+            echo '## Map 1 - market-readiness gate'
             echo ''
             echo '```'
             cat /tmp/proof.log
