@@ -84,3 +84,46 @@ Free disk moved 2,172 -> 3,115 MB across the three batches, never approaching th
 floor. The dips are WAL oscillation, not persistent growth: during batch 04's boundary pass
 free fell 3,059 -> 2,189 MB while the database itself grew ~8 MB and WAL went 1,104 ->
 1,968 MB. Every batch boundary was measured before proceeding.
+
+---
+
+# Batch 08 — production geography 2,375 -> 3,199 verified ZIPs
+
+Shards 201 -> 241 done, 40 prefixes boundary-placed and shadow-built, closure exact at
+**3,295 = 3,218 boundary_complete + 77 not_measured + 0 unclassified**, 0 points
+unresolved. Cutover: **829 candidates, 5 refused on the same frozen-vs-live drift class**
+(0 refusals unexplained, 0 missing source_keys outside the freeze), **824 enabled**.
+
+Verified in two halves because of the statement budget — 500 + 324 ZIPs — with
+**0 facilities changed and 0 development-vs-producer differences in both.**
+
+**Whole-population reconciliation at 3,199 enabled ZIPs — exact and bidirectional:**
+
+```
+production projects 10,508  =  membership rows 10,508
+production markers  33,059  =  marker rows     33,059
+0 no source_key · 0 project without marker · 0 duplicate source_key
+0 missing in production     · 0 missing in relation
+33,059 markers compared: 0 not in relation, 0 coordinate differences
+```
+
+Free disk 3,106 MB. Held on drift: **19 ZIPs** cumulative.
+
+## ⚠️ An MCP statement timeout does NOT prove rollback — corrected in place
+
+Twice this session a 60 s `execute_sql` timeout was followed by a state check showing
+nothing had changed, and I recorded "rolled back atomically". That was right the first
+time and **wrong as a general rule**: a later chunked run showed **2,200 ZIPs marked done
+when the statement had asked for 600**, which is only explicable if a previously
+timed-out block committed *after* I checked. The client stopped waiting; the server did
+not stop working.
+
+**The rule that follows: after a timeout, re-read state and keep re-reading — never
+conclude "it rolled back" from one prompt check, and never re-issue a non-idempotent
+statement on that assumption.** Every re-issue in this batch happened to be idempotent
+(set `enabled=true` where `enabled=false`), which is why no harm followed.
+
+The materialization was then verified rather than trusted: **0 duplicate `(zip,
+source_key, ord)` rows**, **0 flat rows outside the todo set**, and — the check that
+actually matters — **0 ZIPs marked done that carry memberships but produced no flat rows**
+(8,667 checked). Coverage is real, not assumed from a flag.
