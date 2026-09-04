@@ -87,3 +87,26 @@
 --
 -- ⚠️ HARD STOP ON DISK. Free 1,131 MB against the 2,048 MB floor, db 8,412 MB and WAL
 -- 2,064 MB still draining from the marker build. No further growth operations were run.
+
+-- ---------------------------------------------------------------------------
+-- BATCH 22 REMAINDER, 2026-09-04. production_geography_verified 10,491 -> 10,746.
+--
+-- The remaining 255 ZIPs of the 12 prefixes whose markers completed were reconciled through
+-- the producer in seven groups and cut over. The arithmetic closes exactly on the control:
+--   69,934 projects = 69,934 memberships · 73,057 markers = 73,057 relation
+-- Cutover cost no measurable disk (free 1,134 MB before and after) because the geography was
+-- already built - only ~255 small rows were written.
+--
+-- Prefixes 761 and 890 are STILL EXCLUDED. They hold 20,017 memberships and ZERO markers
+-- because the batch-22 marker build stopped itself at the founder floor mid-run. Their ZIPs
+-- remain boundary_complete / measured-not-cut-over, which is the honest explicit state; a
+-- ZIP whose markers are absent must never be served as authoritative.
+--
+-- Whole enabled population after cutover (10,746 ZIPs; controls 386,179 memberships /
+-- 483,434 markers, both non-zero): 0 markerless memberships · 0 orphan markers ·
+-- 0 duplicate memberships · 0 duplicate markers · 0 memberships without a point ·
+-- 0 markers without a point.
+--
+-- ⚠️ DISK REMAINS THE HARD STOP. Free 1,180 MB against the 2,048 MB floor; WAL 2,016 MB has
+-- barely moved in 30 minutes. No growth operation was run after the floor was breached -
+-- only read-only verification and the cutover rows.
