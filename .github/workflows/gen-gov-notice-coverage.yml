@@ -26,9 +26,9 @@ on:
     branches:
       - "claude/**"
     paths:
-      # `paths` and `paths-ignore` cannot both appear on one event, and they are not needed
-      # to: this allow-list already excludes the generated artifact, so the workflow's own
-      # commit cannot retrigger it. The actor guard below is the second half of the fence.
+      # `paths` and `paths-ignore` cannot both appear on one event, and a second filter is
+      # not needed: this allow-list already excludes the generated artifact, so the
+      # workflow's own commit cannot retrigger it.
       - "scripts/gen-gov-notice-coverage.mjs"
       - ".github/workflows/gen-gov-notice-coverage.yml"
 
