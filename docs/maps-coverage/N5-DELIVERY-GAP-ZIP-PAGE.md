@@ -79,3 +79,93 @@ Not proposed as a decision — recorded so the next session does not re-derive t
   ZIP-geography fix and are byte-identical through every cutover so far.
 - Address + radius mode is unaffected and must stay unaffected: it has a real geocoded home and a
   resident-chosen radius, which is the one place a radius is valid.
+
+---
+
+# CLOSED on the branch — the page now serves the authoritative set (2026-09-04)
+
+## What changed
+
+`homesignalmap.html` ZIP mode resolves a **geography state** first (`public.app_zip_geography_state`,
+a view running with owner rights so the browser gets a ZIP and one short string with no grant on
+`geo`), then fails closed on each:
+
+| state | ZIPs | development comes from |
+|---|---:|---|
+| `authoritative` | 10,821 | `app_projects_for_zip` — the same contract production verification gates on |
+| `not_measured` | 642 | nothing; the page says it cannot measure the ZIP |
+| `pending` | 1,259 | the legacy cache, unchanged and never labelled authoritative |
+
+An unreadable state resolves to `pending`, so it can never be mistaken for authoritative.
+Facilities ride the cached report on every state and are passed through **by identity**.
+
+## Proven against the live database, in a real browser, before shipping
+
+`scripts/verify-map1-delivery.mjs` + `.github/workflows/verify-map1-delivery.yml`, run 1
+(`33927447583`) serving the branch on localhost. Every ZIP assertion passed:
+
+```
+── 10804 (authoritative)   facilities unchanged  page 17 · cache 17
+── 76104 (authoritative)
+   cards   456  = 466 authoritative − 10 unlinkable
+   markers 469  = 469 authoritative marker relation
+   NO legacy radius record rendered · multi-marker: 456 cards / 469 markers
+   facilities   40 = 40
+── 76135 (authoritative)
+   cards   116  = 117 − 1 · markers 158 = 158 · facilities 12 = 12
+── 20742 (authoritative, MEASURED-ZERO)
+   cards 0 · markers 0 · the cache would have offered 17 and was not used
+   facilities 22 = 22
+── 01004 (not_measured)
+   development 0 · the cache would have offered 90
+   note: "This ZIP has no published 2025 Census ZCTA boundary, so HomeSignal cannot measure…"
+   facilities 5 = 5
+```
+
+The measured-zero and not_measured lines are the ones that prove the fail-closed rule rather than
+merely asserting it: in both cases the cache was sitting right there with records to offer, and
+the page served none.
+
+⚠️ **The one failure in that run was the verifier, not the page** — address mode timed out waiting
+90 s for the live edge function. Fixed by waiting on the page's own signal
+(`domcontentloaded` + `__HS_VERIFY`) instead of `load`, which on a tile-loading map page can be
+minutes away; re-run in progress.
+
+## Full-population reconciliation
+
+```
+authoritative ZIPs                10,821
+  serving projects                 7,285
+  authoritative measured-zero      3,536
+  served development rows        396,765
+authoritative memberships        406,196
+  withheld: no record link         9,431   (2.3%) — counted and disclosed, never rendered
+served facilities (authoritative) 175,591
+```
+
+**The 9,431 are the honest edge.** They are authoritative memberships whose descriptive row is
+temporarily absent, so they carry no official record URL — and the repo's anti-fabrication prime
+directive forbids rendering a site without one. They are counted, surfaced on the page, and never
+cause a fall back to legacy geography. The identity `cards = memberships − unlinkable` held on
+every ZIP tested (456 = 466−10, 116 = 117−1, 0 = 0−0).
+
+## The instrument that was missing
+
+`served_development_rows` / `served_facility_rows` were NULL on all 12,722 export rows — which is
+exactly why this escaped. Both are populated now, alongside a new `served_development_source` that
+answers what a count cannot: **which path served this page.**
+
+```
+authoritative       10,821 ZIPs    396,765 development rows
+legacy_cache         1,259 ZIPs  1,571,745
+none_not_measured      642 ZIPs          0
+                    ──────────
+                    12,722 ZIPs  1,968,510 · facilities 214,245
+```
+
+## The cron needed no change
+
+`dev_refresh_fire` / `dev_refresh_collect` still rewrite `development_reports` daily, and that is
+now harmless for development: an authoritative ZIP no longer reads that table for development at
+all. Facilities still ride the cache and still want the refresh. The smallest change was **no
+change**.
