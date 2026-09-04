@@ -13,7 +13,17 @@ name: maps-social-image
 # belongs to. It does not set status, approved_at, scheduled_slot or published_at, and it
 # selects only content_family='MAPS' AND status='draft' — an Alerts row is unreachable from
 # here.
+#
+# HOW IT IS TRIGGERED, and why it is not a schedule. workflow_dispatch only works once a
+# workflow is on the default branch, so while this lives on a feature branch the only way
+# to run it is a push trigger — the same one-off-runner pattern fetch-tabs-fixtures.yml
+# already uses in this repo. It is scoped THREE ways so it cannot become ambient
+# generation: to one branch, to the arm file's path alone (an ordinary code push does not
+# fire it), and to the arming gate below. The arm file is set to DISARMED after a capture.
 on:
+  push:
+    branches: [claude/acquisition-log-page-location-hlrt47]
+    paths: ['.github/maps-social-arm']
   workflow_dispatch:
     inputs:
       limit:
@@ -86,8 +96,8 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/maps-social-image.mjs \
-            --limit "${{ inputs.limit }}" \
-            ${{ inputs.ids != '' && format('--ids {0}', inputs.ids) || '' }} \
+            --limit "${{ inputs.limit || '6' }}" \
+            ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
             ${{ inputs.dry == 'true' && '--dry' || '' }} \
             --out "$GITHUB_WORKSPACE/maps-social-out"
 

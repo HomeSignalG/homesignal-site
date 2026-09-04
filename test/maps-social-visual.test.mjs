@@ -85,7 +85,14 @@ for (const forbidden of ['approved_at', 'scheduled_slot', 'published_at', 'bsky_
     `the generator never writes ${forbidden}`);
 }
 ok(!/schedule:/.test(WF), 'the capture workflow has NO schedule — automatic generation stays off');
-ok(/workflow_dispatch/.test(WF) && !/on:\s*\n\s*push/.test(WF), 'dispatch-only');
+// The trigger is a push scoped to ONE branch and ONE path (the arm file) while this lives
+// on a feature branch — workflow_dispatch cannot reach a workflow that is not on main. What
+// must hold is that it can never become ambient: no schedule, never on main's branch list,
+// and a push of ordinary code cannot fire it.
+ok(/workflow_dispatch/.test(WF), 'it is dispatchable once it reaches main');
+ok(/paths: \['\.github\/maps-social-arm'\]/.test(WF),
+  'the push trigger fires ONLY on the arm file, so a code push cannot start a capture');
+ok(!/branches: \[main\]|branches:\s*\n\s*- main/.test(WF), 'it is never triggered on main');
 ok(/ARMING GATE/.test(WF) && /EXPECTED_ARM/.test(WF), 'and arm-gated before it touches production');
 
 // ── founder review distinguishes real from fallback ──────────────────────────────────
