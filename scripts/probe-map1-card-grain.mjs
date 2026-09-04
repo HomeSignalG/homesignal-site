@@ -81,11 +81,28 @@ for (const zip of ZIPS) {
     const rows = (id) => Array.from(document.querySelectorAll('#' + id + ' .rec'));
     const devRailIds = ['apprList', 'propList'];
     const railRows = devRailIds.reduce((n, id) => n + rows(id).length, 0);
-    const railLabels = devRailIds.flatMap((id) =>
-      rows(id).map((r) => (r.querySelector('.t') || {}).textContent || ''));
-    const labelCounts = {};
-    railLabels.forEach((l) => { labelCounts[l] = (labelCounts[l] || 0) + 1; });
+
+    // IDENTITY, NOT LABEL. Two rows reading "Residential Building Permit 5504 LEA CREST" can be
+    // two genuinely distinct permits at one address; only a repeated project REF is a duplicate
+    // card. The rails are rendered from these arrays with .slice(0,12), and stageOf is the page's
+    // own bucketing (exposed as window.__HS_STAGE), so this reproduces exactly what was drawn.
+    const stageOf = window.__HS_STAGE || function (s) { return s && s.bucket; };
+    const railFor = (bucket) => dev.filter((s) => stageOf(s) === bucket).slice(0, 12);
+    const repeatsIn = (arr) => {
+      const c = {};
+      arr.forEach((s) => { const k = refOf(s) || '(no-ref)'; c[k] = (c[k] || 0) + 1; });
+      return Object.entries(c).filter(([, n]) => n > 1);
+    };
+    const apprSlice = railFor('approved');
+    const propSlice = railFor('proposed');
+    const railRepeats = repeatsIn(apprSlice).concat(repeatsIn(propSlice));
+    // The same question asked of the WHOLE rail-eligible set, not just the 12 that fit - so a
+    // clean result inside the cap cannot hide duplication the cap happens to truncate.
+    const uncappedRepeats = repeatsIn(dev.filter((s) => stageOf(s) === 'approved'))
+      .concat(repeatsIn(dev.filter((s) => stageOf(s) === 'proposed')));
     return {
+      railRepeats, uncappedRepeats,
+      railSliceSizes: [apprSlice.length, propSlice.length],
       devSites: dev.length,
       uniqueRefs: Object.keys(per).length,
       noRef: per['(no-ref)'] || 0,
@@ -94,8 +111,6 @@ for (const zip of ZIPS) {
         .sort((a, b) => b[1] - a[1]).slice(0, 5),
       railRows,
       railCapped: devRailIds.some((id) => rows(id).length >= 12),
-      repeatedRailLabels: Object.entries(labelCounts).filter(([, n]) => n > 1)
-        .sort((a, b) => b[1] - a[1]).slice(0, 5),
       leafletMarkers: document.querySelectorAll('#map .leaflet-marker-icon').length,
       headline: (document.getElementById('cTot') || {}).textContent || '',
       cDev: (document.getElementById('cDev') || {}).textContent || '',
@@ -105,15 +120,20 @@ for (const zip of ZIPS) {
   console.log(`   page: ${m.devSites} development sites · ${m.uniqueRefs} unique project refs · `
     + `max ${m.maxPerRef} sites on one project · ${m.leafletMarkers} leaflet markers · `
     + `${m.railRows} rail rows${m.railCapped ? ' (a rail is at its 12-row cap)' : ''}`);
+  console.log(`   rails: ${m.railSliceSizes[0]} approved + ${m.railSliceSizes[1]} proposed rendered`);
   if (m.multiRefs.length) {
     console.log('   projects carrying several sites: '
       + m.multiRefs.map(([k, n]) => `${k}×${n}`).join(', '));
   }
 
   // 1. MARKERS may exceed projects — that is geography, and it must be preserved.
-  ok(m.devSites === b.markers,
-     `${zip}: every authoritative marker is drawn`,
-     `page ${m.devSites} · relation ${b.markers}`);
+  // NOT equality: zipAuthSiteFromMarker drops a marker whose project carries no record_url, which
+  // is the anti-fabrication gate doing its job, and live ingestion moves the relation between the
+  // two reads. What must hold is that nothing EXTRA is drawn.
+  ok(m.devSites <= b.markers,
+     `${zip}: no development marker is drawn beyond the authoritative relation`,
+     `page ${m.devSites} · relation ${b.markers}`
+       + (m.devSites < b.markers ? ` · ${b.markers - m.devSites} withheld (no record link)` : ''));
   ok(m.uniqueRefs === b.projects,
      `${zip}: those markers represent exactly the authoritative project set`,
      `page ${m.uniqueRefs} unique refs · backend ${b.projects} projects`);
@@ -123,11 +143,13 @@ for (const zip of ZIPS) {
   // 2. CARDS must not multiply. The rail is capped at 12 rows, so a repeat inside those 12 is
   //    the observable defect; the cap is reported either way so a clean result cannot be an
   //    artifact of truncation.
-  const dupRail = m.repeatedRailLabels.length;
-  ok(dupRail === 0,
-     `${zip}: no project appears more than once in the resident-facing rails`,
-     dupRail ? m.repeatedRailLabels.map(([l, n]) => `"${l.slice(0, 40)}"×${n}`).join(', ')
-             : `${m.railRows} rows examined${m.railCapped ? ', rail at cap' : ''}`);
+  ok(m.railRepeats.length === 0,
+     `${zip}: no project appears more than once in the rendered rails`,
+     m.railRepeats.length ? m.railRepeats.map(([k, n]) => `${k}×${n}`).join(', ')
+       : `${m.railRows} rows examined${m.railCapped ? ', rail at its 12-row cap' : ''}`);
+  ok(m.uncappedRepeats.length === 0,
+     `${zip}: …and none would, with the 12-row cap removed`,
+     m.uncappedRepeats.length ? m.uncappedRepeats.map(([k, n]) => `${k}×${n}`).join(', ') : 'clean');
 
   // 3. Clicking markers must not mint cards. Two markers of the SAME project, then a recount.
   if (b.multi.length) {
