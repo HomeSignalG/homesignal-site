@@ -23,7 +23,12 @@ on:
         required: false
         default: ''
   push:
-    branches: [main]
+    # The working branch is listed alongside main ON PURPOSE. A brand-new workflow cannot be
+    # dispatched on a feature branch (workflow_dispatch resolves against the default branch), and
+    # this gate is worth nothing if it only runs after the change is already live - the whole
+    # defect it exists to catch shipped to production and passed every gate that existed. A push
+    # trigger runs the workflow from the pushed ref, so the branch is proven before it merges.
+    branches: [main, claude/homesignal-zip-forensics-13xkmw]
     paths:
       - 'homesignalmap.html'
       - 'lib/data.js'
