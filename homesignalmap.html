@@ -228,6 +228,9 @@
   .maprow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 11px}
   .mapkey{display:flex;flex-wrap:wrap;gap:4px}
   .radsel{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
+     offered there - showing it would invite a circle around a ZIP centre. */
+  body.zipmode .radsel{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
     padding:4px 10px;border-radius:7px;cursor:pointer}
@@ -468,6 +471,7 @@
 <script src="lib/templates.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
+<script src="lib/zip-authoritative.js?v=20260904"></script>
 <script src="shell.js"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
@@ -489,6 +493,11 @@ HS.onReady(function(){
   // GEOMETRY is physically inside the chosen radius. The two paths never share retrieval.
   var GEOCODE_ENDPOINT = SUPABASE_URL + "/functions/v1/geocode-address";
   var N5_RPC_URL       = SUPABASE_URL + "/rest/v1/rpc/n5_projects_within_radius";
+  // ZIP MODE reads AUTHORITATIVE whole-ZIP geography (Session B owns building it; Map 1 only
+  // consumes it). Self-describing: it reports not_measured rather than returning an empty set
+  // that would read as "nothing here". No centroid and no radius are involved.
+  var ZIP_AUTH_RPC_URL = SUPABASE_URL + "/rest/v1/rpc/app_zip_projects_markers";
+  var ZIP_AUTH = null;   // the last authoritative ZIP payload, or null in address mode
   var N5_LIMIT         = 500;               // the RPC's own default; its hard server ceiling is 2000
   var N5_NOTE = "";                         // the honest completeness sentence for the current search
   // Stale-response guard. Every search (address OR ZIP) takes a ticket; an async continuation
@@ -1148,7 +1157,8 @@ HS.onReady(function(){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
-    syncRadiusStops();                      // ZIP mode restores its wider frame stops
+    ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
+    syncRadiusStops();
     if(window.HS && HS.state) HS.state.zip = zip;
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
     ZIP_STATE = null; ZIP_INDEXABLE = false; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only via the stamped substance flag
@@ -1219,24 +1229,48 @@ HS.onReady(function(){
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
-    fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
-      .then(function(r){ return r.ok ? r.json() : []; })
-      .then(function(rows){
+    // BOTH reads, together: the cached report still supplies FACILITIES and area/jurisdiction
+    // notices (the EPA national floor is still radius-derived - Session B owns that geography),
+    // while DEVELOPMENT comes from authoritative whole-ZIP membership and replaces the report's
+    // own development points. A failed authoritative read is reported, never silently downgraded
+    // to the centroid-radius development it is meant to replace.
+    Promise.all([
+      fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+        .then(function(r){ return r.ok ? r.json() : []; }),
+      fetch(ZIP_AUTH_RPC_URL, {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip, p_kind: "development", p_authoritative: true })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
+    ])
+      .then(function(both){
+        var rows = both[0], auth = both[1];
         if(!currentReq(token)) return;      // a newer search (or an address) already owns the page
+        ZIP_AUTH = auth;
+        var authSites = HS.zipAuthSitesFrom(auth);
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
-                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at,
+                   counts:row.counts||{},
+                   sites: HS.zipAuthMergeSites(row.sites||[], authSites),
+                   paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
+        } else if(authSites.length){
+          // No cached report row, but the ZIP's own geography is established - render it.
+          render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
+                   sites: authSites, paywall:false, updated:null, facUnavailable:false });
         } else {
-          // No cached row yet → still a valid, empty page. Empty is valid (never fabricated), not an error.
+          // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
+          // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
+          // is a real measurement; a ZIP nobody has measured is not. HS.zipAuthNote says which.
           window.__HS_SITES = [];
-          setIndexable(false);              // empty ZIP is never indexed
+          setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
-          status("Coverage coming — we don't have development records for ZIP " + zip + " yet. Enter your street address for the live 1-mile view.");
+          status(HS.zipAuthNote(auth, zip, []));
         }
       })
       .catch(function(){
+        if(!currentReq(token)) return;
         window.__HS_SITES = [];
         $("results").style.display = "block";
         status("Couldn't load ZIP " + zip + ". Enter your address for the live view.", true);
@@ -1305,8 +1339,11 @@ HS.onReady(function(){
     // Address mode states, in the line the resident already reads for freshness, exactly what the
     // canonical development query returned: a count, a truncation warning, or an honest empty that
     // is scoped to the corpus queried - never "nothing nearby".
+    // ZIP mode states WHAT WAS MEASURED, not merely when. "not measured yet" and "measured,
+    // nothing found" are different facts and the resident is told which.
+    var _zipNote = ZIP_MODE ? HS.zipAuthNote(ZIP_AUTH, ZIP_CODE, sites) : "";
     $("freshLine").textContent = ZIP_MODE
-      ? (data.updated ? "Updated " + fmtDate(data.updated) : "")
+      ? ((data.updated ? "Updated " + fmtDate(data.updated) : "") + (_zipNote ? (data.updated ? " · " : "") + _zipNote : ""))
       : ("Live results · fetched just now" + (N5_NOTE ? " · " + N5_NOTE : ""));
     // FACILITIES: when the EPA read FAILED for this snapshot the count is UNKNOWN, not zero.
     // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
@@ -1836,7 +1873,7 @@ HS.onReady(function(){
     var maxD=0, nLabelable=0;
     MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type, p)])return;
       var en=siteEN(p); if(typeof en[0]!=="number"||typeof en[1]!=="number")return; var dd=Math.hypot(en[0],en[1]);
-      if(dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
+      if(ZIP_MODE || dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
     // Readability: floating type-labels only when few enough not to collide. In a dense
     // cluster (a whole ZIP of downtown facilities) the labels pile into an unreadable wall —
     // above the threshold we drop them and let hover/click reveal each building instead.
@@ -1854,7 +1891,8 @@ HS.onReady(function(){
       if(!mappable(p))return;
       var bkt=bucketOf(p.type, p);
       if(!FILTER[bkt])return;
-      if(Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;   // keep in sync with the chosen radius
+      // ZIP mode draws the WHOLE ZIP - no radius cull. Address mode keeps its chosen radius.
+      if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);
       var raw=String(p.label||"").split(" ·")[0];
       var name=raw.length>20?raw.slice(0,19).trim()+"…":raw;
@@ -2048,11 +2086,14 @@ HS.onReady(function(){
   document.getElementById("todSlider").addEventListener("input",function(){ setTimeOfDay(this.value/100); });
   document.getElementById("radSel").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
+    // A RADIUS REQUIRES AN ADDRESS-DERIVED HOME CENTRE. In ZIP mode there is none, and a
+    // circle around a ZIP centre is exactly the approximation the whole-ZIP invariant forbids -
+    // so the control does nothing there (it is hidden too; this is the belt to that braces).
+    if(!CUR_ADDRESS) return;
     [].forEach.call(this.querySelectorAll("button"),function(c){ c.classList.remove("on"); }); b.classList.add("on");
     CUR_RADIUS = parseFloat(b.getAttribute("data-r"));
     V3.userZoom = false;                    // let the 3D view re-frame to the new data
-    if(CUR_ADDRESS){ run(CUR_ADDRESS); }           // address mode: re-pull records at the new radius
-    else if(ZIP_MODE && LAST_DRAW){ drawMap(LAST_DRAW.data, LAST_DRAW.sites); }  // ZIP mode: re-cull/re-frame the cached data (no network) so widening the radius reveals farther cached records
+    run(CUR_ADDRESS);                       // address mode: re-pull records at the new radius
   });
   window.addEventListener("resize",function(){ if(V3.active)resize3D(); if(GL.active&&GL.map)GL.map.resize(); });
   buildLegend();
