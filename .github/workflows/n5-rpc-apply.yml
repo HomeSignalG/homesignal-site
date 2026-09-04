@@ -357,6 +357,11 @@ jobs:
           echo "identity_args=$ARGS"
           echo "returns=$RES"
 
+      # ⛔ NEVER put a DOUBLE QUOTE inside these psql -c "..." SQL blocks, not even inside a
+      # SQL comment. Bash ends the argument at the quote, psql receives a truncated statement,
+      # and it fails with `syntax error at end of input` AFTER the apply has already committed.
+      # Measured on run 33822830946: the install was correct and byte-identical, and this step
+      # still went red on a comment that read: so an "appears exactly once" test.
       - name: DEFINITION IDENTITY - production body is byte-identical to the reviewed artifact
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -410,7 +415,7 @@ jobs:
               'NO_bbox_centre='                 || ((position('st_envelope' in lower(b)) = 0) and (position('st_boundingdiagonal' in lower(b)) = 0)),
               -- Counting occurrences would be WRONG here and was measured wrong before this
               -- shipped: prosrc keeps the body's own comments, and the comment above the
-              -- polygon branch names ST_PointOnSurface, so an "appears exactly once" test
+              -- polygon branch names ST_PointOnSurface, so an appears-exactly-once test
               -- reports false on a correct function and would abort a valid install. The
               -- property that actually matters is comment-insensitive: NO occurrence exists
               -- before the end of the filter region.

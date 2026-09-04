@@ -1210,3 +1210,160 @@ then restored green:
 
 No production install, no production RPC invocation, no Map 1 edit, no grant/RLS/ownership change,
 no new backend surface. PR #1015 / #1016 remain DRAFT.
+
+---
+
+## 22. REVISION 3 PRODUCTION INSTALL — **INSTALLED AND VERIFIED**, 2026-09-04 00:42:24Z
+
+Founder-authorized: arm and run `n5-rpc-apply` exactly once to install revision 3, verify, disarm.
+**The apply ran exactly once and succeeded.** The workflow RUN is red, and the reason is recorded
+in §22.6 — a defect in my own verification query, after the install had already committed.
+
+### 22.1 Identity
+
+| | |
+|---|---|
+| artifact | `docs/n5-spatial-read-rpc.sql` sha256 `33fdb5d7025d4eee5dcc26e854f1f01d6c73ae4e7e4d016ba6f283f7b2557c02` |
+| artifact commit | `15e45ee` (tests: static 123/123, executable 107/107 on PostGIS 16-3.4 **and** 17-3.5, run 33821072765) |
+| install workflow | `a489214` re-point, `c5b5e4b` gate corrections + arm |
+| run | [33822830946](https://github.com/HomeSignalG/homesignal-site/actions/runs/33822830946), head `c5b5e4b` |
+| **apply attempts** | **1** — one dispatch, no retry, no second dispatch |
+| predecessor | revision 2, `prosrc` md5 `e1bb67c604aaaa4e1ab541ee32bc82ea`, 7 columns |
+
+### 22.2 Pre-state (00:42:19Z) — every hard gate passed
+
+`PRE-STATE VERIFIED - revision-2 predecessor present and identical, manifest READY + synced at
+2026-09-03 20:49:04.959655+00, PROVEN 718278, fingerprint bbda250f..., rejects 5171,
+wrong-snapshot 0, rejected-visible 0, no conflicting exclusive lock`
+
+Predecessor identity was gated in full: one overload, the 4-arg signature, the 7-column return
+contract, owner `postgres`, SECURITY DEFINER, STABLE, `search_path=public`, PUBLIC without EXECUTE,
+anon and authenticated with it, and the exact predecessor body md5.
+
+### 22.3 The apply — one transaction, 00:42:23 → 00:42:24Z
+
+`DROP FUNCTION` → `CREATE FUNCTION` → `COMMENT` → `REVOKE` → `GRANT`, under `--single-transaction`.
+Exactly the intended transaction, committed as one unit.
+
+### 22.4 Installed revision — verified
+
+```
+overloads   1
+installed   n5_projects_within_radius(double precision,double precision,numeric,integer)
+args        p_lat double precision, p_lng double precision, p_radius_mi numeric, p_limit integer
+returns     TABLE(source_key text, feature_id text, registry_id text, provenance text,
+                  distance_mi double precision, geometry_type text,
+                  marker_lat double precision, marker_lng double precision, has_more boolean)
+owner       postgres        secdef  true      volatility  s      proconfig  search_path=public
+prosrc md5  9fc251879f71b86ada2ac5bae934c704   (expected, from the committed file: identical)
+prosrc len  10831
+```
+The workflow's own DEFINITION IDENTITY step printed `EXACT BODY IDENTITY PROVEN` before it failed.
+
+**Contract properties: 43 / 43 true, 0 false, 0 null.** Including, on the installed body:
+no `ST_PointOnSurface` anywhere in the filter region · marker derived after both the filter and
+the page limit · marker joined on the SAME `(source_key, feature_id)` via a LEFT join ·
+`marker_lat` is `ST_Y` and `marker_lng` is `ST_X` · a point is its own marker · the line branch is
+a vertex · an invalid polygon is repaired · the SRID guard fails closed · `ST_DWithin` appears
+exactly once and before any marker token · no `ST_Centroid`, no bbox centre, no `app_projects`,
+no `n5_association`, no dynamic SQL.
+
+Grants: `exec_public=false`, `exec_anon=true`, `exec_auth=true`. No anon/authenticated SELECT on
+`geo.n5_geom`, `geo.n5_point_reject` or `geo.n5_verdict_manifest`; no anon USAGE on schema `geo`.
+RLS unchanged on all three: `rls=true force=false policies=0`.
+
+### 22.5 Controls, before → after
+
+**HARD — every one unchanged:**
+
+| control | before (00:42:19Z) | after (00:45:05Z) |
+|---|---|---|
+| manifest | READY | READY |
+| canonical_synced_at | 2026-09-03 20:49:04.959655+00 | identical |
+| PROVEN | 718,278 | 718,278 |
+| PROVEN fingerprint | `bbda250fc30ee0b3aa3f46a259392aa3` | identical |
+| rejects | 5,171 | 5,171 |
+| wrong-snapshot PROVEN | 0 | 0 |
+| rejected-visible PROVEN | 0 | 0 |
+
+**OBSERVATIONAL — the independent recovery campaign, not this operation:**
+
+| | before | after | delta |
+|---|---|---|---|
+| geometry total | 745,773 | 746,122 | +349 |
+| recovered_authoritative | 27,495 | 27,844 | +349 |
+| association | 28,414 | 29,414 | +1,000 |
+| shards done / pending / running | 228 / 315 / 1 | 238 / 305 / 1 | +10 done |
+
+The installed function reads neither `geo.n5_association` nor `geo.n5_shard` (proven by the
+`NO_n5_association` property), and a CREATE FUNCTION cannot write canonical rows. The campaign was
+not paused, altered or interfered with.
+
+### 22.6 Why the run is RED — the instrument, not the install
+
+The DEFINITION IDENTITY step proved body identity and then died:
+
+```
+prosrc md5 expected (from the committed file): 9fc251879f71b86ada2ac5bae934c704
+prosrc md5 in production                     : 9fc251879f71b86ada2ac5bae934c704
+EXACT BODY IDENTITY PROVEN - production carries the reviewed semantics verbatim
+ERROR:  syntax error at end of input
+LINE 37:     -- polygon branch names ST_PointOnSurface, so an appears
+```
+
+A comment I added to the token query read *so an "appears exactly once" test*. Those **double
+quotes ended the `psql -c "…"` shell argument**, so psql received a truncated statement. The SQL
+never ran; nothing about the function was wrong. Two steps were then skipped: SECURITY, and the
+post-state hard-control proof.
+
+**Both were completed read-only afterwards** through catalog and aggregate queries — no dispatch,
+no second apply, and the production RPC was **not invoked**. Their results are §22.4 and §22.5.
+
+Fixed in the workflow, with the rule written where it will be read: **never put a double quote
+inside these `psql -c "…"` blocks, not even inside a SQL comment** — bash truncates the argument
+and psql fails with `syntax error at end of input` *after* the apply has already committed.
+
+⚠️ The transferable lesson: this failed the way a *good* gate fails — loudly, after proving the
+thing that mattered, and without touching data. But it also shows a verification step can be the
+riskiest part of an install unit, because it runs after the irreversible act. The pre-arm local
+rehearsal (§22.7) exercised the PRE-STATE block against a real predecessor and did not exercise
+this step, which is exactly where the defect was.
+
+### 22.7 What the pre-arm rehearsal caught, before any production contact
+
+The install workflow was written for the FIRST install and would have aborted this unit on a
+correct production state. Corrected in `c5b5e4b` and rehearsed on a local PostgreSQL 16.13 /
+PostGIS 3.4.2 carrying a real revision-2 predecessor installed from git:
+
+1. **Predecessor, not absence.** The gate demanded the function be ABSENT. Replaced with the full
+   predecessor-identity gate above. Proven load-bearing: revoking anon EXECUTE locally produced
+   `[predecessor: anon lacks EXECUTE]`.
+2. **Geometry total and recovered_authoritative demoted to observational**, per this unit's ruling.
+   They were hard-pinned at 741,562 / 23,284; production was at **745,773 / 27,495**, so the run
+   would have aborted on the recovery campaign's legitimate progress.
+3. **Two required hard controls were missing entirely** — wrong-snapshot PROVEN and
+   rejected-visible PROVEN. Both added, both 0 before and after.
+4. **The PROVEN fingerprint was NULL-blind** (`<>` on a `string_agg` that returns NULL for an empty
+   set never fires). Now `is distinct from`; proven load-bearing locally.
+
+The local predecessor reproduced production's `prosrc` md5 `e1bb67c6…` exactly — an independent
+confirmation of the pinned constant.
+
+### 22.8 Mutation accounting
+
+N5 canonical mutation by this operation: **NONE** · reject mutation: **NONE** · manifest mutation:
+**NONE** · manual association mutation: **NONE** · application-data mutation: **NONE** ·
+Map 1 modification: **NONE** · Map 2 modification: **NONE** ·
+**production RPC invocations: ZERO.**
+
+### 22.9 Disarm
+
+`.github/n5-rpc-apply-arm` = `DISARMED-2026-09-04-after-rev3-install`, against
+`EXPECTED_ARM: arm-2026-09-04-rpc-rev3-install`. Checked across every arm file in the repo — no
+token equals its workflow's expected value:
+
+```
+n5-e2e-arm            DISARMED-2026-09-03-after-e2e-proof        vs arm-2026-09-03-e2e-address-radius
+n5-geocode-probe-arm  DISARMED-2026-09-03-after-geocode-probe    vs arm-2026-09-03-geocode-probe
+n5-rpc-apply-arm      DISARMED-2026-09-04-after-rev3-install     vs arm-2026-09-04-rpc-rev3-install
+```
