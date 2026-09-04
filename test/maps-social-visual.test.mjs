@@ -126,5 +126,10 @@ ok(/boundary_complete/.test(GEN),
 ok(/authoritative_zip_status/.test(GEN),
   'the authoritative status is recorded in the evidence of every real visual');
 
+ok(/popupOpen \|\| !clean\.haloPresent/.test(GEN),
+  'a capture where the target could not be made identifiable is REFUSED, not shipped');
+ok(/popup_text/.test(GEN),
+  'the popup text that names the project in the image is recorded as evidence');
+
 console.log(`\n${n - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

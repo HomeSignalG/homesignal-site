@@ -230,6 +230,10 @@ async function capture(page, draft, proj) {
   // radius ring nor a home marker; if either is present the capture is refused rather than
   // shipped, because a broadcast post has no home and no radius.
   const clean = await page.evaluate(() => ({
+    // The open popup is what NAMES the project inside the image. Recording its text is the
+    // in-image evidence that the target is identifiable to a reader, not merely present.
+    popupText: (document.querySelector('.leaflet-popup-content')?.innerText || '').trim().slice(0, 200),
+    haloPresent: !!document.getElementById('hs-social-halo'),
     homePins: document.querySelectorAll('.homepin').length,
     // Vector paths inside the map. In ZIP mode Map 1 draws no radius ring, but it MAY draw
     // real parcel geometry (drawParcels), which is authoritative and must not be refused —
@@ -239,6 +243,12 @@ async function capture(page, draft, proj) {
     popupOpen: !!document.querySelector('.leaflet-popup-content'),
   }));
   if (clean.homePins > 0) return { ok: false, reason: 'refused: a home marker is on the map' };
+  // A picture in which the target cannot be picked out is not a project-specific visual, so
+  // an unopened popup or a missing halo refuses the capture rather than shipping an anonymous
+  // field of dots.
+  if (!clean.popupOpen || !clean.haloPresent) {
+    return { ok: false, reason: `the target could not be made identifiable (popup: ${clean.popupOpen}, halo: ${clean.haloPresent})` };
+  }
 
   // Suppress only chrome that is not the map: page header/nav/footer sit outside #map, so
   // clipping to #map already excludes them. Leaflet's own zoom control is the one control
@@ -360,6 +370,8 @@ async function attach(draft, objectPath, r, proj) {
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
     popup_open: r.checks.popupOpen,
+    popup_text: r.checks.popupText,
+    halo_present: r.checks.haloPresent,
     width: IMG_W, height: IMG_H, device_scale: SCALE,
     note: 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
       + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
