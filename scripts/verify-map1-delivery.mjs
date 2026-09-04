@@ -1,0 +1,168 @@
+// verify-map1-delivery.mjs — does the ACTUAL public Map 1 ZIP page serve AUTHORITATIVE
+// development geography?
+//
+// WHY A SECOND VERIFIER. verify-development.mjs proves the anti-fabrication invariant and the
+// facility count against the cached report — and it passed all the way through the delivery gap,
+// because it never asked WHERE development came from. On 2026-09-04 production_geography_verified
+// read 10,821 while every one of those pages rendered the legacy 3-mile centroid-radius cache.
+// A gate that cannot tell those two apart is not a gate, so this one compares the RENDERED page
+// against the authoritative contract itself.
+//
+// It drives a real browser against SITE_BASE (default https://homesignal.net; set it to a local
+// server to prove a branch before it ships) and reads window.__HS_VERIFY / window.__HS_SITES,
+// which the page publishes for exactly this purpose.
+//
+// Env: SITE_BASE, ZIP_PATH (default "/homesignalmap.html?zip={zip}"), ZIPS (comma list).
+import { readFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+
+const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const grabVar = (name) => {
+  const m = html.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
+  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  return m[1];
+};
+const ENDPOINT = grabVar('ENDPOINT');
+const APIKEY = grabVar('APIKEY');
+const SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
+const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
+const ZIP_PATH = process.env.ZIP_PATH || '/homesignalmap.html?zip={zip}';
+const hdr = { apikey: APIKEY, Authorization: 'Bearer ' + APIKEY };
+const zipUrl = (zip) => SITE_BASE + ZIP_PATH.replace('{zip}', encodeURIComponent(zip));
+
+let fails = 0;
+const ok = (c, name, detail) => {
+  console.log((c ? 'PASS' : 'FAIL') + ' — ' + name + (detail ? '  [' + detail + ']' : ''));
+  if (!c) fails++;
+};
+
+async function jget(url) {
+  const r = await fetch(url, { headers: hdr });
+  if (!r.ok) throw new Error(url + ' -> HTTP ' + r.status);
+  return r.json();
+}
+
+// The BACKEND truth for one ZIP, read the same way the page reads it.
+async function backend(zip) {
+  const q = encodeURIComponent(zip);
+  const [state, recs, rep] = await Promise.all([
+    jget(`${SUPABASE_URL}/rest/v1/app_zip_geography_state?zip=eq.${q}&select=geography_state&limit=1`),
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/app_projects_for_zip`, {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, hdr),
+      body: JSON.stringify({ p_zip: zip, p_kind: 'development' }),
+    }).then((r) => (r.ok ? r.json() : null)),
+    jget(`${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${q}&select=counts,sites&limit=1`),
+  ]);
+  const geographyState = (state && state[0] && state[0].geography_state) || 'pending';
+  const list = Array.isArray(recs) ? recs : [];
+  // What the page WILL render: an authoritative project is withheld only when it has no official
+  // record link, and those are counted rather than hidden.
+  const linkable = list.filter((r) => r && r.source_ref);
+  const markers = linkable.reduce(
+    (n, r) => n + (Array.isArray(r._markers) ? r._markers.filter((m) => typeof m.lat === 'number').length : 0), 0);
+  const cached = (rep && rep[0]) || null;
+  const cachedSites = (cached && cached.sites) || [];
+  const sourced = (s) => !!(s && ((s.url && String(s.url).trim()) || (s.record_url && String(s.record_url).trim())));
+  return {
+    geographyState,
+    authProjects: list.length,
+    servedProjects: linkable.length,
+    unlinkable: list.length - linkable.length,
+    servedMarkers: markers,
+    cachedDevelopment: cachedSites.filter((s) => sourced(s) && s.relevance === 'development').length,
+    cachedFacilities: cachedSites.filter((s) => sourced(s) && s.scope === 'point' && s.relevance !== 'development').length,
+  };
+}
+
+async function pageState(page, url) {
+  await page.goto(url, { waitUntil: 'load', timeout: 90000 });
+  await page.waitForFunction(() => window.__HS_VERIFY && Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
+  return page.evaluate(() => ({
+    v: window.__HS_VERIFY,
+    sites: window.__HS_SITES.length,
+    dev: window.__HS_SITES.filter((s) => s && s.relevance === 'development').length,
+    fac: window.__HS_SITES.filter((s) => s && s.scope === 'point' && s.relevance !== 'development').length,
+    unsourced: window.__HS_SITES.filter((s) => !(s && ((s.url && String(s.url).trim()) || (s.record_url && String(s.record_url).trim())))).length,
+    covNote: (window.__HS_VERIFY && window.__HS_VERIFY.covNote) || '',
+  }));
+}
+
+const ZIPS = (process.env.ZIPS || '10804,76104,76135,20742,01004').split(',').map((z) => z.trim()).filter(Boolean);
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+console.log(`Map 1 delivery gate — ${ZIPS.length} ZIP(s) against ${SITE_BASE}\n`);
+
+for (const zip of ZIPS) {
+  const b = await backend(zip);
+  let p;
+  try { p = await pageState(page, zipUrl(zip)); }
+  catch (e) { ok(false, `${zip}: page loaded`, String(e.message || e)); continue; }
+  console.log(`\n── ${zip} (${b.geographyState}) ──`);
+  ok(p.v.geographyState === b.geographyState,
+     `${zip}: the page resolved the same geography state as the backend`,
+     `page ${p.v.geographyState} · backend ${b.geographyState}`);
+  ok(p.unsourced === 0, `${zip}: every rendered site carries a record link (anti-fabrication)`);
+
+  if (b.geographyState === 'authoritative') {
+    ok(p.dev === b.servedProjects,
+       `${zip}: development CARDS === authoritative projects`,
+       `page ${p.dev} · authoritative ${b.authProjects} minus ${b.unlinkable} unlinkable = ${b.servedProjects}`);
+    ok(p.v.devMarkers === b.servedMarkers,
+       `${zip}: development MARKERS === authoritative marker relation`,
+       `page ${p.v.devMarkers} · relation ${b.servedMarkers}`);
+    ok(p.v.legacyDevelopment === false,
+       `${zip}: NO legacy radius development record was rendered`);
+    ok(b.servedProjects === 0 || p.v.authoritativeDev === true,
+       `${zip}: every rendered development record is stamped authoritative`);
+    if (b.servedMarkers > b.servedProjects) {
+      ok(p.v.devMarkers > p.dev,
+         `${zip}: a multi-marker project keeps ONE card and draws several markers`,
+         `${p.dev} cards · ${p.v.devMarkers} markers`);
+    }
+    if (b.servedProjects === 0) {
+      ok(p.dev === 0 && p.v.legacyDevelopment === false,
+         `${zip}: authoritative MEASURED-ZERO serves zero and does not fall back`,
+         `cache would have offered ${b.cachedDevelopment}`);
+    }
+  } else if (b.geographyState === 'not_measured') {
+    ok(p.dev === 0, `${zip}: not_measured serves no development`,
+       `cache would have offered ${b.cachedDevelopment}`);
+    ok(/cannot measure/i.test(p.covNote),
+       `${zip}: the page says it cannot measure the ZIP rather than claiming zero`,
+       p.covNote.slice(0, 90));
+  } else {
+    ok(p.v.geographyState === 'pending', `${zip}: pending keeps its current behaviour, unlabelled as authoritative`);
+  }
+
+  // FACILITIES ARE OUT OF SCOPE AND MUST NOT MOVE — checked on every state, against a control
+  // that has to be non-zero somewhere or the check attests to nothing.
+  ok(p.fac === b.cachedFacilities, `${zip}: facilities unchanged from the cached report`,
+     `page ${p.fac} · cache ${b.cachedFacilities}`);
+}
+
+// ADDRESS MODE stays a separate contract: a geocoded HOME plus a chosen radius, never ZIP
+// membership. Proven by loading it and checking the page did NOT take the ZIP-mode path.
+{
+  const addr = process.env.ADDR || '2200 Caldwell Ln, Del Valle, TX 78617';
+  const url = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(addr)}`;
+  try {
+    await page.goto(url, { waitUntil: 'load', timeout: 90000 });
+    await page.waitForFunction(() => window.__HS_VERIFY, null, { timeout: 90000 });
+    const st = await page.evaluate(() => ({
+      geographyState: window.__HS_VERIFY.geographyState,
+      zipMode: document.body.classList.contains('zipmode'),
+      radius: (document.getElementById('withinLbl') || {}).textContent || '',
+    }));
+    console.log('\n── address mode ──');
+    ok(st.zipMode === false, 'address mode is not ZIP mode');
+    ok(st.geographyState === null, 'address mode never resolves a ZIP geography state',
+       String(st.geographyState));
+    ok(/within/i.test(st.radius), 'address mode still labels a radius around the home', st.radius.trim());
+  } catch (e) { ok(false, 'address mode loaded', String(e.message || e)); }
+}
+
+await browser.close();
+console.log(`\n${fails === 0 ? 'ALL DELIVERY GATES PASSED' : fails + ' FAILURE(S)'}`);
+process.exit(fails ? 1 : 0);

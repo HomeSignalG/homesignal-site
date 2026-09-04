@@ -1,0 +1,55 @@
+name: verify-map1-delivery
+
+# THE GATE THAT WAS MISSING. Map 1's ZIP page can pass every backend geography check and still
+# render the legacy 3-mile centroid-radius cache to residents — that is exactly what happened:
+# on 2026-09-04, production_geography_verified read 10,821 while all 10,821 of those pages served
+# the cache (docs/maps-coverage/N5-DELIVERY-GAP-ZIP-PAGE.md). This drives a real browser and
+# compares what the PAGE rendered against the authoritative contract, so the two can never drift
+# apart silently again.
+#
+# It serves the checked-out tree over localhost by default, which is the point: a branch is proven
+# BEFORE it ships rather than after. Point SITE_BASE at https://homesignal.net to check what is
+# live instead.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs (default: the regression set)'
+        required: false
+        default: ''
+      site_base:
+        description: 'Where to load the page from (default: the checked-out tree on localhost)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'homesignalmap.html'
+      - 'lib/data.js'
+      - 'scripts/verify-map1-delivery.mjs'
+      - '.github/workflows/verify-map1-delivery.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Serve the checked-out tree
+        if: ${{ inputs.site_base == '' }}
+        run: |
+          python3 -m http.server 8099 >/tmp/http.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
+      - name: Verify the public Map 1 delivery path
+        env:
+          SITE_BASE: ${{ inputs.site_base != '' && inputs.site_base || 'http://localhost:8099' }}
+          ZIP_PATH: '/homesignalmap.html?zip={zip}'
+          ZIPS: ${{ inputs.zips }}
+        run: node scripts/verify-map1-delivery.mjs
