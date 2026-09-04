@@ -1476,3 +1476,97 @@ decision — **logged, non-blocking, not done here**.
 `.github/map1-live-arm` = `DISARMED-2026-09-04-after-live-proof`, against
 `EXPECTED_ARM: arm-2026-09-04-map1-live-proof`. The workflow is dispatch-only and makes no
 production contact while the token does not match.
+
+---
+
+## 24. ZIP headline count — DEPLOYED AND PROVEN LIVE (2026-09-04)
+
+The defect this closes was introduced by §23's own successor, the ZIP authoritative cutover:
+ZIP mode began drawing authoritative whole-ZIP geometry while the headline tile kept reporting
+the **cached report's centroid-radius development count**. Measured live on 78617 before the
+fix: the tile read **48** over a map drawing **55**. A number that contradicts the evidence
+beside it is not a rounding difference — it is the product disagreeing with itself in the one
+place a resident looks first.
+
+### 24.1 The fix (PR #1032, merged as `5a25a1d`)
+
+Two lines of behaviour, both in `homesignalmap.html`:
+
+* `loadZip` now deletes `development` / `proposed` / `comment_open` off the cached report's
+  counters before `render()`, so the tile is recomputed from what is on screen. `facilities`
+  is the engine's own and still accurate, so it stays. **This is the guard address mode has
+  always had** — which is why address mode never carried the defect and served as the positive
+  control for it.
+* `render()`'s fallback became `permits.length + dev.length`. The naive copy of address mode's
+  guard would have counted **area items only**, so a ZIP carrying hundreds of project POINTS
+  and no area notices would compute 0 and wrongly announce itself facilities-only. Both halves
+  are mutation-proved by `test/zip-authoritative.test.mjs` §G.
+
+### 24.2 The deployment, proven by artifact identity rather than by a green job
+
+`pages.yml` dispatched once on `main` → run `33917326873`, head_sha `5a25a1d`, **success**,
+20:41:51Z. No run named "pages build and deployment" appeared, so the Pages source is still
+GitHub Actions (§5 of `CLAUDE.md`). Identity was then measured rather than assumed, on the
+runner, in run `33917776047`:
+
+```
+repo HEAD:         ff7dad806a8bc1c2307cba1b84510dd859ab96a0   (homesignalmap.html identical to main)
+live page HTTP 200, 183585 bytes
+live page sha256:  0876d3f63eb4640f9d03d6ad151264ae882b198b4fffba8f2a427ce409ae292b
+repo  page sha256: 0876d3f63eb4640f9d03d6ad151264ae882b198b4fffba8f2a427ce409ae292b
+```
+
+Byte-identical. A green `deploy` job proves nothing on its own — `actions/deploy-pages@v4`
+succeeds in legacy mode too — so the sha comparison is the evidence, not the workflow colour.
+
+### 24.3 The live proof — run `33917776047`, FAILS: 0 in both gates
+
+**Market-readiness gate, ZIP 78617** (`scripts/map1-ux-gate.mjs`):
+
+```
+{"tile_proposed":55,"rail_proposed":55,"sites_total":564,"dev_points":519,
+ "facilities":30,"withinLbl":"Across ZIP 78617","radiusVisible":false,"homePins":0}
+```
+
+**A8 PASS — 55 == 55**, where the same assertion read 48 vs 55 in the before-run
+(`33915072843`). The contract is EQUALITY, not the return of the old number: the tile is
+correct because it is recomputed from the rendered set, so it tracks whatever the map draws.
+A9 (total tile == records rendered) also passes, and A10/A11 open a real ZIP dossier through
+the page's own `window.siteMarkers` hook — `SH 71 Install Advanced Traffic Management System …
+Proposed / hearing … txdot-projects-info-all · Official record ▸`, link present.
+
+**ZIP geography regression (§11 of the contract proof) — unchanged:** 519 development points,
+every one authoritative; 497 distinct projects; no radius distance and no `registry_id` on any
+of them; every one keeps its official record link; the radius control is not offered; the page
+reads "Updated Sep 2, 2026 · 497 projects across the whole of ZIP 78617."
+
+**Address positive control, the same deployed page:**
+
+```
+{"tile_proposed":2,"rail_proposed":2,"sites_total":38,"dev_points":19,
+ "withinLbl":"Within 2 miles of","radiusVisible":true,"homePins":1}
+```
+
+B6 PASS, and B8/B8b open `Caldwell Lane … Approved / permitted · at this address …
+austin-site-plan-cases · Official record ▸`. B9/B10 hold across a radius change. So the ZIP fix
+did not reach address mode, and the two geographic contracts remain separate.
+
+Session B's layers were not touched: facilities still come from the engine's own count and area
+notices keep their jurisdiction-wide treatment.
+
+### 24.4 Disarm
+
+`.github/map1-live-arm` = `DISARMED-2026-09-04-after-headline-count-proof`, against
+`EXPECTED_ARM: arm-2026-09-04-map1-live-proof` — shared by `map1-live-proof.yml` and
+`map1-ux-gate.yml`, so one token disarms both. Verified mechanically across every arm file in
+the repo; all four are disarmed:
+
+```
+map1-live          DISARMED-2026-09-04-after-headline-count-proof vs arm-2026-09-04-map1-live-proof
+n5-e2e             DISARMED-2026-09-03-after-e2e-proof            vs arm-2026-09-03-e2e-address-radius
+n5-geocode-probe   DISARMED-2026-09-03-after-geocode-probe        vs arm-2026-09-03-geocode-probe
+n5-rpc-apply       DISARMED-2026-09-04-after-rev3-install         vs arm-2026-09-04-rpc-rev3-install
+```
+
+Both gates re-run locally over the committed bytes print `NOT ARMED. No production contact.`
+No site byte changed in this receipt commit, so it is deliberately **not** redeployed.

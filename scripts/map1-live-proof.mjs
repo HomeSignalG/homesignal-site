@@ -87,7 +87,7 @@ await page.click('#go');
 await page.waitForFunction(() => {
   const t = document.getElementById('status');
   return (window.__HS_SITES || []).length > 0 || /couldn't|error/i.test(t ? t.textContent : '');
-}, { timeout: 90000 });
+}, null, { timeout: 90000 });
 await page.waitForTimeout(2500);
 
 const geo = calls.find(c => c.kind === 'geocode');
@@ -217,7 +217,7 @@ if (rows2.some(r => r.has_more === true)) {
 // ═══════════ 8. LIVE ZIP REGRESSION ═══════════
 calls.length = 0;
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 await page.waitForTimeout(4000);
 s = await sites();
 ok(calls.some(c => c.kind === 'zipcache'), '8 — ZIP mode reads the entire-ZIP cached report');
@@ -245,7 +245,7 @@ ok(page.url().indexOf('homesignalmap.html') >= 0,
   '10 — a resident on the old URL lands on the primary map: ' + page.url());
 ok(page.url().indexOf('zip=' + ZIP) >= 0,
   '10 — the old URL keeps its ZIP across the forward, so the bookmark still works');
-await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 ok((await page.locator('#map, #mapInner').count()) >= 1, '10 — and the primary map renders there');
 
 // The normal user path: no live page may still offer the retired map as a destination.
@@ -258,6 +258,55 @@ for (const path of ['/partials/shell.html', '/dashboard.html', '/today.html',
 const nav = await (await fetch(BASE + '/partials/shell.html', { cache: 'no-store' })).text();
 ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(nav),
   '10 — the global nav Maps entry points at the primary map');
+
+// ═══════════ 11. ZIP MODE IS THE WHOLE ZIP — no centroid, no radius ═══════════
+// The invariant: a ZIP search represents the ENTIRE actual ZIP/ZCTA geography and never
+// substitutes a circle around a point. Proven against the deployed page and the real RPC.
+const zlib = await (await fetch(BASE + '/lib/zip-authoritative.js', { cache: 'no-store' })).text();
+ok(/zipAuthSitesFrom/.test(zlib) && /not_measured/.test(zlib),
+  '11 — lib/zip-authoritative.js is deployed');
+const zpage = await (await fetch(BASE + '/homesignalmap.html', { cache: 'no-store' })).text();
+ok(/rpc\/app_zip_projects_markers/.test(zpage),
+  '11 — the deployed page reads authoritative whole-ZIP geography');
+
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
+await page.waitForTimeout(4000);
+const zsites = await page.evaluate(() => (window.__HS_SITES || []).map(s => ({
+  rel: s.relevance, scope: s.scope, auth: s.zip_authoritative === true,
+  ref: s.zip_project_ref || null, rule: s.zip_marker_rule || null,
+  dist: s.distance_mi, e: s.e, n: s.n, rid: s.registry_id, url: s.record_url })));
+const zdev = zsites.filter(x => x.scope === 'point' && x.rel === 'development');
+info('ZIP-mode sites rendered', zsites.length);
+info('ZIP-mode development points', zdev.length);
+info('...of which authoritative', zdev.filter(x => x.auth).length);
+ok(zdev.length > 0 && zdev.every(x => x.auth),
+  '11 — EVERY development point in ZIP mode comes from authoritative whole-ZIP geography',
+  zdev.filter(x => !x.auth).slice(0, 3));
+ok(zdev.every(x => x.dist === undefined || x.dist === null),
+  '11 — no ZIP-mode development point carries a radius distance (there is no HOME to measure from)');
+ok(zdev.every(x => x.rid === undefined || x.rid === null),
+  '11 — no authoritative project carries registry_id, so none is mistaken for an EPA facility');
+ok(zdev.every(x => !!x.url), '11 — every rendered ZIP-mode project keeps its official record link');
+info('distinct authoritative projects', new Set(zdev.map(x => x.ref)).size);
+info('marker rules in use', Array.from(new Set(zdev.map(x => x.rule))).slice(0, 4).join(' | '));
+
+// The radius control must not be offered in ZIP mode - a circle needs an address-derived centre.
+ok(!(await page.locator('#radSel').isVisible().catch(() => false)),
+  '11 — the radius control is NOT offered in ZIP mode');
+const zipLine = await page.textContent('#freshLine');
+info('ZIP completeness line', zipLine);
+ok(/whole of ZIP|whole ZIP|not measured yet/i.test(zipLine || ''),
+  '11 — the page states what was measured across the WHOLE ZIP', zipLine);
+
+// ...and address mode still gets its radius back, on the same deployed page.
+await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForSelector('#addr', { timeout: 30000 });
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => (window.__HS_SITES || []).length > 0, null, { timeout: 90000 });
+ok(await page.locator('#radSel').isVisible(),
+  '11 — an address search restores the radius control (address mode is untouched)');
 
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);

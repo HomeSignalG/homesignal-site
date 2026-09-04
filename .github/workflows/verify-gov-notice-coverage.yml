@@ -1,0 +1,69 @@
+name: Verify the Government Notices coverage artifact (drift gate + self-test)
+
+# `--check` regenerates in memory and exits non-zero when the committed artifact no longer
+# matches production. That makes it a drift gate — but ONLY if it actually fails on drift.
+# A check that always exits 0 is indistinguishable from a check that passes, so this job
+# proves it both ways every time it runs: PASS on the real file, FAIL on a deliberately
+# mutated copy, PASS again after restoring. The mutation lives in the working tree for two
+# steps and is never committed.
+#
+# Deliberately NOT on a schedule. It runs on demand and on pushes that touch the artifact
+# or its generator.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "lib/generated/gov-notice-coverage.json"
+      - "scripts/gen-gov-notice-coverage.mjs"
+      - ".github/workflows/verify-gov-notice-coverage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 1/3 --check must PASS on the committed artifact
+        run: node scripts/gen-gov-notice-coverage.mjs --check
+
+      - name: 2/3 --check must FAIL on a deliberately drifted artifact
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = "lib/generated/gov-notice-coverage.json";
+            const d = JSON.parse(fs.readFileSync(p, "utf8"));
+            const dropped = d.configured_zips.pop();
+            d._counts.configured = d.configured_zips.length;
+            fs.writeFileSync(p, JSON.stringify(d) + "\n");
+            console.log("dropped one ZIP for the negative control:", dropped);
+          '
+          if node scripts/gen-gov-notice-coverage.mjs --check; then
+            echo "::error::--check PASSED on a drifted artifact — it is not a drift gate"
+            git checkout -- lib/generated/gov-notice-coverage.json
+            exit 1
+          fi
+          echo "--check correctly exited non-zero on drift"
+
+      - name: 3/3 restore and --check must PASS again
+        run: |
+          git checkout -- lib/generated/gov-notice-coverage.json
+          git diff --exit-code -- lib/generated/gov-notice-coverage.json
+          node scripts/gen-gov-notice-coverage.mjs --check
+
+      - name: The mutation must never be committed
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::working tree is dirty after the self-test"
+            git status --porcelain
+            exit 1
+          fi
+          echo "working tree clean"
