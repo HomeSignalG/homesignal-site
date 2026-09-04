@@ -230,6 +230,35 @@ ok((await page.locator('.homepin').count()) === 0, '8 — no HOME pin is shown f
 info('ZIP sites rendered', s.length);
 ok(s.length >= 0, '8 — the ZIP page renders');
 
+// ═══════════ 10. MAP 2 RETIREMENT — one map, and no dead end ═══════════
+// The retired page must not be a second map experience, must not be a 404, and must not
+// silently drop the ZIP an old bookmark carried.
+const retired = await (await fetch(BASE + '/maps.html', { cache: 'no-store' })).text();
+ok(/location\.replace\('\/homesignalmap\.html'/.test(retired),
+  '10 — the retired map URL serves a redirect to the primary map');
+ok(!/<template id="hs-content">/.test(retired) && retired.length < 8000,
+  '10 — it is a stub, not a second map experience', retired.length + ' bytes');
+
+await page.goto(BASE + '/maps.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForURL(/homesignalmap\.html/, { timeout: 30000 });
+ok(page.url().indexOf('homesignalmap.html') >= 0,
+  '10 — a resident on the old URL lands on the primary map: ' + page.url());
+ok(page.url().indexOf('zip=' + ZIP) >= 0,
+  '10 — the old URL keeps its ZIP across the forward, so the bookmark still works');
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), { timeout: 60000 });
+ok((await page.locator('#map, #mapInner').count()) >= 1, '10 — and the primary map renders there');
+
+// The normal user path: no live page may still offer the retired map as a destination.
+for (const path of ['/partials/shell.html', '/dashboard.html', '/today.html',
+                    '/development.html', '/homesignalmap.html', '/lib/onboarding.js']) {
+  const body = await (await fetch(BASE + path, { cache: 'no-store' })).text();
+  ok(!/href="maps\.html"|'maps\.html'|"maps\.html"/.test(body),
+    '10 — ' + path + ' offers no route to the retired map');
+}
+const nav = await (await fetch(BASE + '/partials/shell.html', { cache: 'no-store' })).text();
+ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(nav),
+  '10 — the global nav Maps entry points at the primary map');
+
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
 console.log('='.repeat(78));
