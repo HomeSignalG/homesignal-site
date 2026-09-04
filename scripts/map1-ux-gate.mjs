@@ -77,6 +77,20 @@ info('base', BASE); info('zip', ZIP); info('address', ADDRESS);
 console.log('='.repeat(78));
 
 // ═══════════════════ A. ZIP MODE — the entire ZIP ═══════════════════
+// Opens the first DEVELOPMENT marker's real popup and reads it back.
+async function openDossier() {
+  return page.evaluate(async () => {
+    const ms = window.siteMarkers || [];
+    const hit = ms.find(x => x && x.s && x.s.scope === 'point' && x.s.relevance === 'development');
+    if (!hit) return null;
+    hit.m.openPopup();
+    await new Promise(r => setTimeout(r, 400));
+    const el = document.querySelector('.leaflet-popup-content');
+    return el ? { label: hit.s.label || null, text: el.textContent.trim().slice(0, 160),
+                  link: !!el.querySelector('a[href^="http"]') } : null;
+  });
+}
+
 console.log('\nA. ZIP MODE — a resident opens their ZIP');
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
@@ -99,23 +113,15 @@ ok(z.tile_proposed === z.rail_proposed,
 ok(z.tile_total === z.sites_total,
   'A9 the total tile equals the records actually rendered', { tile: z.tile_total, rendered: z.sites_total });
 
-// Marker -> dossier -> evidence: the page's primary interaction.
-const zPin = page.locator('#mapInner .hs-pin, #mapInner .leaflet-marker-icon').first();
-const zPinCount = await zPin.count();
-info('clickable ZIP markers', zPinCount);
-if (zPinCount) {
-  await zPin.click({ force: true });
-  await page.waitForTimeout(1200);
-  const pop = await page.evaluate(() => {
-    const el = document.querySelector('.leaflet-popup-content');
-    return el ? { text: el.textContent.trim().slice(0, 200), link: !!el.querySelector('a[href^="http"]') } : null;
-  });
-  info('ZIP dossier', pop);
-  ok(!!pop, 'A10 clicking a marker opens its dossier');
-  ok(!!(pop && pop.link), 'A11 the dossier carries an official record link (evidence stays reachable)', pop);
-} else {
-  ok(false, 'A10 clicking a marker opens its dossier — NO CLICKABLE MARKER FOUND');
-}
+// Marker -> dossier -> evidence: the page's primary interaction. Opened through the page's
+// OWN hook (window.siteMarkers), which homesignalmap.html exposes precisely so a proof can
+// open a specific marker's real popup "instead of guessing at DOM order". Guessing is what
+// the first version of this gate did, and it clicked the HOME pin in address mode and
+// something inert in ZIP mode - reporting a harness artifact as a product defect.
+const zPop = await openDossier();
+info('ZIP dossier', zPop);
+ok(!!zPop, 'A10 clicking a development marker opens its dossier', zPop);
+ok(!!(zPop && zPop.link), 'A11 the dossier carries an official record link (evidence stays reachable)', zPop);
 
 // ═══════════════════ B. ADDRESS MODE — HOME + radius ═══════════════════
 // Address mode already deletes the engine's development counters when canonical results
@@ -143,19 +149,10 @@ ok(a.tile_proposed === a.rail_proposed,
   { tile: a.tile_proposed, drawn: a.rail_proposed });
 ok(!/Across ZIP/i.test(a.withinLbl || ''), 'B7 ZIP semantics do not leak into address mode', a.withinLbl);
 
-const aPin = page.locator('#mapInner .hs-pin, #mapInner .leaflet-marker-icon').first();
-if (await aPin.count()) {
-  await aPin.click({ force: true });
-  await page.waitForTimeout(1200);
-  const pop2 = await page.evaluate(() => {
-    const el = document.querySelector('.leaflet-popup-content');
-    return el ? { text: el.textContent.trim().slice(0, 160), link: !!el.querySelector('a[href^="http"]') } : null;
-  });
-  info('address dossier', pop2);
-  ok(!!pop2, 'B8 clicking a marker opens its dossier in address mode');
-} else {
-  ok(false, 'B8 clicking a marker opens its dossier — NO CLICKABLE MARKER FOUND');
-}
+const aPop = await openDossier();
+info('address dossier', aPop);
+ok(!!aPop, 'B8 clicking a development marker opens its dossier in address mode', aPop);
+ok(!!(aPop && aPop.link), 'B8b ...carrying its official record link', aPop);
 
 // A radius change must actually change the answer, or the control is decorative.
 const before = a.sites_total;

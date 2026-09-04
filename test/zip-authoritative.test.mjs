@@ -145,5 +145,26 @@ ok(/classList\.remove\("zipmode"\)/.test(page),
 ok(/HS\.n5SitesFrom\(/.test(page) && /HS\.n5MergeSites\(/.test(page),
   'F11 address mode still builds its own radius sites');
 
+// ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
+// Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed
+// nearby" tile read 48 while 55 were actually drawn. The tile came from the cached report's
+// counters, computed over the centroid-radius development set that ZIP mode no longer renders.
+// The page states the contract itself above #cDev: "it must equal the orange Proposed rail."
+console.log('\nG. the cached report\'s development counters cannot outlive the set they described');
+ok(/delete zipCounts\.development; delete zipCounts\.proposed; delete zipCounts\.comment_open;/.test(page),
+  'G1 ZIP mode drops the counters that described the replaced development set');
+ok(/counts:zipCounts/.test(page) && !/counts:row\.counts\|\|\{\}/.test(page),
+  'G2 ...and renders from the cleaned counts, not the raw cached ones');
+// The same guard address mode has always had - this is that pattern, not a new invention.
+ok(/delete data\.counts\.development; delete data\.counts\.proposed; delete data\.counts\.comment_open;/.test(page),
+  'G3 address mode keeps its equivalent guard (the pattern this follows)');
+// AND the fallback the deletion now exposes must count what is RENDERED as development.
+// Counting only area items would make a ZIP of 519 project POINTS announce itself
+// facilities-only; address mode never hit this because FACILITIES_ONLY is ZIP_MODE-gated.
+ok(/data\.counts\.development : \(permits\.length \+ dev\.length\)/.test(page),
+  'G4 the exposed devCount fallback counts development POINTS as well as area items');
+ok(/FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0/.test(page),
+  'G5 ...which is what keeps the facilities-only / coverage-coming note honest');
+
 console.log(fails ? '\n' + fails + ' zip-authoritative assertion(s) FAILED.' : '\nAll zip-authoritative assertions passed.');
 process.exit(fails ? 1 : 0);
