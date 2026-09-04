@@ -201,47 +201,11 @@ console.log('\n-- legend matches what the rest layer actually draws --');
     missing.join(', '));
 }
 
-console.log('\n-- the page wires the symbol layer, not a circle layer --');
-{
-  const page = readFileSync(join(root, 'maps.html'), 'utf8');
-  const restLayer = page.slice(page.indexOf("id:'hs-rest-pt'"), page.indexOf("id:'hs-rest-pt'") + 320);
-  check('hs-rest-pt is a symbol layer', /type:'symbol'/.test(restLayer), restLayer.slice(0, 80));
-  check('it draws the per-feature icon', /'icon-image':\['get','icon'\]/.test(restLayer));
-  check('the Leaflet fallback no longer uses circleMarker for rest',
-    !/L\.circleMarker\(\[it\.lat, it\.lng\], \{ renderer: lfRestRenderer/.test(page));
-  check('the Leaflet fallback draws markerSVG for rest', /HS\.markerSVG\(mk\.shape, mk\.color, '', 20\)/.test(page));
-  // The rest layer is canvas, not DOM, so the only way CI can see it is the live-state
-  // hook. Losing the hook would restore the blind spot that let the circle layer ship.
-  check('the page exposes the live rest-layer verification hook',
-    /window\.__HS_REST_VERIFY\s*=\s*function/.test(page));
-  check('the hook reads the REAL GL layer type and icon expression',
-    /getLayoutProperty\('hs-rest-pt',\s*'icon-image'\)/.test(page)
-    && /layerType:\s*lyr\.type/.test(page));
-  check('the hook reports circles that are NOT honest fallbacks',
-    /unexplainedCircles/.test(page) && /FALLBACK:other/.test(page));
-
-  // The hook names a drawn shape by counting polygon vertices (maps.html
-  // POLY_POINTS_TO_SYMBOL). That table has silently lost entries before — octagon (8)
-  // and cross (12) were both missing once, so correctly-drawn markers read as 'polygon'
-  // and every comparison failed. Drive the REAL table against the REAL markerSVG output
-  // for every canonical symbol, so a shape the verifier cannot name fails here first.
-  const tbl = page.match(/var POLY_POINTS_TO_SYMBOL = (\{[^}]*\})/);
-  check('maps.html still ships the vertex->symbol table', !!tbl);
-  if (tbl) {
-    const PTS = JSON.parse(tbl[1].replace(/(\d+):/g, '"$1":').replace(/'/g, '"'));
-    const nameOf = (svg) => {
-      if (/<rect/.test(svg)) return 'square';
-      if (/<circle/.test(svg)) return 'circle';
-      const m = svg.match(/points="([^"]+)"/);
-      return m ? (PTS[String(m[1].trim().split(/\s+/).filter(Boolean).length)] || 'polygon') : null;
-    };
-    const unnameable = Object.values(REG)
-      .filter((c) => nameOf(HS.markerSVG(c.symbol, '#123456', '', 44)) !== c.symbol)
-      .map((c) => c.symbol);
-    check('the verifier can name every canonical symbol it may have to read back',
-      unnameable.length === 0, unnameable.join(', '));
-  }
-}
+// REMOVED 2026-09-04 with the retirement of the second map: this block read maps.html and
+// asserted how THAT page wired the GL symbol layer, its Leaflet fallback and its
+// __HS_REST_VERIFY hook. The page is now a redirect stub, so the assertions had no
+// subject. Everything above this point tests lib/map.js — the shape/icon resolution that
+// the primary map still uses through markerSVG/shapeEl — and is untouched.
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log('\nAll maps-rest-shape-parity checks passed.');

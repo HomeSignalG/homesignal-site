@@ -6,27 +6,14 @@ name: verify-maps
 # Hard check: the reserve floor min(4, #facilities) holds on the real 78617 default view.
 # Soft check: DALFEN present (logged, never fails the run).
 
+# RETIRED 2026-09-04 with the second map. This workflow's subject was maps.html, which is
+# now a redirect stub to the one primary map, so its automatic triggers were removed: a
+# scheduled or push-triggered run could only ever fail, and a permanently-red check teaches
+# people to ignore red (the same reasoning unit-tests.yml records for its own trigger scoping).
+# workflow_dispatch is KEPT so the job and its script stay available and this is reversible.
+# The script itself is not deleted - it is the record of how that page was verified.
 on:
   workflow_dispatch: {}
-  schedule:
-    - cron: '41 13 * * *'   # daily 13:41 UTC — catches regressions after any deploy
-  push:
-    branches: [main]
-    paths:
-      - 'maps.html'
-      - 'dashboard.html'
-      - 'homesignalmap.html'
-      - 'app.css'
-      - 'lib/map.js'
-      - 'lib/templates.js'
-      - 'config.js'
-      - 'shell.js'
-      - 'partials/shell.html'
-      - 'lib/data.js'
-      - 'scripts/verify-maps.mjs'
-      - 'scripts/verify-map-markers.mjs'
-      - 'test/map-markers.test.mjs'
-      - '.github/workflows/verify-maps.yml'
 
 jobs:
   verify:

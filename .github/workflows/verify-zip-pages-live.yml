@@ -1,0 +1,58 @@
+name: verify-zip-pages-live
+
+# PRODUCTION proof for the canonical ZIP community pages at /community/<zip>/.
+#
+# READ-ONLY: it fetches public URLs and renders them. No commit, no DB write, no secret, no
+# site change. It exists because the build sandbox has no egress to homesignal.net (the
+# agent proxy answers 403 to CONNECT) — the same reason verify-communities.yml exists.
+#
+# Every SEO assertion is made against the INITIAL HTTP RESPONSE BODY. JavaScript is executed
+# afterwards and asserted only to have NOT reversed the build-time decision. The deployed
+# twin of the pre-deployment proof inside pages.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      controls:
+        description: 'JSON control map (classes A-J). Empty = the frozen defaults below.'
+        required: false
+        default: ''
+  schedule:
+    - cron: '20 7 * * *'   # daily, after the 06:40 pages rebuild
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        # No --with-deps: the runner image already carries chromium's shared libraries, and
+        # the apt half is what hung an earlier capture run past its own bound.
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
+      - name: Prove the production ZIP pages
+        env:
+          SITE_BASE: https://homesignal.net
+          # FROZEN CONTROLS — classes A-J, re-derived from live data 2026-09-04 and pinned
+          # here so a reclassification by normal ingestion is a visible one-line change.
+          # Same set pages.yml uses for the pre-deployment proof, plus three meetings
+          # controls: two ZIPs in one county (Santa Clara CA, 231 forward meetings, 60 ZIP
+          # children) which must receive the same cascade, and one in another county which
+          # must receive none of it.
+          DEFAULT_CONTROLS: >-
+            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01002",
+             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"04401",
+             "honest_empty":"02543","fanout":"22030","point_dense":"28468",
+             "meetings_same_a":"95002","meetings_same_b":"95008","meetings_other":"10001"}
+        run: |
+          set -euo pipefail
+          CONTROLS="${{ github.event.inputs.controls }}"
+          if [ -z "$CONTROLS" ]; then CONTROLS="$DEFAULT_CONTROLS"; fi
+          export CONTROLS
+          node scripts/prove-zip-pages-live.mjs

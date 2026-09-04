@@ -11,6 +11,15 @@
 (function(){
   var m = window.location.pathname.match(/^\/development\/(\d{5})\/?$/);
   if (m) window.location.replace('/homesignalmap.html?zip=' + m[1]);
+  // Pretty community route. Once the Pages deployment source is GitHub Actions, every
+  // canonical ZIP has a REAL document at /community/<zip>/ and this branch never fires for
+  // one — 404.html is only reached for paths that do not exist. It matters in two cases:
+  // before that one-time switch (so a canonical link still lands on the right page), and
+  // for a NON-canonical 5-digit path afterwards, which lands on the dynamic page's honest
+  // "isn't covered yet" state. Both are noindex, so no unknown ZIP can become an indexable
+  // community page. No per-ZIP files — the same pattern as /development/ above.
+  var c = window.location.pathname.match(/^\/community\/(\d{5})\/?$/);
+  if (c) window.location.replace('/community.html?zip=' + c[1]);
 })();
 </script>
 <title>HomeSignal — Page not found</title>

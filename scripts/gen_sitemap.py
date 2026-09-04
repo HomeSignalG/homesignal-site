@@ -18,6 +18,17 @@ qualify — the sitemap is only the crawl-rate control. URLs whose flag drops OF
 removed immediately (no ramp on removals).
 
 Uses only the public anon key (same one shipped in community.html); no secrets.
+
+⚠️ THE COMMUNITY HALF OF THIS FILE IS DELIBERATELY STILL `community.html?zip=`. The
+canonical community URL is now `/community/<zip>/` (Alerts SEO build,
+docs/alerts-seo-build-2026-09-04.md), and the advertised set is Rule F, not `indexable` —
+but those documents exist only in the GitHub Pages ARTIFACT, and until the repository Pages
+source is switched to "GitHub Actions" the committed file below is what production serves.
+Rewriting it here first would advertise ~7,000 URLs that 404. `gen_zip_pages.py::
+reconcile_sitemap` rewrites this file INSIDE the artifact instead, so the advertised set
+becomes correct at exactly the moment the documents start existing. Once the deployment
+source is switched and the artifact is live, this generator's community half can be
+retired — not before.
 """
 import json
 import os

@@ -40,6 +40,39 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-04 — ALERTS SEO: LIVE AND PROVEN. Pages source is GitHub Actions
+
+**`/community/<zip>/` is LIVE.** The founder switched the Pages source to **GitHub Actions**;
+the existing `pages.yml` was re-dispatched on `main` @ `09ba9f2` and `actions/deploy-pages@v4`
+deployed at **16:55:42Z** (run 33897571247, deployment 6269007025).
+
+**Persistence proven, not assumed:** the legacy `pages-build-deployment` workflow's last run
+ever is **#900 at 16:13:58Z — before the switch**; a push to `main` afterwards produced no new
+run of it and did not supersede the Actions deployment. ⚠️ A green `deploy-pages` job is NOT
+evidence of the setting (it succeeds in legacy mode too — the 15:58Z retraction in
+`docs/alerts-seo-build-2026-09-04.md` §11); the *absence of that firing* is.
+
+**Fresh Rule F 16:58:06Z: 12,722 canonical · PASS 7,643 · FAIL 5,079** (was 7,256 / 5,466 —
+normal ingestion, not forced). Served sitemap: 7,643 canonical / 0 legacy, reconciled.
+
+- **Production proof: `verify-zip-pages-live` run 33897988781 — 162 passed, 0 failed** (and
+  run 33891407719 before the switch, same result), plus a `pg_net` initial-HTML capture (the sandbox has no egress to
+  homesignal.net). Both are in `docs/alerts-seo-build-2026-09-04.md` §11. Nothing about the
+  implementation is unproven; only the hosting switch is missing.
+- **`pages.yml` is the implementation.** Do not create a Pages workflow from GitHub's suggested
+  Jekyll/static templates.
+- 📌 **OPEN FOLLOW-UP (not blocking):** `scripts/gen_sitemap.py` still writes the committed
+  `sitemap.xml` with the legacy `community.html?zip=` URLs; the artifact rewrite replaces that
+  half at build time, so what is SERVED is correct (7,256 canonical / 0 legacy, measured) while
+  the committed file is not what ships. Retiring its community half is a small, separate change.
+- Re-measured 2026-09-04 15:45:37Z, after deployment: 12,722 canonical ZIPs, Rule F
+  **PASS 7,256 / FAIL 5,466**;
+  vs the development gate — both 6,727 · Alerts-only 529 · development-only 4,975 ·
+  neither 491.
+- Full receipt, publication policy, frozen controls A–J: **`docs/alerts-seo-build-2026-09-04.md`**.
+- Rule F, the crawler ground truth and the geography certification are unchanged:
+  `docs/crawler-ground-truth-2026-09-03.md`.
+
 ### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)
 
 Cursor has been retired from this project; **Claude Code is the only agent going forward.** Two

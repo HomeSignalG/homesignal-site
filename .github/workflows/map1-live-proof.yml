@@ -1,0 +1,134 @@
+name: map1-live-proof
+
+# ONE live production proof of Map 1's address + radius search, driven in a real browser
+# against the DEPLOYED site. Nothing is mocked: the page talks to the real geocode-address
+# function, the real n5_projects_within_radius RPC, the real app_projects and the real
+# get-address-report, exactly as a resident's browser does.
+#
+# SCOPE IS ONE USER FLOW, deliberately: an address search at the initial radius, ONE radius
+# change, then ZIP mode. It issues no database probes of its own - every production call it
+# makes is a call the page itself makes to serve that flow.
+#
+# NO SECRETS. The page uses the public anon key it already ships with, so this job needs no
+# credential at all and is given none. It is a read-only browser session against a public URL.
+#
+# ARM-GATED, and DISPATCH-ONLY. The first step refuses unless .github/map1-live-arm matches
+# EXPECTED_ARM, so a stray dispatch makes no production calls. There is no pull_request
+# trigger: an arm-gated operational workflow that runs on PRs is red the entire time it is
+# correctly disarmed, and a permanently-red check teaches people to ignore red.
+on:
+  workflow_dispatch:
+    inputs:
+      address:
+        description: 'Street address to search'
+        default: '2200 CALDWELL LN, DEL VALLE, TX 78617'
+      zip:
+        description: 'ZIP for the entire-ZIP regression'
+        default: '78617'
+      r1:
+        description: 'Initial radius (0.5 / 1 / 2 / 5)'
+        default: '1'
+      r2:
+        description: 'Radius to change to (0.5 / 1 / 2 / 5)'
+        default: '2'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: map1-live-proof
+  cancel-in-progress: false
+
+env:
+  EXPECTED_ARM: arm-2026-09-04-map1-live-proof
+  BASE: https://homesignal.net
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse to touch production unless deliberately armed
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/map1-live-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED. No production contact."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: a credential is visible to this job. The live proof is a public"
+            echo "browser session and must hold none."
+            exit 1
+          fi
+          echo "No credential in the environment - this is a public read-only browser session."
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Installed in the PARENT of the checkout, so the no-bundler / no-package.json rule for
+      # the site itself still holds (same pattern as unit-tests.yml).
+      - name: Install playwright
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+
+      - name: Prove playwright actually resolves
+        run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING - the proof would silently skip');process.exit(1)})"
+
+      - name: Record which commit production is serving
+        run: |
+          set -euo pipefail
+          echo "repo HEAD: $(git rev-parse HEAD)"
+          curl -sS -o /tmp/live.html -w 'live page HTTP %{http_code}, %{size_download} bytes\n' \
+            "$BASE/homesignalmap.html"
+          echo "live page sha256: $(sha256sum /tmp/live.html | cut -d' ' -f1)"
+          echo "repo  page sha256: $(sha256sum homesignalmap.html | cut -d' ' -f1)"
+
+      - name: LIVE PROOF - one address search, one radius change, one ZIP regression
+        id: proof
+        env:
+          BASE: ${{ env.BASE }}
+          ADDRESS: ${{ inputs.address }}
+          ZIP: ${{ inputs.zip }}
+          R1: ${{ inputs.r1 }}
+          R2: ${{ inputs.r2 }}
+        run: |
+          set -o pipefail
+          node scripts/map1-live-proof.mjs 2>&1 | tee /tmp/proof.log
+
+      # The MARKET-READINESS GATE runs in the same session: the proof above certifies the
+      # geographic contracts, this asks the user-level question - does what the resident READS
+      # agree with what the map DRAWS. Dispatched through this workflow because GitHub only
+      # offers workflow_dispatch for files present on the default branch; the run executes the
+      # dispatched ref's copy, so the branch's own gate script is what actually runs.
+      - name: MARKET-READINESS GATE - Map 1 as a resident uses it
+        if: always()
+        env:
+          BASE: ${{ env.BASE }}
+          ADDRESS: ${{ inputs.address }}
+          ZIP: ${{ inputs.zip }}
+        run: |
+          set -o pipefail
+          node scripts/map1-ux-gate.mjs 2>&1 | tee -a /tmp/proof.log
+
+      - name: Publish the receipt
+        if: always()
+        run: |
+          {
+            echo '## Map 1 address-radius - LIVE production proof'
+            echo ''
+            echo '```'
+            cat /tmp/proof.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
