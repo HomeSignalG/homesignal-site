@@ -14,6 +14,11 @@
 // page (CLAUDE.md §Security). So the storage TRANSPORT is stubbed with the real bytes
 // while every other part of the path is production. That limit is stated, never hidden.
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+
+// Names the surface and the tables this verifier reads, per the repo's surface rule:
+// a clean layer is not evidence about a surface that bypasses it.
+surfaceBanner('verify-maps-preview-live');
 
 const SITE   = process.env.SITE_URL || 'https://homesignal.net';
 const SB     = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
