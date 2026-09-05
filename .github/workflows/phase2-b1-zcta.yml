@@ -50,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon, frs-gate0, frs-gate0-overlap]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon, frs-gate0, frs-gate0-overlap, frs-gate0-diff]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -353,8 +353,22 @@ jobs:
       # 825 names offline; this re-runs the SAME differential over the real FacilityName
       # values the probe just read out of the archive. A mismatch here means the national
       # build would qualify a different facility universe than the shipped engine.
+      # Root-causes the two overlap findings the first pass surfaced: 1,444 REST ids absent
+      # from the bulk eligible set, and 738 coordinate disagreements. A count with no cause
+      # cannot settle Gate 0 either way, so each REST-only id is placed in exactly one bucket
+      # and the buckets are required to sum back to the total.
+      - name: 'FRS Gate 0 follow-up — classify the REST-only ids and the coordinate conflicts'
+        if: ${{ github.event.inputs.mode == 'frs-gate0-diff' }}
+        env:
+          MODE: frs-gate0-diff
+          WORK_DIR: /tmp/frs
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          df -h / | tail -1
+          python3 scripts/frs_bulk_probe.py
+
       - name: 'FRS Gate 1 — eligibility parity over the real national name corpus'
-        if: ${{ github.event.inputs.mode == 'frs-gate0' || github.event.inputs.mode == 'frs-gate0-overlap' }}
+        if: ${{ github.event.inputs.mode == 'frs-gate0' || github.event.inputs.mode == 'frs-gate0-overlap' || github.event.inputs.mode == 'frs-gate0-diff' }}
         env:
           EXTRA_NAMES_FILE: /tmp/frs/frs_names_sample.json
         run: node test/frs-eligibility-parity.test.mjs
