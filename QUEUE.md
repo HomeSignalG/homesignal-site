@@ -40,6 +40,52 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — THE 1,259 PENDING ZIPs ARE FULLY CLASSIFIED. Disk was never the national blocker
+
+**All 1,259 require storage-consuming work, but NOT the same work, and the shape is the finding.**
+Partitioned set-wise against the evidence tables, every category proven rather than inferred.
+
+| cause | ZIPs | evidence | what it actually needs |
+|---|---:|---|---|
+| measured, staged, **never materialised** | **717** | 1,178,636 rows in `geo.n5_association`; **0** rows in `zip_authoritative_membership` / `zip_authoritative_marker` | membership materialisation + marker build + cutover — **~450 MB** |
+| never entered the freeze set | **20** | no frozen development, no associations | boundary-first acquisition |
+| no shard row for the prefix | **445** | identical shape to the 20 | boundary-first acquisition |
+| shards 284 / 300 | **77** | shard `state='pending'` | shard build |
+
+Control: 717 + 20 + 445 + 77 = **1,259**. ✓
+
+- 🔑 **`n5_shard.state='done'` DOES NOT MEAN THE ZIPs WERE MEASURED INTO PRODUCTION.** All 19
+  prefixes holding the 717 are `done`, with real `pairs`, checksums and `phantom: 0` — and
+  **`authoritative = 0` across every one of them**. These are whole metros: Austin 787, Manhattan
+  100, Brooklyn 112, Miami 331, Philadelphia 191, Detroit 482, Cleveland 441, Atlanta 303,
+  Phoenix 850. `done` records that the shard's own pass finished; materialisation and cutover are
+  separate downstream steps that never ran for them.
+- ✅ **PROVEN BY SET EQUALITY, not count equality** (rule 8): the 717 carrying associations are
+  *exactly* the 717 carrying frozen development (`set_disagreement = 0`), and the 445
+  manifest-gap ZIPs are *exactly* the export's `frozen_zero_no_acquisition` population
+  (0 in each direction).
+- ⛔ **THE 465 (445 + 20) CANNOT BE PROMOTED TO MEASURED-ZERO, AND THE REPO ALREADY PROVED WHY.**
+  `docs/maps-coverage/README.md`: *"is 0 because the boundary-first pass has not run there — that
+  is 'not measured', not 'zero developments'"*. The 890 worked example measured it: **11 of 47
+  boundaries a legacy-named build would never have loaded**, and **three ZIP pages carry
+  boundary-first membership while carrying no legacy candidate at all**. ZIPs with zero basis
+  development turned out to hold real development once the boundary-first pass ran. Absence from
+  the frozen basis is therefore evidence of nothing, because the basis is keyed by the SOURCE's
+  own ZIP label, not by geographic intersection.
+- ⚠️ **`max_wal_size = 4096 MB` against ~2,100 MB free — WAL alone can claim ~3 GB.** The 52 MB
+  headroom figure understates the risk of any bulk write; this is why the floor exists and why
+  the shard driver records `free_mb` before each shard. Do not size a write against headroom
+  alone.
+- **Nothing was written this pass, deliberately.** The cheapest single prefix is 191
+  (Philadelphia, 50 ZIP pages, 14,643 associations, ~5.6 MB) — genuinely small, but it still
+  needs a **marker build**, and marker builds are explicitly outside the safe set. There is no
+  bounded verdict-only or cutover-only correction available: `docs/n5-unit-b-cutover.sql` is the
+  SWITCH, and it presupposes membership and markers that do not exist for any of these ZIPs.
+- 📌 **The number for the next capacity decision is 1,259 — not 1,901** (which double-counted the
+  642 honest `not_measured`) — **and 717 of them need only materialisation from associations that
+  are already computed**, which is far cheaper per ZIP than re-acquisition.
+
+
 ### 2026-09-05 — ⚠️ A MAP 1 CODE CHANGE DOES NOT DEPLOY ITSELF. `pages.yml` is path-filtered
 
 **Merging a Map 1 fix to `main` does NOT publish it.** `.github/workflows/pages.yml` fires on
