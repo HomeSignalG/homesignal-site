@@ -31,6 +31,8 @@ import {
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
 import { fenceGeocode } from "./geo-fence.ts";
+import { applyCommercialWorkEvidence } from "./commercial-eligibility.ts";
+import type { CommercialWorkEvidence } from "./commercial-eligibility.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
@@ -143,6 +145,14 @@ export interface ArcgisRegistryEntry {
    *  standing answer), so an array cannot be expressed as a column IN (…) and the entry is
    *  QUARANTINED rather than silently unfiltered. Absent ⇒ no type filter. */
   include_types?: string[];
+  /** COMMERCIAL WORK-EVIDENCE GATE (founder Commercial product rule, 2026-09-05).
+   *  Requires source-native evidence about the WORK before a record may be Commercial, so a
+   *  property's occupancy/zoning/land-use can no longer make a standalone trade, sign,
+   *  business-licence or administrative record into a commercial development object.
+   *  Scoped to Commercial BY CONSTRUCTION — see sources/commercial-eligibility.ts, which also
+   *  explains why this is not expressible as `extra_where` on a mixed-type entry.
+   *  Absent ⇒ behaviour unchanged. */
+  commercial_work_evidence?: CommercialWorkEvidence;
   /** Escape hatch for layers whose date column is a STRING, where recency_days' `DATE '…'`
    *  literal cannot apply (the frisco / worcester / anaheim class). Verbatim clause with
    *  `{cutoff}` → 'YYYY-MM-DD' and `{cutoff_compact}` → 'YYYYMMDD' substituted; requires
@@ -196,6 +206,8 @@ export interface ArcgisRunReport {
   blank_status: number;
   geocode_failures: number;
   no_record_url: number;
+  /** Records the Commercial work-evidence gate downgraded to "other project". */
+  commercial_downgraded: number;
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the fetch and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
@@ -276,7 +288,7 @@ async function runEntry(
     registry_id: entry.registry_id, service_url: entry.service_url,
     fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
-    blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
+    blank_status: 0, geocode_failures: 0, no_record_url: 0, commercial_downgraded: 0, quarantined: [], truncated_at_max_rows: null,
   };
   const records: NormalizedRecord[] = [];
 
@@ -409,7 +421,15 @@ async function normalizeRow(
   // EMPTY. A value that is PRESENT but unmapped still falls through to `unclassified` — that is
   // the unmapped-vs-empty distinction, and it must survive.
   const constantApplies = !typeLookup || !typeSrcVal;
-  const useType = typeHit?.value || (constantApplies ? entry.use_type_const : undefined) || "unclassified";
+  const classifiedType = typeHit?.value || (constantApplies ? entry.use_type_const : undefined) || "unclassified";
+  // COMMERCIAL WORK-EVIDENCE GATE — founder rule, 2026-09-05. A no-op for every non-Commercial
+  // type and for every entry that declares no rule; see sources/commercial-eligibility.ts.
+  const commercialGate = applyCommercialWorkEvidence(
+    classifiedType, entry.commercial_work_evidence,
+    (col) => readCol(row, col), soleTypeCol(entry),
+  );
+  if (commercialGate.downgraded) report.commercial_downgraded++;
+  const useType = commercialGate.useType;
 
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
