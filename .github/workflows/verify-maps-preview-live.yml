@@ -1,0 +1,44 @@
+# PRODUCTION PROOF — the founder can see the exact MAPS visual in the live dashboard.
+#
+# Read-only against production: it fetches the deployed page, reads social_posts, and
+# downloads image objects. It NEVER approves, schedules, publishes, or writes anything.
+name: Verify MAPS founder preview (live)
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: 'Site origin to verify'
+        required: false
+        default: 'https://homesignal.net'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-maps-preview-live
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      # Pinned, and the browser is installed rather than assumed: a browser suite that
+      # silently skips is success-shaped output attesting to nothing.
+      - name: Install Playwright + Chromium
+        run: |
+          npm i --no-save playwright@1.47.2
+          npx playwright install --with-deps chromium
+
+      - name: Verify the live founder review
+        env:
+          SITE_URL: ${{ inputs.site_url || 'https://homesignal.net' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/verify-maps-preview-live.mjs

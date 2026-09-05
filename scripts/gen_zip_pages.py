@@ -334,7 +334,17 @@ def render(p, built):
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
         '<script src="/lib/templates.js"></script>\n<script src="/lib/impact.js"></script>\n'
-        '<script src="/shell.js"></script>\n<script src="/lib/community-page.js"></script>\n'
+        # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
+        # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
+        # host of that same runtime. It was added to community.html alone, so every generated
+        # page threw "Cannot read properties of undefined (reading 'build')" the moment a
+        # sampled ZIP had zero notices - which is what turned the Pages build gate red
+        # (run 33929420398, ZIPs 01001 and 01002). Parity with community.html is asserted by
+        # test/zip-page-shared-runtime.test.mjs so the next shared dependency cannot ship to
+        # one host only.
+        '<script src="/shell.js"></script>\n'
+        '<script src="/lib/gov-notice-copy.js"></script>\n'
+        '<script src="/lib/community-page.js"></script>\n'
         "</body>\n</html>\n")
 
 

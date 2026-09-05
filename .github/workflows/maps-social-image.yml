@@ -1,0 +1,111 @@
+name: maps-social-image
+
+# Generate the MAPS / DEVELOPMENT social visual: a screenshot of the LIVE Map 1 ZIP page,
+# framed on a real project's own coordinates with its real marker popup open.
+#
+# DISPATCH-ONLY AND ARM-GATED, deliberately. There is no schedule and no push trigger:
+# automatic MAPS generation and publication are held, and a capture job that ran on its own
+# would be the first half of that hold quietly coming off. The arm file must match
+# EXPECTED_ARM or the job refuses before it touches anything.
+#
+# THIS JOB NEVER PUBLISHES. It writes exactly two things: a PNG into the existing private
+# social-images bucket, and image_bucket_path + evidence.visual on the MAPS draft it
+# belongs to. It does not set status, approved_at, scheduled_slot or published_at, and it
+# selects only content_family='MAPS' AND status='draft' — an Alerts row is unreachable from
+# here.
+#
+# HOW IT IS TRIGGERED, and why it is not a schedule. workflow_dispatch only works once a
+# workflow is on the default branch, so while this lives on a feature branch the only way
+# to run it is a push trigger — the same one-off-runner pattern fetch-tabs-fixtures.yml
+# already uses in this repo. It is scoped THREE ways so it cannot become ambient
+# generation: to one branch, to the arm file's path alone (an ordinary code push does not
+# fire it), and to the arming gate below. The arm file is set to DISARMED after a capture.
+on:
+  push:
+    branches: [claude/acquisition-log-page-location-hlrt47]
+    paths: ['.github/maps-social-arm']
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'How many MAPS drafts to capture'
+        default: '5'
+      ids:
+        description: 'Optional comma-separated social_posts ids'
+        default: ''
+      dry:
+        description: 'true = capture and upload nothing'
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maps-social-image
+  cancel-in-progress: false
+
+env:
+  EXPECTED_ARM: arm-2026-09-04-maps-social-visual-run6
+  BASE: https://homesignal.net
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse unless deliberately armed
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/maps-social-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED ($ARM). No capture, no write."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Installed in the PARENT of the checkout so the site's no-package.json rule holds
+      # (same pattern as unit-tests.yml and map1-ux-gate.yml).
+      - name: Install playwright
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+
+      - name: Prove playwright actually resolves
+        run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING - the capture would silently skip');process.exit(1)})"
+
+      - name: Record which commit production is serving
+        run: |
+          set -euo pipefail
+          curl -sS -o /tmp/live.html -w 'live Map 1 HTTP %{http_code}, %{size_download} bytes\n' \
+            "$BASE/homesignalmap.html"
+          echo "live page sha256: $(sha256sum /tmp/live.html | cut -d' ' -f1)"
+          echo "repo page sha256: $(sha256sum homesignalmap.html | cut -d' ' -f1)"
+
+      - name: Capture MAPS visuals
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NODE_PATH: ${{ github.workspace }}/../node_modules
+        run: |
+          set -euo pipefail
+          node scripts/maps-social-image.mjs \
+            --limit "${{ inputs.limit || '6' }}" \
+            ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
+            ${{ inputs.dry == 'true' && '--dry' || '' }} \
+            --out "$GITHUB_WORKSPACE/maps-social-out"
+
+      - name: Upload the captured images as a run artifact (review copy)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maps-social-images
+          path: maps-social-out/
+          if-no-files-found: warn
+          retention-days: 14

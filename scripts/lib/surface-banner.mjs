@@ -122,6 +122,16 @@ export const SURFACES = {
     tables: [],
     capped: null,
   },
+  'verify-maps-preview-live': {
+    surface: 'acquisition.html — Bluesky posts tab, MAPS founder review (owner-only)',
+    tables: ['social_posts', 'storage.objects (bucket social-images)'],
+    capped: false,
+    note: 'Reads the SOCIAL QUEUE and its image objects, plus the deployed acquisition.html. '
+        + 'It says nothing about map coverage on either layer: it asks only whether the founder '
+        + 'sees the exact payload the publisher would send. The service key is used SERVER-SIDE '
+        + 'only; the browser half stubs the storage transport with those real bytes because the '
+        + 'dashboard is email-OTP gated and a service key must never reach a page.',
+  },
   'verify-maps-rollout': {
     surface: 'n/a — rollout state only',
     tables: [],
