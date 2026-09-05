@@ -40,6 +40,38 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ⚠️ A MAP 1 CODE CHANGE DOES NOT DEPLOY ITSELF. `pages.yml` is path-filtered
+
+**Merging a Map 1 fix to `main` does NOT publish it.** `.github/workflows/pages.yml` fires on
+push only for the ALERTS ZIP-page generator inputs:
+
+```
+scripts/gen_zip_pages.py · scripts/prove-zip-pages.mjs · lib/community-page.js
+community.html · 404.html · test/zip-pages-{seo,no-point}.test.mjs
+test/community-page-contract.test.mjs · test/fixtures/zip-pages.json · pages.yml
+```
+
+**`homesignalmap.html` and `lib/*.js` are not in that list** — so Map 1's own page and every
+library it loads (`lib/zip-authoritative.js`, `lib/map.js`, `lib/data.js`, `lib/n5-radius.js`)
+can merge green and stay unserved until the daily `40 6 * * *` cron republishes. Up to ~24h
+between "merged" and "residents see it", with nothing anywhere reporting the gap.
+
+**Found the hard way on the 1,259-ZIP correction (#1037, merge `6614ed7`):** CI was green, the
+PR was merged, and no `pages` run existed for the merge commit. The fix reached production only
+because it was dispatched by hand (`workflow_dispatch` on `main`).
+
+- ✅ **Deploy after any Map 1 merge is therefore a REQUIRED step, not an assumption** — dispatch
+  `pages.yml` on `main` and confirm the run, exactly as the founder did for the Alerts SEO
+  switch. Never infer a deploy from a green merge.
+- 📌 **The durable fix is to add Map 1's inputs to that `paths` list.** Not bundled here: it is a
+  workflow change, and this unit was a bounded resident-state correction. Recorded so it is a
+  decision rather than a rediscovery.
+- ⚠️ Do NOT confuse this with the Pages SOURCE question. The source is still **GitHub Actions**
+  and that is verified, not assumed: the legacy `pages build and deployment` workflow shows
+  **0 runs in the last 60**, and its presence — not a green deploy job — is what would signal a
+  revert.
+
+
 ### 2026-09-04 — MAP 1 ZIP DELIVERY: CLOSED ON `main`, and the card grain is PROVEN
 
 **The delivery gap this branch measured is CLOSED — by `main`, not by this branch.** The gap was
