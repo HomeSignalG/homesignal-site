@@ -40,6 +40,35 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ⚖️ STORAGE FLOOR IS NOW 500 MB (founder). The 2,048 MB floor is CANCELLED
+
+Work proceeds in bounded units while free space stays safely above **500 MB**, measuring disk
+before and after each. `DISK_FLOOR_MB` was pinned to `'2048'` in six places in
+`.github/workflows/phase2-b1-zcta.yml` and is read by `n5_shard.disk_free_mb`, so the pipeline
+would have refused to run at all under the old number — it now carries `'500'`.
+
+⚠️ **`PREFIXES` is NOT optional on `n5-unit-a` and `n5-a3-marker`.** Both rebuild by
+delete-then-insert, and the workflow's own comment says an unrestricted build "would make those
+live pages raise" for ZIPs already `production_geography_verified`. Always name the prefixes.
+
+### 2026-09-05 — CORRECTION: the 717 were NOT "measured, awaiting materialisation"
+
+An earlier reading of this same data said the 717 held staged measurement needing only
+promotion. **That was wrong, and the control is what showed it.** `geo.n5_association` is the
+LEGACY CANDIDATE set; authoritative membership derives from `geo.n5_boundary_membership`:
+
+| cohort | associations | boundary membership |
+|---|---:|---:|
+| the 717 (pending) | 717 ZIPs | **0 ZIPs, 0 rows** |
+| control 761/890 (cut over) | 72 ZIPs | **67 ZIPs, 20,017 rows** |
+
+The control's 20,017 boundary rows equal its 20,017 `zip_authoritative_membership` rows exactly,
+so membership is a 1:1 promotion of boundary membership — and the 717 have none. **The
+boundary-first pass never ran for them.** They need real measurement, not accounting.
+
+🟢 **What makes it affordable anyway: 370,836 of the 375,084 source_keys those ZIPs need already
+have geometry in `geo.n5_geom` (98.9%)** — only 4,248 are missing. The expensive half is done.
+
 ### 2026-09-05 — THE 1,259 PENDING ZIPs ARE FULLY CLASSIFIED. Disk was never the national blocker
 
 **All 1,259 require storage-consuming work, but NOT the same work, and the shape is the finding.**
