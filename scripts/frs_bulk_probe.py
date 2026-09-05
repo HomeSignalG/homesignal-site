@@ -26,6 +26,7 @@ typed from memory; a candidate that cannot be discovered is reported, never assu
 import csv
 import hashlib
 import io
+import math
 import json
 import os
 import re
@@ -316,6 +317,101 @@ def overlap(seen):
     return rest, both
 
 
+# ── GATE 0 follow-up: WHY do 1,444 REST ids not appear in the bulk eligible set, and how
+# large are the 738 coordinate disagreements? A count without a cause is a naked assertion,
+# and both of these decide whether the bulk is the same universe or a different one.
+def diff(rest):
+    """Second pass, scanning the archive for ONLY the ids the REST corpus already holds.
+
+    Cheap and exact: the REST set is read first, so the scan records nothing else. Each
+    REST-only id lands in exactly one bucket, and the buckets sum back to the total — a
+    classification that does not reconcile is not a classification.
+    """
+    say("", "")
+    say("GATE 0 follow-up", "classifying REST-only ids and coordinate conflicts")
+    zf = zipfile.ZipFile(f"{WORK}/frs_national_single.zip")
+    member = [n for n in zf.namelist() if n.lower().endswith(".csv")][0]
+    found = {}
+    with zf.open(member) as raw:
+        text = io.TextIOWrapper(raw, encoding="utf-8", errors="replace", newline="")
+        rd = csv.reader(text)
+        header = next(rd)
+        cols = {c.strip().upper(): i for i, c in enumerate(header)}
+        i_rid, i_nm = cols["REGISTRY_ID"], cols["PRIMARY_NAME"]
+        i_la, i_lo = cols["LATITUDE83"], cols["LONGITUDE83"]
+        i_rp, i_cd = cols.get("REF_POINT_DESC"), cols.get("COLLECT_DESC")
+        for row in rd:
+            if len(row) <= max(i_rid, i_nm, i_la, i_lo):
+                continue
+            rid = (row[i_rid] or "").strip()
+            if rid not in rest:
+                continue
+            found[rid] = (
+                (row[i_nm] or "").strip(),
+                (row[i_la] or "").strip(), (row[i_lo] or "").strip(),
+                (row[i_rp].strip() if i_rp is not None and len(row) > i_rp else ""),
+                (row[i_cd].strip() if i_cd is not None and len(row) > i_cd else ""),
+            )
+
+    absent = ineligible = no_coord = ok_rows = 0
+    ineligible_examples, absent_examples = [], []
+    conflicts = []
+    for rid, (rn, rla, rlo) in rest.items():
+        f = found.get(rid)
+        if f is None:
+            absent += 1
+            if len(absent_examples) < 6:
+                absent_examples.append((rid, rn))
+            continue
+        bn, bla, blo, rp, cd = f
+        if not looks_industrial(bn):
+            ineligible += 1
+            if len(ineligible_examples) < 6:
+                ineligible_examples.append((rid, rn, bn))
+            continue
+        if not bla or not blo:
+            no_coord += 1
+            continue
+        ok_rows += 1
+        try:
+            bla_f, blo_f = float(bla), float(blo)
+        except ValueError:
+            continue
+        if rla is None or rlo is None:
+            continue
+        if abs(rla - bla_f) > COORD_EPS or abs(rlo - blo_f) > COORD_EPS:
+            # metres, on a spherical earth. Only the magnitude matters here, not the bearing.
+            dlat = (bla_f - rla) * 111320.0
+            dlng = (blo_f - rlo) * 111320.0 * math.cos(math.radians((bla_f + rla) / 2.0))
+            conflicts.append((math.hypot(dlat, dlng), rid, rn, bn, rp, cd))
+
+    say("REST ids checked against the archive", len(rest))
+    say("  present, eligible, coordinate present", ok_rows)
+    say("  REST-only: ABSENT from the file", absent)
+    say("  REST-only: present but name now INELIGIBLE", ineligible)
+    say("  REST-only: present, eligible, NO COORDINATE", no_coord)
+    say("  buckets sum", ok_rows + absent + ineligible + no_coord)
+    for rid, rn in absent_examples:
+        say(f"    absent {rid}", rn[:60])
+    for rid, rn, bn in ineligible_examples:
+        say(f"    ineligible {rid}", f"REST {rn[:34]!r} vs BULK {bn[:34]!r}")
+
+    conflicts.sort(reverse=True)
+    say("coordinate conflicts (> 1e-4 deg)", len(conflicts))
+    if conflicts:
+        d = [c[0] for c in conflicts]
+        n = len(d)
+        srt = sorted(d)
+        say("  median metres", f"{srt[n//2]:.1f}")
+        say("  p90 metres", f"{srt[int(n*0.9)]:.1f}")
+        say("  max metres", f"{srt[-1]:.1f}")
+        for band, lo, hi in (("<100 m", 0, 100), ("100 m - 1 km", 100, 1000),
+                             ("1 - 10 km", 1000, 10000), (">10 km", 10000, 1e18)):
+            say(f"  {band}", sum(1 for x in d if lo <= x < hi))
+        for dist, rid, rn, bn, rp, cd in conflicts[:8]:
+            say(f"    {dist/1000:.1f} km {rid}", f"{bn[:40]!r} ref={rp[:28]!r} collect={cd[:24]!r}")
+
+
 def main():
     say("mode", MODE)
     say("eligibility INCLUDE tokens", len(INCLUDE))
@@ -332,8 +428,10 @@ def main():
         json.dump(names_out, f, ensure_ascii=False)
     say("name sample written", f"{len(names_out)} names -> {WORK}/frs_names_sample.json")
 
-    if MODE == "frs-gate0-overlap":
-        overlap(seen)
+    if MODE in ("frs-gate0-overlap", "frs-gate0-diff"):
+        rest, _both = overlap(seen)
+        if MODE == "frs-gate0-diff":
+            diff(rest)
 
     say("", "")
     say("SNAPSHOT sha256", sha)
