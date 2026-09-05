@@ -5,6 +5,7 @@
 // the two mode contracts are checked SEPARATELY - ZIP mode must carry no distance and no
 // radius semantics, address mode must send a real geocoded home and a chosen radius.
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const BASE = process.env.SITE_BASE || 'https://homesignal.net';
 let fails = 0;
@@ -24,6 +25,7 @@ const CASES = [
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
+surfaceBanner('verify-map1-zip-states');
 console.log('LIVE Map 1 ZIP-state verification — ' + BASE + '\n');
 
 const facBaseline = {};

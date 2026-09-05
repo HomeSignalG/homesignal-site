@@ -137,6 +137,19 @@ export const SURFACES = {
     tables: [],
     capped: null,
   },
+  'verify-map1-zip-states': {
+    surface: 'Map 1 ZIP mode (homesignalmap.html?zip=) — the geography-state contract',
+    tables: ['app_projects', 'development_reports'],
+    capped: null,
+    note: 'Spans BOTH content layers, and that is the point of it. ZIP-mode DEVELOPMENT comes '
+        + 'from app_projects through the app_zip_projects_markers RPC (authoritative whole-ZIP '
+        + 'membership), while FACILITIES and area notices still come from the uncapped '
+        + 'development_reports cache. A verifier that watched only one of them could not see the '
+        + 'thing this one exists to check: that a ZIP with no authoritative geography renders no '
+        + 'development from EITHER layer while still rendering its facilities, and says so '
+        + 'honestly. It also asserts the two MODES stay separate — ZIP-mode records carry no '
+        + 'distance, address mode sends a geocoded home and a chosen radius and no zip.',
+  },
 };
 
 /** Surfaces that exist and have NO verifier. This is where the next silent defect lives. */
