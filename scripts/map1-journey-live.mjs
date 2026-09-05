@@ -47,6 +47,8 @@ const chrome = () => page.evaluate(() => {
     totalTileShown: (() => { const t = document.getElementById('ccTot');
       return !!t && getComputedStyle(t).display !== 'none'; })(),
     covNote: (document.getElementById('covNote') || {}).textContent || '',
+    covNoteShown: (() => { const n = document.getElementById('covNote');
+      return !!n && getComputedStyle(n).display !== 'none'; })(),
     mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
     hero: (document.querySelector('.sub') || {}).textContent || '',
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
@@ -236,6 +238,12 @@ await waitMap();
 await page.waitForTimeout(900);
 c = await chrome();
 info('facilities-only control ' + FAC_ZIP, { covNote: c.covNote, kFac: c.kFac, totalTileShown: c.totalTileShown });
+// VACUITY GUARD, first: an absent coverage note would make every J assertion below pass
+// by saying nothing. This control was picked BECAUSE the note fires here, so if it does not
+// render the right thing to do is investigate, never to score a silent page as green.
+ok(c.covNoteShown === true && /Nearby EPA-registered facilities are shown for additional local context/i.test(c.covNote || ''),
+  'J0 the corrected facilities-only sentence is actually ON SCREEN (not a vacuous pass)',
+  { covNoteShown: c.covNoteShown, covNote: c.covNote });
 ok(!/Showing EPA-registered facilities for this ZIP/i.test(c.covNote || ''),
   'J1 the false whole-ZIP sentence is absent from production', c.covNote);
 ok(!WHOLE_ZIP_FACILITY_CLAIM.test((c.covNote || '') + ' ' + (c.kFac || '')),
