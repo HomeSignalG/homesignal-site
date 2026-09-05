@@ -40,6 +40,45 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — 🟢 PHASE 2 BATCH A: 174 manifest-gap ZIPs MEASURED, and the zero is real
+
+The first Phase 2 acquisition unit — the manifest-gap population (no `n5_shard` row at all, so
+the boundary-first pass had **never** run there). `n5-boundary-first prefixes=580,875,587,704,710,582`,
+run `33987988103`, 274 s for 6 prefixes.
+
+**Result: 174 ZIPs measured, 1 membership row.** That reads like a broken instrument, and the
+receipts are what prove it is not:
+
+```
+710  ZCTAs loaded 53 · invalid 0 · wrong SRID 0 · vertices 133,611
+     corpus probed 1,170,027 features / 838,968 projects
+     bbox candidates 0 / exact true 0        -> membership 0
+582  ZCTAs loaded 58 · invalid 0 · wrong SRID 0 · vertices  40,725
+     corpus probed 1,170,027 features / 838,968 projects
+     bbox candidates 1 / exact true 1        -> membership 1
+disk 1,775.3 -> 1,771.3 MB   (4.0 MB / 174 ZIPs)   WAL flat 1,024
+```
+
+🔑 **This is the founder's valid measured zero, and the shape of its proof is the point.** The
+zero does not come from a filter returning nothing — it comes from **the entire ZIP geography
+being loaded and evaluated against the entire resident corpus**, with `bbox candidates 0` as the
+result. Loaded-boundary counts, vertex counts and the corpus denominator are the positive
+controls; without them a real zero and a pass that silently skipped these prefixes would be
+indistinguishable. These prefixes are rural ND / NM / LA, and the wired first-party permit
+sources are metro-concentrated, so genuinely-empty is the expected answer.
+
+- **582's one row is `from RECOVERY 1`, `geometry-only pages 1`** — a page carrying authoritative
+  membership and **zero legacy candidates**. Under the shard-first build it would have had
+  nothing. Same class as the 890 worked example.
+- **All 6 prefixes reported `boundaries a shard-first build would NEVER have loaded = <all>`**
+  and `legacy ZIPs with no ZCTA in the national file = 0`.
+- ⚠️ **CORRECTION — 941 and 952 are NOT special and were wrongly held back.** I carried a note
+  that ZIPs `94128` (SFO) and `95219` (Stockton) were "Caltrans special cases to preserve". The
+  Caltrans flag in this file is a permit-**source** wiring rejection (`WRONG_RECORD_CLASS`,
+  Caltrans publishes assets not projects) and has nothing to do with ZIP geography acquisition.
+  Checked rather than recalled: both are canonical pages, `boundary_rows 0`, `shard_rows 0`, not
+  in `n5_cutB_excluded`. They are ordinary manifest-gap ZIPs and are in batch B.
+
 ### 2026-09-05 — ⛔ 11 ZIPs EXCLUDED FROM CUTOVER: intersections found that cannot be placed
 
 **A ZIP with boundary intersections but ZERO membership must NOT be cut over.** It would publish
