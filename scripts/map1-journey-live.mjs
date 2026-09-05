@@ -42,6 +42,13 @@ const chrome = () => page.evaluate(() => {
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
     locLabel: el ? el.textContent.trim() : null,
+    kDev: (document.getElementById('kDev') || {}).textContent || null,
+    kFac: (document.getElementById('kFac') || {}).textContent || null,
+    totalTileShown: (() => { const t = document.getElementById('ccTot');
+      return !!t && getComputedStyle(t).display !== 'none'; })(),
+    covNote: (document.getElementById('covNote') || {}).textContent || '',
+    mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
+    hero: (document.querySelector('.sub') || {}).textContent || '',
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
       ? { address: HS.state.activeProperty.address, zip: HS.state.activeProperty.zip } : null,
     path: location.pathname, search: location.search
@@ -188,6 +195,54 @@ ok(back.stale === 0, 'H no address-radius result survives into ZIP mode', back.s
 ok(back.homePins === 0, 'H no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   'H the saved home survived the whole journey', c.savedHome);
+
+// ── I. F1 — the two scopes on one screen, live ──────────────────────────────────────────
+// Development is measured across the whole ZIP; facilities are an EPA query AROUND it (44% of
+// the facilities shown on a ZIP page sat outside that ZIP, measured over the 50 ZIPs that have
+// authoritative boundaries). The page must say which is which, and must not add them together.
+const WHOLE_ZIP_FACILITY_CLAIM = /(facilit\w*[^.]{0,80}\b(?:for|in|across)\s+(?:this|the)\s+ZIP)|((?:for|in|across)\s+(?:this|the)\s+ZIP[^.]{0,80}\bfacilit)/i;
+// A live FACILITIES-ONLY control, chosen from production so the state actually renders:
+// 71104 (Shreveport LA) carries 40 EPA facilities, 0 development records and no authoritative
+// development membership, so the coverage note fires - the exact page state whose sentence
+// used to read "Showing EPA-registered facilities for this ZIP."
+const FAC_ZIP = process.env.FAC_ZIP || '71104';
+
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await waitShell();
+await waitMap();
+await page.waitForTimeout(600);
+c = await chrome();
+const counts = await page.evaluate(() => ({ dev: (document.getElementById('cDev')||{}).textContent,
+  fac: (document.getElementById('cFac')||{}).textContent,
+  devMarkers: (window.__HS_SITES||[]).filter(s => s.scope==='point' && s.relevance==='development').length,
+  facMarkers: (window.__HS_SITES||[]).filter(s => s.scope==='point' && s.relevance!=='development').length }));
+info('ZIP ' + ZIP + ' scope copy', { kDev: c.kDev, kFac: c.kFac, totalTileShown: c.totalTileShown, mapCap: c.mapCap, counts });
+ok(/across this ZIP/i.test(c.kDev || ''), 'I1 development is described as ACROSS this ZIP', c.kDev);
+ok(/^Nearby regulated facilities$/i.test((c.kFac || '').trim()),
+  'I2 facilities are described as NEARBY, not as a ZIP measurement', c.kFac);
+ok(!WHOLE_ZIP_FACILITY_CLAIM.test(c.kFac + ' ' + c.covNote + ' ' + c.mapCap + ' ' + c.hero),
+  'I3 no ZIP-mode wording says facilities are for/in/across this ZIP',
+  { kFac: c.kFac, covNote: c.covNote, mapCap: c.mapCap, hero: c.hero });
+ok(c.totalTileShown === false, 'I4 no mixed-geography total is displayed in ZIP mode');
+ok(counts.devMarkers > 0 && counts.facMarkers > 0,
+  'I5 both development and facility markers still render', counts);
+ok(/^\d+$/.test((counts.dev||'').trim()) && /^\d+$/.test((counts.fac||'').trim()),
+  'I6 both counts still render', counts);
+
+// ── J. F1 — the facilities-only state, live ─────────────────────────────────────────────
+await page.goto(BASE + '/homesignalmap.html?zip=' + FAC_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await waitShell();
+await waitMap();
+await page.waitForTimeout(900);
+c = await chrome();
+info('facilities-only control ' + FAC_ZIP, { covNote: c.covNote, kFac: c.kFac, totalTileShown: c.totalTileShown });
+ok(!/Showing EPA-registered facilities for this ZIP/i.test(c.covNote || ''),
+  'J1 the false whole-ZIP sentence is absent from production', c.covNote);
+ok(!WHOLE_ZIP_FACILITY_CLAIM.test((c.covNote || '') + ' ' + (c.kFac || '')),
+  'J2 nothing on this page claims the facilities are the ZIP’s', { covNote: c.covNote, kFac: c.kFac });
+ok(/^Nearby regulated facilities$/i.test((c.kFac || '').trim()),
+  'J3 the facility counter is labelled as nearby context', c.kFac);
+ok(c.totalTileShown === false, 'J4 no mixed total on a facilities-only ZIP');
 
 ok(errors.length === 0, 'no fatal client error across the live journey', errors.slice(0, 3));
 
