@@ -119,7 +119,18 @@ for (const zip of ZIPS) {
     };
     const apprSlice = railFor('approved');
     const propSlice = railFor('proposed');
-    const railRepeats = repeatsIn(apprSlice).concat(repeatsIn(propSlice));
+    // REPEATS ARE READ OFF THE RENDERED ROWS, not off a re-slice of the site list. The rails
+    // de-duplicate by project identity before the 12-row cap, so a simulation that re-slices the
+    // raw sites is testing a copy of the renderer rather than the renderer - it reported repeats
+    // the DOM did not contain. Each row carries data-ref, so the question "does one project
+    // appear twice in this rail" is asked of what a resident actually sees.
+    const domRefs = (id) => rows(id).map((el) => el.getAttribute('data-ref') || '(none)');
+    const dupesIn = (refs) => {
+      const c = {};
+      refs.forEach((k) => { c[k] = (c[k] || 0) + 1; });
+      return Object.entries(c).filter(([, n]) => n > 1);
+    };
+    const railRepeats = dupesIn(domRefs('apprList')).concat(dupesIn(domRefs('propList')));
     // The same question asked of the WHOLE rail-eligible set, not just the 12 that fit - so a
     // clean result inside the cap cannot hide duplication the cap happens to truncate.
     const uncappedRepeats = repeatsIn(dev.filter((s) => stageOf(s) === 'approved'))
