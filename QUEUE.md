@@ -40,6 +40,43 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — 🔬 THE PRODUCER RETURNS A BARE ARRAY. `->'projects'` ON IT IS NULL, AND NULL COUNTS AS 0
+
+`public.app_authoritative_projects_for_zip(zip)` returns a **jsonb ARRAY of projects**, not an
+object. `public.app_zip_projects_markers(zip, kind, true)` returns an **object** carrying
+`mode` / `status` / `projects` / `markers`. I wrote one reconciliation query against the wrong
+one of those two shapes:
+
+```
+jsonb_array_length(coalesce(j->'projects','[]'))     -- j is an ARRAY -> ->'projects' is NULL -> 0
+```
+
+Measured on 284/300, where the answer is loudly non-zero: **producer_projects 0 against
+membership 139,652**, reported as **75 of 77 mismatching**. The data was correct and the
+instrument was wrong — the exact inversion of what a failing gate normally means.
+
+- 🔑 **THE ZERO WAS ONLY VISIBLE BECAUSE THE POPULATION WAS DENSE.** The same broken extraction
+  ran first over the 442 manifest-gap ZIPs and reported `producer_projects 0 == membership 0`,
+  which is the *right answer reached by a broken measurement*. On a measured-zero population a
+  wrong instrument and a correct one are indistinguishable. It announced itself only when a ZIP
+  with 14,702 memberships also came back 0.
+- ✅ **The 442 conclusion still stands, on different evidence.** Their `n5_p2a_post` gate used
+  `jsonb_array_length()` directly on `app_projects_for_zip`'s array and the object shape for
+  markers — both correct — and re-reads clean: 442 zips, dev_rows nonzero **0**, marker rows
+  nonzero **0**, legacy fallbacks **0**, facility md5 changed **0**. The flawed step was the
+  recon, and the post-verify is the stronger gate because it runs through the production read
+  path.
+- 🛡️ **THE PRODUCER IS ITS OWN RECONCILIATION, which is why nothing unsafe could have shipped.**
+  `app_authoritative_projects_for_zip` raises `data_exception` on five invariants before it can
+  return: `n_projects <> n_membership`; `n_markers <>` the marker relation; any project missing
+  `source_key` or a required render field; a duplicate project `source_key`; a duplicate
+  `(source_key, marker_seq)`. **All 77 returned without raising**, so projects == membership and
+  markers == relation were already proven at the moment of the call — the counts I stored beside
+  that fact were simply mis-extracted.
+- **Rule: check the RETURN SHAPE of every producer before writing a gate against it**, and pair
+  the gate with a population where the expected answer is non-zero. A gate exercised only where
+  the answer is 0 has not been exercised.
+
 ### 2026-09-05 — ✅ 442 MANIFEST-GAP ZIP PAGES CUT OVER. authoritative 11,558 → 12,000
 
 The Phase 2 manifest-gap population — 445 canonical ZIPs across 40 prefixes with **no
