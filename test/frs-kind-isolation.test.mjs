@@ -7,6 +7,12 @@
 // markers where the kind-filtered read returns 188 — the live development count exactly. So
 // once facility rows exist, every facility marker rides out inside the development payload.
 //
+// And the leak already runs in the other direction, today, with no simulation at all:
+//   app_zip_projects_markers('84302','facility',true) -> projects 0, MARKERS 188
+// The facility caller is handed the development ZIP's entire marker set. The page discards
+// them only because none resolves to a project — which is precisely the incidental safety
+// this file exists to make deliberate.
+//
 // docs/frs-facility-kind-isolation-migration.sql is the fix (record_kind on both relations,
 // both reads filtered, both prefix-rebuild DELETEs scoped). It is parked, not applied, while
 // another session's national development build is still rebuilding those relations.

@@ -199,3 +199,25 @@ commit;
 -- The last line is what makes the proof load-bearing rather than decorative: without the
 -- filter the development payload gains all 22 facility markers. With it, the development
 -- payload is unchanged and neither kind can reach the other.
+--
+-- ── 6. THE LEAK IS NOT PROSPECTIVE. IT IS LIVE TODAY, IN THE FACILITY DIRECTION ─────────
+-- Measured on production 2026-09-05 18:1xZ, calling the shipped function directly:
+--
+--   app_zip_projects_markers('84302','facility',true)
+--     -> status boundary_complete, projects 0, MARKERS 188
+--   app_zip_projects_markers('84302','development',true)
+--     -> status boundary_complete, projects 34, markers 188
+--
+-- The facility read returns ZERO projects and all 188 DEVELOPMENT markers. The projects
+-- half is correctly kind-filtered; the marker half is not filtered at all, so it hands the
+-- facility caller the development ZIP's entire marker set. Nothing a resident sees is wrong
+-- yet, because lib/zip-authoritative.js draws a site only where a marker's project_ref
+-- resolves to a hydrated project and here none do — but that is the page absorbing a
+-- defective payload, not the payload being correct.
+--
+-- So this migration is not only a precondition for the facility population; it repairs a
+-- kind-isolation defect that is already shipped. It stays parked only because applying a
+-- schema change to relations under an in-flight destructive rebuild would queue an
+-- ACCESS EXCLUSIVE lock behind that rebuild's per-prefix transaction and block live Map 1
+-- ZIP reads while it waited. Apply it as soon as that build is done — first, before any
+-- facility row is written.
