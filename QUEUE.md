@@ -40,6 +40,125 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
+
+`CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
+never drew. Measured on production `app_projects` (control 3,216,489 rows): **1,190 records
+state a data centre in their own words; 153 resolved to the Data center category.**
+
+`lib/map.js` gains a **DATACENTER precedence phase** — second only to the facility flag —
+reading the record's own class fields (incl. **`type_raw`**, which the classifier had never
+read) and its name. Every category it displaces is strictly broader, and in each case the
+coarse value is our `type_map` output rather than the source's judgement (Phoenix files
+data-centre fire work under the F-range code → Civic/Public; San Jose publishes
+`type_raw='Data Center'` verbatim and the entry collapsed it to Industrial).
+
+**Effect: project records drawing the octagon 153 → 479 (+326); ZIP pages with at least one
+Data center pin 95 → 219 (+124).** Nothing that states no data centre moves. (The first pass
+reached 452/214; the adversarial audit below added the last +27/+5.)
+
+- Full offline suite green — **143 files, 0 failed** (`maps-delvalle-golden` 235 checks
+  unchanged, so no golden classification drifted). New suite
+  `test/marker-datacenter-type.test.mjs`, **87 checks**, every string verbatim production text.
+- Receipt: `docs/maps-datacenter-type-2026-09-05.md`.
+- ⚖️ **CTO MERGE GATE CLEARED 2026-09-05 — MERGE READY.** The evidence contract was re-examined
+  rather than inherited: this classifier asserts only *"HomeSignal's own source record says this
+  is a data centre."* Verified over **all 96 distinct source records** behind the 452 rows —
+  **0 classified without a literal data-centre string**, 0 from operator/place/coordinate,
+  0 power-generation/crypto/warehouse/office captures, 0 campus records fabricated or collapsed.
+  External datasets are a **completeness** instrument, not a correctness gate for that claim, so
+  **Epoch's inaccessibility is not a merge blocker** (it stays BLOCKED/UNKNOWN, never zero).
+- 🔑 **Case B measured (522 of 1,045 Atlas-proven ZIPs) and it settled the classifier's shape.**
+  ⚠️ **Its "the vocabulary is NOT the gap" half was WRONG and is corrected below — `data hall`
+  is a real missed vocabulary, found only by finishing the other 523 ZIPs rather than
+  extrapolating.** The operator half stands, and it is
+  **unsafe to close**: an operator-brand rule finds **5** real misses (CoreSite VA1/VA3,
+  EdgeConnex) and **31** false positives including **20 residential townhouses** ("VANTAGE HILL
+  - LOT n - TH"), an Amazon delivery station, two office fit-outs, an **Oracle trade-show booth**,
+  a **street name**, and **"aligned" used as an English verb**. Pinned by 13 regression tests
+  built from those exact production strings; suite 33 → 54 checks.
+- ⚔️ **ADVERSARIAL AUDIT PASS — 3 code corrections, 0 false positives found.** All 96 distinct
+  records behind the 452 re-attacked on their **full untruncated names** with 8 false-positive
+  patterns (incidental reference · power generation/substation/transmission · warehouse ·
+  office · crypto · telecom · generic-name-only · operator-only): **94 PROVEN CORRECT · 0 PROVEN
+  FALSE POSITIVE · 2 AMBIGUOUS · 0 UNMEASURED**, with a non-zero control (4 of 96 trip at least
+  one pattern), so the zero is a real absence.
+  1. **Incidental-reference guard.** A "serving/feeding/adjacent to" construction **AND** a
+     competing head noun (substation, kV, transmission, solar, BESS, cell tower…) must BOTH fire
+     to veto — so `132 kV substation to serve the Vantage data center` is vetoed while
+     `AT&T - OAKTON DATA CENTER GENERATOR POWER` and `PHX 05-3 DATA HALL 1B BESS PERMIT` keep
+     classifying. 0 live records trip it; it ships against the corpus that arrives next.
+  2. 🔑 **A REAL DEFECT: the guard was overturned one phase later.** Generic types fall through
+     to `NAME_RULES`, which carried a **duplicate** data-centre rule that re-classified records
+     the DATACENTER phase had already vetoed — so the guard worked for `type='Utility'` and
+     silently did nothing for `type='Development'`. Proven a strict subset and deleted. Pinned
+     by a test asserting a vetoed record carries **no `DATACENTER` shapeRule at all**: a guard a
+     later phase can overturn is not a guard.
+  3. **`data hall` added — the ONE vocabulary extension that survived measurement.** 11
+     development records nationally, **11/11 genuine** (Mesa 243,332 SF + 285,282 SF ground-ups,
+     a Memphis data-hall addition, an Amazon data hall, Iron Mountain SC-31, 3 Phoenix PHX05
+     battery permits, 2 fire-alarm mods). Its neighbours were **rejected on the same evidence**:
+     `colo` matches a Verizon cell site, an AT&T rooftop antenna, and `US 65 … in **Colo**` (an
+     Iowa highway, in Colorado); `server room` matches ~24 office mini-split and
+     clean-agent-suppression permits.
+- ⚠️ **"738 facilities unchanged" needs a precise denominator.** All **738** FRS rows typed
+  `type='datacenter'` are untouched. A *vocabulary*-based FRS count now reads **739** because the
+  widened pattern also reaches `epa_frs:110038203734` `CYRUS ONE DATA HALL 1 POWER POD 1`
+  (`type='energy'`, ZIP 75067) — which still renders **Regulated facility**, because the facility
+  flag short-circuits before the DATACENTER phase. Different denominator, not a change; pinned by
+  a test.
+- 📌 **OPEN, logged not fixed:** Epoch never applied (BLOCKED, never reported as zero) ·
+  **scale is not conveyed** (a sign permit and a 20-storey build both read "Data center") ·
+  coverage 219 ZIPs vs Atlas's 1,152 · 450 Atlas data centres sit outside the modelled geography ·
+  ~30 operator-only record-level misses are structurally unreachable without a join this evidence
+  shows is unsafe.
+
+📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
+(509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
+keep the purple square, the "Regulated facility" legend row and the `facility` filter
+bucket. `datacenter` is a project TYPE; `facility` is a record KIND. Moving them would change
+the facility filter, the `counts.facilities` figure `verify-development` asserts against the
+rendered rail, and a colour the legend explains. **The question, so it is not re-derived:**
+should a regulated facility that IS a data centre draw the octagon, keep the square, or carry
+both (square + a "Data center" line in the popup)? Founder call.
+
+### 2026-09-04 — MAP 1 ZIP DELIVERY: CLOSED ON `main`, and the card grain is PROVEN
+
+**The delivery gap this branch measured is CLOSED — by `main`, not by this branch.** The gap was
+real when measured (`docs/maps-coverage/N5-DELIVERY-GAP-ZIP-PAGE.md` keeps the receipt): the RPC
+`public.app_projects_for_zip` was authoritative for 10,821 ZIPs while `homesignalmap.html` ZIP
+mode still read `public.development_reports`, the legacy 3-mile centroid-radius cache. `main`
+shipped `lib/zip-authoritative.js` for it while this branch was building a second implementation.
+**This branch's duplicate page implementation was dropped rather than merged** (commit `005f813`);
+`main`'s stands.
+
+**The one remaining delivery question — does a multi-marker project produce duplicate resident
+cards? — is answered NO.** Measured against the LIVE site, `verify-map1-card-grain` run
+`33930018814`, `https://homesignal.net`:
+
+| ZIP | development sites | unique project refs | max markers on one project | rails |
+|---|---:|---:|---:|---|
+| 76135 | 158 | 116 | 7 | 24 rows, 0 repeated project |
+| 76104 | 469 drawn of 479 (10 withheld) | 456 | — | clean |
+| 20742 | 0 | 0 | — | clean |
+| 10804 | 1 | 1 | — | clean |
+
+Selecting markers does not create persistent cards (rails 24 → 24), and the headline count stays
+project-grained (`cDev` 66 · markers 159 · projects 116). **THE GRAIN IS THE MARKER; THE CARD IS
+THE PROJECT** — `main`'s implementation holds that invariant.
+
+- ⚠️ **LATENT, not live: the rails hold by ordering plus the 12-row cap, not by de-duplication.**
+  With the cap removed, 76135 shows 12 TxDOT projects repeating up to ×7 and 76104 shows 6 up to
+  ×6. Nothing a resident sees today is wrong. **Recorded, not fixed** — raising or removing a rail
+  cap without adding a de-dup first would introduce the duplication.
+  The gate REPORTS this rather than failing on it — `LATENT` in the probe's output, counted, and
+  named again in its summary line. A gate that goes red on a known unfixed condition stops being
+  read, and then the next real failure reads as noise too; `FAIL` is reserved for something a
+  resident can see today.
+- The probe is committed and re-runnable: `scripts/probe-map1-card-grain.mjs` +
+  `.github/workflows/verify-map1-card-grain.yml` (defaults to serving the tree, which reaches the
+  live Supabase backend from a runner; `site_base` points it at production instead).
+
 ### 2026-09-04 — ALERTS SEO: LIVE AND PROVEN. Pages source is GitHub Actions
 
 **`/community/<zip>/` is LIVE.** The founder switched the Pages source to **GitHub Actions**;
@@ -72,6 +191,352 @@ normal ingestion, not forced). Served sitemap: 7,643 canonical / 0 legacy, recon
 - Full receipt, publication policy, frozen controls A–J: **`docs/alerts-seo-build-2026-09-04.md`**.
 - Rule F, the crawler ground truth and the geography certification are unchanged:
   `docs/crawler-ground-truth-2026-09-03.md`.
+
+### 2026-09-03 — DECISION RECORDED: no tier increase, and the reconciliation that closes it
+
+**Durable home is `docs/maps-go-live-governance.md` §N5** — the arithmetic, the per-family
+multipliers, the measured-vs-extrapolated split, and the assumptions live there so this queue
+does not become the second copy. Recorded here once as a pointer, per the division of record.
+
+**NO TIER INCREASE. CLOSED — do not re-derive.** Worst case 949,175 membership rows /
+**240.5 MB**; permanent additional **619 MB**; free would land **1,007 MB above the 2,048 MB
+floor**, ~5x the 200 MB "thin" threshold. The 0.5–1.2 GB transient WAL term is **refuted by
+measurement** — WAL FELL across the 718,278-row materialisation (1,124,073,844 →
+1,073,742,196).
+
+**Reconciliation, closing exactly:** PROVEN 718,278 materialised + 5,171 rejects = **723,449**
+· RECOVERY 164,185 = 16,450 resident + 2,966 permanently excluded + **144,769 unrecovered** ·
+13 shards = **20,170** associations in `geo.n5_association`, **untouched**.
+
+⚠️ **Measured on a COMPLETE population: PROVEN point 1.0000 only.** Polygon 1.002 and polyline
+1.654 are **extrapolated from 10.0% of RECOVERY projects on a corpus that is 5 of 78
+registries**. Point-family RECOVERY inherits 1.0000 by a geometry-type argument, not a
+measurement.
+
+### 2026-09-03 — THREE PREFIXES: every multiplier measured, and UNDER-INCLUSION IS 21.5%, not 1%
+
+**021 alone was misleading in the direction that mattered most.** Three prefixes, each with
+the prediction stated first:
+
+| prefix | shape | rows | projects | **rows/proj** | under-incl | over-incl | ZCTA vertices | probe |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 021 Boston | 97.9% point | 4,562 | 4,519 | 1.0095 | **50** (1.1%) | 16,892 | 20,151 / 53 | 1.3 s |
+| 010 Springfield | **100% polyline** | 630 | 381 | **1.654** | **89** (14.1%) | 1,148 | 39,867 / 62 | 0.9 s |
+| 890 Las Vegas | **polygon + huge ZCTAs** | 7,729 | 7,715 | **1.002** | **2,640 (34.2%)** | 9,552 | **100,486 / 47** | 1.1 s |
+
+**PER-FAMILY rows/project, now MEASURED not assumed:** PROVEN point **1.0000** (n=4,471) ·
+polygon **1.002** (n=7,715) · polyline **1.654** (n=381). **The x1.0–1.9 polygon assumption
+is now x1.00**, and the x1.9–5.4 polyline assumption is **x1.654** — both were too high, a
+fifth and sixth downward correction. RECOVERY point-family takes 1.0000 from the PROVEN
+measurement: the multiplier is a property of GEOMETRY TYPE under one predicate, not of
+treatment.
+
+🔴 **UNDER-INCLUSION IS 2,779 of 12,921 discovered rows = 21.5%, not the ~1% that 021
+implied — and my "overwhelmingly over-claiming" characterisation from 021 was WRONG as a
+generalisation.** 890 alone contributes 2,640, **34.2% of its own discovered rows**: a
+Henderson parcel's true ZCTA frequently was not among the ~1.42 the 3-mile method guessed,
+so the method is wrong in both directions there, not merely inflationary. **National
+under-inclusion at that rate: ~190,000–204,000 project x ZIP memberships the slice-first
+shape can never find.** That is the size of the blind half, and it is not small.
+- Predictions refuted, all in the informative direction: 010 rows/project 1.654 vs
+  predicted 1.8–3.0; 890 under-inclusion **2,640 vs predicted 50–400 (6.6x over)**; 890
+  boundary vertices 100,486 vs predicted 40,000–90,000.
+- **Boundaries a shard-first build would NEVER have loaded: 010 → 4 of 62 (01034, 01054,
+  01072, 01093); 890 → 11 of 47, 23%** (89001, 89008, 89010, 89013, 89017, 89019, 89020,
+  89022, 89042, 89043, 89047). 890 also shows the opposite extreme of concentration —
+  only **8 of 47 ZCTAs** carry any geometry at all.
+
+**POPULATION RECONCILED, no double counting.** Resident **734,728** = 718,278 PROVEN +
+16,450 RECOVERY (5 registries). National geometry-bearing **882,463** = 718,278 materialised
+PROVEN + 164,185 RECOVERY. **Gap = 147,735, exactly 164,185 − 16,450 — entirely
+un-recovered RECOVERY, nothing else.** Multipliers are applied to NATIONAL counts, and the
+RECOVERY terms sum to 164,185 exactly. PROVEN's 1.0000 is measured on a COMPLETE population;
+every RECOVERY multiplier is measured on 16,450 of 164,185 (10.0%) and extrapolated — that is
+the honest split. **2,966 projects are permanently EXCLUDED** (cincinnati 2,866, cook 70,
+lake 30 — no service_url / row_id identity), so RECOVERY-eligible is **161,219** and the
+unprobed remainder is **34,826**, not 37,792.
+
+✅ **WORST CASE, ONE NUMBER: 949,175 rows → 240.5 MB**, taking the top of every PRIOR
+multiplier (polygon 1.9, polyline 5.4, unprobed 1.9) and ignoring the new measurements
+entirely. Bytes/row **265.6**, cumulative over all three runs.
+
+✅ **THE DISK DECISION IS DETERMINABLE AND THE PESSIMISTIC CASE FITS WITH MARGIN — NOT
+THIN.** Worst-case permanent additional **619 MB** (RECOVERY geometry high 0.37 GB +
+membership 0.235 GB + boundaries **0**, streaming demonstrated three times). Free would fall
+3,674.7 → **3,055 MB, which is 1,007 MB above the 2,048 floor.** Not within 200 MB; not thin.
+- 🔻 **The transient-WAL term I carried at 0.5–1.2 GB is REFUTED by measurement.** Across
+  the 718,278-row PROVEN materialisation WAL went **1,124,073,844 → 1,073,742,196** — it did
+  not grow. WAL is checkpoint-bounded and is already inside the free figure.
+
+### 2026-09-03 — BOUNDARY-FIRST MEASURED ON ONE PREFIX: membership is ~1 row per project, and the disk question is CLOSED
+
+**Prefix 021 (Boston/Cambridge MA), S1 shape, 46.4 s total, probe 1.3 s.** Boundaries
+streamed for the whole GEOID prefix (53 ZCTAs, 20,151 vertices, 0 invalid, 0 wrong SRID),
+probed against the **entire resident corpus of 741,561 features / 734,728 projects**, then
+dropped. **Candidate-bounding guard ran inside the pass over the SQL that executed and
+reported CLEAN** — it did not fire; what would have fired it is recorded in
+`test/n5-candidate-bounding.test.mjs` (15 assertions, proven failing under two neuterings).
+
+**THE RATIO THAT MATTERS, split by class rather than blended:**
+- **PROVEN: 4,471 rows / 4,471 projects = exactly 1.0000.** A point lies in exactly one
+  ZCTA. Theory and measurement agree with no residual.
+- **RECOVERY: 91 rows / 48 projects = 1.8958.** Polylines and polygons span ~1.9.
+- overall 1.0095, dominated by points — **do not quote the blend**; the national mix is
+  81.5/18.5, not 97.9/2.1.
+
+**National membership: ~887,000 – 955,000 rows → ~0.24–0.29 GB** at the measured **285.5
+bytes/row**, built per family (PROVEN 718,278 x 1.0 · RECOVERY point-family 105,227 x 1.0 ·
+polygon 15,656 x 1.0–1.9 · polyline 5,510 x 1.9–5.4 · unprobed 37,792 x 1.0–1.9).
+**Prior estimate 0.5–1.35 GB — the fourth extrapolation corrected downward this session,
+by ~4.6x.**
+
+🔻 **MY OWN PREDICTION WAS REFUTED ON THE LOW SIDE, which is the point of stating it
+first.** Predicted 6,000–9,000 rows, got **4,562**. Predicted under-inclusion 200–800, got
+**50**. Over-inclusion predicted 13,000–16,000, got **16,892** (slightly high). The error
+was assuming resident MassDOT polylines would contribute 1,500–4,000 rows in Boston; they
+contributed **91**, because a statewide highway corpus barely intersects one urban prefix.
+
+**FIRST REAL UNDER-INCLUSION NUMBER: 50 rows on 021** — `discovered \ legacy`, i.e. real
+ZIP membership the slice-first build would never have found. Against **16,892**
+over-inclusion on the same prefix. So the legacy 3-mile method is wrong in both directions
+but **overwhelmingly by over-claiming**: 21,404 legacy pairs over 4,930 projects is **4.34
+ZIPs per project** where exact geometry assigns **1.01**.
+
+⚠️ **A REPORTING LINE IN THE FIRST RUN WAS WRONG — recorded because the number was
+printed.** "boundaries a shard-first build would never have loaded" printed **-4**, by
+subtracting two set SIZES (53 ZCTAs, 57 legacy ZIPs) instead of taking a set DIFFERENCE;
+the sets overlap only partially because some legacy ZIPs have no ZCTA at all. Fixed to
+compute the real difference both ways. **The unfixed consequence: for 021 the true
+"never-loaded" count is not known**, because the scratch boundary table was dropped with
+the GEOID set still in it. What IS known: 57 legacy ZIPs, 53 ZCTAs, **13 legacy ZIPs
+received no member**, and **44 of 53 ZCTAs carry at least one**.
+
+✅ **THE DISK DECISION IS DETERMINABLE AND THE ANSWER IS: NO INCREASE NEEDED.**
+Permanent additional from today **~0.32–0.64 GB against 1.60 GB headroom** (free 3,690.5
+MB vs the 2,048 floor) — RECOVERY remaining ~0.08–0.35 GB, membership ~0.24–0.29 GB, and
+**ZCTA boundaries 0 because streaming is now demonstrated, not argued**: 53 loaded, probed
+in 1.3 s, dropped in the same run.
+
+### 2026-09-03 — POLYGONS ARE LIGHT, THE NATIONAL ZCTA COST IS MEASURED, AND ONE TERM IS LEFT
+
+**Every storage term for the boundary-first pass is now measured except one — and the
+survivor is the largest.** Only the membership output remains an estimate, and no further
+acquisition can settle it; it needs the pass itself.
+
+**PART 1 — `henderson-residential-permits`, polygon family, acquired 8,474 of 8,475.**
+features/project **1.019** · mean **12.1** vertices · **median 6** · p90 14 · max 827 ·
+avg `ST_MemSize` **242 B** · **247 B per project**.
+- ⚖️ **CTDOT IS THE OUTLIER, exactly as MassDOT was one level up.** CTDOT: mean 298
+  vertices but **median 33**, dragged by a single 16,278-point polygon. Henderson is
+  **20× lighter per feature**. A registry mean had again been standing in for a family.
+- Multiplicity is settled across five measured registries: **1.000 (raleigh), 1.000
+  (ctdot), 1.000 (iowa), 1.019 (henderson), 5.437 (massdot)** — four of five at ~1.0.
+- **RECOVERY complete: 0.19–0.85 GB (pre-A2) → 0.17–1.63 GB (post-A2, polygon size
+  assumed from CTDOT) → ~0.10–0.37 GB (measured).** The A2-era ceiling was inflated by
+  treating CTDOT as typical.
+
+🛑 **THE FIRST HENDERSON RUN WAS PARTIAL AND REPORTED SUCCESS — 28 batch errors, 8,194 of
+8,475 projects (3.3% missing), `fetch status OK`, exit 0.** That is the precise failure
+`n5_acquire_registry.py`'s own docstring says it exists to avoid, and it shipped because
+`batch_errors` was printed as a statistic rather than treated as a verdict. Fixed
+(`ad30537`): the run compares asked-for against acquired, prints `acquisition complete:
+NO - PARTIAL`, and **exits non-zero**. **The gate fired on its first real use** — the
+completion re-run recovered 280 of 281 and correctly failed on the last one.
+- **The final missing project is a PUBLISHER-SIDE ABSENCE, receipted not assumed.**
+  `arcgis:henderson-residential-permits:BMFD2024317224` → direct single-ident query,
+  **HTTP 200 with `"features":[]`**. The snapshot holds it; the live layer has dropped it.
+  So the registry is complete as far as the publisher offers, and a green run now means
+  that rather than "nobody checked".
+- 📌 **Logged, not built: there is no RECOVERY analogue of `geo.n5_point_reject`.** A
+  PROVEN project that cannot be materialised gets a CHECKed reason; a RECOVERY project the
+  publisher has dropped gets nothing, and is visible only as a count mismatch.
+
+**PART 2 — NATIONAL ZCTA GEOMETRY, MEASURED OFF THE PINNED FILE. Nothing persisted, and
+no database credential was in the job's environment.** 33,791 features, all shape type 5,
+37,813 rings, `.shp` content **822,289,256 bytes**, run time 8.9 s.
+- **TOTAL VERTICES 51,290,700** · mean **1,517.9** · **median 981** · p75 1,999 · p90
+  3,407 · p95 4,598 · p99 7,947 · max 61,813 · min 5 · 1.12 rings/feature.
+- **National ZCTA table 791–814 MB** (geometry 784–807 + heap 6.3 + GiST 1.4), against the
+  **0.9–1.3 GB** the two samples implied. **Both samples were HIGH** — 2,181 and 1,282 mean
+  vertices against a national 1,517.9 with a median of 981 — and the spread collapses from
+  **43% to 2.9%**.
+- The estimate constants are measured, not assumed: **16.022–16.490 B/vertex** from three
+  live samples; PostGIS stores geometry **uncompressed** (`pg_column_size` 34,936 vs
+  `ST_MemSize` 34,939 on the same rows); **GiST 42.0 B/row** and **heap 195.8 B/row** on
+  `geo.n5_geom` at 732,927 rows, GiST being vertex-independent because it indexes bounding
+  boxes.
+
+**WHERE CAPACITY STANDS: permanent additional ~0.58–1.70 GB against ~1.64 GB headroom.**
+PROVEN 0.318 GB is spent; RECOVERY ~0.10–0.37 GB; ZCTA 0.79–0.81 GB and **transient if
+boundaries stream per prefix (S1)**; **membership output 0.5–1.35 GB, unmeasured**. The
+low end fits comfortably, the high end sits on the line, and **the decision no longer
+waits on sampling** — it waits on provisioning for the 1.35 GB case or on a bounded
+single-prefix boundary-first run that measures the membership row count directly.
+
+### 2026-09-02 — A2 MEASURED: features/project is 1.000, not 4.416 — and it moved the uncertainty rather than removing it
+
+**`raleigh-building-permits` acquired IN FULL** (run 33697…, 198.8 s, 604 requests,
+907,466 bytes): accepted 6,023 projects → **6,023 recoverable → 6,023 fetched → 6,023
+features**, `esriGeometryPoint`, **0 batch errors, 0 unasked echoes, 0 rows with no usable
+geometry**. **FEATURES PER PROJECT = 1.000.**
+
+⚠️ **The 4.416 figure was ONE registry, not a corpus property.** Per-registry, now that a
+fourth exists: **massdot-highway-projects 5.437** · ctdot-project-work-areas **1.000** ·
+iowa-dot-bid-projects-lines **1.000** · raleigh-building-permits **1.000**. **Three of the
+four are exactly 1.000**; the aggregate was carried entirely by MassDOT. Any future
+national extrapolation from a single registry should be treated the same way this one
+was — as a lead, not a rate.
+
+🔻 **BUT THE CAPACITY QUESTION DID NOT CLOSE, and the reason is worth reading.** A2
+collapsed *multiplicity* and simultaneously exposed a term the old single average was
+hiding: **bytes per feature spans 9× by geometry family** — measured heap per row,
+raleigh (point) **194 B** · massdot (polyline) **746 B** · iowa (polyline) 1,064 B ·
+ctdot (polygon) **5,065 B**. All-in for the point family is **561.7 B/feature** (measured
+as the delta over the acquisition: 3,383,296 B ÷ 6,023).
+- Prior RECOVERY bracket **0.19 – 0.85 GB** → now **~0.17 – 1.63 GB**: the floor fell,
+  and **the ceiling ROSE**, because polygon rows are far heavier than the 822 B average
+  the DOT-only corpus implied.
+- **The next measurement that actually collapses it is one POLYGON-family registry** —
+  `henderson-residential-permits` (8,475 projects) is the obvious candidate. Multiplicity
+  is now answered; vertex count is not.
+
+**Permanent additional storage from today: ~0.66 – 2.97 GB against ~1.61 GB of headroom**
+(free 3,698.5 MB vs the 2,048 MB floor). It still straddles. PROVEN's 0.318 GB is already
+spent and is inside that free figure; the membership-output term (0.5–1.35 GB) remains
+open and is now the single largest component.
+
+✅ **Full acquisition of the two largest registries is CHEAPER than scoped.** Measured
+rate **604 requests / 198.8 s ≈ 0.33 s per request**, so `little-rock-permits` (4,901
+requests) is **~27 min** and `new-hanover-county-building-permits` (3,751) **~21 min** —
+both comfortably inside a 120-minute job. The earlier 41–82 min estimate that argued for
+picking a smaller registry was pessimistic by ~2.5×; the pick was still right for the
+modal-family reason, but the cost argument behind it does not hold.
+
+### 2026-09-02 — N5 A0/A1 APPLIED: PROVEN points materialised, and three things logged as untested or deviant
+
+**A1 landed: `geo.n5_geom` is no longer RECOVERY-only.** 718,278 `proven_stored_point`
+rows + 8,626 `recovered_authoritative`; rejects 4,877 `MULTI_COORD_UNRESOLVED` + 294
+`NULL_COORD`; **718,278 + 4,877 + 294 = 723,449 PROVEN projects, closing exactly.**
+Founder-verified independently. **Measured, replacing the estimate: 419–442 bytes per
+PROVEN point row all-in (0.318 GB nationally)** — index is 55% of it. `VACUUM FULL` ran
+before materialisation so the delta is not inflated by the backfill's dead tuples.
+
+⚠️ **THE CAPACITY QUESTION IS NOT CLOSED, and the narrowed bracket must not be read as
+if it were (founder, 2026-09-02).** The **membership-output term, 0.5–1.35 GB, is NOT
+collapsed by these passes** and stays open until the boundary-first pass actually runs.
+Only the PROVEN term became measured here; the RECOVERY term collapses with A2.
+
+🔻 **DEVIATION, KNOWINGLY TAKEN — #1015 was modified after an authorization said it would
+not be.** The instruction "#1015 stays draft and unmodified" and the later instruction
+naming "#1015's SQL header" as one of three required canonical-data comment locations are
+in direct conflict, and the header was the urgent one: it argues eligibility from
+*"the table is populated only by the RECOVERY path … Presence in this table is therefore
+itself the treatment gate"*, which **PROVEN materialisation makes false**, silently
+widening what that RPC returns rather than failing. Resolution taken and **accepted by
+the founder**: comment-only, on **its own branch** (`claude/n5-spatial-read-rpc`,
+`87e9147`), function body untouched, the old sentence **quoted and marked corrected
+rather than deleted**, and the one-line predicate change named
+(`provenance = 'recovered_authoritative'`) for whoever un-drafts it. Recorded here so the
+next reader sees a knowing exception, not an oversight.
+
+⚠️ **TWO IMPLEMENTATION CHOICES ARE UNTESTED IN PRODUCTION — both returned 0, which is
+exactly how an untested default survives to surprise someone later.** Neither was in the
+migration authorization; both are mine and both are overridable:
+
+1. **Reject precedence** — `NO_REGISTRY_VERDICT` → `NULL_COORD` → `INVALID_COORD` →
+   `NULL_ISLAND` → `OUTSIDE_JURISDICTION` → `MULTI_COORD_UNRESOLVED`. Only the first and
+   last ever fired (294 / 4,877); the middle four returned **0**, so the ordering among
+   them has never been exercised on real data.
+2. **`OUTSIDE_JURISDICTION` envelope** — lat 17–72, lng −180 to −64 (CONUS + AK + HI +
+   PR). It rejected **0** of 723,449 projects. A coordinate outside it would be dropped
+   from materialisation, so if the corpus ever gains a territory outside that box
+   (Guam, American Samoa, USVI) the envelope silently excludes it. **Widen the envelope
+   before adding such a source; do not discover it as a mystery zero.**
+
+**`lit(None)` residue: NONE — receipted, not assumed.** `fetch_features` wrote `first_z3`
+as `lit(z3)`, and `lit(None)` yields the literal string `'None'`, which `char(3)` would
+truncate to `'Non'` — a fabricated value shaped like a ZIP3 prefix in a provenance
+column. Fixed to emit SQL NULL. Measured after: **0 rows `first_z3 IN ('Non','None')`,
+0 rows non-numeric**, and the positive control that makes that zero meaningful —
+the 8,626 rows that DO carry `first_z3` carry exactly the 13 completed shard prefixes
+(`010`–`019`, `062`, `063`, `520`), nothing else.
+
+### 2026-09-02 — N5 ANSWERS ONLY HALF THE COMPLETENESS REQUIREMENT — and 544 shards does not change that
+
+**The standing requirement is both directions: nothing on a ZIP page that is not inside that
+ZIP's boundary, and nothing inside the boundary missing from the page. Measured against the
+shipped code and live data, the build delivers the first and is nearly blind to the second.**
+Finishing all 544 shards does not close it — it repeats the same slice-first search 544 times.
+**Founder-accepted 2026-09-02: the answer to the standing requirement is NO.**
+
+**OVER-INCLUSION — served.** Every frozen legacy `(project, ZIP)` pair is re-judged by exact
+`ST_Intersects` and stored as `geo.n5_association.evidence` (1 verified · 2 unjudgeable ·
+3 **refuted** · 4 unresolved). Over 13 completed shards: 20,170 rows = 19,913 legacy pairs +
+257 additions; ev1 5,592 (5,335 legacy + 257 adds) · ev2 9,857 · ev3 **4,721** · ev4 0.
+**Cumulative refutation 4,721 / (4,721 + 5,335) = 46.9%** on the geometry-judgeable
+denominator; per shard 0.0% (520, n=2) → **83.6%** (011). Only **10,056 of 19,913 pairs
+(50.5%) were judgeable at all** — 7,869 of the 9,857 ev2 rows sit in shard 016 alone.
+⚠️ **Detection is not correction.** `grep -rln "n5_association\|n5_geom"` matches only
+`scripts/n5_shard.py` and `scripts/n5_verify_snapshot.py` — no page, no edge function, no
+HTML/JS. A refuted association is recorded and the ZIP page still shows it.
+
+**UNDER-INCLUSION — structurally unaddressed. The cause, verbatim from
+`scripts/n5_shard.py::build_associations`:**
+
+```sql
+rec as (select g.source_key, g.geom g
+          from geo.n5_geom g join proj p on p.source_key=g.source_key
+         where p.treatment='RECOVERY' and g.geom is not null),
+```
+
+**`rec` joins `geo.n5_geom` to `proj`, not to `bnd`.** `proj` derives from `fr`
+(`geo.n5_frozen where z3=<shard>`), so the national geometry corpus is filtered down to the
+shard's frozen slice **before** any intersection runs. An addition can therefore only ever be
+found for a project the legacy 3-mile method already placed in that prefix. A project whose
+geometry sits inside a ZCTA but which was never associated with that prefix is absent from
+`fr` → `proj` → `allgeom`, so it is invisible to `ver` and to `adds`: neither refuted nor
+added, just absent. **Nothing looks for it.**
+
+**Three independent narrowings, not one:**
+
+1. **Project scope** — only projects already in the frozen slice are searched.
+2. **Boundary scope** — `bnd` comes from `select distinct zip from geo.n5_frozen where z3=…`,
+   i.e. only ZIPs that already carry a legacy pair. **20 ZIP pages** in the 13 completed
+   prefixes had **no boundary loaded at all** (428 pages exist in those prefixes; 408 zips in
+   the slice), so they cannot receive an addition by construction, for any project.
+3. **Shard scope** — a searched project is tested only against its own prefix's boundaries.
+   **721 of 1,953 cached projects (36.9%) carry legacy pairs spanning more than one ZIP3
+   prefix, up to 10.**
+
+⚠️ **257 additions is an artifact of the search shape, not the size of the gap.** It measures
+one narrow case: a project already in the slice whose geometry lands in another ZIP of the
+same prefix that already carried a legacy pair.
+
+**Receipts (real stored rows):**
+
+- **`arcgis:massdot-highway-projects:613818` — 84 geometry features, 13 legacy ZIPs across 2
+  prefixes, `evidence=1` count **0**.** Every legacy claim refuted, no addition found; after
+  the build the layer asserts **no ZIP at all** for it, while its 84 features are physically
+  somewhere.
+- `arcgis:massdot-highway-projects:609402` — 191 features, 14 legacy ZIPs, ev1 in 4.
+- **86 of 1,953 cached projects have zero `evidence=1` associations** — geometry in hand, no
+  ZIP membership established. Founder-verified independently 2026-09-02.
+
+**What is needed:** a **boundary-first** pass — for each ZCTA, find all national geometry
+intersecting it, independent of what the legacy method guessed. Nothing in the repo does this;
+the shard builder cannot, because `join proj` removes the candidates before the predicate runs.
+**Do not run more shards until that pass is scoped — throughput is not the constraint, search
+shape is** (founder, 2026-09-02).
+
+> ⚖️ **SUPERSEDED 2026-09-03 by the BOUNDARY-FIRST section above** — the pass was scoped, measured
+> on one prefix, and the disk question closed, so shard building resumed under it. **State as of
+> 2026-09-04: 542 of 544 shards built.** The two outstanding, **284 and 300, are NOT started, and
+> the reason is disk, not shape** — free space is ~2,108 MB against the founder's hard 2,048 MB
+> floor, i.e. ~60 MB of headroom. Do not start them, and do not obtain headroom by any of the
+> prohibited routes (no WAL surgery, no `VACUUM FULL` on `app_projects`, no speculative REINDEX, no
+> deletion of authoritative geometry / membership / markers / preservation evidence, no retiring
+> Map 2 for disk, no paid storage without authorization).
+
 
 ### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)
 

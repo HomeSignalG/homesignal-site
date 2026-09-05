@@ -29,6 +29,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import (  # noqa: E402  - one implementation, imported not re-derived
     sql, http, esri, lit, read_dbf, read_shp_polygons, rings_to_multipolygon_wkt,
+    SQLPayloadTooLarge,
     paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL, TIGER_SHA256,
     CANON_SRID, UA, STATS,
 )
@@ -64,6 +65,78 @@ def say(k, v):
 def one(rows, col):
     return rows[0][col] if rows else None
 
+
+
+# Target request size for the FIRST attempt. Not a ceiling and not a promise: the server
+# is still the authority, and a 413 halves the batch as before. It exists because a fixed
+# 25 rows is sized for the worst row in the corpus (an 11 MB polygon) and charges that
+# cost to every load - a 250,000-row point insert became ~10,000 sequential requests and
+# did not finish inside the job budget.
+INSERT_TARGET_BYTES = 2_000_000
+INSERT_MAX_ROWS = 1000
+
+
+def initial_batch_rows(rows, cap=INSERT_MAX_ROWS):
+    """First-attempt batch size, from the MEAN length of the rows actually in hand.
+
+    An earlier attempt at a byte budget failed because it was a guessed constant applied
+    blind, and one 11 MB row made it wrong. This is different in the two ways that
+    mattered: it reads the real rows rather than assuming their size, and the adaptive
+    413 halving that now exists is what actually enforces the limit."""
+    if not rows:
+        return 1
+    mean = max(1, sum(len(r) for r in rows) // len(rows))
+    return max(1, min(cap, INSERT_TARGET_BYTES // mean))
+
+
+def insert_batched(prefix, rows, suffix, tag, start=None, on_oversize=None):
+    """Send `rows` as INSERT statements, SPLITTING whenever the server says 413.
+
+    WHY ADAPTIVE RATHER THAN A BYTE BUDGET: shard 891 first failed with a 25-ROW cap
+    (a polygon WKT is tens of thousands of chars, so 25 dense rings is megabytes). The
+    first fix guessed a 4 MB budget and got 413 AGAIN - the guess was simply wrong, and
+    a comment claiming it was "measured" made it look verified when it was not. The
+    server knows its own limit; the client's job is to react to it.
+
+    On 413 the batch is halved and retried, down to a single row. A SINGLE row that is
+    still refused is a hard error - never skipped, because silently dropping geometry
+    would look exactly like a successful load.
+
+    Row ORDER is preserved and every row is sent exactly once; the halving only changes
+    how they are grouped.
+    """
+    if start is None:
+        start = initial_batch_rows(rows)
+        say(f"{tag} first batch", f"{start} rows (mean row "
+            f"{(sum(len(r) for r in rows) // max(1, len(rows))):,} chars)")
+    i, size = 0, max(1, start)
+    while i < len(rows):
+        chunk = rows[i:i + size]
+        try:
+            sql(prefix + ",".join(chunk) + suffix, tag, raise_413=True)
+        except SQLPayloadTooLarge:
+            if len(chunk) == 1:
+                # The SERVER has now proven this single row cannot be transported. That is
+                # a measurement, not a prediction - which is why the ceiling is not a
+                # constant anywhere in this file.
+                if on_oversize is None:
+                    # No quarantine channel (e.g. a ZCTA boundary, whose absence would
+                    # silently corrupt membership). Fail closed.
+                    raise SystemExit(
+                        f"STOP: {tag} refused a SINGLE row as 413 ({len(chunk[0])} chars) "
+                        "and this table has no quarantine channel. Not skipped.")
+                # Quarantine, don't stop (docs rule §8): the record is still WRITTEN, with
+                # its geometry marked unusable and the reason recorded, so it lands in the
+                # existing unresolved accounting instead of vanishing.
+                say(f"{tag} single row {len(chunk[0])} chars", "QUARANTINED (413)")
+                on_oversize(chunk[0])
+                i += 1
+                size = max(1, start)
+                continue
+            size = max(1, len(chunk) // 2)
+            say(f"{tag} 413 - splitting batch", f"{len(chunk)} -> {size}")
+            continue
+        i += size
 
 def load_registry():
     reg = json.load(open(REG_PATH))
@@ -141,13 +214,8 @@ def load_boundaries(z3, zips):
         wkt = rings_to_multipolygon_wkt(rings, zc)
         vals.append(f"({lit(z3)},{lit(zc)},ST_GeomFromText({lit(wkt)},{CANON_SRID}))")
         loaded += 1
-        if len(vals) >= 25:
-            sql("insert into geo.n5_zcta (z3,zcta5,geom) values " + ",".join(vals)
-                + " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
-            vals = []
-    if vals:
-        sql("insert into geo.n5_zcta (z3,zcta5,geom) values " + ",".join(vals)
-            + " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
+    insert_batched("insert into geo.n5_zcta (z3,zcta5,geom) values ", vals,
+                   " on conflict (z3,zcta5) do update set geom=excluded.geom;", "zcta ins")
     r = sql(f"select count(*) n, count(*) filter (where not ST_IsValid(geom)) bad, "
             f"coalesce(sum(ST_NPoints(geom)),0) pts from geo.n5_zcta where z3={lit(z3)};", "zcta chk")
     return loaded, sorted(set(missing)), int(r[0]["n"]), int(r[0]["bad"]), int(r[0]["pts"])
@@ -155,13 +223,32 @@ def load_boundaries(z3, zips):
 
 # ---------------------------------------------------------------- recovery
 
+# Ceiling on the identity IN-list, independent of what a publisher declares: a big
+# maxRecordCount is not a promise about URL/body handling, and 250 identities is
+# already 19x the old fixed 10.
+BATCH_IDENT_MAX = 250
+# A publisher that fails this many identities in a row one-at-a-time is down, not
+# flaky; grinding 47,000 singles against it is not recovery.
+BATCH_SINGLE_FAIL_LIMIT = 25
+
+
 def recover_shard(z3, registry):
     """Recover authoritative geometry for RECOVERY-class projects in this shard.
 
     Publisher feature multiplicity is preserved (one row per source_key x OBJECTID) and a
     recovered feature is keyed by the FROZEN identity we asked for, never by the string the
     publisher echoes back - the N4 trailing-space defect. Geometry already in geo.n5_geom
-    from an earlier shard is a cache HIT and is not refetched."""
+    from an earlier shard is a cache HIT and is not refetched.
+
+    CANONICAL DATA - geo.n5_geom is no longer RECOVERY-only. This path writes
+    provenance='recovered_authoritative'; the PROVEN materialisation writes
+    'proven_stored_point' with feature_id 'pt:1' ('pt:2' and beyond are RESERVED and
+    UNDEFINED - no code path emits them). PRESENCE IN THE TABLE IS THEREFORE NO LONGER A
+    TREATMENT GATE; `provenance` is. The column is NOT NULL with NO DEFAULT on purpose, so
+    a new writer must state which kind of geometry it is writing rather than inheriting one
+    by omission. Rows are never refreshed (ON CONFLICT DO NOTHING), so the FIRST acquisition
+    is the durable vintage in recovered_at - which is also why deleting rows from this table
+    is what would break vintage, not writing to it."""
     rows = sql(f"""select registry_id,
                           count(distinct source_key) filter (where source_key_basis is null
                               or source_key_basis not in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) recoverable,
@@ -170,6 +257,11 @@ def recover_shard(z3, registry):
                      from geo.n5_frozen
                     where z3={lit(z3)} and treatment='RECOVERY'
                     group by 1 order by 1;""", "rec sources")
+    incomplete = {x["registry_id"] for x in sql(
+        "select distinct registry_id from geo.n5_recovery_attempt where not complete;",
+        "incomplete attempts", read_only=True)}
+    if incomplete:
+        say("registries with an UNFINISHED earlier attempt", ", ".join(sorted(incomplete)))
     report = []
     for r in rows:
         rid = r["registry_id"]
@@ -188,12 +280,26 @@ def recover_shard(z3, registry):
             report.append({"registry_id": rid, "status": "NO_RECOVERABLE_KEYS",
                            "unstable": n_unstable})
             continue
-        cached = {x["source_key"] for x in sql(
-            "select distinct source_key from geo.n5_geom where source_key in ("
-            + ",".join(lit(k) for k in keys) + ");", "cache probe")}
+        # PRESENCE IS NOT COMPLETENESS. insert_batched writes a registry's features in
+        # chunks, so a process killed mid-insert leaves SOME of a key's features behind -
+        # and a probe that asks only "is this source_key present?" then reads those keys
+        # as done and never asks for the rest. That is a permanent hole that looks exactly
+        # like a project with less geometry to find. geo.n5_recovery_attempt.complete is
+        # the marker: a registry with an unfinished attempt anywhere is re-asked in full.
+        # Nothing is deleted - the re-fetch inserts ON CONFLICT DO NOTHING, so existing
+        # rows keep their first-acquisition vintage and only the missing features arrive.
+        if rid in incomplete:
+            cached, forced = set(), True
+            say(f"  {rid} cache BYPASSED", "an earlier attempt did not complete")
+        else:
+            cached, forced = {x["source_key"] for x in sql(
+                "select distinct source_key from geo.n5_geom where source_key in ("
+                + ",".join(lit(k) for k in keys) + ");", "cache probe", read_only=True)}, False
         todo = [k for k in keys if k not in cached]
         st = {"registry_id": rid, "status": "OK", "projects": len(keys),
               "cache_hits": len(cached), "fetched": 0, "features": 0, "unstable": n_unstable}
+        if forced:
+            st["cache_bypassed"] = True
         if todo:
             plat, entry = registry.get(rid, (None, None))
             if entry is None or not entry.get("service_url"):
@@ -201,14 +307,26 @@ def recover_shard(z3, registry):
                 st["reason"] = "no service_url in jurisdiction-registry.json"
                 report.append(st)
                 continue
+            # Claim the attempt as INCOMPLETE first, so a process killed anywhere inside
+            # fetch_features leaves a durable marker instead of an absence.
+            sql(f"""insert into geo.n5_recovery_attempt
+                      (z3,registry_id,projects_in_shard,cache_hits,fetched,features,
+                       complete,started_at,completed_at)
+                    values ({lit(z3)},{lit(rid)},{len(keys)},{len(cached)},0,0,
+                            false,now(),null)
+                    on conflict (z3,registry_id) do update set
+                      complete=false, started_at=now(), completed_at=null;""", "rec claim")
             st.update(fetch_features(rid, entry, todo, z3))
         sql(f"""insert into geo.n5_recovery_attempt
-                  (z3,registry_id,projects_in_shard,cache_hits,fetched,features,bytes_in,requests)
+                  (z3,registry_id,projects_in_shard,cache_hits,fetched,features,bytes_in,requests,
+                   complete,completed_at)
                 values ({lit(z3)},{lit(rid)},{len(keys)},{len(cached)},{st.get('fetched',0)},
-                        {st.get('features',0)},{st.get('bytes_in',0)},{st.get('requests',0)})
+                        {st.get('features',0)},{st.get('bytes_in',0)},{st.get('requests',0)},
+                        true,now())
                 on conflict (z3,registry_id) do update set
                   projects_in_shard=excluded.projects_in_shard, cache_hits=excluded.cache_hits,
-                  fetched=excluded.fetched, features=excluded.features;""", "rec attempt")
+                  fetched=excluded.fetched, features=excluded.features,
+                  complete=true, completed_at=now();""", "rec attempt")
         report.append(st)
     return report
 
@@ -244,17 +362,54 @@ def fetch_features(rid, entry, keys, z3):
         cases.setdefault(parts[2].strip(), k)
     want = sorted(cases)
     feats, unasked, errors = [], [], 0
-    for i in range(0, len(want), 10):
-        chunk = want[i:i + 10]
-        vals = ",".join(("'" + c.replace("'", "''") + "'") if quoted else c for c in chunk)
+    # BATCH SIZE COMES FROM THE PUBLISHER, NOT FROM A CONSTANT. It was a hardcoded 10,
+    # which is ~4,700 sequential POSTs for a 47k-project shard (722 / little-rock-permits)
+    # and does not finish inside the job budget. The request is a POST, so the 2,048-char
+    # GET ceiling never applied. One identity can map to SEVERAL features - multiplicity is
+    # deliberately preserved - so the identity chunk stays well under the record cap and the
+    # exceededTransferLimit guard below still decides, never this arithmetic.
+    declared = meta.get("maxRecordCount")
+    try:
+        declared = int(declared)
+    except (TypeError, ValueError):
+        declared = 0
+    chunk = max(10, min(BATCH_IDENT_MAX, declared // 4)) if declared > 0 else 10
+    say(f"  {rid} identity batch", f"{chunk} (publisher maxRecordCount {declared or 'undeclared'})")
+    i, singles_failed = 0, 0
+    while i < len(want):
+        part = want[i:i + chunk]
+        vals = ",".join(("'" + c.replace("'", "''") + "'") if quoted else c for c in part)
         j, why2 = http(url + "/query", {"where": f"{ident} IN ({vals})", "outFields": ident,
                                         "returnGeometry": "true", "outSR": str(CANON_SRID),
                                         "f": "json"}, method="POST")
         if j is None or esri(j):
+            # NARROW THE BLAST RADIUS BEFORE COUNTING A LOSS. At the old fixed 10 an error
+            # skipped 10 projects; at 250 it would silently skip 250, and a skipped project
+            # is not an error the reader sees - it is a project quietly reclassified from
+            # geometry_verified to legacy_unsupported. So halve and retry, and only give up
+            # on the ONE identity that actually fails.
+            if len(part) > 1:
+                chunk = max(1, len(part) // 2)
+                continue
             errors += 1
+            singles_failed += 1
+            if singles_failed > BATCH_SINGLE_FAIL_LIMIT:
+                return {"status": "PUBLISHER_UNREACHABLE",
+                        "reason": f"{singles_failed} consecutive single-identity failures "
+                                  f"({why2 or esri(j)}); refusing to grind the remaining "
+                                  f"{len(want) - i} identities",
+                        "bytes_in": STATS["bytes_in"] - b0,
+                        "requests": STATS["requests"] - r0}
+            i += 1
             continue
         if j.get("exceededTransferLimit"):
-            raise SystemExit(f"STOP: {rid} capped a batch; refusing a truncated recovery")
+            if len(part) == 1:
+                raise SystemExit(f"STOP: {rid} capped a SINGLE identity; refusing a "
+                                 f"truncated recovery")
+            chunk = max(1, len(part) // 2)
+            say(f"  {rid} transfer limit - halving batch", f"{len(part)} -> {chunk}")
+            continue
+        singles_failed = 0
         for ft in j.get("features") or []:
             echo = str((ft.get("attributes") or {}).get(ident))
             sk = cases.get(echo.strip())
@@ -262,10 +417,33 @@ def fetch_features(rid, entry, keys, z3):
                 unasked.append(echo)
                 continue
             feats.append((sk, ft))
-    rows, nfeat = [], 0
+        i += len(part)
+        if len(want) > 2000 and (i // chunk) % 20 == 0:
+            say(f"  {rid} recovery progress", f"{i:,} / {len(want):,} identities")
+    # A registry-wide acquisition has no originating shard, and `lit(None)` would write
+    # the literal string 'None' into a char(3) column rather than SQL NULL - i.e. a
+    # fabricated provenance value that looks like a ZIP3. Emit NULL instead.
+    z3sql = lit(z3) if z3 else "null"
+    rows = []
+    oversize = {}
+    # FEATURE_ID MUST BE A FUNCTION OF THE FEATURE, NOT OF THE FETCH. It used to be
+    # `<identity>#<global counter>`, so the SAME feature got a different id in a run that
+    # asked for a different set of keys - and (source_key, feature_id) is the conflict
+    # target, so ON CONFLICT DO NOTHING could not see it as already present. Re-fetching an
+    # already-recovered key therefore INSERTED a second copy of its geometry instead of
+    # no-opping. Measured on shard 722 / little-rock-permits after the completeness-marker
+    # re-fetch: 467 keys held rows from both runs, 1,961 old against 1,929 new.
+    #
+    # The id is now `<identity>#<index within THAT identity's features, ordered by the
+    # geometry itself>`. Ordering by geometry rather than by response order is what makes
+    # it stable: a publisher is under no obligation to return one permit's features in the
+    # same sequence twice. Multiplicity is still preserved exactly - a permit that really
+    # does carry 80 features keeps 80 rows, #0..#79. That multiplicity is REAL, not an
+    # artefact: shard 720 ran once, cleanly, and its heaviest key holds 80 rows with 80
+    # distinct feature_ids and ONE distinct geometry, straight from the publisher.
+    prepared = {}
     for sk, ft in feats:
         g = ft.get("geometry") or {}
-        oid = str((ft.get("attributes") or {}).get(ident, "")).strip() + f"#{nfeat}"
         # rings_to_wkt returns a (wkt, reason) PAIR - a malformed publisher ring set is
         # reported rather than raised, so one bad record cannot end the batch. paths_ and
         # POINT return a bare string. Unpacking the pair is not optional: assigning it
@@ -279,24 +457,68 @@ def fetch_features(rid, entry, keys, z3):
             wkt, bad = f"POINT({g['x']} {g['y']})", None
         else:
             wkt, bad = None, "NO_GEOMETRY"
-        nfeat += 1
-        if not wkt:
-            reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)})")
-        else:
-            # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
-            # thousands of characters and must not be re-escaped per quote.
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)})")
-    for i in range(0, len(rows), 25):
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3) values "
-            + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
+        echoed = str((ft.get("attributes") or {}).get(ident, "")).strip()
+        prepared.setdefault(sk, []).append((echoed, wkt, bad))
+    for sk in sorted(prepared):
+        # Sort key is deterministic and total: geometry-less rows last, then the WKT, then
+        # the reason. Identical geometries tie and take consecutive indices, which is what
+        # keeps the count right without inventing a distinction the publisher did not make.
+        group = sorted(prepared[sk], key=lambda t: (t[1] is None, t[1] or "", t[2] or ""))
+        for idx, (echoed, wkt, bad) in enumerate(group):
+            oid = f"{echoed}#{idx}"
+            if not wkt:
+                reason = bad or "no usable geometry"
+                rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{z3sql},"
+                            f"'recovered_authoritative')")
+            else:
+                # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
+                # thousands of characters and must not be re-escaped per quote.
+                row = (f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
+                       f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
+                       f"'recovered_authoritative')")
+                rows.append(row)
+                # If the server later refuses this row alone as 413, it is written instead
+                # as outcome=3 with the reason - the same quarantine channel a malformed
+                # ring set uses. The record survives; only its geometry is unusable.
+                oversize[row] = (
+                    f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,"
+                    f"{lit('WKT_EXCEEDS_TRANSPORT_LIMIT:' + str(len(wkt)) + ' chars')},"
+                    f"{z3sql},'recovered_authoritative')")
+    quarantined = []
+
+    def _quarantine(row_sql):
+        q = oversize.get(row_sql)
+        if q is None:
+            # Only a geometry row can be quarantined; anything else must not be swallowed.
+            raise SystemExit("STOP: geom ins oversize row has no quarantine form")
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
+            "invalid_reason,first_z3,provenance) values " + q
+            + " on conflict (source_key,feature_id) do nothing;", "geom quarantine")
+        quarantined.append(q)
+
+    insert_batched(
+        "insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,"
+        "invalid_reason,first_z3,provenance) values ", rows,
+        " on conflict (source_key,feature_id) do nothing;", "geom ins",
+        on_oversize=_quarantine)
+    if quarantined:
+        say("features QUARANTINED as untransportable WKT", len(quarantined))
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
             "bytes_in": STATS["bytes_in"] - b0, "requests": STATS["requests"] - r0}
 
 
 # ---------------------------------------------------------------- association
+
+# The per-shard association CTE chain does the spatial work for every legacy pair, and
+# the remaining shards are the dense metros: 761 (Fort Worth / TxDOT) carries 13,590
+# projects / 15,677 pairs and hit the DEFAULT statement timeout -
+#   ERROR: 57014: canceling statement due to statement timeout
+# That is a time limit on correct work, not a defect in the query, so the fix is to give
+# the heavy statements a longer budget rather than to simplify what they check. Each
+# Management API request is its own session, so a plain SET applies to that request only.
+HEAVY_TIMEOUT_SQL = "set statement_timeout = '600s';\n"
+
 
 def build_associations(z3):
     """One evidence row per frozen legacy pair, plus geometry-only additions.
@@ -343,7 +565,7 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 
 
 def associate(z3):
-    q = build_associations(z3) + """
+    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + """
 insert into geo.n5_association (source_key, zip, evidence)
 select source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
 on conflict do nothing;"""
@@ -351,7 +573,7 @@ on conflict do nothing;"""
 
 
 def shard_counts(z3):
-    q = build_associations(z3) + """
+    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + """
 select (select count(*) from legacy) legacy_pairs,
        (select count(*) from cls where ev=1) v1,
        (select count(*) from cls where ev=2) v2,
@@ -361,10 +583,25 @@ select (select count(*) from legacy) legacy_pairs,
        (select count(distinct source_key) from proj) projects,
        (select count(*) from hasg) with_geom,
        (select count(*) from proj where unstable) unstable_projects;"""
-    return sql(q, "counts " + z3)[0]
+    return sql(q, "counts " + z3, read_only=True)[0]
 
 
 # ---------------------------------------------------------------- one shard
+
+def freeze_zips(z3):
+    """The distinct ZIPs this shard's slice actually contains, read from the frozen basis.
+
+    Derived from preservation.app_project_identity itself rather than from the canonical ZIP
+    registry, so the list is total by construction: a ZIP present in the basis but absent
+    from the registry would otherwise be skipped silently, and the freeze would look clean.
+    """
+    rows = sql(f"""select distinct i.zip as zip
+                     from preservation.app_project_identity i
+                    where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
+                      and left(i.zip,3)={lit(z3)}
+                    order by i.zip;""", f"freeze zips {z3}", read_only=True)
+    return [r["zip"] for r in rows]
+
 
 def run_shard(z3):
     say("", "")
@@ -372,24 +609,60 @@ def run_shard(z3):
     say("SHARD", z3)
     t_shard = time.time()
     man = sql(f"""select projects, pairs, zips, checksum from geo.n5_shard
-                   where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest")[0]
+                   where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest", read_only=True)[0]
     say("manifest projects / pairs / zips",
         f"{man['projects']} / {man['pairs']} / {man['zips']}")
 
     # 1 - FREEZE this shard's slice of the frozen baseline
+    #
+    # ONE STATEMENT PER ZIP, not one for the whole prefix. The single-statement form fit
+    # 540 shards and then stopped fitting: shard 662 (148,286 pairs, 1.56x shard 571's
+    # 95,182) halted three times at the ~120 s statement ceiling with the insert rolled
+    # back each time - geo.n5_frozen for that prefix stayed 0, so the failure was clean and
+    # repeatable, only never-ending. An index took the planner cost 181,525 -> 38,407 and it
+    # STILL did not fit, because the cost that remains is per-ROW (the app_projects lookup
+    # and the write), not the scan; app_refresh_sweep and dev_refresh_tick running alongside
+    # were enough to spend the rest.
+    #
+    # ZIP4 buckets were tried first and were not fine enough: prefix 662 has only four
+    # non-empty ones (6620 42,302 · 6621 65,029 · 6622 40,719 · 6625 398), so the largest is
+    # still 44% of the shard - 6620 committed in ~55 s and 6621 exceeded the bucket timeout.
+    # A prefix's ZIP count is bounded (25 here) and its rows divide over them, so per-ZIP is
+    # the granularity that does not need re-tuning for the next dense shard.
+    #
+    # The predicate carries BOTH left(zip,3) and the ZIP. The ZIP is the index cond; the
+    # left(zip,3) is what lets the planner USE the partial index at all, since it cannot
+    # prove a bare ZIP equality implies the index's prefix list. Redundant to a reader,
+    # load-bearing to the planner (EXPLAIN: 230 with it, seq scan without).
+    #
+    # Fails safe: the delete runs once, before any chunk, so a chunk that fails leaves a
+    # PARTIAL slice - and the checksum gate immediately below compares projects, pairs and
+    # the order-independent checksum against the manifest, so a partial slice halts as
+    # FREEZE_DRIFT rather than being built on. The next run deletes and redoes it.
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "clear frozen")
-    sql(f"""insert into geo.n5_frozen (z3,source_key,zip,source_seq,registry_id,treatment,lat,lng,source_key_basis)
-            select {lit(z3)}, i.source_key, i.zip, i.source_seq,
-                   coalesce(i.registry_id,'(null)'), a.treatment, i.lat, i.lng, p.source_key_basis
-              from preservation.app_project_identity i
-              join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
-              left join public.app_projects p on p.id = i.app_project_id
-             where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
-               and left(i.zip,3)={lit(z3)};""", "freeze")
+    zips = freeze_zips(z3)
+    say("freeze ZIPs in this slice", f"{len(zips)} (manifest says {man['zips']})")
+    if not zips:
+        return halt(z3, "FREEZE_EMPTY", {"zips": 0})
+    for z in zips:
+        sql(f"""set statement_timeout='110s';
+                insert into geo.n5_frozen (z3,source_key,zip,source_seq,registry_id,treatment,lat,lng,source_key_basis)
+                select {lit(z3)}, i.source_key, i.zip, i.source_seq,
+                       coalesce(i.registry_id,'(null)'), a.treatment, i.lat, i.lng, p.source_key_basis
+                  from preservation.app_project_identity i
+                  join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
+                  left join public.app_projects p on p.id = i.app_project_id
+                 where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
+                   and left(i.zip,3) = {lit(z3)} and i.zip = {lit(z)};""", f"freeze {z}")
+    # The whole table was just replaced, so its planner statistics describe the PREVIOUS
+    # shard until autoanalyze happens to catch up. Cheap here, and it removes the
+    # stale-statistics class of plan blow-up on the dense shards. Hardening: it is not
+    # a proven cause of the 934 timeout, only a risk this removes.
+    sql("analyze geo.n5_frozen;", "analyze frozen")
     chk = sql(f"""select count(*) rows, count(distinct source_key) projects,
                          count(distinct source_key||'|'||zip) pairs, count(distinct zip) zips,
                          sum(('x'||substr(md5(source_key||'|'||zip||'|'||coalesce(source_seq::text,'')),1,8))::bit(32)::bigint) ck
-                    from geo.n5_frozen where z3={lit(z3)};""", "freeze chk")[0]
+                    from geo.n5_frozen where z3={lit(z3)};""", "freeze chk", read_only=True)[0]
     say("frozen rows / projects / pairs",
         f"{chk['rows']} / {chk['projects']} / {chk['pairs']}")
     drift = []
@@ -405,11 +678,12 @@ def run_shard(z3):
 
     # 2 - BOUNDARIES
     zips = [r["zip"] for r in sql(
-        f"select distinct zip from geo.n5_frozen where z3={lit(z3)} order by zip;", "zips")]
+        f"select distinct zip from geo.n5_frozen where z3={lit(z3)} order by zip;", "zips", read_only=True)]
     loaded, missing, nb, bad, pts = load_boundaries(z3, zips)
     say("ZIPs in shard / ZCTA-matched / no boundary",
         f"{len(zips)} / {loaded} / {len(missing)}")
     say("boundary polygons valid", f"{nb - bad} of {nb}" + ("" if bad == 0 else "  <-- INVALID"))
+    sql("analyze geo.n5_zcta;", "analyze zcta")
     say("boundary vertices", f"{pts:,}")
     if bad:
         return halt(z3, "INVALID_BOUNDARY", {"invalid": bad})
@@ -430,7 +704,7 @@ def run_shard(z3):
     before = shard_counts(z3)
     associate(z3)
     got = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                      "assoc n"), "n"))
+                      "assoc n", read_only=True), "n"))
     say("", "")
     say("legacy pairs", before["legacy_pairs"])
     say("  geometry_verified (1)", before["v1"])
@@ -453,17 +727,17 @@ def run_shard(z3):
                               where left(a.zip,3)={lit(z3)}
                                 and not exists (select 1 from geo.n5_frozen f
                                                  where f.z3={lit(z3)} and f.source_key=a.source_key);""",
-                          "phantom"), "n"))
+                          "phantom", read_only=True), "n"))
     say("phantom projects (not in frozen slice)", phantom)
     fp1 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp1"), "m")
+                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp1", read_only=True), "m")
     associate(z3)
     n2 = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                     "assoc n2"), "n"))
+                     "assoc n2", read_only=True), "n"))
     fp2 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp2"), "m")
+                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp2", read_only=True), "m")
     say("second-run inserts", n2 - got)
     say("fingerprint identical", "yes" if fp1 == fp2 else "NO")
     say("shard fingerprint", fp1)
@@ -475,8 +749,8 @@ def run_shard(z3):
     #     geo.n5_geom is deliberately NOT discarded: it is the cross-shard geometry cache.
     sql(f"delete from geo.n5_zcta where z3={lit(z3)};", "drop zcta")
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "drop frozen")
-    left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left"), "n"))
-    left_f = int(one(sql(f"select count(*) n from geo.n5_frozen where z3={lit(z3)};", "f left"), "n"))
+    left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left", read_only=True), "n"))
+    left_f = int(one(sql(f"select count(*) n from geo.n5_frozen where z3={lit(z3)};", "f left", read_only=True), "n"))
     say("working set discarded (boundaries / frozen)", f"{left_z} / {left_f} remaining")
 
     # 7 - DISK

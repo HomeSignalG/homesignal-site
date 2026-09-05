@@ -1,0 +1,35 @@
+name: residential-measure
+
+# The Residential before/after, measured through the REAL production read (the same
+# app_zip_projects_markers RPC the page performs) and the REAL shipped lib/ modules. Runs where
+# egress works. Read-only: it never writes to the database and never touches the site.
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: 'Optional: cap the number of ZIPs (e.g. "300" for a smoke run)'
+        required: false
+        default: ''
+      stride:
+        description: 'Optional: measure every Nth canonical ZIP (spatially spread sample)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Measure
+        env:
+          SAMPLE: ${{ github.event.inputs.sample }}
+          STRIDE: ${{ github.event.inputs.stride }}
+          CONCURRENCY: '10'
+        run: node scripts/residential-measure.mjs

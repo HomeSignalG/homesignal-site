@@ -77,11 +77,21 @@ const ZIP_AUTH = {
 };
 ZIP_AUTH['78617'].projects[0].project_ref = 'socrata:austin:SP-1';
 ZIP_AUTH['80210'].projects[0].project_ref = 'arcgis:denver:D-1';
+// A FACILITIES-ONLY ZIP: its whole-ZIP geography IS measured and holds no development, while
+// the EPA layer still has facilities near it. This is the state that used to say "Showing
+// EPA-registered facilities for this ZIP" - the page's strongest whole-ZIP facility claim,
+// on exactly the pages where facilities are all there is.
+ZIP_AUTH['84334'] = { zip: '84334', mode: 'development', status: 'boundary_complete',
+  projects: [], markers: [] };
 const ZIP_ROW = {
   '78617': [{ zip: '78617', home_lat: 30.1745, home_lng: -97.6134, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
     sites: [{ scope: 'point', label: 'ZIP FACILITY', registry_id: '110000555555',
               url: 'https://echo.epa.gov/y', lat: 30.1750, lng: -97.6140, e: 0.05, n: 0.03 }] }],
+  '84334': [{ zip: '84334', home_lat: 41.7166, home_lng: -112.1500, counts: { facilities: 6 },
+    refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
+    sites: [{ scope: 'point', label: 'RIVERSIDE GRAIN CO', registry_id: '110000888888',
+              url: 'https://echo.epa.gov/w', lat: 41.7180, lng: -112.1520, e: 0.1, n: 0.1 }] }],
   '80210': [{ zip: '80210', home_lat: 39.6796, home_lng: -104.9611, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
     sites: [{ scope: 'point', label: 'DENVER FACILITY', registry_id: '110000777777',
@@ -156,6 +166,15 @@ const chrome = () => page.evaluate(() => {
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
     locLabel: el ? el.textContent.trim() : null,
+    kDev: (document.getElementById('kDev') || {}).textContent || null,
+    kFac: (document.getElementById('kFac') || {}).textContent || null,
+    totalTileShown: (() => { const t = document.getElementById('ccTot');
+      return !!t && getComputedStyle(t).display !== 'none'; })(),
+    covNote: (document.getElementById('covNote') || {}).textContent || '',
+    mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
+    hero: (document.querySelector('.sub') || {}).textContent || '',
+    facMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance !== 'development').length,
+    devMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance === 'development').length,
     locTitle: (() => { const w = el && el.closest('.loc'); return w ? (w.getAttribute('title') || '') : ''; })(),
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
       ? { address: HS.state.activeProperty.address, zip: HS.state.activeProperty.zip } : null,
@@ -308,6 +327,80 @@ ok(back.stale === 0, '9 no address-radius result survives into ZIP mode', back.s
 ok(back.homePins === 0, '9 no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '9 the saved home survived the whole journey', c.savedHome);
+
+// ═══ 10. F1 — TWO SCOPES ON ONE SCREEN, NAMED SEPARATELY ═══
+// Development is measured across the whole ZIP. Facilities are an EPA query AROUND the ZIP:
+// measured 2026-09-05 over the 50 ZIPs that have authoritative boundaries, 269 of 610
+// facilities shown sat outside the ZIP whose page showed them, and the search circle covered
+// 52.5% of the ZIP on average. So the page may never describe facilities as being in, for or
+// across the ZIP, and may not add the two sets into one total.
+const WHOLE_ZIP_FACILITY_CLAIM = /(facilit\w*[^.]{0,80}\b(?:for|in|across)\s+(?:this|the)\s+ZIP)|((?:for|in|across)\s+(?:this|the)\s+ZIP[^.]{0,80}\bfacilit)/i;
+
+console.log('\n10. F1 — ZIP mode names its two geographic scopes');
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+await page.waitForTimeout(500);
+c = await chrome();
+const zc = await page.evaluate(() => ({ dev: (document.getElementById('cDev')||{}).textContent,
+  fac: (document.getElementById('cFac')||{}).textContent }));
+info('ZIP scope copy', { kDev: c.kDev, kFac: c.kFac, totalTileShown: c.totalTileShown, mapCap: c.mapCap, counts: zc });
+ok(/across this ZIP/i.test(c.kDev || ''), '10a development is described as ACROSS this ZIP', c.kDev);
+ok(/^Nearby regulated facilities$/i.test((c.kFac || '').trim()),
+  '10b facilities are described as NEARBY, not as a ZIP measurement', c.kFac);
+ok(!WHOLE_ZIP_FACILITY_CLAIM.test(c.kFac + ' ' + c.covNote + ' ' + c.mapCap + ' ' + c.hero),
+  '10c no ZIP-mode string claims facilities are for/in/across this ZIP',
+  { kFac: c.kFac, covNote: c.covNote, mapCap: c.mapCap, hero: c.hero });
+ok(c.totalTileShown === false,
+  '10d ZIP mode shows NO combined total (whole-ZIP development + nearby facilities is not a number)');
+ok(/nearby facilities for context/i.test(c.mapCap || ''),
+  '10e the map caption says the two marker classes have different scopes', c.mapCap);
+ok(c.devMarkers > 0, '10f development markers still render in ZIP mode', c.devMarkers);
+ok(c.facMarkers > 0, '10g facility markers still render in ZIP mode', c.facMarkers);
+// Both counters must still RENDER a number - this change touched labels and one tile's
+// visibility, never a count. (Their VALUES are proven against the drawn sets by the
+// market-readiness gate's A8/A9, and against production by the live proof.)
+ok(/^\d+$/.test((zc.dev || '').trim()), '10h the development counter still renders a number', zc.dev);
+ok(/^\d+$/.test((zc.fac || '').trim()) && Number(zc.fac) > 0,
+  '10i the facility counter still renders its count', zc.fac);
+
+// ═══ 11. F1 — the facilities-only state ═══
+await page.goto(base + '/homesignalmap.html?zip=84334', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+await page.waitForTimeout(700);
+c = await chrome();
+info('facilities-only ZIP 84334', { covNote: c.covNote, kFac: c.kFac });
+ok(/Nearby EPA-registered facilities are shown for additional local context/i.test(c.covNote || ''),
+  '11a the facilities-only note is the truthful contextual wording', c.covNote);
+ok(!/Showing EPA-registered facilities for this ZIP/i.test(c.covNote || ''),
+  '11b the false whole-ZIP sentence is gone', c.covNote);
+ok(!WHOLE_ZIP_FACILITY_CLAIM.test(c.covNote || ''),
+  '11c ...and nothing in it claims those facilities are the ZIP’s', c.covNote);
+ok(c.totalTileShown === false, '11d still no combined total on a facilities-only ZIP');
+
+// ═══ 12. F1 — address mode is a different contract and keeps its own labels ═══
+await page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
+await page.click('#go');
+await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 60000 });
+await page.waitForTimeout(500);
+c = await chrome();
+const am = await page.evaluate(() => ({
+  within: (document.getElementById('withinLbl') || {}).textContent,
+  radiusVisible: (() => { const e = document.getElementById('radSel'); if (!e) return false;
+    const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
+  homePins: document.querySelectorAll('.homepin').length,
+  canonical: (window.__HS_SITES || []).filter(s => s.n5_feature_id).length
+}));
+info('address mode after the ZIP change', { ...am, kDev: c.kDev, kFac: c.kFac, totalTileShown: c.totalTileShown });
+ok(/Within/.test(am.within || ''), '12a address mode still states its radius', am.within);
+ok(am.radiusVisible && am.homePins === 1 && am.canonical > 0,
+  '12b HOME, the radius control and canonical radius results are untouched', am);
+ok(c.totalTileShown === true,
+  '12c address mode KEEPS its total — every class in it shares one radius contract');
+ok(!/across this ZIP/i.test(c.kDev || ''), '12d no ZIP-mode scope copy leaks into address mode', c.kDev);
 
 ok(pageErrors.length === 0, 'no fatal client error across the journey', pageErrors.slice(0, 3));
 

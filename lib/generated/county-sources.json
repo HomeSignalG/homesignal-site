@@ -1,452 +1,523 @@
 {
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
-  "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
+  "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.",
   "registry_entries": 239,
   "statewide": {
     "AK": [
       {
         "id": "akdot-stip-24-27",
         "label": "Alaska Department of Transportation & Public Facilities (AKDOT&PF)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "AL": [
       {
         "id": "aldot-atrip-ii-projects",
         "label": "Alabama Department of Transportation (ALDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "aldot-rebuild-alabama-grant-projects",
         "label": "Alabama Department of Transportation (ALDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "AR": [
       {
         "id": "ar-ardot-job-status-lines",
         "label": "Arkansas Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "ar-ardot-job-status-points",
         "label": "Arkansas Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "AZ": [
       {
         "id": "adot-tip-fy2026-2030",
         "label": "Arizona Department of Transportation (ADOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "CA": [
       {
         "id": "caltrans-sb1-projects",
         "label": "California Department of Transportation (Caltrans)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "CT": [
       {
         "id": "ctdot-project-work-areas",
         "label": "Connecticut Department of Transportation (CTDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "FL": [
       {
         "id": "fdot-active-construction-projects",
         "label": "Florida Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "GA": [
       {
         "id": "georgia-dot-gpas-projects",
         "label": "Georgia Department of Transportation (GDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "HI": [
       {
         "id": "hdot-active-design-projects",
         "label": "Hawaii Department of Transportation (HDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "IA": [
       {
         "id": "iowa-dot-bid-projects",
         "label": "Iowa Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "iowa-dot-bid-projects-lines",
         "label": "Iowa Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "iowa-dot-five-year-program",
         "label": "Iowa Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "ID": [
       {
         "id": "itd-itip-projects",
         "label": "Idaho Transportation Department (ITD)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "itd-itip-projects-lines",
         "label": "Idaho Transportation Department (ITD)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "IL": [
       {
         "id": "idot-annual-program-bridges",
         "label": "Illinois Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "idot-annual-program-construction",
         "label": "Illinois Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "IN": [
       {
         "id": "indot-spms-active-projects",
         "label": "Indiana Department of Transportation (INDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "KS": [
       {
         "id": "kdot-wincpms-project-locations",
         "label": "Kansas Department of Transportation (KDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "KY": [
       {
         "id": "kytc-syp-highway-plan",
         "label": "Kentucky Transportation Cabinet (KYTC)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MA": [
       {
         "id": "massdot-highway-projects",
         "label": "Massachusetts Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MD": [
       {
         "id": "mdot-sha-project-portal",
         "label": "Maryland Department of Transportation State Highway Administration (MDOT SHA)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "ME": [
       {
         "id": "maine-dot-public-projects",
         "label": "Maine Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "maine-dot-public-projects-lines",
         "label": "Maine Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MI": [
       {
         "id": "mdot-stip-projects",
         "label": "Michigan Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MN": [
       {
         "id": "mndot-chip-roadway-projects",
         "label": "Minnesota Department of Transportation (MnDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "mndot-stip-roadway-projects",
         "label": "Minnesota Department of Transportation (MnDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MO": [
       {
         "id": "modot-stip-locations-accepted",
         "label": "Missouri Department of Transportation (MoDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "MT": [
       {
         "id": "mt-mdt-stip-lines",
         "label": "Montana Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NC": [
       {
         "id": "ncdot-stip-projects-lines",
         "label": "North Carolina Department of Transportation (NCDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "ncdot-stip-projects-points",
         "label": "North Carolina Department of Transportation (NCDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "ND": [
       {
         "id": "nddot-special-road-fund-projects",
         "label": "North Dakota Department of Transportation (NDDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NE": [
       {
         "id": "ndot-program-book-points",
         "label": "Nebraska Department of Transportation (NDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "ndot-program-book-segments",
         "label": "Nebraska Department of Transportation (NDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NH": [
       {
         "id": "nhdot-ten-year-plan-projects",
         "label": "New Hampshire Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NJ": [
       {
         "id": "nj-stip-projects",
         "label": "New Jersey Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NV": [
       {
         "id": "nvdot-project-boundaries",
         "label": "Nevada Department of Transportation (NVDOT; self-abbreviates \"NDOT\")",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "NY": [
       {
         "id": "nysdot-capital-program-projects",
         "label": "New York State Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "nysdot-capital-program-projects-2",
         "label": "New York State Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "nysdot-capital-program-projects-3",
         "label": "New York State Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "OH": [
       {
         "id": "odot-current-projects",
         "label": "Ohio Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "odot-current-projects-lines",
         "label": "Ohio Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "OK": [
       {
         "id": "okdot-workplan-roadways",
         "label": "Oklahoma Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "OR": [
       {
         "id": "oregon-dot-stip-projects",
         "label": "Oregon Department of Transportation (ODOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "oregon-dot-stip-projects-lines",
         "label": "Oregon Department of Transportation (ODOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "PA": [
       {
         "id": "penndot-transportation-projects",
         "label": "Pennsylvania Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "RI": [
       {
         "id": "ridot-rhode-restore-projects",
         "label": "Rhode Island Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "SC": [
       {
         "id": "scdot-project-viewer-lines",
         "label": "South Carolina Department of Transportation (SCDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "SD": [
       {
         "id": "sd-stip-construction-reconstruction",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-pavement-preservation",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-railroad-crossings",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-resurfacing",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-safety-lines",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-safety-points",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "sd-stip-structures",
         "label": "South Dakota Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "TN": [
       {
         "id": "tennessee-dot-projects",
         "label": "Tennessee Department of Transportation (TDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "TX": [
       {
         "id": "txdot-projects-info-all",
         "label": "Texas Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "UT": [
       {
         "id": "udot-active-projects",
         "label": "Utah Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "udot-active-projects-lines",
         "label": "Utah Department of Transportation",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "VA": [
       {
         "id": "vdot-syip-approved-projects",
         "label": "Virginia Department of Transportation (VDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "vdot-syip-approved-projects-lines",
         "label": "Virginia Department of Transportation (VDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "VT": [
       {
         "id": "vtrans-project-locations",
         "label": "Vermont Agency of Transportation (VTrans)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "vtrans-project-locations-lines",
         "label": "Vermont Agency of Transportation (VTrans)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "WA": [
       {
         "id": "wsdot-project-delivery-plan-complete",
         "label": "Washington State Department of Transportation (WSDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "wsdot-project-delivery-plan-proposed",
         "label": "Washington State Department of Transportation (WSDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "wsdot-project-delivery-plan-under-construction",
         "label": "Washington State Department of Transportation (WSDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "WI": [
       {
         "id": "wisdot-highway-program-6yr",
         "label": "Wisconsin Department of Transportation (WisDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "WV": [
       {
         "id": "wvdoh-active-projects",
         "label": "West Virginia Division of Highways (WVDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ],
     "WY": [
       {
         "id": "wydot-stip-projects",
         "label": "Wyoming Department of Transportation (WYDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       },
       {
         "id": "wydot-stip-projects-lines",
         "label": "Wyoming Department of Transportation (WYDOT)",
-        "scope": "statewide"
+        "scope": "statewide",
+        "commercial": false
       }
     ]
   },
@@ -455,1425 +526,1646 @@
       {
         "id": "huntsville-building-permits",
         "label": "City of Huntsville, Alabama",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "AL|Madison": [
       {
         "id": "huntsville-building-permits",
         "label": "City of Huntsville, Alabama",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "AR|Benton": [
       {
         "id": "bentonville-catalyst-permits",
         "label": "City of Bentonville, Arkansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "AR|Pulaski": [
       {
         "id": "little-rock-permits",
         "label": "City of Little Rock, Arkansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "AR|Saline": [
       {
         "id": "little-rock-permits",
         "label": "City of Little Rock, Arkansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "AZ|Coconino": [
       {
         "id": "coconino-county-permits",
         "label": "Coconino County, Arizona",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "AZ|Maricopa": [
       {
         "id": "gilbert-energov-permits",
         "label": "Town of Gilbert",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "mesa-building-permits",
         "label": "City of Mesa",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "peoria-az-building-permits",
         "label": "City of Peoria, Arizona",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "phoenix-building-permits",
         "label": "City of Phoenix",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "scottsdale-building-permits",
         "label": "City of Scottsdale",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "tempe-building-permits",
         "label": "City of Tempe",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "AZ|Pima": [
       {
         "id": "tucson-commercial-building-permits",
         "label": "City of Tucson",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "tucson-residential-building-permits",
         "label": "City of Tucson",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "AZ|Pinal": [
       {
         "id": "casa-grande-active-development-sites",
         "label": "City of Casa Grande",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "AZ|Yavapai": [
       {
         "id": "coconino-county-permits",
         "label": "Coconino County, Arizona",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "CA|Marin": [
       {
         "id": "marin-county-building-permits",
         "label": "County of Marin",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "CA|Orange": [
       {
         "id": "anaheim-land-use-cases",
         "label": "City of Anaheim",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "city-of-orange-active-planning-projects",
         "label": "City of Orange, California",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CA|San Diego": [
       {
         "id": "san-diego-approved-permits",
         "label": "City of San Diego",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CA|San Luis Obispo": [
       {
         "id": "slo-county-planning-permits",
         "label": "San Luis Obispo County Department of Planning & Building",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "CA|Santa Clara": [
       {
         "id": "san-jose-permits",
         "label": "City of San Jose, California",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CA|Sonoma": [
       {
         "id": "sonoma-county-fire-rebuild-permits",
         "label": "County of Sonoma",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "CO|Adams": [
       {
         "id": "adams-county-building-permits",
         "label": "Adams County, Colorado",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "aurora-building-permits",
         "label": "City of Aurora, Colorado",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "CO|Arapahoe": [
       {
         "id": "aurora-building-permits",
         "label": "City of Aurora, Colorado",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "CO|Boulder": [
       {
         "id": "boulder-construction-permits",
         "label": "City of Boulder",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "CO|Denver": [
       {
         "id": "denver-commercial-construction-permits",
         "label": "City and County of Denver",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "denver-residential-construction-permits",
         "label": "City and County of Denver",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "CO|Douglas": [
       {
         "id": "aurora-building-permits",
         "label": "City of Aurora, Colorado",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "CO|El Paso": [
       {
         "id": "colorado-springs-planning-applications",
         "label": "City of Colorado Springs",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CO|Jefferson": [
       {
         "id": "denver-residential-construction-permits",
         "label": "City and County of Denver",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "CO|Larimer": [
       {
         "id": "fort-collins-building-permits",
         "label": "City of Fort Collins",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "CO|Weld": [
       {
         "id": "weld-county-site-plan-review",
         "label": "Weld County, Colorado",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "CT|Fairfield": [
       {
         "id": "stamford-major-developments",
         "label": "City of Stamford",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "CT|Hartford": [
       {
         "id": "hartford-building-permits",
         "label": "City of Hartford",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "DE|Kent": [
       {
         "id": "kent-county-de-building-permits",
         "label": "Kent County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "DE|New Castle": [
       {
         "id": "new-castle-county-permits",
         "label": "New Castle County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "DE|Sussex": [
       {
         "id": "sussex-county-de-conditional-use",
         "label": "Sussex County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "FL|Lee": [
       {
         "id": "lee-county-fl-development-orders",
         "label": "Lee County, Florida",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "FL|Miami-Dade": [
       {
         "id": "miami-building-permits",
         "label": "City of Miami",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "GA|Chatham": [
       {
         "id": "savannah-commercial-building-permits",
         "label": "City of Savannah / Chatham County",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "GA|DeKalb": [
       {
         "id": "dekalb-county-building-permits",
         "label": "DeKalb County, Georgia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "GA|Forsyth": [
       {
         "id": "forsyth-county-ga-building-permits",
         "label": "Forsyth County, Georgia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "GA|Fulton": [
       {
         "id": "dekalb-county-building-permits",
         "label": "DeKalb County, Georgia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "johns-creek-building-permits",
         "label": "City of Johns Creek, Georgia",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "GA|Gwinnett": [
       {
         "id": "dekalb-county-building-permits",
         "label": "DeKalb County, Georgia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "johns-creek-building-permits",
         "label": "City of Johns Creek, Georgia",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "GA|Henry": [
       {
         "id": "dekalb-county-building-permits",
         "label": "DeKalb County, Georgia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "ID|Ada": [
       {
         "id": "canyon-county-building-permits",
         "label": "Canyon County, Idaho",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "ID|Canyon": [
       {
         "id": "canyon-county-building-permits",
         "label": "Canyon County, Idaho",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "IL|Champaign": [
       {
         "id": "champaign-il-special-use-permits",
         "label": "City of Champaign, Illinois",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "IL|Cook": [
       {
         "id": "chicago-building-permits",
         "label": "City of Chicago",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "cook-county-il-highway-construction-program",
         "label": "Cook County Department of Transportation and Highways",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "IL|DuPage": [
       {
         "id": "chicago-building-permits",
         "label": "City of Chicago",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "naperville-building-permits",
         "label": "City of Naperville, Illinois",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "IL|Lake": [
       {
         "id": "lake-county-il-construction-program",
         "label": "Lake County, Illinois Division of Transportation",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "IL|Will": [
       {
         "id": "naperville-building-permits",
         "label": "City of Naperville, Illinois",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "IN|Lake": [
       {
         "id": "chicago-building-permits",
         "label": "City of Chicago",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "KS|Butler": [
       {
         "id": "butler-county-ks-permits",
         "label": "Butler County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "KS|Johnson": [
       {
         "id": "overland-park-building-permits",
         "label": "City of Overland Park, Kansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "KS|Shawnee": [
       {
         "id": "topeka-building-permits",
         "label": "City of Topeka, Kansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "KS|Wyandotte": [
       {
         "id": "overland-park-building-permits",
         "label": "City of Overland Park, Kansas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "KY|Boone": [
       {
         "id": "boone-county-ky-planning-board-actions",
         "label": "Boone County Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "KY|Campbell": [
       {
         "id": "kenton-county-devtracking-permits",
         "label": "Planning & Development Services of Kenton County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "KY|Fayette": [
       {
         "id": "lexington-row-permits",
         "label": "Lexington-Fayette Urban County Government",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "KY|Jefferson": [
       {
         "id": "louisville-active-construction-permits",
         "label": "Louisville Metro, Kentucky",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "KY|Kenton": [
       {
         "id": "kenton-county-devtracking-permits",
         "label": "Planning & Development Services of Kenton County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "LA|East Baton Rouge": [
       {
         "id": "east-baton-rouge-building-permits",
         "label": "City of Baton Rouge / Parish of East Baton Rouge",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "LA|Jefferson": [
       {
         "id": "new-orleans-permits",
         "label": "City of New Orleans",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "LA|Orleans": [
       {
         "id": "new-orleans-permits",
         "label": "City of New Orleans",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MA|Middlesex": [
       {
         "id": "cambridge-building-permits-addition-alteration",
         "label": "City of Cambridge",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "cambridge-building-permits-new-construction",
         "label": "City of Cambridge",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "cambridge-demolition-permits",
         "label": "City of Cambridge",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MA|Suffolk": [
       {
         "id": "boston-approved-building-permits",
         "label": "City of Boston",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MA|Worcester": [
       {
         "id": "worcester-building-permits",
         "label": "City of Worcester, Massachusetts",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MD|Anne Arundel": [
       {
         "id": "anne-arundel-commercial-site-plans",
         "label": "Anne Arundel County, Maryland",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "anne-arundel-subdivision-activity",
         "label": "Anne Arundel County, Maryland",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MD|Baltimore": [
       {
         "id": "baltimore-county-permits",
         "label": "Baltimore County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "MD|Harford": [
       {
         "id": "baltimore-county-permits",
         "label": "Baltimore County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "MD|Howard": [
       {
         "id": "baltimore-county-permits",
         "label": "Baltimore County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "MD|Montgomery": [
       {
         "id": "montgomery-county-commercial-permits",
         "label": "Montgomery County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "montgomery-county-demolition-permits",
         "label": "Montgomery County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "montgomery-county-residential-permits",
         "label": "Montgomery County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MD|Prince George's": [
       {
         "id": "prince-georges-county-permits",
         "label": "Prince George's County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MD|Queen Anne's": [
       {
         "id": "kent-county-de-building-permits",
         "label": "Kent County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "MI|Oakland": [
       {
         "id": "independence-twp-construction-permits",
         "label": "Independence Township (Oakland County)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MI|Washtenaw": [
       {
         "id": "ann-arbor-energov-permits",
         "label": "City of Ann Arbor",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MI|Wayne": [
       {
         "id": "detroit-building-permits",
         "label": "City of Detroit",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "detroit-demolition-permits",
         "label": "City of Detroit",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "detroit-trades-permits",
         "label": "City of Detroit",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MN|Hennepin": [
       {
         "id": "minneapolis-ccs-permits",
         "label": "City of Minneapolis (CCS)",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MN|Ramsey": [
       {
         "id": "minneapolis-ccs-permits",
         "label": "City of Minneapolis (CCS)",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MO|Boone": [
       {
         "id": "columbia-mo-capital-projects",
         "label": "City of Columbia, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "columbia-mo-permits",
         "label": "City of Columbia, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MO|Cass": [
       {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MO|Clay": [
       {
         "id": "kcmo-building-permits",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MO|Jackson": [
       {
         "id": "kcmo-building-permits",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MO|Platte": [
       {
         "id": "kcmo-building-permits",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "kcmo-development-cases",
         "label": "City of Kansas City, Missouri",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MO|St. Louis": [
       {
         "id": "stlouis-county-mo-subdivisions",
         "label": "St. Louis County, Missouri (unincorporated)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MS|DeSoto": [
       {
         "id": "desoto-county-permits",
         "label": "DeSoto County, Mississippi",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "MT|Flathead": [
       {
         "id": "flathead-county-building-permits",
         "label": "Flathead County, Montana",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "MT|Gallatin": [
       {
         "id": "bozeman-building-permits",
         "label": "City of Bozeman, Montana",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "MT|Missoula": [
       {
         "id": "missoula-addresses-with-permits",
         "label": "City of Missoula, Montana",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "NC|Brunswick": [
       {
         "id": "brunswick-county-permits",
         "label": "Brunswick County, North Carolina",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "NC|Buncombe": [
       {
         "id": "asheville-accela-permits",
         "label": "City of Asheville",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "NC|Cabarrus": [
       {
         "id": "cabarrus-county-plan-reviews",
         "label": "Cabarrus County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NC|Durham": [
       {
         "id": "durham-building-permits",
         "label": "City & County of Durham",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NC|Mecklenburg": [
       {
         "id": "charlotte-land-dev-commercial-projects",
         "label": "City of Charlotte",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "NC|New Hanover": [
       {
         "id": "new-hanover-county-building-permits",
         "label": "New Hanover County, North Carolina",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "NC|Orange": [
       {
         "id": "durham-building-permits",
         "label": "City & County of Durham",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NC|Wake": [
       {
         "id": "raleigh-building-permits",
         "label": "City of Raleigh",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "wake-county-building-permits",
         "label": "Wake County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "ND|Burleigh": [
       {
         "id": "bismarck-building-permits",
         "label": "City of Bismarck",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "NE|Lancaster": [
       {
         "id": "lincoln-residential-new-construction-permits",
         "label": "City of Lincoln, Nebraska",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "NM|Bernalillo": [
       {
         "id": "albuquerque-building-permits",
         "label": "City of Albuquerque, New Mexico",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "NM|Sandoval": [
       {
         "id": "albuquerque-building-permits",
         "label": "City of Albuquerque, New Mexico",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "NV|Clark": [
       {
         "id": "clark-county-active-projects",
         "label": "Clark County, Nevada",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "clv-planning-cases",
         "label": "City of Las Vegas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "henderson-commercial-permits",
         "label": "City of Henderson, Nevada",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "henderson-residential-permits",
         "label": "City of Henderson, Nevada",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "NV|Washoe": [
       {
         "id": "reno-ldc-projects",
         "label": "City of Reno",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "NY|Bronx": [
       {
         "id": "nyc-dob-permit-issuance",
         "label": "New York City (DOB BIS legacy)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NY|Erie": [
       {
         "id": "buffalo-building-permits",
         "label": "City of Buffalo",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "NY|Kings": [
       {
         "id": "nyc-dob-permit-issuance",
         "label": "New York City (DOB BIS legacy)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NY|Nassau": [
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NY|New York": [
       {
         "id": "nyc-dob-permit-issuance",
         "label": "New York City (DOB BIS legacy)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NY|Queens": [
       {
         "id": "nyc-dob-permit-issuance",
         "label": "New York City (DOB BIS legacy)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "NY|Richmond": [
       {
         "id": "nyc-dob-permit-issuance",
         "label": "New York City (DOB BIS legacy)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "nyc-dobnow-approved-permits",
         "label": "New York City (DOB NOW)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "OH|Cuyahoga": [
       {
         "id": "cleveland-issued-building-permits",
         "label": "City of Cleveland",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "OH|Delaware": [
       {
         "id": "columbus-building-permits",
         "label": "City of Columbus",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "OH|Franklin": [
       {
         "id": "columbus-building-permits",
         "label": "City of Columbus",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "OH|Hamilton": [
       {
         "id": "boone-county-ky-planning-board-actions",
         "label": "Boone County Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "cincinnati-building-permits",
         "label": "City of Cincinnati",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "OH|Summit": [
       {
         "id": "summit-county-oh-planning-commission-items",
         "label": "Summit County Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "OR|Clackamas": [
       {
         "id": "portland-building-permits",
         "label": "City of Portland",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "OR|Deschutes": [
       {
         "id": "bend-or-permit-applications",
         "label": "City of Bend, Oregon",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "OR|Jackson": [
       {
         "id": "jackson-county-or-building-permits",
         "label": "Jackson County, Oregon",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "jackson-county-or-land-use-permits",
         "label": "Jackson County, Oregon",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "OR|Marion": [
       {
         "id": "salem-structure-permits",
         "label": "City of Salem, Oregon",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "OR|Multnomah": [
       {
         "id": "portland-building-permits",
         "label": "City of Portland",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "OR|Washington": [
       {
         "id": "portland-building-permits",
         "label": "City of Portland",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "PA|Allegheny": [
       {
         "id": "allegheny-county-asbestos-permits",
         "label": "Allegheny County Health Department",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "pittsburgh-pli-permits",
         "label": "City of Pittsburgh",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "PA|Centre": [
       {
         "id": "centre-county-pa-building-permits",
         "label": "Centre County, Pennsylvania",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "PA|Chester": [
       {
         "id": "chester-county-pa-act247-plans",
         "label": "Chester County, Pennsylvania",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "new-castle-county-permits",
         "label": "New Castle County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "PA|Delaware": [
       {
         "id": "delaware-county-pa-subdivisions-land-developments",
         "label": "Delaware County, Pennsylvania",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "new-castle-county-permits",
         "label": "New Castle County, Delaware",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "philadelphia-li-permits",
         "label": "City of Philadelphia",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "PA|Lehigh": [
       {
         "id": "allentown-energov-building-permits",
         "label": "City of Allentown, Pennsylvania",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "PA|Montgomery": [
       {
         "id": "montgomery-county-pa-act247-proposals",
         "label": "Montgomery County Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "philadelphia-li-permits",
         "label": "City of Philadelphia",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "PA|Philadelphia": [
       {
         "id": "philadelphia-li-permits",
         "label": "City of Philadelphia",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "PA|York": [
       {
         "id": "york-county-pa-planning-subdivisions",
         "label": "York County, Pennsylvania",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "SC|Berkeley": [
       {
         "id": "charleston-county-permits",
         "label": "Charleston County, South Carolina",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "SC|Charleston": [
       {
         "id": "charleston-county-permits",
         "label": "Charleston County, South Carolina",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "SD|Minnehaha": [
       {
         "id": "sioux-falls-building-permits",
         "label": "City of Sioux Falls, South Dakota",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "TN|Davidson": [
       {
         "id": "nashville-building-permits-issued",
         "label": "Metro Nashville-Davidson County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "TN|Hamilton": [
       {
         "id": "chattanooga-building-permits",
         "label": "Chattanooga-Hamilton County Regional Planning Agency",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "chattanooga-permits-archive",
         "label": "City of Chattanooga / Hamilton County, Tennessee",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TN|Knox": [
       {
         "id": "knoxville-building-permits",
         "label": "City of Knoxville / Knox County, Tennessee",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TN|Montgomery": [
       {
         "id": "clarksville-montgomery-final-subdivisions",
         "label": "Clarksville-Montgomery County Regional Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "clarksville-montgomery-preliminary-subdivisions",
         "label": "Clarksville-Montgomery County Regional Planning Commission",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "TN|Rutherford": [
       {
         "id": "murfreesboro-building-permits",
         "label": "City of Murfreesboro, Tennessee",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "nashville-building-permits-issued",
         "label": "Metro Nashville-Davidson County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "TN|Shelby": [
       {
         "id": "memphis-dpd-building-permits",
         "label": "City of Memphis Division of Planning & Development",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "shelby-county-building-permits",
         "label": "Shelby County, Tennessee",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "TN|Williamson": [
       {
         "id": "nashville-building-permits-issued",
         "label": "Metro Nashville-Davidson County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "TN|Wilson": [
       {
         "id": "nashville-building-permits-issued",
         "label": "Metro Nashville-Davidson County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "TX|Bexar": [
       {
         "id": "san-antonio-permits-issued",
         "label": "San Antonio",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "san-antonio-prelim-plan-review",
         "label": "City of San Antonio",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Collin": [
       {
         "id": "frisco-active-building-permits",
         "label": "City of Frisco",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "TX|Dallas": [
       {
         "id": "dallas-specific-use-permits",
         "label": "City of Dallas",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "irving-development-permits",
         "label": "City of Irving",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Denton": [
       {
         "id": "denton-county-dev-permits",
         "label": "Denton County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "frisco-active-building-permits",
         "label": "City of Frisco",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "TX|El Paso": [
       {
         "id": "el-paso-new-residential-permits",
         "label": "City of El Paso",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Harris": [
       {
         "id": "harris-county-permits",
         "label": "Harris County Permits",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "harris-county-plats",
         "label": "Harris County Permits (unincorporated / non-Houston)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "houston-plat-applications",
         "label": "City of Houston Planning & Development Department",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Hays": [
       {
         "id": "san-marcos-planning-cases",
         "label": "San Marcos",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "TX|Tarrant": [
       {
         "id": "arlington-issued-permits",
         "label": "City of Arlington",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "arlington-permit-applications",
         "label": "City of Arlington",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "arlington-planning-cases",
         "label": "City of Arlington",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "fort-worth-development-permits",
         "label": "Fort Worth",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "fort-worth-zoning-cases",
         "label": "City of Fort Worth Development Services",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Travis": [
       {
         "id": "austin-issued-construction-permits",
         "label": "City of Austin",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "austin-site-plan-cases",
         "label": "City of Austin",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "austin-subdivision-cases",
         "label": "City of Austin",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "austin-zoning-cases",
         "label": "City of Austin Planning Department",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Williamson": [
       {
         "id": "round-rock-large-development-projects",
         "label": "Round Rock",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "UT|Salt Lake": [
       {
         "id": "slc-planning-petitions",
         "label": "Salt Lake City",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "UT|Utah": [
       {
         "id": "provo-planning-applications",
         "label": "Provo",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "VA|Arlington": [
       {
         "id": "fairfax-recent-building-permits",
         "label": "Fairfax County Land Development Services",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "VA|Fairfax": [
       {
         "id": "fairfax-active-site-construction",
         "label": "Fairfax County Land Development Services",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       },
       {
         "id": "fairfax-recent-building-permits",
         "label": "Fairfax County Land Development Services",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "VA|Loudoun": [
       {
         "id": "loudoun-county-residential-permits",
         "label": "Loudoun County, Virginia",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "VA|Prince William": [
       {
         "id": "fairfax-recent-building-permits",
         "label": "Fairfax County Land Development Services",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "VA|Virginia Beach": [
       {
         "id": "virginia-beach-building-permits",
         "label": "City of Virginia Beach",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "VT|Chittenden": [
       {
         "id": "burlington-vt-building-permits",
         "label": "City of Burlington, Vermont",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       },
       {
         "id": "burlington-vt-zoning-permits",
         "label": "City of Burlington, Vermont",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "WA|Clark": [
       {
         "id": "clark-county-active-dev-permits",
         "label": "Clark County",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "WA|King": [
       {
         "id": "bellevue-permits",
         "label": "City of Bellevue",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "seattle-building-permits",
         "label": "City of Seattle",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       },
       {
         "id": "seattle-land-use-permits",
         "label": "City of Seattle",
-        "scope": "city"
+        "scope": "city",
+        "commercial": true
       }
     ],
     "WA|Pierce": [
       {
         "id": "pierce-county-pals-permits",
         "label": "Pierce County (PALS)",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       },
       {
         "id": "tacoma-accela-permits",
         "label": "City of Tacoma",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "WA|Spokane": [
       {
         "id": "spokane-county-building-planning-permits",
         "label": "Spokane County, Washington",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "WA|Stevens": [
       {
         "id": "spokane-county-building-planning-permits",
         "label": "Spokane County, Washington",
-        "scope": "local"
+        "scope": "local",
+        "commercial": true
       }
     ],
     "WA|Thurston": [
       {
         "id": "thurston-county-residential-permits",
         "label": "Thurston County, Washington",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ],
     "WI|Dane": [
       {
         "id": "madison-planning-projects",
         "label": "City of Madison",
-        "scope": "city"
+        "scope": "city",
+        "commercial": false
       }
     ],
     "WY|Sheridan": [
       {
         "id": "sheridan-county-building-permits",
         "label": "Sheridan County, Wyoming",
-        "scope": "local"
+        "scope": "local",
+        "commercial": false
       }
     ]
   }
