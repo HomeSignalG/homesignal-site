@@ -53,12 +53,13 @@ coarse value is our `type_map` output rather than the source's judgement (Phoeni
 data-centre fire work under the F-range code → Civic/Public; San Jose publishes
 `type_raw='Data Center'` verbatim and the entry collapsed it to Industrial).
 
-**Effect: project records drawing the octagon 153 → 452 (+299); ZIP pages with at least one
-Data center pin 95 → 214 (+119).** Nothing that states no data centre moves.
+**Effect: project records drawing the octagon 153 → 479 (+326); ZIP pages with at least one
+Data center pin 95 → 219 (+124).** Nothing that states no data centre moves. (The first pass
+reached 452/214; the adversarial audit below added the last +27/+5.)
 
 - Full offline suite green — **143 files, 0 failed** (`maps-delvalle-golden` 235 checks
   unchanged, so no golden classification drifted). New suite
-  `test/marker-datacenter-type.test.mjs`, 33 checks, verbatim production strings.
+  `test/marker-datacenter-type.test.mjs`, **87 checks**, every string verbatim production text.
 - Receipt: `docs/maps-datacenter-type-2026-09-05.md`.
 - ⚖️ **CTO MERGE GATE CLEARED 2026-09-05 — MERGE READY.** The evidence contract was re-examined
   rather than inherited: this classifier asserts only *"HomeSignal's own source record says this
@@ -68,17 +69,49 @@ Data center pin 95 → 214 (+119).** Nothing that states no data centre moves.
   External datasets are a **completeness** instrument, not a correctness gate for that claim, so
   **Epoch's inaccessibility is not a merge blocker** (it stays BLOCKED/UNKNOWN, never zero).
 - 🔑 **Case B measured (522 of 1,045 Atlas-proven ZIPs) and it settled the classifier's shape.**
-  The vocabulary is NOT the gap — 0 records use `colocation`/`server farm`/`data hall`/MW
-  language without also saying "data center". The gap is operator-named projects, and it is
+  ⚠️ **Its "the vocabulary is NOT the gap" half was WRONG and is corrected below — `data hall`
+  is a real missed vocabulary, found only by finishing the other 523 ZIPs rather than
+  extrapolating.** The operator half stands, and it is
   **unsafe to close**: an operator-brand rule finds **5** real misses (CoreSite VA1/VA3,
   EdgeConnex) and **31** false positives including **20 residential townhouses** ("VANTAGE HILL
   - LOT n - TH"), an Amazon delivery station, two office fit-outs, an **Oracle trade-show booth**,
   a **street name**, and **"aligned" used as an English verb**. Pinned by 13 regression tests
   built from those exact production strings; suite 33 → 54 checks.
-- 📌 **OPEN, logged not fixed:** Epoch never applied · the other 523 case-B ZIPs unmeasured
-  (~30 record-level misses estimated) · **scale is not conveyed** (a sign permit and a 20-storey
-  build both read "Data center") · coverage 214 ZIPs vs Atlas's 1,152 · 450 Atlas data centres
-  sit outside the modelled geography.
+- ⚔️ **ADVERSARIAL AUDIT PASS — 3 code corrections, 0 false positives found.** All 96 distinct
+  records behind the 452 re-attacked on their **full untruncated names** with 8 false-positive
+  patterns (incidental reference · power generation/substation/transmission · warehouse ·
+  office · crypto · telecom · generic-name-only · operator-only): **94 PROVEN CORRECT · 0 PROVEN
+  FALSE POSITIVE · 2 AMBIGUOUS · 0 UNMEASURED**, with a non-zero control (4 of 96 trip at least
+  one pattern), so the zero is a real absence.
+  1. **Incidental-reference guard.** A "serving/feeding/adjacent to" construction **AND** a
+     competing head noun (substation, kV, transmission, solar, BESS, cell tower…) must BOTH fire
+     to veto — so `132 kV substation to serve the Vantage data center` is vetoed while
+     `AT&T - OAKTON DATA CENTER GENERATOR POWER` and `PHX 05-3 DATA HALL 1B BESS PERMIT` keep
+     classifying. 0 live records trip it; it ships against the corpus that arrives next.
+  2. 🔑 **A REAL DEFECT: the guard was overturned one phase later.** Generic types fall through
+     to `NAME_RULES`, which carried a **duplicate** data-centre rule that re-classified records
+     the DATACENTER phase had already vetoed — so the guard worked for `type='Utility'` and
+     silently did nothing for `type='Development'`. Proven a strict subset and deleted. Pinned
+     by a test asserting a vetoed record carries **no `DATACENTER` shapeRule at all**: a guard a
+     later phase can overturn is not a guard.
+  3. **`data hall` added — the ONE vocabulary extension that survived measurement.** 11
+     development records nationally, **11/11 genuine** (Mesa 243,332 SF + 285,282 SF ground-ups,
+     a Memphis data-hall addition, an Amazon data hall, Iron Mountain SC-31, 3 Phoenix PHX05
+     battery permits, 2 fire-alarm mods). Its neighbours were **rejected on the same evidence**:
+     `colo` matches a Verizon cell site, an AT&T rooftop antenna, and `US 65 … in **Colo**` (an
+     Iowa highway, in Colorado); `server room` matches ~24 office mini-split and
+     clean-agent-suppression permits.
+- ⚠️ **"738 facilities unchanged" needs a precise denominator.** All **738** FRS rows typed
+  `type='datacenter'` are untouched. A *vocabulary*-based FRS count now reads **739** because the
+  widened pattern also reaches `epa_frs:110038203734` `CYRUS ONE DATA HALL 1 POWER POD 1`
+  (`type='energy'`, ZIP 75067) — which still renders **Regulated facility**, because the facility
+  flag short-circuits before the DATACENTER phase. Different denominator, not a change; pinned by
+  a test.
+- 📌 **OPEN, logged not fixed:** Epoch never applied (BLOCKED, never reported as zero) ·
+  **scale is not conveyed** (a sign permit and a 20-storey build both read "Data center") ·
+  coverage 219 ZIPs vs Atlas's 1,152 · 450 Atlas data centres sit outside the modelled geography ·
+  ~30 operator-only record-level misses are structurally unreachable without a join this evidence
+  shows is unsafe.
 
 📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
 (509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they

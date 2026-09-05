@@ -186,6 +186,96 @@ ok(key({ type: 'Development', type_raw: 'Minor Site Plan', name: 'CoreSite VA1' 
 ok(key({ type: 'Commercial', name: 'Commercial Addition/Alteration EDGECONNEX / #500' }) === 'commercial',
   '12b: KNOWN GAP — "EDGECONNEX / #500" is a real data centre; source wording carries only the brand');
 
+// ── 13. INCIDENTAL-REFERENCE GUARD — a power project SERVING a data centre is not one ───
+// The worst failure this type can have is telling a resident a data centre is coming when
+// what is coming is a switchyard. The guard needs BOTH a "serving …" construction AND a
+// competing infrastructure head noun, so a data-centre project that merely involves power
+// still classifies.
+[['Utility', '132 kV substation to serve the Vantage data center campus'],
+ ['Development', 'New transmission line feeding the Ashburn data center campus'],
+ ['Utility', 'Switchyard supporting the proposed data centre'],
+ ['Development', 'Monopole antenna adjacent to the data center'],
+ ['Development', 'Solar farm serving the new data center'],
+ ['Utility', 'Electric service and power line in support of the CyrusOne data center'],
+ ['Development', 'Battery energy storage associated with the Aligned data centre']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) !== 'datacenter',
+    '13a.' + i + ': "' + r[1].slice(0, 46) + '…" is infrastructure serving a data centre, not one');
+});
+
+// The other half — these name power equipment but ARE data-centre projects, and must survive.
+// Every one is verbatim production text except the substation case, which is the adversarial
+// near-miss that proves the guard needs the "serving" half and not just the noun.
+[['Development', 'AT&T - OAKTON DATA CENTER GENERATOR POWER (PR)'],
+ ['Commercial', 'NEW Install data centers. This will include a new service that will power 20 transformers (3,250kva)'],
+ ['Development', 'Data center substation and switchgear for the new campus'],
+ ['Utility', 'BOSTON- DATA CENTER ELECTRIC UPGRADES AT HQ BOSTON'],
+ ['Civic/Public', 'AVION DATA CENTER DUCT BANK (AMAZON)']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) === 'datacenter',
+    '13b.' + i + ': "' + r[1].slice(0, 46) + '…" is a data-centre project that involves power — still classifies');
+});
+
+// The guard must not be overturnable by a later phase. This is the regression for the real
+// defect found while writing it: a duplicate data-centre rule in NAME_RULES re-classified
+// records the phase had already vetoed, one phase later.
+ok(m({ type: 'Development', name: 'New transmission line feeding the Ashburn data center campus' })
+    .shapeRule.indexOf('DATACENTER') === -1,
+  '13c: a vetoed record carries no DATACENTER shapeRule — no later phase re-adds it');
+ok(key({ type: 'Development', name: '1100 DATACENTER RD SFR ADDITION' }) !== 'datacenter',
+  '13d: the street-name veto also survives every later phase');
+
+// ── 14. `data hall` — the ONE vocabulary extension that survived measurement ──────
+// Swept across all 1,045 ZIPs where Compute Atlas independently places a data centre, then
+// re-measured nationally: `data hall` appears in 11 development records and every one is a
+// genuine data centre. All 11 strings below are VERBATIM production `name` values.
+[['Commercial', 'ADD PEMB & Foundation additions and Data Hall structures only - no MEP or other interior alterations.'],
+ ['Commercial', 'AMAZON DATA HALL PH02- ACCESS CONTROL'],
+ ['Commercial', 'Commercial/Industrial Projects New ground up 285,282 SF unlimited area data hall building with type II-B construction. G'],
+ ['Commercial', 'Commercial/Industrial Projects Shell data hall building 1, construction type II-B, two story 243,332 SF total building. '],
+ ['Civic/Public', 'FIRE ALARM TI - DATA HALLS'],
+ ['Civic/Public', 'IRON MOUNTAIN SC-31 DATA HALL TI'],
+ ['Civic/Public', 'SC-33 DATA HALL'],
+ ['Civic/Public', 'SC-35 DATA HALL OFFICE ALARM MOD']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) === 'datacenter',
+    '14a.' + i + ': "' + r[1].slice(0, 46) + '…" states a data hall → datacenter');
+});
+
+// The three Phoenix PHX05 battery permits are the sharpest case in the whole build: they name
+// BESS equipment, so they fire the incidental guard's competing-noun half — and must still
+// classify, because the battery is INSIDE the data hall rather than serving one from outside.
+// This is the assertion that proves the guard genuinely requires BOTH halves.
+[['Civic/Public', 'PHX 05-3 DATA HALL 1B BESS PERMIT'],
+ ['Civic/Public', 'PHX 05-3 DATA HALL1C BESS PERMIT'],
+ ['Civic/Public', 'PHX05-3 DATA HALL 1A EESS']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) === 'datacenter',
+    '14b.' + i + ': "' + r[1] + '" is battery plant INSIDE a data hall — competing noun alone does not veto');
+});
+
+// The neighbours REJECTED in the same sweep, on the same evidence. `colo` and `server room`
+// were both candidate vocabulary; each is shown here matching something that is emphatically
+// not a data centre. All verbatim production text. This is why the extension is one term wide.
+[['Development', '813726 Verizon New Colo LDO2022-00283'],
+ ['Development', 'Building AT&T full Colo on existing rooftop - install antenna, ancillary equipment, mounts, WUC, fiber per si'],
+ ['Utility', 'US 65 0.2 mi S of Co Rd E41 in Colo'],
+ ['Commercial', 'ALTER Customer Wants To Use ePlans Interior work only,Install supplemental cooling for existing server room.'],
+ ['Development', 'Mechanical Permit INSTALL NEW MINI SPLIT IN SERVER ROOM'],
+ ['Commercial', 'Commercial Clean Agent fire suppression system for small server room'],
+ ['Development', 'PERMIT - RENOVATION/ALTERATION SPR 2019 CBRC: INTERIOR ALTERATIONS FOR NEW SERVER ROOMS ON FLOOR 36 & 37. DEMO']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) !== 'datacenter',
+    '14c.' + i + ': "' + r[1].slice(0, 46) + '…" is a rejected neighbour — never a data centre');
+});
+
+// The one FRS facility the widened vocabulary reaches stays a regulated facility. The facility
+// flag short-circuits before the DATACENTER phase, so the 738 type='datacenter' facility
+// representations and this one are all untouched — no regulatory identity is overwritten.
+ok(key({ record_kind: 'facility', facility: true, type: 'energy',
+  name: 'CYRUS ONE DATA HALL 1 POWER POD 1' }) === 'facility',
+  '14d: an FRS facility naming a data hall keeps its regulated-facility square');
+
 // ── 10. Symbol uniqueness still holds across the closed registry ──────────────────
 const symbols = Object.keys(HS.CATEGORY_REGISTRY).map((k) => HS.CATEGORY_REGISTRY[k].symbol);
 ok(new Set(symbols).size === symbols.length, '10: no two categories share a symbol');

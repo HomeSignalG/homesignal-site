@@ -264,3 +264,116 @@ purple square. No geometry, ZIP assignment, or radius behaviour was touched in e
 5. **Coverage remains far short of reality** — Atlas places ≥1 data centre in 1,152 modelled ZIPs; HomeSignal classifies 214.
 6. **450 of Atlas's 1,110** data centres sit outside the modelled 12,722-ZIP geography entirely.
 7. Pre-existing, unrelated, **not fixed**: `NAME_RULES` matches `townhou?se` but not the plural `TOWNHOMES`, so `VANTAGE HILL TOWNHOMES` lands on the honest circle rather than Residential.
+
+---
+
+# Adversarial audit — the corrections that reached production (2026-09-05)
+
+A competitor-CTO audit attacked the claim head-on: *would a stranger, shown these pins, find
+one that is not a data centre?* The output of this pass is not another report — it is three
+changes to `lib/map.js` and 33 more regression checks.
+
+## 12. False-positive attack — 8 patterns, every one of the 96 distinct records
+
+Run over the **full untruncated `name`** of all 96 distinct source records behind the live 452
+(not the truncated display string, which is how a permit's real subject gets hidden):
+incidental reference · power generation / substation / transmission · warehouse or logistics ·
+office fit-out · crypto mining · telecom / central office · generic-name-only ·
+operator-brand-only.
+
+| verdict | records | notes |
+|---|---:|---|
+| **PROVEN CORRECT** | 94 | each states a data centre in its own words |
+| **PROVEN FALSE POSITIVE** | **0** | no record classified without a literal data-centre string |
+| **AMBIGUOUS** | 2 | `AT&T - OAKTON DATA CENTER GENERATOR POWER` (backup power AT a data centre) and a Phoenix `QTS DATA CENTER` sign permit — both real data-centre work, neither a new building |
+| **UNMEASURED** | 0 | every distinct record was read |
+
+**4 of 96 trip at least one attack pattern**, which is the control that makes the 0 readable: a
+zero from a probe that fires on nothing is indistinguishable from a dead query.
+
+## 13. The incidental-reference guard — shipped on absence, not on a hit
+
+The worst failure this type can have is telling a resident a data centre is coming when what is
+coming is a **switchyard**. `DATACENTER_SERVING_RE` (a "serving / feeding / adjacent to /
+in support of" construction) **AND** `DATACENTER_COMPETING_RE` (substation, switchyard, kV,
+transmission, solar, BESS, wind, power plant, cell tower, antenna) must **both** fire before a
+name is vetoed. One alone is not enough, deliberately:
+
+- `AT&T - OAKTON DATA CENTER GENERATOR POWER` — no serving construction → **keeps** classifying.
+- `PHX 05-3 DATA HALL 1B BESS PERMIT` — battery plant **inside** the data hall → **keeps**
+  classifying, even though it names BESS.
+- `132 kV substation to serve the Vantage data center` → **vetoed**.
+
+**0 of the 96 live records trip this guard today.** It ships anyway, for the same reason the
+street-name guard did: such records certainly exist nationally, they are simply not yet in a
+county HomeSignal has wired, and the corpus grows on every ingest.
+
+### The real defect this found — a guard overturned one phase later
+
+Writing the guard surfaced a bug in the shipped code: it vetoed `type='Utility'` cases but not
+`type='Development'` cases. Cause — generic types fall through to `NAME_RULES`, which carried a
+**duplicate** data-centre rule that re-classified records the DATACENTER phase had already
+vetoed. Proven a strict subset of `DATACENTER_RE` and **deleted**, with the reason left in
+place as a comment. Pinned by `13c` (a vetoed record carries no `DATACENTER` shapeRule at all)
+and `13d` (the street-name veto also survives every later phase) — a guard that a later phase
+can overturn is not a guard.
+
+## 14. Case B completed — and it disproved my own 50% conclusion
+
+The previous pass reported, from 522 of 1,045 Atlas-proven ZIPs, that *"the vocabulary is not
+the gap."* Completing chunks 3–6 **disproved that**, which is why the measurement was finished
+rather than extrapolated.
+
+**`data hall` is a real, unambiguous missed vocabulary** — the industry's own term for a data
+centre's equipment floor. Nationally it appears in **11 development records and every one is a
+genuine data centre**: two Mesa AZ ground-up buildings (243,332 SF and 285,282 SF), a Memphis
+data-hall structural addition, an Amazon data hall, an Iron Mountain colocation TI, three
+Phoenix PHX05 battery permits and two Phoenix fire-alarm modifications. Added to
+`DATACENTER_RE`.
+
+Its neighbours in the same sweep were **rejected on the same evidence** — precision, not
+vocabulary breadth, is what makes this type trustworthy:
+
+- **`colo`** matches `813726 Verizon New Colo LDO2022-00283` (a cell site), `AT&T full Colo on
+  existing rooftop - install antenna`, and `US 65 0.2 mi S of Co Rd E41 in **Colo**` — an Iowa
+  highway segment, in *Colorado*.
+- **`server room`** matches ~24 office fit-outs: mini-splits, clean-agent suppression, wall
+  heaters, `INTERIOR ALTERATIONS FOR NEW SERVER ROOMS ON FLOOR 36 & 37`.
+
+Operator-brand matching stays refused, now on the completed corpus: **~5 true finds against
+31+ adjudicated false**, including 20 `VANTAGE HILL … TH` townhouses, an Amazon delivery
+station, Google/Oracle office fit-outs, `ORACLE BOOTH #5739`, `Markley Street`, `pre-lumen`,
+an `IDC` permit code, a bell-tower antenna colocation, and *"aligned"* used as an English verb.
+
+## 15. Production delta after this pass
+
+| measure | before | after | change |
+|---|---:|---:|---|
+| Data center **project rows** | 452 | **479** | +27 |
+| ZIP pages with ≥1 Data center pin | 214 | **219** | +5 |
+| distinct source **records** | 96 | **107** | +11 |
+| **proven false positives removed** | — | **0** | none were found |
+| **proven false negatives added** | — | **11** | all `data hall` |
+
+⚠️ **One number needs stating precisely rather than as "738 unchanged."** The 738 is the count
+of FRS rows typed `type='datacenter'`, and all 738 are untouched. A *vocabulary*-based count of
+FRS rows now returns **739**, because the widened pattern also reaches one existing facility —
+`epa_frs:110038203734`, `CYRUS ONE DATA HALL 1 POWER POD 1` (`type='energy'`, ZIP 75067). It
+still renders as **Regulated facility**: the facility flag short-circuits before the DATACENTER
+phase. Nothing was converted, and no regulatory identity was overwritten. Different denominator,
+not a change — pinned by test `14d`.
+
+## 16. Verification for this pass
+
+- `test/marker-datacenter-type.test.mjs` — **87 checks** (was 54), every string verbatim
+  production text: 7 guard-fires, 5 must-keep, 11 `data hall` keeps, 3 BESS-inside-a-hall keeps,
+  7 rejected-neighbour vetoes, 1 frozen FRS facility, plus the two overturn regressions.
+- Affected map/marker suites re-run and green: `maps-category-contract` (178),
+  `maps-delvalle-golden` (235 — no golden classification drifted), `maps-rule-output-contract`,
+  `marker-name-enrichment`, `maps-rest-shape-parity`, `cleveland-type-map`,
+  `arcgis-type-const-with-map`, `city-of-orange-connector`, `idaho-itip-pair`,
+  `kytc-syp-connector`, `phoenix-connector`, `type-raw-provenance`.
+- **Full offline suite: 143 files, 0 failed.**
+- Geography untouched in both page modes — no coordinate, ZIP assignment, radius or campus
+  grouping was written, derived or fabricated. Atlas coordinates were used only to *select ZIPs
+  to measure*, never as geometry.
