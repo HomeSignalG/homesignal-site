@@ -14,13 +14,37 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-// Verified against production before this run:
-//   08005 pending/'unknown' · 01001 authoritative 34 markers · 01004 not_measured · 01009 complete 0 markers
+// Every expectation below was read out of production's own cutover/status tables immediately
+// before this run — none is carried over from an earlier session.
+//
+// 08005 MOVED, and that is the point of re-reading rather than trusting the old list. It was
+// this file's 'pending' control; the Phase 2 manifest-gap cutover measured its whole ZCTA
+// against the whole corpus, found 0 intersections and 0 declared candidates, and enabled it as
+// an authoritative MEASURED ZERO (run_id phase2-gap-caseA-2026-09-05). Re-pointing it is
+// following the proven state, not making a red test green — and the 'pending' state it vacated
+// is now covered by two ZIPs that really are pending.
+//
+//   dev  = authoritative membership rows the production relation holds for that ZIP
+//   fac  = whether the page must still carry facilities (proves facilities are unaffected)
 const CASES = [
-  { zip: '08005', kind: 'pending'       },
-  { zip: '01001', kind: 'authoritative' },
-  { zip: '01004', kind: 'not_measured'  },
-  { zip: '01009', kind: 'measured_zero' },
+  // ── controls that predate Phase 2, expectations unchanged ────────────────────────────────
+  { zip: '01001', kind: 'authoritative', dev: 12,   fac: false, tag: 'pre-Phase-2 control' },
+  { zip: '01004', kind: 'not_measured',              fac: false, tag: 'NO_ZCTA_IN_TIGER_2025' },
+  { zip: '01009', kind: 'measured_zero',             fac: false, tag: 'pre-Phase-2 control' },
+
+  // ── Phase 2, shards 284/300 — authoritative NON-ZERO, the newly built population ──────────
+  { zip: '28428', kind: 'authoritative', dev: 2440, fac: true,  tag: 'shard 284 · retired 2,424 legacy' },
+  { zip: '30033', kind: 'authoritative', dev: 2261, fac: true,  tag: 'shard 300 · retired 10,960 legacy' },
+  { zip: '28456', kind: 'authoritative', dev: 12,   fac: true,  tag: 'shard 284 · small non-zero' },
+
+  // ── Phase 2 — authoritative MEASURED ZERO, the state that must never read as unmeasured ───
+  { zip: '08005', kind: 'measured_zero',             fac: false, tag: 'manifest-gap 442' },
+  { zip: '38801', kind: 'measured_zero',             fac: true,  tag: 'manifest-gap 442 · 40 facilities' },
+  { zip: '30090', kind: 'measured_zero',             fac: true,  tag: 'shard 300 Case A · 40 facilities' },
+
+  // ── the 3 genuinely pending ZIPs — must NOT present as boundary_complete ──────────────────
+  { zip: '99128', kind: 'pending', tag: 'Case C: intersection exists, membership unbuildable' },
+  { zip: '94128', kind: 'pending', tag: 'unevaluatable legacy candidates' },
 ];
 
 const browser = await chromium.launch();
@@ -53,7 +77,14 @@ for (const c of CASES) {
   });
   facBaseline[c.zip] = m.fac;
 
-  console.log(`── ${c.zip} (${c.kind}) · development=${m.dev} · facilities/other=${m.fac}`);
+  console.log(`── ${c.zip} (${c.kind}${c.tag ? ' · ' + c.tag : ''}) · development=${m.dev} · facilities/other=${m.fac}`);
+
+  // Facilities must survive a geography cutover untouched. Asserted on the pages where
+  // production holds facility rows, INCLUDING measured-zero pages - a page with zero
+  // development must still show its facilities, or the cutover ate something it never owned.
+  if (c.fac === true) {
+    ok(m.fac > 0, `${c.zip}: facilities still present after the cutover`, `facilities=${m.fac}`);
+  }
 
   // The invariant that applies to EVERY state: no fabricated ZIP-mode geography.
   ok(m.devWithDistance === 0,
@@ -70,6 +101,14 @@ for (const c of CASES) {
   }
   if (c.kind === 'authoritative') {
     ok(m.dev > 0, `${c.zip}: still renders whole-ZIP development (regression control)`, `dev=${m.dev}`);
+    // The strong form: the live page renders EXACTLY what the authoritative relation holds.
+    // A legacy-geography fallback would show a different number, so this is also the live
+    // no-fallback proof - the legacy 3-mile branch never returns the membership count.
+    if (c.dev != null) {
+      ok(m.dev === c.dev,
+         `${c.zip}: live rendered development EQUALS the authoritative relation`,
+         `live=${m.dev} relation=${c.dev}`);
+    }
     ok(!m.notMeasured && !m.couldNotRead,
        `${c.zip}: makes no not-measured and no failure claim`);
     ok(m.wholeZip, `${c.zip}: claims the measurement across the WHOLE ZIP`);
