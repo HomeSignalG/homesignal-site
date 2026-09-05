@@ -40,6 +40,55 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
+
+`CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
+never drew. Measured on production `app_projects` (control 3,216,489 rows): **1,190 records
+state a data centre in their own words; 153 resolved to the Data center category.**
+
+`lib/map.js` gains a **DATACENTER precedence phase** — second only to the facility flag —
+reading the record's own class fields (incl. **`type_raw`**, which the classifier had never
+read) and its name. Every category it displaces is strictly broader, and in each case the
+coarse value is our `type_map` output rather than the source's judgement (Phoenix files
+data-centre fire work under the F-range code → Civic/Public; San Jose publishes
+`type_raw='Data Center'` verbatim and the entry collapsed it to Industrial).
+
+**Effect: project records drawing the octagon 153 → 452 (+299); ZIP pages with at least one
+Data center pin 95 → 214 (+119).** Nothing that states no data centre moves.
+
+- Full offline suite green — **143 files, 0 failed** (`maps-delvalle-golden` 235 checks
+  unchanged, so no golden classification drifted). New suite
+  `test/marker-datacenter-type.test.mjs`, 33 checks, verbatim production strings.
+- Receipt: `docs/maps-datacenter-type-2026-09-05.md`.
+- ⚖️ **CTO MERGE GATE CLEARED 2026-09-05 — MERGE READY.** The evidence contract was re-examined
+  rather than inherited: this classifier asserts only *"HomeSignal's own source record says this
+  is a data centre."* Verified over **all 96 distinct source records** behind the 452 rows —
+  **0 classified without a literal data-centre string**, 0 from operator/place/coordinate,
+  0 power-generation/crypto/warehouse/office captures, 0 campus records fabricated or collapsed.
+  External datasets are a **completeness** instrument, not a correctness gate for that claim, so
+  **Epoch's inaccessibility is not a merge blocker** (it stays BLOCKED/UNKNOWN, never zero).
+- 🔑 **Case B measured (522 of 1,045 Atlas-proven ZIPs) and it settled the classifier's shape.**
+  The vocabulary is NOT the gap — 0 records use `colocation`/`server farm`/`data hall`/MW
+  language without also saying "data center". The gap is operator-named projects, and it is
+  **unsafe to close**: an operator-brand rule finds **5** real misses (CoreSite VA1/VA3,
+  EdgeConnex) and **31** false positives including **20 residential townhouses** ("VANTAGE HILL
+  - LOT n - TH"), an Amazon delivery station, two office fit-outs, an **Oracle trade-show booth**,
+  a **street name**, and **"aligned" used as an English verb**. Pinned by 13 regression tests
+  built from those exact production strings; suite 33 → 54 checks.
+- 📌 **OPEN, logged not fixed:** Epoch never applied · the other 523 case-B ZIPs unmeasured
+  (~30 record-level misses estimated) · **scale is not conveyed** (a sign permit and a 20-storey
+  build both read "Data center") · coverage 214 ZIPs vs Atlas's 1,152 · 450 Atlas data centres
+  sit outside the modelled geography.
+
+📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
+(509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
+keep the purple square, the "Regulated facility" legend row and the `facility` filter
+bucket. `datacenter` is a project TYPE; `facility` is a record KIND. Moving them would change
+the facility filter, the `counts.facilities` figure `verify-development` asserts against the
+rendered rail, and a colour the legend explains. **The question, so it is not re-derived:**
+should a regulated facility that IS a data centre draw the octagon, keep the square, or carry
+both (square + a "Data center" line in the popup)? Founder call.
+
 ### 2026-09-04 — MAP 1 ZIP DELIVERY: CLOSED ON `main`, and the card grain is PROVEN
 
 **The delivery gap this branch measured is CLOSED — by `main`, not by this branch.** The gap was
