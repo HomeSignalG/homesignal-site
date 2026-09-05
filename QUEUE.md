@@ -40,6 +40,95 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ✅ 442 MANIFEST-GAP ZIP PAGES CUT OVER. authoritative 11,558 → 12,000
+
+The Phase 2 manifest-gap population — 445 canonical ZIPs across 40 prefixes with **no
+`n5_shard` row at all**, so the boundary-first pass had never run there. 442 cut over, 3 held
+with recorded cause, control 12,722 ✓, `enabled_unverified` 0.
+
+```
+authoritative  12,000   (11,558 at Phase 2 start)
+pending            80   = 77 in shards 284/300 + 99128 + 94128 + 95219
+not_measured      642   unchanged
+zips 442 · dev_rows nonzero 0 · marker rows nonzero 0 · legacy fallbacks 0
+facility row count changed 0 · facility md5 changed 0 · 4,557 facility rows preserved
+```
+
+**The measured zero here rests on TWO independent lines of evidence, not one.** Boundary-first
+loaded each ZCTA from the pinned TIGER file (`in_file == loaded` on all 40 prefixes, 0 invalid,
+0 wrong SRID) and intersected it against the whole resident corpus (1,170,027 features /
+838,968 projects) for 0 exact intersections; **and** `public.app_projects` carries **0 declared
+development candidates** for all 442. Neither alone would be enough.
+
+- 🔑 **`geo.maps_zip_export` is what proves these ZIPs were measurABLE.** None of the 522 pending
+  ZIPs has a `maps_zip_geography_status` row, so the 642 `NO_ZCTA_IN_TIGER_2025` classification
+  could not settle it. The export covers **all 12,722** and its `not_measured` set is exactly
+  those 642, agreeing set-wise in **both** directions (`export_only 0`, `status_only 0`) — and
+  all 445 carry `not_measured = false`. That is a positive assertion of a TIGER ZCTA, so each
+  was in `wanted`, loaded, and evaluated.
+- ⚠️ **ENABLING THE CUTOVER ROW IS NOT THE WHOLE CUTOVER.** `app_projects_for_zip` switches on
+  `app_zip_geography_cutover.enabled`, but `app_zip_projects_markers(zip, kind, true)` gates on
+  `geo.maps_zip_geography_status.status = 'boundary_complete'` and returns
+  `status:'unknown', projects:null` without it. That row is normally written by **unit-a**,
+  which refuses these prefixes. Enabling without it leaves a page whose project list is
+  authoritative-empty while its marker read says "not measured yet" — two production reads
+  disagreeing about the same page. The status row is written by the cutover here, with
+  `run_id='phase2-gap-caseA-2026-09-05'` so it is never mistaken for a unit-a product.
+  - **Precedent, checked before writing rather than after:** **3,573** ZIPs already serve
+    `boundary_complete` with `membership_rows = 0`, and **all 3,573 are enabled and verified**.
+    The shape is established; only the provenance differs.
+- ⛔ **`n5-unit-a` REFUSES A PREFIX THAT IS NOT A DONE SHARD, and that guard is correct.** Its
+  `populate()` is `delete from zip_authoritative_membership where left(zcta5,3)=PFX` then insert,
+  so rebuilding a live prefix makes those pages error for the width of the rebuild. Manifest-gap
+  prefixes have no shard row by definition. `n5-shard` equally refuses an id absent from the
+  `phase1-2026-09-01` manifest. **Neither was weakened.** It cost nothing for 444 of 445, because
+  with 0 boundary rows unit-a would build nothing.
+  - Safety check run BEFORE the attempt, not after: those 40 prefixes hold **0 already-
+    authoritative ZIPs, 0 existing membership rows, 0 existing markers**, so no rebuild could
+    have touched a serving page.
+- 🩺 **ONLY ONE OF 29 BOUNDARY-POSITIVE ZCTAs IS A CANONICAL PAGE.** Boundary-first loads every
+  ZCTA in a prefix, not only canonical ones, so 28 of the 29 that gained rows are not HomeSignal
+  pages at all. Count boundary rows per *canonical* ZIP or the population reads 29× too big.
+
+#### The three held ZIPs, and a NEW exclusion class
+
+**99128 — Case C.** 1 boundary row, and membership cannot be built: prefix 991 is not in the
+shard manifest, so neither unit-a nor n5-shard will touch it. Boundary > 0 with membership = 0 is
+the founder's do-not-cut-over case exactly. Left pending.
+
+**94128 (SFO) and 95219 (Stockton) — UNEVALUATABLE CANDIDATE, a class the Case A/B/C gate does
+not cover.** Both carry legacy `caltrans-sb1-projects` rows that *declare* those ZIPs while their
+coordinates sit up to ~20 km away (94128's 32 rows span lat 37.5813–37.7572, reaching downtown
+San Francisco). Splitting on whether the candidate could be evaluated at all:
+
+| zip | legacy rows | source_keys with geometry | intersecting the ZCTA |
+|---|---:|---:|---:|
+| 94128 | 32 | 26 of 32 | **0 of 26** |
+| 95219 | 2 | **0 of 2** | n/a |
+
+- **95219 is the clear one: 100% of its candidates have no geometry in `geo.n5_geom`.** Publishing
+  `boundary_complete` / 0 there would assert a measurement that never happened for the only
+  projects claiming the ZIP. 94128 is held on the same rule rather than on a threshold.
+- **The 26/26 control is why the legacy rows are not evidence of membership either.** Where the
+  source's ZIP claim *was* checkable, it was wrong every single time. A source-declared ZIP is a
+  candidate association, which the founder's invariant says must never substitute for measured
+  boundary membership.
+- ⚠️ **Both stay on the prohibited legacy branch while held, and that is the accepted cost** of
+  not publishing an unearned measured zero. Recorded in `geo.n5_cutb_excluded`.
+- 🔁 **This corrects my own correction.** I had earlier recorded that holding 941/952 as "Caltrans
+  special cases" was baseless. The *reason* I gave was indeed wrong — the QUEUE Caltrans entries
+  are a source-wiring rejection — but including them is what surfaced this class, and they turned
+  out to be the only two gap ZIPs carrying any legacy development at all.
+
+#### Instrument failure worth keeping
+
+`preservation.legacy_zip_association` returned **0 declared candidates for every gap ZIP**,
+including 94128 and 95219 — which demonstrably serve 32 and 2 rows. The legacy read path is
+`public.app_projects` (3,216,716 rows), not that table. **A known-positive control is the only
+reason the wrong zero was caught**: `lza_94128_dev` 0 against `app_projects_94128` **52**, with
+control ZIP 70301 at 0. Re-run on the right table the answer is 2 ZIPs / 34 rows / 26 with
+geometry — which then agrees exactly with the independently captured baseline.
+
 ### 2026-09-05 — 🔑 A 60 s MCP CLIENT TIMEOUT IS NOT A ROLLBACK. Re-check state, never assume
 
 Two Phase 2 reconciliation batches returned `MCP server "Supabase" tool "execute_sql" timed
