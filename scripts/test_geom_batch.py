@@ -1,0 +1,111 @@
+"""Offline proof that insert_batched SPLITS on HTTP 413 and never loses a row.
+
+No network, no DB: n3_pilot.sql is replaced with a fake server that refuses any statement
+over a secret size. The point is that the client does NOT know that size - the first fix
+for shard 891 guessed a 4 MB budget and got 413 again - so the test asserts the client
+adapts to whatever the server enforces.
+"""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault("SUPABASE_ACCESS_TOKEN", "test-token-not-a-secret")
+
+import n3_pilot as N
+
+fails = 0
+def ok(c, name):
+    global fails
+    print(("PASS" if c else "FAIL") + " - " + name)
+    if not c: fails += 1
+
+SENT = []
+LIMIT = 50_000          # the server's secret limit; the client never sees this number
+
+def fake_sql(query, tag="", raise_413=False):
+    if len(query) > LIMIT:
+        if raise_413:
+            raise N.SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
+        raise SystemExit("413")
+    SENT.append(query)
+    return []
+
+N.sql = fake_sql
+import n5_shard as S
+S.sql = fake_sql
+S.say = lambda k, v: None
+
+PFX, SFX = "insert into t values ", " on conflict do nothing;"
+
+def run(rows):
+    SENT.clear()
+    S.insert_batched(PFX, rows, SFX, "test")
+    # every statement the fake server accepted must be within its limit
+    return SENT
+
+# 1. Small rows. The first batch is sized from the MEAN row length rather than a
+#    constant, so 100 short rows ride in ONE statement instead of four - which is the
+#    whole point: a fixed 25 charges every load the cost of the worst row in the corpus.
+rows = ["(%d,'%s')" % (i, "x" * 100) for i in range(100)]
+sent = run(rows)
+ok(all(len(q) <= LIMIT for q in sent), "small rows: every statement accepted within limit")
+ok(sum(q.count("),(") + 1 for q in sent) == 100, "small rows: all 100 rows sent")
+ok(len(sent) == 1, "small rows: grouped into 1 statement, not 4 of 25 (got %d)" % len(sent))
+
+# 1b. The size is DERIVED, not fixed: longer rows must yield a smaller first batch, and a
+#     single untransportable row must not propose a batch of more than one.
+ok(S.initial_batch_rows(["x" * 150] * 1000) > S.initial_batch_rows(["x" * 40_000] * 100),
+   "a longer row yields a smaller first batch")
+ok(S.initial_batch_rows(["x" * 11_346_221]) == 1,
+   "an 11 MB row proposes a batch of exactly 1")
+ok(S.initial_batch_rows([]) == 1, "no rows proposes 1, never 0")
+ok(S.initial_batch_rows(["x"] * 10_000) <= S.INSERT_MAX_ROWS,
+   "the row cap still bounds it however short the rows are")
+
+# 2. Dense rows - the shard-891 shape. 25 would blow the limit, so it must SPLIT.
+rows = ["(%d,'%s')" % (i, "p" * 8_000) for i in range(25)]
+sent = run(rows)
+ok(all(len(q) <= LIMIT for q in sent), "dense rows: client adapted to the server's limit")
+ok(sum(q.count("),(") + 1 for q in sent) == 25, "dense rows: all 25 rows sent, none dropped")
+ok(len(sent) > 1, "dense rows: it actually split (got %d statements)" % len(sent))
+
+# 3. ORDER is preserved across the split - a reordering would corrupt first_z3 provenance.
+rows = ["(%d,'%s')" % (i, "q" * 6_000) for i in range(30)]
+sent = run(rows)
+seq = []
+for q in sent:
+    body = q[len(PFX):-len(SFX)]
+    seq += [int(p.split(",")[0].lstrip("(")) for p in body.split("),(")]
+ok(seq == list(range(30)), "split preserves row order exactly")
+
+# 4. A single row the server will never accept is a HARD ERROR, never skipped.
+try:
+    S.insert_batched(PFX, ["(1,'%s')" % ("z" * (LIMIT * 2))], SFX, "test")
+    ok(False, "an unsplittable oversize row raises")
+except SystemExit as e:
+    ok("SINGLE row" in str(e), "an unsplittable oversize row raises and says so")
+
+# 4b. WITH a quarantine channel, an untransportable row is WRITTEN, not dropped, and the
+#     run continues over the remaining rows. This is the shard-891 case: one Las Vegas
+#     planning-case feature whose WKT is 11.3 MB, among rows that are otherwise fine.
+S.sql = fake_sql
+seen = []
+rows = ["(1,'ok-a')", "(2,'%s')" % ("Z" * (LIMIT * 3)), "(3,'ok-b')"]
+S.insert_batched(PFX, rows, SFX, "test", on_oversize=lambda r: seen.append(r))
+ok(len(seen) == 1 and seen[0] == rows[1], "oversize row handed to the quarantine channel")
+sent_rows = []
+for q in SENT[-10:]:
+    body = q[len(PFX):-len(SFX)]
+    sent_rows += body.split("),(")
+ok(any("ok-a" in r for r in sent_rows) and any("ok-b" in r for r in sent_rows),
+   "rows on BOTH sides of the quarantined row still sent - the run continued")
+
+# 5. Non-413 failures still fail closed (raise_413 only softens 413).
+def fake_500(query, tag="", raise_413=False):
+    raise SystemExit("STOP: SQL %s failed HTTP 500" % tag)
+S.sql = fake_500
+try:
+    S.insert_batched(PFX, ["(1,'a')"], SFX, "test")
+    ok(False, "a non-413 error still stops the run")
+except SystemExit as e:
+    ok("500" in str(e), "a non-413 error still stops the run")
+
+sys.exit(1 if fails else 0)

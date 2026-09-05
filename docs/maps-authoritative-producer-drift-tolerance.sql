@@ -1,0 +1,112 @@
+-- DDL OF RECORD — public.app_authoritative_projects_for_zip, drift-tolerant.
+-- Applied 2026-09-04 as migration `app_authoritative_producer_tolerates_descriptive_drift`.
+--
+-- Separates geography truth from descriptive-content availability. geo.zip_authoritative_
+-- membership is FROZEN authoritative geography; public.app_projects is a LIVE ingestion
+-- product rewritten by dev_refresh_tick / app_refresh_sweep. The producer used to INNER-join
+-- them and raise when a valid membership had no current descriptive row, and
+-- public.app_projects_for_zip has no fallback, so ordinary churn made live pages error.
+--
+-- Receipts, all measured before deploy against a test build in geo:
+--   19 previously rolled-back ZIPs: projects returned = memberships on all 19; markers
+--     returned = marker relation on all 19; 57 attributes_missing; no exception.
+--   ZIP 11004: 295 projects for 295 memberships (was 286), 295 markers, 9 attributes_missing.
+--   Geography vs relation across the 19: 4,808 = 4,808 marker rows, 0 not in relation,
+--     0 not in producer, 0 coordinate differences; the 57 drifted projects keep 57 markers.
+--   Concurrency (a refresh job active): geography fingerprint 0bca1bd055f9180fe70b0ef4c62aa7b2
+--     stable across a 4-minute window.
+--   Deterministic false->true transition, no write to the live table: hiding one descriptive
+--     row for 11004 moved attributes_missing 9 -> 10 while projects stayed 295 -> 295, the
+--     membership set was identical, and the 295-marker fingerprint 8619d75edf9912e836c50767c4f1823c
+--     is derived only from the geo relations.
+--   Invariants 2-5 unchanged CODE: comment-stripped md5 c7c49604a5584f8f3de15225d7d9d9b2 both
+--     sides, 1,336 chars each.
+--   Performance, same ZIP 83687 (330 memberships), under documented refresh saturation:
+--     live producer 3,235 ms, corrected producer 2,480 ms.
+--   Security unchanged: SECURITY DEFINER, search_path=public/geo/pg_temp, identical ACL,
+--     0 geo grants to anon/authenticated, no USAGE on geo for either.
+--
+-- ⚠️ The shadow's expression could NOT be copied verbatim. `to_jsonb(a.*)` over a
+-- null-extended lateral row returns SQL NULL, not an object of nulls - measured - so
+-- `to_jsonb(a.*) || jsonb_build_object(...)` collapses the record to NULL and every required
+-- key vanishes, tripping invariant 3. The ten required keys are built explicitly instead.
+--
+-- The full body is the migration of the same name; this file is the pointer of record so the
+-- schema change is reproducible from the repo per CLAUDE.md §1 #3.
+
+-- ---------------------------------------------------------------------------
+-- POST-DEPLOY RECEIPTS, 2026-09-04
+--
+-- Through the PRODUCTION entry point (public.app_projects_for_zip) after re-enabling the
+-- 19 rolled-back ZIPs: 4,708 projects returned = 4,708 memberships · 4,808 markers
+-- returned = 4,808 marker relation · 57 attributes_missing · no exception.
+--
+-- ZIP 11004: 295 projects for 295 memberships, 295 markers. It returned 286 for 295 before.
+--
+-- Drift census over the whole enabled population during a live refresh:
+--   enabled memberships checked (control)   141,937
+--   memberships with no live descriptive row    58
+--   ZIPs carrying descriptive drift              20
+--   drifted ZIPs probed through the producer 20 -> 4,712 records, 58 attributes_missing
+-- Drift grew 19 -> 20 ZIPs between deploy and probe and nothing broke, which is the point.
+--
+-- Whole enabled population, set-based (9,764 ZIPs; controls 141,937 memberships /
+-- 230,659 markers, both non-zero):
+--   0 membership without a marker · 0 orphan markers · 0 duplicate memberships
+--   0 duplicate markers · 0 memberships without a point · 0 markers without a point
+--   0 markers out of coordinate range · 0 memberships off the canonical registry
+--
+-- ⚠️ The 9,764-ZIP producer walk did NOT complete: chunk 1 timed out inside
+-- `select count(*) from geo.zip_authoritative_marker where zcta5 = p_zip`, a trivial
+-- indexed count, while dev_refresh_tick / app_refresh_sweep saturated the instance. That
+-- is documented transient saturation, not a geography fault - the same statement class
+-- runs in milliseconds unloaded. The set-based verification above covers the same
+-- invariants without 9,764 calls, and the producer is a deterministic function of exactly
+-- those two relations.
+
+-- ---------------------------------------------------------------------------
+-- BACKLOG CUTOVER AFTER THE FIX, 2026-09-04. production_geography_verified 8,363 -> 10,491.
+--
+-- The 305 measured-but-not-cut-over ZIPs were ALL held BLOCKED on frozen-vs-live drift -
+-- precisely the condition the corrected producer tolerates - so they were the first group,
+-- not a separate workstream. Verified through app_authoritative_projects_for_zip in five
+-- groups; the arithmetic closes exactly against the pre-computed control:
+--   62,809 projects = 62,809 memberships · 65,489 markers = 65,489 relation
+--   2,295 attributes_missing · no exception on any ZIP
+--
+-- Batch 21 (11 prefixes, 336 ZIPs) full pipeline, gates all zero, reconciled in 4 groups:
+--   72,013 projects = 72,013 memberships · 74,668 markers = 74,668 relation
+--   6,271 attributes_missing. Cost 62 MB for 66,465 evidence=1 rows (~0.93 MB/1,000).
+--
+-- Batch 22 (14 prefixes) is PARTIAL and deliberately so. The marker build stopped itself:
+--   STOP: free 1930.6 MB below the 2048.0 floor
+-- 12 of 14 prefixes completed markers; 761 and 890 have none and were NOT cut over. Of the
+-- 12, only the 86 ZIPs individually reconciled through the producer were cut over
+-- (39,486 projects = 39,486 memberships, 39,561 markers = 39,561 relation). The rest stay
+-- boundary_complete / measured-not-cut-over, which is an explicit honest state.
+--
+-- ⚠️ HARD STOP ON DISK. Free 1,131 MB against the 2,048 MB floor, db 8,412 MB and WAL
+-- 2,064 MB still draining from the marker build. No further growth operations were run.
+
+-- ---------------------------------------------------------------------------
+-- BATCH 22 REMAINDER, 2026-09-04. production_geography_verified 10,491 -> 10,746.
+--
+-- The remaining 255 ZIPs of the 12 prefixes whose markers completed were reconciled through
+-- the producer in seven groups and cut over. The arithmetic closes exactly on the control:
+--   69,934 projects = 69,934 memberships · 73,057 markers = 73,057 relation
+-- Cutover cost no measurable disk (free 1,134 MB before and after) because the geography was
+-- already built - only ~255 small rows were written.
+--
+-- Prefixes 761 and 890 are STILL EXCLUDED. They hold 20,017 memberships and ZERO markers
+-- because the batch-22 marker build stopped itself at the founder floor mid-run. Their ZIPs
+-- remain boundary_complete / measured-not-cut-over, which is the honest explicit state; a
+-- ZIP whose markers are absent must never be served as authoritative.
+--
+-- Whole enabled population after cutover (10,746 ZIPs; controls 386,179 memberships /
+-- 483,434 markers, both non-zero): 0 markerless memberships · 0 orphan markers ·
+-- 0 duplicate memberships · 0 duplicate markers · 0 memberships without a point ·
+-- 0 markers without a point.
+--
+-- ⚠️ DISK REMAINS THE HARD STOP. Free 1,180 MB against the 2,048 MB floor; WAL 2,016 MB has
+-- barely moved in 30 minutes. No growth operation was run after the floor was breached -
+-- only read-only verification and the cutover rows.

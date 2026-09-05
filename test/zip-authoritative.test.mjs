@@ -59,6 +59,28 @@ ok(HS.zipAuthOutcome({ status: 'something_new' }) === 'unavailable',
 ok(HS.zipAuthOutcome(MEASURED_ZERO) !== HS.zipAuthOutcome(NOT_MEASURED),
   'A7 the two empties never collapse to the same outcome');
 
+// A8-A10. 'unknown' is the producer's OTHER way of saying "no geography for this ZIP", and it
+// covers 1,259 of the 12,722 live ZIP pages. Measured 2026-09-05 against production: every ZIP
+// the geography view calls `pending` returns status 'unknown', and all 1,259 have NO row in
+// geo.maps_zip_geography_status - nobody measured them. Reading that as 'unavailable' told those
+// residents their coverage "could not be read just now", which is a false claim about a read that
+// succeeded, and dropped the address-mode invitation the honest wording carries.
+const UNKNOWN = { zip: '08005', mode: 'authoritative', status: 'unknown', projects: null, markers: null };
+ok(HS.zipAuthOutcome(UNKNOWN) === 'not_measured',
+  "A8 a 'unknown' status reads not_measured - the read SUCCEEDED and said it holds nothing");
+ok(HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('not measured yet') !== -1
+   && HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('could not be read') === -1,
+  'A9 ...so the page states the honest status, never a transient-failure claim');
+ok(HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('street address') !== -1,
+  'A10 ...and keeps the address-mode route, which is the only live answer for such a ZIP');
+// The allow-list must stay an allow-list of two. A9 above would also pass if every unrecognised
+// status were swept into not_measured, so A6's control is what makes this change safe, and it is
+// re-asserted here against a DIFFERENT novel status than A6 uses.
+ok(HS.zipAuthOutcome({ status: 'partially_measured' }) === 'unavailable',
+  'A11 a status nobody has vetted is STILL unavailable - this is not a catch-all');
+ok(HS.zipAuthOutcome(null) === 'unavailable',
+  'A12 a genuinely failed read stays distinguishable from an unmeasured ZIP');
+
 // ── B. sites are built at the marker grain, from content ─────────────────────────────────────
 console.log('\nB. marker grain, and nothing drawn without content');
 const sites = HS.zipAuthSitesFrom(COMPLETE);

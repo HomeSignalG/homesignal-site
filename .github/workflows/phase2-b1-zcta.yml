@@ -18,7 +18,7 @@ name: phase2-b1-zcta
 # to this repository. Nothing is uploaded as an artifact either — the receipt channel
 # is the job log, as with recon-fetch.yml and db-sql.yml.
 #
-# Two modes, and the separation is the point:
+# The B1 modes, and the separation is the point:
 #   validate  acquire, checksum, read the archive's own .prj, count features, derive
 #             the in-scope ZCTA set, size the payload. NO DATABASE CREDENTIAL IS
 #             EVEN PLACED IN THE ENVIRONMENT, so it cannot write if it tried.
@@ -26,6 +26,12 @@ name: phase2-b1-zcta
 #             both reproduce exactly, then send ONE SQL request that is ONE
 #             transaction. Any in-transaction assertion raises and the whole
 #             transaction rolls back.
+#
+#   n5-verify re-derive the completed shards' geometry-verified associations from the
+#             frozen snapshot alone and compare them, exactly, against what those shards
+#             wrote. Read-only against every durable N5 artifact; its one write is a
+#             scratch boundary table it creates and drops in the same run, because the
+#             per-shard ZCTA slices are correctly discarded at cleanup.
 #
 # Credentials: SUPABASE_ACCESS_TOKEN only, and never in B1 validate mode. It already
 # exists (db-sql.yml, deploy-edge-functions.yml). No new secret was created for this
@@ -44,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -52,9 +58,34 @@ on:
         default: 'AUTO'
         type: string
       max_shards:
-        description: 'n5-shard: how many shards this run may complete'
+        description: 'n5-shard: how many shards this run may complete · n5-recon: ZIPs per chunk'
         required: false
         default: '1'
+        type: string
+      prefix:
+        description: 'n5-boundary-first: the ONE ZIP3 prefix to probe'
+        required: false
+        default: ''
+        type: string
+      prefixes:
+        description: 'n5-boundary-first: comma-separated ZIP3 list, run sequentially in one process'
+        required: false
+        default: ''
+        type: string
+      marker_mode:
+        description: 'n5-a3-marker: measure (component primitives) | build (marker relation)'
+        required: false
+        default: 'measure'
+        type: string
+      bench_passes:
+        description: 'n5-a4-bench: comma-separated pass numbers to record (default 3,4)'
+        required: false
+        default: '3,4'
+        type: string
+      registry_id:
+        description: 'n5-acquire: the ONE registry_id to acquire in full'
+        required: false
+        default: ''
         type: string
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -74,6 +105,23 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+
+      # Unconditional, offline, no credential. sql() guards EVERY mode below, so the
+      # instrument that decides whether a batch survives a gateway throttle is itself
+      # checked on every dispatch rather than trusted.
+      - name: 'Self-test: sql() retries 429 only and still fails closed'
+        run: python3 scripts/test_sql_retry.py
+
+      # Also unconditional and offline. The geometry insert is what halted shard 891 with
+      # HTTP 413, and a batcher that silently drops a row would look exactly like success.
+      - name: 'Self-test: n5_geom inserts batch by bytes as well as rows'
+        run: python3 scripts/test_geom_batch.py
+
+      # Also unconditional and offline. The recovery fetch decides how many identities
+      # ride in one publisher request; a batcher that skips a range on error or accepts a
+      # truncated response would look exactly like a shard with less geometry to find.
+      - name: 'Self-test: recovery batches from the publisher and loses no identity'
+        run: python3 scripts/test_recovery_batching.py
 
       - name: Validate (no database credential in scope)
         if: ${{ github.event.inputs.mode == 'validate' }}
@@ -169,6 +217,103 @@ jobs:
           MAX_SHARDS: ${{ github.event.inputs.max_shards }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_shard.py
+
+      - name: N5 Part 1 - does the snapshot reproduce what the shards built (read-only)
+        if: ${{ github.event.inputs.mode == 'n5-verify' }}
+        env:
+          MODE: n5-verify
+          SNAPSHOT: phase1-2026-09-01
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_verify_snapshot.py
+
+      - name: N5 A2 - acquire ONE registry's geometry in full (not a shard run)
+        if: ${{ github.event.inputs.mode == 'n5-acquire' }}
+        env:
+          MODE: n5-acquire
+          SNAPSHOT: phase1-2026-09-01
+          REGISTRY_ID: ${{ github.event.inputs.registry_id }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_acquire_registry.py
+
+      - name: N5 Part 2 - national ZCTA geometry distribution (read-only, no DB credential)
+        if: ${{ github.event.inputs.mode == 'n5-zcta-stats' }}
+        env:
+          MODE: n5-zcta-stats
+        run: python3 scripts/n5_zcta_stats.py
+
+      - name: N5 S1 - boundary-first membership probe, ONE prefix
+        if: ${{ github.event.inputs.mode == 'n5-boundary-first' }}
+        env:
+          MODE: n5-boundary-first
+          SNAPSHOT: phase1-2026-09-01
+          PREFIX: ${{ github.event.inputs.prefix }}
+          PREFIXES: ${{ github.event.inputs.prefixes }}
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_boundary_first.py
+
+      - name: N5 Unit A - authoritative SHADOW read product (no production read change)
+        if: ${{ github.event.inputs.mode == 'n5-unit-a' }}
+        env:
+          MODE: n5-unit-a
+          # Optional, same meaning as on the marker step: restrict the rebuild so it
+          # never deletes membership under ZIPs that are already serving. Empty = all
+          # done shards.
+          PREFIXES: ${{ github.event.inputs.prefixes }}
+          SNAPSHOT: phase1-2026-09-01
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_unit_a_shadow.py
+
+      - name: N5 Unit A3 - clipped-geometry measurement for the marker-grain decision
+        if: ${{ github.event.inputs.mode == 'n5-a3-clip' }}
+        env:
+          MODE: n5-a3-clip
+          SNAPSHOT: phase1-2026-09-01
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_a3_clip_stats.py
+
+      - name: N5 Unit A3 - authoritative marker grain (measure primitives | build relation)
+        if: ${{ github.event.inputs.mode == 'n5-a3-marker' }}
+        env:
+          MODE: n5-a3-marker
+          MARKER_MODE: ${{ github.event.inputs.marker_mode }}
+          # Optional. Restricts a build to the named prefixes so a batch never rebuilds
+          # markers under ZIPs that are already production_geography_verified (the
+          # delete/insert window would make those live pages raise). Empty = all.
+          PREFIXES: ${{ github.event.inputs.prefixes }}
+          SNAPSHOT: phase1-2026-09-01
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_a3_markers.py
+
+      - name: N5 - whole-population reconciliation of the ENABLED ZIP set
+        if: ${{ github.event.inputs.mode == 'n5-recon' }}
+        env:
+          MODE: n5-recon
+          RECON_CHUNK: ${{ github.event.inputs.max_shards }}
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_recon_population.py
+
+      - name: N5 Unit A4 - create the measured-required source_key index
+        if: ${{ github.event.inputs.mode == 'n5-a4-index' }}
+        env:
+          MODE: n5-a4-index
+          A4_MODE: index
+          DISK_FLOOR_MB: '2048'
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_a4_index.py
+
+      - name: N5 Unit A4 - re-benchmark the authoritative project lookup
+        if: ${{ github.event.inputs.mode == 'n5-a4-bench' }}
+        env:
+          MODE: n5-a4-bench
+          A4_MODE: bench
+          BENCH_PASSES: ${{ github.event.inputs.bench_passes }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_a4_index.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
