@@ -40,6 +40,51 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ✅ 413 ZIP PAGES CUT OVER. authoritative 10,821 → 11,234, pending 1,259 → 846
+
+**Ten prefixes taken through the full established contract under the 500 MB floor**, each one
+boundary-first → unit-a → a3-marker → baseline → enable → verify through the production read
+path → stamp. Every prefix passed every gate.
+
+| prefix | place | ZIPs | authoritative rows |
+|---|---|---:|---:|
+| 191 | Philadelphia | 50 | 10,980 |
+| 331 | Miami | 63 | 11,556 |
+| 100 | Manhattan | 52 | 23,472 |
+| 294 | SC Lowcountry | 48 | 11,066 |
+| 201 | Jersey City / Newark | 45 | 45,782 |
+| 112 | Brooklyn | 44 | 21,095 |
+| 482 | Detroit | 42 | 21,540 |
+| 951 | Riverside | 29 | 11,350 |
+| 934 | Ventura / Oxnard | 28 | 13,824 |
+| 722 | Little Rock | 12 | 47,204 |
+| **total** | | **413** | **217,869** |
+
+**359,258 prohibited 3-mile centroid-radius rows retired.** Across all 413:
+**facility md5 changed on 0** · **legacy-geography fallbacks 0** · control 12,722 ✓.
+Disk after: free 1,899.1 MB, **headroom 1,399.1 MB over the 500 floor**, WAL flat at 1,024.
+
+- 🔑 **THE GATE IS `producer == membership`, NOT `producer == boundary_membership`.** I nearly
+  broke this: on 722 I measured 1,018 "unlinkable" projects by filtering `app_projects` on
+  `record_kind='development'`, concluded the equality gate needed adjusting, and built an
+  adjusted expectation — then the producer returned **47,204 = membership exactly**. The
+  `record_kind` filter does not match the producer's join, so the adjustment was the error.
+  The original equality is correct and held on all ten prefixes.
+- ⚠️ **Membership can legitimately be smaller than boundary membership.** Batch A came out
+  206,889 vs 206,894 — five SCDOT **polyline** rows in 29440/29488 that never became
+  membership, with geometry present and no reject logged. Unexplained, recorded, harmless
+  here: 294 still passed its gate exactly, because the gate pairs producer with membership.
+- ⚠️ **Statement-timeout sizing is per prefix, not global.** Dense metros need ~8 ZIPs per
+  producer batch (Riverside), sparse ones take 24-32 (Miami, SC). The baseline read is the
+  LEGACY branch and times out separately — 951's first attempt died and rolled back atomically,
+  enabling nothing. Always use a self-advancing `not exists` scratch table so every batch is
+  idempotent and resumable.
+
+**Remaining pending 846** = 324 done-shard ZIPs in 9 prefixes not yet built (787 Austin, 441
+Cleveland, 850 Phoenix, 303 Atlanta, 760, 598, 662, 358, 571) + 445 manifest-gap + 77 in
+shards 284/300.
+
+
 ### 2026-09-05 — ✅ PREFIX 191 (PHILADELPHIA) IS LIVE. The per-ZIP cost is now MEASURED
 
 **First bounded unit under the 500 MB floor, end to end, and it works.** authoritative
