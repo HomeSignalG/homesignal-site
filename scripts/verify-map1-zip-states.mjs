@@ -57,7 +57,16 @@ const facBaseline = {};
 for (const c of CASES) {
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  // SETTLE, don't guess. A fixed 3s wait read 798 of 28428's 2,442 records and 0 of 30033's
+  // 2,261 - a partial render mid-load, which is indistinguishable from wrong data if you
+  // sample once. Wait until the rendered set stops growing, then sample.
+  let prevLen = -1, stable = 0;
+  for (let i = 0; i < 60 && stable < 3; i++) {
+    await page.waitForTimeout(1000);
+    const len = await page.evaluate(() => (window.__HS_SITES || []).length);
+    stable = (len === prevLen) ? stable + 1 : 0;
+    prevLen = len;
+  }
 
   const m = await page.evaluate(() => {
     const sites = window.__HS_SITES || [];
@@ -66,6 +75,10 @@ for (const c of CASES) {
     const txt = document.body.innerText || '';
     return {
       dev: dev.length, fac: fac.length,
+      // Which layer each development record came from. The authoritative RPC stamps
+      // authoritative:true; anything without it came from the development_reports cache.
+      devAuthoritative: dev.filter(s => s.authoritative === true).length,
+      devCached:        dev.filter(s => s.authoritative !== true).length,
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
@@ -77,7 +90,9 @@ for (const c of CASES) {
   });
   facBaseline[c.zip] = m.fac;
 
-  console.log(`── ${c.zip} (${c.kind}${c.tag ? ' · ' + c.tag : ''}) · development=${m.dev} · facilities/other=${m.fac}`);
+  console.log(`── ${c.zip} (${c.kind}${c.tag ? ' · ' + c.tag : ''}) · development=${m.dev}`
+    + ` (authoritative=${m.devAuthoritative} cached=${m.devCached}) · facilities/other=${m.fac}`
+    + ` · settled after ${prevLen} sites`);
 
   // Facilities must survive a geography cutover untouched. Asserted on the pages where
   // production holds facility rows, INCLUDING measured-zero pages - a page with zero
