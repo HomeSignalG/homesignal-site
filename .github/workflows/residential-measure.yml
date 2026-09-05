@@ -10,6 +10,10 @@ on:
         description: 'Optional: cap the number of ZIPs (e.g. "300" for a smoke run)'
         required: false
         default: ''
+      stride:
+        description: 'Optional: measure every Nth canonical ZIP (spatially spread sample)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -26,5 +30,6 @@ jobs:
       - name: Measure
         env:
           SAMPLE: ${{ github.event.inputs.sample }}
+          STRIDE: ${{ github.event.inputs.stride }}
           CONCURRENCY: '10'
         run: node scripts/residential-measure.mjs

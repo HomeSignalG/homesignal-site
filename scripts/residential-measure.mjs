@@ -28,6 +28,11 @@ const KEY = grab('APIKEY');
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 const CONCURRENCY = process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 10) : 8;
+// STRIDE takes every Nth canonical ZIP. Deterministic and SPATIALLY SPREAD - ZIP codes are
+// geographic, so every Nth one walks the whole country, while SAMPLE=n takes the first n and
+// would report New England. Used when the full 12,722-ZIP walk does not fit the runner budget;
+// the receipt must then say STRIDE and the ZIP count, because a sample is not a census.
+const STRIDE = process.env.STRIDE ? parseInt(process.env.STRIDE, 10) : 0;
 
 // The SHIPPED modules, loaded in the page's own order.
 globalThis.window = globalThis;
@@ -63,7 +68,8 @@ async function canonicalZips() {
     const rows = await pageAll(t, 'zip');
     if (rows && rows.length) {
       ZIP_SOURCE = t;
-      const uniq = Array.from(new Set(rows));
+      let uniq = Array.from(new Set(rows));
+      if (STRIDE > 1) uniq = uniq.filter((_, i) => i % STRIDE === 0);
       return SAMPLE ? uniq.slice(0, SAMPLE) : uniq;
     }
   }
@@ -163,6 +169,7 @@ console.log('\n===== RESIDENTIAL MEASUREMENT =====');
 console.log(JSON.stringify({
   measured_at: new Date().toISOString(),
   zip_source: ZIP_SOURCE,
+  stride: STRIDE || 1,
   zips: {
     total: T.zips_total, measurable: T.zips_measurable, not_measured: T.zips_not_measured,
     unavailable: T.zips_unavailable,
