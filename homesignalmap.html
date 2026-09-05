@@ -1059,6 +1059,11 @@ HS.onReady(function(){
   var LAYER_LABEL = { datacenter:"Data center", industrial:"Industrial", energy:"Energy",
                       logistics:"Logistics", residential:"Residential" };
 
+  // MUST equal MAX_FACILITIES in supabase/functions/get-address-report/index.ts, which is where
+  // the slice actually happens. The page cannot import it, so a test extracts both and fails if
+  // they ever diverge — a stale copy here would silently stop disclosing the truncation.
+  var FACILITY_QUERY_CAP = 40;
+
   var map, layerGroup;
   // ===== Development-tracker (resolved-project anchor + ZIP/county notices) state =====
   // The anchor + notices load on a SEPARATE async path from the EPA/planning report, so they
@@ -1642,8 +1647,34 @@ HS.onReady(function(){
     // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
     // updateCovNote() say why. A genuinely-empty ZIP is NOT flagged and still shows a true 0.
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
+    // THE FACILITY NUMBER IS A CEILING, NOT A COUNT, WHENEVER IT EQUALS THE QUERY CAP.
+    // get-address-report::facilitySites sorts the EPA FRS result by distance and slices it to
+    // MAX_FACILITIES — `kept.slice(0, MAX_FACILITIES)` — in BOTH modes. So a page reading
+    // exactly 40 is showing the forty NEAREST, and we cannot tell from the sliced array whether
+    // forty exist or four hundred do. Measured 2026-09-05: 2,383 of 12,722 ZIP pages (18.7%)
+    // sit exactly on that cap, and one of them, 84321, has at least 56 qualifying facilities
+    // inside its own ZCTA. Printing a bare "40" there states a total the data cannot support.
+    //
+    // What IS provable from a capped page is a LOWER BOUND: the unsliced set held at least
+    // MAX_FACILITIES members. So the tile says "40+" and the label says which forty they are.
+    // Nothing about the geography changes here — this only stops a ceiling being read as a total.
+    var facShown = (data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length;
+    var facCapped = !FAC_UNAVAILABLE && Number(facShown) === FACILITY_QUERY_CAP;
     $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
-      : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
+      : (facCapped ? (FACILITY_QUERY_CAP + "+") : String(facShown));
+    if(facCapped && $("kFac")){
+      $("kFac").textContent = ZIP_MODE ? "Nearby regulated facilities (nearest 40 shown)"
+                                       : "Regulated facilities nearby (nearest 40 shown)";
+    }
+    var _facTile = $("cFac") && $("cFac").parentNode;
+    if(_facTile){
+      _facTile.title = FAC_UNAVAILABLE
+        ? "EPA's facility service did not answer for this snapshot, so the count is unknown rather than zero."
+        : (facCapped
+            ? "EPA returned at least " + FACILITY_QUERY_CAP + " regulated facilities here. The map shows the "
+              + FACILITY_QUERY_CAP + " nearest; there may be more."
+            : "Every regulated facility EPA returned for this search is shown.");
+    }
     // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
     // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
     // development rather than passing it off as whole-ZIP (it is not a fallback), so the
