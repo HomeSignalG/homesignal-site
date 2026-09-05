@@ -40,6 +40,40 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ⛔ 11 ZIPs EXCLUDED FROM CUTOVER: intersections found that cannot be placed
+
+**A ZIP with boundary intersections but ZERO membership must NOT be cut over.** It would publish
+`boundary_complete` with 0 projects — "we measured this whole ZIP and found nothing" — when in
+fact we found intersections and could not derive a point for any of them. 76008 and 76028 carry
+**17 intersecting projects each**.
+
+Excluded and left pending, recorded in `geo.n5_cutB_excluded` with the reason: **11 ZIPs, 58
+unplaceable intersections** — 76028, 76008, 76065, 76082, 76084, 59830, 76087, 59858, 76078,
+76085, 76086.
+
+- **Every one is dominated by POLYLINE DOT sources** — `txdot-projects-info-all`,
+  `itd-itip-projects-lines`, `mt-mdt-stip-lines`. Same shape as the 5 SCDOT polyline rows in
+  batch A. A line that only touches a ZCTA boundary has no interior point to place.
+- ✅ **Nothing already live has this defect, and the control proves the query works:**
+  **1,272 ZIPs nationally** have boundary rows with zero membership, and **0 of them are
+  enabled**. A bare zero here would have been meaningless; the 1,272 is what makes it evidence.
+- 📌 **This is the durable rule for every future batch:** cut over a ZIP only when it has
+  membership, or when it has NO boundary intersections at all (a real measured-zero). The
+  in-between case is `not_measured`, not zero.
+
+### 2026-09-05 — ✅ 490 ZIP PAGES CUT OVER. authoritative 10,821 → 11,311, pending 1,259 → 769
+
+Fourteen prefixes through the full contract. **758,786 prohibited 3-mile centroid-radius rows
+retired**, **279,360 authoritative rows serving**. Across all of them: **facility md5 changed 0**
+· **legacy-geography fallbacks 0** · **enabled-but-unverified 0** · control 12,722 ✓.
+Free 1,764.4 MB, **headroom 1,264.4 MB**, WAL flat at 1,024.
+
+⚠️ **Verify light-ZIP-first.** Ordering the producer batch by `membership_rows asc` cleared 50 of
+77 dense-prefix ZIPs in two calls after batches of 26, 12 and even 6 had all timed out. The
+heavy tail (Sioux Falls 57110 at 5,364 rows, Missoula 59801 at 5,220) then goes 1-4 at a time.
+**Never leave a ZIP enabled-but-unverified** — it serves authoritative data while the state view
+still calls it pending.
+
 ### 2026-09-05 — ✅ 413 ZIP PAGES CUT OVER. authoritative 10,821 → 11,234, pending 1,259 → 846
 
 **Ten prefixes taken through the full established contract under the 500 MB floor**, each one
