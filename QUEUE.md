@@ -40,6 +40,80 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ✅ PHASE 2 COMPLETE. authoritative 12,077 of 12,722 · pending 3, each with a proven cause
+
+Every canonical ZIP page is now either authoritative, honestly `not_measured`, or one of three
+pending ZIPs held on evidence. **Session total: authoritative 10,821 → 12,077 (+1,256), pending
+1,259 → 3 (−1,256), control 12,722 ✓, `enabled_unverified` 0 throughout.**
+
+```
+canonical registry              12,722    state rows 12,722
+authoritative                   12,077    cutover enabled 12,077 · verified 12,077
+not_measured                       642    NO_ZCTA_IN_TIGER_2025
+pending                              3    94128 · 95219 · 99128
+enabled but unverified               0    enabled off-registry 0
+free disk                      1,020.2 MB  (db 9,098.8 · WAL 1,488.0) — 520.2 MB over the 500 floor
+```
+
+#### Phase 2 delivered 519 ZIP pages in two units
+
+| unit | ZIPs | authoritative rows serving | legacy rows retired | facility md5 changed |
+|---|---:|---:|---:|---:|
+| manifest-gap Case A | 442 | 0 (measured zero) | 0 | **0** |
+| shards 284 / 300 | 77 | **139,652** | **352,453** | **0** |
+| **total** | **519** | **139,652** | **352,453** | **0** |
+
+5,985 facility rows preserved byte-identically across both units.
+
+**The 77 went through the full contract with every gate paired to a non-zero control:** shard
+284 `VERIFIED CLEAN` (`28387756dc78e5b8b30d01d09593eee9`, 202,207 associations, phantom 0,
+second-run inserts 0) and shard 300 (`shards still pending: 0`) · boundary-first · unit-a ·
+a3-marker · **7 integrity gates all 0** against 139,652 memberships / 140,302 markers ·
+**producer reconciliation 139,652 = 139,652 and 140,302 = 140,302, 0 mismatches, taken before
+any cutover row existed** · baseline · enable under the Case A/B/C gate (**Case B 75 · Case A 2 ·
+Case C 0**) · production verification through `app_projects_for_zip` and
+`app_zip_projects_markers` (**0 project mismatches, 0 marker mismatches, 0 legacy-geography
+fallbacks, 0 facility changes**) · stamp.
+
+#### The national zero-state invariant, with its control
+
+```
+Case C nationally (canonical, boundary > 0, membership = 0)        1      (was 1,272 in Phase 1)
+  of which ENABLED                                                 0      <- the invariant
+enabled claiming membership_rows > 0 with no membership rows       0
+enabled with membership > 0 but zero markers                       0
+excluded rows 14 = 3 canonical (the 3 pending) + 11 non-canonical  0 enabled
+control: 19102 is canonical                                        1
+```
+
+The 11 Phase 1 exclusions are **not** canonical pages, which is why they never appear in
+`pending`. That is checked, not assumed — the control proves the canonical test discriminates.
+
+#### The 3 pending ZIPs, classified and caused
+
+| zip | boundary | membership | declared dev candidates | with geometry | class |
+|---|---:|---:|---:|---:|---|
+| **94128** SFO | 0 | 0 | 32 | 26 | UNEVALUATABLE CANDIDATE |
+| **95219** Stockton | 0 | 0 | 2 | **0** | UNEVALUATABLE CANDIDATE |
+| **99128** | **1** | 0 | 0 | — | CASE C |
+
+- **94128 / 95219 — a class the Case A/B/C gate does not cover.** Both carry legacy
+  `caltrans-sb1-projects` rows *declaring* those ZIPs while their coordinates sit up to ~20 km
+  away (94128's span lat 37.5813–37.7572, reaching downtown San Francisco). Where the claim was
+  checkable it was wrong **26 times out of 26**, so the legacy rows are not evidence of
+  membership either. But 6 of 32 (and **2 of 2** on 95219) have no geometry in `geo.n5_geom`, so
+  those candidates were never evaluatable and `boundary_complete` would assert a measurement that
+  did not happen. Held. **Accepted cost, stated not buried: both keep serving the prohibited
+  legacy branch while pending.**
+- **99128 — Case C, and unreachable by design.** 1 exact ZCTA intersection, membership 0.
+  Prefix 991 has no row in the `phase1-2026-09-01` shard manifest, so `n5-unit-a` refuses it
+  (requires a done shard) and `n5-shard` refuses it (refuses any id not in the manifest).
+  **Neither guard was weakened**; enabling would publish `boundary_complete` with 0 projects
+  while an intersection is known to exist.
+
+All three are recorded in `geo.n5_cutb_excluded` with their reason, and **0 of the 14 excluded
+rows is enabled**.
+
 ### 2026-09-05 — 🔬 THE PRODUCER RETURNS A BARE ARRAY. `->'projects'` ON IT IS NULL, AND NULL COUNTS AS 0
 
 `public.app_authoritative_projects_for_zip(zip)` returns a **jsonb ARRAY of projects**, not an
