@@ -57,6 +57,10 @@ const readScreen = () => page.evaluate(() => {
     tile_facilities: num('cFac'),
     tile_open: num('cOpen'),
     tile_total: num('cTot'),
+    total_tile_shown: (() => { const t = document.getElementById('ccTot');
+      return !!t && getComputedStyle(t).display !== 'none'; })(),
+    k_dev: (document.getElementById('kDev') || {}).textContent || null,
+    k_fac: (document.getElementById('kFac') || {}).textContent || null,
     rail_proposed: proposed.length,
     sites_total: sites.length,
     dev_points: sites.filter(devPoint).length,
@@ -110,8 +114,17 @@ ok(z.homePins === 0, 'A7 no HOME pin for a ZIP (a ZIP is not somebody’s home)'
 ok(z.tile_proposed === z.rail_proposed,
   'A8 the "New projects proposed nearby" tile equals the Proposed set actually drawn',
   { tile: z.tile_proposed, drawn: z.rail_proposed });
-ok(z.tile_total === z.sites_total,
-  'A9 the total tile equals the records actually rendered', { tile: z.tile_total, rendered: z.sites_total });
+// A9 CHANGED 2026-09-05 (F1). ZIP mode no longer shows a combined total: adding whole-ZIP
+// development to nearby facilities produced one number from two geographies. The assertion is
+// now that it is ABSENT here, and address mode - where every class shares one radius contract -
+// still carries it and still has to add up (B-section).
+ok(z.total_tile_shown === false,
+  'A9 ZIP mode shows no combined total (whole-ZIP development + nearby facilities is not a number)',
+  { shown: z.total_tile_shown, tile: z.tile_total });
+ok(/across this ZIP/i.test(z.k_dev || ''),
+  'A9b the development counter says it is measured ACROSS this ZIP', z.k_dev);
+ok(/^Nearby regulated facilities$/i.test((z.k_fac || '').trim()),
+  'A9c the facility counter says NEARBY, never a whole-ZIP claim', z.k_fac);
 
 // Marker -> dossier -> evidence: the page's primary interaction. Opened through the page's
 // OWN hook (window.siteMarkers), which homesignalmap.html exposes precisely so a proof can

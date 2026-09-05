@@ -382,11 +382,19 @@
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
                when nothing is open. Sits above the counts so a worried resident sees it first. -->
           <div class="commentbar" id="commentBar" style="display:none"></div>
+          <!-- TWO SCOPES, NAMED SEPARATELY. Development is measured across the whole ZIP;
+               facilities are a nearby contextual layer around the ZIP, not a whole-ZIP
+               measurement (measured 2026-09-05 over 50 ZIPs with authoritative boundaries:
+               269 of 610 facilities shown sat outside the ZIP whose page showed them). The
+               labels are set per mode in render(); these are the address-mode defaults. -->
           <div class="counts">
-            <div class="cc"><div class="n" id="cFac">0</div><div class="k">Regulated facilities nearby</div></div>
-            <div class="cc"><div class="n" id="cDev">0</div><div class="k">New projects proposed nearby</div></div>
+            <div class="cc"><div class="n" id="cFac">0</div><div class="k" id="kFac">Regulated facilities nearby</div></div>
+            <div class="cc"><div class="n" id="cDev">0</div><div class="k" id="kDev">New projects proposed nearby</div></div>
             <div class="cc flag"><div class="n" id="cOpen">0</div><div class="k">Open for public comment</div></div>
-            <div class="cc"><div class="n" id="cTot">0</div><div class="k">Total records nearby</div></div>
+            <!-- Address mode only: every class in this total shares ONE radius contract, so the
+                 sum means something. ZIP mode hides it - adding whole-ZIP development to nearby
+                 facilities produces a number with no geographic meaning. -->
+            <div class="cc" id="ccTot"><div class="n" id="cTot">0</div><div class="k">Total records nearby</div></div>
           </div>
           <!-- Honest coverage note: shown only on a ZIP page that has EPA facilities but no planning
                items yet, so "0 planning items" doesn't read as "nothing is happening" when the real
@@ -973,8 +981,13 @@ HS.onReady(function(){
     }
     if(!FACILITIES_ONLY){ el.style.display = "none"; el.textContent = ""; return; }
     var where = ZIP_COUNTY ? (ZIP_COUNTY + " County") : "this area";
-    el.textContent = "Showing EPA-registered facilities for this ZIP. Local planning-hearing and "
-      + "land-use coverage for " + where + " isn't available yet — we're adding counties over time.";
+    // WAS: "Showing EPA-registered facilities for this ZIP." That was false - the facility set
+    // is an EPA query around this ZIP, not a measurement of it, and on 50 ZIPs with authoritative
+    // boundaries 44% of the facilities shown sat outside the ZIP. It appeared on exactly the pages
+    // where facilities are the only content, so it was the strongest whole-ZIP claim on the page.
+    el.textContent = "Nearby EPA-registered facilities are shown for additional local context. "
+      + "Local planning-hearing and land-use coverage for " + where + " isn't available yet — "
+      + "we're adding counties over time.";
     el.style.display = "";
   }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
@@ -1208,7 +1221,10 @@ HS.onReady(function(){
         var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development overview";
         var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
         document.title = "Development around " + label + " — HomeSignal";
-        var _cap2 = document.querySelector(".map-cap"); if(_cap2) _cap2.textContent = "Development across " + label;
+        // One canvas, two scopes - say so, in six words, rather than letting the caption
+        // imply the facility pins were measured across the ZIP too.
+        var _cap2 = document.querySelector(".map-cap");
+        if(_cap2) _cap2.textContent = "Development across " + label + " · nearby facilities for context";
         // The same authoritative label the H1 uses - "Denver (80210)" - so the global
         // location control names the area on screen rather than a saved home elsewhere.
         if(window.HS && HS.setViewLabel) HS.setViewLabel(label);
@@ -1228,14 +1244,17 @@ HS.onReady(function(){
     // can widen the 3D aerial view to reach cached records past the default frame.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
+    // The hero used to put "industrial facilities" inside the SAME "across ZIP" clause as the
+    // development records. Facilities are an EPA query around this ZIP, not a measurement of it,
+    // so the clause is split: what is measured across the ZIP, then what is shown nearby.
     if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
-      + "industrial facilities, data-center activity, planning hearings and open comment windows — "
-      + "every item linked to its official public record."; }
+      + "data-center activity, planning hearings and open comment windows, plus nearby "
+      + "regulated facilities for context — every item linked to its official public record."; }
     var _hint = document.querySelector(".hint");
     if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
       + "Free while we're in launch."; }
     var _cap = document.querySelector(".map-cap");
-    if(_cap){ _cap.textContent = "Development across ZIP " + zip; }
+    if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
     var _addr = $("addr");
     if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
     status("Loading development records for ZIP " + zip + " …");
@@ -1303,9 +1322,20 @@ HS.onReady(function(){
     if(ZIP_MODE){
       $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
       $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // Each counter says which geography it is a count OF. Development is authoritative
+      // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
+      // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
+      if($("kDev")) $("kDev").textContent = "New projects proposed across this ZIP";
+      if($("kFac")) $("kFac").textContent = "Nearby regulated facilities";
+      if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
       $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // Address mode is radius-shaped end to end, so its labels and its total stand as they
+      // were. Restored explicitly because a resident can switch modes without a page load.
+      if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
+      if($("kFac")) $("kFac").textContent = "Regulated facilities nearby";
+      if($("ccTot")) $("ccTot").style.display = "";
       // Address mode's current view is the address the resident searched - never a
       // previously saved home that happens to sit in the same ZIP.
       if(window.HS && HS.setViewLabel) HS.setViewLabel(data.address || "", { precise:true });
