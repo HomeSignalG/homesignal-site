@@ -88,6 +88,13 @@ const T = {
 };
 const STREET = /[0-9]{2,6}\s+[A-Za-z]/;
 
+// WHY THE REASON IS RECORDED: the first full run reported measurable:0 / unavailable:1279 while
+// 11,494 ZIPs were boundary_complete - the instrument had not actually read anything, and a bare
+// "unavailable" counter could not say whether that was an HTTP failure, an unrecognised status or
+// a shape problem. "No data" and "did not run" must never be indistinguishable.
+const REASONS = Object.create(null);
+const reason = (k) => { REASONS[k] = (REASONS[k] || 0) + 1; };
+
 async function oneZip(zip) {
   let payload;
   try {
@@ -95,11 +102,19 @@ async function oneZip(zip) {
       method: 'POST', headers: H,
       body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
     });
-    if (!r.ok) { T.zips_unavailable++; return; }
+    if (!r.ok) {
+      const body = (await r.text()).slice(0, 200);
+      reason('http_' + r.status + ':' + body);
+      T.zips_unavailable++; return;
+    }
     payload = await r.json();
-  } catch { T.zips_unavailable++; return; }
+  } catch (e) { reason('threw:' + String(e && e.message).slice(0, 120)); T.zips_unavailable++; return; }
 
   const outcome = HS.zipAuthOutcome(payload);
+  if (outcome !== 'complete') {
+    reason('outcome_' + outcome + ' status=' + String(payload && payload.status)
+      + ' projects=' + (Array.isArray(payload && payload.projects) ? 'array' : typeof (payload || {}).projects));
+  }
   if (outcome === 'not_measured') { T.zips_not_measured++; return; }
   if (outcome !== 'complete') { T.zips_unavailable++; return; }
   T.zips_measurable++;
@@ -190,5 +205,6 @@ console.log(JSON.stringify({
   labels: { kept_with_street_number: T.kept_label_street_number,
             removed_with_street_number: T.removed_label_street_number },
   kept_by_rule: T.kept_rule, removed_by_rule: T.removed_by_rule,
-  kept_by_family: top(T.kept_by_family), removed_by_family: top(T.removed_by_family)
+  kept_by_family: top(T.kept_by_family), removed_by_family: top(T.removed_by_family),
+  non_complete_reasons: top(REASONS, 8)
 }, null, 1));
