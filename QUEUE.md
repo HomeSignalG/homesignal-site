@@ -69,9 +69,13 @@ THE PROJECT** — `main`'s implementation holds that invariant.
   With the cap removed, 76135 shows 12 TxDOT projects repeating up to ×7 and 76104 shows 6 up to
   ×6. Nothing a resident sees today is wrong. **Recorded, not fixed** — raising or removing a rail
   cap without adding a de-dup first would introduce the duplication.
+  The gate REPORTS this rather than failing on it — `LATENT` in the probe's output, counted, and
+  named again in its summary line. A gate that goes red on a known unfixed condition stops being
+  read, and then the next real failure reads as noise too; `FAIL` is reserved for something a
+  resident can see today.
 - The probe is committed and re-runnable: `scripts/probe-map1-card-grain.mjs` +
-  `.github/workflows/verify-map1-card-grain.yml` (defaults to serving the tree; `site_base` points
-  it at production).
+  `.github/workflows/verify-map1-card-grain.yml` (defaults to serving the tree, which reaches the
+  live Supabase backend from a runner; `site_base` points it at production instead).
 
 ### 2026-09-04 — ALERTS SEO: LIVE AND PROVEN. Pages source is GitHub Actions
 
