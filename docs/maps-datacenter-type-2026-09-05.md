@@ -125,3 +125,142 @@ line in the popup)? Logged in `QUEUE.md`; not taken.
   `maps-delvalle-golden` (235 checks — no golden classification drifted),
   `maps-category-contract` (178), `maps-rule-output-contract`, `marker-name-enrichment`.
   The new file appears in the runner's own log, so its silence is not being read as a pass.
+
+---
+
+# CTO merge gate — independent evidence and the Case B measurement (2026-09-05)
+
+## 6. What this classifier actually asserts — the evidence contract it needs
+
+The prior gate applied a two-source (Compute Atlas + Epoch AI) contract and returned NOT MERGE
+READY when Epoch proved unreachable. Re-examined against the assertion the code makes, that
+contract was **the wrong instrument for this change**. Six distinct things were being treated
+as interchangeable:
+
+| # | Evidence type | Needed to merge THIS change? |
+|---|---|---|
+| 1 | The HomeSignal source record's own wording states it is a data centre | **YES — this is the whole assertion** |
+| 2 | Independent corroboration that the physical site is a data centre | No — audit value, not correctness |
+| 3 | Proof the classifier finds data centres with opaque names (completeness) | No — a *coverage* question |
+| 4 | EPA-FRS evidence a regulated facility is data-centre associated | No — frozen layer, untouched |
+| 5 | Geography sufficient to locate a record | Unchanged — no geography touched |
+| 6 | Geography sufficient to assert an exact footprint | Not asserted, not touched |
+
+**The classifier makes claim 1 and only claim 1.** It reads `type`, `type_raw`, `use_type`,
+`layer`, `category` and `name` — all HomeSignal's own record — and fires only on a literal
+data-centre string. It cannot fire on an operator, a place, a coordinate, or an external
+dataset. Verified structurally over all 96 records below: **0 classified without a literal
+data-centre string in their own source data.**
+
+So Atlas and Epoch are a **completeness/audit mechanism (claim 3), not a correctness gate for
+claim 1**. Requiring a second external dataset to approve a record that *says* "Data Center"
+in the county's own filing inverts the source-of-truth order this repo runs on. Epoch is
+therefore **not a merge blocker for this change**; it remains the right instrument for the
+coverage question, which is logged as unmeasured.
+
+## 7. Epoch access — one attempt, all official surfaces, BLOCKED
+
+| Surface | Result |
+|---|---|
+| `epoch.ai/data/ai-data-centers` | `000` — gateway 403 CONNECT |
+| `epoch.ai/api/data/data-centers` | `000` — gateway 403 CONNECT |
+| `huggingface.co/api/datasets?author=EpochAI` | `000` — gateway 403 CONNECT |
+| `github.com/epoch-research` (Epoch's own org, 33 repos) | **200 — reachable, carries no data-centres dataset** |
+| Founder-supplied file in either repo | none present |
+
+The GitHub 200 is the control: the block is **host policy, not a network fault**. Recorded
+**BLOCKED/UNKNOWN — never zero**. No mirror, no scrape, no search-snippet substitution.
+
+## 8. All 452 — complete correctness reconciliation
+
+The 452 are **96 distinct source records** fanned across ZIP pages by the existing 3-mile
+spatial scoping. Every one was pulled and read (3 index-scan chunks over the 214 DC-project
+ZIPs; the previously-timing-out full-table scan was never repeated).
+
+| | |
+|---|---:|
+| Distinct source records behind the 452 rows | **96** |
+| Classified from the source's own `type_raw` | **17** |
+| Classified from the source's own `name` | **79** |
+| **Classified with NO data-centre string anywhere (fabrication)** | **0** |
+| Classified from a place name, operator, or coordinate alone | **0 — structurally impossible** |
+| Records tripping the street-name guard | 0 |
+| Power-generation / crypto-mining / warehouse / office records wrongly captured | **0** |
+| Campus records fabricated or collapsed | **0** — each source filing stays one record |
+
+Types displaced: Development 43 · Industrial 20 · Commercial 16 · unclassified 8 ·
+Civic/Public 6 · Utility 3. Every displacement was read individually; each is a coarse bucket
+losing to the record's own stated class (Phoenix files data-centre fire work under the Fire
+department code → Civic/Public; San Jose's `type_raw` literally reads `Data Center` and the
+registry mapped it to Industrial).
+
+**Product nuances recorded, not defects.** Roughly a third of the 96 are *ancillary permits at
+a data centre* — a fire pump, gates, a sign, a CRAC unit, interior partitions, a roof. The
+**type** is right (the thing worked on is a data centre); what these do not convey is
+**scale**. A resident sees "Data center" for a sign permit and for a 20-storey new build alike.
+That is a stage/scale display question for Map 1, not a classification error, and is out of
+scope here.
+
+**Fan-out is pre-existing, not introduced.** 6 records produce 135 of the 452 ZIP-rows; two
+MassDOT HQ records alone appear on 66 Boston ZIP pages. They already appeared on all those
+pages — as "Roads & infrastructure" diamonds. This change alters their **shape and label only**;
+no record's geography, ZIP set, or coordinate changes.
+
+## 9. Case B — the measurement that mattered, and its verdict
+
+Searched the corpus for real data centres the classifier still leaves as another type, bounded
+to the **1,045 ZIPs where Compute Atlas independently places a data centre but HomeSignal
+classifies none** — index-friendly `zip IN (...)` chunks, never a full-table scan.
+**522 of 1,045 ZIPs measured (50%).** Three signal tiers:
+
+| Tier | Signal | Hits | True data centres | False positives |
+|---|---|---:|---:|---:|
+| 1 | Explicit alternative vocabulary (`colocation`, `colo`, `server farm/room/hall`, `data hall`, `computer room`, `internet exchange`, `IDC`, `hyperscale`) | 1 | **0** | 1 |
+| 2 | Compute Atlas operator brands (65 curated) | 57 | **5** | 31 adjudicated, 21 unadjudicated |
+| 3 | Megawatt capacity language | 1 | **0** | 1 |
+
+**Finding 1 — the classifier's vocabulary is not the gap.** Across 522 ZIPs, not one record
+uses an alternative data-centre wording without also saying "data center". Tier 1's single hit
+is `Building AT&T full Colo on existing rooftop - install antenna` (telecom colocation); Tier 3's
+is `Cummins 1.5 MW optional standby power generator`. Adding either vocabulary would import
+false positives and recover nothing.
+
+**Finding 2 — the real gap is operator-named projects, and it cannot be closed safely.** The 5
+genuine misses are `CoreSite VA1`, `CORESITE VA3-2 PHASE 2`, `CoreSite VA3-2A (Phase 2A)`,
+`CORESITE VA-1 CR14B CRAH Addition` and `EDGECONNEX / #500` — all Atlas-corroborated Reston
+campuses whose HomeSignal wording carries only the brand. The same brand rule that finds them
+also produced, from real production rows:
+
+- **20 residential townhouses** — `VANTAGE HILL - LOT 1..20 - TH` (Vantage is both a data-centre operator and a subdivision name)
+- `AMAZON DELIVERY STATION, 7659 SOLLEY ROAD` — a delivery warehouse
+- `Google Reston Training Room / 16 FL`, `Oracle-Reston-/ 4th FL corridor` — office fit-outs
+- `ORACLE BOOTH #5739` — a **trade-show booth**
+- `US 202: Markley Street` — a **street name**
+- `Structural work … aligned with existing slab` — **"aligned" as an ordinary English verb**
+
+**31 false positives against 5 true finds.** Turning 20 townhouses into data centres on a
+homebuyer's map is a far worse product outcome than missing five Reston permits. The classifier's
+refusal to read operators is therefore **validated by measurement, not assumed** — and is now
+pinned by 13 regression tests built from these exact production strings.
+
+**Extrapolated, unmeasured:** ~5 true misses per 174 ZIPs suggests **roughly 30 record-level
+misses** across the full 1,045. Stated as an estimate; the other 523 ZIPs were not measured.
+
+## 10. Map 1 behaviour — verified end to end
+
+Traced source → classifier → read model → render on a live ZIP. `app_projects_for_zip('20151',
+'development')` returns **378 rows, 8 carrying data-centre wording, 0 missing `lat`** — matching
+the per-ZIP measurement for 20151 exactly. All 8 resolve to `datacenter`/octagon through the
+shipped `HS.resolveMarker`. Data center is a generated `SHAPE_LEGEND` row and filter bucket, so
+exposure needs no separate wiring. Facility records still resolve `PRECEDENCE:facility-flag` →
+purple square. No geometry, ZIP assignment, or radius behaviour was touched in either page mode.
+
+## 11. Known limitations — stated, not resolved
+
+1. **Epoch AI never applied** — blocked; the independent-coverage question stays open.
+2. **Case B measured on 50%** of its ZIP space; ~30 record-level misses estimated, not counted.
+3. **~30 record-level misses are structurally unreachable** without an operator-identity join that this evidence shows is unsafe as a classifier rule.
+4. **Scale is not conveyed** — a sign permit and a 20-storey build both render "Data center".
+5. **Coverage remains far short of reality** — Atlas places ≥1 data centre in 1,152 modelled ZIPs; HomeSignal classifies 214.
+6. **450 of Atlas's 1,110** data centres sit outside the modelled 12,722-ZIP geography entirely.
+7. Pre-existing, unrelated, **not fixed**: `NAME_RULES` matches `townhou?se` but not the plural `TOWNHOMES`, so `VANTAGE HILL TOWNHOMES` lands on the honest circle rather than Residential.

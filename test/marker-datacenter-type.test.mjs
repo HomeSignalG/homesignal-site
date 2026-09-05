@@ -127,6 +127,65 @@ ok(key({ type: 'Civic/Public', type_raw: 'FIRE PREVENTION SERVICE REQUEST',
   name: 'MCDOWELL ROAD PUMP STATION' }) === 'civic',
   '9: with the data-centre words removed the coarse type stands — the rule, not the fixture, is what moves 2g');
 
+// ── 11. OPERATOR BRANDS MUST NEVER CLASSIFY — the Case B adversarial set ──────────
+// Measured 2026-09-05 over 522 of the 1,045 ZIPs where Compute Atlas independently places a
+// data centre: matching on a data-centre OPERATOR BRAND finds 5 real missed data centres and
+// 31 false positives. These are the false positives, VERBATIM from production. Every one of
+// them is what a brand-token rule would have turned into a Data center octagon on a resident's
+// map. The classifier reads only what the record says it IS, never who is named in it — these
+// tests are what stops that property from being "simplified" away later.
+ok(key({ type: 'Residential', name: 'Residential New VANTAGE HILL - LOT 12 - TH' }) === 'residential',
+  '11a: "VANTAGE HILL - LOT 12 - TH" is a TOWNHOUSE (Vantage is a data-centre operator AND a subdivision name)');
+// Lands on the honest circle, not residential: NAME_RULES matches `townhou?se`, which does not
+// cover the plural "TOWNHOMES". That is a PRE-EXISTING residential-rule gap, unrelated to this
+// change and deliberately not fixed here — what matters for this unit is that it is not a data centre.
+ok(key({ type: 'Development', name: 'VANTAGE HILL TOWNHOMES' }) === 'other',
+  '11b: "VANTAGE HILL TOWNHOMES" is not a data centre (honest circle; see note on TOWNHOMES)');
+ok(key({ type: 'Commercial', name: 'Commercial Addition/Alteration VANTAGE HILL - LOT 1 - GARAGE TO SALES OFFICE CONVERSION' }) === 'commercial',
+  '11c: a garage-to-sales-office conversion at Vantage Hill stays commercial');
+ok(key({ type: 'Commercial', type_raw: 'site development plan', name: 'AMAZON DELIVERY STATION, 7659 SOLLEY ROAD (MODIFICATION)' }) === 'commercial',
+  '11d: an AMAZON DELIVERY STATION is a warehouse, not a data centre');
+ok(key({ type: 'Commercial', name: 'Commercial Addition/Alteration Google Reston Training Room/ 16 FL' }) === 'commercial',
+  '11e: a Google office training room is not a data centre');
+ok(key({ type: 'Commercial', name: 'Commercial Addition/Alteration Oracle-Reston-/ 4th FL corridor' }) === 'commercial',
+  '11f: an Oracle office corridor is not a data centre');
+ok(key({ type: 'Development', name: "General Construction NRF 2026: Retail's Big Show - ORACLE BOOTH #5739 to install a temporary exhibit" }) === 'commercial',
+  '11g: an ORACLE trade-show BOOTH reads commercial off "Retail", never data centre');
+ok(key({ type: 'Utility', name: 'US 202:  Markley Street (SB) Norristown Borough Reconstruction/Signal Improvements' }) === 'infrastructure',
+  '11h: "Markley Street" is a STREET (Markley Group is a data-centre operator) — stays infrastructure');
+ok(key({ type: 'Development', name: 'Structural Structural work to rebuild raised floor platform, aligned with existing slab' }) === 'other',
+  '11i: "aligned" as an ordinary English verb is not the operator Aligned Data Centers');
+
+// Vocabulary probes that ALSO must not classify — both are real production strings found by
+// the Case B sweep, and both are the reason `colo` and megawatt language stayed OUT of the rule.
+ok(key({ type: 'Development', name: 'Building AT&T full Colo on existing rooftop - install antenna, ancillary equipment, mounts, fiber' }) === 'infrastructure',
+  '11j: a rooftop cell-site "Colo" reads infrastructure off "antenna", never data centre');
+ok(key({ type: 'Development', name: 'NEW Installation of a new stationary Cummins 1.5 MW optional standby power generator on a new concrete pad' }) === 'other',
+  '11k: a 1.5 MW standby generator is not a data centre');
+
+// The invariant behind every case in §11, asserted directly: not one operator-brand string
+// reaches the Data center category by any path.
+[['Residential','Residential New VANTAGE HILL - LOT 12 - TH'],['Development','VANTAGE HILL TOWNHOMES'],
+ ['Commercial','AMAZON DELIVERY STATION, 7659 SOLLEY ROAD (MODIFICATION)'],
+ ['Commercial','Commercial Addition/Alteration Google Reston Training Room/ 16 FL'],
+ ['Commercial','Commercial Addition/Alteration Oracle-Reston-/ 4th FL corridor'],
+ ['Utility','US 202:  Markley Street (SB) Norristown Borough Reconstruction/Signal Improvements'],
+ ['Development','Building AT&T full Colo on existing rooftop - install antenna'],
+ ['Development','NEW Installation of a new stationary Cummins 1.5 MW optional standby power generator']
+].forEach(function (r, i) {
+  ok(key({ type: r[0], name: r[1] }) !== 'datacenter', '11z.' + i + ': operator-brand string never reaches datacenter');
+});
+
+// ── 12. The five REAL Case B misses — documented as KNOWN GAPS, not silently "passing" ───
+// These are genuine data-centre projects (CoreSite VA1/VA3, EdgeConnex — all corroborated by
+// Compute Atlas) whose HomeSignal source wording never says "data center". The classifier
+// CORRECTLY declines them: the only signal available is the operator brand, and §11 above shows
+// what classifying on that costs. Asserting the current behaviour keeps the gap visible.
+ok(key({ type: 'Development', type_raw: 'Minor Site Plan', name: 'CoreSite VA1' }) === 'other',
+  '12a: KNOWN GAP — "CoreSite VA1" is a real data centre; source states no class, so it stays the honest circle');
+ok(key({ type: 'Commercial', name: 'Commercial Addition/Alteration EDGECONNEX / #500' }) === 'commercial',
+  '12b: KNOWN GAP — "EDGECONNEX / #500" is a real data centre; source wording carries only the brand');
+
 // ── 10. Symbol uniqueness still holds across the closed registry ──────────────────
 const symbols = Object.keys(HS.CATEGORY_REGISTRY).map((k) => HS.CATEGORY_REGISTRY[k].symbol);
 ok(new Set(symbols).size === symbols.length, '10: no two categories share a symbol');

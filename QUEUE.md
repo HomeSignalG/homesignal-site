@@ -60,8 +60,25 @@ Data center pin 95 → 214 (+119).** Nothing that states no data centre moves.
   unchanged, so no golden classification drifted). New suite
   `test/marker-datacenter-type.test.mjs`, 33 checks, verbatim production strings.
 - Receipt: `docs/maps-datacenter-type-2026-09-05.md`.
-- **Pushed to the branch, NOT merged** — it changes what residents see, which is a gated
-  class under CLAUDE.md's autonomy grant. Merge is the founder's call.
+- ⚖️ **CTO MERGE GATE CLEARED 2026-09-05 — MERGE READY.** The evidence contract was re-examined
+  rather than inherited: this classifier asserts only *"HomeSignal's own source record says this
+  is a data centre."* Verified over **all 96 distinct source records** behind the 452 rows —
+  **0 classified without a literal data-centre string**, 0 from operator/place/coordinate,
+  0 power-generation/crypto/warehouse/office captures, 0 campus records fabricated or collapsed.
+  External datasets are a **completeness** instrument, not a correctness gate for that claim, so
+  **Epoch's inaccessibility is not a merge blocker** (it stays BLOCKED/UNKNOWN, never zero).
+- 🔑 **Case B measured (522 of 1,045 Atlas-proven ZIPs) and it settled the classifier's shape.**
+  The vocabulary is NOT the gap — 0 records use `colocation`/`server farm`/`data hall`/MW
+  language without also saying "data center". The gap is operator-named projects, and it is
+  **unsafe to close**: an operator-brand rule finds **5** real misses (CoreSite VA1/VA3,
+  EdgeConnex) and **31** false positives including **20 residential townhouses** ("VANTAGE HILL
+  - LOT n - TH"), an Amazon delivery station, two office fit-outs, an **Oracle trade-show booth**,
+  a **street name**, and **"aligned" used as an English verb**. Pinned by 13 regression tests
+  built from those exact production strings; suite 33 → 54 checks.
+- 📌 **OPEN, logged not fixed:** Epoch never applied · the other 523 case-B ZIPs unmeasured
+  (~30 record-level misses estimated) · **scale is not conveyed** (a sign permit and a 20-storey
+  build both read "Data center") · coverage 214 ZIPs vs Atlas's 1,152 · 450 Atlas data centres
+  sit outside the modelled geography.
 
 📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
 (509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
