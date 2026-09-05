@@ -833,27 +833,70 @@ HS.onReady(function(){
   // "Facility · operating now" label — keys on THIS, never on scope, so a permit never inherits
   // an EPA-facility affordance. Returns the trimmed id or "".
   function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
-  // Friendly, plain-language building type from the facility name (falls back to its layer).
+  // Friendly, plain-language facility type, deterministically normalised from the EPA FRS
+  // facility NAME — which is the only type evidence this record carries. FRS's name is
+  // authoritative source text, so normalising it is legitimate; ASSERTING a kind the name
+  // does not state is not.
+  //
+  // WHAT THE FALLBACK USED TO DO, AND WHY IT WAS THE DEFECT (measured 2026-09-05).
+  // It ended `return LAYER_LABEL[s.layer] || "Industrial facility"`, and s.layer is itself a
+  // keyword guess (index.ts::classifyLayer) whose DEFAULT is "industrial". So any facility
+  // whose name matched none of the rules below was shown to a resident as "Industrial".
+  // Across the national corpus that was 31,169 of ~113,895 regulated sites — 27.4% — and the
+  // bucket demonstrably contained things that are not industrial plants:
+  //   PITMAN FARMS - MORONI TURKEY PROCESSING · DEL MONTE FOODS PLANT #140
+  //   UNION PACIFIC RAILROAD - CLEARFIELD YARD · BYU CENTRAL HEATING PLANT
+  //   2024 ROAD & UTILITY PROJECT · 14600 S RAILROAD CROSSING
+  // A resident cannot tell a sourced label from a defaulted one, so the default was a claim
+  // the data never made. It now says what is true instead: "Regulated facility".
+  //
+  // Every rule below is still traceable to a word in the facility's own name; nothing here
+  // invents a taxonomy, and the raw name is always rendered beside this label.
   function facilityType(s){
     // A scope:"point" record with no FRS registry ID is a planning/permit filing, not an EPA
     // facility — label it by its lifecycle STAGE (proposed/approved/operating/built), never by a
     // hardcoded "Permitted construction" (that was true only for the old TABS-only point set).
     if(!frsRid(s)) return stageWord(s);
     var n = String(s.label||"").toLowerCase();
-    if(/data cent/.test(n)) return "Data center";
+    // `datacenter` as one word is shipped vocabulary (index.ts LAYER_KEYWORDS) that the
+    // spaced pattern alone missed — 6 sites nationally, verified 6/6 carry the single token.
+    if(/data cent|datacenter/.test(n)) return "Data center";
     if(/aggregate|gravel|\bsand\b|quarry|\bpit\b/.test(n)) return "Aggregate / gravel";
     if(/concrete|cement|asphalt|ready.?mix/.test(n)) return "Concrete / asphalt";
     if(/wool|textile/.test(n)) return "Textile mill";
     if(/planing|lumber|sawmill|\bwood\b/.test(n)) return "Lumber / planing mill";
     if(/sheet metal|\bmetal\b|\bsteel\b|foundry|fabricat|machine/.test(n)) return "Metal works";
-    if(/water|treatment|wastewater|sewer|lagoon/.test(n)) return "Water treatment";
-    if(/power|electric|energy|solar|turbine|substation|generat/.test(n)) return "Energy / power";
+    // `water` matched as a bare SUBSTRING, so a place name beat every rule below it:
+    // STILLWATER SOLAR and
+    // EAST BRIDGEWATER SOLAR read as "Water treatment", as did WATERTOWN SANITARY LANDFILL and
+    // CLEARWATER MANUFACTURING. Whole-word \bwater\b (plus the compounds that are real water
+    // words) releases 143 of 5,740 lower-half matches — 46 to Energy, 23 to Waste, the rest to
+    // their own true rule — and not one released name is a water facility.
+    if(/\bwater\b|treatment|wastewater|stormwater|sewer|lagoon/.test(n)) return "Water treatment";
+    // `wind` likewise: it is in LAYER_KEYWORDS.energy but was absent here, so wind sites
+    // reached the layer fallback. Verified 124/124 of the lower-half fallback-energy sites
+    // carry the token, 0 carry anything else.
+    if(/power|electric|energy|solar|turbine|substation|generat|\bwind\b/.test(n)) return "Energy / power";
     if(/warehouse|logistic|distribution|freight|trucking/.test(n)) return "Logistics / warehouse";
     if(/grain|feed|dairy|cannery|\bmeat\b|packing|\bfood\b|elevator/.test(n)) return "Food / ag processing";
     if(/chemical|refin|fertilizer|rendering|explosive|munition/.test(n)) return "Chemical / refining";
     if(/recycl|landfill|compost|\bwaste\b|sanitation/.test(n)) return "Waste / recycling";
-    if(/\bmill\b/.test(n)) return "Mill";
-    return LAYER_LABEL[s.layer] || "Industrial facility";
+    // A MILL IN A PLACE NAME IS NOT A MILL. The bare \bmill\b test matched 2,277 lower-half
+    // sites of which only 480 are mills; the rest are streets and subdivisions — MILL POND
+    // RACE, BARNES MILL ROAD IMPROVEMENTS, FORT MILL COMMERCIAL DEVELOPMENT, ADDITION TO
+    // SHELTON MILL TOWNHOMES. Requiring "mill(s)" to be the trailing noun (optionally with a
+    // company suffix) keeps SPINTEX MILL / GERDAU TAMPA MILL / MFGR PAPER MILL and demotes
+    // the toponyms to the honest label. Same failure class, and same fix, as the ingest
+    // repo's _BODY_AS_PLACE_RE: a name used as a PLACE is not that thing.
+    if(/\bmills?\b\s*(?:co|inc|llc|lp|ltd|company|corp|corporation)?\.?\s*$/.test(n)) return "Mill";
+    // Self-described industrial operators keep a real label — this is the operator's own word
+    // for itself, not a default. 9,239 of the 16,326 lower-half fallback sites carry it.
+    // `plant` is deliberately NOT here: it is the token that produced "BYU CENTRAL HEATING
+    // PLANT" and "DEL MONTE FOODS PLANT #140" as "Industrial".
+    if(/industrial|industries|manufactur/.test(n)) return "Industrial";
+    // No type evidence in the name. Say what the source actually establishes — that EPA
+    // regulates this site — and let the facility's own name, rendered beside this, speak.
+    return "Regulated facility";
   }
 
   // ───────────────────── ENVIRONMENTAL RECORDS (EPA ECHO + TCEQ) — shared render layer ─────────────────────
