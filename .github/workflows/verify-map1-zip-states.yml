@@ -1,0 +1,41 @@
+# Map 1's ZIP-mode geography contract, proven against LIVE production.
+#
+# The sandbox has no egress to homesignal.net, so this is the only place the claim
+# "production tells the resident the truth about this ZIP" can actually be tested.
+#
+# It checks all three geography states with controls chosen for the state they represent
+# (authoritative / pending-'unknown' / not_measured, plus a measured-ZERO authoritative ZIP,
+# which is the one that must never be confused with an unmeasured one), and it checks that a
+# genuine read failure STILL does not masquerade as not-measured. Address mode is exercised
+# through the real form so the two geographic contracts are proven separate rather than
+# assumed separate.
+name: verify-map1-zip-states
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_base:
+        description: "Origin to verify (defaults to production)"
+        required: false
+        default: "https://homesignal.net"
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "scripts/verify-map1-zip-states.mjs"
+      - ".github/workflows/verify-map1-zip-states.yml"
+      - "lib/zip-authoritative.js"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -D playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Verify LIVE production ZIP states
+        env:
+          SITE_BASE: ${{ github.event.inputs.site_base || 'https://homesignal.net' }}
+        run: node scripts/verify-map1-zip-states.mjs
