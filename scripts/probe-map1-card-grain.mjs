@@ -17,6 +17,14 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+
+// The SHIPPED site builder, loaded in the page's own order, so the expected-set control below is
+// the product's answer rather than a re-derivation of it.
+globalThis.window = globalThis.window || globalThis;
+for (const f of ['../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+  (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
+}
+const HS = globalThis.window.HS;
 const grab = (n) => {
   const m = html.match(new RegExp(`var ${n}\\s*=\\s*["']([^"']+)["']`));
   if (!m) throw new Error('could not read ' + n);
@@ -59,9 +67,15 @@ async function backend(zip) {
   const markers = Array.isArray(j && j.markers) ? j.markers : [];
   const per = new Map();
   markers.forEach((m) => { const k = String(m.project_ref); per.set(k, (per.get(k) || 0) + 1); });
+  // What the SHIPPED site builder makes of this exact payload - the page's own answer, computed
+  // here independently of the browser so the assertion is not comparing the page to itself.
+  const built = HS.zipAuthSitesFrom(j);
+  const expected = new Set(built.map((s) => s.zip_project_ref).filter(Boolean));
   return {
     status: j && j.status,
     projects: projects.length,
+    expectedProjects: expected.size,
+    expectedSites: built.length,
     markers: markers.length,
     multi: [...per.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]),
     single: [...per.entries()].filter(([, n]) => n === 1),
@@ -144,9 +158,21 @@ for (const zip of ZIPS) {
      `${zip}: no development marker is drawn beyond the authoritative relation`,
      `page ${m.devSites} · relation ${b.markers}`
        + (m.devSites < b.markers ? ` · ${b.markers - m.devSites} withheld (no record link)` : ''));
-  ok(m.uniqueRefs === b.projects,
-     `${zip}: those markers represent exactly the authoritative project set`,
+  // NOT equality any more, and the reason is a product rule rather than a tolerance: since
+  // 2026-09-05 the page renders only QUALIFYING development. lib/residential-qualify.js drops
+  // Residential records that are routine work on an existing property (an HVAC permit is not a
+  // development), and the record_url gate drops records with no official link. So the page
+  // legitimately renders FEWER projects than the RPC returns. What must still hold is that it
+  // renders nothing EXTRA, and that the shortfall is exactly what the SHIPPED site builder
+  // accounts for - which is computed here from the same payload by the same modules, never by a
+  // second copy of the rules.
+  ok(m.uniqueRefs <= b.projects,
+     `${zip}: no project is rendered beyond the authoritative set`,
      `page ${m.uniqueRefs} unique refs · backend ${b.projects} projects`);
+  ok(m.uniqueRefs === b.expectedProjects,
+     `${zip}: the rendered projects are exactly those the shipped builder qualifies`,
+     `page ${m.uniqueRefs} · shipped builder ${b.expectedProjects}`
+       + ` · ${b.projects - b.expectedProjects} not qualifying (routine work or no record link)`);
   ok(m.noRef === 0, `${zip}: every rendered development site carries a project identity`,
      `${m.noRef} without one`);
 

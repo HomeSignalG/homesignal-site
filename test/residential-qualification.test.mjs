@@ -13,6 +13,7 @@
 // one asserted here.
 //
 // Run: node test/residential-qualification.test.mjs
+import { readFileSync } from 'node:fs';
 let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 
@@ -157,6 +158,37 @@ ok(verdict({ registry_id: 'denton-county-dev-permits', type_raw: 'ADDITION TO HO
   'A4: a family dev-type rule cannot override an explicit routine activity');
 ok(verdict({ registry_id: 'denton-county-dev-permits', type_raw: 'HOUSE', name: 'HOUSE LENNAR HOMES OF TEXAS INC' }) === 'DEVELOPMENT',
   'A5: Denton PermitType=HOUSE is a new dwelling permit and qualifies');
+
+// ── RAIL DE-DUP — one project = one card (the contract the card-grain probe enforces) ───
+// The functions are EXTRACTED FROM THE SHIPPED PAGE and executed, not re-implemented here: a
+// copy would pass while the page regressed. Narrowing Residential made room under the 12-row
+// cap, which turned the probe's long-standing LATENT duplicate condition actual - 76135 drew
+// one TxDOT corridor project 7 times.
+const pageSrc = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const grabFn = (name) => {
+  const i = pageSrc.indexOf('function ' + name + '(');
+  if (i === -1) throw new Error('not found in homesignalmap.html: ' + name);
+  let depth = 0, j = pageSrc.indexOf('{', i);
+  for (let k = j; k < pageSrc.length; k++) {
+    if (pageSrc[k] === '{') depth++;
+    else if (pageSrc[k] === '}') { depth--; if (depth === 0) return pageSrc.slice(i, k + 1); }
+  }
+  throw new Error('unbalanced: ' + name);
+};
+const railEnv = (0, eval)('(function(){' + grabFn('railKey') + '\n' + grabFn('dedupeByProject')
+  + '\nreturn { dedupeByProject: dedupeByProject, railKey: railKey };})()');
+const corridor = [
+  { zip_project_ref: 'arcgis:txdot-projects-info-all:000814132' },
+  { zip_project_ref: 'arcgis:txdot-projects-info-all:000814132' },
+  { zip_project_ref: 'arcgis:txdot-projects-info-all:000814132' },
+  { zip_project_ref: 'arcgis:txdot-projects-info-all:207901054' }
+];
+ok(railEnv.dedupeByProject(corridor).length === 2,
+  '25: one road project drawn as many markers becomes ONE rail card');
+ok(railEnv.dedupeByProject([{ label: 'a' }, { label: 'b' }, { label: 'c' }]).length === 3,
+  '26: rows with NO project identity are never collapsed — two real permits at one address both keep a card');
+ok(/items = dedupeByProject\(items\);[\s\S]{0,200}items\.slice\(0,12\)/.test(pageSrc),
+  '27: the page de-dups BEFORE the 12-row cap, so the cap can never hide a duplicate');
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURE(S)`);
 process.exit(fails === 0 ? 0 : 1);

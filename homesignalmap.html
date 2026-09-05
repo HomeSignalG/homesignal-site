@@ -1812,9 +1812,32 @@ HS.onReady(function(){
       "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
+  // ONE PROJECT = ONE CARD. The rails are built from SITES, and one project can legitimately own
+  // several sites - a road corridor drawn as points along its length is the standard case. Until
+  // now the rails held that contract by ordering plus the 12-row cap, which truncated the repeats
+  // rather than removing them; scripts/probe-map1-card-grain.mjs has reported that as a LATENT
+  // condition with the words "de-dup the rails before any cap is raised". Narrowing the Residential
+  // population made room under the cap and turned it actual: 76135 rendered one TxDOT project 7
+  // times. De-duping on the project's own identity is that precondition, met. A row with NO project
+  // identity is never collapsed - it gets a unique key, so two genuinely distinct permits at one
+  // address both keep their card.
+  function railKey(s, i){
+    var k = s && (s.zip_project_ref || s.n5_source_key || s.source_id || s.project_ref);
+    return k ? 'ref:' + k : 'row:' + i;
+  }
+  function dedupeByProject(items){
+    var seen = Object.create(null), out = [];
+    (items || []).forEach(function(s, i){
+      var k = railKey(s, i);
+      if(seen[k]) return;
+      seen[k] = 1; out.push(s);
+    });
+    return out;
+  }
   function listInto(id, items, emptyMsg, opts){
     opts = opts || {};
     var el = $(id);
+    items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
     el.innerHTML = items.slice(0,12).map(function(s){
       var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
