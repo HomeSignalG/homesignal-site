@@ -213,6 +213,11 @@ jobs:
         env:
           MODE: n5-shard
           SNAPSHOT: phase1-2026-09-01
+          # Founder-authorised floor, 2026-09-05: 500 MB, superseding 2048. This step was
+          # the ONLY writing n5 step with no DISK_FLOOR_MB line, so n5_shard.py fell back
+          # to its hardcoded 2048 default and refused at 1,769 MB free. The script default
+          # is deliberately left at 2048 - it is the fail-safe for a caller that sets none.
+          DISK_FLOOR_MB: '500'
           Z3: ${{ github.event.inputs.z3 }}
           MAX_SHARDS: ${{ github.event.inputs.max_shards }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
