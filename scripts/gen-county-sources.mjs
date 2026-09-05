@@ -22,12 +22,21 @@
 //     em-dash separator. That suffix is the dataset edition ("… — STIP FFY 2024-2027
 //     (Approved Final)"), not the body's name; 12 of the entries carry one. Nothing else
 //     is rewritten, so a label can never say something the registry does not.
+//   • commercial — whether this entry can still classify a record as Commercial, read
+//     from the config and nothing else: its type_map maps some value to "Commercial"
+//     (or use_type_const is "Commercial") AND its commercial_work_evidence is not
+//     `unresolved`. This is the ONE derived subject-matter fact in the file, and it exists
+//     because the founder's Commercial rule (2026-09-05) makes "no Commercial source covers
+//     this county" a statement the page MUST be able to make. A county with no such entry
+//     can never show a Commercial pin, so a page there must not imply it measured and found
+//     none. It is read from config, never inferred from an id, a family or a name.
 //   • scope  — read from the entry's own shape, never guessed:
 //       statewide : the coverage row declares a state and no county
 //       city      : `jurisdiction` begins "City of " — the source's own declaration that
 //                   it covers a city, which is what lets the copy say so
 //       local     : anything else (county, district, authority)
-// No subject-matter claim is derived. We never write "road projects" or "building
+// `commercial` above is the ONE exception, and it is read from config rather than inferred.
+// Otherwise no subject-matter claim is derived: we never write "road projects" or "building
 // permits" from an id or a family — the registry does not state it, so neither do we.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -48,14 +57,21 @@ export function buildCountySources(registry) {
   for (const e of entries) {
     const label = String(e.jurisdiction ?? '').split(' — ')[0].trim();
     if (!label) continue;                          // no self-description -> name nothing
+    // See the header note: config-read, never inferred. An entry whose work-evidence rule
+    // is `unresolved` is no longer capable of asserting Commercial, so it must not count as
+    // Commercial coverage — otherwise the copy would name a source for a claim it can no
+    // longer make.
+    const declaresCommercial =
+      Object.values(e.type_map ?? {}).includes('Commercial') || e.use_type_const === 'Commercial';
+    const commercial = declaresCommercial && !(e.commercial_work_evidence?.unresolved === true);
     for (const cv of e.coverage ?? []) {
       const state = cv.state;
       if (!state) continue;
       if (cv.county == null) {
-        (statewide[state] ||= []).push({ id: e.registry_id, label, scope: 'statewide' });
+        (statewide[state] ||= []).push({ id: e.registry_id, label, scope: 'statewide', commercial });
       } else {
         const scope = /^City of /i.test(label) ? 'city' : 'local';
-        (counties[`${state}|${cv.county}`] ||= []).push({ id: e.registry_id, label, scope });
+        (counties[`${state}|${cv.county}`] ||= []).push({ id: e.registry_id, label, scope, commercial });
       }
     }
   }
@@ -72,7 +88,7 @@ export function buildCountySources(registry) {
   return {
     _generated: 'AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json',
     _regenerate: 'node scripts/gen-county-sources.mjs',
-    _contract: 'label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.',
+    _contract: 'label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.',
     registry_entries: entries.length,
     statewide: sortKeys(statewide),
     counties: sortKeys(counties)
