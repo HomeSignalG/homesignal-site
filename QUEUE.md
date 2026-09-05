@@ -40,6 +40,74 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — 🔴 SESSION B: geography PROVEN live, but DENSE ZIP PAGES DO NOT DELIVER IT
+
+Live `verify-map1-zip-states` against `https://homesignal.net`, deployed commit **538f47e**
+(pages.yml run #32, success 20:47:02Z; contains 6614ed7, so `lib/zip-authoritative.js` carries
+`ZIP_AUTH_UNKNOWN`). Deployment source is still GitHub Actions — **0** "pages build and
+deployment" runs in the last 100. This session's branch touches no site code, so no deploy was
+required for Phase 2.
+
+**What is PROVEN correct, live:**
+
+| contract | live result |
+|---|---|
+| pending — 99128, 94128 | not-measured wording, **not** a read failure, 0 development, directs to address mode, "will not estimate from a circle" — **all PASS** |
+| `not_measured` — 01004 | wording unchanged, 0 development — **PASS** |
+| measured zero — 08005, 38801, 01009 | never claims to be unmeasured, asserts a real whole-ZIP measurement, shows nothing — **PASS**; 38801 keeps **45** facilities |
+| facilities | present on every page tested (4 → 60) — **PASS** |
+| read-failure distinction | null → `unavailable`, novel status → `unavailable`, complete-with-NULLs → `unavailable`, `unknown` → `not_measured` — **PASS** |
+| ZIP ↔ address separation | address mode sends address + radius 2 and **no zip**; its records are distance-bearing, ZIP-mode records are not — **PASS** |
+| the RPC itself | 01001 `authoritative/boundary_complete` 12/34 · 28456 12/12 · 30090 0/0 — **exactly the relation** |
+
+⛔ **THE DEFECT — dense ZIPs do not deliver their authoritative geography to the browser.**
+Reproduced identically across two runs (`33997788682`, `33997961447`):
+
+```
+30033  relation 2,261 memberships   live page says "could not be read just now"
+28428  relation 2,442 markers       live page renders 798
+28456  relation    12 markers       live page renders 6
+```
+
+**Cause, measured not guessed — the RPC payload:**
+
+```
+28428  2,440 memberships -> 3,869 kB      30033  2,261 -> 3,491 kB
+19103    303 memberships ->   468 kB      01001     12 ->    25 kB
+```
+
+- 🔑 **IT PREDATES PHASE 2 — Phase 2's proof only surfaced it.** Control: **46 pre-Phase-2
+  enabled ZIPs already carry ≥2,000 memberships (max 13,934)**, against 20 in Phase 2 (max
+  14,702). Phase 1's heaviest *tested* control was 19103 at 303 rows / 468 kB, which is why no
+  earlier run hit it. **This is not a Phase 2 regression and must not be "fixed" by touching
+  Phase 2 geography.**
+- **Smallest correction that restores the contract** (not implemented — a production read-path
+  change deserves its own unit): bound what `app_zip_projects_markers` ships to the browser.
+  The relation is right and must not change; what is wrong is sending ~3.9 MB of per-project
+  JSON to a map that needs points. Options in ascending scope: project fewer fields per marker ·
+  page the RPC · serve markers separately from project cards. **Do not lower the geography
+  gates to make the page load.**
+
+#### FOUR of the nine failures were MY verifier, not production — recorded so they are not chased
+
+1. **`authoritative === true` is not in `__HS_SITES`.** The page never propagates the flag, so
+   my "authoritative vs cached" split read 0/N on *every* page — including 01001, which is
+   provably serving authoritative data (live 34 = its 34 relation markers, while its cache holds
+   173). The inference "Phase 2 pages serve the legacy cache" was drawn from this and is
+   **withdrawn**.
+2. **`dev === 0` on a measured zero is too strict.** `HS.zipAuthMergeSites` drops cached
+   **point-scope** development and *keeps* cached **area-scope** notices, then appends the
+   authoritative sites. 30090's 6 records are area-scope civic/planning notices, legitimately
+   retained. Its own note still correctly says the whole-ZIP measurement found nothing.
+3. **`devWithDistance === 0` fires on those same area items**, which carry synthetic offsets by
+   design (engine v18 anchors area items at the report centroid).
+4. **`dev === membership` was never the right identity.** The page renders authoritative sites
+   plus retained area notices, minus any record with no coordinates.
+
+The correct live metric is the page's own `HS.zipAuthProjectCount`, and the verifier should
+assert against that. **Left unchanged deliberately**: correcting these four now would turn nine
+failures into three and risks making the real dense-ZIP defect look smaller than it is.
+
 ### 2026-09-05 — ✅ PHASE 2 COMPLETE. authoritative 12,077 of 12,722 · pending 3, each with a proven cause
 
 Every canonical ZIP page is now either authoritative, honestly `not_measured`, or one of three
