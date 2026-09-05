@@ -525,7 +525,7 @@
 <script src="lib/map.js?v=20260720b"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
-<script src="lib/zip-authoritative.js?v=20260904"></script>
+<script src="lib/zip-authoritative.js?v=20260905b"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="shell.js"></script>
 
@@ -674,6 +674,26 @@ HS.onReady(function(){
       return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
     }
     return "Facility · operating now";
+  }
+  // ───────────────── THE MAP 1 *TYPE* — the word the legend shows, on the record itself ────────
+  // A resident reading a record needs three separate facts: NAME, TYPE, STAGE. ZIP mode used to
+  // give them NAME + STAGE twice over and no TYPE at all: the popup's second line is the stage
+  // word, and the rail's tag line fell through LAYER_LABEL[s.layer] to the literal "Development".
+  // So a UDOT corridor read "IH 35 … / Proposed / hearing / udot-active-projects-lines" and the
+  // words "Roads & infrastructure" — the Type its own diamond stands for in the legend — never
+  // appeared anywhere the resident could read them.
+  // The Type comes from the SHARED resolver (HS.resolveMarker in lib/map.js), the same authority
+  // that picks the pin's shape, so the word and the shape can never disagree. This READS that
+  // resolver; it does not classify anything itself.
+  // Scoped deliberately to ZIP-AUTHORITATIVE DEVELOPMENT records (zip_authoritative === true):
+  // those are the records whose `type` field carries a lifecycle bucket, which is what displaced
+  // the Type in the first place. EPA facilities, area/jurisdiction notices and every address-mode
+  // record are left exactly as they were.
+  function typeLabelFor(s){
+    if(!s || s.zip_authoritative !== true) return "";
+    if(frsRid(s) !== "") return "";                    // a facility is named by its own line
+    var m = (HS.resolveMarker ? HS.resolveMarker(s) : null);
+    return (m && m.legendLabel) ? m.legendLabel : "";
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
@@ -1455,7 +1475,20 @@ HS.onReady(function(){
     // relevance 'development' and 812 Residential (measured 2026-09-06).
     var sites = (data.sites || []).filter(sourced);
     if(window.HS && HS.residentialQualifySites) sites = HS.residentialQualifySites(sites);
-    window.__HS_SITES = sites;
+    // PROJECT GRAIN vs GEOMETRY-MARKER GRAIN (lib/zip-authoritative.js).
+    // `sites` is at MARKER grain: one authoritative project can own many markers, because that
+    // is how its geography is drawn — a road corridor clipped to this ZCTA gets one marker per
+    // ~1km of its length. Those markers are geographically truthful and every one of them still
+    // goes to drawMap() below.
+    // `rows` is at PROJECT grain: one row per real project. Everything that tells the resident
+    // HOW MANY PROJECTS there are — the headline counter and the Proposed/Approved/Operating
+    // rails — reads `rows`, never `sites`. Before this split, ZIP 84029's 8 real projects were
+    // counted and listed 221 times because one UDOT corridor owns 188 markers there.
+    // The helper is a no-op wherever a site carries no zip_project_ref (EPA facilities, area
+    // notices, and every address-mode site), so address mode is untouched by construction.
+    var rows = HS.zipAuthCollapseToProjects(sites);
+    window.__HS_SITES = sites;        // marker grain — the map + the anti-fabrication verifier
+    window.__HS_PROJECT_ROWS = rows;  // project grain — what the counters and rails must equal
     // SEO policy: index only a ZIP page whose stamped substance flag is true AND that rendered
     // real sourced content. Address mode (ZIP_MODE false), thin and empty ZIPs stay noindex.
     // ZIP_INDEXABLE resolves async in loadZip(); whichever setIndexable() call lands last wins.
@@ -1483,10 +1516,11 @@ HS.onReady(function(){
     // counters and these rails are projections of one predicate (Task 5). isPermit (project_no) is kept
     // only to route a filing's "record ▸" to the property page.
     var isDevPoint = function(s){ return s.scope==="point" && s.relevance==="development"; };
-    var permits = sites.filter(isDevPoint);
-    var fac = sites.filter(function(s){ return s.scope==="point" && s.relevance!=="development"; });
-    var dev = sites.filter(function(s){ return s.scope==="area" && !isCivic(s); });
-    var civic = sites.filter(function(s){ return s.scope==="area" && isCivic(s); });
+    // PROJECT GRAIN from here down: these four sets feed the counters and the rails.
+    var permits = rows.filter(isDevPoint);
+    var fac = rows.filter(function(s){ return s.scope==="point" && s.relevance!=="development"; });
+    var dev = rows.filter(function(s){ return s.scope==="area" && !isCivic(s); });
+    var civic = rows.filter(function(s){ return s.scope==="area" && isCivic(s); });
     var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
@@ -1495,7 +1529,7 @@ HS.onReady(function(){
     // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
     // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
-    var open = sites.filter(function(s){ return s.comment_open === true; });
+    var open = rows.filter(function(s){ return s.comment_open === true; });
     // Freshness stamp: ZIP pages are a cached snapshot — show when it was last refreshed so the
     // reader knows it's not live. Address mode is a live fetch.
     // Address mode states, in the line the resident already reads for freshness, exactly what the
@@ -1517,7 +1551,7 @@ HS.onReady(function(){
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
     $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
-    $("cTot").textContent  = sites.length;
+    $("cTot").textContent  = rows.length;
 
     // Open-for-comment banner — rebuilt every render (clears between searches; works in both
     // modes since it reads the already-computed `open` set). Hidden with no reserved space when
@@ -2051,7 +2085,11 @@ HS.onReady(function(){
     var fanNote = (s.scope==="point" && s._fan)
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
       : "";
-    return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
+    // NAME / TYPE / STAGE — the Type line appears only when typeLabelFor() can state it.
+    var tline = typeLabelFor(s);
+    return "<div class='pt'>"+esc(s.label)+"</div>"+
+      (tline ? "<div class='pk'>"+esc(tline)+"</div>" : "")+
+      "<div class='pk'>"+kind+distStr+"</div>"+
       "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
@@ -2104,7 +2142,7 @@ HS.onReady(function(){
       if(eh && eh.tone!=="ok"){
         v = "<div class='vflag' style='color:"+envColor(eh.tone,false)+"'>"+esc(eh.text)+" · "+envLinks(s).join(" · ")+"</div>";
       }
-      var tag = LAYER_LABEL[s.layer] || "Development";
+      var tag = typeLabelFor(s) || LAYER_LABEL[s.layer] || "Development";
       // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
       // countdown — it's resolved, not an open comment window — plus a "decided" marker.
       var mdate = s.meeting_date ? s.meeting_date.slice(0,10) : "";
