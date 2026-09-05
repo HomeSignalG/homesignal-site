@@ -40,6 +40,39 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — 🔑 A 60 s MCP CLIENT TIMEOUT IS NOT A ROLLBACK. Re-check state, never assume
+
+Two Phase 2 reconciliation batches returned `MCP server "Supabase" tool "execute_sql" timed
+out after 60s`. I checked after the first and saw the table unchanged at 80 rows, so I read
+the timeout as an atomic rollback — the behaviour recorded for 951 in Phase 1. It is not the
+same thing:
+
+```
+batch 1 (80)   -> returned 80,  recon = 80
+batch 2 (150)  -> CLIENT TIMEOUT, recon read back as 80
+batch 3 (80)   -> CLIENT TIMEOUT
+later          -> recon = 230   = 80 + 150
+```
+
+**Batch 2 committed. It simply committed after I had already looked.** Batch 3 then selected
+the same ZIPs (its `not exists` snapshot still saw 80) and inserted 0 through
+`on conflict do nothing` — which is the only reason the total is 230 and not 310.
+
+- ⚖️ **Two different timeouts, opposite consequences.** A **server-side** `statement_timeout`
+  (PG 57014) aborts the statement and rolls back — that is the 951 case, and it is safe. A
+  **client-side** 60 s MCP timeout only stops *waiting*; the statement keeps running and
+  commits. Reading one as the other is how a batch gets silently double-applied.
+- 🛡️ **What made this harmless was the idempotent shape, not luck.** The self-advancing
+  `not exists` predicate plus `on conflict do nothing` is what turned a re-issued overlapping
+  batch into a no-op. Keep both on every batch that can be interrupted.
+- **After ANY client timeout: re-read the target table before deciding what to do next**, and
+  re-read it again a moment later if the count looks unchanged — the commit can land between
+  the two reads.
+- ⚠️ **Do not run heavy queries beside a running shard build.** Batches of 150 and then 80 both
+  outran 60 s only while shard 284 was building; the same 80 had returned in seconds before it
+  started. `docs/maps-coverage/N5-BATCH-23-761-890.md` records the converse — my own 150-ZIP
+  verification query was the live contention hypothesis when shard 662 halted three times.
+
 ### 2026-09-05 — 🟢 PHASE 2 BATCH A: 174 manifest-gap ZIPs MEASURED, and the zero is real
 
 The first Phase 2 acquisition unit — the manifest-gap population (no `n5_shard` row at all, so
