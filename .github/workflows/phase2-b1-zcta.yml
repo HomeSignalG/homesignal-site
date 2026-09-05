@@ -248,7 +248,7 @@ jobs:
           SNAPSHOT: phase1-2026-09-01
           PREFIX: ${{ github.event.inputs.prefix }}
           PREFIXES: ${{ github.event.inputs.prefixes }}
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_boundary_first.py
 
@@ -261,7 +261,7 @@ jobs:
           # done shards.
           PREFIXES: ${{ github.event.inputs.prefixes }}
           SNAPSHOT: phase1-2026-09-01
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_unit_a_shadow.py
 
@@ -270,7 +270,7 @@ jobs:
         env:
           MODE: n5-a3-clip
           SNAPSHOT: phase1-2026-09-01
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_a3_clip_stats.py
 
@@ -284,7 +284,7 @@ jobs:
           # delete/insert window would make those live pages raise). Empty = all.
           PREFIXES: ${{ github.event.inputs.prefixes }}
           SNAPSHOT: phase1-2026-09-01
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_a3_markers.py
 
@@ -293,7 +293,7 @@ jobs:
         env:
           MODE: n5-recon
           RECON_CHUNK: ${{ github.event.inputs.max_shards }}
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_recon_population.py
 
@@ -302,7 +302,7 @@ jobs:
         env:
           MODE: n5-a4-index
           A4_MODE: index
-          DISK_FLOOR_MB: '2048'
+          DISK_FLOOR_MB: '500'
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_a4_index.py
 
