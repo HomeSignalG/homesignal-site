@@ -107,3 +107,35 @@ Automated tests passed while the rule was still wrong. Reading real rows caught 
   list; they remain routine on their own.
 * `type_raw='Residential'` self-corroborated every weak head, turning the street `NEW HOPE RD`
   into a development. The corroborating noun must come from the same field as the head.
+
+## How the national numbers are produced
+
+`scripts/residential-measure.mjs` + `.github/workflows/residential-measure.yml`.
+
+SQL could not deliver them here, and that is worth recording so nobody repeats it: there is no
+index on `app_projects (record_kind, type)`, so isolating the ~635k residential rows out of 3.2M
+is a full scan. With a concurrent geography build (`geo.n5_p2_gap` DDL, observed in
+`pg_stat_activity` at 20:09Z) on the same instance, **every** shape tried exceeded both the 60s
+MCP budget and the 120s Management-API budget: hash join, cross-join-lateral over the membership
+keys, and a ZIP-range chunk.
+
+Measuring through `app_zip_projects_markers` is not a weaker substitute — it is the read the page
+itself performs, and the counts come from the same `lib/` modules the browser runs, loaded in the
+page's order. **"Before" is not a second implementation**: the same shipped `zipAuthSitesFrom()`
+runs twice per ZIP, once with `HS.residentialGateDrops` detached, so the difference *is* what the
+gate removed. The script reports which table supplied the ZIP denominator, because a denominator
+that silently changed source would make every percentage unreadable.
+
+## Deferred, not done
+
+* **Temporal relevance is unresolved and deliberately not decided here.** Retained records include
+  Denton `HOUSE` permits dated 2013–2014 and an Austin subdivision case dated 2003. The founder
+  rule says activity qualification and temporal relevance are separate questions and that a
+  threshold must be measured before adoption. The stage/date distribution of the retained set is
+  reported; no date threshold is applied.
+* **11,310 Residential objects hold authoritative POLYGON geometry rendered as a point-on-surface
+  pentagon.** Separate presentation question, untouched by this population correction.
+* **Recovery from other Types is not implemented.** Generic-typed records that state residential
+  development are already classified Residential by `NAME_RULES` and are therefore gated like any
+  other; records typed Commercial/Industrial that state residential development are not retyped,
+  because retyping is a classifier change and this unit corrects the population.
