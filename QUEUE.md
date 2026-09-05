@@ -40,6 +40,38 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
+
+`CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
+never drew. Measured on production `app_projects` (control 3,216,489 rows): **1,190 records
+state a data centre in their own words; 153 resolved to the Data center category.**
+
+`lib/map.js` gains a **DATACENTER precedence phase** — second only to the facility flag —
+reading the record's own class fields (incl. **`type_raw`**, which the classifier had never
+read) and its name. Every category it displaces is strictly broader, and in each case the
+coarse value is our `type_map` output rather than the source's judgement (Phoenix files
+data-centre fire work under the F-range code → Civic/Public; San Jose publishes
+`type_raw='Data Center'` verbatim and the entry collapsed it to Industrial).
+
+**Effect: project records drawing the octagon 153 → 452 (+299); ZIP pages with at least one
+Data center pin 95 → 214 (+119).** Nothing that states no data centre moves.
+
+- Full offline suite green — **143 files, 0 failed** (`maps-delvalle-golden` 235 checks
+  unchanged, so no golden classification drifted). New suite
+  `test/marker-datacenter-type.test.mjs`, 33 checks, verbatim production strings.
+- Receipt: `docs/maps-datacenter-type-2026-09-05.md`.
+- **Pushed to the branch, NOT merged** — it changes what residents see, which is a gated
+  class under CLAUDE.md's autonomy grant. Merge is the founder's call.
+
+📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
+(509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
+keep the purple square, the "Regulated facility" legend row and the `facility` filter
+bucket. `datacenter` is a project TYPE; `facility` is a record KIND. Moving them would change
+the facility filter, the `counts.facilities` figure `verify-development` asserts against the
+rendered rail, and a colour the legend explains. **The question, so it is not re-derived:**
+should a regulated facility that IS a data centre draw the octagon, keep the square, or carry
+both (square + a "Data center" line in the popup)? Founder call.
+
 ### 2026-09-04 — MAP 1 ZIP DELIVERY: CLOSED ON `main`, and the card grain is PROVEN
 
 **The delivery gap this branch measured is CLOSED — by `main`, not by this branch.** The gap was
