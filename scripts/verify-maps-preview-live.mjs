@@ -110,10 +110,31 @@ const page = await browser.newPage();
 const csp = [];
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) csp.push(m.text()); });
 await page.goto(`${SITE}/acquisition.html`, { waitUntil: 'domcontentloaded' });
-await page.waitForFunction(() => typeof window.bskyRenderImage === 'function', { timeout: 30000 })
-  .catch(() => {});
+
+// The dashboard's script body is an IIFE, so its functions are deliberately NOT globals.
+// Rather than exporting them for a test (production code should not grow hooks for its
+// own verifier), the functions are EXTRACTED from the SERVED bytes and injected into
+// this page. The page origin, the served document and -- what actually matters here --
+// the page's own CSP all still apply to the image load being proved.
+const cut = (from, to) => {
+  const i = doc.indexOf(from), j = doc.indexOf(to, i);
+  if (i < 0 || j < 0) throw new Error(`could not extract ${from} from the SERVED page`);
+  return doc.slice(i, j);
+};
+const shipped = cut('  var _bskyBlobUrl = {};', '  // VISUAL STATUS.')
+              + cut('  function mapsVisual(p){', '  function mapsEvidence(');
+// Chained replaces rather than a character-class regex: the shim is built as a STRING
+// here, and a class containing both quote styles is the kind of escaping that breaks in
+// one layer and is only discovered at runtime on a runner.
+const ESC_SHIM = 'function esc(s){s=String(s==null?"":s);'
+  + 'return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")'
+  + '.replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}';
+const EXPORTS = '\nwindow.bskyRenderImage=bskyRenderImage;'
+  + 'window.bskyApplyApprovalGate=bskyApplyApprovalGate;'
+  + 'window.mapsImageRequired=mapsImageRequired;window.mapsVisual=mapsVisual;';
+await page.addScriptTag({ content: ESC_SHIM + '\n' + shipped + EXPORTS });
 const live = await page.evaluate(() => typeof window.bskyRenderImage === 'function');
-ok('the LIVE page defines the shipped preview functions', live);
+ok('the SERVED page carries the shipped preview functions (extracted from its own bytes)', live);
 if (!live) { await browser.close(); console.log(`\n${pass} passed, ${fail} failed`); process.exit(1); }
 
 // Stub ONLY the storage transport, with the real bytes fetched above.
