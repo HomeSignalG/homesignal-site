@@ -189,6 +189,8 @@ ok(railEnv.dedupeByProject([{ label: 'a' }, { label: 'b' }, { label: 'c' }]).len
   '26: rows with NO project identity are never collapsed — two real permits at one address both keep a card');
 ok(/items = dedupeByProject\(items\);[\s\S]{0,200}items\.slice\(0,12\)/.test(pageSrc),
   '27: the page de-dups BEFORE the 12-row cap, so the cap can never hide a duplicate');
+ok(/<div class='rec' data-ref='\"\+esc\(railKey\(s, i\)\)\+\"'/.test(pageSrc),
+  '28: every rail row carries its project identity, so one-project-one-card is checkable in the DOM');
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURE(S)`);
 process.exit(fails === 0 ? 0 : 1);

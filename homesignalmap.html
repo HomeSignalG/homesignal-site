@@ -1839,7 +1839,7 @@ HS.onReady(function(){
     var el = $(id);
     items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
-    el.innerHTML = items.slice(0,12).map(function(s){
+    el.innerHTML = items.slice(0,12).map(function(s, i){
       var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
@@ -1869,7 +1869,12 @@ HS.onReady(function(){
       var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
       var dm = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
-      return "<div class='rec'><span class='dot' style='background:"+col+"'></span>"+
+      // data-ref makes the row's PROJECT IDENTITY observable in the DOM. The card-grain probe
+      // used to simulate the rail by re-slicing the site list, which meant it was testing its own
+      // copy of the rendering rather than the rendering; with the rails now de-duped, that
+      // simulation disagreed with the DOM it was supposed to be checking. Reading identity off
+      // the rendered row is the fix, and it makes "one project = one card" checkable directly.
+      return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
         "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+v+"</div></div>";
     }).join("");
