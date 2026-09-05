@@ -40,6 +40,41 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-05 — ✅ PREFIX 191 (PHILADELPHIA) IS LIVE. The per-ZIP cost is now MEASURED
+
+**First bounded unit under the 500 MB floor, end to end, and it works.** authoritative
+**10,821 → 10,871**, pending **1,259 → 1,209**, control 12,722 ✓, `not_measured` 642 unchanged.
+
+| step | result | disk |
+|---|---|---|
+| `n5-boundary-first prefix=191` | 10,980 boundary rows across **49 of 50** ZIPs | +2.3 MB |
+| `n5-unit-a prefixes=191` | membership 10,980 — **exactly** the boundary rows (1:1) | +3.2 MB |
+| `n5-a3-marker build prefixes=191` | markers 10,982; all 5 integrity gates 0 | +3.1 MB |
+| producer reconciliation (50 ZIPs) | projects 10,980 = membership · markers 10,982 = marker · **0 mismatches** | — |
+| cutover + verify + stamp | 50 enabled, 50 verified | +0.1 MB |
+| **total** | **50 ZIP pages** | **+8.7 MB** |
+
+🔑 **0.17 MB per ZIP page.** That retires **27,226 prohibited 3-mile centroid-radius rows** and
+replaces them with 10,980 exact `ST_Intersects` records. Extrapolated, the remaining **687**
+done-shard ZIPs cost **~120 MB** — not the ~450 MB estimated from association counts, because
+boundary membership is much smaller than the legacy candidate set (10,980 vs 14,643 on 191).
+
+- **LIVE PROOF, not just the RPC:** `verify-map1-card-grain` against `https://homesignal.net` —
+  **19102: 104 projects**, **19103: 303 projects = 303 authoritative**, rails clean, headline
+  project-grained, no marker drawn beyond the relation.
+- **Facilities untouched:** 1,402 rows across 49 ZIPs, **facility md5 changed on 0 of 50**, and
+  **0 legacy-geography fallbacks** — every returned record carries `authoritative=true`.
+- ⚠️ **Producer reconciliation must run in groups of ~7 on dense metros.** 25 ZIPs and even 10
+  blew the 55 s statement timeout on Philadelphia; the doc's Fort Worth groups of 10-15 do not
+  transfer. Use a self-advancing scratch table (`not exists in verify`) so batches are idempotent
+  and resumable.
+- ⚠️ **A transient `rpc 500` from `app_zip_projects_markers` under concurrent load is NOT a
+  defect.** One appeared mid-run on 01001 and did not reproduce; 01001 was intact throughout
+  (membership 12, markers 34, verified). The control that settles it: membership total moved
+  406,196 → 417,176, i.e. **exactly +10,980**, and ZIPs-with-membership 7,301 → 7,350, exactly
+  +49. `PREFIXES` scoping held.
+
+
 ### 2026-09-05 — ⚖️ STORAGE FLOOR IS NOW 500 MB (founder). The 2,048 MB floor is CANCELLED
 
 Work proceeds in bounded units while free space stays safely above **500 MB**, measuring disk
