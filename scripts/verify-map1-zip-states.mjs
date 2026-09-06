@@ -46,13 +46,20 @@ for (const c of CASES) {
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
       couldNotRead: /could not be read/i.test(txt),
-      // Matched on the address-mode DIRECTION, not on the literal 'street address'. That phrase
-      // named a shape the geocoder never required and was removed from the ZIP-mode hint (#1079)
-      // and from the not-measured note; on a pending ZIP the hint was its last rendered source,
-      // so this assertion went red the moment #1079 deployed while the page still directed the
-      // resident to address mode perfectly well. The alternation spans both the old and new
-      // wording so it is not gated on a deploy, and it still fails if the CTA disappears.
-      addressCta:  /enter (an|your) (street )?address/i.test(txt),
+      // Matched on the address-mode DIRECTION, never on a literal. History: the phrase
+      // 'street address' named a shape the geocoder never required and left the ZIP-mode hint in
+      // #1079, which reddened this check on deploy; the replacement spanned the wordings known at
+      // the time and #1086 then reddened it again with 'Enter A street address to switch…'. An
+      // article list is the wrong shape for this — the guarantee is that the page tells the
+      // resident to ENTER something, so the pattern is anchored on the imperative verb and the
+      // noun, with whatever wording sits between them.
+      //
+      // Anchoring is load-bearing in BOTH directions. A bare /address/i would be satisfied by the
+      // ZIP clarifier 'The entire ZIP area — not only projects near one address.', which is not a
+      // CTA — the guard would then pass on a page whose CTA had been deleted. [^.\n]{0,24} keeps
+      // the match inside one sentence and one text node, so a stray 'Enter…' elsewhere on the
+      // page cannot reach across to an unrelated 'address'.
+      addressCta:  /\b(enter|type|search)\b[^.\n]{0,24}\baddress\b/i.test(txt),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
