@@ -93,6 +93,7 @@ ok(c.activeTokens.indexOf('dev') < 0, 'B Development & Impact is NOT active on M
 // ── E. ...and the proven ZIP contract is untouched ──────────────────────────────────────
 const z = await page.evaluate(() => ({
   within: (document.getElementById('withinLbl') || {}).textContent,
+  rAddr: (document.getElementById('rAddr') || {}).textContent,
   radiusVisible: (() => { const e = document.getElementById('radSel'); if (!e) return false;
     const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
   homePins: document.querySelectorAll('.homepin').length,
@@ -103,7 +104,8 @@ const z = await page.evaluate(() => ({
   fresh: (document.getElementById('freshLine') || {}).textContent
 }));
 info('ZIP ' + ZIP, z);
-ok(/Across ZIP/.test(z.within || ''), 'E ZIP mode still shows the whole ZIP', z.within);
+const eLine = ((z.within || '') + ' ' + (z.rAddr || '')).replace(/\s+/g, ' ').trim();
+ok(/^All development across ZIP \d{5}$/.test(eLine), 'E ZIP mode still shows the whole ZIP', eLine);
 ok(z.radiusVisible === false, 'E no address-radius control in ZIP mode');
 ok(z.homePins === 0, 'E no HOME pin in ZIP mode');
 ok(z.devPoints > 0 && z.devPoints === z.authoritative,
@@ -163,6 +165,7 @@ await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_featur
 await page.waitForTimeout(1000);
 const a = await page.evaluate(() => ({
   within: (document.getElementById('withinLbl') || {}).textContent,
+  rAddr: (document.getElementById('rAddr') || {}).textContent,
   radiusVisible: (() => { const e = document.getElementById('radSel'); if (!e) return false;
     const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
   homePins: document.querySelectorAll('.homepin').length,
@@ -186,13 +189,15 @@ await page.waitForTimeout(500);
 c = await chrome();
 const back = await page.evaluate(() => ({
   within: (document.getElementById('withinLbl') || {}).textContent,
+  rAddr: (document.getElementById('rAddr') || {}).textContent,
   homePins: document.querySelectorAll('.homepin').length,
   stale: (window.__HS_SITES || []).filter(s => s.n5_feature_id).length
 }));
 info('back to ZIP ' + OTHER_ZIP, { loc: c.locLabel, ...back });
 ok(new RegExp(OTHER_ZIP).test(c.locLabel || '') && !/CALDWELL/i.test(c.locLabel || ''),
   'H returning to a ZIP drops the address from the current view', c.locLabel);
-ok(/Across ZIP/.test(back.within || ''), 'H ...and the page is back in whole-ZIP mode', back.within);
+const hLine = ((back.within || '') + ' ' + (back.rAddr || '')).replace(/\s+/g, ' ').trim();
+ok(/^All development across ZIP \d{5}$/.test(hLine), 'H ...and the page is back in whole-ZIP mode', hLine);
 ok(back.stale === 0, 'H no address-radius result survives into ZIP mode', back.stale);
 ok(back.homePins === 0, 'H no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),

@@ -220,6 +220,7 @@ ok(c.activeTokens.indexOf('dev') < 0, '2 Development & Impact is NOT active on M
 // ═══ 6. ...while the proven ZIP contract is untouched ═══
 let z = await page.evaluate(() => ({
   within: (document.getElementById('withinLbl') || {}).textContent,
+  rAddr: (document.getElementById('rAddr') || {}).textContent,
   radiusVisible: (() => { const e = document.getElementById('radSel'); if (!e) return false;
     const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
   homePins: document.querySelectorAll('.homepin').length,
@@ -228,7 +229,15 @@ let z = await page.evaluate(() => ({
   distances: (window.__HS_SITES || []).filter(s => s.distance_mi != null).length
 }));
 info('ZIP 78617 map state', z);
-ok(/Across ZIP 78617/.test(z.within || ''), '6 ZIP mode still says it is showing the whole ZIP', z.within);
+// The heading now names WHAT is whole-ZIP, not just that something is: "All development
+// across ZIP X". Asserting the whole phrase, because "across ZIP X" alone was the wording a
+// resident could read as "some development, from around here".
+// The label spans the eyebrow and the prominent place line, so assert what a reader sees:
+// "All development across" + "ZIP 78617". Either half alone would pass while the rendered
+// sentence was broken.
+const zLine = ((z.within || '') + ' ' + (z.rAddr || '')).replace(/\s+/g, ' ').trim();
+ok(zLine === 'All development across ZIP 78617',
+  '6 ZIP mode reads "All development across ZIP 78617"', zLine);
 ok(z.radiusVisible === false, '6 no address-radius control in ZIP mode');
 ok(z.homePins === 0, '6 no HOME pin in ZIP mode');
 ok(z.devPoints > 0 && z.devPoints === z.authoritative,
@@ -301,7 +310,9 @@ let a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
-ok(/Within/.test(a.within || ''), '8 address mode states the radius', a.within);
+// Radius AND subject, in the heading: "Showing development within <radius> of".
+ok(/^Showing development within .+ of$/.test((a.within || '').trim()),
+  '8 address mode states what is shown and the radius it is shown within', a.within);
 ok(a.radiusVisible === true, '8 the radius control is available in address mode');
 ok(a.homePins === 1, '8 HOME is pinned at the geocoded address');
 ok(a.canonical > 0, '8 canonical radius results render', a.canonical);
@@ -316,13 +327,16 @@ await page.waitForTimeout(300);
 c = await chrome();
 const back = await page.evaluate(() => ({
   within: (document.getElementById('withinLbl') || {}).textContent,
+  rAddr: (document.getElementById('rAddr') || {}).textContent,
   homePins: document.querySelectorAll('.homepin').length,
   stale: (window.__HS_SITES || []).filter(s => s.n5_feature_id).length
 }));
 info('back to ZIP 80210', { loc: c.locLabel, ...back });
 ok(/80210/.test(c.locLabel || '') && !/CALDWELL/i.test(c.locLabel || ''),
   '9 returning to a ZIP drops the address from the current view', c.locLabel);
-ok(/Across ZIP 80210/.test(back.within || ''), '9 ...and the page is back in whole-ZIP mode', back.within);
+const backLine = ((back.within || '') + ' ' + (back.rAddr || '')).replace(/\s+/g, ' ').trim();
+ok(backLine === 'All development across ZIP 80210',
+  '9 ...and the page is back in whole-ZIP mode', backLine);
 ok(back.stale === 0, '9 no address-radius result survives into ZIP mode', back.stale);
 ok(back.homePins === 0, '9 no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
@@ -395,12 +409,64 @@ const am = await page.evaluate(() => ({
   canonical: (window.__HS_SITES || []).filter(s => s.n5_feature_id).length
 }));
 info('address mode after the ZIP change', { ...am, kDev: c.kDev, kFac: c.kFac, totalTileShown: c.totalTileShown });
-ok(/Within/.test(am.within || ''), '12a address mode still states its radius', am.within);
+ok(/^Showing development within .+ of$/.test((am.within || '').trim()),
+  '12a address mode still states what is shown and its radius', am.within);
 ok(am.radiusVisible && am.homePins === 1 && am.canonical > 0,
   '12b HOME, the radius control and canonical radius results are untouched', am);
 ok(c.totalTileShown === true,
   '12c address mode KEEPS its total — every class in it shares one radius contract');
 ok(!/across this ZIP/i.test(c.kDev || ''), '12d no ZIP-mode scope copy leaks into address mode', c.kDev);
+// The caption sits ON the map canvas, so it names the radius too - a resident reading the pins
+// should not have to look back up at the heading to know what circle they are inside.
+ok(/^Development within .+ of this home$/.test((c.mapCap || '').trim()),
+  '12e the address map caption names the radius, not just "around this home"', c.mapCap);
+
+// ── 13. THE TWO MODES ARE NOT A ONE-WAY DOOR ───────────────────────────────────────────
+// run() flips ZIP_MODE in JS and never touches the URL, so before the back control existed a
+// resident who searched an address had no control, no history entry and no visible route back
+// to the whole-ZIP view. These assert the route exists in address mode, points somewhere real,
+// and is ABSENT in ZIP mode (where it would point at the page you are already on).
+const bz = await page.evaluate(() => {
+  const e = document.getElementById('backZip');
+  const a = e && e.querySelector('a');
+  return { present: !!e, shown: !!e && getComputedStyle(e).display !== 'none',
+           text: a ? a.textContent.trim() : null,
+           href: a ? a.getAttribute('href') : null };
+});
+info('back-to-ZIP control (address mode)', bz);
+ok(bz.shown === true, '13a address mode offers a way back to the whole ZIP', bz);
+ok(/^\u2190 Back to all development in ZIP \d{5}$/.test(bz.text || ''),
+  '13b ...labelled with the destination ZIP, in the founder-specified words', bz.text);
+ok(/^homesignalmap\.html\?zip=\d{5}$/.test(bz.href || ''),
+  '13c ...as a real link, so browser back/forward and middle-click behave normally', bz.href);
+// It must lead to the ZIP the resident came from, not the sample default.
+// The flow reached here via ZIP 84334, so THAT is the ZIP the page was opened with. Pinned to
+// the concrete value rather than "any ZIP", so a control that silently fell back to the sample
+// default (78617) would fail instead of passing as "well, it points at some ZIP".
+ok((bz.href || '').endsWith('=84334'),
+  '13d ...pointing at the ZIP this page was opened with, not the sample default', bz.href);
+
+// And in ZIP mode there is nothing to go back to, so it must not be drawn.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+await page.waitForTimeout(400);
+const bzZip = await page.evaluate(() => {
+  const e = document.getElementById('backZip');
+  return { shown: !!e && getComputedStyle(e).display !== 'none',
+           within: (document.getElementById('withinLbl') || {}).textContent,
+           rAddr: (document.getElementById('rAddr') || {}).textContent,
+           scopeNote: (document.getElementById('scopeNote') || {}).textContent,
+           scopeNoteShown: (() => { const n = document.getElementById('scopeNote');
+             return !!n && getComputedStyle(n).display !== 'none'; })() };
+});
+info('ZIP mode heading pair', bzZip);
+ok(bzZip.shown === false, '13e ZIP mode draws no back control — it IS the whole-ZIP view', bzZip);
+// The subline must make "entire ZIP" explicit rather than restating the heading.
+ok(/entire ZIP area/i.test(bzZip.scopeNote || '') && /not only projects near one address/i.test(bzZip.scopeNote || ''),
+  '13f a clarifier says plainly this is the whole ZIP, not nearby projects', bzZip.scopeNote);
+ok(bzZip.scopeNoteShown === true,
+  '13g ...and it is actually visible, not merely present in the DOM', bzZip);
 
 ok(pageErrors.length === 0, 'no fatal client error across the journey', pageErrors.slice(0, 3));
 
