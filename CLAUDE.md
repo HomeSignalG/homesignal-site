@@ -763,6 +763,65 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
+  RECORD** (DB-verified 2026-09-06; full receipt `docs/map1-residential-total-qualification-2026-09-06.md`).
+  Corrects the four defects the independent adversarial audit proved against `48214b3`.
+  - ⚠️ **THE PREVIOUS BUILD'S CLAIM "qualification = rail count = rendered population" WAS FALSE.**
+    `zipAuthMergeSites` dropped report sites only at `scope='point'`, so **41,661 area-scope
+    development sites — 2,288 of them Residential candidates across 90 ZIPs — reached the rails,
+    `devCount` and all three map views un-qualified.** Gating the two places a site is BUILT was
+    not enough because a cached report site has no `app_projects` row: the site IS the record.
+    **Standing answer: the gate belongs at `render()`**, the ONE funnel every user-facing
+    Residential population comes out of, plus `renderProperty()` which does not pass through it.
+    A site ADAPTER (`residentialEvidenceFromSite`) reads the same three evidence fields off a
+    report site so there is one contract, never a second copy. After: 1,666 routine + 340
+    unresolved removed, 282 genuine developments kept, **0 bypassing**.
+  - ⚖️ **FOUNDER RULING 2026-09-06 — source provenance MAY qualify a record, but only where the
+    corpus is demonstrably bounded to a development class.** 8 granted, **each re-proved from its
+    own production `type_raw` census** (austin-subdivision-cases, austin-site-plan-cases,
+    chester-county-pa-act247-plans, delaware-county-pa-subdivisions-land-developments,
+    york-county-pa-planning-subdivisions, fairfax-active-site-construction,
+    seattle-land-use-permits, casa-grande-active-development-sites) — **1,930 → 12,243 qualifying
+    of 12,922**. **5 REJECTED on the same evidence and they must not be "restored":**
+    `dallas-specific-use-permits` (530 `type_raw` values that are USES — Videoboard 1,067, Bus
+    Passenger Shelter 914, Billiard Hall 655), `slc-planning-petitions` (34 of its 44 residential
+    rows are `Routine and Uncontest Home Occ`, a home-occupation licence),
+    `slo-county-planning-permits` (Zoning Clearance 6,605, SolarAPP+, Vacation Rental),
+    `burlington-vt-zoning-permits` (`type_raw` is a ZONING DISTRICT), `arlington-permit-applications`
+    (occupancy class). A drafted **Montgomery County** family rule for worktype `CONSTRUCT` (2,041
+    rows) was killed by its own sample: sheds, decks and bike sheds. **Provenance sits BELOW
+    row-level routine evidence** — Fairfax's 68 real pools are still pools.
+  - 🔑 **A PROJECT NAME IS NOT AN ACTIVITY, and the fix is FOUR WORDS, not a general relaxation.**
+    Measured across the ten development registries, the routine words firing from `name` but not
+    `type_raw` are dominated by ` addition ` (**261**, every sampled hit a subdivision NAME — in
+    American plat vocabulary an "Addition" IS a subdivision) with ` tree ` a distant second (5 —
+    "The Woods at Rose Tree", York's plan "Cherry Tree"). **` pool ` was deliberately NOT demoted:
+    all 68 of its hits are real pools**, and demoting it would have restored the exact noise the
+    rule exists to remove. The label-vs-activity split is **generated from the registry's own
+    `column_map.title` column names** (`scripts/residential-name-kind.mjs`, 55 of 239 families) and
+    pinned against drift by a test that re-derives it.
+  - **Vocabulary + precedence:** `subdivide`/`subdivided`/`subdividing`/`resub` added from
+    production text (space-delimited, so `resub` cannot match `resubmission`); unambiguous
+    multi-word construction phrases now match anywhere in ACTIVITY text, not only at its head
+    (Naperville's `RESIDENTIAL Single Family New Construction - Lot 168` was UNRESOLVED); and
+    **strong routine evidence now outranks every development rule**, which removes the
+    `DEV_ANYWHERE` leak the audit measured at 144 records.
+  - 📌 **MEASURED, NOT FIXED — do not re-derive.** **4,237 multifamily records sit under another
+    Type by `type_map` config, not by keyword fallback**: `nashville-building-permits-issued`
+    `Building Residential - New` → **Development, 3,517 rows** (genuinely Residential) and Austin's
+    `Commercial Multi Family` → Commercial, 718 (mixed-use). Correcting them is a
+    Commercial/Development taxonomy change, deliberately out of the Residential unit.
+  - 📌 **INGESTION FOLLOW-UP REQUIRED — 449,071 rows (35.0%)** come from families whose only
+    mapped class field is a building USE/OCCUPANCY/UNIT type (Brunswick 133,241 · Sioux Falls
+    81,609 · Huntsville 71,872 · San Jose 59,561 · **Loudoun 45,618, which also maps NO
+    `file_date` at all and is therefore 100% undated** · Durham 35,202 · seven smaller). Whether a
+    work-class column exists upstream **cannot be verified from the sandbox** (no egress to the
+    source hosts), so nothing was guessed. The next operation is a field-list probe per layer, then
+    a `column_map` addition — config, no code.
+  - **What "one card" guarantees, stated exactly: ONE QUALIFIED SOURCE OBJECT = ONE CARD**, never
+    one real-world project. Nothing merges two source records describing the same building, and
+    nothing should — DeKalb's `1881` townhome development files New Construction, General Combined
+    Plumbing and Electrical Combined Line separately, and only the first qualifies.
 - 🟢 **PHOENIX BUILDING PERMITS wired — `phoenix-building-permits` (arcgis, registry 86 → 87);
   Maricopa development pages 40 → 97** (DB-verified 2026-07-28). The City of Phoenix Planning &
   Development Department's **own** MapServer (`maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1`),
