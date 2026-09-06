@@ -289,8 +289,24 @@ for (const z of CAND) {
     if (dev !== '\u2014') { stateFails++; console.log('   !! ' + z + ' is not_measured but shows dev "' + dev + '"'); }
   } else if (measuredZero) {
     sawMeasuredZero++; sawMeasured++;
-    // The founder's control: an authoritative zero must stay a REAL numeric zero.
-    if (dev !== '0') { zeroFails++; console.log('   !! ' + z + ' is a measured zero but shows dev "' + dev + '"'); }
+    // THE CONTROL, CORRECTED. The founder's rule is that an AUTHORITATIVE state shows a real
+    // NUMBER, never the em-dash reserved for "unknown" - that is what keeps measured-zero
+    // visibly distinct from not-measured. My first version asserted the number was literally
+    // "0", which conflated two DIFFERENT measures: freshLine counts authoritative whole-ZIP
+    // PROJECTS, while this tile counts PROPOSED items (which include area-scoped notices).
+    // A ZIP can honestly have 0 of the first and a non-zero second.
+    if (dev === '\u2014' || !/^\d+$/.test(dev)) {
+      zeroFails++; console.log('   !! ' + z + ' is authoritative but shows a non-numeric dev "' + dev + '"');
+    }
+    // REPORTED, NOT FAILED: the two numbers a resident reads side by side disagree in shape -
+    // "No qualifying development records across ZIP X" above a non-zero proposed tile. Both
+    // are individually true and they measure different things, but the PAIR reads as a
+    // contradiction. Flagged for the founder; deciding which number the tile should show is a
+    // product call, not something to change inside a verification run.
+    if (dev !== '0') {
+      console.log('   ?? REPORT — ' + z + ': freshLine says "no qualifying development records" ' +
+        'while the proposed tile shows "' + dev + '". Different measures, contradictory to read.');
+    }
   } else if (/^\d+$/.test(dev)) {
     sawMeasured++;
   }
@@ -298,7 +314,7 @@ for (const z of CAND) {
 ok(stateFails === 0,
   'C8 every not-measured ZIP shows UNKNOWN, never a false numeric zero', stateFails);
 ok(zeroFails === 0,
-  'C8b every AUTHORITATIVE measured zero shows a real numeric 0, never an em-dash', zeroFails);
+  'C8b every AUTHORITATIVE ZIP shows a real NUMBER, never the unknown em-dash', zeroFails);
 ok(sawMeasured > 0,
   'C9 measured ZIPs were actually observed live (not a vacuous pass)', sawMeasured);
 ok(sawMeasuredZero > 0,
