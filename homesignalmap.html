@@ -252,6 +252,30 @@
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
+  /* Type row heading + its dropdown. The chips remain the primary control; this is a
+     second view of the SAME filter state for residents who look for an explicit control
+     rather than trying the legend. */
+  .typehd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tfwrap{position:relative;display:inline-flex}
+  .tfbtn{font:inherit;font-size:11px;font-weight:600;color:var(--ink);cursor:pointer;
+    display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:7px;
+    border:1px solid var(--line);background:#fff}
+  .tfbtn:hover{background:#f2f5f3}
+  .tfbtn[aria-expanded="true"]{border-color:var(--green);color:var(--green)}
+  .tfct{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
+    padding:0 4px;border-radius:999px;background:var(--green);color:#fff;font-size:10px;font-weight:700}
+  .tfct[hidden]{display:none}
+  .tfmenu{position:absolute;top:calc(100% + 5px);left:0;z-index:900;min-width:210px;padding:6px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.13)}
+  .tfmenu[hidden]{display:none}
+  .tfrow{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:6px;cursor:pointer;
+    font-size:12px;color:var(--ink);white-space:nowrap}
+  .tfrow:hover{background:#f2f5f3}
+  .tfrow input{margin:0;cursor:pointer;accent-color:var(--green)}
+  .tfrow .ic{display:flex;align-items:center;line-height:0}
+  .tfall{display:block;width:100%;margin-top:4px;padding:6px;font:inherit;font-size:11px;font-weight:600;
+    color:var(--green);background:none;border:0;border-top:1px solid var(--line);cursor:pointer;text-align:left}
+  .tfall:hover{background:#f2f5f3}
 
   /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
      The resolved-project data is a verified public-record anchor. Every honesty label the
@@ -342,7 +366,15 @@
             <div class="maplegend-wrap">
               <div class="mapkey-hd">Stage — pin color</div>
               <div class="mapkey" id="mapkey"></div>
-              <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
+              <div class="mapkey-hd typehd" id="shapeLegHd"><span>Type — pin shape</span>
+                <span class="tfwrap">
+                  <button type="button" class="tfbtn" id="typeFilterBtn" aria-haspopup="true"
+                          aria-expanded="false" aria-controls="typeFilterMenu">Show types
+                    <span class="tfct" id="typeFilterCount" hidden></span> &#9662;</button>
+                  <div class="tfmenu" id="typeFilterMenu" hidden role="group"
+                       aria-label="Show or hide project types"></div>
+                </span>
+              </div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
               <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. A site that is a data center <em>and</em> carries an EPA record keeps its data-center shape with a small purple EPA square beneath, and appears under either filter. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
               <!-- Shown ONLY when every Type chip is off (HS.allCategoriesOff) and this ZIP
@@ -1837,7 +1869,43 @@ HS.onReady(function(){
       });
       typeRows.push({ key: "facility", shape: HS.CATEGORY_REGISTRY.facility.symbol,
                       color: HS.markerRegistry.facilityHex, label: HS.CATEGORY_REGISTRY.facility.label });
-      var catState = HS.getCategoryFilters();
+
+      // TWO CONTROLS OVER ONE STATE. The legend chips and the "Show types" dropdown are two
+      // views of the SAME HS.getCategoryFilters() set - not a second filter model. Everything
+      // that mutates goes through setType(), and everything that displays is repainted by
+      // syncTypeControls(), so the two can never disagree about what is hidden. A resident who
+      // discovers the chips and one who opens the dropdown are operating the same switch.
+      var tfBtn = document.getElementById("typeFilterBtn");
+      var tfMenu = document.getElementById("typeFilterMenu");
+      var tfCount = document.getElementById("typeFilterCount");
+      var chipByKey = {}, boxByKey = {};
+
+      function syncTypeControls(){
+        var st = HS.getCategoryFilters(), hidden = 0;
+        typeRows.forEach(function(r){
+          var on = !!st[r.key];
+          if(!on) hidden++;
+          var chip = chipByKey[r.key];
+          if(chip){
+            chip.classList.toggle("off", !on);
+            chip.setAttribute("aria-pressed", on ? "true" : "false");
+          }
+          var box = boxByKey[r.key];
+          if(box) box.checked = on;
+        });
+        // The count is the honest read of the control: a resident who left types off and
+        // scrolled away can see, without opening anything, that the map is filtered.
+        if(tfCount){ tfCount.hidden = (hidden === 0); tfCount.textContent = hidden ? String(hidden) : ""; }
+        if(tfBtn) tfBtn.setAttribute("aria-label",
+          hidden ? (hidden + " of " + typeRows.length + " project types hidden") : "All project types shown");
+      }
+      // The ONLY writer. Both controls and the reset call it.
+      function setType(key, on){
+        HS.setCategoryFilter(key, on);
+        syncTypeControls();
+        applyFilter();
+      }
+
       typeRows.forEach(function(r){
         var row = document.createElement("span");
         row.className = "sh";
@@ -1845,22 +1913,70 @@ HS.onReady(function(){
         row.setAttribute("role", "button");
         row.setAttribute("data-cat", r.key);
         row.setAttribute("aria-label", r.label + " markers");
-        if(!catState[r.key]) row.classList.add("off");
-        row.setAttribute("aria-pressed", catState[r.key] ? "true" : "false");
         row.innerHTML = "<span class='ic'>" + HS.markerSVG(r.shape, r.color, "", 14) + "</span><span class='t'>" + esc(r.label) + "</span>";
-        function toggle(){
-          var on = !HS.getCategoryFilters()[r.key];
-          HS.setCategoryFilter(r.key, on);
-          row.classList.toggle("off", !on);
-          row.setAttribute("aria-pressed", on ? "true" : "false");
-          applyFilter();
-        }
+        chipByKey[r.key] = row;
+        function toggle(){ setType(r.key, !HS.getCategoryFilters()[r.key]); }
         row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
         row.addEventListener("keydown", function(e){
           if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
         });
         shapes.appendChild(row);
       });
+
+      // The dropdown, built from the SAME typeRows - never a hand-listed second roster, so a
+      // category added to CATEGORY_REGISTRY appears in both controls with no change here.
+      if(tfMenu){
+        tfMenu.innerHTML = "";
+        typeRows.forEach(function(r){
+          var lab = document.createElement("label");
+          lab.className = "tfrow";
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.setAttribute("data-cat-input", r.key);
+          cb.addEventListener("change", function(){ setType(r.key, cb.checked); });
+          boxByKey[r.key] = cb;
+          var ic = document.createElement("span");
+          ic.className = "ic";
+          ic.innerHTML = HS.markerSVG(r.shape, r.color, "", 14);
+          var t = document.createElement("span");
+          t.className = "t";
+          t.textContent = r.label;
+          lab.appendChild(cb); lab.appendChild(ic); lab.appendChild(t);
+          tfMenu.appendChild(lab);
+        });
+        var all = document.createElement("button");
+        all.type = "button";
+        all.className = "tfall";
+        all.id = "typeFilterAll";
+        all.textContent = "Show all types";
+        all.addEventListener("click", function(){
+          typeRows.forEach(function(r){ HS.setCategoryFilter(r.key, true); });
+          syncTypeControls();
+          applyFilter();
+        });
+        tfMenu.appendChild(all);
+      }
+      // Open/close wired ONCE - buildLegend can run again on a redraw, and re-adding these
+      // would stack duplicate document-level listeners.
+      if(tfBtn && tfMenu && !tfBtn.getAttribute("data-wired")){
+        tfBtn.setAttribute("data-wired", "1");
+        var closeTf = function(){
+          tfMenu.hidden = true;
+          tfBtn.setAttribute("aria-expanded", "false");
+        };
+        tfBtn.addEventListener("click", function(e){
+          e.stopPropagation();
+          var opening = tfMenu.hidden;
+          tfMenu.hidden = !opening;
+          tfBtn.setAttribute("aria-expanded", opening ? "true" : "false");
+        });
+        tfMenu.addEventListener("click", function(e){ e.stopPropagation(); });
+        document.addEventListener("click", closeTf);
+        document.addEventListener("keydown", function(e){
+          if(e.key === "Escape" || e.key === "Esc"){ closeTf(); }
+        });
+      }
+      syncTypeControls();
     }
   }
 
