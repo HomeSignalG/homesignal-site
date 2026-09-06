@@ -40,6 +40,70 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — DATA CENTER SIGNIFICANCE: what KIND of activity, not just what it relates to
+
+`Data center` was the whole answer for a **285,282 SF ground-up data hall** AND for a
+**sign permit**. Both correct; neither told a resident whether something is being built.
+TYPE and SIGNIFICANCE are now separate dimensions — the type, octagon, colour, filters and
+counts are untouched.
+
+🔑 **THE FIELD INVENTORY DECIDED THE DESIGN.** Measured over the whole corpus (107 records /
+479 rows): `size` **0/479** · `investment` **0/479** · `jobs` **0/479** · `scope_text`
+**0/479** · `developer` **0/479**. **There is no structured scale anywhere.** Only two
+authoritative inputs exist: the issuing authority's own permit class (`type_raw`, 383/479)
+and the record's own description. Explicit square footage appears in **6 of 479 rows**.
+
+**Taxonomy — two established states and an explicit unknown:**
+- **Major development** — 5 records / 9 rows (new-construction/shell permit class, or "new
+  ground up" / "construct data center" wording)
+- **Ancillary work** — 15 records / 46 rows (the jurisdiction's OWN ancillary class: sign,
+  fire alarm, fire pump, stationary battery, access gates, fire-prevention service request;
+  or a named ancillary act like a roof or cooling-tower replacement)
+- **Significance not stated** — **87 records / 424 rows (81%)**, and that is the correct
+  outcome. Absence of scale is never read as "small".
+
+⛔ **EXPANSION WAS MEASURED AND REJECTED** — 2 of 5 candidates genuine. A rule on
+"addition"/"expansion" would have told residents that `DATA CENTER CRAC ADDITION` (a cooling
+unit) and `DATA CENTER & HVAC EXPANSION` (65 rows) are data-centre expansions.
+
+🔑 **THE VETO: the source's own class outranks its free text.** `ADDITIONS/ALTERATIONS/REPAIRS
+Construct data center and pump house renovations` reads as new construction and was filed by
+the jurisdiction as an alteration. 2 production records turn on this; both stay unknown.
+Proven load-bearing — strip the class and the identical text does read as major.
+
+⚠️ **`permit_class`, NOT `type_raw` — and the reason is the frozen classifier.** ZIP mode
+rebuilds development through `zipAuthSiteFromMarker`, which does not map `type_raw`. Without
+carrying the class, **ancillary loses 12 of 15 records / 41 of 46 rows** on the flagship
+surface (major loses none — every major record's evidence is also in its name). So the class
+travels under its own name: mapping it as `type_raw` would feed the FROZEN data-centre
+classifier a fifth evidence field and turn **2 more records** into data centres. Asserted both
+ways. Fails safe — a future projection dropping the column loses a verdict, never invents one.
+
+⚠️ **Postgres has no `\b` word boundary — it is `\y`.** The corpus-wide SQL mirror of these
+rules first reported 3 major / 0 vetoed; with `\y` the same query reports 5 / 2. The
+instrument was under-matching, not the shipped JavaScript.
+
+- **Resident-facing, proven in a real browser on the authoritative ZIP path:**
+  `Major development · Approved / permitted` · `Ancillary work · Proposed / hearing` ·
+  `Significance not stated · Recorded / operating`. Significance ADDS to the lifecycle stage,
+  never replaces it.
+- **Frozen and proven frozen:** the classifier (107/479 before and after) · dual identity (EPA
+  data centres keep the octagon + subordinate EPA square, and are pinned `significanceApplies:
+  false` — an operating facility is not a development record) · every other type carries
+  `significance: null` even when its permit class matches · geography untouched · 3 records
+  still make 3 markers.
+- Suites: `marker-datacenter-significance` 52 · `map1-datacenter-significance.browser` 12 ·
+  dual-identity 36 + 20 · `marker-datacenter-type` 87 · `user-journey.browser` 0 failed ·
+  **full offline 148 files, 0 failed**. Mutation-proved (veto→1 red, no-significance→30 red,
+  page line→4 red incl. the acceptance test, which was rewritten after a first mutation showed
+  it could pass on the lifecycle words alone).
+- 📌 **OPEN, logged not fixed:** 81% not stated (the evidence does not exist) · `name` is
+  truncated at ~120 chars by the connectors, so wording beyond that is invisible · square
+  footage is not a separate rendered field (it survives inside the displayed description; a
+  separate line would imply a structured field that does not exist) · 96 of 479 rows carry no
+  permit class at all · significance is per RECORD, not per project — no entity resolution.
+- Receipt: `docs/maps-datacenter-significance-2026-09-06.md`.
+
 ### 2026-09-06 — DATA CENTER + EPA DUAL IDENTITY: one record, two truths (Map 1)
 
 **The founder-set contract, implemented:** a site that IS a data centre and separately
