@@ -170,7 +170,8 @@ const a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
-ok(/Within/.test(a.within || ''), 'G address mode states the radius', a.within);
+ok(/^Showing development within .+ of$/.test(a.within || ''),
+   'G address mode states WHAT is bounded and by what radius', a.within);
 ok(a.radiusVisible === true, 'G the radius control is available in address mode');
 ok(a.homePins === 1, 'G HOME is pinned at the geocoded address', a.homePins);
 ok(a.canonical > 0, 'G canonical radius results render', a.canonical);
