@@ -30,6 +30,65 @@ If you can't produce the evidence in the same message, you don't yet know it —
 
 ---
 
+## CONCURRENCY CHECK — REQUIRED BEFORE EDITING (founder, 2026-09-06)
+
+**Many sessions write this repo at once. Check before you build, or you will build something that
+already exists.** This supplements the shared-data "re-read before write" rule (#0a): that one
+covers TABLES, this one covers FEATURES, which is where the collisions have actually happened.
+
+*Measured 2026-09-06: eleven `claude/*` branches pushed within two hours, and **four separate
+sessions independently built the same Map 1 two-mode clarity feature** — #1068, #1069, #1070 and
+#1071. #1069 merged and deployed at 18:53:05Z; #1072 then reverted it as out of scope, so within
+about twenty minutes the same feature was built four times, shipped, and removed. Three of the
+four builds were wasted, and each was proven with its own live production run before anyone
+noticed the others.*
+
+**Before changing a customer-facing feature, page, UI label, control, navigation behaviour, test,
+workflow, or any implementation that can overlap across sessions:**
+
+1. **Fetch current `main`.** Read the tip you actually have, not the one your session started on.
+2. **Search open and recently merged PRs** for the same outcome, feature, wording, element id,
+   page, user journey, acceptance criterion, or affected file. Search the thing a resident would
+   notice, not your branch's vocabulary — the four duplicates above carried four different branch
+   names and one feature.
+3. **Check active branches/sessions** for work implementing the same outcome:
+   `git for-each-ref --sort=-committerdate --format='%(committerdate:iso8601) %(refname:short)' refs/remotes/origin | head`
+4. **Assign and record exactly one verdict BEFORE editing:**
+   - **ALREADY IMPLEMENTED** — the acceptance criteria are already merged or deployed. Do not make
+     a competing implementation. Verify and report the existing result.
+   - **DUPLICATE IN PROGRESS** — another active branch/session is implementing the same customer
+     outcome. Do not create competing work. Report the branch/PR and wait for direction or
+     coordinate ownership.
+   - **GENUINE GAP** — no active or merged work satisfies the acceptance criteria. Proceed.
+5. **Only edit after** confirming there is no active duplicate and the work is still needed.
+6. **A founder-reverted product outcome is not a gap.** If `main` once carried the outcome and a
+   revert removed it, absence from `main` is a DECISION, not an opening. Do not rebuild or
+   re-merge it without new explicit authorization naming the revert. *(#1069 shipped the Map 1
+   mode-clarity work and #1072 reverted it as out of scope; two duplicate PRs were still open at
+   that moment, each one merge away from re-shipping what had just been deliberately removed.)*
+
+**Before opening a PR or merging:**
+
+1. Fetch `main` again.
+2. Recheck open and recently merged PRs, and active branches, for the same outcome.
+3. Inspect whether `main` now has an equivalent implementation, or whether the PR conflicts in the
+   same customer-facing file(s).
+4. **If equivalent work is now merged:** do NOT force-resolve the conflict to ship another
+   implementation. Close or re-scope the duplicate PR, and report the shipped PR, merge SHA,
+   deployment status, and any unique non-duplicate work.
+5. **If a branch holds both unique and duplicate work:** remove the duplicate portion, rebase on
+   current `main`, and open a new, narrowly scoped PR containing only the unique work.
+
+⚠️ **A conflict in the very file your feature edits is the signal, not an obstacle.** On
+2026-09-06 that was `mergeable_state: dirty` on `homesignalmap.html`, and the correct resolution
+was to close the PR, not to fix the conflict.
+
+⚠️ **Step 2 costs one API call and is the one that would have caught it.** In the case above the
+duplicate was found at merge time — after the feature had been built, proven with a live
+production run, and written up. Everything before that fetch was sunk cost.
+
+---
+
 ## Standing autonomy grant — ship this class without asking (founder, 2026-07-30)
 
 **Do not ask permission for work you have already verified.** Verifying first and asking after
