@@ -143,6 +143,22 @@ If it fails, the fix is wording on the surfaces in the table above. Change one, 
 
 ---
 
+## A trap in the mechanical half, so the next suite avoids it
+
+**Do not serve Leaflet from a hardcoded `node_modules/leaflet/...` path.** The repo has no
+`package.json`, and `unit-tests.yml` installs **playwright alone** into a scratch directory
+*outside* the checkout — so `node_modules/leaflet` exists on a dev machine and never on a
+runner. A hardcoded `readFile` throws `ENOENT` inside the Playwright route handler and kills
+the suite **before a single assertion prints**.
+
+Use the shape `test/map1-dual-identity.browser.test.mjs` already uses: `require.resolve(
+'leaflet/dist/leaflet…')`, and `route.continue()` to the CDN the page already names when that
+fails. A missing map then shows up as red assertions rather than as a crash.
+
+🔑 **The wider lesson: a crash and a clean pass both print zero failure lines.** Searching CI
+output for `FAIL` will not find a suite that died before it could report. Attribute a red job
+by the runner's non-zero exit count, never by the absence of failure text.
+
 ## Running the mechanical half
 
 ```
