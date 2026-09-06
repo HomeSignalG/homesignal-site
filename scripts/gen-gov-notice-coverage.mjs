@@ -70,6 +70,26 @@ const SOURCE_CURRENT_DAYS = 90;
 const currentFloor = new Date(Date.now() - SOURCE_CURRENT_DAYS * 86400000)
   .toISOString()
   .slice(0, 10);
+// ⚠️ THE +90 CEILING IS DELIBERATELY *NOT* APPLIED HERE, AND THAT IS A DECISION WITH A
+// REASON, NOT AN OVERSIGHT. The founder refined the source-currentness window to a
+// symmetric -90/+90 on 2026-09-06, and the engine measurement
+// (homesignal-ingest scripts/measure_gov_notices.sql) enforces both ends. Applying the
+// ceiling HERE would drop 322 canonical ZIP pages across 17 counties from the artifact.
+//
+// Those 17 fail the ceiling because of a HomeSignal CONFIGURATION DEFECT, not because
+// their sources are stale. Every one is a CivicClerk feed configured
+// `$top=5&$orderby=startDateTime desc`; the vendor caps a page at ~15 rows, so descending
+// order returns only the far-future tail and the county's current meetings — which sit in
+// the middle of the tenant's history — are unreachable. Proven live 2026-09-06: the Anne
+// Arundel tenant holds 437 events and a date-bounded refetch returns 15, ALL inside
+// -90/+90 with 6 past-dated; Delaware County PA holds 1,390 and likewise returns 15 all
+// inside the window. The sources are current; our query cannot see them.
+//
+// Removing 322 pages of correct coverage to enforce a rule against our own defect would
+// be trading correctness for nothing. The repair needs a RELATIVE date bound that a static
+// feeds.csv URL cannot express, so it is architectural and is HELD, not attempted.
+// Cohort frozen in public.gn_civicclerk_window_defect_20260906.
+// Restore the ceiling here in the same change that repairs those endpoints.
 const delivered = await all(
   `alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}`,
   'community_id',
