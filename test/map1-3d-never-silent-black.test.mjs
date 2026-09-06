@@ -8,10 +8,12 @@
 //   background on screen — a completely black rectangle — with the explanation discarded.
 //
 //   Two failure classes were measured, both producing exactly that:
-//     * NO WEBGL. With getContext('webgl') returning null (Brave's "Block fingerprinting:
-//       Strict" is the common cause), three.js r132 THROWS "Error creating WebGL context."
-//       and MapLibre 4.7.1 throws "Failed to initialize WebGL". BOTH 3D views go black
-//       while the 2D Leaflet map, which needs no WebGL, keeps working.
+//     * NO WEBGL. With getContext('webgl') returning null — one REPRODUCED trigger, whose
+//       causes are many (blocked/unavailable WebGL, no hardware acceleration, a driver
+//       denylist, a virtualised GPU, an older mobile device) — three.js r132 THROWS
+//       "Error creating WebGL context." and MapLibre 4.7.1 throws "Failed to initialize
+//       WebGL". BOTH 3D views go black while the 2D Leaflet map, which needs no WebGL,
+//       keeps working. The trigger is not attributed to any one browser.
 //     * NON-FINITE HOME. render() can pass {lat:null,lng:null} (the branch for a ZIP with
 //       authoritative geography but no cached development_reports row). MapLibre's
 //       constructor then throws "Invalid LngLat object: (NaN, NaN)" — captured verbatim
@@ -49,9 +51,9 @@ ok(HS.webglSupported(docWith((t) => (t === 'webgl' ? {} : null))) === true,
   '§1 a browser that grants a webgl context reports supported');
 ok(HS.webglSupported(docWith((t) => (t === 'webgl2' ? {} : null))) === true,
   '§1 webgl2 alone is enough');
-// The measured Brave shape: the API exists, the context is refused. Presence != capability.
+// The measured shape: the API exists, the context is refused. Presence != capability.
 ok(HS.webglSupported(docWith(() => null)) === false,
-  '§1 a browser that REFUSES the context reports unsupported (the Brave fingerprinting case)');
+  '§1 a browser that REFUSES the context reports unsupported — presence of the API is not capability');
 ok(HS.webglSupported({ createElement: () => ({}) }) === false,
   '§1 a canvas with no getContext reports unsupported');
 // A probe that can throw is a second failure mode, so it must swallow its own errors only.
@@ -59,15 +61,47 @@ ok(HS.webglSupported(docWith(() => { throw new Error('blocked'); })) === false,
   '§1 a throwing getContext returns false rather than propagating');
 ok(HS.webglSupported(null) === false, '§1 no document reports unsupported, never throws');
 
-// ── §2 the failure copy names the view, the cause, and what still works ─────────────────
-const nowebgl = HS.map3dFailCopy('3D satellite', 'nowebgl');
-ok(/3D satellite/.test(nowebgl), '§2 copy names the view the resident clicked');
-ok(/WebGL/i.test(nowebgl) && /Brave/i.test(nowebgl),
-  '§2 the no-WebGL copy names the cause and the setting that fixes it');
-ok(/2D map/.test(nowebgl), '§2 the no-WebGL copy says what still works');
-ok(/load/i.test(HS.map3dFailCopy('3D aerial', 'load')), '§2 the load-failure copy is distinct');
-ok(HS.map3dFailCopy('3D aerial', 'init') !== nowebgl,
-  '§2 an init failure is not reported as a WebGL failure — different causes, different copy');
+// ── §2 the failure copy is BROWSER-NEUTRAL and never asks anyone to weaken a setting ────
+// Founder ruling, 2026-09-06. HomeSignal must work across supported browsers and must never
+// instruct a resident to change a privacy control, a shield, or a security setting to see a
+// map. An earlier draft named a specific browser's fingerprinting setting and told the
+// resident to turn it down. This section exists so that copy cannot come back — it is the
+// half of this file that guards a PRODUCT rule rather than a defect.
+const EXPECTED =
+  '3D view isn\u2019t available on this device or browser right now. ' +
+  'You\u2019ve been returned to the 2D map.';
+ok(HS.MAP3D_FALLBACK === EXPECTED,
+  '§2 the fallback message is the approved string, character for character', HS.MAP3D_FALLBACK);
+ok(HS.MAP3D_FALLBACK_DETAIL === '3D views require WebGL and hardware-accelerated graphics.',
+  '§2 the optional secondary line is the approved string', HS.MAP3D_FALLBACK_DETAIL);
+// Every failure class yields the SAME resident-facing string. A per-reason message is how
+// vendor-specific copy re-enters: one branch gets "helpful" and names a browser.
+['nowebgl', 'load', 'init', undefined, 'something-new'].forEach((r) => {
+  ok(HS.map3dFailCopy(r) === EXPECTED,
+    '§2 reason ' + JSON.stringify(r) + ' yields the same neutral message');
+});
+// The prohibition, asserted as a prohibition rather than trusted to the string comparison
+// above — so it still holds if the approved copy is ever revised.
+const BANNED = [
+  [/brave/i, 'a browser name (Brave)'], [/chrome|chromium/i, 'a browser name (Chrome)'],
+  [/safari/i, 'a browser name (Safari)'], [/firefox/i, 'a browser name (Firefox)'],
+  [/edge\b/i, 'a browser name (Edge)'],
+  [/shield/i, 'a privacy control (Shields)'], [/fingerprint/i, 'fingerprinting protection'],
+  [/settings?\b/i, 'browser settings'], [/\benable\b|\bre-enable\b/i, 'an instruction to enable something'],
+  [/\bturn (on|off)\b/i, 'an instruction to turn something on or off'],
+  [/\bdisable\b/i, 'an instruction to disable something'],
+  [/hardware acceleration\b(?!.*require)/i, 'an instruction about hardware acceleration'],
+];
+const allCopy = [HS.MAP3D_FALLBACK, HS.MAP3D_FALLBACK_DETAIL, HS.map3dFailCopy('nowebgl')].join(' | ');
+BANNED.forEach(([re, what]) => {
+  ok(!re.test(allCopy), '§2 the copy never mentions ' + what);
+});
+// And the page must not carry a second, older copy path that bypasses the helper.
+ok(!/Brave|Shields|fingerprint/i.test(page),
+  '§2 no browser-specific fallback copy remains anywhere in the page');
+ok(!/Brave|Shields|fingerprint/i.test(readFileSync(join(root, 'lib/map.js'), 'utf8').split('\n')
+     .filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')),
+  '§2 no browser-specific fallback copy remains in lib/map.js outside its comments');
 
 // ── §3 the page guards BOTH measured failure classes ────────────────────────────────────
 // The exact defect: a callback invoked into an empty catch. Its absence is the fix.
@@ -100,6 +134,14 @@ ok(/mapMsg\("3D satellite", "Loading satellite imagery…", "load"\)/.test(page)
   '§4 entering 3D satellite shows a loading state');
 ok(/\.map-msg\.mm-bar\{/.test(page),
   '§4 the failure notice has a strip mode — it must not cover the 2D map it falls back to');
+ok(/mapMsg\(copy, detail, "fail"\)/.test(page),
+  '§4 the fallback renders the approved primary message with the optional secondary line');
+ok(/@media \(max-width: 560px\)\{ \.map-msg \.mm-sub\{display:none\} \}/.test(page),
+  '§4 the secondary line is dropped where there is no room, rather than growing the strip');
+ok(/-webkit-backdrop-filter/.test(page),
+  '§4 the notice is styled for WebKit too — this must render on Safari, not only Chromium');
+ok(/status\(""\);\s*\/\/ one explanation, not two/.test(page),
+  '§4 a load failure shows ONE message, not the loader status plus the strip');
 ok(/console\.error\("\[HomeSignal\] " \+ label \+ " failed to start:"/.test(page),
   '§4 the swallowed exception is now logged, so a console error exists to paste');
 ok(/GL\.map\.on\("error"/.test(page) && /webglcontextlost/.test(page),

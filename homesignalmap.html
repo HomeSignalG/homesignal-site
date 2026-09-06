@@ -99,7 +99,8 @@
      as a silent black rectangle. Hidden entirely when nothing is wrong, so a working
      map is pixel-identical to before. */
   .map-msg{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
-    padding:24px;background:rgba(10,18,20,.92);backdrop-filter:blur(1px)}
+    padding:24px;background:rgba(10,18,20,.92);
+    -webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px)}
   .map-msg[hidden]{display:none}
   /* FALLBACK NOTICE — a strip, never a cover. When a 3D view fails the resident is put back
      on the 2D map, so the explanation must sit ABOVE that map without hiding it; covering it
@@ -113,6 +114,11 @@
   .map-msg .mm-x{position:absolute;top:8px;right:10px;border:0;background:transparent;cursor:pointer;
     color:#eaf5f1;font:600 15px var(--font);line-height:1;padding:4px 6px;opacity:.75}
   .map-msg .mm-x:hover{opacity:1}
+  .map-msg .mm-sub{margin-top:3px;opacity:.85}
+  /* The secondary line is optional by design — on a narrow screen the primary message and
+     the map matter more than the requirement note, so it is dropped rather than allowed to
+     grow the strip over the 2D map underneath it. */
+  @media (max-width: 560px){ .map-msg .mm-sub{display:none} }
   .map-msg .mm-spin{width:22px;height:22px;margin:0 auto 10px;border-radius:50%;
     border:2px solid rgba(255,255,255,.25);border-top-color:#2dd4bf;animation:mmspin .9s linear infinite}
   @keyframes mmspin{to{transform:rotate(360deg)}}
@@ -1077,7 +1083,8 @@ HS.onReady(function(){
     var loading = (kind === "load");
     el.className = "map-msg" + (loading ? "" : " mm-bar");
     el.innerHTML = "<div class='mm-in'>" + (loading ? "<div class='mm-spin'></div>" : "")
-      + "<div class='mm-t'>" + esc(title) + "</div><div>" + esc(body || "") + "</div></div>"
+      + "<div class='mm-t'>" + esc(title) + "</div>"
+      + (body ? "<div class='mm-sub'>" + esc(body) + "</div>" : "") + "</div>"
       + (loading ? "" : "<button type='button' class='mm-x' id='mapMsgX' aria-label='Dismiss'>\u00d7</button>");
     el.hidden = false;
     var x = $("mapMsgX"); if(x) x.addEventListener("click", function(){ mapMsg(); });
@@ -1088,12 +1095,18 @@ HS.onReady(function(){
   // black rectangle behind. `reason` is 'nowebgl' | 'load' | 'init'; the copy lives in
   // lib/map.js so it can be unit-tested offline.
   function fail3D(mode, reason){
-    var label = (mode === "gl") ? "3D satellite" : "3D aerial";
-    var copy  = (window.HS && HS.map3dFailCopy) ? HS.map3dFailCopy(label, reason)
-              : (label + " couldn't start. Showing the 2D map instead.");
+    // The resident-facing string is browser-neutral and identical for every failure class:
+    // it names no browser, no vendor setting and no privacy control (founder ruling,
+    // 2026-09-06). WHICH failure occurred goes to the console, where it is a diagnostic.
+    if(window.console && console.warn) console.warn("[HomeSignal] 3D view unavailable (" + mode + "/" + reason + ")");
+    var copy   = (window.HS && HS.MAP3D_FALLBACK) ? HS.MAP3D_FALLBACK
+               : "3D view isn\u2019t available on this device or browser right now. "
+               + "You\u2019ve been returned to the 2D map.";
+    var detail = (window.HS && HS.MAP3D_FALLBACK_DETAIL) ? HS.MAP3D_FALLBACK_DETAIL : "";
     setView("2d");                                  // never strand the resident on a dead panel
     syncViewSeg("2d");
-    mapMsg(label + " isn't available here", copy, "fail");
+    status("");                                     // one explanation, not two
+    mapMsg(copy, detail, "fail");
   }
 
   // Keep the segmented control's highlight honest when the page — not a click — chooses
@@ -2521,9 +2534,11 @@ HS.onReady(function(){
     if(mode==="2d") return;
 
     // PREFLIGHT, before the dark panel is left on screen with nothing in it. Both 3D views
-    // are WebGL; a browser that blocks it (Brave's "Block fingerprinting: Strict" is the
-    // common case) fails them BOTH while the 2D Leaflet map keeps working. Detected here so
-    // the resident is told, instead of being shown a black rectangle and a clean console.
+    // need a WebGL context; where one cannot be created BOTH fail while the 2D Leaflet map,
+    // which needs no WebGL, keeps working. The causes are many and not attributable to any
+    // one browser — WebGL unavailable or switched off, no hardware acceleration, a driver
+    // denylist, a virtualised GPU, an older mobile device. Detected here so the resident is
+    // returned to a working map, instead of being shown a blank panel and a clean console.
     if(!(window.HS && HS.webglSupported && HS.webglSupported(document))){ fail3D(mode, "nowebgl"); return; }
     if(!homePointOK(LAST_HOME)){ fail3D(mode, "init"); return; }
 
