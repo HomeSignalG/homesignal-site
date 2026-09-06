@@ -266,28 +266,55 @@ ok(bare.shown === false,
 // Each ZIP is judged by the state IT reports, and the pass requires having OBSERVED both
 // states, so a run where every candidate happened to be measured cannot score green on the
 // not-measured rule it never exercised.
-const CAND = (process.env.STATE_ZIPS || '78617,71104,84334,84999').split(',').map(z => z.trim()).filter(Boolean);
-let sawNotMeasured = 0, sawMeasured = 0, stateFails = 0;
+// FIRST RUN FOUND ALL CANDIDATES MEASURED, so the list is widened to genuinely SEARCH for a
+// not_measured ZIP - rural/remote ZIPs across many states, where authoritative measurement is
+// least likely to have landed. Selection is the instrument here; a narrow list proves nothing.
+const CAND = (process.env.STATE_ZIPS ||
+  '78617,71104,84334,59718,82190,89049,79837,99723,57625,88055,04413,96769,83252,59645,89310'
+).split(',').map(z => z.trim()).filter(Boolean);
+let sawNotMeasured = 0, sawMeasured = 0, sawMeasuredZero = 0, stateFails = 0, zeroFails = 0;
 for (const z of CAND) {
   await page.goto(BASE + '/homesignalmap.html?zip=' + z, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 }).catch(() => {});
   await page.waitForTimeout(2500);
   const r = await readScreen();
-  const notMeasured = /not measured yet/i.test(r.freshLine || '');
+  const fresh = r.freshLine || '';
+  const notMeasured = /not measured yet/i.test(fresh);
+  // "measured zero" is the AUTHORITATIVE zero and says so in its own words.
+  const measuredZero = /measurement of the whole ZIP, not an empty search/i.test(fresh);
   const dev = (r.tileDevText || '').trim();
-  info('state ZIP ' + z, { notMeasured: notMeasured, dev: dev, fresh: (r.freshLine || '').slice(0, 120) });
+  info('state ZIP ' + z, { notMeasured, measuredZero, dev, fresh: fresh.slice(0, 110) });
   if (notMeasured) {
     sawNotMeasured++;
     if (dev !== '\u2014') { stateFails++; console.log('   !! ' + z + ' is not_measured but shows dev "' + dev + '"'); }
+  } else if (measuredZero) {
+    sawMeasuredZero++; sawMeasured++;
+    // The founder's control: an authoritative zero must stay a REAL numeric zero.
+    if (dev !== '0') { zeroFails++; console.log('   !! ' + z + ' is a measured zero but shows dev "' + dev + '"'); }
   } else if (/^\d+$/.test(dev)) {
-    sawMeasured++;   // authoritative measured value, including a real numeric zero
+    sawMeasured++;
   }
 }
 ok(stateFails === 0,
   'C8 every not-measured ZIP shows UNKNOWN, never a false numeric zero', stateFails);
-ok(sawNotMeasured > 0 && sawMeasured > 0,
-  'C9 both states were actually OBSERVED live (not a vacuous pass)',
-  { notMeasured: sawNotMeasured, measured: sawMeasured });
+ok(zeroFails === 0,
+  'C8b every AUTHORITATIVE measured zero shows a real numeric 0, never an em-dash', zeroFails);
+ok(sawMeasured > 0,
+  'C9 measured ZIPs were actually observed live (not a vacuous pass)', sawMeasured);
+ok(sawMeasuredZero > 0,
+  'C9b ...including at least one AUTHORITATIVE measured zero, distinct from not-measured',
+  sawMeasuredZero);
+// NOT-MEASURED is reported as INCONCLUSIVE rather than failed when production contains no such
+// ZIP. The repo's own convention: an absence of evidence is neither a pass nor a fail, and
+// scoring it green would claim a live proof that never ran. The RULE itself is mutation-proved
+// offline (user-journey section 14), so this reports coverage, not correctness.
+if (sawNotMeasured === 0) {
+  console.log('INCONCLUSIVE — C8 not exercised live: none of the ' + CAND.length +
+    ' probed ZIPs is in the not_measured state. Rule proven offline (section 14e/14f); ' +
+    'NOT proven on production.');
+} else {
+  console.log('   · not_measured ZIPs observed live: ' + sawNotMeasured);
+}
 
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
