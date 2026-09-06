@@ -11225,3 +11225,37 @@ geography, and it would move the export from B to D — but it would also flip
 live behaviour change on a page outside this unit's scope, and trading one wrong answer for a
 different wrong answer is not a repair. The honest fix is to give `development.html` the same
 not-measured contract Map 1 has, which is a product change and a founder call.
+
+---
+
+## 2026-09-06 — FOUR VERIFIER DEFECTS, all the same shape: the instrument testing its sample
+
+Adding three cases to `scripts/verify-map1-zip-states.mjs` broke it four times, and not once was
+the product at fault. Recorded together because the shape repeats.
+
+1. **`dev === 0` on a pending ZIP.** 95219 renders 3 development sites. Measured against its
+   cached report: **5 development sites, 3 area-scope and 2 point-scope**, and the page shows 3
+   — `zipAuthMergeSites` dropped BOTH point-scope records and kept the jurisdiction notices.
+   That is the invariant working. `dev === 0` had passed only because the two pending ZIPs
+   sampled first happened to carry no area notices. Now: **0 AUTHORITATIVE and 0 POINT-scope**,
+   for the pending and not_measured classes alike.
+2. **A vacuous address-mode pass.** It read `window.__HS_SITES` without clearing it, so it
+   measured whatever the last ZIP case left behind — and while that case rendered nothing,
+   `dev=0 with-distance=0` passed while asserting nothing at all.
+3. **"Settled after 0 sites" accepted as settled.** 76227 (5,869 markers, ~3 MB) reported 0 on
+   one run and 5,976 on the next from the same commit. Three consecutive zero polls during a
+   slow load are indistinguishable from a measured zero. The loop now requires a non-zero count
+   before believing a stable reading **when the intercepted payload carries markers** — the
+   evidence ends the wait, not the clock.
+4. **Address-mode state carrying over from a dense ZIP page.** `zip_authoritative=5844` appeared
+   inside an ADDRESS-mode assertion. It is 76227's exact delivered count and **provably not
+   78617's own geography — that ZIP holds 522 markers / 496 projects**, so it was carry-over,
+   not the two modes conflating. Clearing the global and parking on `about:blank` both failed,
+   and the page persists nothing (no localStorage, no sessionStorage), so the measurement moved
+   to a **fresh browser context**, which shares no document, globals or storage. That also makes
+   the "did it render" check structural: in a new context the global starts undefined, so
+   requiring it back proves the render happened.
+
+**Deployed commit at the time of these measurements: `96eade0`** (pages run 35, success,
+2026-09-06 15:48:54Z). Live function: `ships_type_raw true`, `has_lateral_repair true`,
+`statement_timeout=25s`.
