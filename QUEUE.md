@@ -10720,3 +10720,83 @@ open.
 ⚠️ `geo.rule5_type_raw_diff(text)` is a **scratch measurement function** created today and
 revoked from `anon`/`authenticated`. Drop it once the national blast radius is measured or
 abandoned.
+
+---
+
+## 2026-09-06 — DENSE TRANSPORT REPAIR, Gates 4/7/8–10: the dense ZIPs deliver, live
+
+**Gate 4, answered on evidence rather than preference.** The smaller corrections were tried in
+order and each was measured, not assumed:
+
+| correction | result |
+|---|---|
+| single scan + narrow projection | 20148 warm 4,453 → 2,501 ms. **Not sufficient** — no margin against 3 s, and 15,521 ms cold. |
+| `VACUUM` (membership + markers + app_projects) | membership `Heap Fetches` 13,546 → 0. Changed nothing on the app_projects side. |
+| `app_projects_skey_kind_id_idx` (source_key, record_kind, id), 315 MB | the lateral now reads `rows=1` per key instead of ~18. **Fixes the high-multiplier ZIPs, does nothing for 1:1 ones** — 28467 still 10,821 cold reads / 4,960 ms. |
+| a covering index with INCLUDE | **rejected on the measurement above**: it reorders the same ~14,000 random reads, it does not remove them. |
+
+The wall is arithmetic: a 1:1 dense ZIP needs ~11,000–15,000 **random** lookups into a 2.9 GB /
+3.22M-row table at ~0.44 ms each. Nothing that keeps the content in `app_projects` removes that.
+**Only ZIP-contiguous storage does**, and that is the queued follow-up, not a same-day repair.
+
+**Shipped (live): `zip_markers_lateral_lowest_id_and_own_timeout`.**
+
+1. `lateral ... order by p.id asc limit 1` replaces `distinct on (p.source_key)`. **This `limit 1`
+   is not a cap on results** — it picks the one descriptive row per project (A3's existing
+   lowest-stable-id rule, which `distinct on` expressed by reading every version and discarding
+   the rest). Proven equivalent, not asserted: over the six controls, **33,376 rows, the two
+   forms select a byte-identical `(source_key, id)` set** — md5 over `string_agg(... order by
+   source_key collate "C", id)`, `identical_selection = true` on all six. (Collation pinned per
+   CLAUDE.md rule 9.) 30033 went 29,155 ms → 372 ms warm by reading 2,261 rows instead of 40,404.
+2. The function carries `set statement_timeout to '25s'`. This is the piece that stops a
+   **complete** result being thrown away by a 3 s alarm. It is a bound on a pathological cold
+   read (worst measured post-lateral: 4,960 ms), **not a licence to be slow** and not a
+   substitute for the contiguity work.
+
+**Gate 8–10 — measured LIVE in production, run `34041813224`, against the deployed page:**
+
+| ZIP | before | after | authoritative sites drawn |
+|---|---|---|---|
+| 28456 | 200 / 7,492 B | 200 · 1,169 ms | 6 |
+| 30033 | **500 · 57014** | **200 · 1,831 ms · 1,425,846 B** | **538** (was 0) |
+| 20148 | **500 · 57014** | **200 · 2,883 ms · 8,913,711 B** | **3** |
+| 28451 | **500 · 57014** | **200 · 3,509 ms · 8,969,912 B** | **2,000** (was 0) |
+
+28451 landing at 3,509 ms is the function-scoped timeout doing exactly its job: under the old 3 s
+role budget that complete 8.97 MB answer was discarded.
+
+⚖️ **20148 draws 3 pins from 13,935 markers, and that is Rule 5 working — do not "fix" it.**
+13,932 of its 13,934 records are `loudoun-county-residential-permits` whose `type_raw` is a
+UNIT type (`SINGLE-FAMILY ATTACHED` 6,259, `SINGLE-FAMILY DETACHED` 3,975, `MULTI-FAMILY
+STACKED` 1,529, `MULTI-FAMILY ATTACHED` 930, plus mixed-case variants) and whose `name` is that
+same string plus the address. No activity column, so the founder's Class 4 applies and the
+verdict is UNRESOLVED, which does not render. **`lib/residential-qualify.js` names this exact
+case in its own header** ("loudoun `SINGLE-FAMILY DETACHED` is a UNIT_TYPE"). It is an
+intentional qualification exclusion, not a missing project.
+- It does mean 20148 ships 8.9 MB so the browser can draw 3 pins. **Logged, not taken:** the
+  payload is 4–6× compressible with no data change — `source_ref` is 3 distinct values across
+  1,156,564 bytes, `registry_id` 3 / 473,748, `type_raw` 10 / 301,825, `type` 2 / 153,266,
+  `status` 3 / 125,404, `date_kind` 1; JSON key names alone are ~2.2 MB of the 8.9 MB. An
+  intern/tuple encoding is a transport change that preserves every record. Not bundled here.
+
+**Gate 7 — the 28428 remainder, classified and sized nationally.** It is exactly **30**, and it
+is neither a transport loss nor a Rule 5 exclusion: all 30 are membership rows whose
+`source_key` has **no `app_projects` row at all** (`<no app_projects row at all>`, n=30, e.g.
+`arcgis:new-hanover-county-building-permits:24-013122`). Geography was measured against a
+snapshot that held these records and ingest has since removed or re-keyed them. There is nothing
+to render, and rendering something would be fabrication.
+- **National size, with its control: 16,513 membership rows across 988 ZIPs, against 901,465
+  membership rows in total — 1.83%.**
+- Named `staleMembership` in `scripts/verify-map1-zip-states.mjs`, which now splits four
+  outcomes instead of three: `delivered` · `droppedByRuleFive` (intentional qualification
+  exclusion) · `staleMembership` (proven unrenderable-data exception) · `unexplained`, which
+  must be **0**. The identity asserted is the founder's in full:
+  `delivered + rule-5 dropped + stale-membership == the authoritative relation`. The stale class
+  is **reported, never asserted to zero** — it is real and sized — and a second assertion
+  requires it to be explained by the producer (`membership_count` vs hydrated `projects.length`)
+  rather than by a lost payload.
+
+**Still open:** ZIP-contiguous content storage (`geo.zip_authoritative_project`) so a cold dense
+ZIP is fast rather than merely correct; the payload intern encoding; and the national blast
+radius of the `type_raw` regression, which stays UNVERIFIED (the chunked measurement exceeded
+the 60 s client window). `geo.rule5_type_raw_diff(text)` remains as scratch to be dropped.

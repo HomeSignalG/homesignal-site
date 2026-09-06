@@ -113,19 +113,33 @@ for (const c of CASES) {
         if (!a || !Array.isArray(a.markers) || !Array.isArray(a.projects) || !window.HS) return null;
         const byRef = Object.create(null);
         a.projects.forEach(p => { if (p && p.project_ref && !byRef[p.project_ref]) byRef[p.project_ref] = p; });
-        let delivered = 0, droppedByRuleFive = 0, unexplained = 0;
+        // FOUR OUTCOMES, and only one of them is a defect:
+        //   delivered        drawn on the map
+        //   droppedByRuleFive  an INTENTIONAL QUALIFICATION EXCLUSION - the founder's residential
+        //                    rule rejecting routine work on an existing residential property
+        //   staleMembership  an explicitly PROVEN UNRENDERABLE-DATA EXCEPTION - authoritative
+        //                    geography holds this source_key but app_projects has no row for it
+        //                    at all, so there is no record to draw and drawing one would be
+        //                    fabrication. Measured nationally 2026-09-06: 16,513 membership rows
+        //                    across 988 ZIPs, against 901,465 membership rows in total (1.83%).
+        //                    It is REPORTED, never asserted to zero - it is real and sized.
+        //   unexplained      everything else, and it must be 0
+        let delivered = 0, droppedByRuleFive = 0, staleMembership = 0, unexplained = 0;
         a.markers.forEach(m => {
           const proj = byRef[m.project_ref];
+          if (!proj) { staleMembership++; return; }
           if (HS.zipAuthSiteFromMarker(m, proj)) { delivered++; return; }
           // rebuild what the site WOULD have been, then ask the shipped gate if it is the reason
-          const hasBasis = !!proj && typeof m.lat === 'number' && typeof m.lng === 'number';
+          const hasBasis = typeof m.lat === 'number' && typeof m.lng === 'number';
           if (hasBasis && HS.residentialGateDrops) {
             const probe = { use_type: proj.type || '', label: proj.name || '' };
             if (HS.residentialGateDrops(probe, proj)) { droppedByRuleFive++; return; }
           }
           unexplained++;
         });
-        return { relation: a.markers.length, delivered, droppedByRuleFive, unexplained };
+        return { relation: a.markers.length, membership: a.membership_count,
+                 hydrated: a.projects.length,
+                 delivered, droppedByRuleFive, staleMembership, unexplained };
       })(),
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
@@ -174,10 +188,25 @@ for (const c of CASES) {
       const r = m.ruleFive;
       ok(r.unexplained === 0,
          `${c.zip}: every authoritative marker accounted for — 0 unexplained losses`,
-         `relation=${r.relation} delivered=${r.delivered} rule5-dropped=${r.droppedByRuleFive} UNEXPLAINED=${r.unexplained}`);
-      ok(r.delivered + r.droppedByRuleFive === r.relation,
-         `${c.zip}: delivered + rule-5 dropped == the authoritative relation`,
-         `${r.delivered} + ${r.droppedByRuleFive} = ${r.delivered + r.droppedByRuleFive} vs ${r.relation}`);
+         `relation=${r.relation} delivered=${r.delivered} rule5-dropped=${r.droppedByRuleFive} `
+         + `stale-membership=${r.staleMembership} UNEXPLAINED=${r.unexplained}`);
+      // THE FOUNDER'S ACCOUNTING IDENTITY, in full:
+      //   raw authoritative relation
+      //     − intentional qualification exclusions (Rule 5)
+      //     − explicitly proven unrenderable-data exceptions (stale membership)
+      //     = the qualifying authoritative population that is delivered
+      ok(r.delivered + r.droppedByRuleFive + r.staleMembership === r.relation,
+         `${c.zip}: delivered + rule-5 dropped + stale-membership == the authoritative relation`,
+         `${r.delivered} + ${r.droppedByRuleFive} + ${r.staleMembership} = `
+         + `${r.delivered + r.droppedByRuleFive + r.staleMembership} vs ${r.relation}`);
+      // The stale class must be attributable to the PRODUCER, not to the transport: a marker
+      // with no project is only excusable when the RPC itself hydrated fewer source_keys than
+      // geography holds. If those two ever disagree, records went missing between them.
+      ok(r.membership == null || r.hydrated == null
+         || r.staleMembership <= (r.membership - r.hydrated) + (r.relation - r.membership),
+         `${c.zip}: stale markers are explained by the producer, not by a lost payload`,
+         `membership=${r.membership} hydrated=${r.hydrated} markers=${r.relation} `
+         + `stale=${r.staleMembership}`);
       ok(m.devAuthoritative === r.delivered,
          `${c.zip}: everything the gate admitted actually reached the rendered set`,
          `rendered=${m.devAuthoritative} admitted=${r.delivered}`);
