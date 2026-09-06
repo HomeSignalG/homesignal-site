@@ -1,0 +1,36 @@
+{
+  "base": "https://homesignal.net",
+  "address": "2200 CALDWELL LN, DEL VALLE, TX 78617",
+  "zip": "78617",
+  "radii_requested": [0.5, 1, 2, 5],
+  "geocoded_home": {
+    "lat": 30.215054966235,
+    "lng": -97.53885104845,
+    "matched": "2200 CALDWELL LN, DEL VALLE, TX, 78617",
+    "rpc_centre_lat": 30.215054966235,
+    "rpc_centre_lng": -97.53885104845,
+    "byte_identical": true
+  },
+  "per_radius": [
+    { "radius": 0.5, "rows_returned": 2,   "rows_with_geometry": 2,   "rendered_canonical": 2,   "max_recomputed_mi": 0.278336, "max_delta_mi": 0.000123, "outside_radius": 0, "distance_disagreements": 0 },
+    { "radius": 1,   "rows_returned": 5,   "rows_with_geometry": 5,   "rendered_canonical": 5,   "max_recomputed_mi": 0.939314, "max_delta_mi": 0.002285, "outside_radius": 0, "distance_disagreements": 0 },
+    { "radius": 2,   "rows_returned": 19,  "rows_with_geometry": 19,  "rendered_canonical": 19,  "max_recomputed_mi": 2.462779, "max_delta_mi": 0.796957, "outside_radius": 1, "distance_disagreements": 1 },
+    { "radius": 5,   "rows_returned": 246, "rows_with_geometry": 246, "rendered_canonical": 245, "max_recomputed_mi": 6.467125, "max_delta_mi": 3.63228,  "outside_radius": 5, "distance_disagreements": 12 }
+  ],
+  "started_utc": "2026-09-06T18:07:26.606Z",
+  "finished_utc": "2026-09-06T18:08:56.403Z",
+  "fails": 4,
+  "result": "FAIL",
+
+  "classification_added_after_the_run": {
+    "verdict": "THE FOUR FAILURES ARE A DEFECT IN THE ASSERTION ADDED THIS UNIT, NOT IN ADDRESS MODE",
+    "why": "The new containment assertion recomputes a great-circle distance from HOME to the row's REPRESENTATIVE MARKER POINT and requires it to be inside the radius. That is only valid for point geometry. PostGIS measures distance to the NEAREST point of a geometry, so a long corridor can have its nearest edge inside the circle while its representative point sits outside.",
+    "classifying_query": "select geometry_type, count(*), count(*) filter (where centroid_mi > 5.000001), max(abs(centroid_mi - distance_mi)), max(distance_mi) from public.n5_projects_within_radius(30.215054966235,-97.53885104845,5) ... group by 1",
+    "result_at_5_mi": [
+      { "geometry_type": "ST_Point",            "rows": 234, "centroid_outside_5mi": 0, "max_delta_mi": 0.0147, "max_centroid_mi": 4.9930, "max_rpc_distance_mi": 4.9976 },
+      { "geometry_type": "ST_MultiLineString",  "rows": 12,  "centroid_outside_5mi": 5, "max_delta_mi": 3.6323, "max_centroid_mi": 6.4671, "max_rpc_distance_mi": 4.7318 }
+    ],
+    "the_decisive_number": "Every ST_MultiLineString row has distance_mi <= 4.7318, i.e. inside the 5-mile radius. Not one row is actually outside. All 234 point rows agree to within 0.0147 mi and 0 are outside.",
+    "instrument_positive_control": "The recompute reproduces production's own distance_mi to 0.000035 and 0.000123 mi on the two 0.5-mile rows, and measures a known-far point at 15.2 mi, so the helper itself is sound for points."
+  }
+}
