@@ -57,7 +57,20 @@ for (const zip of ZIPS) {
                record_url: site ? site.record_url : null };
     });
     out.markersYieldingNull = perMarker.filter(x => !x.site).length;
-    out.markerRefsYieldingNull = perMarker.filter(x => !x.site).map(x => x.ref + '#' + x.seq);
+    // WHY each one is null. zipAuthSiteFromMarker has exactly two null exits:
+    //   (a) !project  (b) lat/lng not a finite NUMBER
+    out.nullReasons = perMarker.filter(x => !x.site).slice(0, 8).map(x => ({
+      ref: x.ref, hasProject: x.hasProject,
+      latType: typeof x.lat, lngType: typeof x.lng, lat: x.lat, lng: x.lng
+    }));
+    // and a survivor for contrast
+    out.survivorSample = perMarker.filter(x => x.site).slice(0, 2).map(x => ({
+      ref: x.ref, hasProject: x.hasProject, latType: typeof x.lat, lat: x.lat
+    }));
+    // do the project refs actually cover the marker refs?
+    out.projectRefCount = Object.keys(byRef).length;
+    out.markerRefsMissingFromProjects = (raw && raw.markers || [])
+      .map(m => m.project_ref).filter(r => !byRef[r]).slice(0, 8);
 
     // what actually reached the rendered set
     const live = window.__HS_SITES || [];
@@ -80,7 +93,11 @@ for (const zip of ZIPS) {
   console.log(`   declared            ${JSON.stringify(stages.declared)}`);
   console.log(`   rpc markers/projects ${stages.rpcMarkers} / ${stages.rpcProjects}   complete=${stages.isComplete}`);
   console.log(`   zipAuthSitesFrom     ${stages.zipAuthSitesFrom}`);
-  console.log(`   markers yielding null ${stages.markersYieldingNull} ${JSON.stringify((stages.markerRefsYieldingNull||[]).slice(0,8))}`);
+  console.log(`   markers yielding null ${stages.markersYieldingNull}`);
+  console.log(`   distinct project refs in byRef ${stages.projectRefCount}`);
+  console.log(`   marker refs MISSING from projects ${JSON.stringify(stages.markerRefsMissingFromProjects)}`);
+  console.log(`   NULL REASONS ${JSON.stringify(stages.nullReasons, null, 1)}`);
+  console.log(`   survivor sample ${JSON.stringify(stages.survivorSample)}`);
   console.log(`   authSites failing sourced() ${stages.authSitesFailingSourced}`);
   console.log(`   __HS_SITES total / authoritative  ${stages.liveTotal} / ${stages.liveAuthoritative}`);
   console.log(`   CONVERTED BUT NOT RENDERED (${(stages.convertedButNotRendered||[]).length}): ${JSON.stringify((stages.convertedButNotRendered||[]).slice(0,10))}`);
