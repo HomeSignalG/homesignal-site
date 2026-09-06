@@ -11158,3 +11158,70 @@ showed 35 seconds had passed where I had assumed thirteen minutes.
 - **The transferable lesson, which is the same one this file keeps re-learning:** an elapsed-time
   claim needs a clock, exactly as a row count needs a query. "It has been running a long time"
   felt like an observation and was an inference from my own polling cadence.
+
+---
+
+## 2026-09-06 — WHERE "12,077" ACTUALLY CAME FROM, and the state defect it was hiding
+
+Refreshing `geo.maps_zip_export` after the repair (its own controls green — 12,722 rows, 0
+unbucketed, 0 overlapping flags) put the 64 in **`B_authoritative_measured_zero`**, the one
+bucket its DDL says must never absorb a not-measured ZIP: *"D … NOT a zero - the ABSENCE of a
+measurement. Never fold into B."* Their own flags on the same row read `not_measured=true,
+measured_zero=false`, so the row contradicted itself.
+
+**The bucket CASE is ordered, and cutover outranks status:**
+```
+when cut.production_geography_verified_at is not null and membership_rows > 0 → A
+when cut.production_geography_verified_at is not null                         → B
+when s.status = 'boundary_complete'                                           → C
+when s.status = 'not_measured'                                                → D
+```
+So the export is not misreading the new rows — it is faithfully reporting what
+`public.app_zip_geography_cutover` says. And that table says:
+
+```
+cutover rows                                              12,077
+production_geography_verified_at set                      12,077
+… of those, membership_rows = 0                            4,081
+… of those, NOT boundary_complete in the state table          64   ← exactly our 64
+enabled = true                                            12,077   (disabled 0)
+```
+
+**12,077 is the row count of `app_zip_geography_cutover`.** The Phase 2 receipt's figure was
+not only a subtraction — it was this table, which over-counts by exactly the 64 ZIPs that were
+cut over and stamped `production_geography_verified_at` (2026-09-05 17:55Z → 19:38Z) **with
+`membership_rows = 0` and no ZCTA in the pinned archive.** That is a stamp asserting verified
+whole-ZIP geography for a ZIP that has none, and it is the reason those 64 never got a status
+row: they went down the cutover path instead.
+
+**Blast radius, measured, on both consumers — and they differ:**
+- **Map 1 (`homesignalmap.html`) is UNAFFECTED and honest.** `app_zip_projects_markers` gates
+  on `geo.maps_zip_geography_status`, never on the cutover table, and nothing client-side reads
+  the cutover table (`grep` over `*.js|*.mjs|*.html|*.ts` → 0 hits). The live verifier proves
+  it for two of the 64: **10015 and 78711 → not-measured wording, 0 authoritative, 0
+  point-scope development.**
+- ⚠️ **`public.app_projects_for_zip` DOES gate on it — `where c.zip = p_zip and c.enabled` —
+  and it is resident-facing**, reached by `lib/data.js::rpcAllRows` from `development.html`
+  and `property.html`. Measured live, with controls:
+
+  | ZIP | class | `app_projects_for_zip(…,'development')` |
+  |---|---|---|
+  | **10015** | one of the 64 | **0 rows** — the authoritative branch, a measured-zero-shaped answer |
+  | **78711** | one of the 64 | **0 rows** — same |
+  | 01004 | established `not_measured` | **90 rows** — no cutover row, so the LEGACY branch serves legacy content |
+  | 01009 | measured zero | 0 rows ✔ |
+  | 28456 | authoritative | 12 rows ✔ |
+
+  So on that surface a not-measured ZIP is wrong in one of two ways depending on whether it has
+  a cutover row, and neither is the honest not-measured state Map 1 gives. **This is
+  pre-existing and was not changed by this unit's write** — `app_projects_for_zip` does not
+  read `maps_zip_geography_status` at all.
+
+**NOT REPAIRED, deliberately, and this is the open decision.** Clearing
+`production_geography_verified_at`/`enabled` on those 64 rows would be truthful about the
+geography, and it would move the export from B to D — but it would also flip
+`app_projects_for_zip` for them from the authoritative branch to the LEGACY branch, i.e. from
+`0 rows` to serving legacy centroid-derived content, exactly as 01004 does with 90. That is a
+live behaviour change on a page outside this unit's scope, and trading one wrong answer for a
+different wrong answer is not a repair. The honest fix is to give `development.html` the same
+not-measured contract Map 1 has, which is a product change and a founder call.
