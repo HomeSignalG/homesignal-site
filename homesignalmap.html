@@ -655,6 +655,22 @@ HS.onReady(function(){
     var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
     return lc || "unknown";   // operating | approved | proposed | unknown — verbatim
   }
+  // ONE lifecycle palette for the 3D aerial view. three.js wants a 0xRRGGBB integer, so this
+  // converts the SAME hex the 2D pins, the GL pins and the legend chip read (HS.LIFECYCLE_HEX
+  // via COLORS) rather than restating it as a literal. Every place a lifecycle colour was
+  // typed out by hand in this view has drifted from the legend at least once — most recently
+  // `unknown`, which was hardcoded to the operating green and therefore claimed a lifecycle
+  // the source never stated. An unrecognised bucket falls back to the neutral, never to a
+  // stage colour: guessing a stage is the failure this bucket exists to prevent.
+  function lc3D(bkt){
+    var hex = String((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468").replace("#","");
+    var n = parseInt(hex, 16);
+    return isNaN(n) ? 0x706468 : n;
+  }
+  // Label-chip backgrounds for the 3D aerial view — a dark plate behind white text, echoing
+  // the stage. `unknown` gets a NEUTRAL plate for the same reason its pin does; it used to
+  // fall through to the operating green.
+  var LBL_BG = { approved:"#14306e", operating:"#0E2A26", unknown:"#2A2A2C" };
   // ───────────────────── LIFECYCLE STAGE LABEL — the ONE source of truth for a record's words ──────────
   // A record's resident-facing stage MUST come from the SAME signal that colours its dot, or the two
   // disagree (the 12,000-page bug: an orange "proposed" dot whose popup read "operating now", and a
@@ -2338,19 +2354,26 @@ HS.onReady(function(){
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
         // label (they'd overlap into noise); the name shows on the 2D map and in the list.
+        var pcol=lc3D("proposed");
         var grp=new THREE.Group();grp.position.set(x,0,zc);
         var ge=new THREE.BoxGeometry(w,h,w);ge.translate(0,h/2,0);
-        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:0xE2772F,transparent:true,opacity:.85})));
-        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:0xE2772F,transparent:true,opacity:.10})));
+        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:pcol,transparent:true,opacity:.85})));
+        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:.10})));
         grp.scale.y=Math.max(0.0001,V3.rise);G.add(grp);V3.proposed.push(grp);
       } else {
-        // Built + approved are precise, fewer, and the point of the view — label these.
-        var col=bkt==="approved"?0x2563EB:0x1f5130;
+        // Operating, approved and lifecycle-UNKNOWN are precise, fewer, and the point of the
+        // view — label these. The colour comes from lc3D (the shared lifecycle palette), NOT
+        // from a hardcoded literal: this line used to read
+        //     var col = bkt==="approved" ? 0x2563EB : 0x1f5130;
+        // so `unknown` was painted the operating green EXACTLY, byte for byte — the 3D aerial
+        // said "operating now" about every record whose source states no lifecycle, which is
+        // the one claim the unknown bucket exists to avoid making.
+        var col=lc3D(bkt);
         var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:col,roughness:.7,emissive:0xffce8a,emissiveIntensity:.10}));
         bm.position.set(x,h/2,zc);bm.castShadow=true;bm.receiveShadow=true;bm.userData.site=p;G.add(bm);V3.pickable.push(bm);
         // Friendly building-TYPE label — only when the scene is sparse enough to read;
         // in a dense cluster hover/click shows it instead (see showLabels above).
-        if(showLabels){ var lb=lblSprite(facilityType(p),bkt==="approved"?"#14306e":"#0E2A26","#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
+        if(showLabels){ var lb=lblSprite(facilityType(p),LBL_BG[bkt]||LBL_BG.unknown,"#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });

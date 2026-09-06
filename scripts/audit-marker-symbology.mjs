@@ -53,7 +53,7 @@ const UNIVERSE = [
 // the live-sample path does see it.
 // `On file` STAYS: it is the legacy TABS vocabulary the frozen UNIVERSE rows still carry, and
 // it is the lifecycle-unknown colour. Both are real; neither is a guess.
-const STATUS_EXPECT = { Proposed: '#c47a1a', Approved: '#3f7fb0', Operating: '#1f9d5c', Active: '#1f9d5c', 'On file': '#6b7f76' };
+const STATUS_EXPECT = { Proposed: '#c47a1a', Approved: '#3f7fb0', Operating: '#1f9d5c', Active: '#1f9d5c', 'On file': '#706468' };
 const GENERIC_TYPES = new Set(['Development', 'unclassified', 'Trades', 'Land use', 'Civic/Public']);
 
 function auditRow(item, n) {

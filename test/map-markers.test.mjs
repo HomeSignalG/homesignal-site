@@ -17,7 +17,7 @@ const CASES = [
   { label: 'Residential / Active', item: { type: 'Residential', status: 'Active' }, shape: 'pentagon', color: '#1f9d5c' },
   { label: 'Infrastructure / Approved', item: { type: 'Infrastructure', status: 'Approved' }, shape: 'diamond', color: '#3f7fb0' },
   { label: 'Commercial / Proposed', item: { type: 'Commercial', status: 'Proposed' }, shape: 'hexagon', color: '#c47a1a' },
-  { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: HS.CATEGORY_REGISTRY.other.symbol, color: '#6b7f76' },
+  { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: HS.CATEGORY_REGISTRY.other.symbol, color: '#706468' },
   { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'square', color: '#6f42c1', isFacility: true }
 ];
 
