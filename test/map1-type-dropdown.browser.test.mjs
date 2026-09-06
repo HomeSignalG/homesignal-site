@@ -6,6 +6,10 @@
 //
 //   A site proven to be DATA CENTER + EPA REGULATED FACILITY.
 //   Turn OFF every Map 1 type except EPA / Regulated facility.
+//
+// ⚖️ UPDATED 2026-09-06. Regulated facility is no longer a Type: it moved to its own
+// "Regulatory records" switch, so this dropdown lists the SEVEN project types and the
+// EPA half of the scenario is driven by #regToggle instead of an eighth checkbox.
 //   The site remains visible, drawn as a DATA CENTER with an EPA square beneath it,
 //   exactly ONCE, and its popup states both truths.
 //
@@ -132,7 +136,7 @@ ok(base0 === 3, '1: the fixture population renders', base0);
 
 await page.click('#typeFilterBtn');
 ok(await menuOpen(), '2: clicking the control opens the dropdown');
-ok(Object.keys(await boxes()).length === 8, '2: it lists all 8 project types', Object.keys(await boxes()).length);
+ok(Object.keys(await boxes()).length === 7, '2: it lists all 7 project types', Object.keys(await boxes()).length);
 ok(Object.values(await boxes()).every(Boolean), '2: all start checked');
 
 await page.uncheck('#typeFilterMenu input[data-cat-input="datacenter"]');
@@ -149,10 +153,13 @@ ok(!(await menuOpen()), '4: the menu is closed before touching the legend chips'
 // would correctly change nothing - the absent-category chip issue, not a filter defect.
 // An assertion that cannot move is not a test, so this uses a category the data has.
 const before = await pins();
-await page.click('#mapkeyShapes span.sh[data-cat="facility"]');
-ok((await boxes()).facility === false, '4: clicking a CHIP updates the dropdown checkbox');
+await page.click('#mapkeyShapes span.sh[data-cat="other"]');
+ok((await boxes()).other === false, '4: clicking a CHIP updates the dropdown checkbox');
 ok((await badge()) === '2', '4: the badge tracks both controls', await badge());
-ok((await pins()) < before, '4: the chip still filters', before + ' -> ' + (await pins()));
+// The dropdown is the TYPE control, so its badge must count project types only — a
+// regulatory record is not a hidden "type" and must never appear in that count.
+ok((await boxes()).facility === undefined,
+  '4b: the Type dropdown offers no "Regulated facility" row', JSON.stringify(await boxes()));
 
 await page.click('#typeFilterBtn');
 await page.click('#typeFilterAll');
@@ -161,18 +168,36 @@ ok(Object.values(await boxes()).every(Boolean) && Object.values(await chips()).e
 ok((await badge()) === null, '5: the badge clears');
 ok((await pins()) === base0, '5: every pin returns', await pins());
 
-for (const k of ['datacenter','industrial','residential','infrastructure','commercial','civic','other','facility'])
-  await page.uncheck('#typeFilterMenu input[data-cat-input="' + k + '"]');
-ok((await pins()) === 0, '6: unchecking every type empties the map');
-ok(await page.isVisible('#mapkeyEmpty'), '6: ...and the all-off note still fires');
+const TYPE_KEYS = ['datacenter','industrial','residential','infrastructure','commercial','civic','other'];
+for (const k of TYPE_KEYS) await page.uncheck('#typeFilterMenu input[data-cat-input="' + k + '"]');
+ok((await page.$$('#typeFilterMenu input[data-cat-input]')).length === TYPE_KEYS.length,
+  '6: the dropdown offers exactly the seven project types');
+// Every TYPE is off, but the regulatory switch is still on and its records are still
+// drawn — so the map is not empty and must not claim to be.
+ok((await pins()) > 0, '6: unchecking every type leaves the regulatory records on the map', await pins());
+ok(!(await page.isVisible('#mapkeyEmpty')), '6: ...so the all-off note stays silent');
+// Same popover rule as §4: the open menu sits OVER the rows beneath it, so a resident
+// closes it before reaching the Regulatory records switch. Asserted rather than assumed —
+// a click that lands on the popover instead of the switch is a real usability defect and
+// the test must fail on it, not route around it invisibly.
+await page.keyboard.press('Escape');
+ok(!(await menuOpen()), '6b: the menu is closed before touching the regulatory switch');
+await page.click('#regToggle');
+ok((await pins()) === 0, '6b: turning the regulatory switch off as well empties the map');
+ok(await page.isVisible('#mapkeyEmpty'), '6b: ...and now the all-off note fires');
+await page.click('#regToggle');
+await page.click('#typeFilterBtn');
 await page.click('#typeFilterAll');
+// "Show all types" is the TYPE control's reset and must not reach across dimensions.
+ok(await page.evaluate(() => document.getElementById('regToggle').getAttribute('aria-checked')) === 'true',
+  '6c: "Show all types" leaves the regulatory switch exactly as it found it');
 
 await page.uncheck('#typeFilterMenu input[data-cat-input="datacenter"]');
 const labels = () => page.evaluate(() => (window.__HS_SITES||[])
   .filter(s => window.HS.markerCategories(window.__HS_RESOLVE_TRACKER(s)).some(k => window.HS.getCategoryFilters()[k]))
   .map(s => s.label));
 ok((await labels()).includes('CORESITE - VA1 DATA CENTER'),
-  '7: DUAL IDENTITY intact - data center OFF, facility ON, record still visible');
+  '7: DUAL IDENTITY intact - data center OFF, regulatory ON, record still visible');
 await page.click('#typeFilterAll');
 
 await page.click('body', { position: { x: 5, y: 5 } });

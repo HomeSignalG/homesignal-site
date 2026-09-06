@@ -298,6 +298,26 @@
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
   .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
+  /* REGULATORY ROW. Deliberately NOT `.mapkey span` — those rules dim and strike through
+     a chip when it is off, and the founder's rule is that the regulatory control must
+     never gray out or strike anything. It is a switch, so it reads its state from the
+     switch, and the Stage and Type rows above are visually untouched by it. */
+  .mapkey-reg{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .regtog{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;
+    padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:#f7faf8;
+    font:600 12px var(--font);color:var(--ink)}
+  .regtog:hover{background:#f2f5f3}
+  .regtog:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  .regtog .sw{position:relative;flex:0 0 auto;width:28px;height:16px;border-radius:999px;
+    background:#c9d2cd;transition:background .12s}
+  .regtog .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;
+    border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28);transition:transform .12s}
+  .regtog[aria-checked="true"] .sw{background:var(--green)}
+  .regtog[aria-checked="true"] .sw::after{transform:translateX(12px)}
+  .regtog .ic{display:flex;align-items:center;line-height:0}
+  .regtog .st{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--mute)}
+  .regtog[aria-checked="true"] .st{color:var(--green)}
+  .mapkey-reghelp{font-size:11px;color:var(--mute);line-height:1.45;max-width:46em}
   /* Caption for the two legend rows: spans the full map width and centers, so it
      reads as a caption under the map rather than a narrow column flushed left. */
   .mapkey-note{font-size:11px;color:var(--mute);line-height:1.45;width:100%;
@@ -451,7 +471,14 @@
                 </span>
               </div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. A site that is a data center <em>and</em> carries an EPA record keeps its data-center shape with a small purple EPA square beneath, and appears under either filter. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <!-- THE THIRD ROW. Regulatory records are not a project type and not a lifecycle
+                   stage — they are context that OVERLAPS both — so they get their own row and
+                   their own on/off control rather than an eighth Type chip. Built from
+                   HS.REGULATORY_LEGEND; nothing here is hand-listed. -->
+              <div class="mapkey-hd" id="regLegHd">Regulatory records</div>
+              <div class="mapkey-reg" id="mapkeyReg"></div>
+              <div class="mapkey-reghelp" id="mapkeyRegHelp"></div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. Regulatory records are a separate overlay: a project that also carries a regulatory record keeps its own shape and color and gains a small purple <strong>R</strong> in the lower-right corner, while a location with a regulatory record but no mapped project draws a standalone purple square. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
               <!-- Shown ONLY when every Type chip is off (HS.allCategoriesOff) and this ZIP
                    actually has records to reveal. Sits under the legend it refers to, so the
                    sentence and the control it names are read together. -->
@@ -601,7 +628,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=74a6ebde"></script>
+<script src="lib/map.js?v=2f98ff11"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
@@ -1893,15 +1920,10 @@ HS.onReady(function(){
       // render dashed + slightly smaller: the visual cue that the spot is representative.
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
-      // mk.signal is the subordinate EPA square on a dual-identity record (Data center
-      // + Regulated facility). ONE marker at ONE coordinate — the badge hangs below the
-      // primary symbol, which stays on the icon anchor, so no geometry moves.
-      var svg = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
-      var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
-      var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
+      var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
-      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk, size:size, solidPoint:solidPoint });
       bounds.push(ll);
     });
     applyFilter();
@@ -1931,7 +1953,13 @@ HS.onReady(function(){
       dualIdentityMarkers: dual,
       // Lets a check tell "no records here" apart from "the resident hid every type" —
       // the two produce an identical visibleMarkers of 0.
-      allTypesOff: HS.allCategoriesOff ? HS.allCategoriesOff() : null,
+      // The TYPE row only — regulatory records are their own dimension with their own
+      // switch, and folding the two together is what made the all-off note unreachable.
+      allTypesOff: HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff() : null,
+      regulatoryOn: HS.regulatoryVisible ? HS.regulatoryVisible() : null,
+      // Badges actually PAINTED, read off the rendered markup rather than from filter
+      // state — the point of a verify field is to prove what shipped to the screen.
+      regulatoryBadges: document.querySelectorAll("#map .leaflet-marker-icon:not(.homepin) svg text").length,
       facilitiesOnly: FACILITIES_ONLY,
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
@@ -2045,13 +2073,51 @@ HS.onReady(function(){
   //
   // Scoped to the TYPE row only. Lifecycle chips can also empty the map, but that is a
   // separate affordance and a separate product decision — this says exactly one true thing.
+  //
+  // ⚠️ THE PREDICATE IS THE TYPE KEYS, NOT ALL CATEGORY KEYS (2026-09-06). Regulatory
+  // records left the Type row for their own switch, so "every Type chip is off" no longer
+  // implies an empty map: with the switch on, regulatory-only locations are still drawn.
+  // Reading HS.allCategoriesOff() here would have kept the note silent whenever the
+  // regulatory switch was on — the note would never fire in the exact state it exists for
+  // — and asserting "the map is empty" is only honest if it actually is, so the emptiness
+  // half is MEASURED against the same markerVisible() the layer uses rather than inferred.
   function syncAllTypesOffNote(){
     var em = document.getElementById("mapkeyEmpty");
     if(!em) return;
-    var allOff = HS.allCategoriesOff ? HS.allCategoriesOff() : false;
-    em.hidden = !(allOff && siteMarkers.length > 0);
+    var allOff = HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff()
+               : (HS.allCategoriesOff ? HS.allCategoriesOff() : false);
+    var nothingVisible = !siteMarkers.some(markerVisible);
+    em.hidden = !(allOff && nothingVisible && siteMarkers.length > 0);
+  }
+  // ONE icon builder for the 2D layer, so the marker drawn at load and the marker
+  // redrawn when the regulatory switch moves are the same drawing. The primary symbol
+  // stays centred on the icon anchor and the badge overflows the box, so re-icon-ing
+  // never moves the record off its coordinate.
+  function siteIcon(mk, size, solidPoint){
+    // HS.visibleSignal is the ONLY place that decides whether the R is drawn: with the
+    // regulatory switch off it returns null and the pin renders exactly as any other
+    // project pin of its type and stage — the project is not hidden, its regulatory
+    // annotation is.
+    var svg = HS.markerSVG(mk.shape, mk.color, '', size,
+                           HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
+    var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
+    return L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  }
+  // The 2D layer builds its icons ONCE and thereafter only adds/removes them, so the
+  // badge state has to be repainted explicitly when the switch moves. Guarded on an
+  // actual transition: every other filter click leaves the badges alone, and re-icon-ing
+  // every marker on every Stage/Type click would be churn with no visible effect.
+  var REG_BADGES_DRAWN = null;
+  function syncRegulatoryBadges(){
+    var on = HS.regulatoryVisible ? HS.regulatoryVisible() : true;
+    if(on === REG_BADGES_DRAWN) return;
+    REG_BADGES_DRAWN = on;
+    siteMarkers.forEach(function(x){
+      if(x.mk && x.mk.signal && x.m && x.m.setIcon){ x.m.setIcon(siteIcon(x.mk, x.size, x.solidPoint)); }
+    });
   }
   function applyFilter(){
+    syncRegulatoryBadges();
     siteMarkers.forEach(function(x){
       if(markerVisible(x)){ x.m.addTo(layerGroup); }
       else { layerGroup.removeLayer(x.m); }
@@ -2089,9 +2155,16 @@ HS.onReady(function(){
       d.appendChild(row);
     });
     // The SHAPE rows are the TYPE dimension, and they are toggles — the same pattern as
-    // the lifecycle chips above. Turning every type off except Regulated facility is the
-    // founder's acceptance scenario, and a dual-identity Data center survives it BECAUSE
-    // it holds a `facility` membership — while still drawing its Data center octagon.
+    // the lifecycle chips above.
+    //
+    // ⛔ REGULATED FACILITY IS NOT ONE OF THEM (founder, 2026-09-06). It used to be
+    // pushed on here as an eighth chip, which put a regulatory RECORD beside seven
+    // project TYPES and asked the resident to choose between things that are both true
+    // of the same site. It now has its own row and its own switch, below. The FILTER is
+    // unchanged — same `facility` key, same membership set, same any-of test — so the
+    // dual-identity contract still holds: a Data center that carries a regulatory record
+    // is still admitted by EITHER its Data center chip or the regulatory switch, and it
+    // still draws its Data center octagon whichever one admitted it.
     var shapes = document.getElementById("mapkeyShapes");
     if(shapes && HS.SHAPE_LEGEND && HS.setCategoryFilter){
       shapes.innerHTML = "";
@@ -2099,8 +2172,6 @@ HS.onReady(function(){
       var typeRows = HS.SHAPE_LEGEND.map(function(r){
         return { key: r.categoryKey, shape: r.shape, color: neutral, label: r.label };
       });
-      typeRows.push({ key: "facility", shape: HS.CATEGORY_REGISTRY.facility.symbol,
-                      color: HS.markerRegistry.facilityHex, label: HS.CATEGORY_REGISTRY.facility.label });
 
       // TWO CONTROLS OVER ONE STATE. The legend chips and the "Show types" dropdown are two
       // views of the SAME HS.getCategoryFilters() set - not a second filter model. Everything
@@ -2210,6 +2281,64 @@ HS.onReady(function(){
       }
       syncTypeControls();
     }
+    buildRegulatoryRow();
+  }
+
+  // ── THE REGULATORY ROW — a third dimension with ONE control ────────────────────
+  // Stage answers "where is it in its lifecycle", Type answers "what kind of thing is
+  // it", and this answers "does it carry an environmental regulatory record". The three
+  // are independent, so this control writes ONLY the `facility` key and never reads or
+  // touches the other seven: turning it off cannot dim, strike through, reset or hide a
+  // Stage or Type chip, which is the founder's rule and the reason it is a switch in its
+  // own row rather than an eighth chip wearing the chips' off-state styling.
+  //
+  // What the switch owns, exactly:
+  //   ON  — the purple R rides on every qualifying project marker (HS.visibleSignal),
+  //         and regulatory-only locations — a regulatory record with no mapped project
+  //         type — draw their standalone purple square.
+  //   OFF — the R is not drawn and the regulatory-only squares are filtered out. A
+  //         project that happens to carry a regulatory record is NOT hidden by this: it
+  //         keeps its own shape, its own colour and its own Type membership.
+  function buildRegulatoryRow(){
+    var host = document.getElementById("mapkeyReg");
+    var reg = HS.REGULATORY_LEGEND;
+    if(!host || !reg || !HS.setCategoryFilter) return;
+    var help = document.getElementById("mapkeyRegHelp");
+    var hd = document.getElementById("regLegHd");
+    if(hd) hd.textContent = reg.heading;
+    if(help) help.textContent = reg.helper;
+    host.innerHTML = "";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "regtog";
+    btn.id = "regToggle";
+    btn.setAttribute("role", "switch");
+    btn.setAttribute("data-cat", reg.key);
+    // The R the resident sees on the map, rendered from the SAME marker code that draws
+    // it on the pins — so the legend cannot show one badge while the map draws another.
+    var badge = HS.markerSVG(reg.symbol, reg.color, reg.letter, 15);
+    btn.innerHTML = "<span class='sw' aria-hidden='true'></span>"
+      + "<span class='ic' aria-hidden='true'>" + badge + "</span>"
+      + "<span class='t'>" + esc(reg.toggleLabel) + "</span>"
+      + "<span class='st' id='regToggleState' aria-hidden='true'></span>";
+
+    function sync(){
+      var on = HS.regulatoryVisible ? HS.regulatoryVisible() : !!HS.getCategoryFilters()[reg.key];
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+      var st = document.getElementById("regToggleState");
+      if(st) st.textContent = on ? "ON" : "OFF";
+      // The switch already states on/off; the accessible name says what it controls.
+      btn.setAttribute("aria-label", reg.toggleLabel);
+    }
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      HS.setCategoryFilter(reg.key, !HS.getCategoryFilters()[reg.key]);
+      sync();
+      applyFilter();
+    });
+    host.appendChild(btn);
+    sync();
   }
 
   // The class of official document the record link opens, so the label states it up
@@ -2593,7 +2722,8 @@ HS.onReady(function(){
     el.style.width=el.style.height=size+"px"; el.style.lineHeight="0";
     if(approxPt) el.style.opacity="0.85";
     el.style.cursor="pointer";
-    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
+    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size,
+                                HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     return el;
   }
   function initGL(home){
