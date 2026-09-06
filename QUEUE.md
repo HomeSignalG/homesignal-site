@@ -11358,7 +11358,7 @@ the already-proven population. The migration re-derives it and refuses if it mov
 canonical                12,722     enabled cutover rows                  12,013
 boundary_complete        12,013     enabled outside boundary_complete          0
 not_measured                706     boundary_complete missing enabled          0
-pending                       3     verified rows                         12,013
+NO status row at all          3     verified rows                         12,013
                          ------     verified outside boundary_complete         0
 TOTAL                    12,722     not_measured with enabled cutover          0
                                     pending with enabled cutover               0
@@ -11379,6 +11379,40 @@ TOTAL                    12,722     not_measured with enabled cutover          0
 
 The three `not_measured` ZIPs now answer identically; `ARRAY(0)` keeps a measured zero distinct
 from an unmeasured one; pending is distinct again; facilities survive on every row.
+
+**Gate 7, second pass — A COUNT IS AN ASSERTION, and fixing only the prose left it standing.**
+The first pass repaired the WORDING on `lib/community-page.js` and `development.html` and
+stopped there. Five surfaces print a development NUMBER, and all five still printed `0` for a
+`not_measured` ZIP — including the ZIP page itself, whose stat tile read **"Development
+projects: 0"** two lines above a section head that said "not measured". `HS.zipDevelopmentState`
+/ `HS.zipDevelopmentCount` in `lib/data.js` are now the one decision behind all five
+(`community-page` · `dashboard` · `properties` · `today` · `property`): a measured count renders
+as the number, a measured **zero still renders as 0** (a real finding, hiding it is the opposite
+error), an unmeasured or failed read renders an em dash. `shell.js` is deliberately unchanged —
+an empty search index finds nothing but claims nothing. **`reports.html` takes
+`projects[0].name` unguarded and throws on ANY empty array, including a genuine measured zero:
+a real pre-existing defect on a different axis, LOGGED not bundled.**
+
+**Gate 11 — the production 57014s are CONTENTION FROM ANOTHER SESSION, measured not assumed.**
+The browser verifier's two DB-reading controls timed out. Cause, read off `pg_stat_activity` at
+17:11–17:22Z: two concurrent `mgmt-api` sessions running full aggregates over
+`public.app_projects` (`select registry_id, type_raw, type, count(*) … where registry_id in
+('nashville-building-permits-issued','austin-site-plan-cases','austin-subdivision-cases')`), at
+**80 s / 99 s / 109 s elapsed, both parked on `LWLock:BufferMapping`** — buffer-pool thrash on a
+2.9 GB table. Rule #0a: another session, not this probe (8 sequential page loads, already
+finished). Two receipts prove it is latency and not semantics:
+- The identical calls as `anon` return the **correct shapes** — 01009 `ARRAY(0)` in 11,379 ms,
+  28456 `ARRAY(12)` in 14,693 ms.
+- The function-scoped 25 s budget **does re-arm over a smaller caller budget** — under an
+  explicit `statement_timeout = 3s`, 28456 still completed `n=12` in 13,853 ms. So a 57014
+  through PostgREST means the read genuinely exceeded **25 s**, which is what an 80-second
+  competing seq scan does to it.
+
+`verify-zip-development-contract` therefore reports a 57014 as **INCONCLUSIVE** for the shape
+assertion on either DB-reading control, still asserts the safety property that binds regardless
+(*a failed read must never render as an empty finding*), and — so this can never become a
+vacuous green — **exits 2, not 0, when EVERY DB-reading control timed out**. Run `34048064884`:
+0 failures, 12 PASS, 2 INCONCLUSIVE, exit 2 with the reason named.
 
 ---
 
