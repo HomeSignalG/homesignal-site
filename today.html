@@ -117,7 +117,7 @@ HS.onReady(async function () {
   document.getElementById('tdScoreTrend').textContent = c.growth_pressure ? 'Growth pressure: ' + c.growth_pressure : '';
   document.getElementById('tdVitals').innerHTML =
     (c.value_trend != null ? '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">' + HS.trend(c.value_trend) + '</span></div>' : '')
-    + '<div class="vital"><span class="vl">Projects tracked</span><span class="vv">' + (await HS.data.projects(S.zip, home)).length + '</span></div>'
+    + '<div class="vital"><span class="vl">Projects tracked</span><span class="vv">' + HS.zipDevelopmentCount(await HS.data.projects(S.zip, home)) + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + changes.filter(function(c){return HS.daysUntil(c.window_closes_at)>=0 || !c.quiet;}).length + '</span></div>'
     + '<div class="vital"><span class="vl">Growth pressure</span><span class="vv" style="color:var(--amber)">' + HS.esc(c.growth_pressure) + '</span></div>';
   document.getElementById('tdBars').innerHTML = HS.tpl.scoreBars(c.component_scores);

@@ -50,7 +50,7 @@ HS.onReady(async function () {
   document.getElementById('propStrip').innerHTML =
     HS.tpl.statTile(S.properties.length, 'Saved Places', '')
     + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all places', 'accent')
-    + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
+    + HS.tpl.statTile(HS.zipDevelopmentCount(projects), 'Nearby projects total', '')
     + (avg != null ? HS.tpl.statTile(avg, 'Avg property score', 'g') : '');
 
   var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };

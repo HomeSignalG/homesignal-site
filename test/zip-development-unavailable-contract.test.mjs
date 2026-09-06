@@ -126,5 +126,54 @@ function load(rpcImpl) {
      '6: and it uses the ONE shared helper, so two surfaces cannot diverge');
 }
 
+// ── 7. A COUNT IS AN ASSERTION TOO ──────────────────────────────────────────────────────
+// Fixing the PROSE and leaving the ARITHMETIC alone lets the same false zero back in through a
+// stat tile: "Projects near you: 0" states a finding for a ZIP that was never measured, exactly
+// as "no records on file" did. Five surfaces print that number, so one shared decision makes it
+// impossible for them to disagree — and this section is what stops a sixth from being added, or
+// one of the five from quietly reverting to `.length`.
+{
+  const HS = load(async () => ({ data: [], error: null })).HS;
+
+  ok(HS.zipDevelopmentState({ length: 3, complete: true }) === null,
+     '7: a completed read is a MEASUREMENT — the count means what it says');
+  ok(HS.zipDevelopmentState({ length: 0, complete: false, unavailable: 'not_measured' }) === 'not_measured',
+     '7: ...an unavailable read reports its own reason');
+  ok(HS.zipDevelopmentState({ length: 0, complete: false, unavailable: null }) === 'read_failed',
+     '7: ...and a failed read is its own state, never silently a zero');
+
+  ok(HS.zipDevelopmentCount({ length: 3, complete: true }) === 3,
+     '7: a measured count is rendered as the number');
+  ok(HS.zipDevelopmentCount({ length: 0, complete: true }) === 0,
+     '7: a measured ZERO is still rendered as 0 — it is a real finding and must not be hidden');
+  ok(HS.zipDevelopmentCount({ length: 0, complete: false, unavailable: 'not_measured' }) === '\u2014',
+     '7: an unmeasured ZIP renders an em dash, asserting nothing');
+  ok(HS.zipDevelopmentCount({ length: 0, complete: false }) === '\u2014',
+     '7: ...and so does a failed read');
+  ok(HS.zipDevelopmentCount({ length: 0, complete: false, unavailable: 'not_measured' }, 41) === '\u2014',
+     '7: an explicit count cannot override the state — the tile still asserts nothing');
+
+  // Every surface that prints the number must route it through that one decision.
+  const SURFACES = [
+    ['lib/community-page.js', 'Development projects'],
+    ['dashboard.html',        'Projects near you'],
+    ['properties.html',       'Nearby projects total'],
+    ['today.html',            'Projects tracked'],
+    ['property.html',         'Nearby projects'],
+  ];
+  for (const [file, label] of SURFACES) {
+    const src = readFileSync(join(root, file), 'utf8');
+    const i = src.indexOf(label);
+    ok(i !== -1, '7: ' + file + ' still renders "' + label + '"');
+    // the helper call and the label sit in the same expression on these surfaces
+    // the label may precede OR follow the value, so look either side of it — but not so far
+    // that a NEIGHBOURING tile's correct call could vouch for this one (mutation-proved below)
+    const near = src.slice(Math.max(0, i - 260), i + 200);
+    ok(/HS\.zipDevelopmentCount\(/.test(near),
+       '7: ' + file + ' prints "' + label + '" through the shared decision, not a raw .length',
+       near.match(/HS\.zipDevelopmentCount\(/) ? 'ok' : 'RAW COUNT');
+  }
+}
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nzip-development-unavailable-contract: all checks passed');
 process.exit(fails ? 1 : 0);

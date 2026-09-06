@@ -102,7 +102,7 @@ HS.onReady(async function () {
 
   var openCount = changes.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; }).length;
   document.getElementById('dashStrip').innerHTML =
-    HS.tpl.statTileLink(projects.length, 'Projects near you', '', nav('development.html', Object.assign({ sort: 'distance' }, mapCtx())))
+    HS.tpl.statTileLink(HS.zipDevelopmentCount(projects), 'Projects near you', '', nav('development.html', Object.assign({ sort: 'distance' }, mapCtx())))
     + HS.tpl.statTileLink(openCount, 'Action windows open', 'accent', nav('alerts.html', Object.assign({ band: 'open' }, mapCtx())))
     + (c && c.growth_pressure ? HS.tpl.statTileLink('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure', '', nav('development.html', Object.assign({ lens: 2 }, mapCtx()))) : '')
     + (c && c.community_score != null ? HS.tpl.statTileLink(c.community_score, 'ZIP Score', 'g', nav('community.html', Object.assign({ focus: 'score' }, mapCtx()))) : '');
