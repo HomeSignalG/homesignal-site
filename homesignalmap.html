@@ -334,17 +334,28 @@
 <template id="hs-content">
   <div class="wrap">
     <div class="head">
-      <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
+      <!-- COLD-LOAD DEFAULTS — no ZIP and no address yet, so the page cannot name a place.
+           This copy used to read "Box Elder County · Utah", "Enter a Box Elder County address"
+           and "Box Elder County addresses only, for now": a coverage claim that is false on
+           every one of the 12,722 ZIP pages outside that one Utah county, and the only state
+           in which a visitor still sees it. Both live paths overwrite all of it — loadZip()
+           with the ZIP's own wording, run() with the near-home wording.
+           What the replacement must NOT do is swap a too-small promise for a too-big one.
+           EPA-registered facilities are the national floor; permit and planning coverage is
+           per county, and each page already states which of the two it could measure. So the
+           hint names the variability instead of claiming nationwide development coverage. -->
+      <div class="eyebrow" id="eyebrow">Development tracker</div>
       <h1>Development around your home</h1>
-      <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
+      <div class="sub">Enter your street address to see what's built and what's proposed nearby —
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
       <form class="search" id="form">
         <input id="addr" type="text" autocomplete="street-address"
-          placeholder="e.g. 20 North Main Street, Brigham City, UT 84302" required/>
+          placeholder="Enter your street address, city and state" required/>
         <button id="go" type="submit">See development</button>
       </form>
-      <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
+      <div class="hint">Coverage varies by county — every page says what it could and could not
+        measure, and never fills a gap with a guess. Free while we're in launch.</div>
       <button type="button" class="linklike" id="sampleBtn">See a sample</button>
     </div>
 
@@ -489,7 +500,7 @@
       <div class="devtracker" id="devTracker" style="display:none">
         <div class="card read dt-anchor" id="dtAnchor" style="display:none">
           <div class="dt-hd">Tracked project in this area</div>
-          <div class="dt-sub">A verified land-assembly anchor built from Box Elder County public
+          <div class="dt-sub">A verified land-assembly anchor built from county public
             parcel records. Every parcel below is tied to its owner of record; honesty labels are
             shown exactly as the record store carries them.</div>
           <div id="dtAnchorBody"></div>
@@ -3232,7 +3243,7 @@ HS.onReady(function(){
       var inN = RESOLVED_PARCELS.filter(function(p){ return String(p.zip)===String(CURRENT_DEV_ZIP); }).length;
       var elseN = RESOLVED_PARCELS.length - inN;
       cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in this land " +
-        "assembly (real Box Elder County parcel geometry)." +
+        "assembly (real county parcel geometry)." +
         "<span class='sw' style='background:#6d5fc0'></span>" + inN + " in ZIP " + esc(CURRENT_DEV_ZIP) +
         "<span class='sw' style='background:#E2772F'></span>" + elseN + " elsewhere in the assembly (neighboring ZIP)";
       cap.style.display = "";

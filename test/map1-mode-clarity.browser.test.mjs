@@ -169,6 +169,24 @@ const loadZip = async (zip) => {
   await page.waitForTimeout(700);
 };
 
+// ═══ 0. COLD LOAD — the page before it knows a place ══════════════════════════════════════
+// No ?zip= and no ?addr=: neither live path has run, so the visitor is reading the static
+// markup. That markup used to promise "Box Elder County addresses only, for now" on a
+// national footprint. It must now claim neither one county nor the whole country.
+await page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(500);
+const cold = [await text('#eyebrow'), await text('.head h1'), await text('.sub'),
+              await text('.hint'),
+              await page.evaluate(() => (document.getElementById('addr') || {}).placeholder || '')
+             ].join(' | ');
+ok(!/Box Elder|Brigham City/i.test(cold),
+  '0a: the cold-load hero names no single county — it does not know one yet', JSON.stringify(cold));
+ok(!/nationwide|all 50 states|every county|anywhere in the/i.test(cold),
+  '0b: …and does not replace that with a promise of nationwide coverage', JSON.stringify(cold));
+ok(/varies by county/i.test(await text('.hint') || ''),
+  '0c: it says coverage varies, which is what is actually true', JSON.stringify(await text('.hint')));
+await shot('0-cold-load');
+
 // ═══ 1. ENTIRE ZIP VIEW ═══════════════════════════════════════════════════════════════════
 await loadZip('78617');
 await shot('1-zip-mode');
@@ -242,6 +260,10 @@ ok(!/across ZIP/i.test(aHero) && !/\(78617\)/.test(aHero),
   '3f: the hero stops claiming the whole ZIP once a home is the centre', JSON.stringify(aHero));
 ok(/around your home/i.test(await text('.head h1') || ''),
   '3g: …and says whose home the view is about', JSON.stringify(await text('.head h1')));
+// 78617 is the designated demo ZIP, so a signed-out search that lands in it used to be
+// captioned "Del Valle (Sample Zip Code)" — a real address search, labelled a demo.
+ok(!/Sample Zip Code/i.test(await text('#locLabel') || ''),
+  '3h: a searched address is never captioned as the sample ZIP', JSON.stringify(await text('#locLabel')));
 
 // ═══ 4. THE RADIUS CONTROL ════════════════════════════════════════════════════════════════
 const stops = await radiusStops();

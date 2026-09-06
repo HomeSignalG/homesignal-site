@@ -888,7 +888,13 @@
         ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
         : ((p || myZip)
           ? ('Viewing · ' + viewedLabel())
-          : (HS.isSample()
+          // A PRECISE VIEW IS NEVER A SAMPLE. Once a page names what it is showing for a
+          // searched address (HS.setViewLabel(..., {precise:true}) — Map 1's near-home mode),
+          // the chip must say that, not "(Sample Zip Code)". It used to fall straight to the
+          // sample label for a signed-out visitor whose search happened to land in the demo
+          // ZIP, so a real address search was captioned as a demo. The sample label itself is
+          // unchanged and still marks the demo ZIP's own page.
+          : ((HS.isSample() && !state.viewLabelPrecise)
             ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
             : ('Viewing · ' + viewedLabel())));
       const locWrap = $('locLabel').closest('.loc');
