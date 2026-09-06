@@ -50,6 +50,27 @@ const CASES = [
   // ── the 3 genuinely pending ZIPs ──────────────────────────────────────────────────────────
   { zip: '99128', kind: 'pending', tag: 'Case C: intersection exists, membership unbuildable' },
   { zip: '94128', kind: 'pending', tag: 'unevaluatable legacy candidates' },
+  { zip: '95219', kind: 'pending', tag: '100% unevaluatable candidates - 0 of 2 have geometry' },
+
+  // ── a ZIP repaired 2026-09-06 from NO STATE ROW to not_measured ───────────────────────────
+  // The 64 that had no geography-state row at all are now stamped not_measured /
+  // NO_ZCTA_IN_TIGER_2025, proven by the pinned TIGER archive read on a runner with a passing
+  // positive control. The write was behaviour-neutral by design - the RPC already returned
+  // 'unknown' for a ZIP with no row, and the page maps 'unknown' and 'not_measured' to the
+  // same honest state. This case is what makes that claim a MEASUREMENT rather than a reading
+  // of the code: if the repair had changed what a resident sees, this ZIP would fail here.
+  { zip: '10015', kind: 'not_measured', fac: false, tag: 'repaired 2026-09-06 - was stateless, NYC PO-box ZIP with no ZCTA' },
+  { zip: '78711', kind: 'not_measured', fac: false, tag: 'repaired 2026-09-06 - Austin PO-box ZIP with no ZCTA' },
+
+  // ── RESIDENTIAL RULE 5 / type_raw control ─────────────────────────────────────────────────
+  // 76227 is the sharpest available proof that type_raw reaches Rule 5 in production. 5,388 of
+  // its records are denton-county-dev-permits with type_raw 'HOUSE' and name 'HOUSE' - the name
+  // carries NO evidence beyond the type, so FAMILY_TYPE_RAW is the ONLY rule that can admit
+  // them and it reads type_raw alone. Blank that one field and all 5,388 fall to UNRESOLVED and
+  // vanish. The same ZIP carries its own negative controls: 'ADDITION TO HOUSE' and 'GARAGE'
+  // must stay dropped, so a pass here cannot be bought by admitting everything.
+  { zip: '76227', kind: 'authoritative', markers: 5869, projects: 5708, fac: false, ruleFiveControl: 5000,
+    tag: 'DENSE - Rule 5 / type_raw control, 5,388 denton HOUSE permits' },
 ];
 
 const browser = await chromium.launch();
@@ -137,9 +158,25 @@ for (const c of CASES) {
           }
           unexplained++;
         });
+        // TYPE_RAW COUNTERFACTUAL. Rule 5 reads project.type_raw inside HS.residentialActivity,
+        // one call deeper than the site builder - which is how a payload narrowing dropped it
+        // on 2026-09-06 and shipped Rule 5 with half its evidence for ~15 hours, silently,
+        // because a rejected record is DROPPED rather than marked. Re-running the SHIPPED gate
+        // over the SAME markers with that one field blanked measures whether it is still
+        // load-bearing IN PRODUCTION. `deliveredNoTypeRaw` materially below `delivered` is the
+        // proof; equality would mean the field is not reaching the rule.
+        let deliveredNoTypeRaw = 0, projectsWithTypeRaw = 0;
+        a.projects.forEach(p => { if (p && typeof p.type_raw === 'string' && p.type_raw) projectsWithTypeRaw++; });
+        a.markers.forEach(m => {
+          const proj = byRef[m.project_ref];
+          if (!proj) return;
+          const blanked = Object.assign({}, proj); delete blanked.type_raw;
+          if (HS.zipAuthSiteFromMarker(m, blanked)) deliveredNoTypeRaw++;
+        });
         return { relation: a.markers.length, membership: a.membership_count,
                  hydrated: a.projects.length,
-                 delivered, droppedByRuleFive, staleMembership, unexplained };
+                 delivered, droppedByRuleFive, staleMembership, unexplained,
+                 deliveredNoTypeRaw, projectsWithTypeRaw };
       })(),
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
@@ -210,6 +247,19 @@ for (const c of CASES) {
       ok(m.devAuthoritative === r.delivered,
          `${c.zip}: everything the gate admitted actually reached the rendered set`,
          `rendered=${m.devAuthoritative} admitted=${r.delivered}`);
+      // GATE 8 - type_raw reaches Rule 5, proven live rather than read off the SQL.
+      if (c.ruleFiveControl) {
+        ok(r.projectsWithTypeRaw > 0,
+           `${c.zip}: the live RPC ships type_raw on the project objects`,
+           `${r.projectsWithTypeRaw} of ${r.hydrated} carry a non-empty type_raw`);
+        ok(r.deliveredNoTypeRaw < r.delivered,
+           `${c.zip}: type_raw is LOAD-BEARING — blanking it in the shipped gate loses records`,
+           `delivered=${r.delivered} vs deliveredWithoutTypeRaw=${r.deliveredNoTypeRaw} `
+           + `(loss ${r.delivered - r.deliveredNoTypeRaw})`);
+        ok(r.delivered - r.deliveredNoTypeRaw >= c.ruleFiveControl,
+           `${c.zip}: the loss is the whole FAMILY_TYPE_RAW population, not a rounding effect`,
+           `expected at least ${c.ruleFiveControl}, measured ${r.delivered - r.deliveredNoTypeRaw}`);
+      }
     } else if (c.markers != null) {
       ok(false, `${c.zip}: could not read the authoritative payload to account for it`, 'ZIP_AUTH absent');
     }
