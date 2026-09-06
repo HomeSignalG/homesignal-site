@@ -67,6 +67,7 @@ const readScreen = () => page.evaluate(() => {
     facilities: sites.filter(s => s.scope === 'point' && s.relevance !== 'development').length,
     freshLine: txt('freshLine'),
     withinLbl: txt('withinLbl'),
+    mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
     rAddr: txt('rAddr'),
     scopeNote: txt('scopeNote'),
     scopeNoteShown: (() => { const n = document.getElementById('scopeNote');
@@ -200,6 +201,10 @@ await page.waitForTimeout(9000);
 const a2 = await readScreen();
 info('after switching to 2 miles', { before: before, after: a2.sites_total, within: a2.withinLbl });
 ok(/2 miles/i.test(a2.withinLbl || ''), 'B9 the page states the NEW radius', a2.withinLbl);
+// The caption is ON the map canvas, so it must track the radius too - a caption still
+// naming the OLD radius beside re-scoped pins is worse than no caption.
+ok(/^Development within 2 miles of this home$/.test((a2.mapCap || '').trim()),
+  'B9b ...and the map caption states the NEW radius too', a2.mapCap);
 ok(a2.tile_proposed === a2.rail_proposed,
   'B10 the tile still equals the drawn set after a radius change',
   { tile: a2.tile_proposed, drawn: a2.rail_proposed });

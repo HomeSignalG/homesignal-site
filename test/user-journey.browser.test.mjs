@@ -440,7 +440,12 @@ const bz = await page.evaluate(() => {
            text: a ? a.textContent.trim() : null,
            href: a ? a.getAttribute('href') : null };
 });
-info('back-to-ZIP control (address mode)', bz);
+const homeBtnAddr = await page.evaluate(() => { const b = document.getElementById('homeViewBtn');
+  return !!b && getComputedStyle(b).display !== 'none'; });
+info('back-to-ZIP control (address mode)', { ...bz, homeBtnShown: homeBtnAddr });
+// PAIRED CONTROL: a blanket hide would satisfy 13h while deleting a working feature.
+ok(homeBtnAddr === true,
+  '13i ...while address mode, which HAS a geocoded home, still offers it', homeBtnAddr);
 ok(bz.shown === true, '13a address mode offers a way back to the whole ZIP', bz);
 ok(/^\u2190 Back to all development in ZIP \d{5}$/.test(bz.text || ''),
   '13b ...labelled with the destination ZIP, in the founder-specified words', bz.text);
@@ -465,7 +470,9 @@ const bzZip = await page.evaluate(() => {
            rAddr: (document.getElementById('rAddr') || {}).textContent,
            scopeNote: (document.getElementById('scopeNote') || {}).textContent,
            scopeNoteShown: (() => { const n = document.getElementById('scopeNote');
-             return !!n && getComputedStyle(n).display !== 'none'; })() };
+             return !!n && getComputedStyle(n).display !== 'none'; })(),
+           homeBtnShown: (() => { const b = document.getElementById('homeViewBtn');
+             return !!b && getComputedStyle(b).display !== 'none'; })() };
 });
 info('ZIP mode heading pair', bzZip);
 ok(bzZip.shown === false, '13e ZIP mode draws no back control — it IS the whole-ZIP view', bzZip);
@@ -474,6 +481,10 @@ ok(/entire ZIP area/i.test(bzZip.scopeNote || '') && /not only projects near one
   '13f a clarifier says plainly this is the whole ZIP, not nearby projects', bzZip.scopeNote);
 ok(bzZip.scopeNoteShown === true,
   '13g ...and it is actually visible, not merely present in the DOM', bzZip);
+// A ZIP centroid is a page anchor, not somebody's house. A control offering to re-frame the
+// view "from home" promises a place the page does not have.
+ok(bzZip.homeBtnShown === false,
+  '13h ZIP mode hides the HOME-specific "From home" control - there is no home here', bzZip);
 
 // ── 14. THE NOT-MEASURED STATE IS SAYABLE OUT LOUD ─────────────────────────────────────
 // Launch-gate task 6: a resident must be able to explain what "not measured" means. The
@@ -509,6 +520,36 @@ ok(nm.dev.trim() === '\u2014',
 // so assert a measured ZIP still prints a real number.
 ok(/^\d+$/.test((zc.dev || '').trim()),
   '14f ...while a MEASURED ZIP still shows a real number (the em-dash is not blanket)', zc.dev);
+
+// ── 15. THE CAPTION TRACKS THE RADIUS ──────────────────────────────────────────────────
+// Criterion B: the radius label AND the map caption must both restate the NEW radius. The
+// caption is set in run(), which a radius change re-enters - this proves that wiring rather
+// than assuming it.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
+await page.click('#go');
+await page.waitForFunction(() => /Showing development within/.test(
+  (document.getElementById('withinLbl') || {}).textContent || ''), null, { timeout: 30000 });
+const before15 = await page.evaluate(() => ({
+  within: (document.getElementById('withinLbl') || {}).textContent || '',
+  cap: (document.querySelector('.map-cap') || {}).textContent || '' }));
+await page.click('#radSel button[data-r="2"]');
+await page.waitForFunction(() => /2 miles/.test(
+  (document.getElementById('withinLbl') || {}).textContent || ''), null, { timeout: 30000 });
+await page.waitForTimeout(400);
+const after15 = await page.evaluate(() => ({
+  within: (document.getElementById('withinLbl') || {}).textContent || '',
+  cap: (document.querySelector('.map-cap') || {}).textContent || '' }));
+info('radius change', { before: before15, after: after15 });
+ok(/Showing development within 2 miles of/.test(after15.within),
+  '15a the heading restates the NEW radius', after15.within);
+ok(/^Development within 2 miles of this home$/.test(after15.cap.trim()),
+  '15b the map caption restates the NEW radius too', after15.cap);
+ok(before15.cap.trim() !== after15.cap.trim(),
+  '15c ...and it actually CHANGED (not a caption that happens to match)',
+  { before: before15.cap, after: after15.cap });
 
 ok(pageErrors.length === 0, 'no fatal client error across the journey', pageErrors.slice(0, 3));
 
