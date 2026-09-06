@@ -8,3 +8,7 @@ _site/
 # exists only when a session installs a dev dependency to run an offline browser proof
 # (test/map1-address-radius.browser.mjs needs playwright-core + the pinned leaflet build).
 node_modules/
+
+# Browser-proof screenshots (test/map1-mode-clarity.browser.test.mjs with SHOTS=1). Evidence
+# for a review, regenerated on demand; never an input to any check, so never committed.
+test/__screens__/

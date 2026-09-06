@@ -61,6 +61,7 @@
   .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
     color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
   .linklike:hover{color:#174026}
+  .backzip{margin-top:8px;font-size:13px;font-weight:600}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -416,6 +417,11 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- THE WAY BACK. A resident who lands on a ZIP page and then searches their address
+               had no control returning them to the whole ZIP - only editing the URL. Shown in
+               address mode only, and only when a ZIP is actually known (the page it came from,
+               else the ZIP the geocoder matched); never guessed. -->
+          <button type="button" class="linklike backzip" id="backZip" hidden></button>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -1098,6 +1104,22 @@ HS.onReady(function(){
     else { run(a.value.trim()); }
   }); }
 
+  // "Back to all development in ZIP X" - the way out of address mode. It routes through the
+  // SAME loadZip() the crawlable ?zip= landing uses, and rewrites the URL to match, so the view
+  // on screen and the address bar never disagree and the back button behaves.
+  var _backZip = document.getElementById("backZip");
+  if(_backZip){ _backZip.addEventListener("click", function(){
+    var z = _backZip.getAttribute("data-zip") || "";
+    if(!/^\d{5}$/.test(z)) return;                 // never navigate to a ZIP we did not resolve
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set("zip", z); u.searchParams.delete("addr");
+      window.history.pushState({}, "", u.toString());
+    } catch(e){}
+    if(window.HS && HS.state) HS.state.zip = z;
+    loadZip(z); loadDevTracker(z);
+  }); }
+
   // ADDRESS MODE, STEP 1 - the existing production geocoder. One call, no second geocoder,
   // never a ZIP centroid. Returns the endpoint's own match object, or null when it reports no
   // match; the endpoint publishes no match-quality field, so none is invented here.
@@ -1157,6 +1179,12 @@ HS.onReady(function(){
       var r = parseFloat(c.getAttribute("data-r"));
       var allowed = ZIP_MODE || HS.N5_RADII.indexOf(r) >= 0;
       c.disabled = !allowed;
+      // ...and HIDDEN, not merely greyed. The 3/10/20 stops are allowed only in ZIP mode, where
+      // the whole row is display:none - so in practice a resident only ever saw them disabled,
+      // under a tooltip promising a "whole-ZIP view" that never shows them. Three dead buttons
+      // beside four live ones read as broken. They stay in the DOM (setRadiusButton addresses
+      // the 3-mile stop by element) and simply do not render where they cannot be chosen.
+      c.hidden = !allowed;
       c.title = allowed ? "" : "Available for whole-ZIP view; address search covers 0.5, 1, 2 and 5 miles";
     });
   }
@@ -1180,6 +1208,21 @@ HS.onReady(function(){
     document.body.classList.remove("zipmode");
     var _cap2 = document.querySelector(".map-cap");
     if(_cap2){ _cap2.textContent = "Development around this home"; }
+    // LAUNCH STANDARD - the two modes must not be readable at once. A resident who searches an
+    // address FROM a ZIP page kept the ZIP hero: "Del Valle (78617)" over "What's built and
+    // what's proposed ACROSS ZIP 78617", sitting directly above a card reading "within 2 miles
+    // of 2200 Caldwell Ln". Both claims on one screen, contradicting each other, is exactly the
+    // ZIP-wide/near-home confusion this launch gate exists to remove. The hero follows the mode.
+    // It is deliberately address-FREE: the card already carries the geocoded address, and this
+    // runs before the geocoder answers, so naming an address here could only disagree with it.
+    $("eyebrow").textContent = "Near-home view";
+    var _h1a = document.querySelector(".head h1");
+    if(_h1a) _h1a.textContent = "Development around your home";
+    var _sub2 = document.querySelector(".sub");
+    if(_sub2){ _sub2.textContent = "What's built and what's proposed near this address — "
+      + "data-center activity, planning hearings and open comment windows, plus nearby "
+      + "regulated facilities for context — every item linked to its official public record."; }
+    document.title = "Development near " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1405,6 +1448,24 @@ HS.onReady(function(){
           window.__HS_SITES = [];
           setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
+          // LAUNCH STANDARD - "not measured" must never wear the clothes of "zero nearby".
+          // render() never runs on this path, so the card kept its ADDRESS-MODE defaults:
+          // "Within 1 mile of / -" over four zeros labelled "nearby". On an unmeasured ZIP a
+          // resident read that as "nothing is being built within a mile of me" - a near-home
+          // finding, from a radius nobody entered, about a ZIP nobody measured. There is no
+          // cached report row on this path, so NONE of those four numbers was ever counted:
+          // the counters are removed rather than relabelled, and the note below carries the
+          // finding in words (measured-and-empty vs not-measured-at-all).
+          var _outcome = HS.zipAuthOutcome ? HS.zipAuthOutcome(auth) : "not_measured";
+          if($("withinLbl")) $("withinLbl").textContent = _outcome === "complete"
+            ? "All development across ZIP " + zip
+            : "Development coverage · ZIP " + zip;
+          if($("rAddr")) $("rAddr").textContent = _outcome === "complete"
+            ? "The entire ZIP " + zip + " area — not just projects near one address."
+            : "";
+          var _counts = document.querySelector(".counts");
+          if(_counts) _counts.style.display = "none";
+          if($("backZip")) $("backZip").hidden = true;
           status(HS.zipAuthNote(auth, zip, []));
         }
       })
@@ -1419,18 +1480,32 @@ HS.onReady(function(){
   function render(data){
     status("");
     $("results").style.display = "block";
+    // The empty/not-measured branch above removes the counters; a resident can search an
+    // address from that page with no reload, so restore them whenever there is a real read.
+    var _cts = document.querySelector(".counts");
+    if(_cts) _cts.style.display = "";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // LAUNCH STANDARD: name the geography in full. "Across ZIP 84302" was read as
+      // "projects dotted around ZIP 84302" - i.e. nearby - which is the exact confusion the
+      // two modes must not share. "ALL development across ZIP X" states the scope, and the
+      // line under it says what the resident is NOT looking at, because the near-home mode
+      // is one search box away and looks almost identical.
+      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      $("rAddr").textContent = "The entire ZIP " + ZIP_CODE + " area — not just projects near one address.";
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
       if($("kDev")) $("kDev").textContent = "New projects proposed across this ZIP";
       if($("kFac")) $("kFac").textContent = "Nearby regulated facilities";
       if($("ccTot")) $("ccTot").style.display = "none";
+      if($("backZip")) $("backZip").hidden = true;    // already the whole ZIP
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // "Within 1 mile of" is a fragment: it never says within a mile of WHAT, and it never
+      // says what is being counted. The heading and the address line below it now read as one
+      // sentence - "Showing development within 1 mile of / 2200 Caldwell Ln, ..." - so the
+      // centre and the radius are both named where the resident is already looking.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
@@ -1442,6 +1517,15 @@ HS.onReady(function(){
       // Address search: scope the App-map cross-link to this address's ZIP (same parse as the engine).
       var addrZip = (window.HS && HS.parseZipFromAddress) ? HS.parseZipFromAddress(data.address) : null;
       if(addrZip && window.HS && HS.state) HS.state.zip = addrZip;
+      // ZIP_CODE survives the switch to address mode, so a resident who came from a ZIP page
+      // goes back to THAT ZIP; someone who arrived by address goes to the one the geocoder
+      // matched. Neither known - no button, rather than a ZIP we would be inventing.
+      var _bz = $("backZip"), _bzip = ZIP_CODE || addrZip;
+      if(_bz){
+        if(_bzip){ _bz.textContent = "← Back to all development in ZIP " + _bzip;
+                   _bz.setAttribute("data-zip", _bzip); _bz.hidden = false; }
+        else { _bz.hidden = true; }
+      }
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
