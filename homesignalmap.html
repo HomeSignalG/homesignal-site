@@ -48,7 +48,12 @@
   h1{font-weight:700;font-size:30px;letter-spacing:-.02em;margin:6px 0 4px}
   .sub{color:var(--soft);font-size:15px;max-width:640px}
 
-  form.search{display:flex;gap:10px;margin:18px 0 4px;flex-wrap:wrap}
+  /* The address field carries a VISIBLE label, not just a placeholder: a placeholder disappears
+     the moment the resident types, so it cannot name the field while it is being filled in. The
+     label sits above the row rather than inside it, because form.search is a flex row and a
+     label flex-item would land beside the input instead of over it. */
+  .search-label{display:block;font-size:12.5px;font-weight:700;color:var(--ink);margin:18px 0 6px}
+  form.search{display:flex;gap:10px;margin:0 0 4px;flex-wrap:wrap}
   .search input{flex:1;min-width:260px;font-family:var(--font);font-size:15px;padding:13px 15px;
     border:1px solid var(--line);border-radius:11px;background:#fff}
   .search input:focus{outline:none;border-color:var(--green-bright);box-shadow:0 0 0 3px #16a34a22}
@@ -359,10 +364,11 @@
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
+      <label class="search-label" for="addr">Address</label>
       <form class="search" id="form">
         <input id="addr" type="text" autocomplete="street-address"
-          placeholder="e.g. 20 North Main Street, Brigham City, UT 84302" required/>
-        <button id="go" type="submit">See development</button>
+          placeholder="Start typing an address" required/>
+        <button id="go" type="submit">See development nearby</button>
       </form>
       <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
       <button type="button" class="linklike" id="sampleBtn">See a sample</button>
@@ -1386,12 +1392,15 @@ HS.onReady(function(){
       + "data-center activity, planning hearings and open comment windows, plus nearby "
       + "regulated facilities for context — every item linked to its official public record."; }
     var _hint = document.querySelector(".hint");
-    if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
-      + "Free while we're in launch."; }
+    // The field takes FREE-FORM text and geocodes it on submit — there is no suggestion list to
+    // choose from (nothing listens for input; autocomplete="street-address" is the browser's own
+    // autofill, not ours). So the copy asks for an address, and deliberately does not demand a
+    // "full" one or a fixed "street, city, state, ZIP" shape the geocoder does not require.
+    if(_hint){ _hint.textContent = "Enter an address to see development nearby."; }
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
-    var _addr = $("addr");
-    if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
+    // No placeholder override here any more: "Start typing an address" reads correctly in BOTH
+    // modes, and a second copy of it would be one more string to keep in sync for no gain.
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
