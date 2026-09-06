@@ -1,0 +1,53 @@
+{
+  "task": "TASK 1 — instrument the harness so environment claims are provable",
+  "measured_at_utc": "2026-09-06T17:45Z",
+  "result": "STOP CONDITION MET — the harness role lacks pg_stat_activity visibility for other sessions",
+
+  "what_the_gate_9_harness_actually_is": {
+    "script": "scripts/verify-map1-zip-states.mjs",
+    "transport": "Playwright/Chromium against https://homesignal.net; every DB read is an HTTP request to PostgREST made by the page's own supabase-js anon client",
+    "direct_postgres_connection": false,
+    "evidence": "the file imports { chromium } from 'playwright' and nothing else network-facing; repo-wide grep for a pg client (require('pg') | from 'pg' | new Client() ) returns 0 files; the repo ships no package.json, so there is no postgres dependency to configure",
+    "consequence": "there is no harness-owned Postgres connection on which application_name can be set. PostgREST names its own pooled backends.",
+    "postgrest_application_name_distinct_values": "postgrest"
+  },
+
+  "permission_probe_run_as_anon": {
+    "why_anon": "anon is the only role the harness ever authenticates as",
+    "pg_stat_activity_readable": true,
+    "rows_returned": 48,
+    "other_sessions": 47,
+    "other_sessions_with_readable_query": 0,
+    "other_sessions_showing_insufficient_privilege": 47,
+    "column_visibility_across_the_47_other_sessions": {
+      "application_name": 40,
+      "query": 0,
+      "state": 0,
+      "wait_event": 0,
+      "query_start": 0,
+      "xact_start": 0
+    }
+  },
+
+  "exact_permission_missing": {
+    "grant": "membership in the built-in role pg_read_all_stats (or superuser) for the role the harness runs as",
+    "current_state": {
+      "pg_has_role('anon','pg_read_all_stats','member')": false,
+      "pg_has_role('authenticator','pg_read_all_stats','member')": false,
+      "anon_rolsuper": false
+    },
+    "without_it": "pg_stat_activity.query is returned as the literal '<insufficient privilege>' and state / wait_event / query_start / xact_start are NULL for every session but the caller's own"
+  },
+
+  "why_task_2_cannot_run": [
+    "TASK 2a requires capturing query, state, wait_event, xact_start, query_start, pid, application_name. Five of those seven are invisible to the harness role for every other session.",
+    "TASK 2e's BLOCKED-ON-ENVIRONMENT rule requires matching other sessions' query text against 'app_projects_for_zip' OR 'app_zip_projects_markers'. That column reads '<insufficient privilege>' for all 47 other sessions, so the rule is not evaluable by the harness.",
+    "TASK 1's application_name tagging has no connection to apply to, and the two ways to create one are both unauthorized here: granting pg_read_all_stats to the public anon role would let any anon caller read every session's SQL, and giving the harness its own Postgres connection requires a database credential that does not exist as a CI secret today."
+  ],
+
+  "not_done": [
+    "artifacts/gate9/pgstat_pre_<runid>.json — TASK 1 says do not proceed to TASK 2",
+    "artifacts/gate9/timings_<runid>.csv — same",
+    "artifacts/gate9/pgstat_fail_<runid>.json — same"
+  ]
+}
