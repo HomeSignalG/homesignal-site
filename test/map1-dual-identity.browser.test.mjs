@@ -6,6 +6,12 @@
 //
 //   A site proven to be DATA CENTER + EPA REGULATED FACILITY.
 //   Turn OFF every Map 1 type except EPA / Regulated facility.
+//
+// ⚖️ UPDATED 2026-09-06. Regulated facility left the Type row for its own "Regulatory
+// records" switch and the subordinate purple square became a lower-right purple R badge.
+// The CONTRACT under test is unchanged — one record, two memberships, one marker, primary
+// identity Data center — so only the control that is clicked and the badge that is read
+// have moved. `setReg` drives the switch; `readMarkers` reports the badge letter.
 //   The site remains visible, drawn as a DATA CENTER with an EPA square beneath it,
 //   exactly ONCE, and its popup states both truths.
 //
@@ -127,7 +133,10 @@ const readMarkers = () => page.evaluate(() => {
       primaryPoints: pts.trim().split(/\s+/).filter(Boolean).length,
       polygons: poly,
       rects: (html.match(/<rect/g) || []).length,
-      purple: /#7d148c/i.test(html)
+      purple: /#7d148c/i.test(html),
+      // The regulatory BADGE, read off the painted markup: a purple rect carrying a
+      // white capital R. `rects` alone cannot say that — a capsule primary is a rect too.
+      rBadge: /#7d148c/i.test(html) && />R<\/text>/.test(html)
     };
   }).filter(m => !m.home);
 });
@@ -141,63 +150,82 @@ const setTypes = (on) => page.evaluate((keys) => {
   });
   return rows.map(r => r.getAttribute('data-cat') + '=' + r.getAttribute('aria-pressed'));
 }, on);
+// The regulatory dimension is ONE switch in its own row — clicked, like everything else.
+const setReg = (want) => page.evaluate((on) => {
+  const t = document.getElementById('regToggle');
+  if (t && (t.getAttribute('aria-checked') === 'true') !== on) t.click();
+}, want);
 
 // ── 0. the surface exists and is honest before anything is clicked ─────────────────
 const rowKeys = await page.evaluate(() =>
   Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]')).map(r => r.getAttribute('data-cat')));
-ok(rowKeys.includes('datacenter') && rowKeys.includes('facility'),
-  '0a: Map 1 exposes a Data center row and a Regulated facility row as TYPE filters', rowKeys.join(','));
+ok(rowKeys.includes('datacenter') && !rowKeys.includes('facility'),
+  '0a: the TYPE row exposes Data center and NOT Regulated facility', rowKeys.join(','));
+ok(await page.evaluate(() => !!document.getElementById('regToggle')),
+  '0a2: …and regulatory records have their own switch instead');
 const before = await readMarkers();
 ok(before.length === 3, '0b: all three production records render with every filter on', before.length);
 
 // THE OCTAGON IS 8 POINTS, THE SQUARE IS A <rect> — read from the DOM, not from our model.
-const dualMk = before.filter(m => m.primaryPoints === 8 && m.rects === 1 && m.purple);
+const dualMk = before.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(dualMk.length === 1,
-  '1: the dual-identity record draws ONE marker: an octagon primary with a purple EPA square', dualMk.length);
-ok(before.filter(m => m.rects === 1 && m.polygons === 0).length === 1,
-  '2: the ordinary EPA facility still draws a plain purple square — unchanged', 'ANDURIL INDUSTRIES');
+  '1: the dual-identity record draws ONE marker: an octagon primary with a purple R badge', dualMk.length);
+ok(before.filter(m => m.rects === 1 && m.polygons === 0 && !m.rBadge).length === 1,
+  '2: a regulatory-only location still draws a plain purple square — unchanged', 'ANDURIL INDUSTRIES');
 ok(before.filter(m => m.primaryPoints === 8 && m.rects === 0).length === 1,
   '3: the ordinary data-centre project draws a bare octagon — no EPA signal invented');
 
-// ── 4. THE FOUNDER'S ACCEPTANCE TEST — every type OFF except EPA ───────────────────
-await setTypes(['facility']);
+// ── 4. THE FOUNDER'S ACCEPTANCE TEST — every type OFF, regulatory ON ──────────────
+await setTypes([]); await setReg(true);
 await page.waitForTimeout(250);
 const epaOnly = await readMarkers();
-const epaOnlyDual = epaOnly.filter(m => m.primaryPoints === 8 && m.rects === 1 && m.purple);
+const epaOnlyDual = epaOnly.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(epaOnly.length === 2, '4a: EPA-only → exactly the two records with EPA membership remain', epaOnly.length);
 ok(epaOnlyDual.length === 1,
-  '4b: ALL TYPES OFF EXCEPT EPA → the data centre is STILL VISIBLE, STILL an octagon, STILL carrying its EPA square, exactly ONCE');
+  '4b: ALL TYPES OFF + REGULATORY ON → the data centre is STILL VISIBLE, STILL an octagon, STILL carrying its R badge, exactly ONCE');
 ok(epaOnly.filter(m => m.primaryPoints === 8 && m.rects === 0).length === 0,
   '4c: …and the data-centre PROJECT (no EPA record) is correctly hidden');
 
-// ── 5. The mirror case — Data Center only ─────────────────────────────────────────
-await setTypes(['datacenter']);
+// ── 5. The mirror case — Data Center only, regulatory OFF ────────────────────────
+// This is where the two dimensions come apart, and it is the whole point of the split:
+// the PROJECT is not hidden by the regulatory switch, only its regulatory annotation is.
+await setTypes(['datacenter']); await setReg(false);
 await page.waitForTimeout(250);
 const dcOnly = await readMarkers();
 ok(dcOnly.length === 2, '5a: Data center only → the dual record and the DC project', dcOnly.length);
-ok(dcOnly.filter(m => m.primaryPoints === 8 && m.rects === 1 && m.purple).length === 1,
-  '5b: DC ON / EPA OFF → the EPA square is STILL attached — a filter does not erase a known attribute');
+ok(dcOnly.filter(m => m.primaryPoints === 8).length === 2,
+  '5b: DC ON / regulatory OFF → the regulated data centre is STILL DRAWN, still an octagon');
+ok(dcOnly.filter(m => m.rBadge).length === 0,
+  '5b2: …and the R badge is gone — the switch hides the annotation, never the project');
 ok(dcOnly.filter(m => m.rects === 1 && m.polygons === 0).length === 0,
-  '5c: …and the ordinary EPA facility is correctly hidden');
+  '5c: …and the regulatory-only location is correctly hidden');
+// The switch is reversible and does not disturb the Type row it sits under.
+await setReg(true);
+await page.waitForTimeout(250);
+ok((await readMarkers()).filter(m => m.rBadge).length === 1,
+  '5d: turning it back on repaints the badge on the already-drawn pin');
+ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]'))
+     .filter(r => r.getAttribute('aria-pressed') === 'true').map(r => r.getAttribute('data-cat')).join(',')) === 'datacenter',
+  '5e: …and every Type chip is exactly where the resident left it');
 
 // ── 6. Both on / both off ─────────────────────────────────────────────────────────
-await setTypes(['datacenter', 'facility']);
+await setTypes(['datacenter']); await setReg(true);
 await page.waitForTimeout(250);
 const bothOn = await readMarkers();
-ok(bothOn.length === 3 && bothOn.filter(m => m.primaryPoints === 8 && m.rects === 1).length === 1,
+ok(bothOn.length === 3 && bothOn.filter(m => m.primaryPoints === 8 && m.rBadge).length === 1,
   '6a: BOTH ON → the dual record appears ONCE, not once per matching filter', bothOn.length);
 
-await setTypes([]);
+await setTypes([]); await setReg(false);
 await page.waitForTimeout(250);
 ok((await readMarkers()).length === 0, '6b: BOTH OFF → not visible');
 
 // ── 7. One underlying record, and the page says so ────────────────────────────────
-await setTypes(['facility']);
+await setTypes([]); await setReg(true);
 await page.waitForTimeout(250);
 const v = await page.evaluate(() => window.__HS_VERIFY);
 ok(v.dualIdentityMarkers === 1,
   '7a: the page reports exactly ONE dual-identity marker object — dual membership never created a second record', v.dualIdentityMarkers);
-ok(v.visibleMarkers === 2, '7b: the visible count under EPA-only is 2 underlying records, not 3', v.visibleMarkers);
+ok(v.visibleMarkers === 2, '7b: the visible count under regulatory-only is 2 underlying records, not 3', v.visibleMarkers);
 
 // ── 8. The popup carries both truths, identity first ──────────────────────────────
 const popup = await page.evaluate(() => {

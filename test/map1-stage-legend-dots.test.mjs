@@ -82,6 +82,18 @@ if (!/function markerTitle\(s, mk\)\{/.test(src)) {
   failures.push('markerTitle() is gone — markers would communicate stage by colour alone');
 }
 if (!/title="' \+ escAttr\(title\)/.test(src)) failures.push('the 2D marker carries no title attribute');
+// THE TITLE BELONGS INSIDE siteIcon(), NOT AT THE CREATION CALL. The regulatory switch
+// repaints every badged marker through syncRegulatoryBadges() -> setIcon(siteIcon(...)),
+// so a title applied only where the marker is first built is silently dropped the moment
+// a resident toggles that switch — and a missing tooltip looks like nothing at all.
+// Both halves are asserted: the builder takes the title, and the repaint path passes one.
+if (!/function siteIcon\(mk, size, solidPoint, title\)/.test(src)) {
+  failures.push('siteIcon() does not take the title — a marker repaint would drop it');
+}
+if (!/setIcon\(siteIcon\(x\.mk, x\.size, x\.solidPoint, markerTitle\(x\.s, x\.mk\)\)\)/.test(src)) {
+  failures.push('the regulatory-badge repaint rebuilds icons without a title, so toggling the '
+    + 'regulatory switch would strip every marker of its stage text');
+}
 if (!/el\.setAttribute\("title", title\)/.test(src)) failures.push('the satellite marker carries no title');
 // The words must come from the same two facts the mark is drawn from, or the sentence and the
 // symbol can disagree — the exact class of bug kindLabel() was named to prevent.

@@ -1483,23 +1483,50 @@
   async function wireSearch() {
     const input = $('hs-search'), box = $('hs-search-results');
     if (!input || !box) return;
-    const home = state.activeProperty;
-    const [projects, changes] = await Promise.all([
-      HS.data.projects(state.zip, home), HS.data.changes(state.zip, home)]);
-    const idx = [
-      ...projects.map(p => ({ label: p.name, sub: p.type, href: 'development.html?id=' + p.id })),
-      ...changes.map(c => ({ label: c.title, sub: c.category, href: c.related_project_id ? 'development.html?id=' + c.related_project_id : 'alerts.html' })),
-      ...state.properties.map(p => ({ label: p.address, sub: p.city + ', ' + p.state, href: 'property.html?id=' + p.id }))
-    ];
+    // The index fills in asynchronously, but the LISTENERS ARE ATTACHED FIRST and never
+    // wait on it. They used to sit after `await Promise.all([...])`, so any rejection in
+    // the data read — a null client, an RPC error, one bad row — left the field silently
+    // DEAD: typing produced no dropdown at all, not even "No matches", which is
+    // indistinguishable from a broken control. An empty index now degrades to an honest
+    // "No matches" instead. Result semantics are unchanged: the same rows, the same
+    // substring match, the same markup.
+    let idx = [];
+    const hitsFor = q => idx.filter(i => (i.label + ' ' + i.sub).toLowerCase().includes(q)).slice(0, 8);
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase();
       if (!q) { box.classList.add('hidden'); return; }
-      const hits = idx.filter(i => (i.label + ' ' + i.sub).toLowerCase().includes(q)).slice(0, 8);
+      const hits = hitsFor(q);
       box.innerHTML = hits.map(h => `<a href="${h.href}"><b>${HS.esc(h.label)}</b><span>${HS.esc(h.sub)}</span></a>`).join('')
         || '<div class="empty">No matches</div>';
       box.classList.remove('hidden');
     });
+    // Enter opens the top match. This search has only ever been click-to-navigate, so
+    // pressing Enter did nothing at all — the field looked broken to anyone who typed a
+    // query and hit return. There is no search-results PAGE to submit to, so the top hit
+    // is the only honest destination; with no hits, Enter does nothing rather than
+    // navigating somewhere the query did not ask for.
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim().toLowerCase();
+      if (!q) return;
+      const top = hitsFor(q)[0];
+      if (!top) return;
+      e.preventDefault();
+      location.href = top.href;
+    });
     document.addEventListener('click', e => { if (!box.contains(e.target) && e.target !== input) box.classList.add('hidden'); });
+
+    const home = state.activeProperty;
+    let projects = [], changes = [];
+    try {
+      [projects, changes] = await Promise.all([
+        HS.data.projects(state.zip, home), HS.data.changes(state.zip, home)]);
+    } catch (e) { console.warn('search index', e); }
+    idx = [
+      ...projects.map(p => ({ label: p.name, sub: p.type, href: 'development.html?id=' + p.id })),
+      ...changes.map(c => ({ label: c.title, sub: c.category, href: c.related_project_id ? 'development.html?id=' + c.related_project_id : 'alerts.html' })),
+      ...(state.properties || []).map(p => ({ label: p.address, sub: p.city + ', ' + p.state, href: 'property.html?id=' + p.id }))
+    ];
   }
 
   // The header's universal search lives behind a compact "Search" button (it used to be a
