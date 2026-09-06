@@ -249,6 +249,9 @@
   .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
   .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
+  .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
+    background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
+  .mapkey-empty[hidden]{display:none}
 
   /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
      The resolved-project data is a verified public-record anchor. Every honesty label the
@@ -341,7 +344,8 @@
               <div class="mapkey" id="mapkey"></div>
               <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Select any chip in either row to show or hide those pins. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <div class="mapkey-empty" id="mapkeyEmpty" hidden>Every matching pin is switched off. Turn a Stage or Type chip back on to show records again.</div>
             </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
@@ -543,6 +547,18 @@ HS.onReady(function(){
   var FILTER = {};
   LEGEND.forEach(function(it){ FILTER[it.b] = true; });
   FILTER.built = true;                          // legacy alias (cached rows stamp type='built')
+  // ── TYPE — pin shape: the SECOND legend row's toggle state ───────────────────
+  // Keyed on the canonical CATEGORY_REGISTRY key (HS.resolveMarker's `typeKey`), which is a
+  // CLOSED set — so adding a category to the registry gives it a chip AND a working toggle
+  // with no change here, the same "generated from one table" contract the shapes already have.
+  //
+  // DEFAULT-VISIBLE (`!== false`), deliberately the OPPOSITE polarity to the stage FILTER
+  // above. A key this page has never seen must read as ON, never as hidden: the stage row
+  // needs its `FILTER.built = true` legacy alias for precisely the failure this avoids — a
+  // key absent from the filter map silently drops every record carrying it, and a dropped
+  // record is indistinguishable from a ZIP that has none. Showing a pin nobody asked to hide
+  // is a cosmetic miss; hiding a real permit and saying nothing is the anti-fabrication one.
+  var TYPE_FILTER = {};
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
@@ -724,6 +740,21 @@ HS.onReady(function(){
   // "Facility · operating now" label — keys on THIS, never on scope, so a permit never inherits
   // an EPA-facility affordance. Returns the trimmed id or "".
   function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
+  // A record's canonical TYPE key — the same value HS.resolveMarker uses to pick the pin
+  // SHAPE, so a chip can never switch off a shape other than the one drawn beside it.
+  // frsRid is passed for real (not the ""-stub bucketOf uses) because that flag is what
+  // resolves an EPA facility to `facility` rather than to its underlying land use.
+  // Memoized on the site object — the same render-time stamping placeStackedPoints already
+  // does with _fanN/_fanIdx — so a dense ZIP (5,500+ sites) resolves once per draw, not
+  // once per toggle click across three views.
+  function typeKeyOf(s){
+    if(!s) return "other";
+    if(typeof s._typeKey === "string") return s._typeKey;
+    var mk = HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, frsRid) : null;
+    s._typeKey = (mk && mk.typeKey) || "other";
+    return s._typeKey;
+  }
+  function typeVisible(s){ return TYPE_FILTER[typeKeyOf(s)] !== false; }
   // Friendly, plain-language building type from the facility name (falls back to its layer).
   function facilityType(s){
     // A scope:"point" record with no FRS registry ID is a planning/permit filing, not an EPA
@@ -1617,6 +1648,10 @@ HS.onReady(function(){
       mapMarkers: siteMarkers.length,
       visibleMarkers: vis,
       facilitiesOnly: FACILITIES_ONLY,
+      // Both legend rows' state, so a verifier can tell "this ZIP has no records" apart from
+      // "the resident switched these off" — the two produce an identical visibleMarkers of 0.
+      stageFilter: JSON.parse(JSON.stringify(FILTER)),
+      typeFilter: JSON.parse(JSON.stringify(TYPE_FILTER)),
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
     };
@@ -1689,12 +1724,20 @@ HS.onReady(function(){
     return fails;
   };
 
-  // Show only the buckets whose legend chip is on.
+  // Show only the records both legend rows agree on: the STAGE chip for its lifecycle
+  // bucket AND the TYPE chip for its category must be on.
   function applyFilter(){
+    var vis = 0;
     siteMarkers.forEach(function(x){
-      if(FILTER[x.bucket]){ x.m.addTo(layerGroup); }
+      if(FILTER[x.bucket] && typeVisible(x.s)){ x.m.addTo(layerGroup); vis++; }
       else { layerGroup.removeLayer(x.m); }
     });
+    // An empty map caused by the resident's own toggles must SAY so. Without this, switching
+    // off every Type renders a blank map that is indistinguishable from a ZIP with no records
+    // — the same "silence and a filtered-out result look identical" trap the filter polarity
+    // above guards against, one layer up in the UI. Only fires when there IS data to hide.
+    var em = document.getElementById("mapkeyEmpty");
+    if(em){ em.hidden = !(siteMarkers.length > 0 && vis === 0); }
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
     publishVerifyState();
@@ -1726,14 +1769,48 @@ HS.onReady(function(){
       });
       d.appendChild(row);
     });
+    // The Type row is built exactly like the Stage row above, and for the same reason: it
+    // already carried the full toggle affordance in CSS — `cursor:pointer`, a :hover state, a
+    // :focus-visible outline and a defined `.off` appearance (40% opacity + strikethrough) —
+    // inherited from `.mapkey span`, which both rows use. Only the wiring was absent, so the
+    // chips looked and felt switchable and did nothing. Rows are GENERATED from
+    // HS.SHAPE_LEGEND (itself generated from CATEGORY_REGISTRY), never hand-listed.
     var shapes = document.getElementById("mapkeyShapes");
     if(shapes && HS.SHAPE_LEGEND){
+      shapes.innerHTML = "";
       var neutral = HS.markerRegistry.neutralHex;
-      var rows = HS.SHAPE_LEGEND.map(function(s){
-        return "<span class='sh'><span class='ic'>" + HS.markerSVG(s.shape, neutral, "", 14) + "</span><span class='t'>" + esc(s.label) + "</span></span>";
+      var shapeRows = HS.SHAPE_LEGEND.map(function(s){
+        return { key:s.categoryKey, shape:s.shape, color:neutral, label:s.label };
       });
-      rows.push("<span class='sh'><span class='ic'>" + HS.markerSVG("square", HS.markerRegistry.facilityHex, "", 14) + "</span><span class='t'>Regulated facility</span></span>");
-      shapes.innerHTML = rows.join("");
+      // Appended rather than read from SHAPE_LEGEND because lib/map.js filters `isFacility`
+      // out of that list (it is a legend row, not a project type). It IS a filterable
+      // category here, and keeps its own purple instead of the neutral outline.
+      shapeRows.push({ key:"facility", shape:"square", color:HS.markerRegistry.facilityHex, label:"Regulated facility" });
+      shapeRows.forEach(function(it){
+        var row = document.createElement("span");
+        row.className = "sh";
+        row.tabIndex = 0;
+        row.setAttribute("role", "button");
+        row.setAttribute("aria-label", it.label + " markers");
+        var on = TYPE_FILTER[it.key] !== false;
+        if(!on) row.classList.add("off");
+        row.setAttribute("aria-pressed", on ? "true" : "false");   // pressed = type shown
+        row.innerHTML = "<span class='ic'>" + HS.markerSVG(it.shape, it.color, "", 14) + "</span><span class='t'>" + esc(it.label) + "</span>";
+        function toggle(){
+          // Written as an explicit `=== false` flip, not `!TYPE_FILTER[k]`, so the
+          // default-visible polarity survives: `undefined` (never touched) means ON.
+          var next = TYPE_FILTER[it.key] === false;
+          TYPE_FILTER[it.key] = next;
+          row.classList.toggle("off", !next);
+          row.setAttribute("aria-pressed", next ? "true" : "false");
+          applyFilter();
+        }
+        row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
+        row.addEventListener("keydown", function(e){
+          if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
+        });
+        shapes.appendChild(row);
+      });
     }
   }
 
@@ -1995,7 +2072,7 @@ HS.onReady(function(){
     // Frame the view to where the buildings actually are (not the empty outer radius),
     // so it reads well at every radius. maxD = farthest visible facility from home.
     var maxD=0, nLabelable=0;
-    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type, p)])return;
+    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type, p)])return; if(!typeVisible(p))return;
       var en=siteEN(p); if(typeof en[0]!=="number"||typeof en[1]!=="number")return; var dd=Math.hypot(en[0],en[1]);
       if(ZIP_MODE || dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
     // Readability: floating type-labels only when few enough not to collide. In a dense
@@ -2015,6 +2092,7 @@ HS.onReady(function(){
       if(!mappable(p))return;
       var bkt=bucketOf(p.type, p);
       if(!FILTER[bkt])return;
+      if(!typeVisible(p))return;
       // ZIP mode draws the WHOLE ZIP - no radius cull. Address mode keeps its chosen radius.
       if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);
@@ -2151,6 +2229,7 @@ HS.onReady(function(){
       if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
       if(!mappable(s))return;
       var bkt=bucketOf(s.type); if(!FILTER[bkt])return;
+      if(!typeVisible(s))return;
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
