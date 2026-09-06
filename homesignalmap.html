@@ -300,9 +300,6 @@
   .dt-alias .nm{font-weight:600;color:var(--ink)}
   .dt-alias .src{color:var(--mute);font-size:11.5px;margin-top:2px}
   .dt-alias .src a{color:var(--green)}
-  .backzip{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:600;
-    color:#0f766e;text-decoration:none;border-bottom:1px solid rgba(15,118,110,.35)}
-  .backzip:hover,.backzip:focus{border-bottom-color:#0f766e}
   .dt-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:6px;
     background:#e6f4ec;color:#1f5130;margin-left:7px;vertical-align:middle}
   .dt-chip.warn{background:#fdf0e6;color:#a85a1f}
@@ -419,14 +416,6 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
-          <!-- BACK TO THE WHOLE ZIP. Before this existed, ZIP_MODE was set true in exactly
-               one place — loadZip(), the initial page load — so a resident who searched an
-               address could not return to the ZIP-wide view without hand-editing the URL.
-               Deliberately an <a href> to the canonical ?zip= entry rather than an in-page
-               state flip: it re-enters through loadZip(), so the view is byte-identical to
-               a fresh visit and no mode state can be left half-switched. Hidden until a ZIP
-               is actually known (a resident may arrive straight into address mode). -->
-          <a class="backzip" id="backZip" href="#" style="display:none"></a>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -1427,46 +1416,25 @@ HS.onReady(function(){
       });
   }
 
-
   function render(data){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      // "All development across ZIP X", not "Across ZIP X": the noun is what makes this a
-      // WHOLE-ZIP claim rather than a vague proximity one, and the claim is true — ZIP mode
-      // reads authoritative ZIP/ZCTA membership (lib/zip-authoritative.js) with no radius.
-      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
       $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
       if($("kDev")) $("kDev").textContent = "New projects proposed across this ZIP";
       if($("kFac")) $("kFac").textContent = "Nearby regulated facilities";
-      // Already looking at the whole ZIP — offering a way "back" to it would be nonsense.
-      if($("backZip")) $("backZip").style.display = "none";
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      // "Showing development within N of" — the verb+noun stop this reading as though the
-      // radius bounded the whole page; facilities remain a separate, separately-labelled count.
-      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
+      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
       if($("kFac")) $("kFac").textContent = "Regulated facilities nearby";
-      // Shown ONLY when a ZIP is actually known. A resident who arrived straight into
-      // address mode has no ZIP to go back to, and inventing one from the geocode would be
-      // a claim about coverage the page has not measured.
-      var _bz = $("backZip");
-      if(_bz){
-        if(ZIP_CODE){
-          _bz.textContent = "\u2190 Back to all development in ZIP " + ZIP_CODE;
-          _bz.href = "homesignalmap.html?zip=" + encodeURIComponent(ZIP_CODE);
-          _bz.style.display = "";
-        } else {
-          _bz.style.display = "none";
-        }
-      }
       if($("ccTot")) $("ccTot").style.display = "";
       // Address mode's current view is the address the resident searched - never a
       // previously saved home that happens to sit in the same ZIP.
