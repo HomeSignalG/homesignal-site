@@ -148,6 +148,45 @@ ok(/console\.error\("\[HomeSignal\] " \+ label \+ " failed to start:"/.test(page
 ok(/GL\.map\.on\("error"/.test(page) && /webglcontextlost/.test(page),
   '§4 MapLibre asynchronous failures are surfaced too — they never reach the loader catch');
 
+// ── §6 the three ASYNCHRONOUS failure routes, each measured before it was guarded ────────
+// None of these can reach the loader's try/catch: they happen after a successful start, so
+// a code path that only guards initialisation cannot see them. Each was reproduced against
+// the real page before the guard was written, and each produced a black or blank panel.
+
+// (a) LOST WEBGL CONTEXT. Measured: forcing WEBGL_lose_context took the three.js canvas from
+//     0% to 100% dark while the segmented control still read "3D aerial" and nothing was said.
+ok(/rn\.domElement\.addEventListener\("webglcontextlost"/.test(page),
+  '§6a three.js listens for context loss on its own canvas');
+ok(/V3\.lost=true;[\s\S]{0,120}fail3D\("3d","contextlost"\)/.test(page),
+  '§6a a lost context marks the view dead AND falls back');
+ok(/if\(!V3\.active\|\|!V3\.inited\|\|V3\.lost\)return;/.test(page),
+  '§6a the render loop stops drawing into a dead context');
+// getContext() still returns the (dead) context object after a loss, so "a context exists"
+// is not evidence the view can draw — re-entry must consult V3.lost as well.
+ok(/if\(V3\.lost \|\| !V3\.rn/.test(page),
+  '§6a re-entering 3D after a loss does not present the dead canvas again');
+ok(/webglcontextrestored/.test(page),
+  '§6a a restored context clears the flag rather than failing forever');
+
+// (b) EVERY IMAGERY TILE FAILS. Measured: the map constructs, controls and attribution
+//     appear, and the canvas is 100% dark. A single missing tile must NOT fail the view, so
+//     the guard is deliberately narrow — errored AND not one tile ever arrived.
+ok(/GL\.satTiles = 0; GL\.satErrors = 0;/.test(page), '§6b tile successes and errors are counted');
+ok(/if\(e && e\.sourceId === "sat" && e\.tile\) GL\.satTiles\+\+;/.test(page),
+  '§6b a delivered tile is recorded, so a slow map is never called a failure');
+ok(/GL\.satTiles === 0 && GL\.satErrors > 0\) fail3D\("gl","tiles"\)/.test(page),
+  '§6b fallback needs BOTH no tiles at all AND at least one error — not one missing tile');
+ok(/GL_TILE_GRACE_MS = \d+/.test(page), '§6b the judgement waits a grace period');
+ok(/if\(GL\.active && GL\.satTiles/.test(page),
+  '§6b a resident who already switched away is not yanked back by a late verdict');
+
+// (c) THE NOTICE MUST NOT SWALLOW THE MAP IT FALLS BACK TO. Measured: elementFromPoint over
+//     the 2D zoom button returned the NOTICE — the control was covered and unclickable.
+ok(/\.map-msg\.mm-bar\{inset:auto 0 auto 56px;/.test(page),
+  '§6c the strip starts clear of the top-left zoom control');
+ok(/pointer-events:none\}/.test(page) && /\.map-msg\.mm-bar \.mm-x\{pointer-events:auto\}/.test(page),
+  '§6c clicks pass through the strip, except its own dismiss button');
+
 // ── §5 the working 2D path is untouched ─────────────────────────────────────────────────
 ok(/L\.map\("mapInner", \{ scrollWheelZoom:false \}\)/.test(page),
   '§5 the 2D Leaflet map is constructed exactly as before');

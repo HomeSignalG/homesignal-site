@@ -89,21 +89,10 @@ async function frameIsFlat(page) {
   return { flat: uniq.size < 6, distinct: uniq.size };
 }
 
-async function scenario(name, opts) {
-  const ctx = await browser.newContext(
-    MOBILE ? { ...devices[ENGINE === 'webkit' ? 'iPhone 13' : 'Pixel 7'] } : { viewport: { width: 1280, height: 1100 } });
-  const page = await ctx.newPage();
-  const consoleErrors = [];
-  page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
-
-  if (opts.blockWebGL) {
-    await page.addInitScript(() => {
-      const G = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function (t, o) {
-        return /webgl/i.test(t) ? null : G.call(this, t, o);
-      };
-    });
-  }
+// Shared network stubbing, so every scenario — including the context-loss run — sees the
+// identical fixture surface. Extracted rather than duplicated: two copies of a fixture
+// drift, and a scenario testing a different surface proves nothing about the others.
+async function routeAll(page, opts) {
   if (!LIVE) {
     await page.route('**://cdn.jsdelivr.net/**', (rt) => {
       const u = rt.request().url();
@@ -113,6 +102,10 @@ async function scenario(name, opts) {
         return existsSync(f) ? rt.fulfill({ status: 200, contentType: ct, body: readFileSync(f) }) : null;
       };
       if (opts.blockCDN && /three/.test(u)) return rt.abort();
+      // A library that answers 200 with a body that defines no global: the loader's onload
+      // fires, the callback runs, and the init reference throws. Distinct from a network failure.
+      if (opts.emptyLib && /three\.min\.js/.test(u))
+        return rt.fulfill({ status: 200, contentType: 'text/javascript', body: '/* 200, defines nothing */' });
       if (/three\.min\.js/.test(u)) return local('three-0.132.2/build/three.min.js', 'text/javascript') || rt.continue();
       if (/maplibre-gl\.js/.test(u)) return local('maplibre-gl-4.7.1/dist/maplibre-gl.js', 'text/javascript') || rt.continue();
       if (/leaflet\.js/.test(u)) return local('leaflet-1.9.4/dist/leaflet.js', 'text/javascript') || rt.continue();
@@ -131,17 +124,42 @@ async function scenario(name, opts) {
         body: '[{"name":"Brigham City","level":"city","county":"Box Elder","state":"Utah"}]' });
       return rt.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
     });
-    for (const host of ['**://server.arcgisonline.com/**', '**://elevation-tiles-prod.s3.amazonaws.com/**',
-                        '**://*.tile.openstreetmap.org/**'])
-      await page.route(host, (rt) => rt.fulfill({ status: 200, contentType: 'image/png', body: TILE }));
+    // Imagery hosts. `blockTiles` reproduces the measured case where the map constructs
+    // perfectly and every tile fails — a 100%-dark canvas under working controls.
+    await page.route('**://server.arcgisonline.com/**',
+      (rt) => opts.blockTiles ? rt.abort() : rt.fulfill({ status: 200, contentType: 'image/png', body: TILE }));
+    await page.route('**://elevation-tiles-prod.s3.amazonaws.com/**',
+      (rt) => opts.blockTiles ? rt.abort() : rt.fulfill({ status: 200, contentType: 'image/png', body: TILE }));
+    await page.route('**://*.tile.openstreetmap.org/**',
+      (rt) => rt.fulfill({ status: 200, contentType: 'image/png', body: TILE }));
   }
+}
+
+async function scenario(name, opts) {
+  const ctx = await browser.newContext(
+    MOBILE ? { ...devices[ENGINE === 'webkit' ? 'iPhone 13' : 'Pixel 7'] } : { viewport: { width: 1280, height: 1100 } });
+  const page = await ctx.newPage();
+  const consoleErrors = [];
+  page.on('pageerror', (e) => consoleErrors.push('pageerror: ' + e.message));
+
+  if (opts.blockWebGL) {
+    await page.addInitScript(() => {
+      const G = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) {
+        return /webgl/i.test(t) ? null : G.call(this, t, o);
+      };
+    });
+  }
+  await routeAll(page, opts);
 
   await page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
   await page.waitForTimeout(2500);
 
   for (const [v, viewName] of [['3d', '3D aerial'], ['gl', '3D satellite']]) {
     await page.evaluate((v) => document.querySelector(`#viewSeg button[data-v="${v}"]`).click(), v);
-    await page.waitForTimeout(6500);
+    // The page gives imagery 8s to deliver one tile before falling back, so a scenario that
+    // blocks tiles must outlast that window or it measures the state BEFORE the decision.
+    await page.waitForTimeout(opts.blockTiles ? 13000 : 6500);
     const st = await page.evaluate(() => {
       const m = document.getElementById('mapMsg');
       const host = document.querySelector('#viewSeg button.on').getAttribute('data-v');
@@ -180,6 +198,17 @@ async function scenario(name, opts) {
                  panes: document.querySelectorAll('#map .leaflet-pane').length };
       });
       ok(usable.ok && usable.panes > 0, `${label} — 2D map remains usable after the failed 3D selection`, usable);
+      // MEASURED GAP: the notice strip used to sit over the 2D zoom control, so
+      // elementFromPoint on the zoom button returned the NOTICE and the control could not be
+      // clicked. "Visible" is not "usable" — this asserts the control is actually reachable.
+      const ctrl = await page.evaluate(() => {
+        const z = document.querySelector('#map .leaflet-control-zoom');
+        if (!z) return { ok: false, why: 'no zoom control' };
+        const b = z.querySelector('a').getBoundingClientRect();
+        const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return { ok: !!(hit && z.contains(hit)), hit: hit ? (hit.className || hit.tagName) : null };
+      });
+      ok(ctrl.ok, `${label} — the 2D zoom control is CLICKABLE, not just visible, under the notice`, ctrl);
       ok(!/brave|shields|fingerprint|settings/i.test(st.notice || ''),
         `${label} — the notice names no browser and no setting`, st.notice);
     }
@@ -191,10 +220,44 @@ async function scenario(name, opts) {
 }
 
 console.log(`\n=== 3D ACCEPTANCE — engine=${ENGINE} device=${MOBILE ? 'mobile' : 'desktop'} network=${LIVE ? 'live' : 'stubbed'} ===\n`);
+// A lost context is the black panel arriving AFTER a successful start — measured taking the
+// three.js canvas from 0% to 100% dark while the view still claimed "3D aerial".
+async function contextLossScenario() {
+  const ctx = await browser.newContext(
+    MOBILE ? { ...devices[ENGINE === 'webkit' ? 'iPhone 13' : 'Pixel 7'] } : { viewport: { width: 1280, height: 1100 } });
+  const page = await ctx.newPage();
+  await routeAll(page, {});
+  await page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'load', timeout: 60000 });
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => document.querySelector('#viewSeg button[data-v="3d"]').click());
+  await page.waitForTimeout(6000);
+  const lost = await page.evaluate(() => {
+    const c = document.querySelector('#map3d canvas'); if (!c) return 'no canvas';
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    const e = gl && gl.getExtension('WEBGL_lose_context');
+    if (!e) return 'extension unavailable';
+    e.loseContext(); return 'forced';
+  });
+  const label = `[${ENGINE}${MOBILE ? '/mobile' : ''}] webgl context lost after a good init`;
+  if (lost !== 'forced') { ok(true, `${label} — SKIPPED (${lost})`); await ctx.close(); return; }
+  await page.waitForTimeout(4000);
+  const st = await page.evaluate(() => ({
+    active: document.querySelector('#viewSeg button.on').getAttribute('data-v'),
+    notice: document.getElementById('mapMsg').hidden ? null : (document.querySelector('#mapMsg .mm-t') || {}).textContent,
+    leaflet: !!document.querySelector('#map .leaflet-container'),
+  }));
+  ok(st.active === '2d' && st.notice === APPROVED && st.leaflet,
+    `${label} — falls back to a usable 2D map with the approved notice`, st);
+  await ctx.close();
+}
+
 await scenario('webgl available', {});
 await scenario('webgl blocked', { blockWebGL: true });
 await scenario('report has no home point', { noHome: true });
 await scenario('3D library blocked', { blockCDN: true });
+await scenario('every satellite tile fails', { blockTiles: true });
+await scenario('3D library 200s but defines nothing', { emptyLib: true });
+await contextLossScenario();
 await browser.close();
 server.close();
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed');
