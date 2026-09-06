@@ -27,7 +27,8 @@ const V = HS.RESIDENTIAL_VOCABULARY;
 // 1. The literal-only invariant that licenses the regex translation at all.
 const LITERAL = /^[a-z0-9 ]+$/;
 const bad = [];
-for (const k of ['dev_anywhere', 'dev_head', 'dev_head_weak', 'dev_noun', 'routine_anywhere']) {
+for (const k of ['dev_anywhere', 'dev_phrase_anywhere', 'dev_head', 'dev_head_weak', 'dev_noun',
+                 'routine_anywhere', 'routine_object', 'scale_noun', 'place_ambiguous']) {
   for (const p of V[k]) if (!LITERAL.test(p)) bad.push(k + ':' + JSON.stringify(p));
 }
 ok(bad.length === 0, '1: every vocabulary phrase is pure [a-z0-9 ] — ' + (bad.join(', ') || 'none'));
@@ -45,19 +46,30 @@ const alt = (ps) => ps.map((x) => x.trim()).join('|');
 const rHas = (ps) => new RegExp(' (' + alt(ps) + ') ');
 const rHead = (ps) => new RegExp('^ (' + alt(ps) + ') ');
 const RE = {
-  devAny: rHas(V.dev_anywhere), devHead: rHead(V.dev_head), devWeak: rHead(V.dev_head_weak),
-  devNoun: rHas(V.dev_noun), routineAny: rHas(V.routine_anywhere), routineHead: rHead(V.routine_anywhere)
+  devAny: rHas(V.dev_anywhere), devPhrase: rHas(V.dev_phrase_anywhere),
+  devHead: rHead(V.dev_head), devWeak: rHead(V.dev_head_weak),
+  devNoun: rHas(V.dev_noun), routineAny: rHas(V.routine_anywhere), routineHead: rHead(V.routine_anywhere),
+  accessory: rHas(V.routine_object), scale: rHas(V.scale_noun),
+  routineNoPlace: rHas(V.routine_anywhere.filter((w) => V.place_ambiguous.indexOf(w) === -1))
 };
 // The generated CASE ladder, re-expressed over those regexes. Same order as the SQL.
 function sqlVerdict(p) {
   const tr = HS.residentialNormalize(p.type_raw), nm = HS.residentialNormalize(p.name), both = tr + nm;
-  if (RE.devAny.test(both)) return 'DEVELOPMENT';
+  const rid = String(p.registry_id || '');
+  const isLabel = !!V.name_kind_label[rid];
+  if (RE.routineAny.test(tr)) return 'ROUTINE';
   if (RE.routineHead.test(nm)) return 'ROUTINE';
-  if (RE.devHead.test(tr) || RE.devHead.test(nm)) return 'DEVELOPMENT';
-  if (RE.devWeak.test(tr) && RE.devNoun.test(tr)) return 'DEVELOPMENT';
-  if (RE.devWeak.test(nm) && RE.devNoun.test(nm)) return 'DEVELOPMENT';
-  if (RE.routineAny.test(both)) return 'ROUTINE';
-  const fam = V.family_rules[String(p.registry_id || '')];
+  const devPhrase = RE.devPhrase.test(tr) || (!isLabel && RE.devPhrase.test(nm));
+  const devHead = RE.devHead.test(tr) || (!isLabel && RE.devHead.test(nm));
+  const weak = (RE.devWeak.test(tr) && RE.devNoun.test(tr))
+            || (!isLabel && RE.devWeak.test(nm) && RE.devNoun.test(nm));
+  if (devPhrase || devHead || weak) {
+    return (RE.accessory.test(both) && !RE.scale.test(both)) ? 'ROUTINE' : 'DEVELOPMENT';
+  }
+  if (RE.routineAny.test(tr) || (!isLabel && RE.routineAny.test(nm)) || RE.routineNoPlace.test(nm)) return 'ROUTINE';
+  if (RE.devAny.test(both)) return 'DEVELOPMENT';
+  if (V.dev_provenance[rid]) return 'DEVELOPMENT';
+  const fam = V.family_rules[rid];
   if (fam && fam.dev_type_raw.some((t) => tr === ' ' + t + ' ')) return 'DEVELOPMENT';
   return 'UNRESOLVED';
 }
@@ -93,7 +105,30 @@ const CORPUS = [
   ['x', 'Site Dev Residential', 'Site Dev Residential OAKMONT PARK'],
   ['x', 'Residential', 'NEW HOPE RD'],
   ['x', 'Residential', 'Sundeck Lane 45'],
-  ['x', 'Residential', 'Residential Alteration']
+  ['x', 'Residential', 'Residential Alteration'],
+  // The audit's own production strings — every mechanism this change touches.
+  ['topeka-building-permits', 'Residential Interior Remodel', 'Residential Interior Remodel 4124 SW STONEYLAKE DR LOT8 BLOCK A CLARION LAKE SUBDIVISION'],
+  ['memphis-dpd-building-permits', 'RES', 'ACC Build wood fence according to site plan'],
+  ['wake-county-building-permits', 'Residential Accessory Building Structure', 'Residential Accessory Building Structure EXIST SFD'],
+  ['york-county-pa-planning-subdivisions', 'NO NO YES NO NO NO NO NO', 'Cherry Tree'],
+  ['austin-subdivision-cases', 'Single Family', 'Shoalwood Addition Sec 4'],
+  ['austin-subdivision-cases', 'SF', 'TRAVIS COOKE ROAD ADDITION NO. 2'],
+  ['austin-site-plan-cases', 'MF', 'MOUNTAIN SHADOWS APARTMENTS'],
+  ['austin-site-plan-cases', 'Single Family', 'Stassney Lane Townhomes'],
+  ['austin-site-plan-cases', 'Single Family', 'Evans Resident Boat Dock Remodel'],
+  ['delaware-county-pa-subdivisions-land-developments', 'Residential', 'Glendale Heights HOA Subdivide 41.411 acres into two lots'],
+  ['delaware-county-pa-subdivisions-land-developments', 'Residential', 'Sunnybrae Farm Further develop 2.28 acres with 6,113 sq ft of building additions'],
+  ['seattle-land-use-permits', 'Single Family/Duplex', 'Master Use Permit Land Use Application to subdivide one development site into two'],
+  ['seattle-land-use-permits', 'Single Family/Duplex', 'Master Use Permit Shoreline application to allow an addition to an existing single family residence'],
+  ['fairfax-active-site-construction', 'Infill Lot Grading Plan', 'ORCHARD VIEW LOT 39 POOL'],
+  ['fairfax-active-site-construction', 'Infill Lot Grading Plan', 'FOX LAKE CAVALIERS ADDITION LOT 10 (SU)'],
+  ['fairfax-active-site-construction', 'Subdivision Grading Plan', "Digges Addition to Chesterbrook Lot 1"],
+  ['dallas-specific-use-permits', 'Multiple-family use', 'Multiple-family use'],
+  ['slc-planning-petitions', 'Routine and Uncontest Home Occ', 'Routine and Uncontest Home Occ'],
+  ['naperville-building-permits', 'RESIDENTIAL', 'RESIDENTIAL Single Family New Construction - Lot 168'],
+  ['overland-park-building-permits', 'Deck', 'Building (Residential) 5804 NEWTON ST'],
+  ['montgomery-county-residential-permits', 'CONSTRUCT', 'CONSTRUCT Build deck using Typical Deck Details, New Deck'],
+  ['slo-county-planning-permits', 'Residential New Structure', 'Residential New Structure 1234 MAIN ST']
 ];
 let mismatches = 0;
 for (const [registry_id, type_raw, name] of CORPUS) {
