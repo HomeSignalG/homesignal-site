@@ -169,34 +169,66 @@ function radiusEvidence(radius, rows, rendered) {
   const withGeom = rows.filter(r => r.marker_lat != null && r.marker_lng != null);
   const checks = withGeom.map(r => {
     const d = haversineMi(HOME.lat, HOME.lng, Number(r.marker_lat), Number(r.marker_lng));
+    // A ROW'S GEOMETRY DECIDES WHICH DISTANCE BOUNDS IT.
+    // For a point, the marker IS the project, so recomputing HOME -> marker is a real
+    // independent check of containment. For a line or polygon, PostGIS measures to the NEAREST
+    // part of the geometry, and the representative marker is only a place to draw a pin - a
+    // corridor can legitimately have its nearest edge inside the circle and its pin outside.
+    // Judging a line by its pin does not measure containment; it measures pin placement.
+    const isPoint = /^ST_(Multi)?Point$/i.test(String(r.geometry_type || ''));
+    const rpcMi = Number(r.distance_mi);
     return { source_key: r.source_key, feature_id: r.feature_id, registry_id: r.registry_id,
-             provenance: r.provenance, geometry_type: r.geometry_type,
+             provenance: r.provenance, geometry_type: r.geometry_type, is_point: isPoint,
              marker_lat: r.marker_lat, marker_lng: r.marker_lng,
              rpc_distance_mi: r.distance_mi, recomputed_mi: Number(d.toFixed(6)),
-             delta_mi: Number(Math.abs(d - Number(r.distance_mi)).toFixed(6)),
-             inside: d <= radius + 1e-6 };
+             // Kept for EVERY row as diagnostic evidence. For a non-point row it is reported
+             // and never scored - see the split assertions below.
+             delta_mi: Number(Math.abs(d - rpcMi).toFixed(6)),
+             inside: isPoint ? (d <= radius + 1e-6) : (rpcMi <= radius + 1e-6) };
   });
-  const outside = checks.filter(c => !c.inside);
-  const disagree = checks.filter(c => c.delta_mi > 0.02);
+  const pts = checks.filter(c => c.is_point);
+  const nonPts = checks.filter(c => !c.is_point);
+  const outsidePts = pts.filter(c => !c.inside);
+  const outsideNonPts = nonPts.filter(c => !c.inside);
+  const disagree = pts.filter(c => c.delta_mi > 0.02);       // point rows only
   const noGeom = rows.length - withGeom.length;
   EVIDENCE.per_radius.push({ radius, rows_returned: rows.length, rows_with_geometry: withGeom.length,
     rows_without_geometry: noGeom, rendered_canonical: rendered,
-    max_recomputed_mi: checks.length ? Math.max(...checks.map(c => c.recomputed_mi)) : null,
-    max_delta_mi: checks.length ? Math.max(...checks.map(c => c.delta_mi)) : null,
-    outside_radius: outside.length, distance_disagreements: disagree.length,
+    point_rows: pts.length, non_point_rows: nonPts.length,
+    geometry_types: [...new Set(checks.map(c => c.geometry_type))],
+    max_recomputed_mi: pts.length ? Math.max(...pts.map(c => c.recomputed_mi)) : null,
+    max_delta_mi: pts.length ? Math.max(...pts.map(c => c.delta_mi)) : null,
+    max_rpc_distance_mi: checks.length ? Math.max(...checks.map(c => Number(c.rpc_distance_mi))) : null,
+    outside_radius_points: outsidePts.length,
+    outside_radius_non_points: outsideNonPts.length,
+    distance_disagreements: disagree.length,
+    // diagnostic only: how far a non-point row's PIN sits, which is not a containment claim
+    non_point_marker_diagnostics: nonPts.map(c => ({ source_key: c.source_key,
+      geometry_type: c.geometry_type, rpc_distance_mi: c.rpc_distance_mi,
+      marker_point_mi: c.recomputed_mi, marker_point_outside_radius: c.recomputed_mi > radius })).slice(0, 12),
     sample: checks.slice(0, 5) });
-  info(`[${radius} mi] rows`, rows.length + ' (with geometry ' + withGeom.length + ')');
-  if (checks.length) {
-    info(`[${radius} mi] farthest recomputed`, Math.max(...checks.map(c => c.recomputed_mi)) + ' mi');
-    info(`[${radius} mi] worst distance delta`, Math.max(...checks.map(c => c.delta_mi)) + ' mi');
+  info(`[${radius} mi] rows`, rows.length + ' (with geometry ' + withGeom.length
+       + '; point ' + pts.length + ', non-point ' + nonPts.length + ')');
+  if (pts.length) {
+    info(`[${radius} mi] farthest point recompute`, Math.max(...pts.map(c => c.recomputed_mi)) + ' mi');
+    info(`[${radius} mi] worst point delta`, Math.max(...pts.map(c => c.delta_mi)) + ' mi');
+  }
+  if (nonPts.length) {
+    info(`[${radius} mi] non-point rows, farthest NEAREST-geometry distance`,
+         Math.max(...nonPts.map(c => Number(c.rpc_distance_mi))) + ' mi');
+    info(`[${radius} mi] non-point rows whose PIN sits outside the radius (diagnostic, not a failure)`,
+         nonPts.filter(c => c.recomputed_mi > radius).length);
   }
   ok(rows.length === 0 || withGeom.length > 0,
      `5c — [${radius} mi] returned rows carry canonical marker geometry`, { rows: rows.length, withGeom: withGeom.length });
-  ok(outside.length === 0,
-     `5c — [${radius} mi] EVERY returned project is physically within the selected radius`,
-     outside.slice(0, 4));
+  ok(outsidePts.length === 0,
+     `5c — [${radius} mi] every POINT project is physically within the selected radius (recomputed from the geocoded HOME)`,
+     outsidePts.slice(0, 4));
+  ok(outsideNonPts.length === 0,
+     `5c — [${radius} mi] every NON-POINT project is within the radius by production's nearest-geometry distance`,
+     outsideNonPts.slice(0, 4));
   ok(disagree.length === 0,
-     `5c — [${radius} mi] the RPC's distance_mi matches an independent great-circle recompute from the geocoded HOME`,
+     `5c — [${radius} mi] on POINT rows the RPC's distance_mi matches an independent great-circle recompute from the geocoded HOME`,
      disagree.slice(0, 4));
   ok(checks.every(c => /point|polygon|linestring|geometry/i.test(String(c.geometry_type || ''))),
      `5c — [${radius} mi] every result is a real canonical geometry, not a synthesised point`,
