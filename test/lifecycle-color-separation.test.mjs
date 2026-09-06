@@ -236,5 +236,54 @@ ok(/lc3d\("proposed"\)/.test(aerialCode),
   '8d: the proposed wireframe reads the palette too, not a second literal');
 
 
+// §9 — A COLOUR YOU CANNOT SEE IS NOT A COLOUR. §1-§8 prove the palette is separated;
+// this proves enough of each mark is actually PAINTED in it for that separation to
+// reach a reader. The two are different claims, and the second is the one that was
+// missed: after the palette was fixed the legend still read as one colour, because
+// markerSVG drew a CONSTANT 3px white halo at every size while the marks are not one
+// size — 14 in the legend, 13-15 for the 3D-satellite pins, 20 on the 2D map. A centred
+// 3px stroke eats 1.5px inward regardless, so a 14px chip was 29% colour and 71% white.
+//
+// The invariant is SIZE-INVARIANCE, not a magic number: a chip and a pin must be the
+// same drawing at different scales. Asserted as a spread across sizes rather than a
+// value per size, so it cannot be satisfied by tuning one call site.
+const SIZES = [13, 14, 15, 20, 22, 26];
+function fillShare(size) {
+  const inradius = (size * 0.40 * 1.16) / 2;          // equilateral: inradius = circumradius / 2
+  const inner = Math.max(0, inradius - HS.markerStroke(size) / 2);
+  return Math.pow(inner / inradius, 2);               // area share still showing the fill
+}
+const shares = SIZES.map(fillShare);
+const spread = Math.max(...shares) - Math.min(...shares);
+ok(spread < 0.02,
+  `9a: the visible-fill share is size-invariant — ${(Math.min(...shares) * 100).toFixed(0)}%-${(Math.max(...shares) * 100).toFixed(0)}% across ${SIZES.length} sizes`);
+ok(Math.min(...shares) >= 0.5,
+  `9b: every mark is at least half its own colour — worst ${(Math.min(...shares) * 100).toFixed(0)}%`);
+// The legend chip is the surface the defect was reported on; name it so a regression says so.
+ok(fillShare(14) >= 0.5,
+  `9c: the 14px LEGEND CHIP is ${(fillShare(14) * 100).toFixed(0)}% colour (was 29% under the constant 3px halo)`);
+// Controls, so §9a-c are load-bearing rather than arithmetic that cannot fail.
+const constantHalo = (size) => {
+  const inradius = (size * 0.40 * 1.16) / 2;
+  return Math.pow(Math.max(0, inradius - 1.5) / inradius, 2);
+};
+ok(constantHalo(14) < 0.35 && constantHalo(26) > 0.5,
+  '9d: control — the OLD constant 3px halo gave 29% at 14 and 56% at 26, i.e. it was NOT size-invariant');
+ok(Math.max(...SIZES.map(constantHalo)) - Math.min(...SIZES.map(constantHalo)) > 0.2,
+  '9e: control — that old spread was >20 points, so §9a would have failed on it');
+// The halo must not be thinned away: it is what separates a pin from the map tiles
+// underneath, and losing it would trade one legibility defect for another.
+ok(SIZES.every((s) => HS.markerStroke(s) >= 1.25),
+  '9f: every mark keeps a real white halo — no size drops below 1.25px');
+// The largest marks are unchanged in effect, which is what makes this a SMALL-mark fix.
+ok(Math.abs(HS.markerStroke(26) - 3) < 0.02,
+  `9g: at the default size the halo is still ~3px (${HS.markerStroke(26).toFixed(2)}) — big pins look the same`);
+// And it is actually wired into the shipped markup, not just the helper.
+const chip = HS.markerSVG('triangle', LC.unknown, '', 14);
+const swAttr = Number((chip.match(/stroke-width="([\d.]+)"/) || [])[1]);
+ok(Math.abs(swAttr - HS.markerStroke(14)) < 0.01 && swAttr < 3,
+  `9h: the emitted 14px chip carries stroke-width ${swAttr} — the helper reaches the real markup`);
+
+
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
