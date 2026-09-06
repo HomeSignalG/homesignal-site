@@ -40,6 +40,83 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — MAP 1 GEOGRAPHY-STATE CLARITY (founder decision, single owner)
+
+**Founder decision supersedes the #1072 "out of scope" revert, for this narrow unit only.** Not
+a Map redesign, not new features, not DB/GIS/SEO/Alerts/GN/Map 2 work, not a copy rewrite.
+
+**FOUR sessions independently built this instruction.** #1069 merged and was reverted by #1072;
+#1068 and #1070 stayed open; this branch was the fourth. Under the founder's SINGLE OWNER rule
+they are now consolidated: **#1068 and #1070 closed as superseded**, one owner branch, one PR.
+
+**Owner branch: `claude/data-center-type-build-maps-ylpsb7`.** Chosen on the founder's criterion
+(smallest clean diff + strongest evidence) applied to the AUTHORIZED change set, not to line
+count in the abstract. Measured: #1068 touches 2 files but implements only D+E; #1070 touches 7
+and implements A+D+E; this branch is the only one implementing **B** (mode identity in the H1 /
+kicker / standfirst) and **C** (no fictional HOME control) at all, and the only one with a
+dedicated suite (**54 assertions**) and mutation proofs. A's finding was **ported in from #1070
+and credited in the code comment** rather than lost.
+
+| authorized | change | source |
+|---|---|---|
+| **A** truthful not-measured | dev counter → em dash when the authoritative read is not `boundary_complete`; **an authoritative measured zero still prints a real `0`** | **finding from #1070** |
+| **B** mode identity | H1 `ZIP 78617` → `Development around this address`, kicker → `Near-home view`, standfirst re-scoped; headings `All development across ZIP <ZIP>` / `Showing development within <radius> of` | this branch |
+| **C** no fictional HOME | `👁 From home` hidden in ZIP mode (`body.zipmode #homeViewBtn`) — it frames the 3D camera on a HOME point, so offering it where none exists is the centroid-as-home implication `lib/zip-authoritative.js` forbids | this branch |
+| **D** return path | `← Back to all development in ZIP <ZIP>`, re-entering the existing `loadZip()`, clearing `addr`/`CUR_ADDRESS`/`N5_NOTE` and rewriting the URL to `?zip=`; hidden when no known ZIP | this branch |
+| **E** wording | map captions restated per render so a radius change leaves no stale claim | this branch |
+
+**A is mutation-proved in BOTH directions**, which is the point of it: reverting the em dash
+fails 2 assertions, and making it *blanket* fails 3 — so measured-zero is provably still
+distinct rather than collateral damage. Reverting B, C, D or E individually fails 2–4 each.
+
+**Seven states proved with a screenshot and a wording readout each** (real page, real browser,
+fixtured network, **0 page errors**): measured ZIP · **authoritative measured zero → `0`** ·
+**not-measured → `—`** · address search · radius change · address→ZIP return · bare address with
+no return control. All Map 1 browser suites green; offline suite green. Two browser failures
+(`acquisition-video-producer-workflow`, `dashboard-browser`) reproduce on a pristine
+`origin/main` worktree and are **not attributable**.
+
+**No data logic changed.** No geography, geocoder, RPC, facility, database, schema, taxonomy or
+classifier behaviour. The only non-presentation line is a re-entry into `loadZip()`, already the
+sole code that establishes ZIP mode.
+
+📌 **Preserved from #1068, NOT implemented:** it derives a return ZIP from the **geocoder's own
+resolved `m.zip`** for a resident who never came from a ZIP page — deliberately not from the
+typed string. Worth having; it is wider than authorization D ("when a resident entered address
+mode from a known ZIP"), so it is recorded rather than taken.
+
+⚠️ **THE HUMAN USABILITY GATE IS `NOT RUN` AND CODE PROOF DOES NOT SUBSTITUTE FOR IT.** No
+participant was recruited, moderated or observed. Materials, pass bar and scoring sheet:
+`docs/map1-launch-usability-gate.md`. **Map 1 is not launch-ready until a human moderator runs
+3–5 non-technical participants.**
+
+⚠️ **Deployment needs a MANUAL `pages.yml` dispatch on `main`** — #1072 reverted the trigger
+widening and recorded that 339 of 344 shipped files can merge and never deploy. Trigger repair
+is explicitly out of scope here.
+
+⚠️ **CI CAUGHT A DEFECT THE LOCAL RUN COULD NOT, AND THE INSTRUMENT LESSON IS THE DURABLE
+HALF.** The new suite served Leaflet from a hardcoded `node_modules/leaflet/...` path. That
+resolves in this sandbox and **cannot** on a runner: the repo has no `package.json` and
+`unit-tests.yml` installs **playwright alone** into a scratch dir *outside* the checkout, so
+`readFile` threw `ENOENT` inside the route handler and killed the run **before a single
+assertion printed**. Fixed to the sibling suite's shape — `require.resolve('leaflet/…')`, else
+`route.continue()` to the CDN the page already names — and proven by hiding the package: 55
+legible PASS/FAIL lines instead of a crash.
+- 🔑 **My own search for the failing file missed it for the same reason the crash was invisible:
+  I scanned the CI log for `FAIL —` and `FAILS: [1-9]`, and a suite that dies before printing
+  emits neither.** It read as "no failing suite in the log", which is the repo's own
+  *"an instrument must prove it ran before its silence counts as evidence"* rule, hit while
+  investigating. **A crash and a clean pass are both `0 FAIL lines`** — attribute by the
+  runner's non-zero exit count, never by the absence of failure text.
+- GitHub's log API also caps the returned log **from the end**, so the first ~50 suites were
+  not in any response. The name was found by grepping the capped log for the suite's own
+  filename rather than for failure text.
+
+**Observed and left alone (out of scope, and it does not misstate data):** in ZIP mode the
+`Proposed` tile can read lower than the "N projects across the whole of ZIP" line — the tile is
+the Proposed rail, the line is every qualifying project regardless of stage. The live gate
+asserts the tile equals the set actually drawn.
+
 ### 2026-09-06 — DATA CENTER SIGNIFICANCE, FINAL: say the activity, not a magnitude
 
 Second and last significance unit, implementing exactly what an adversarial competitor-CTO

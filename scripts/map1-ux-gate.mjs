@@ -71,6 +71,16 @@ const readScreen = () => page.evaluate(() => {
     radiusVisible: (() => { const el = document.getElementById('radSel'); if (!el) return false;
       const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
     homePins: document.querySelectorAll('.homepin').length,
+    scopeLine: (document.getElementById('rAddr') || {}).textContent || null,
+    mapCap: (document.querySelector('.map-cap') || {}).textContent || null,
+    // The in-page route back to the whole ZIP, and the 3D camera control that only means
+    // something when a HOME exists. Both are MODE SIGNALS: each must be present in exactly
+    // one mode, or the page is telling the resident they are somewhere they are not.
+    backZip: (() => { const el = document.getElementById('backZip'); if (!el) return null;
+      const cs = getComputedStyle(el);
+      return { shown: cs.display !== 'none' && cs.visibility !== 'hidden', text: el.textContent.trim() }; })(),
+    fromHomeVisible: (() => { const el = document.getElementById('homeViewBtn'); if (!el) return false;
+      const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
     mapPresent: !!document.querySelector('#mapInner .leaflet-container, #map .leaflet-container')
   };
 });
@@ -106,14 +116,38 @@ ok(errors.length === 0, 'A1 the page loads with no fatal client error', errors.s
 ok(z.mapPresent, 'A2 the map renders');
 ok(z.sites_total > 0, 'A3 results appear', z.sites_total);
 ok(z.dev_points > 0, 'A4 development/projects appear', z.dev_points);
-ok(/Across ZIP/i.test(z.withinLbl || ''), 'A5 the page says it is showing the whole ZIP', z.withinLbl);
+ok(/All development across ZIP/i.test(z.withinLbl || ''),
+  'A5 the page says it is showing ALL development across the whole ZIP', z.withinLbl);
 ok(z.radiusVisible === false, 'A6 no radius control in ZIP mode (address-radius semantics do not leak)');
 ok(z.homePins === 0, 'A7 no HOME pin for a ZIP (a ZIP is not somebody’s home)');
+// TASK 4 of the usability gate — "am I looking at a whole ZIP or a radius around a home?"
+// Three independent signals have to agree, because a resident reads whichever one they land on.
+ok(/whole ZIP boundary, not a radius/i.test(z.scopeLine || ''),
+  'A7b the scope line says explicitly this is the whole ZIP boundary, not a radius', z.scopeLine);
+ok(/^All development across/i.test((z.mapCap || '').trim()),
+  'A7c the MAP caption says the same thing the heading says', z.mapCap);
+ok(z.fromHomeVisible === false,
+  'A7d no "From home" camera control in ZIP mode (there is no home to frame from)');
+ok(!(z.backZip && z.backZip.shown),
+  'A7e no "back to the ZIP" control while already in the ZIP view', z.backZip);
 
-// THE HEADLINE NUMBER MUST DESCRIBE THE MAP.
-ok(z.tile_proposed === z.rail_proposed,
-  'A8 the "New projects proposed nearby" tile equals the Proposed set actually drawn',
-  { tile: z.tile_proposed, drawn: z.rail_proposed });
+// THE HEADLINE NUMBER MUST DESCRIBE THE MAP — with one honest exception, added 2026-09-06.
+// On a ZIP whose authoritative membership is NOT measured the counter now reads an em dash
+// (readScreen's num() reports that as 'unavailable') rather than an authoritative 0. That is
+// not a tile/rail disagreement, it is the tile refusing to state a number it does not have —
+// so it is asserted as its own case, paired with the sentence that has to justify it.
+if (z.tile_proposed === 'unavailable') {
+  ok(/is not measured yet/i.test(z.freshLine || ''),
+    'A8-unmeasured the em-dash counter is accompanied by the not-measured sentence', z.freshLine);
+  ok(z.rail_proposed === 0,
+    'A8-unmeasured ...and nothing is drawn as whole-ZIP development there', z.rail_proposed);
+} else {
+  ok(z.tile_proposed === z.rail_proposed,
+    'A8 the "New projects proposed nearby" tile equals the Proposed set actually drawn',
+    { tile: z.tile_proposed, drawn: z.rail_proposed });
+  ok(!/is not measured yet/i.test(z.freshLine || ''),
+    'A8b a ZIP printing a real number is not simultaneously described as unmeasured', z.freshLine);
+}
 // A9 CHANGED 2026-09-05 (F1). ZIP mode no longer shows a combined total: adding whole-ZIP
 // development to nearby facilities produced one number from two geographies. The assertion is
 // now that it is ABSENT here, and address mode - where every class shares one radius contract -
@@ -125,6 +159,18 @@ ok(/across this ZIP/i.test(z.k_dev || ''),
   'A9b the development counter says it is measured ACROSS this ZIP', z.k_dev);
 ok(/^Nearby regulated facilities$/i.test((z.k_fac || '').trim()),
   'A9c the facility counter says NEARBY, never a whole-ZIP claim', z.k_fac);
+// TASK 6 — a resident must be able to tell "we measured and found none" from "nobody has
+// measured this yet". The page states one of the three outcomes in words, never a bare 0.
+ok(/across the whole of ZIP|No qualifying development records across|is not measured yet|could not be read/i
+    .test(z.freshLine || ''),
+  'A9d the ZIP states WHAT WAS MEASURED in words, not just a count', z.freshLine);
+// MEASURED ZERO AND NOT-MEASURED ARE DIFFERENT FACTS AND MUST LOOK DIFFERENT. A ZIP measured
+// across its whole boundary that holds nothing prints a real 0; only an unmeasured (or
+// unreadable) one prints the em dash.
+if (/No qualifying development records across/i.test(z.freshLine || '')) {
+  ok(z.tile_proposed === 0,
+    'A9e a MEASURED ZIP holding nothing prints a real 0, never the unknown em dash', z.tile_proposed);
+}
 
 // Marker -> dossier -> evidence: the page's primary interaction. Opened through the page's
 // OWN hook (window.siteMarkers), which homesignalmap.html exposes precisely so a proof can
@@ -156,11 +202,14 @@ ok(a.mapPresent, 'B1 the map renders for an address');
 ok(a.homePins === 1, 'B2 HOME is shown, so development is readable relative to the home', a.homePins);
 ok(a.radiusVisible === true, 'B3 the radius control is available in address mode');
 ok(a.sites_total > 0, 'B4 results appear', a.sites_total);
-ok(/Within/i.test(a.withinLbl || ''), 'B5 the page says results are within the chosen radius', a.withinLbl);
+ok(/Showing development within/i.test(a.withinLbl || ''),
+  'B5 the page says results are development within the chosen radius', a.withinLbl);
 ok(a.tile_proposed === a.rail_proposed,
   'B6 POSITIVE CONTROL — the proposed tile equals the drawn set in address mode',
   { tile: a.tile_proposed, drawn: a.rail_proposed });
 ok(!/Across ZIP/i.test(a.withinLbl || ''), 'B7 ZIP semantics do not leak into address mode', a.withinLbl);
+ok(/of this address/i.test(a.mapCap || ''),
+  'B7b the map caption names the radius and the address, not "this home"', a.mapCap);
 
 const aPop = await openDossier();
 info('address dossier', aPop);
@@ -177,6 +226,44 @@ ok(/2 miles/i.test(a2.withinLbl || ''), 'B9 the page states the NEW radius', a2.
 ok(a2.tile_proposed === a2.rail_proposed,
   'B10 the tile still equals the drawn set after a radius change',
   { tile: a2.tile_proposed, drawn: a2.rail_proposed });
+
+// ═══════════════════ C. THE ROUND TRIP — address mode must be ESCAPABLE ═══════════════════
+// A resident who narrows to their home has to be able to get back to the whole ZIP without
+// editing a URL or pressing browser Back. This section only runs on the ZIP -> address path,
+// because that is the only path where a real ZIP is known to return to.
+console.log('\nC. ROUND TRIP — ZIP -> address -> ZIP, through the page itself');
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
+await page.waitForTimeout(4000);
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => {
+  const t = document.getElementById('status');
+  return (window.__HS_SITES || []).length > 0 || /couldn't|error/i.test(t ? t.textContent : '');
+}, null, { timeout: 120000 });
+await page.waitForTimeout(3000);
+const c1 = await readScreen();
+info('address mode reached from the ZIP view', { back: c1.backZip, within: c1.withinLbl });
+ok(!!(c1.backZip && c1.backZip.shown), 'C1 a way back to the whole ZIP is offered', c1.backZip);
+ok(new RegExp('Back to all development in ZIP ' + ZIP).test((c1.backZip || {}).text || ''),
+  'C2 ...and it names the ZIP it returns to', (c1.backZip || {}).text);
+
+await page.click('#backZip');
+await page.waitForFunction(() => (window.__HS_SITES || []).length > 0
+  && !(window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 120000 });
+await page.waitForTimeout(3000);
+const c2 = await readScreen();
+info('back in the ZIP view', { within: c2.withinLbl, url: page.url(), homePins: c2.homePins });
+ok(/All development across ZIP/i.test(c2.withinLbl || ''), 'C3 the whole-ZIP view is restored', c2.withinLbl);
+ok(c2.radiusVisible === false && c2.homePins === 0,
+  'C4 the address-mode controls and the HOME pin are gone again',
+  { radius: c2.radiusVisible, homePins: c2.homePins });
+ok(new RegExp('[?&]zip=' + ZIP).test(page.url()) && !/[?&]addr=/.test(page.url()),
+  'C5 the URL follows the view, so a refresh or a shared link lands on the whole ZIP', page.url());
+ok(c2.tile_proposed === c2.rail_proposed,
+  'C6 the headline number still describes the map after the round trip',
+  { tile: c2.tile_proposed, drawn: c2.rail_proposed });
+ok(errors.length === 0, 'C7 the whole round trip ran with no fatal client error', errors.slice(0, 3));
 
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);

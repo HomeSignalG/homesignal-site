@@ -103,7 +103,7 @@ const z = await page.evaluate(() => ({
   fresh: (document.getElementById('freshLine') || {}).textContent
 }));
 info('ZIP ' + ZIP, z);
-ok(/Across ZIP/.test(z.within || ''), 'E ZIP mode still shows the whole ZIP', z.within);
+ok(/All development across ZIP/i.test(z.within || ''), 'E ZIP mode still shows the whole ZIP', z.within);
 ok(z.radiusVisible === false, 'E no address-radius control in ZIP mode');
 ok(z.homePins === 0, 'E no HOME pin in ZIP mode');
 ok(z.devPoints > 0 && z.devPoints === z.authoritative,

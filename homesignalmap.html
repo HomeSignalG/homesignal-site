@@ -61,6 +61,16 @@
   .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
     color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
   .linklike:hover{color:#174026}
+  /* RETURN TO THE WHOLE-ZIP VIEW. Address mode is a DIFFERENT geography, not a filter of the
+     ZIP view, so the way back has to be a visible control - not the browser Back button and
+     not a URL edit. Deliberately a bordered pill rather than a .linklike: a resident who has
+     just narrowed to their home needs to SEE that the wider view is still one click away. */
+  .backzip{display:none;align-items:center;gap:7px;margin-top:10px;
+    border:1px solid var(--line);background:#f7faf8;color:var(--green);
+    font:600 12.5px var(--font);padding:6px 12px;border-radius:9px;cursor:pointer}
+  .backzip:hover{background:#eef4f0}
+  .backzip:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  body:not(.zipmode) .backzip.has-zip{display:inline-flex}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -231,6 +241,10 @@
   /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
      offered there - showing it would invite a circle around a ZIP centre. */
   body.zipmode .radsel{display:none}
+  /* "From home" frames the 3D camera on the HOME point. ZIP mode has no home - offering the
+     control there tells a resident there is one, which is the centroid-as-home implication
+     the ZIP contract forbids. Hidden with the radius control, for the same reason. */
+  body.zipmode #homeViewBtn{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
     padding:4px 10px;border-radius:7px;cursor:pointer}
@@ -348,6 +362,10 @@
       </form>
       <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
       <button type="button" class="linklike" id="sampleBtn">See a sample</button>
+      <!-- Shown only in ADDRESS mode, and only when this page arrived from a ZIP view, so the
+           label can name the real ZIP rather than guess one. Restores the whole-ZIP view
+           through the same loadZip() the URL boot uses - no new query, no new geography. -->
+      <button type="button" class="backzip" id="backZip">&#8592; <span id="backZipText"></span></button>
     </div>
 
     <div class="status" id="status"></div>
@@ -1093,6 +1111,36 @@ HS.onReady(function(){
     run(address);
   });
 
+  // "Back to all development in ZIP <zip>" — the ONLY in-page route from the near-home radius
+  // view back to the entire-ZIP view. Without it a resident who searches an address can reach
+  // the whole ZIP again only by editing the URL or pressing browser Back, which is not a
+  // product. Visible in address mode only, and only once a ZIP view has actually been shown.
+  function showBackToZip(){
+    var b = document.getElementById("backZip");
+    if(!b) return;
+    var t = document.getElementById("backZipText");
+    if(ZIP_MODE || !ZIP_CODE){ b.classList.remove("has-zip"); return; }
+    if(t) t.textContent = "Back to all development in ZIP " + ZIP_CODE;
+    b.classList.add("has-zip");
+  }
+  var _backZip = document.getElementById("backZip");
+  if(_backZip){ _backZip.addEventListener("click", function(){
+    if(!ZIP_CODE) return;
+    var zip = ZIP_CODE;
+    // Keep the URL honest about what is on screen, so a refresh or a shared link lands on the
+    // whole-ZIP view the resident is looking at rather than back on the address they left.
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set("zip", zip); u.searchParams.delete("addr");
+      window.history.replaceState(null, "", u.toString());
+    } catch(e){}
+    // Clear the address-mode state explicitly. loadZip() resets the ZIP-scoped state, but
+    // CUR_ADDRESS is what the radius selector re-runs against, so leaving it set keeps a
+    // searched address alive behind a view that no longer shows it.
+    $("addr").value = ""; CUR_ADDRESS = ""; N5_NOTE = "";
+    loadZip(zip);
+  }); }
+
   // "See a sample" — fill the box with a known address and submit via the normal search path.
   var _sampleBtn = document.getElementById("sampleBtn");
   if(_sampleBtn){ _sampleBtn.addEventListener("click", function(){
@@ -1182,7 +1230,34 @@ HS.onReady(function(){
     // Back to address mode: bring back the radius control and reset the ZIP-scoped caption.
     document.body.classList.remove("zipmode");
     var _cap2 = document.querySelector(".map-cap");
-    if(_cap2){ _cap2.textContent = "Development around this home"; }
+    // Named with the radius from the first frame, so the caption never reads "around this
+    // home" while the heading already says "within 2 miles of". render() re-states it with the
+    // radius that actually answered, which is what a later radius change re-paints.
+    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS)
+      + " of this address · nearby facilities for context"; }
+    // The way back to the whole ZIP. Offered ONLY when this page actually came from a ZIP
+    // view, so the label names a ZIP the resident has really seen rather than one parsed out
+    // of whatever they typed. Presentation + a re-entry into the existing loadZip().
+    showBackToZip();
+    // THE HEADING HAS TO CHANGE MODE TOO. Arriving from a ZIP view left the H1 reading
+    // "ZIP 78617" and the standfirst reading "across ZIP 78617" while the results below said
+    // "within 2 miles of" — the page's largest type making the whole-ZIP claim over near-home
+    // results. A resident reading top-down would answer "which view am I in?" wrongly.
+    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Near-home view";
+    var _h1A = document.querySelector(".head h1");
+    if(_h1A) _h1A.textContent = "Development around this address";
+    var _subA = document.querySelector(".sub");
+    if(_subA){ _subA.textContent = "What's built and what's proposed within the distance you "
+      + "choose around one address — data-center activity, planning hearings and open comment "
+      + "windows, plus nearby regulated facilities for context — every item linked to its "
+      + "official public record."; }
+    var _hintA = document.querySelector(".hint");
+    // Only mention the way back when there IS one — a resident who came straight to the
+    // address view has no ZIP to return to, and pointing at a control that is not on screen
+    // is the same class of error as the H1 above.
+    if(_hintA){ _hintA.textContent = (ZIP_CODE ? "Search a different address, or go back to the "
+      + "whole ZIP. " : "Search a different address any time. ") + "Free while we're in launch."; }
+    document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1268,6 +1343,7 @@ HS.onReady(function(){
 
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    showBackToZip();                    // hides it: this IS the whole-ZIP view
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
@@ -1327,7 +1403,7 @@ HS.onReady(function(){
         // One canvas, two scopes - say so, in six words, rather than letting the caption
         // imply the facility pins were measured across the ZIP too.
         var _cap2 = document.querySelector(".map-cap");
-        if(_cap2) _cap2.textContent = "Development across " + label + " · nearby facilities for context";
+        if(_cap2) _cap2.textContent = "All development across " + label + " · nearby facilities for context";
         // The same authoritative label the H1 uses - "Denver (80210)" - so the global
         // location control names the area on screen rather than a saved home elsewhere.
         if(window.HS && HS.setViewLabel) HS.setViewLabel(label);
@@ -1343,8 +1419,9 @@ HS.onReady(function(){
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
     // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
-    // Elder, which is wrong on every other ZIP page). The radius selector stays visible so residents
-    // can widen the 3D aerial view to reach cached records past the default frame.
+    // Elder, which is wrong on every other ZIP page). The radius selector is HIDDEN here
+    // (body.zipmode .radsel) - ZIP mode has no home to centre a radius on, and offering the
+    // control would invite exactly the circle-around-the-ZIP-centre reading the contract forbids.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
     // The hero used to put "industrial facilities" inside the SAME "across ZIP" clause as the
@@ -1357,7 +1434,7 @@ HS.onReady(function(){
     if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
       + "Free while we're in launch."; }
     var _cap = document.querySelector(".map-cap");
-    if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
+    if(_cap){ _cap.textContent = "All development across ZIP " + zip + " · nearby facilities for context"; }
     var _addr = $("addr");
     if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
     status("Loading development records for ZIP " + zip + " …");
@@ -1423,8 +1500,11 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // "All" is the word that answers the question a resident actually has here: is this
+      // everything in my ZIP, or just the projects nearest the middle of it? The second line
+      // names the geography explicitly, because "across" alone can be read as "around".
+      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · the whole ZIP boundary, not a radius around its centre";
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
@@ -1433,7 +1513,15 @@ HS.onReady(function(){
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // One sentence naming BOTH the radius and the centre, so the heading + address line read
+      // as "Showing development within 2 miles of / 2200 CALDWELL LN ...". The old "Within 2
+      // miles of" left the resident to infer what the results were, and of what.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
+      // Say the scope on the MAP too, and re-say it on every render so a radius change cannot
+      // leave a stale number in the caption.
+      var _capA = document.querySelector(".map-cap");
+      if(_capA){ _capA.textContent = "Development within " + radiusLabel(CUR_RADIUS)
+        + " of this address · nearby facilities for context"; }
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
@@ -1516,9 +1604,24 @@ HS.onReady(function(){
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
     $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
+    // DEVELOPMENT: the same UNKNOWN-is-not-ZERO rule the facilities counter above already
+    // applies, for the same reason. On a ZIP whose authoritative membership is NOT measured
+    // the page deliberately DISCARDS the cached report's radius-derived development rather
+    // than passing it off as whole-ZIP (zipAuthMergeSites) — so the surviving count is 0
+    // because we threw it away, not because the ZIP is quiet. Printing "0 New projects
+    // proposed across this ZIP" beside "not measured yet" states a measured zero the data
+    // cannot support, and measured-zero vs not-measured is exactly the distinction a resident
+    // has to be able to draw. Show the unknown as an em dash; freshLine says why.
+    //   Finding credited to PR #1070, preserved here under the single-owner consolidation.
+    // Gated on zipAuthIsComplete, which is FALSE for both 'not_measured' and 'unavailable'
+    // (a read that failed is not a measured zero either) and TRUE for a genuinely measured
+    // ZIP that holds nothing — so an AUTHORITATIVE MEASURED ZERO still prints a real 0.
+    var DEV_UNMEASURED = ZIP_MODE
+      && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
-    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
+      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
