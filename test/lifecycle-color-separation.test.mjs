@@ -173,32 +173,38 @@ if (fb) {
     '6b: that fallback matches lib/templates.js exactly — no script-order-dependent colour');
 }
 
-// §7 — STAGE vs the REGULATED-FACILITY purple, measured separately and on a DIFFERENT
-// floor, because it is a different question. Facility is not a stage: on
-// homesignalmap.html it is filtered out of the stage row entirely and appears in the
-// "Type — pin shape" row as a SQUARE, so colour is not the only thing telling it from a
-// stage triangle. It is measured anyway because all of these pins share one map.
+// §7 — STAGE vs the REGULATED-FACILITY purple, on the SAME floor as everything else.
+// Facility is not a stage — homesignalmap.html filters it out of the stage row and shows
+// it in the "Type — pin shape" row as a SQUARE — but all of these pins share one map, so
+// colour has to separate them too and there is no reason to hold it to a weaker bar.
 //
-// ⚠️ MEASURED AND NOT FIXED HERE, so it is on the record rather than discovered again:
-// lifecycle `approved` (#2563EB) vs facility (#6f42c1) is 15.2 — CLOSER than the
-// operating/unknown pair that was reported. It is PRE-EXISTING and untouched by this
-// change; the EPA purple is the facility identity colour across the whole product
-// (including the small purple square under a dual-identity data-centre pin), so moving
-// either value is a separate decision with a much wider blast radius. The floor below
-// is set at the current worst case: it cannot get worse without failing, and closing it
-// is a founder call, not a silent edit.
-const FACILITY_FLOOR = 15;
+// THIS SECTION USED TO CARRY AN EXCEPTION, and the history is the point. It was written
+// with FACILITY_FLOOR = 15 because lifecycle `approved` (#2563EB) vs the old facility
+// purple (#6f42c1) measured 15.2 — CLOSER than the operating/unknown pair that was
+// actually reported from the live page — and that adjacency was pre-existing, so it was
+// pinned at its own worst case and named rather than silently excluded. It has since been
+// closed: the purple moved from a blue-violet to a true violet (see lib/map.js
+// FACILITY_HEX), taking that pair to 27.0 and the permit-status one from 24.3 to 37.6.
+// A floor that was a placeholder for an open question is now just the floor.
 [['lifecycle', LC], ['status', ST]].forEach(([name, pal]) => {
   Object.keys(pal).forEach((k) => {
     const d = dE00(pal[k], FACILITY);
-    ok(d >= FACILITY_FLOOR, `7a: ${name} ${k} vs regulated-facility — dE00 ${d.toFixed(1)} >= ${FACILITY_FLOOR}`);
+    ok(d >= FLOOR, `7a: ${name} ${k} vs regulated-facility — dE00 ${d.toFixed(1)} >= ${FLOOR}`);
   });
 });
-ok(dE00(LC.unknown, FACILITY) >= FLOOR,
-  `7b: the NEUTRAL specifically clears the full ${FLOOR} against facility — dE00 ${dE00(LC.unknown, FACILITY).toFixed(1)}`);
-ok(Math.abs(dE00('#2563EB', '#6f42c1') - 15.2) < 0.2,
-  '7c: the logged approved-vs-facility adjacency is 15.2 — pinned so a change to it is deliberate');
-
+// The two pairs the move existed to fix, asserted by name so a regression says which.
+ok(dE00(LC.approved, FACILITY) >= FLOOR,
+  `7b: LIFECYCLE approved vs facility — dE00 ${dE00(LC.approved, FACILITY).toFixed(1)} (was 15.2)`);
+ok(dE00(ST.approved, FACILITY) >= FLOOR,
+  `7c: STATUS approved vs facility — dE00 ${dE00(ST.approved, FACILITY).toFixed(1)} (was 24.3)`);
+// Controls: the OLD purple fails both, so §7a-c are load-bearing rather than tautological.
+ok(dE00('#2563EB', '#6f42c1') < FLOOR && Math.abs(dE00('#2563EB', '#6f42c1') - 15.2) < 0.2,
+  '7d: control — the old purple measured 15.2 against the same blue and would fail this floor');
+// §7e — WHY THE PURPLE HAS TO STAY SATURATED, so nobody softens it back into a collision.
+// It must clear the warm-grey NEUTRAL as well as the blue, and a muted purple cannot:
+// #7b2d8e (chroma 62) lands at 24.7 against it. The constraint is three-way, not two.
+ok(dE00('#7b2d8e', LC.unknown) < FLOOR,
+  '7e: control — a softer purple fails against the neutral, which is what forces the saturation');
 
 // §8 — THE 3D AERIAL VIEW MUST NOT RESTATE THE PALETTE. This is the other half of the
 // same defect and it was worse: build3DFacilities read

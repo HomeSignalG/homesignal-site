@@ -306,7 +306,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110005052085|https://echo.epa.gov/detailed-facility-report?fid=110005052085|(no-date)|BFI WASTE SYSTEMS OF TEXAS LP",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110005052085",
    "fallback_reason": null,
@@ -332,7 +332,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110005079495|https://echo.epa.gov/detailed-facility-report?fid=110005079495|(no-date)|FRANKS WASTE OIL SERVICE",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110005079495",
    "fallback_reason": null,
@@ -358,7 +358,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110008975804|https://echo.epa.gov/detailed-facility-report?fid=110008975804|(no-date)|SOUTH AUSTIN REGIONAL WASTEWATER TREATMENT PLANT",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110008975804",
    "fallback_reason": null,
@@ -384,7 +384,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110012255175|https://echo.epa.gov/detailed-facility-report?fid=110012255175|(no-date)|TORRES TRUCKING SIGNATURE HAULING",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110012255175",
    "fallback_reason": null,
@@ -410,7 +410,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110033390104|https://echo.epa.gov/detailed-facility-report?fid=110033390104|(no-date)|BFI RECYCLING CENTER MANOR",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110033390104",
    "fallback_reason": null,
@@ -436,7 +436,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110033793465|https://echo.epa.gov/detailed-facility-report?fid=110033793465|(no-date)|LONE STAR INFRASTRUCTURE CONCRETE BATCH CP-7",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110033793465",
    "fallback_reason": null,
@@ -462,7 +462,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110033828918|https://echo.epa.gov/detailed-facility-report?fid=110033828918|(no-date)|JL D MANAGEMENT CONCRETE CRUSHER",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110033828918",
    "fallback_reason": null,
@@ -488,7 +488,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110034291059|https://echo.epa.gov/detailed-facility-report?fid=110034291059|(no-date)|DE-ANDA TRUCKING",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110034291059",
    "fallback_reason": null,
@@ -514,7 +514,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110039703611|https://echo.epa.gov/detailed-facility-report?fid=110039703611|(no-date)|SOUTH AUSTIN REGIONAL WASTEWATER TREATMENT PLANT",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110039703611",
    "fallback_reason": null,
@@ -540,7 +540,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110056361743|https://echo.epa.gov/detailed-facility-report?fid=110056361743|(no-date)|CITY OF AUSTIN WATER UTILITY SOUTH AUSTIN REGIONAL WASTEWATER",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110056361743",
    "fallback_reason": null,
@@ -566,7 +566,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070171250|https://echo.epa.gov/detailed-facility-report?fid=110070171250|(no-date)|AGGREGATE HAULERS DEL VALLE",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070171250",
    "fallback_reason": null,
@@ -592,7 +592,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070182593|https://echo.epa.gov/detailed-facility-report?fid=110070182593|(no-date)|TXI - GARFIELD SAND & GRAVEL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070182593",
    "fallback_reason": null,
@@ -618,7 +618,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070191525|https://echo.epa.gov/detailed-facility-report?fid=110070191525|(no-date)|SANDHILL POWER PLANT",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070191525",
    "fallback_reason": null,
@@ -644,7 +644,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070363763|https://echo.epa.gov/detailed-facility-report?fid=110070363763|(no-date)|WALNUT CREEK WASTEWATER TREATMENT FACILITY",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070363763",
    "fallback_reason": null,
@@ -670,7 +670,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070366263|https://echo.epa.gov/detailed-facility-report?fid=110070366263|(no-date)|PEARCE LANE WASTEWATER TREATMENT PLANT",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070366263",
    "fallback_reason": null,
@@ -696,7 +696,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070376640|https://echo.epa.gov/detailed-facility-report?fid=110070376640|(no-date)|TXI - GARFIELD SAND & GRAVEL PLANT",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070376640",
    "fallback_reason": null,
@@ -722,7 +722,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110070735758|https://echo.epa.gov/detailed-facility-report?fid=110070735758|(no-date)|SAND HILL ENERGY CENTER",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110070735758",
    "fallback_reason": null,
@@ -748,7 +748,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071144283|https://echo.epa.gov/detailed-facility-report?fid=110071144283|(no-date)|LONGVIEW OFFSITE UTILITIES PHASE 1",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071144283",
    "fallback_reason": null,
@@ -774,7 +774,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071161706|https://echo.epa.gov/detailed-facility-report?fid=110071161706|(no-date)|SAND HILL ENERGY CENTER",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071161706",
    "fallback_reason": null,
@@ -800,7 +800,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071299543|https://echo.epa.gov/detailed-facility-report?fid=110071299543|(no-date)|MDH INDUSTRIAL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071299543",
    "fallback_reason": null,
@@ -826,7 +826,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071346495|https://echo.epa.gov/detailed-facility-report?fid=110071346495|(no-date)|DALFEN INDUSTRIAL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071346495",
    "fallback_reason": null,
@@ -852,7 +852,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071347034|https://echo.epa.gov/detailed-facility-report?fid=110071347034|(no-date)|LONGVIEW OFFSITE UTILITIES PHASE 1",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071347034",
    "fallback_reason": null,
@@ -878,7 +878,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071425575|https://echo.epa.gov/detailed-facility-report?fid=110071425575|(no-date)|ATX 130 INDUSTRIAL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071425575",
    "fallback_reason": null,
@@ -904,7 +904,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071443381|https://echo.epa.gov/detailed-facility-report?fid=110071443381|(no-date)|D174 MDH HWY 71 LOGISTICS",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071443381",
    "fallback_reason": null,
@@ -930,7 +930,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071657336|https://echo.epa.gov/detailed-facility-report?fid=110071657336|(no-date)|BIEL INDUSTRIAL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071657336",
    "fallback_reason": null,
@@ -956,7 +956,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071708120|https://echo.epa.gov/detailed-facility-report?fid=110071708120|(no-date)|GIGA TEXAS OFFSITE WASTEWATER INTERCEPTOR",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071708120",
    "fallback_reason": null,
@@ -982,7 +982,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071895462|https://echo.epa.gov/detailed-facility-report?fid=110071895462|(no-date)|TIMBER CREEK SUBSTATION",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071895462",
    "fallback_reason": null,
@@ -1008,7 +1008,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110071945553|https://echo.epa.gov/detailed-facility-report?fid=110071945553|(no-date)|COLORADO BEND INDUSTRIAL",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110071945553",
    "fallback_reason": null,
@@ -1034,7 +1034,7 @@
   {
    "category": "facility",
    "classification_rule": "PRECEDENCE:facility-flag",
-   "color": "#6f42c1",
+   "color": "#7d148c",
    "dedupe_identity": "110072130517|https://echo.epa.gov/detailed-facility-report?fid=110072130517|(no-date)|RECLAIMED WATER AND WASTEWATER INFRASTRUCTURE",
    "evidence_url": "https://echo.epa.gov/detailed-facility-report?fid=110072130517",
    "fallback_reason": null,

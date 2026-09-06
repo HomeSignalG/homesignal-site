@@ -17,7 +17,7 @@ global.window = { HS: {} };
 await import('../lib/templates.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
-const FAC = HS.markerRegistry.facilityHex;   // #6f42c1
+const FAC = HS.markerRegistry.facilityHex;   // #7d148c
 
 // ── a realistic synthetic ZIP: dev records across every canonical type × status,
 //    plus more records than the 16-letter cap so the "rest" is non-trivial ──────────

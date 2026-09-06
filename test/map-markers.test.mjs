@@ -18,7 +18,7 @@ const CASES = [
   { label: 'Infrastructure / Approved', item: { type: 'Infrastructure', status: 'Approved' }, shape: 'diamond', color: '#3f7fb0' },
   { label: 'Commercial / Proposed', item: { type: 'Commercial', status: 'Proposed' }, shape: 'hexagon', color: '#c47a1a' },
   { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: HS.CATEGORY_REGISTRY.other.symbol, color: '#706468' },
-  { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'square', color: '#6f42c1', isFacility: true }
+  { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'square', color: '#7d148c', isFacility: true }
 ];
 
 CASES.forEach(function (c) {
@@ -34,7 +34,7 @@ ok(ind.shape === 'triangle' && ind.shape !== 'square', 'Industrial never resolve
 
 // Regression: facility with Industrial type → purple square.
 const fac = HS.resolveMarker({ type: 'Industrial', status: 'Operating', record_kind: 'facility' });
-ok(fac.shape === 'square' && fac.color === '#6f42c1', 'facility Industrial → purple square');
+ok(fac.shape === 'square' && fac.color === '#7d148c', 'facility Industrial → purple square');
 
 // Collision cases — deliberate precedence.
 ok(HS.resolveMarker({ type: 'Commercial Industrial Mixed-Use' }).shape === 'hexagon', 'Commercial Industrial Mixed-Use → hexagon (mixed-use)');
@@ -69,7 +69,7 @@ HS.MapProvider.render(el, {
 });
 ok(el.innerHTML.indexOf('<polygon') !== -1, 'schematic Industrial pin renders polygon (triangle)');
 const facMk = HS.resolveMarker({ type: 'Industrial', _facility: true, status: 'Operating' });
-ok(facMk.shape === 'square' && facMk.color === '#6f42c1', 'schematic facility contract is purple square');
+ok(facMk.shape === 'square' && facMk.color === '#7d148c', 'schematic facility contract is purple square');
 
 // Tracker lifecycle color mode (Approach B).
 const site = { label: 'Permit', use_type: 'Industrial', type: 'proposed', layer: 'industrial' };
@@ -77,7 +77,7 @@ const tmk = HS.resolveTrackerMarker(site, function () { return ''; });
 ok(tmk.shape === 'triangle' && tmk.color === HS.LIFECYCLE_HEX.proposed, 'tracker dev item: triangle + lifecycle proposed color');
 const fsite = { label: 'EPA site', use_type: 'Industrial', type: 'built', layer: 'industrial', registry_id: 'TX123' };
 const fmk = HS.resolveTrackerMarker(fsite, function (s) { return s.registry_id; });
-ok(fmk.shape === 'square' && fmk.color === '#6f42c1', 'tracker EPA facility: purple square regardless of lifecycle');
+ok(fmk.shape === 'square' && fmk.color === '#7d148c', 'tracker EPA facility: purple square regardless of lifecycle');
 
 if (fails) {
   console.error('\n' + fails + ' assertion(s) failed');
