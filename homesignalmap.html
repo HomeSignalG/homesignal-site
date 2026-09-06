@@ -167,7 +167,10 @@
   .band{margin-top:22px}
   .band-h{font-weight:700;font-size:16px;color:#fff;
     margin:-18px -18px 0;padding:12px 18px;border-radius:16px 16px 0 0}
-  .band-h.t-built{background:#1f5130}
+  /* The three band headers ARE stage swatches — same three colours as the legend, same
+     stage names — so this tracks HS.LIFECYCLE_HEX. Left dark, an "Operating now" header
+     in brand green would sit above "Operating now" pins in a different green. */
+  .band-h.t-built{background:#00893a}
   .band-h.t-approved{background:#2563EB}
   .band-h.t-proposed{background:#E2772F}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}

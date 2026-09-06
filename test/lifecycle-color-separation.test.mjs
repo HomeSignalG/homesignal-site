@@ -285,5 +285,56 @@ ok(Math.abs(swAttr - HS.markerStroke(14)) < 0.01 && swAttr < 3,
   `9h: the emitted 14px chip carries stroke-width ${swAttr} — the helper reaches the real markup`);
 
 
+// §10 — A STAGE COLOUR MUST READ AS ITS OWN HUE, not merely sit far from its neighbours.
+// This is the rule §1's separation floor did not contain, and its absence is why the legend
+// still looked like one colour after the palette was "fixed": `operating` was '#1f5130', the
+// BRAND green (--green), picked for buttons and headings rather than as a data colour. Its
+// CIELAB chroma was 29 — against 80 for approved, 67 for proposed, 71 for the facility violet
+// — so it was barely more saturated than the NEUTRAL it has to contrast with (chroma 6), and
+// at L*30 on a 14px mark it read as dark GREY.
+//
+// The pair still measured 33.5 dE00 apart and passed §1. That is the trap worth naming:
+// dE00 sums lightness, chroma and hue, so a pair can clear any distance floor on LIGHTNESS
+// alone — and lightness is the first thing a small mark loses to a white halo and a shadow.
+// A distance floor and a chroma floor answer different questions and both are needed.
+const CHROMATIC = { operating: LC.operating, approved: LC.approved, proposed: LC.proposed,
+                    facility: FACILITY };
+function chromaOf(hex) { const lab = rgb2lab(hex2rgb(hex)); return Math.hypot(lab[1], lab[2]); }
+Object.entries(CHROMATIC).forEach(([k, hex]) => {
+  ok(chromaOf(hex) >= 45,
+    `10a: ${k} reads as its own hue — CIELAB chroma ${chromaOf(hex).toFixed(0)} >= 45`);
+});
+// The neutral is the deliberate exception and is asserted the OTHER way in §4, so the two
+// rules cannot both be satisfied by making everything grey or everything saturated.
+ok(chromaOf(LC.unknown) <= 8,
+  `10b: the neutral stays neutral — chroma ${chromaOf(LC.unknown).toFixed(0)} <= 8`);
+ok(chromaOf('#1f5130') < 45,
+  '10c: control — the old brand green measured chroma 29 and would fail 10a');
+ok(dE00('#1f5130', LC.unknown) > FLOOR,
+  '10d: control — and it PASSED the distance floor while failing to read as green, which is '
+  + 'exactly why a distance floor alone was not enough');
+
+// §11 — the three `.band-h.t-*` section headers in homesignalmap.html are stage swatches too:
+// same three colours, same stage names, white 16px BOLD text on them. 16px bold is BELOW the
+// WCAG large-text threshold (18.66px bold), so they need 4.5:1, not 3:1.
+const bandContrast = (hex) => contrast(hex, '#ffffff');
+ok(bandContrast(LC.operating) >= 4.5,
+  `11a: Operating now band header — white text ${bandContrast(LC.operating).toFixed(2)}:1 >= 4.5`);
+ok(bandContrast(LC.approved) >= 4.5,
+  `11b: Approved band header — white text ${bandContrast(LC.approved).toFixed(2)}:1 >= 4.5`);
+// ⚠️ MEASURED AND NOT FIXED: `proposed` (#E2772F) is 3.04:1 on its band header — it already
+// failed before this change and fixing it means altering a stage colour that was not in scope.
+// Pinned at its measured value so it cannot get worse without failing, and reported rather
+// than silently excluded. Closing it is a founder call.
+ok(bandContrast(LC.proposed) >= 3.0,
+  `11c: Proposed band header — ${bandContrast(LC.proposed).toFixed(2)}:1, a NAMED pre-existing `
+  + 'exception below 4.5, pinned at its current worst');
+// The CSS must actually carry the stage colour, or the header and the legend drift apart.
+const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const bandHex = (page.match(/\.band-h\.t-built\{background:(#[0-9a-fA-F]{6})\}/) || [])[1];
+ok(String(bandHex).toLowerCase() === String(LC.operating).toLowerCase(),
+  `11d: the "Operating now" band header uses the stage colour (${bandHex} === ${LC.operating})`);
+
+
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
