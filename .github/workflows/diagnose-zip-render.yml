@@ -1,0 +1,21 @@
+# THROWAWAY diagnostic for the live ZIP-mode render regression. Read-only against production;
+# writes nothing, gates nothing. Delete with its branch once the cause is named.
+name: diagnose-zip-render
+on:
+  push:
+    branches: ["claude/diagnose-zip-mode-render"]
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -D playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Diagnose live ZIP render
+        env:
+          SITE_BASE: https://homesignal.net
+        run: node scripts/diagnose-zip-render.mjs
