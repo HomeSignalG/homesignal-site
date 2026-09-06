@@ -1,0 +1,35 @@
+name: verify-header-search-removed
+
+# TEMPORARY, scratch-branch-only, read-only live verification of #1097. No secrets, no writes.
+# Push-triggered because a workflow_dispatch target must exist on the default branch, and this
+# file is deliberately never merged to main.
+on:
+  push:
+    branches: [claude/verify-header-search-removed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify
+        env:
+          SITE_BASE: https://homesignal.net
+        run: node scripts/verify-header-search-removed.mjs
+      - name: Upload header receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: header-receipts
+          path: receipt-*.png
+          if-no-files-found: warn
