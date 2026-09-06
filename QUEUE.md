@@ -40,6 +40,106 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — 🔴 DENSE-ZIP DELIVERY: root cause fixed at the DB, still FAILS live, and a SECOND loss found
+
+**Gate 0 — no collision.** `origin/main` `c1f1288`; deployed `538f47e` (pages.yml #32, success).
+18 open PRs inspected by CHANGED FILES, not titles: only #400 (July, DRAFT) and #287 touch
+`homesignalmap.html` / `lib/map.js`, and neither hunk mentions `app_zip_projects_markers`,
+`ZIP_AUTH`, `zipAuth*`, `__HS_SITES` or `development_reports`. Nothing supersedes this work.
+
+#### Gate 1 — the bottleneck, isolated rather than assumed
+
+**`anon` carries `statement_timeout = 3s`.** That is the browser's real budget.
+
+```
+zip     memberships  candidates   rpc_ms    MB
+01001            12          --    2,461   0.02
+19103           303          --      644   0.46
+28428         2,440       2,410    1,818   3.78
+30033         2,261      40,404   17,345   3.41   <- EXCEEDS
+20148        13,934      13,937    9,712  21.71   <- EXCEEDS (pre-Phase-2, already live)
+```
+
+⚠️ **It is NOT payload size.** 28428 is the LARGER payload (3.78 MB) and ran 1.8 s, while the
+SMALLER 30033 (3.41 MB) took 17.3 s. And it is **not the join** — measured separately at
+293–440 ms. The driver is the **candidate multiplier**: `distinct on (p.source_key) p.*` had to
+SORT every candidate row carrying all 35 `app_projects` columns. 30033's source_keys match
+**40,404** candidate rows to keep 2,261.
+
+#### Gate 3/5 — the repair (applied, live)
+
+Two migrations, both **spliced into the live `pg_get_functiondef`** rather than retyped (rule 7),
+so the legacy branch carried across byte-for-byte and each failed closed on its anchor:
+
+1. `zip_markers_project_only_read_fields` — project the **11 fields**
+   `lib/zip-authoritative.js::zipAuthSiteFromMarker` actually reads. `address`, `developer`,
+   `scope_text` never reach the rendered site object, so this is behaviour-identical, **not a
+   truncation** — every project and marker is still returned. `point_rule` deliberately NOT
+   added (app_projects has no such column; adding it would change what residents see).
+   Also declares `membership_count` / `marker_count` / `project_count` — **Gate 4**, so partial
+   delivery cannot hide behind a success state.
+2. `zip_markers_narrow_distinct_then_pk_join` — sort only `(source_key, id)`, the exact keys the
+   original `distinct on … order by p.source_key, p.id asc` used, then PK-join the winners.
+   Identical row chosen; the sort payload drops from 12 columns to 2.
+
+```
+zip     before                after (server)
+30033   17,345 ms / 3.41 MB   926 ms / 1.47 MB
+28428    1,818 ms / 3.78 MB   766 ms / 1.60 MB
+20148    9,712 ms /21.71 MB  1,348 ms / 9.18 MB
+28451        not measured    1,408 ms / 9.46 MB (3-pass steady)
+```
+
+**delivered == declared on every ZIP measured.** National accounting unchanged: 12,722 /
+12,077 / 642 / 3, enabled-unverified 0, Case C enabled 0, free 1,469 MB.
+
+#### ⛔ Gate 6/8 — IT STILL FAILS LIVE, so this is not a PASS
+
+Live run `34001159109` against production, 14 controls, **19 failures**:
+
+```
+28451  EXTREME 14,705 markers -> live "could not be read"   delivered 0
+20148  EXTREME 13,935 markers -> live "could not be read"   delivered 0
+30033          2,261 markers -> live "could not be read"   delivered 0
+```
+
+Server-side the same ZIPs return in ~1.4 s, so the residual is in the browser read path
+(9+ MB over the wire), not the query. **The original defect is materially improved and NOT
+resolved.**
+
+#### 🔬 AND A SECOND LOSS, size-independent, that the corrected Gate-4 assertion caught
+
+```
+28456     12 markers -> 6 delivered      19103  303 -> 259      28428  2,442 -> 798
+```
+
+**28456 is 12 records.** No timeout, no payload pressure. The RPC payload is provably perfect:
+12 markers · 12 projects · 12 distinct refs each · **0** markers with no project · **0** markers
+without a point · **12 of 12** carrying a non-empty `source_ref`.
+
+Three hypotheses raised and **all refuted by measurement** — recorded so nobody re-runs them:
+- **the anti-fabrication `sourced()` gate** — 0 of 28456/19103/28428's markers lack a
+  `record_url`;
+- **the marker↔project join in `zipAuthSitesFrom`** — 0 markers without a matching project;
+- **coordinate collapse** — 28456 has **3** distinct points, not 6; 19103 has 156, not 259;
+  28428 has 1,232, not 798. The rendered counts match none of them.
+
+So the loss is in the page render path, downstream of a complete and correct payload, and is
+**not yet identified**. It affects small ZIPs too, which means Map 1 has been under-delivering
+authoritative projects on ordinary pages — not only dense ones.
+
+#### Gate 7 — verifier instruments corrected, standards kept
+
+`authoritative` is not propagated into `__HS_SITES` (it read 0 even on 01001, which provably
+serves authoritative data); the discriminator is now **`zip_authoritative`**, which
+`zipAuthSiteFromMarker` does set. The no-distance rule now binds authoritative records only,
+because `zipAuthMergeSites` deliberately keeps cached **area-scope** civic notices that carry
+synthetic offsets by design. Measured zero now requires **zero AUTHORITATIVE** development, not
+zero development. The truncation gate is delivered-markers == relation plus
+`zipAuthProjectCount` == distinct projects. **20148 and 28451 added as extreme controls** so a
+repair proven only at ~2,400 records can never pass again. That last change is what surfaced
+the second loss.
+
 ### 2026-09-05 — 🔴 SESSION B: geography PROVEN live, but DENSE ZIP PAGES DO NOT DELIVER IT
 
 Live `verify-map1-zip-states` against `https://homesignal.net`, deployed commit **538f47e**
