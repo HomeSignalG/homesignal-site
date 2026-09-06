@@ -341,7 +341,7 @@
               <div class="mapkey" id="mapkey"></div>
               <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. A site that is a data center <em>and</em> carries an EPA record keeps its data-center shape with a small purple EPA square beneath, and appears under either filter. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
             </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
@@ -612,7 +612,18 @@ HS.onReady(function(){
   // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
   // can assert, live, that the label a resident sees agrees with the dot's colour — the regression
   // guard for the class of bug where the two were computed from different signals.
-  function kindLabel(s){ return (frsRid(s) !== "") ? "Facility · operating now" : stageWord(s); }
+  function kindLabel(s){
+    if(frsRid(s) === "") return stageWord(s);
+    // DUAL IDENTITY: a regulated facility whose own EPA record names a data centre reads
+    // as what it IS first and what it CARRIES second. The words come from the resolver's
+    // category registry, so the popup can never disagree with the symbol drawn.
+    var mk = HS.resolveTrackerMarker(s, frsRid);
+    if(mk.isDataCenter){
+      var REG = HS.CATEGORY_REGISTRY;
+      return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
+    }
+    return "Facility · operating now";
+  }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
   function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
@@ -1590,12 +1601,15 @@ HS.onReady(function(){
       // render dashed + slightly smaller: the visual cue that the spot is representative.
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
-      var svg = HS.markerSVG(mk.shape, mk.color, '', size);
+      // mk.signal is the subordinate EPA square on a dual-identity record (Data center
+      // + Regulated facility). ONE marker at ONE coordinate — the badge hangs below the
+      // primary symbol, which stays on the icon anchor, so no geometry moves.
+      var svg = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
       var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
       var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
-      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk });
       bounds.push(ll);
     });
     applyFilter();
@@ -1613,9 +1627,16 @@ HS.onReady(function(){
     var vis = 0;
     siteMarkers.forEach(function(x){ if(x && x.m && layerGroup && layerGroup.hasLayer(x.m)) vis++; });
     var covEl = $("covNote");
+    // Dual-identity observability: the count of rendered markers carrying BOTH a primary
+    // Data center symbol and a subordinate EPA signal, so a live check can assert the
+    // record appears ONCE rather than twice however many memberships admitted it.
+    var dual = 0;
+    siteMarkers.forEach(function(x){ if(x && x.mk && x.mk.isDataCenter && x.mk.isFacility) dual++; });
+    window.__HS_CATEGORY_FILTERS = HS.getCategoryFilters ? HS.getCategoryFilters() : null;
     window.__HS_VERIFY = {
       mapMarkers: siteMarkers.length,
       visibleMarkers: vis,
+      dualIdentityMarkers: dual,
       facilitiesOnly: FACILITIES_ONLY,
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
@@ -1689,10 +1710,26 @@ HS.onReady(function(){
     return fails;
   };
 
-  // Show only the buckets whose legend chip is on.
+  // ONE visibility predicate for all three views (2D, 3D aerial, 3D satellite), so a
+  // record can never be filtered in on one surface and out on another. Lifecycle AND
+  // category, category being an any-of test over the record's membership set.
+  function siteVisible(p){
+    if(!FILTER[bucketOf(p.type, p)]) return false;
+    return HS.categoryVisible ? HS.categoryVisible(HS.resolveTrackerMarker(p, frsRid)) : true;
+  }
+  // TWO INDEPENDENT FILTER DIMENSIONS, and a marker must clear BOTH.
+  //   lifecycle  — FILTER[bucket], the colour chips (Operating / Approved / Proposed / Unknown)
+  //   category   — HS.categoryVisible, the SHAPE rows (Data center, Regulated facility, …)
+  // Category membership is an ANY-OF test over a set, so a dual-identity record qualifies
+  // through EITHER Data center or Regulated facility — and, because it is still ONE marker
+  // object in siteMarkers, it is added to the layer ONCE however many memberships matched.
+  // Neither filter can change what the record IS: the symbol was resolved before this ran.
+  function markerVisible(x){
+    return !!FILTER[x.bucket] && (HS.categoryVisible ? HS.categoryVisible(x.mk || x.s) : true);
+  }
   function applyFilter(){
     siteMarkers.forEach(function(x){
-      if(FILTER[x.bucket]){ x.m.addTo(layerGroup); }
+      if(markerVisible(x)){ x.m.addTo(layerGroup); }
       else { layerGroup.removeLayer(x.m); }
     });
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
@@ -1726,14 +1763,43 @@ HS.onReady(function(){
       });
       d.appendChild(row);
     });
+    // The SHAPE rows are the TYPE dimension, and they are toggles — the same pattern as
+    // the lifecycle chips above. Turning every type off except Regulated facility is the
+    // founder's acceptance scenario, and a dual-identity Data center survives it BECAUSE
+    // it holds a `facility` membership — while still drawing its Data center octagon.
     var shapes = document.getElementById("mapkeyShapes");
-    if(shapes && HS.SHAPE_LEGEND){
+    if(shapes && HS.SHAPE_LEGEND && HS.setCategoryFilter){
+      shapes.innerHTML = "";
       var neutral = HS.markerRegistry.neutralHex;
-      var rows = HS.SHAPE_LEGEND.map(function(s){
-        return "<span class='sh'><span class='ic'>" + HS.markerSVG(s.shape, neutral, "", 14) + "</span><span class='t'>" + esc(s.label) + "</span></span>";
+      var typeRows = HS.SHAPE_LEGEND.map(function(r){
+        return { key: r.categoryKey, shape: r.shape, color: neutral, label: r.label };
       });
-      rows.push("<span class='sh'><span class='ic'>" + HS.markerSVG("square", HS.markerRegistry.facilityHex, "", 14) + "</span><span class='t'>Regulated facility</span></span>");
-      shapes.innerHTML = rows.join("");
+      typeRows.push({ key: "facility", shape: HS.CATEGORY_REGISTRY.facility.symbol,
+                      color: HS.markerRegistry.facilityHex, label: HS.CATEGORY_REGISTRY.facility.label });
+      var catState = HS.getCategoryFilters();
+      typeRows.forEach(function(r){
+        var row = document.createElement("span");
+        row.className = "sh";
+        row.tabIndex = 0;
+        row.setAttribute("role", "button");
+        row.setAttribute("data-cat", r.key);
+        row.setAttribute("aria-label", r.label + " markers");
+        if(!catState[r.key]) row.classList.add("off");
+        row.setAttribute("aria-pressed", catState[r.key] ? "true" : "false");
+        row.innerHTML = "<span class='ic'>" + HS.markerSVG(r.shape, r.color, "", 14) + "</span><span class='t'>" + esc(r.label) + "</span>";
+        function toggle(){
+          var on = !HS.getCategoryFilters()[r.key];
+          HS.setCategoryFilter(r.key, on);
+          row.classList.toggle("off", !on);
+          row.setAttribute("aria-pressed", on ? "true" : "false");
+          applyFilter();
+        }
+        row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
+        row.addEventListener("keydown", function(e){
+          if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
+        });
+        shapes.appendChild(row);
+      });
     }
   }
 
@@ -1995,7 +2061,7 @@ HS.onReady(function(){
     // Frame the view to where the buildings actually are (not the empty outer radius),
     // so it reads well at every radius. maxD = farthest visible facility from home.
     var maxD=0, nLabelable=0;
-    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type, p)])return;
+    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!siteVisible(p))return;
       var en=siteEN(p); if(typeof en[0]!=="number"||typeof en[1]!=="number")return; var dd=Math.hypot(en[0],en[1]);
       if(ZIP_MODE || dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
     // Readability: floating type-labels only when few enough not to collide. In a dense
@@ -2014,7 +2080,7 @@ HS.onReady(function(){
       if(typeof en[0]!=="number"||typeof en[1]!=="number")return;
       if(!mappable(p))return;
       var bkt=bucketOf(p.type, p);
-      if(!FILTER[bkt])return;
+      if(!siteVisible(p))return;
       // ZIP mode draws the WHOLE ZIP - no radius cull. Address mode keeps its chosen radius.
       if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);
@@ -2111,7 +2177,7 @@ HS.onReady(function(){
     el.style.width=el.style.height=size+"px"; el.style.lineHeight="0";
     if(approxPt) el.style.opacity="0.85";
     el.style.cursor="pointer";
-    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size);
+    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
     return el;
   }
   function initGL(home){
@@ -2150,7 +2216,7 @@ HS.onReady(function(){
       var ll=siteLL(s);
       if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
       if(!mappable(s))return;
-      var bkt=bucketOf(s.type); if(!FILTER[bkt])return;
+      var bkt=bucketOf(s.type); if(!siteVisible(s))return;
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));

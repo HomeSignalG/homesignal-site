@@ -40,6 +40,71 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — DATA CENTER + EPA DUAL IDENTITY: one record, two truths (Map 1)
+
+**The founder-set contract, implemented:** a site that IS a data centre and separately
+CARRIES an EPA-FRS record keeps **Data center as its primary identity and primary symbol**,
+with the **EPA square as a subordinate signal beneath it**. It belongs to **both** filter
+memberships and renders as **ONE marker**. Filtering changes whether a record is visible;
+it never changes what the record is.
+
+**Before:** all 741 rows — `CORESITE - VA1 DATA CENTER`, `CYRUSONE NORTHERN VIRGINIA DATA
+CENTER`, `ALIGNED ENERGY DATA CENTERS (ASHBURN)`, `NTT GLOBAL DATA CENTERS AMERICAS - VA1` —
+drew an anonymous purple square identical to a plating works, said `Facility · operating now`
+in the popup, and the word "data center" appeared nowhere on the page. The octagon shipped
+in #1046 drew for PROJECTS only, so the two halves of one subject spoke two vocabularies.
+
+**Population measured 2026-09-06** (control: 215,305 facility rows / 114,039 FRS records):
+- **A — the FRS record's own stamped class is `datacenter`: 741 rows · 342 records · 512 ZIPs.**
+  0 of them lack data-centre wording in their own name · 0 are non-FRS · 0 duplicate rows for
+  the same `(zip, record)`. No project join needed and none performed.
+- **B — project↔FRS same-site join: not attempted** (Phase 8 forbids over-joining; Category A
+  needs no join).
+- **C — ambiguous grain: 1**, and it is deliberately NOT promoted. 🔑 `CYRUS ONE DATA HALL 1
+  POWER POD 1` (stamped `energy`) names the hall it powers; its siblings `POWER POD 5` and
+  `POWER POD 7` name nothing. Reading the free-text NAME would call one of three identical
+  power pods a data centre purely because of its label, so the facility path reads the
+  **stamped class field only**. A power pod at a data centre is not a data centre.
+- **D — untouched: 214,563 rows / 113,696 records** keep their purple square, their legend
+  row, their filter bucket and their popup, verbatim.
+
+**Architecture — three concepts, never conflated, no schema change and no DB write:**
+`categoryKey` = ENTITY IDENTITY (one value, drives the symbol) · `signal` = the subordinate
+symbol · `categories` = FILTER MEMBERSHIP (a set). `HS.categoryVisible` is an **any-of** test
+over one marker object, which is what makes "either filter shows it, exactly once"
+structural rather than conventional.
+
+🆕 **Map 1 gained a second filter dimension, because the acceptance test needs one.** It had
+only the lifecycle chips; "Type — pin shape" was a static caption, so *"turn off every type
+except EPA"* was not something a resident could do. The shape rows are now toggles (same
+pattern, `aria-pressed`, keyboard-operable), and one shared `siteVisible()` predicate serves
+2D, 3D aerial and satellite so a record can never be filtered in on one view and out on another.
+
+**The founder's acceptance test passes in a real browser, driven by clicking the legend**
+(`test/map1-dual-identity.browser.test.mjs`, 20 assertions, FAILS: 0, fixtures verbatim from
+production ZIP 20171): every type OFF except EPA → the data centre stays visible, keeps its
+Data center octagon, keeps its EPA square, appears once, popup reads
+`Data center · Regulated facility · operating now`.
+
+- Marker geometry: the primary symbol stays ON the icon anchor and the badge overflows
+  downward, so the composed icon box is **byte-identical** to every other pin — no offset, no
+  second coordinate, no geography touched anywhere.
+- Suites: `marker-dual-identity` 36 · `map1-dual-identity.browser` 20 · `marker-datacenter-type`
+  87 · **full offline 147 files, 0 failed**. Both new suites **mutation-proved load-bearing**
+  (removing the category test reddens 6; disabling dual identity reddens 8 + 12).
+- ⚠️ `user-journey.browser` reports 5 failures in the sandbox — **and the identical 5 on
+  unmodified `origin/main` (4a80502)**. Pre-existing, egress-caused. The control was run
+  before the number was quoted.
+- ⚖️ **This REVERSES the open question logged below**, which read "whether a regulated facility
+  that IS a data centre should draw the octagon … is a separate, resident-visible call."
+  The founder made the call. The two old assertions are kept in the test file, inverted, so
+  the change of contract is legible rather than silently deleted.
+- 📌 **OPEN, logged not fixed:** no project↔facility relationship is asserted anywhere (a
+  campus with both a permit record and an FRS record still shows two records — HomeSignal has
+  no evidence they are one entity) · the type filter is per-session like the lifecycle chips ·
+  3D aerial draws blocks, so the EPA signal shows in 2D and satellite only.
+- Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
+
 ### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
 
 `CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
@@ -113,7 +178,11 @@ reached 452/214; the adversarial audit below added the last +27/+5.)
   ~30 operator-only record-level misses are structurally unreachable without a join this evidence
   shows is unsafe.
 
-📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
+✅ **ANSWERED 2026-09-06 — see the dual-identity entry above. The founder ruled: Data
+center is the primary identity and symbol, EPA is a subordinate signal beneath it, and the
+record holds both filter memberships. The question as it stood is retained below.**
+
+📌 **~~OPEN~~ RESOLVED — the 738 EPA-FRS facilities typed `datacenter`**
 (509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
 keep the purple square, the "Regulated facility" legend row and the `facility` filter
 bucket. `datacenter` is a project TYPE; `facility` is a record KIND. Moving them would change
