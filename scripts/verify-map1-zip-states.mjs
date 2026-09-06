@@ -339,35 +339,37 @@ ok(/could not be read/i.test(f.noteFail),
 console.log('');
 
 // ── address mode: separate contract, real geocoded home + chosen radius, no ZIP ─────────────
-// Park on a blank document FIRST. A dense ZIP page whose render lands after its own case has
-// finished will otherwise repopulate window.__HS_SITES underneath the address-mode read - that
-// is exactly how `zip_authoritative=5844` appeared in an ADDRESS-mode assertion.
-await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
+// A FRESH BROWSER CONTEXT, not the page the ZIP cases used. `zip_authoritative=5844` turned up
+// inside an ADDRESS-mode assertion - 76227's exact delivered count, and provably not 78617's
+// own geography (78617 holds 522 markers / 496 projects, measured). Clearing the global and
+// parking on about:blank both failed to shake it off, so rather than keep guessing at the
+// carry-over path the measurement moves somewhere it cannot follow. A new context shares no
+// document, no globals and no storage with the ZIP run.
+const addrCtx = await browser.newContext();
+const apage = await addrCtx.newPage();
 console.log('── address mode, driven through the real form ──');
 let payload = null, endpoint = null;
-page.on('request', (req) => {
+apage.on('request', (req) => {
   if (req.url().includes('/functions/v1/get-address-report') && req.method() === 'POST') {
     endpoint = req.url();
     try { payload = JSON.parse(req.postData() || '{}'); } catch (_e) { payload = { _unparsed: true }; }
   }
 });
-await page.goto(`${BASE}/homesignalmap.html`, { waitUntil: 'domcontentloaded' });
-// CLEAR THE GLOBAL, THEN REQUIRE IT BACK. Without this the address-mode assertion reads
-// whatever the LAST ZIP case left behind: it passed as `dev=0 with-distance=0` for as long as
-// the final case was a ZIP that renders nothing, which is a vacuous pass - it asserted that a
-// measurement which had not happened carried no distances. Adding a dense final case exposed
-// it as `dev=5852`, exactly the previous page's count. An instrument must prove it ran.
-await page.evaluate(() => { window.__HS_SITES = undefined; });
-await page.waitForTimeout(2000);
+await apage.goto(`${BASE}/homesignalmap.html`, { waitUntil: 'domcontentloaded' });
+// The global starts undefined in a fresh context, so requiring it BACK is what proves the
+// address render actually ran. The old form read it without clearing and passed as
+// `dev=0 with-distance=0` for as long as the final ZIP case rendered nothing - a vacuous pass
+// asserting that a measurement which had not happened carried no distances.
+await apage.waitForTimeout(2000);
 // choose a radius explicitly, the way a resident does
-await page.evaluate(() => {
+await apage.evaluate(() => {
   const b = document.querySelector('[data-r="2"]');
   if (b) b.click();
 });
-await page.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
-await page.click('#go');
-await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 30000 }).catch(() => {});
-await page.waitForTimeout(3000);
+await apage.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
+await apage.click('#go');
+await apage.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 30000 }).catch(() => {});
+await apage.waitForTimeout(3000);
 
 ok(payload !== null, 'address mode issues its own report request', endpoint ? 'POST get-address-report' : 'none seen');
 if (payload) {
@@ -378,7 +380,7 @@ if (payload) {
      'and NO zip — address geography is never substituted for ZIP geography',
      'zip=' + JSON.stringify(payload.zip));
 }
-const addrMode = await page.evaluate(() => {
+const addrMode = await apage.evaluate(() => {
   const sites = window.__HS_SITES;
   if (sites === undefined) return { rendered: false, dev: 0, withDistance: 0, auth: 0 };
   const dev = (sites || []).filter(s => s && s.relevance === 'development');
@@ -395,6 +397,7 @@ ok(addrMode.dev === 0 || addrMode.withDistance > 0,
    'address-mode development is distance-bearing — the opposite of ZIP mode',
    `dev=${addrMode.dev} with-distance=${addrMode.withDistance}`);
 
+await addrCtx.close();
 await browser.close();
 console.log(`\n${fails === 0 ? 'LIVE ZIP-STATE GATE: PASS' : fails + ' FAILURE(S)'}`);
 process.exit(fails ? 1 : 0);
