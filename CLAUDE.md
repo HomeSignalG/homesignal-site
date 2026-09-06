@@ -61,6 +61,11 @@ workflow, or any implementation that can overlap across sessions:**
      coordinate ownership.
    - **GENUINE GAP** — no active or merged work satisfies the acceptance criteria. Proceed.
 5. **Only edit after** confirming there is no active duplicate and the work is still needed.
+6. **A founder-reverted product outcome is not a gap.** If `main` once carried the outcome and a
+   revert removed it, absence from `main` is a DECISION, not an opening. Do not rebuild or
+   re-merge it without new explicit authorization naming the revert. *(#1069 shipped the Map 1
+   mode-clarity work and #1072 reverted it as out of scope; two duplicate PRs were still open at
+   that moment, each one merge away from re-shipping what had just been deliberately removed.)*
 
 **Before opening a PR or merging:**
 
