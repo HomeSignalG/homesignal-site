@@ -16,7 +16,43 @@ name: pages
 
 on:
   workflow_dispatch:
+  # PUBLISH TRIGGER — must mirror what the artifact SHIPS, not what the ZIP generator reads.
+  #
+  # This list used to name the nine generator/gate inputs, which is the wrong question: the
+  # "Stage the static site" step below rsyncs the WHOLE repo minus .github/docs/test/
+  # node_modules, so 339 of the 344 shipped files had no publish trigger — index.html,
+  # app.css, homesignalmap.html, partials/shell.html and every lib/*.js among them. Measured
+  # over the 20 commits before this change: 18 touched a shipped file and pages fired on push
+  # for 0 of them. Publishing worked only because someone dispatched it by hand after nearly
+  # every merge (17 of 22 main runs were workflow_dispatch); when nobody did, the site waited
+  # for the 06:40 cron. Keep this list in step with the rsync excludes — a mismatch is silent,
+  # so test/pages-publish-trigger.test.mjs derives the shipped set from that rsync line and
+  # fails when the two drift.
+  #
+  # Scoped to main: the deploy job is already `if: github.ref == 'refs/heads/main'`, so a
+  # branch build could never publish, and a broad path list on every branch push would run
+  # this 30-minute Playwright build on every commit of every branch. The pull_request trigger
+  # below keeps the pre-merge proof that branch pushes used to give (20 of 42 runs), on the
+  # same narrow generator inputs it has always covered. Same split, and the same reasoning,
+  # as unit-tests.yml.
   push:
+    branches: [main]
+    paths:
+      - '**'
+      - '!.github/**'
+      - '!docs/**'
+      - '!test/**'
+      - '!node_modules/**'
+      # …then the gate inputs that live inside those excluded trees. Order matters: a later
+      # positive pattern re-includes a path an earlier '!' removed.
+      - '.github/workflows/pages.yml'
+      - 'test/zip-pages-seo.test.mjs'
+      - 'test/zip-pages-no-point.test.mjs'
+      - 'test/community-page-contract.test.mjs'
+      - 'test/fixtures/zip-pages.json'
+  # PRE-MERGE PROOF, unchanged in scope: the generator/gate inputs, so a change to the ZIP
+  # build is proven before it reaches main. Builds, never deploys.
+  pull_request:
     paths:
       - 'scripts/gen_zip_pages.py'
       - 'scripts/prove-zip-pages.mjs'
