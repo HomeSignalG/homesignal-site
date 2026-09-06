@@ -26,7 +26,12 @@ import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js'];
+// shell.js joins the two libs #1087 keyed. It is the shared runtime — the header, the
+// search, the modals, the boot sequence — so a fix in it that a browser never fetches is
+// the same class of silent failure, and #1089's search fix was the first to ship behind
+// exactly that risk. Its tags are written as src="shell.js" on the 14 pages and as
+// src="/shell.js" by the generator (which carries <base href="/">), so §1 matches both.
+const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -38,7 +43,7 @@ CONTENT_KEYED.forEach((rel) => {
   const found = [];
   pages.forEach((p) => {
     const src = readFileSync(join(root, p), 'utf8');
-    const re = new RegExp('src="' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\?v=([^"]*))?"', 'g');
+    const re = new RegExp('src="/?' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\?v=([^"]*))?"', 'g');
     let m;
     while ((m = re.exec(src))) found.push({ page: p, key: m[2] || null });
   });
@@ -57,20 +62,30 @@ CONTENT_KEYED.forEach((rel) => {
 // scripts/verify-map-markers.mjs. So the set is PINNED at its measured membership: a NEW
 // keyless lib fails immediately, and closing the existing nine stays a deliberate act.
 // ⚠️ MEASURED, NOT FIXED — the nine are listed so this is a record, not a silence.
+// ⚠️ WIDENED from `lib/*.js` to EVERY same-origin script. The original sweep could only
+// ever see lib/, so a keyless script anywhere else was not "known" — it was invisible.
+// shell.js was keyless on all 14 pages for the life of the repo and this pin reported
+// nothing, which is the failure mode §2 exists to prevent: an absence that reads as a pass.
+// Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
   'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
-  'lib/community-page.js', 'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js'
+  'lib/community-page.js', 'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
+  'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
+// A leading "/" is the generator's absolute form, not a different file (same rule as
+// test/zip-page-shared-runtime.test.mjs). Absolute http(s) sources are third-party CDN
+// loads, versioned in their own URL, and are not ours to key.
+const localSrc = (u) => u.replace(/^\//, '');
 const keyless = new Set();
 pages.forEach((p) => {
   const src = readFileSync(join(root, p), 'utf8');
-  const re = /src="(lib\/[a-z0-9-]+\.js)"/g;
+  const re = /<script\s+src="(?!https?:)([^"?]+\.js)"/g;
   let m;
-  while ((m = re.exec(src))) keyless.add(m[1]);
+  while ((m = re.exec(src))) keyless.add(localSrc(m[1]));
 });
 const unexpected = [...keyless].filter((f) => !KNOWN_KEYLESS.has(f));
 ok(unexpected.length === 0,
-  '2a: no NEW keyless lib/*.js has appeared'
+  '2a: no NEW keyless same-origin script has appeared'
   + (unexpected.length ? ' — ' + unexpected.join(', ') : ` (${keyless.size} known, pinned)`));
 // And the two files that carry shipped fixes must never fall back into that set.
 CONTENT_KEYED.forEach((rel) => {
@@ -82,7 +97,7 @@ CONTENT_KEYED.forEach((rel) => {
 const byFile = {};
 pages.forEach((p) => {
   const src = readFileSync(join(root, p), 'utf8');
-  const re = /src="(lib\/[a-z0-9-]+\.js)\?v=([^"]+)"/g;
+  const re = /src="\/?([a-z0-9/-]+\.js)\?v=([^"]+)"/g;
   let m;
   while ((m = re.exec(src))) (byFile[m[1]] = byFile[m[1]] || new Set()).add(m[2]);
 });
