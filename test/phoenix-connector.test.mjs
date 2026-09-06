@@ -9,7 +9,7 @@
 // and the record renders as a generic circle. These assertions pin the two facts that a
 // green run must mean:
 //   • every value the live layer publishes is in `type_map`, and every mapped value is one
-//     of the six canonical use_types (an off-vocabulary value would miss lib/map.js's
+//     of the canonical use_types (an off-vocabulary value would miss lib/map.js's
 //     closed TYPE_EXACT table and fall through to keyword guessing);
 //   • the coverage gate holds BOTH ways — Phoenix records ride AZ/Maricopa pages and no
 //     other, and a non-Maricopa ZIP never even fetches the layer.
@@ -62,12 +62,17 @@ ok(ENTRY.dataset_url.startsWith('https://'), 'dataset_url is absolute https');
 }
 
 // ── 3. Type vocabulary — complete, and inside the canonical closed set ───────────
-const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Commercial', 'Civic/Public']);
+// The closed use_type vocabulary = lib/map.js::TYPE_EXACT. 'other project' is the TERMINAL
+// neutral (engine constant NON_QUALIFYING_COMMERCIAL_USE_TYPE): it resolves through
+// TYPE_EXACT like the rest, and is the one member that deliberately does NOT continue into
+// keyword/name inference — which is precisely the property this assertion exists to protect.
+const USE_TYPES = new Set(['Industrial', 'Development', 'Residential', 'Utility', 'Commercial',
+  'Civic/Public', 'other project']);
 {
   const vals = Object.keys(ENTRY.type_map);
   ok(vals.length === 238, `type_map carries all 238 live PER_TYPE_DESC values (got ${vals.length})`);
   const bad = Object.entries(ENTRY.type_map).filter(([, v]) => !USE_TYPES.has(v));
-  ok(bad.length === 0, 'every mapped value is one of the six canonical use_types',
+  ok(bad.length === 0, 'every mapped value is one of the canonical use_types',
     JSON.stringify(bad.slice(0, 5)));
   // The vocabulary carries two upstream quirks that must survive verbatim — a
   // double-space and a mid-word space. Normalising either would silently unclassify them.
