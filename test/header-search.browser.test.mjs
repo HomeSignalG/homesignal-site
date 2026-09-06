@@ -16,6 +16,15 @@
 // Both are pinned here because both are invisible at runtime: nothing throws where a user or
 // a reviewer would see it, and the offline suite cannot reach either without a browser.
 //
+// THE PAGE UNDER TEST IS alerts.html, NOT MAPS. It used to be homesignalmap.html; the Maps
+// header no longer carries the universal search control at all (it is suppressed there until
+// universal search can answer Maps' own vocabulary — see injectShell() in shell.js), so
+// driving this suite from Maps would assert against a control that is deliberately absent.
+// The search index is page-independent — wireSearch() reads HS.data.projects/changes plus the
+// saved properties, never the host page — so alerts.html exercises exactly the same behaviour.
+// This file is therefore also the NON-MAPS PRESERVATION CHECK: every assertion below passing
+// is the proof that suppressing the control on Maps changed nothing anywhere else.
+//
 // Every network call is answered locally or aborted; no production service is touched.
 //
 // Run: node test/header-search.browser.test.mjs
@@ -71,7 +80,7 @@ const boxState = page => page.$eval('#hs-search-results',
           hrefs: [...e.querySelectorAll('a')].map(a => a.getAttribute('href')) }));
 
 // ── 1. the dropdown still filters and still links (result semantics unchanged) ──────────
-let page = await typeQuery(base + '/homesignalmap.html?data=seed', 'data center', false);
+let page = await typeQuery(base + '/alerts.html?data=seed', 'data center', false);
 let st = await boxState(page);
 ok(!st.hidden && st.hrefs.length > 0, '1a a matching query renders linked results', st);
 ok(st.hrefs.every(h => /^(development|alerts|property)\.html/.test(h)),
@@ -85,7 +94,7 @@ ok(page.url() === base + '/' + top, '2 Enter navigates to the TOP hit', { url: p
 await page.close();
 
 // ── 3. Enter with nothing to open must not invent a destination ─────────────────────────
-page = await typeQuery(base + '/homesignalmap.html?data=seed', 'zzzznotathing', false);
+page = await typeQuery(base + '/alerts.html?data=seed', 'zzzznotathing', false);
 st = await boxState(page);
 ok(!st.hidden && st.text === 'No matches', '3a a query with no hits says so', st);
 const before = page.url();
@@ -95,7 +104,7 @@ ok(page.url() === before, '3b Enter on an empty result set stays put', page.url(
 await page.close();
 
 // ── 4. THE REGRESSION: a failed index degrades to "No matches", never to a dead field ───
-page = await typeQuery(base + '/homesignalmap.html', 'data center', true);
+page = await typeQuery(base + '/alerts.html', 'data center', true);
 st = await boxState(page);
 ok(!st.hidden, '4a a degraded index still opens the dropdown (the field is not dead)', st);
 ok(st.text === 'No matches', '4b ...and says "No matches" rather than nothing at all', st);
