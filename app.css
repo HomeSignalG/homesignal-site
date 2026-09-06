@@ -473,6 +473,13 @@
 #hs-search-results a b{font-size:13px;color:var(--ink);font-weight:600}
 #hs-search-results a span{font-size:11.5px;color:var(--ink-3)}
 #hs-search-results .empty{padding:11px 13px;font-size:12.5px;color:var(--ink-3)}
+/* Header universal search: a compact "Search" button (styled as .sharebtn, so it is
+   the same height, border, radius and type size as Share) that opens the SAME input in
+   a popover. The wide header field was removed because it competed with the Maps page's
+   own address control; nothing about search behaviour or result semantics changed. */
+.hs-searchwrap{position:relative;display:flex}
+.hs-searchpanel{position:absolute;top:calc(100% + 8px);right:0;width:min(420px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:10px;z-index:60}
+.hs-searchpanel input{width:100%;border:1px solid var(--line);background:#f7f9f7;border-radius:9px;padding:9px 13px;font-size:13px;color:var(--ink)}
 .data-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;font-size:13px}
 .data-table th,.data-table td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-2)}
 .data-table th{background:#f7f9f7;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);cursor:pointer;user-select:none}
@@ -501,9 +508,15 @@
   .sharegrid{grid-template-columns:repeat(3,1fr)}
   .strip .stat{min-width:calc(50% - 7px)}
   .page{padding:20px 16px 48px}
-  /* top bar: let the search shrink gracefully instead of clipping to "Se" */
+  /* top bar: the utility cluster is compact buttons now, so it just tightens up */
   .top{gap:8px;padding:11px 14px}
-  .top .search{min-width:0}
+  /* The search popover is right-anchored to its button, which on a phone sits far
+     enough from the viewport edge that a 420px panel would hang off-screen to the
+     LEFT. Dropping the wrap to static hands the containing block to .top (sticky, so
+     it IS a positioned ancestor) and the panel spans the bar instead — no magic
+     offsets, and it stays anchored under the header at any header height. */
+  .hs-searchwrap{position:static}
+  .hs-searchpanel{left:14px;right:14px;width:auto;top:calc(100% + 6px)}
   .top .loc{max-width:44vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .hero h1{font-size:30px}
 }

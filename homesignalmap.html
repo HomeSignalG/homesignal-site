@@ -1415,7 +1415,7 @@ HS.onReady(function(){
     // choose from (nothing listens for input; autocomplete="street-address" is the browser's own
     // autofill, not ours). So the copy asks for an address, and deliberately does not demand a
     // "full" one or a fixed "street, city, state, ZIP" shape the geocoder does not require.
-    if(_hint){ _hint.textContent = "Enter an address to see development nearby."; }
+    if(_hint){ _hint.textContent = "Enter a street address to switch from ZIP-wide results to development nearby."; }
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
     // No placeholder override here any more: "Start typing an address" reads correctly in BOTH

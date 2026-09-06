@@ -36,8 +36,19 @@
 <div class="top" id="hs-top">
   <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
   <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
-  <div class="search"><input id="hs-search" placeholder="Search HomeSignal — addresses, projects, topics…" autocomplete="off"><div id="hs-search-results" class="hidden"></div></div>
   <div class="sp"></div>
+  <!-- Universal search is a COMPACT BUTTON in the utility cluster, not a wide field in the
+       primary header flow. The wide input competed with the Maps page's own address field
+       and read as a second address-search path. The capability is unchanged: this is the
+       SAME #hs-search input and #hs-search-results dropdown wireSearch() has always bound,
+       moved into a popover the button opens. There is no second search implementation. -->
+  <div class="hs-searchwrap" id="hs-searchwrap">
+    <button class="sharebtn" type="button" id="hs-search-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="hs-search-panel" onclick="HS.toggleSearch()">Search</button>
+    <div class="hs-searchpanel hidden" id="hs-search-panel" role="dialog" aria-label="Search HomeSignal">
+      <input id="hs-search" placeholder="Search HomeSignal — addresses, projects, topics…" autocomplete="off">
+      <div id="hs-search-results" class="hidden"></div>
+    </div>
+  </div>
   <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
   <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
   <button class="sharebtn" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
