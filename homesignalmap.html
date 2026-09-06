@@ -1426,12 +1426,10 @@ HS.onReady(function(){
     // can widen the 3D aerial view to reach cached records past the default frame.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
-    // The hero used to put "industrial facilities" inside the SAME "across ZIP" clause as the
-    // development records. Facilities are an EPA query around this ZIP, not a measurement of it,
-    // so the clause is split: what is measured across the ZIP, then what is shown nearby.
-    if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
-      + "data-center activity, planning hearings and open comment windows, plus nearby "
-      + "regulated facilities for context — every item linked to its official public record."; }
+    // Founder copy: one plain line. The long inventory clause it replaced named the record types
+    // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
+    // seen any of them — the page below already labels each of those, so the hero just says why to read it.
+    if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
     var _hint = document.querySelector(".hint");
     // The field takes FREE-FORM text and geocodes it on submit — there is no suggestion list to
     // choose from (nothing listens for input; autocomplete="street-address" is the browser's own
