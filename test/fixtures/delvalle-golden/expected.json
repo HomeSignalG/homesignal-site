@@ -61,7 +61,7 @@
    "austin-subdivision-cases": 15
   },
   "by_symbol": {
-   "circle": 3,
+   "capsule": 3,
    "cross": 7,
    "diamond": 4,
    "hexagon": 10,
@@ -142,7 +142,7 @@
   {
    "categoryKey": "other",
    "label": "Other project",
-   "shape": "circle"
+   "shape": "capsule"
   }
  ],
  "lifecycle_chips": [
@@ -1132,7 +1132,7 @@
    "source_registry_id": "austin-site-plan-cases",
    "source_status_raw": "Approved",
    "source_type_raw": "unclassified",
-   "symbol": "circle",
+   "symbol": "capsule",
    "zip": "78617"
   },
   {
@@ -1600,7 +1600,7 @@
    "source_registry_id": "austin-subdivision-cases",
    "source_status_raw": "Approved",
    "source_type_raw": "unclassified",
-   "symbol": "circle",
+   "symbol": "capsule",
    "zip": "78617"
   },
   {
@@ -1704,7 +1704,7 @@
    "source_registry_id": "austin-subdivision-cases",
    "source_status_raw": "Proposed",
    "source_type_raw": "unclassified",
-   "symbol": "circle",
+   "symbol": "capsule",
    "zip": "78617"
   },
   {
@@ -1917,7 +1917,7 @@
   },
   "other": {
    "label": "Other project",
-   "symbol": "circle"
+   "symbol": "capsule"
   },
   "residential": {
    "label": "Residential",

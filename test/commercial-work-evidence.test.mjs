@@ -128,7 +128,7 @@ console.log('§4 the downgrade is TERMINAL — the name phase cannot re-promote 
 {
   const t = HS.classifyProjectType(zipSite(NON_QUALIFYING_COMMERCIAL_USE_TYPE, 'ELE 100 E MARKHAM ST'));
   eq(t.typeKey, 'other', '§4 downgraded record resolves to the Other-project category');
-  eq(t.shape, 'circle', '§4 downgraded record draws a circle, not a hexagon');
+  eq(t.shape, HS.CATEGORY_REGISTRY.other.symbol, '§4 downgraded record draws the Other-project symbol, not a hexagon');
   eq(t.legendLabel, 'Other project', '§4 legend label is Other project');
 
   // THE LEAK, proved absent. Each label below is a real production label shape whose text
@@ -146,7 +146,7 @@ console.log('§4 the downgrade is TERMINAL — the name phase cannot re-promote 
   for (const label of leaky) {
     const m = HS.resolveMarker(zipSite(NON_QUALIFYING_COMMERCIAL_USE_TYPE, label));
     eq(m.typeKey, 'other', `§4 no re-promotion: ${label}`);
-    eq(m.shape, 'circle', `§4 stays a circle: ${label}`);
+    eq(m.shape, HS.CATEGORY_REGISTRY.other.symbol, `§4 stays Other project: ${label}`);
   }
   // The counterfactual that proves §4 is load-bearing rather than scaffolding: the SAME labels
   // through the generic buckets DO get re-promoted to Commercial, which is why a naive
@@ -299,7 +299,7 @@ console.log('§10 the LIVE page path labels the Type, not the Stage');
       type: NON_QUALIFYING_COMMERCIAL_USE_TYPE, status: 'Operating',
       source_ref: 'https://example/permit', registry_id: 'little-rock-permits' }), () => '');
   eq(d.typeKey, 'other', '§10 PAGE PATH: a downgraded record is an Other project');
-  eq(d.shape, 'circle', '§10 PAGE PATH: …and draws a circle');
+  eq(d.shape, HS.CATEGORY_REGISTRY.other.symbol, '§10 PAGE PATH: …and draws the Other-project symbol');
 }
 
 console.log('§11 Commercial zero / coverage semantics');

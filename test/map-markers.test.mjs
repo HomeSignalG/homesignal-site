@@ -17,7 +17,7 @@ const CASES = [
   { label: 'Residential / Active', item: { type: 'Residential', status: 'Active' }, shape: 'pentagon', color: '#1f9d5c' },
   { label: 'Infrastructure / Approved', item: { type: 'Infrastructure', status: 'Approved' }, shape: 'diamond', color: '#3f7fb0' },
   { label: 'Commercial / Proposed', item: { type: 'Commercial', status: 'Proposed' }, shape: 'hexagon', color: '#c47a1a' },
-  { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: 'circle', color: '#6b7f76' },
+  { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: HS.CATEGORY_REGISTRY.other.symbol, color: '#6b7f76' },
   { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'square', color: '#6f42c1', isFacility: true }
 ];
 
@@ -40,10 +40,13 @@ ok(fac.shape === 'square' && fac.color === '#6f42c1', 'facility Industrial → p
 ok(HS.resolveMarker({ type: 'Commercial Industrial Mixed-Use' }).shape === 'hexagon', 'Commercial Industrial Mixed-Use → hexagon (mixed-use)');
 ok(HS.resolveMarker({ type: 'Mixed-Use Residential' }).shape === 'pentagon', 'Mixed-Use Residential → pentagon');
 ok(HS.resolveMarker({ type: 'Water Treatment Plant' }).shape === 'diamond', 'Water Treatment Plant → diamond (not plant/industrial)');
-ok(HS.resolveMarker({ type: 'School' }).shape === 'circle', 'School → circle');
+// School is CIVIC (the registry made civic first-class with its own cross precisely
+// because schools were being drawn as an Other-project dot). The KEYWORD rule used to
+// emit a circle while declaring typeKey 'civic'; it now agrees with the registry.
+ok(HS.resolveMarker({ type: 'School' }).shape === 'cross', 'School → cross (Civic & public)');
 
 // Generic source types are non-terminal — name/title keywords classify when type_map is coarse.
-ok(HS.resolveMarker({ type: 'Development' }).shape === 'circle', 'bare Development → circle');
+ok(HS.resolveMarker({ type: 'Development' }).shape === HS.CATEGORY_REGISTRY.other.symbol, 'bare Development → the Other-project symbol');
 ok(HS.resolveMarker({ type: 'Development', name: 'Warehouse distribution center' }).shape === 'triangle',
    'Development + warehouse name → triangle via KEYWORD');
 ok(HS.resolveMarker({ type: 'unclassified', title: 'Mixed-Use Residential tower' }).shape === 'pentagon',

@@ -73,10 +73,10 @@ for (const [label, , name] of TYPES) {
   const z = HS.resolveMarker(zipSite(TERMINAL, name));
   const r = HS.resolveMarker(reportSite(TERMINAL, name));
   check(`${label}: terminal-neutral stays Other project (ZIP path)`,
-    z.typeKey === 'other' && z.shape === 'circle' && z.legendLabel === 'Other project',
+    z.typeKey === 'other' && z.shape === REG.other.symbol && z.legendLabel === 'Other project',
     `${z.typeKey}/${z.shape}`);
   check(`${label}: terminal-neutral stays Other project (report path)`,
-    r.typeKey === 'other' && r.shape === 'circle', `${r.typeKey}/${r.shape}`);
+    r.typeKey === 'other' && r.shape === REG.other.symbol, `${r.typeKey}/${r.shape}`);
 }
 
 console.log('\n-- 4. it beats statedDataCenter(), which runs before the TYPE_EXACT loop --');

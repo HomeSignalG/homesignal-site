@@ -88,7 +88,7 @@ const tabs = dev.filter(r => r.source_registry_id === null);
 // ── 3. SEMANTIC REGISTRY — closed, symbol-unique, aligned ─────────────────────────────
 {
   const REQUIRED = { datacenter: 'octagon', industrial: 'triangle', residential: 'pentagon',
-    infrastructure: 'diamond', commercial: 'hexagon', civic: 'cross', other: 'circle', facility: 'square' };
+    infrastructure: 'diamond', commercial: 'hexagon', civic: 'cross', other: 'capsule', facility: 'square' };
   const reg = golden.semantic_registry;
   eq(Object.keys(reg).sort().join(','), Object.keys(REQUIRED).sort().join(','),
      '3: the category registry is exactly the closed accepted set');

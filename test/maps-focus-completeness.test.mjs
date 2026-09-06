@@ -95,11 +95,11 @@ eq(HS.resolveMarker({ type: 'Industrial' }).shape, 'triangle', 'Industrial → t
 eq(HS.resolveMarker({ type: 'Residential' }).shape, 'pentagon', 'Residential → pentagon');
 eq(HS.resolveMarker({ type: 'Roads & infrastructure' }).shape, 'diamond', 'Roads & infrastructure → diamond');
 eq(HS.resolveMarker({ type: 'Commercial' }).shape, 'hexagon', 'Commercial → hexagon');
-eq(HS.resolveMarker({ type: 'Development' }).shape, 'circle', 'generic Development → circle (Other project)');
+eq(HS.resolveMarker({ type: 'Development' }).shape, HS.CATEGORY_REGISTRY.other.symbol, 'generic Development → the Other-project symbol');
 // missing / unknown fields → honest neutral fallback, NOT purple.
 const blank = HS.resolveMarker({});
-ok(blank.shape === 'circle' && blank.color === HS.markerRegistry.neutralHex && blank.color !== FAC,
-   'missing fields → neutral circle, never purple');
+ok(blank.shape === HS.CATEGORY_REGISTRY.other.symbol && blank.color === HS.markerRegistry.neutralHex && blank.color !== FAC,
+   'missing fields → the neutral Other-project symbol, never purple');
 const unknown = HS.resolveMarker({ type: 'flabbergast', status: 'quux' });
 ok(unknown.color === HS.markerRegistry.neutralHex && unknown.color !== FAC, 'unknown status → neutral "On file", not purple');
 
