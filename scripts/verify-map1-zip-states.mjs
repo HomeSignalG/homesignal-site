@@ -59,7 +59,21 @@ for (const c of CASES) {
       // CTA — the guard would then pass on a page whose CTA had been deleted. [^.\n]{0,24} keeps
       // the match inside one sentence and one text node, so a stray 'Enter…' elsewhere on the
       // page cannot reach across to an unrelated 'address'.
-      addressCta:  /\b(enter|type|search)\b[^.\n]{0,24}\baddress\b/i.test(txt),
+      //
+      // THE VERB SET IS THE THIRD COPY EDIT TO REACH THIS LINE, and the reason is always the
+      // same: the guarantee is 'the page directs the resident to the address control', while the
+      // regex can only enumerate ways of saying it. #1088 replaced a literal-phrase list with
+      // verb+noun for exactly this reason; 'choose'/'select'/'pick' are the same imperative in
+      // the same guarantee and belong in the same set. The hero's helper text now reads 'Choose
+      // an address from the suggestions, press Enter, or click search.', which directs the
+      // resident to address mode as plainly as 'Enter an address' did.
+      //
+      // NOT A LOOSENING — every negative #1088 proved stays negative, because none of them
+      // contains ANY of these verbs: the ZIP clarifier, the static Box Elder hint, and a note
+      // whose CTA sentence has been deleted all still fail. Proven in both directions offline by
+      // test/address-cta-guard.test.mjs, which also pins this pattern IDENTICAL to the copy in
+      // user-journey 14c — #1088 asked for that and nothing enforced it.
+      addressCta:  /\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(txt),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
