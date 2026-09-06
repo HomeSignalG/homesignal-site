@@ -40,6 +40,63 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — DATA CENTER SIGNIFICANCE, FINAL: say the activity, not a magnitude
+
+Second and last significance unit, implementing exactly what an adversarial competitor-CTO
+audit of `96eade0` justified. **That audit found NO correctness defect** — 0 false Major,
+0 false Ancillary, no geography/classifier/dual-identity regression — and two resident-facing
+weaknesses plus one latent risk. All four fixes are here; nothing else was taken.
+
+| audit finding | change |
+|---|---|
+| `Ancillary work` asserts a MAGNITUDE no evidence establishes | label **gone**; the resident reads the activity the authority named |
+| 16 records / 79 rows of existing-building evidence sat in the unknown bucket | new state **Work on existing data center** |
+| `\bshell\b` could read `SHELL TI` as major nationally | TI added to the major veto (**preventive**; 0 such records today) |
+| `Significance not stated` reads as HomeSignal's finding | → **Scope not stated by source** |
+
+**BEFORE → AFTER, exact, control 107 records / 479 rows both sides:**
+Major **5/9 → 5/9 (unchanged)** · Ancillary 15/46 → the activity itself, same 15/46 ·
+**Work on existing data center 0 → 16 records / 79 rows** · Unknown 87/424 → **71/345**.
+`87−16=71`, `424−79=345`. **Nothing was reclassified to reach a number**; unknown falls
+81% → 66% purely by no longer discarding evidence already held.
+
+🔑 **EXPLICIT PRECEDENCE, a decision rather than regex order:** supporting activity →
+existing-building → major (still vetoed by its class) → source-silence. Ordering
+existing BEFORE major is what makes `SHELL TI` unreachable by the major test and what
+lifts the two `ADDITIONS/ALTERATIONS/REPAIRS Construct data center…` records out of
+silence. Ordering supporting FIRST is why `IRON MOUNTAIN SC-31 DATA HALL TI` reads
+`Fire-alarm permit` rather than the vaguer existing state. **Verified against all 5
+production Major records: none matches the two earlier phases, so the ordering cannot
+steal a major verdict.**
+
+⚠️ **THE MAGNITUDE PROHIBITION IS ASSERTED, NOT ASSUMED.** A stationary-battery or
+fire-pump installation can be substantial. No label — state or activity — may contain
+minor/small/insignificant/unimportant/low/trivial/negligible/slight, tested across every
+label the system can emit. "Supporting" describes RELATION, never size.
+
+- **Resident-facing:** `Sign permit` · `Fire-alarm permit` · `Fire-pump permit` ·
+  `Battery-system permit` · `Access-control permit` · `Fire-prevention service request` ·
+  `Roof replacement` · `Cooling-tower work` · `Work on existing data center` ·
+  `Major development` · `Scope not stated by source`.
+- **Frozen and proven frozen:** identity classifier (no vocabulary touched; `permit_class`
+  still emits no `type_raw` key, and the two type_raw-only records still do not become data
+  centres) · dual identity · filters · geography · every other Map 1 type.
+- Suites: significance **84** · significance browser **16** · dual-identity · user-journey ·
+  hydration all 0 failed · **full offline 148 files, 0 failed**. Mutation-proved: removing
+  the existing state reddens 9, the TI veto 5, collapsing the specific labels 12.
+- ⚠️ **Two new tests failed first and both were the TEST's fault** — the old veto proof no
+  longer isolated the veto (the record's own name says "renovations", so it now reaches the
+  existing state on the name alone), and a truncation fixture was 118 chars, not the real 120.
+- 📌 **LOGGED, NOT FIXED — lifecycle wording.** 8 supporting records still render
+  `… · Proposed / hearing` for ordinary OPEN permits. That comes from the pre-existing
+  `STAGE_WORD` map, not from this unit; naming the permit improves it but does not fix it.
+- 📌 **Deliberately out of scope:** entitlement/planning (15 records / 32 rows) ·
+  square-footage extraction (4 records / 6 rows) · Expansion (still 2 of 5 genuine) ·
+  entity resolution · national coverage · Epoch.
+- ⚠️ **Postgres has no `\b` word boundary — it is `\y`.** The SQL mirror uses `\y`; the
+  shipped JS uses `\b`. Mixing them silently under-matched and first reported 3 Major, not 5.
+- Receipt: `docs/maps-datacenter-significance-final-2026-09-06.md`.
+
 ### 2026-09-06 — DATA CENTER SIGNIFICANCE: what KIND of activity, not just what it relates to
 
 `Data center` was the whole answer for a **285,282 SF ground-up data hall** AND for a
