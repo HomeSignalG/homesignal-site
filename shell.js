@@ -1502,6 +1502,37 @@
     document.addEventListener('click', e => { if (!box.contains(e.target) && e.target !== input) box.classList.add('hidden'); });
   }
 
+  // The header's universal search lives behind a compact "Search" button (it used to be a
+  // wide field in the primary header flow, which competed with the Maps page's own address
+  // control). This ONLY shows and hides the existing input — wireSearch() above still owns
+  // the index, the query and the results, so there is exactly one search implementation.
+  function searchOpen() {
+    const panel = $('hs-search-panel');
+    return !!panel && !panel.classList.contains('hidden');
+  }
+  HS.closeSearch = function () {
+    const panel = $('hs-search-panel'), btn = $('hs-search-btn'), box = $('hs-search-results');
+    if (!panel) return;
+    panel.classList.add('hidden');
+    if (box) box.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  };
+  HS.openSearch = function () {
+    const panel = $('hs-search-panel'), btn = $('hs-search-btn'), input = $('hs-search');
+    if (!panel) return;
+    panel.classList.remove('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    if (input) { try { input.focus(); input.select(); } catch (e) {} }
+  };
+  HS.toggleSearch = function () { searchOpen() ? HS.closeSearch() : HS.openSearch(); };
+  function wireSearchToggle() {
+    const wrap = $('hs-searchwrap'); if (!wrap) return;
+    // Close on a click anywhere outside the button + panel. The opening click is inside
+    // the wrap, so it can never close the panel it just opened.
+    document.addEventListener('click', e => { if (searchOpen() && !wrap.contains(e.target)) HS.closeSearch(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && searchOpen()) { HS.closeSearch(); const b = $('hs-search-btn'); if (b) b.focus(); } });
+  }
+
   // -------------------------------------------------- bell badge --------------
   async function paintBell() {
     const badge = $('hs-bell-badge'); if (!badge) return;
@@ -1605,6 +1636,7 @@
     HS.paintWhereLine();   // shared header context line (async, never blocks boot)
     buildShare();
     wireSearch();
+    wireSearchToggle();
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
