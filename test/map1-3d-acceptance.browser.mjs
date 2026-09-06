@@ -10,13 +10,17 @@
 // obtain Chromium, so Gecko and WebKit rows must be run where those binaries exist):
 //   BROWSER=chromium node test/map1-3d-acceptance.browser.mjs
 //   BROWSER=firefox  node test/map1-3d-acceptance.browser.mjs
-//   BROWSER=webkit   node test/map1-3d-acceptance.browser.mjs          # Safari engine
-//   BROWSER=webkit  DEVICE=mobile node test/map1-3d-acceptance.browser.mjs   # mobile Safari
-//   BROWSER=chromium DEVICE=mobile node test/map1-3d-acceptance.browser.mjs  # mobile Chrome
+//   BROWSER=webkit   node test/map1-3d-acceptance.browser.mjs
+//   BROWSER=webkit   DEVICE=mobile node test/map1-3d-acceptance.browser.mjs
+//   BROWSER=chromium DEVICE=mobile node test/map1-3d-acceptance.browser.mjs
 //
-// Brave runs the Chromium engine, so the chromium rows cover its rendering. What Brave (or
-// any browser) can change is whether a WebGL context is granted — which is exactly what the
-// `webgl-blocked` scenario simulates, deterministically, on every engine.
+// Engines are addressed by ENGINE name only (the Playwright launcher API). Which shipping
+// browser each engine stands in for is recorded in the acceptance checklist, not here — the
+// harness tests rendering engines and makes no claim about any vendor.
+//
+// The one thing a browser can vary that matters here is whether a WebGL context is granted.
+// That is exactly what the `webgl blocked` scenario simulates, deterministically, on every
+// engine — so the fallback path is proven identically everywhere rather than inferred.
 //
 // Network is stubbed by default so the matrix is deterministic and touches no production
 // service. LIVE=1 uses the real CDNs and tile hosts instead, for a final on-network pass.
@@ -150,7 +154,7 @@ async function scenario(name, opts) {
         leafletTiles: document.querySelectorAll('#map img.leaflet-tile').length,
         leafletPane: !!document.querySelector('#map .leaflet-container'),
         glCanvas: !!document.querySelector('#mapgl canvas'),
-        glChrome: document.querySelectorAll('#mapgl .maplibregl-ctrl').length,
+        glControls: document.querySelectorAll('#mapgl .maplibregl-ctrl').length,
         threeCanvas: !!document.querySelector('#map3d canvas'),
         panel,
       };
@@ -159,7 +163,7 @@ async function scenario(name, opts) {
     const label = `[${ENGINE}${MOBILE ? '/mobile' : ''}] ${name} · ${viewName}`;
 
     // OUTCOME A — the 3D view loaded.
-    const loadedA = st.active === v && (v === 'gl' ? (st.glCanvas && st.glChrome > 0) : st.threeCanvas);
+    const loadedA = st.active === v && (v === 'gl' ? (st.glCanvas && st.glControls > 0) : st.threeCanvas);
     // OUTCOME B — returned to a FUNCTIONING 2D map, with the approved neutral notice.
     const loadedB = st.active === '2d' && st.map2dShown && st.leafletPane
                     && st.notice === APPROVED && st.noticeIsStrip;

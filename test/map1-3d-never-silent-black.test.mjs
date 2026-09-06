@@ -64,9 +64,10 @@ ok(HS.webglSupported(null) === false, '§1 no document reports unsupported, neve
 // ── §2 the failure copy is BROWSER-NEUTRAL and never asks anyone to weaken a setting ────
 // Founder ruling, 2026-09-06. HomeSignal must work across supported browsers and must never
 // instruct a resident to change a privacy control, a shield, or a security setting to see a
-// map. An earlier draft named a specific browser's fingerprinting setting and told the
-// resident to turn it down. This section exists so that copy cannot come back — it is the
-// half of this file that guards a PRODUCT rule rather than a defect.
+// map. An earlier draft named a browser and a privacy control and told the resident to turn
+// it down. This section exists so that copy cannot come back — it is the half of this file
+// that guards a PRODUCT rule rather than a defect. The vendor names below appear ONLY as
+// prohibition patterns: a guard cannot detect a word it is not allowed to spell.
 const EXPECTED =
   '3D view isn\u2019t available on this device or browser right now. ' +
   'You\u2019ve been returned to the 2D map.';
