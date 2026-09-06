@@ -47,7 +47,33 @@ async function all(path, select) {
 }
 
 const communities = await all('communities?id=not.is.null', 'id,parent_id,level,zip_codes');
-const delivered = await all('alerts?pipeline_type=eq.government_notice', 'community_id');
+
+// SOURCE CURRENTNESS (founder ruling 2026-09-06). A community only anchors coverage when
+// it has a CURRENT source: at least one qualifying dated government notice no more than
+// 90 days in the PAST. Applied here so the committed artifact cannot claim coverage that
+// is held up only by stale content — the guarantee is structural, not coincidental.
+//
+//   * `gte` and no upper bound (beyond the +730 the ingest guard already enforces before
+//     a row is ever stored): on this corpus the normalized GN date is often the MEETING
+//     date, not the posting date. A strictly-past window marks live agenda-publishing
+//     counties stale. Control measured 2026-09-06: Dorchester SC's live feed returned 103
+//     items whose newest POSTING date was two days old while its stored notice dates are
+//     2026-09-08 and 2026-03-17.
+//   * This is NOT the record-display window. Records 91–365 days old stay displayable on
+//     a current source; nothing here filters what a page shows.
+//   * The engine-side measurement (homesignal-ingest scripts/measure_gov_notices.sql)
+//     additionally requires an ACTIVE government_notice/alerts feed. This generator
+//     cannot: public.feeds has RLS with zero policies, so the anon key sees none of it.
+//     Both give the same membership today; the engine measurement is the stricter of the
+//     two and is the one to trust if they ever diverge.
+const SOURCE_CURRENT_DAYS = 90;
+const currentFloor = new Date(Date.now() - SOURCE_CURRENT_DAYS * 86400000)
+  .toISOString()
+  .slice(0, 10);
+const delivered = await all(
+  `alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}`,
+  'community_id',
+);
 
 const kids = new Map();
 for (const c of communities) if (c.parent_id) (kids.get(c.parent_id) || kids.set(c.parent_id, []).get(c.parent_id)).push(c.id);
