@@ -73,6 +73,23 @@ function haversineMi(aLat, aLng, bLat, bLng) {
 
 // The contract radii. Default preserves the original two-radius flow exactly, so an existing
 // dispatch behaves as it always did; a dispatch that names all four walks all four.
+// SCREENSHOTS of the three states the launch standard asks a resident to tell apart. Written
+// beside the JSON evidence so one artifact carries both the numbers and what the numbers looked
+// like. The header card is captured rather than the whole page: it is where both mode claims and
+// the exit control live, and a full-page shot of a map is mostly map.
+async function shot(page, name) {
+  try {
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync('artifacts/address-mode', { recursive: true });
+    const f = 'artifacts/address-mode/' + (process.env.RUN_ID || 'local') + '-' + name + '.png';
+    const card = page.locator('.card.read').first();
+    if (await card.count()) await card.screenshot({ path: f });
+    else await page.screenshot({ path: f });
+    console.log('   \u00b7 screenshot: ' + f);
+    (EVIDENCE.screenshots = EVIDENCE.screenshots || []).push(f);
+  } catch (e) { console.log('   \u00b7 screenshot failed (' + name + '): ' + e); }
+}
+
 const RADII = String(process.env.RADII || '').trim()
   ? String(process.env.RADII).split(',').map(x => Number(x.trim())).filter(x => x > 0)
   : [R1, R2];
@@ -411,10 +428,69 @@ ok(!calls.some(c => c.kind === 'rpc'), '8 — ZIP mode makes NO N5 radius call',
 ok(!s.some(x => x.n5_feature_id), '8 — no address-radius result survives into ZIP mode',
   s.filter(x => x.n5_feature_id).map(x => x.label));
 const cap = await page.textContent('#withinLbl');
-ok(/Across ZIP/.test(cap || ''), '8 — ZIP mode presents the ENTIRE ZIP geography: ' + cap);
+// The coverage claim is now stated in the resident's words, not implied by a preposition.
+ok(cap === 'All development across ZIP ' + ZIP,
+  '8 — ZIP mode names the ENTIRE ZIP as its coverage: "All development across ZIP ' + ZIP + '"', cap);
 ok((await page.locator('.homepin').count()) === 0, '8 — no HOME pin is shown for a ZIP centroid');
+ok(await page.locator('#zipBackBtn').isHidden(),
+  '8 — the back-to-ZIP control is HIDDEN in ZIP mode (there is nothing to go back from)');
 info('ZIP sites rendered', s.length);
 ok(s.length >= 0, '8 — the ZIP page renders');
+const zipSitesBefore = s.length;
+await shot(page, '1-zip-mode');
+
+// ═══════════ 8b. THE ADDRESS-MODE EXIT CONTROL ═══════════
+// Address mode is the only mode a resident can enter and not leave: ZIP mode is reachable from
+// a URL, address mode only from the search box. This proves the way out exists, is offered ONLY
+// in address mode, and lands on the same whole-ZIP view with every trace of the address gone.
+calls.length = 0; rpcResponses.length = 0;
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => {
+  const el = document.getElementById('withinLbl');
+  return !!el && /Showing development within/.test(el.textContent || '');
+}, null, { timeout: 90000 });
+const addrCap = await page.textContent('#withinLbl');
+const addrWho = await page.textContent('#rAddr');
+info('address-mode headline', addrCap);
+info('address-mode subject', addrWho);
+ok(/^Showing development within .+ of$/.test(addrCap || ''),
+  '8b — address mode names WHAT is bounded by the radius: "' + addrCap + '"', addrCap);
+ok(!!(addrWho || '').trim() && addrWho !== '—',
+  '8b — ...and the address it is centred on is named beneath it', addrWho);
+const backVisible = await page.locator('#zipBackBtn').isVisible();
+const backText = (await page.textContent('#zipBackBtn') || '').replace(/\s+/g, ' ').trim();
+ok(backVisible, '8b — the back-to-ZIP control is VISIBLE in address mode');
+ok(backText.indexOf('Back to all development in ZIP ' + ZIP) !== -1,
+  '8b — ...and names the ZIP it returns to', backText);
+ok((await page.locator('.homepin').count()) === 1, '8b — address mode has its HOME pin');
+ok(await page.locator('#radSel').isVisible(), '8b — address mode has its radius control');
+await shot(page, '2-address-mode');
+
+calls.length = 0; rpcResponses.length = 0;
+await page.click('#zipBackBtn');
+await page.waitForFunction(() => {
+  const el = document.getElementById('withinLbl');
+  return !!el && /^All development across ZIP/.test(el.textContent || '');
+}, null, { timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
+await page.waitForTimeout(3000);
+const sBack = await sites();
+ok(new URL(page.url()).searchParams.get('zip') === ZIP,
+  '8b — Back lands on the existing ?zip= entry path, carrying the SAME ZIP', page.url());
+ok((await page.textContent('#withinLbl')) === 'All development across ZIP ' + ZIP,
+  '8b — ...restoring the whole-ZIP view');
+ok((await page.locator('.homepin').count()) === 0, '8b — ...with the HOME pin gone');
+ok(await page.locator('#radSel').isHidden(), '8b — ...the radius control gone');
+ok(!sBack.some(x => x.n5_feature_id), '8b — ...and every address-radius result gone',
+  sBack.filter(x => x.n5_feature_id).map(x => x.label).slice(0, 5));
+ok(!calls.some(c => c.kind === 'rpc'), '8b — Back issues NO radius query', calls.map(c => c.kind));
+ok(await page.locator('#zipBackBtn').isHidden(), '8b — ...and the control hides itself again');
+info('ZIP sites after Back', sBack.length + ' (before the address search: ' + zipSitesBefore + ')');
+ok(sBack.length === zipSitesBefore,
+  '8b — the ZIP view is the SAME view, not a smaller one',
+  { before: zipSitesBefore, after: sBack.length });
+await shot(page, '3-zip-mode-after-back');
 
 // ═══════════ 10. MAP 2 RETIREMENT — one map, and no dead end ═══════════
 // The retired page must not be a second map experience, must not be a 404, and must not

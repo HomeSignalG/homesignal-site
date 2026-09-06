@@ -130,6 +130,15 @@
   .read{padding:18px}
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
   .addr{font-weight:600;font-size:16px;margin-bottom:4px}
+  /* ADDRESS-MODE EXIT. Address mode is the only mode a resident can enter and not leave:
+     ZIP mode is reachable from a URL, address mode only from the search box. Without this the
+     way back is editing the address bar. Hidden in ZIP mode - see render(). */
+  .zipback{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:6px 11px;
+    font:inherit;font-size:12.5px;font-weight:600;color:var(--soft);cursor:pointer;
+    background:#f6f9f7;border:1px solid var(--line);border-radius:999px}
+  .zipback[hidden]{display:none}
+  .zipback:hover{color:var(--ink);border-color:var(--mute)}
+  .zipback:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   .freshline{font-size:11.5px;color:var(--mute);margin-bottom:12px;min-height:14px}
   .freshline:empty{margin-bottom:0;min-height:0}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
@@ -375,6 +384,7 @@
           </div>
         </div>
         <div class="card read">
+          <button type="button" class="zipback" id="zipBackBtn" hidden>&#8592; <span id="zipBackLbl">Back to all development in this ZIP</span></button>
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
@@ -1044,6 +1054,17 @@ HS.onReady(function(){
   }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
 
+  // BACK TO THE WHOLE ZIP. Deliberately a navigation to the page's own existing ?zip= entry
+  // path rather than an in-place teardown: a full load is what guarantees the address, the HOME
+  // pin, the radius selection and every address-radius result are gone, because the page boots
+  // into ZIP mode exactly as it does from any other ZIP link. No new query, no new data path,
+  // no new URL contract - the same URL an Alerts or Development link already produces.
+  var _zipBack = document.getElementById("zipBackBtn");
+  if(_zipBack){ _zipBack.addEventListener("click", function(){
+    if(!ZIP_CODE) return;
+    location.href = "homesignalmap.html?zip=" + encodeURIComponent(ZIP_CODE);
+  }); }
+
   $("form").addEventListener("submit", function(e){
     e.preventDefault();
     var address = $("addr").value.trim();
@@ -1381,7 +1402,10 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
+      // "Across ZIP 78617" above a map of pins reads as SOME projects around here. The claim
+      // this mode actually makes is coverage of the entire ZIP, so it says so.
+      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      if($("zipBackBtn")) $("zipBackBtn").hidden = true;
       $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
@@ -1391,7 +1415,16 @@ HS.onReady(function(){
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // "Within 2 miles of" never says WHAT is within 2 miles. The radius bounds Development;
+      // facilities are a separate nearby layer, and the combined total tile makes the ambiguity
+      // easy to resolve the wrong way.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
+      // Offered only when there is a ZIP to go back TO - a bare address search (no ?zip=) has
+      // no ZIP view to restore, and a button that guesses one would invent a geography.
+      if($("zipBackBtn")){
+        $("zipBackBtn").hidden = !ZIP_CODE;
+        if(ZIP_CODE && $("zipBackLbl")) $("zipBackLbl").textContent = "Back to all development in ZIP " + ZIP_CODE;
+      }
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
