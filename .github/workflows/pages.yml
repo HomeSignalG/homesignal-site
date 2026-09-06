@@ -17,35 +17,12 @@ name: pages
 on:
   workflow_dispatch:
   push:
-    # THE TRIGGER MUST MATCH WHAT SHIPS. "Stage the static site" below rsyncs the WHOLE
-    # repo minus .git/.github/_site/test/docs/node_modules, so 344 tracked files reach
-    # production — while this filter named 5. Measured 2026-09-06: 339 of 344 shipped
-    # files could change, merge to main, and never deploy. The site kept serving the
-    # previous artifact and nothing reported a problem, because a deploy that never runs
-    # looks exactly like a deploy with nothing to do.
-    #
-    # That is not hypothetical: #1064's Map 1 symbol fix merged to main and did not reach
-    # a single resident, because `lib/map.js` and `homesignalmap.html` were both outside
-    # this list. The same held for index.html, alerts.html, app.css, sitemap.xml and the
-    # entire lib/ runtime.
-    #
-    # Written as "everything, minus the trees the artifact excludes" rather than as a list
-    # of files, because THE LIST IS WHAT DRIFTED: every file added since this workflow was
-    # written silently defaulted to never-deploy. The three negations mirror the rsync
-    # --exclude flags in "Stage the static site", so the trigger and the artifact cannot
-    # disagree as the repo grows. Patterns are evaluated in order and the last match wins,
-    # so the four re-included paths below survive their tree's exclusion.
-    #
-    # Strictly ADDITIVE: every path the old list matched still triggers (proven by
-    # test/pages-trigger-covers-artifact.test.mjs, which also fails if the artifact starts
-    # shipping a tree the trigger does not watch).
     paths:
-      - '**'
-      - '!docs/**'
-      - '!test/**'
-      - '!.github/**'
-      # The gate inputs the build itself runs, re-included after the test/ exclusion, and
-      # this workflow re-included after the .github/ one so a change here proves itself.
+      - 'scripts/gen_zip_pages.py'
+      - 'scripts/prove-zip-pages.mjs'
+      - 'lib/community-page.js'
+      - 'community.html'
+      - '404.html'
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
