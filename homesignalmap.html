@@ -50,22 +50,46 @@
 
   /* The address field carries a VISIBLE label, not just a placeholder: a placeholder disappears
      the moment the resident types, so it cannot name the field while it is being filled in. The
-     label sits above the row rather than inside it, because form.search is a flex row and a
-     label flex-item would land beside the input instead of over it. */
+     label sits above the field rather than inside it: the placeholder is now an EXAMPLE
+     address, which is guidance, not the field's name. */
   .search-label{display:block;font-size:12.5px;font-weight:700;color:var(--ink);margin:18px 0 6px}
-  form.search{display:flex;gap:10px;margin:0 0 4px;flex-wrap:wrap}
-  .search input{flex:1;min-width:260px;font-family:var(--font);font-size:15px;padding:13px 15px;
-    border:1px solid var(--line);border-radius:11px;background:#fff}
+  /* The search control is ONE field: the submit button lives INSIDE the input as a
+     magnifying-glass icon pinned to the far right. The full-width green "See development
+     nearby" button that used to sit beside the field was removed — it read as the page's
+     primary action when the primary action is typing an address, and on a phone it wrapped
+     below and pushed the field narrow. Nothing about the SEARCH changed: the button kept
+     its id (#go) and type="submit", so the click still goes through the form's own submit
+     handler, Enter still submits, and the disabled-while-searching state still applies. */
+  form.search{position:relative;display:block;margin:0 0 4px;max-width:640px}
+  .search input{width:100%;box-sizing:border-box;font-family:var(--font);font-size:15px;
+    padding:13px 52px 13px 15px;border:1px solid var(--line);border-radius:11px;background:#fff}
   .search input:focus{outline:none;border-color:var(--green-bright);box-shadow:0 0 0 3px #16a34a22}
-  .search button{font-family:var(--font);font-weight:600;font-size:15px;color:#fff;background:var(--green);
-    border:0;border-radius:11px;padding:13px 20px;cursor:pointer}
-  .search button:hover{background:#174026}
-  .search button:disabled{opacity:.6;cursor:default}
-  .hint{font-size:12.5px;color:var(--mute);margin-top:2px}
+  .search input[aria-invalid="true"]{border-color:var(--violation)}
+  /* 44x44 is the TAP TARGET, not the artwork: the button is a transparent 44px square centred
+     on the field's right edge and only the ~19px glyph inside it is drawn, so the minimum
+     touch size is met without the field itself growing — the input's own height is unchanged
+     (13px padding + 15px text ≈ 46px), which is why a 44px control fits inside it. */
+  .search button{position:absolute;top:50%;right:3px;transform:translateY(-50%);
+    width:44px;height:44px;display:flex;align-items:center;justify-content:center;padding:0;
+    border:0;border-radius:9px;background:none;color:var(--green);cursor:pointer}
+  .search button svg{width:19px;height:19px;display:block}
+  .search button:hover{background:#16a34a14;color:#174026}
+  .search button:focus-visible{outline:2px solid var(--green-bright);outline-offset:-2px}
+  .search button:disabled{opacity:.45;cursor:default;background:none}
+  .hint{font-size:12.5px;color:var(--mute);margin-top:6px}
+  /* Inline validation covers the ONE thing this page can judge client-side: an empty box.
+     Anything typed is handed to the geocoder, which reports its own honest no-match — the
+     field takes free-form text, so no address SHAPE is demanded here (the same reason the
+     no-match copy suggests a city or ZIP rather than prescribing a triple). */
+  .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
   /* Quiet text link (e.g. "See a sample") — a link, never a second primary button. */
   .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
     color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
   .linklike:hover{color:#174026}
+  /* Secondary text links under the field, stacked so each reads as its own quiet option
+     rather than a button row. Both are links, never a second primary action. */
+  .herolinks{margin-top:6px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+  .herolinks .linklike{margin-top:0}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -368,13 +392,34 @@
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
       <label class="search-label" for="addr">Address</label>
-      <form class="search" id="form">
-        <input id="addr" type="text" autocomplete="street-address"
-          placeholder="Start typing an address" required/>
-        <button id="go" type="submit">See development nearby</button>
+      <form class="search" id="form" role="search">
+        <!-- No `required`: the browser's own validity bubble PREEMPTS the submit event, so with
+             it the page could never show its own inline message. Emptiness is checked in the
+             submit handler instead, which is also the only check this page can honestly make —
+             the geocoder decides what resolves. -->
+        <input id="addr" type="text" autocomplete="street-address" enterkeyhint="search"
+          aria-describedby="addrHint" placeholder="Enter a street address, e.g., 13313 Coomes Dr"/>
+        <!-- SAME id and SAME type="submit" as the green button this replaced, so clicking the
+             icon takes the identical path it always did — the form's submit handler — and every
+             existing #go reference (the disabled-while-searching state, the browser suites that
+             click '#go') keeps working against the control it always addressed. -->
+        <button id="go" type="submit" aria-label="Search nearby development"
+                title="Search nearby development">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.9-3.9"/>
+          </svg>
+        </button>
       </form>
-      <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
-      <button type="button" class="linklike" id="sampleBtn">See a sample</button>
+      <div class="hint" id="addrHint">Choose an address from the suggestions, press Enter, or click search.</div>
+      <div class="search-err" id="addrErr" role="alert" hidden></div>
+      <div class="herolinks">
+        <button type="button" class="linklike" id="sampleBtn">See a sample</button>
+        <!-- The ZIP-wide "all development" view is THIS page at ?zip=NNNNN. The link is written
+             only when a ZIP is actually known (see setZipBrowseLink) — it never guesses one and
+             never prints a placeholder ZIP. -->
+        <a class="linklike" id="zipAllLink" hidden></a>
+      </div>
     </div>
 
     <div class="status" id="status"></div>
@@ -1133,12 +1178,60 @@ HS.onReady(function(){
   }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
 
+  // ---- address-field validation -------------------------------------------------------
+  // EMPTY is the only thing this page can judge client-side, and that is deliberate: the field
+  // takes FREE-FORM text and the geocoder decides what resolves, reporting its own honest
+  // no-match ("We couldn't find that address …"). Inventing a client-side address SHAPE test
+  // here would reject addresses the geocoder accepts — the same reason the field's copy asks
+  // for an address rather than demanding a street/city/state/ZIP triple.
+  function clearAddrError(){
+    var e = $("addrErr"); if(e){ e.hidden = true; e.textContent = ""; }
+    var a = $("addr"); if(a) a.removeAttribute("aria-invalid");
+  }
+  function showAddrError(){
+    var e = $("addrErr");
+    if(e){ e.textContent = "Enter or select a valid address to search nearby development."; e.hidden = false; }
+    var a = $("addr"); if(a){ a.setAttribute("aria-invalid","true"); try{ a.focus(); }catch(_e){} }
+  }
+
+  // ---- "Browse all development in ZIP NNNNN" --------------------------------------------
+  // The ZIP-wide / all-development view is this same page at ?zip=NNNNN, so the link points
+  // there and introduces no new view. It renders ONLY when a ZIP is genuinely known; with no
+  // ZIP it stays hidden rather than showing a guessed or placeholder one.
+  function knownZip(){
+    var u = new URL(window.location.href);
+    var z = u.searchParams.get("zip");
+    if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
+    if(!z && window.HS && HS.state && /^\d{5}$/.test(String(HS.state.zip))) z = String(HS.state.zip);
+    return /^\d{5}$/.test(String(z || "")) ? String(z) : "";
+  }
+  // Last resort in address mode: the ZIP the geocoder's OWN matched address ends with. Read
+  // from real returned text, never synthesised, and only used when no ZIP context exists.
+  function zipFromAddress(s){
+    var m = String(s || "").match(/\b(\d{5})(?:-\d{4})?\s*$/);
+    return m ? m[1] : "";
+  }
+  function setZipBrowseLink(zip){
+    var el = document.getElementById("zipAllLink"); if(!el) return;
+    if(!/^\d{5}$/.test(String(zip || ""))){ el.hidden = true; return; }
+    el.textContent = "Browse all development in ZIP " + zip + " \u2192";
+    el.setAttribute("href", "homesignalmap.html?zip=" + encodeURIComponent(zip));
+    el.hidden = false;
+  }
+
+  // ONE submit path for every way the search can start — the icon button (type="submit"),
+  // the Enter key, and "See a sample" (which calls requestSubmit). Exactly the path the old
+  // green button used; only the control's appearance changed.
   $("form").addEventListener("submit", function(e){
     e.preventDefault();
     var address = $("addr").value.trim();
-    if(!address) return;
+    if(!address){ showAddrError(); return; }   // never run an empty search
+    clearAddrError();
     run(address);
   });
+  // Typing is the resident correcting the thing the message complained about, so the message
+  // clears then rather than lingering under a field that now has content in it.
+  $("addr").addEventListener("input", clearAddrError);
 
   // "See a sample" — fill the box with a known address and submit via the normal search path.
   var _sampleBtn = document.getElementById("sampleBtn");
@@ -1255,6 +1348,11 @@ HS.onReady(function(){
       + "windows, plus nearby regulated facilities for context — every item linked to its "
       + "official public record."; }
     document.title = "Development around " + address + " — HomeSignal";
+    // Address mode is exactly where the way BACK to the whole-ZIP view earns its place, so the
+    // link is written from the ZIP context we already hold (falling back to the ZIP the typed
+    // address itself ends with). It is refreshed after the geocode below with the ZIP from the
+    // geocoder's own matched address.
+    setZipBrowseLink(knownZip() || zipFromAddress(address));
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1279,6 +1377,10 @@ HS.onReady(function(){
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
+      // The geocoder's own matched address is the most authoritative ZIP available here, so the
+      // browse link is re-derived from it once it exists. Still never synthesised: no match text
+      // with a trailing ZIP and no ZIP context leaves the link exactly as it was.
+      setZipBrowseLink(knownZip() || zipFromAddress(m.matchedAddress || address));
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -1430,16 +1532,26 @@ HS.onReady(function(){
     // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
     // seen any of them — the page below already labels each of those, so the hero just says why to read it.
     if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
-    var _hint = document.querySelector(".hint");
-    // The field takes FREE-FORM text and geocodes it on submit — there is no suggestion list to
-    // choose from (nothing listens for input; autocomplete="street-address" is the browser's own
-    // autofill, not ours). So the copy asks for an address, and deliberately does not demand a
-    // "full" one or a fixed "street, city, state, ZIP" shape the geocoder does not require.
-    if(_hint){ _hint.textContent = "Enter a street address to switch from ZIP-wide results to development nearby."; }
+    // The helper text is now the SAME sentence in both modes — it describes how to WORK the
+    // field (suggestions / Enter / the search icon), which does not change with the mode — so
+    // ZIP mode no longer overrides it and there is one string to keep true instead of two.
+    // The "suggestions" it names are the browser's own street-address autofill: this page has
+    // never had a suggestion list of its own (nothing listens for input), and the field still
+    // takes FREE-FORM text, so the copy deliberately does not demand a "full" address or a
+    // fixed "street, city, state, ZIP" shape the geocoder does not require.
+    //
+    // ⚠️ THIS DELIBERATELY SUPERSEDES #1086's OVERRIDE, which read "Enter a street address to
+    // switch from ZIP-wide results to development nearby." — do not restore it on the reading
+    // that it was lost to a bad conflict resolution. The founder specified this helper string
+    // verbatim, and it answers a different question: #1086's sentence explained the SCOPE
+    // CHANGE, this one explains how to operate the control. The scope information did not go
+    // anywhere — the kicker, H1 and standfirst already swap to near-home wording on search
+    // (#1070/#1081), and the ZIP-wide scope is now NAMED under the field as the way back:
+    setZipBrowseLink(zip);
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
-    // No placeholder override here any more: "Start typing an address" reads correctly in BOTH
-    // modes, and a second copy of it would be one more string to keep in sync for no gain.
+    // No placeholder override here any more: the example-address placeholder reads correctly in
+    // BOTH modes, and a second copy of it would be one more string to keep in sync for no gain.
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
