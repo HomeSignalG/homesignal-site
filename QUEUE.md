@@ -11379,3 +11379,50 @@ TOTAL                    12,722     not_measured with enabled cutover          0
 
 The three `not_measured` ZIPs now answer identically; `ARRAY(0)` keeps a measured zero distinct
 from an unmeasured one; pending is distinct again; facilities survive on every row.
+
+---
+
+## 2026-09-06 — I BROKE `app_projects_for_zip` IN PRODUCTION FOR ~20 MINUTES. The cause is a testing vantage point, not a typo
+
+`projects_for_zip_geography_state_gate` made the function read `geo.maps_zip_geography_status`.
+The function was **SECURITY INVOKER**, so it runs as the CALLER, and `anon` has no USAGE on
+schema `geo`. Every development read through that RPC returned
+
+```
+{"code":"42501","message":"permission denied for schema geo"}
+```
+
+**for EVERY canonical ZIP — the 12,013 `boundary_complete` ones included**, not merely the 706
+the gate was about. On the page that degrades to `complete:false` → an empty array → the old
+"No permit or planning records on file" copy, so a healthy ZIP looked like an empty one. Live
+from roughly 16:35Z to 16:57Z.
+
+⚠️ **EVERY CHECK I RAN PASSED, AND EVERY ONE WAS TAKEN FROM A VANTAGE POINT THE PRODUCT DOES
+NOT HAVE.** `execute_sql` runs as the **service role**, which *can* read `geo`. The control
+matrix, the state reconciliation, the before/after on 10015 — all correct, all blind to this.
+**A permission change cannot be verified by a caller that holds more permission than the
+product's caller.** The browser probe was the only instrument running as `anon`, which is why
+it was the only one that saw it.
+- The same trap as the `geo.n5_zcta` empty-table zero earlier today, rotated: there the
+  instrument had no data, here the instrument had too much authority.
+
+**Fix:** `security definer`, matching the pattern already next door —
+`public.app_zip_projects_markers` reads the same `geo` table and has been
+`STABLE SECURITY DEFINER SET search_path TO 'public','geo','pg_temp'` all along. Granting `anon`
+USAGE on `geo` was the alternative and is wider and riskier. Body otherwise byte-identical to
+the gate migration; only the security context changed.
+
+**Re-verified AS `anon`, which is the check that was missing:**
+
+| ZIP | development (as anon) | facilities (as anon) |
+|---|---|---:|
+| 10015 | `UNAVAILABLE:not_measured` | 10 |
+| 78711 | `UNAVAILABLE:not_measured` | 35 |
+| 01004 | `UNAVAILABLE:not_measured` | 5 |
+| 01009 | **`ARRAY(0)`** — measured zero, still distinct | 26 |
+| 28456 | `ARRAY(12)` | 5 |
+| 94128 | `UNAVAILABLE:unknown` | 20 |
+
+**The standing rule this earns:** any change that makes a public RPC touch a new schema is a
+PERMISSION change as much as a logic change, and must be verified with `set local role anon`
+before it is called done.
