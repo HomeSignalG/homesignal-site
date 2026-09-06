@@ -46,7 +46,13 @@ for (const c of CASES) {
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
       couldNotRead: /could not be read/i.test(txt),
-      addressCta:  /street address/i.test(txt),
+      // Matched on the address-mode DIRECTION, not on the literal 'street address'. That phrase
+      // named a shape the geocoder never required and was removed from the ZIP-mode hint (#1079)
+      // and from the not-measured note; on a pending ZIP the hint was its last rendered source,
+      // so this assertion went red the moment #1079 deployed while the page still directed the
+      // resident to address mode perfectly well. The alternation spans both the old and new
+      // wording so it is not gated on a deploy, and it still fails if the CTA disappears.
+      addressCta:  /enter (an|your) (street )?address/i.test(txt),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };

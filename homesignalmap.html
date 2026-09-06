@@ -1248,8 +1248,11 @@ HS.onReady(function(){
       if(!m || typeof m.lat !== "number" || typeof m.lng !== "number"){
         // The geocoder's own honest no-match. Nothing is rendered, so the previous address's
         // records can never sit under an address the geocoder could not place.
+        // The recovery hint SUGGESTS, it does not prescribe a shape: the field takes free-form
+        // text and the geocoder requires no "street, city and ZIP" triple, so demanding one here
+        // contradicted the field's own copy at the exact moment the resident needed help.
         $("go").disabled = false;
-        status("We couldn't find that address. Check the street, city and ZIP and try again.", true);
+        status("We couldn't find that address. Try a different spelling, or add the city or ZIP.", true);
         return;
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
