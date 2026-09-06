@@ -89,34 +89,48 @@ async function headerChecks(page, label) {
   if (keys.includes('d6e6818c')) ok(`maps: served shell.js key = d6e6818c`);
   else bad(`maps: shell.js key not d6e6818c -> ${JSON.stringify(shellReqs)}`);
 
-  // The page's own address field must still exist and be usable.
+  // The page's own address field must still exist and be usable. The exact copy is NOT
+  // pinned here: #1090 rewrote this field after #1079, and #1097 changed no page copy —
+  // so the receipt records what production actually serves.
   const addr = await page.evaluate(() => {
     const i = document.getElementById('addr');
+    if (!i) return null;
     const b = document.getElementById('go');
-    const l = document.querySelector('label.search-label');
-    return i ? {
-      placeholder: i.placeholder, disabled: i.disabled,
+    const l = document.querySelector('label.search-label') || document.querySelector('label[for="addr"]');
+    return {
+      placeholder: i.placeholder, disabled: i.disabled, readOnly: i.readOnly,
+      visible: !!(i.offsetParent || i.getClientRects().length),
+      inForm: !!i.closest('form'),
       label: l ? l.textContent.trim() : null,
-      cta: b ? b.textContent.trim() : null
-    } : null;
+      cta: b ? (b.textContent || '').trim() : null,
+      ctaExists: !!b
+    };
   });
-  if (addr && addr.placeholder === 'Start typing an address' && !addr.disabled) ok(`maps: address field present and enabled (label "${addr.label}", CTA "${addr.cta}")`);
-  else bad(`maps: address field wrong or missing -> ${JSON.stringify(addr)}`);
+  if (addr && addr.visible && !addr.disabled && !addr.readOnly && addr.inForm && addr.ctaExists)
+    ok(`maps: address field present, visible, enabled, inside its form (label "${addr.label}", placeholder "${addr.placeholder}", CTA "${addr.cta}")`);
+  else bad(`maps: address field not usable -> ${JSON.stringify(addr)}`);
 
-  // Data center type filter still present and togglable.
-  const dc = await page.evaluate(() => {
-    const els = Array.from(document.querySelectorAll('button,[role=button],label'));
-    const el = els.find((e) => /data\s*cent(er|re)/i.test((e.textContent || '').trim()));
-    if (!el) return null;
-    const before = el.getAttribute('aria-pressed');
-    el.click();
-    const after = el.getAttribute('aria-pressed');
-    el.click();
-    return { text: (el.textContent || '').trim().slice(0, 40), before, after, restored: el.getAttribute('aria-pressed') };
+  // Data center TYPE filter. Its authoritative state is HS.getCategoryFilters().datacenter
+  // (setType -> HS.setCategoryFilter -> applyFilter); the chip carries no aria-pressed, so
+  // assert the state the map actually filters on, plus the rendered marker count.
+  const dc = await page.evaluate(async () => {
+    const chip = document.querySelector('[data-cat="datacenter"][role="button"]');
+    if (!chip) return { missing: true };
+    const filt = () => (window.HS && HS.getCategoryFilters ? !!HS.getCategoryFilters().datacenter : null);
+    const pins = () => document.querySelectorAll('.leaflet-marker-icon').length;
+    const before = { on: filt(), pins: pins() };
+    chip.click();
+    await new Promise((r) => setTimeout(r, 1200));
+    const after = { on: filt(), pins: pins() };
+    chip.click();
+    await new Promise((r) => setTimeout(r, 1200));
+    const restored = { on: filt(), pins: pins() };
+    return { missing: false, label: (chip.textContent || '').trim(), before, after, restored };
   });
-  if (dc && dc.before !== dc.after) ok(`maps: Data center type filter toggles (${dc.before} -> ${dc.after}, restored ${dc.restored})`);
-  else if (dc) bad(`maps: Data center chip found but aria-pressed did not change -> ${JSON.stringify(dc)}`);
-  else bad('maps: no Data center type control found');
+  if (dc.missing) bad('maps: no [data-cat="datacenter"] type chip found');
+  else if (dc.before.on !== dc.after.on && dc.restored.on === dc.before.on)
+    ok(`maps: Data center type filter toggles and restores (on ${dc.before.on}->${dc.after.on}->${dc.restored.on}; pins ${dc.before.pins}->${dc.after.pins}->${dc.restored.pins})`);
+  else bad(`maps: Data center filter state did not toggle -> ${JSON.stringify(dc)}`);
 
   const sites = await page.evaluate(() => (Array.isArray(window.__HS_SITES) ? window.__HS_SITES.length : null));
   notes.push(`      maps: window.__HS_SITES length = ${sites}`);
