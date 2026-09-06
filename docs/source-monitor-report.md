@@ -21837,3 +21837,1088 @@ A permanent tier, not a one-time sweep. Cleveland's `Building` sat in `include_t
 | fairfax-recent-building-permits | APPTYPEALIAS | in-window type read returned null (arcgis reader could not resolve a type domain) |
 
 - Whitelist/mapping invariant holds: every whitelisted value has a `type_map` line or a `use_type_const`.
+
+## Run 2026-09-05T11:08:08.635Z
+
+- Sources re-probed: **18** · discovery targets walked: **44** · candidates evaluated: **188**
+- Auto-wired: **none**
+- Flagged new shapes (connector work needed — never guessed): **138**
+- Dev-backed ZIP pages (exact): **unavailable**
+
+| target | result | evidence |
+|---|---|---|
+| denton-county-dev-permits | still-stale | newest DateReceiv = 2023-06-09 (> 400d old) |
+| mckinney-underconstruction | still-stale | newest IssueDate = 2023-09-26 (> 400d old) |
+| frisco-active-building-permits | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| frisco-active-zoning-sup-cases | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| allen-current-development-projects | flag | layer "Current Development Projects" is esriGeometryPolygon |
+| el-paso-new-commercial | flag | fresh (newest 2026-08-31); lexicon maps 5120/11358 rows; unmapped:   (4201); Revisions Required (2); Hold for Corrections (8); Out for Corrections (4); TCO Issued (67); Inspection (1956) |
+| el-paso-accela-building-permits | error | service error 404: Service OpenData_Accela/BuildingPermits/MapServer not found  |
+| dallas-building-permits-e7gq | still-stale | rowsUpdatedAt = 2020-08-30 (> 400d old) |
+| dallas-building-permits-6ik7 | still-stale | rowsUpdatedAt = 2018-02-09 (> 400d old) |
+| fort-worth-development-permits-gate-validation | already-wired | registry entry exists |
+| denton-city-portal | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html lang="en"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8" />
+      <meta name="generator" con |
+| plano-portal | no-candidates | 1 first-party dataset(s) for q=permit but none matched the permit/land-use pattern (or all duplicate/already wired) |
+| stpaul-approved-building-permits | still-stale | newest ISSUEDATE = 2025-06-30 (> 400d old) |
+| worcester-building-permits | already-wired | registry entry exists |
+| syracuse-permit-requests | flag | fresh (newest 2025-08-16) but no lexicon status column among: Permit_Number, Full_Address, Owner, Issue_Date, Permit_Type, Description_of_Work, LONG, LAT, ObjectId |
+| howard-county-permits | flag | updated 2025-12-04; columns: permit_number, category, type, file_date, permit_type, census_tract, issue_date, city, zip, sewer, water… |
+| houston-ckan | flag | CKAN catalog with 4 permit-pattern dataset(s): Combustible Storage Permits (Waste or Dumpster Permits) Sold from May 2012 th...; City of Houston Active Commercial Vehicle Loading Zone Permits; City of Houston Residential Building Permits by Month and Year; All Paid Vehicle Permits 05/01/2011 to 04/3 |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6582 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6582 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6556 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| el-paso-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| arlington-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| dallas-open-data → Building Permits for Fiscal Year 2011 - 2012 (azf5-sdcr) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2017 - 2018 (w2uy-zn9f) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2013 - 2014 (fs84-rv8z) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2015 - 2016 (rzm4-tcqx) | still-stale | rowsUpdatedAt = 2021-07-29 (> 400d old) |
+| dallas-open-data → ROW Permits - Points (bw6g-a3ur) | flag | updated 2026-08-10; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| dallas-open-data → ROW Permits - Lines (xd3q-ipis) | flag | updated 2026-08-10; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| dallas-open-data → Jill SRF 14 08 Permit W Location (4xqw-i3tz) | still-stale | rowsUpdatedAt = 2014-11-04 (> 400d old) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit | flag | layer "Custer West Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Craig Ranch Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Honey Creek Investment District Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Huntington Park Land Use Plan Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit | flag | layer "MTC Regulating Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit | flag | layer "Stonebridge Ranch Exhibit" is (none) |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 1 | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Origin 1 | error | max(created_date) query failed |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1 | flag | layer "Drive Time Areas 1" is esriGeometryPolygon |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 2 | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → Addresses911Permits_GC/911 Addresses | error | max(created_date) query failed |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → CityETJPermits_GC/City Labels | flag | layer "City Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/ETJ Labels | flag | layer "ETJ Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | flag | layer "City and ETJ" is esriGeometryPolygon |
+| denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017 | flag | layer "1 Foot Contours - 2017" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005 | flag | layer "2 Foot Contours - 2005" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000 | flag | layer "2 Foot Contours - LIDAR 2000" is esriGeometryPolyline |
+| jeffco-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| adams-co-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| adams-co-dcat → Subdivisions | flag | layer "Subdivisions" is esriGeometryPolygon |
+| adams-co-dcat → Advancing Adams Future Land Use 2022 | flag | layer "Advancing_Adams_FLU" is esriGeometryPolygon |
+| boulder-city-dcat → Future Land Use | flag | layer "Future Land Use" is esriGeometryPolygon |
+| boulder-city-dcat → Boulder Valley Planning Areas | flag | layer "Boulder Valley Planning Areas" is esriGeometryPolygon |
+| boulder-city-dcat → BVCP Future Land Use 2020 Retired | flag | layer "Future Land Use" is esriGeometryPolygon |
+| boulder-city-dcat → BVCP Planning Areas 2020 Retired | flag | layer "BVCP Areas" is esriGeometryPolygon |
+| boulder-city-dcat → Zoning Districts | flag | layer "Zoning Districts" is esriGeometryPolygon |
+| boulder-city-dcat → Development Review Cases | flag | layer "Development Review" is esriGeometryPolygon |
+| fort-collins-hub-dcat → Zoning | flag | layer "City Zoning" is esriGeometryPolygon |
+| fort-collins-hub-dcat → Current Development | flag | layer "Current Development" is esriGeometryPolygon |
+| denver-dcat → Existing Landuse 2020 | flag | layer "PLAN_EXISTINGLANDUSE2020_A" is esriGeometryPolygon |
+| denver-dcat → Existing Landuse 2018 | flag | layer "PLAN_EXISTINGLANDUSE2018_A" is esriGeometryPolygon |
+| denver-dcat → City and County of Denver Subdivision Lot Boundaries | flag | layer "ENG_SRVLOTS_A" is esriGeometryPolygon |
+| denver-dcat → South Platte River Glide Sites | flag | fields: OBJECTID, SITE, X_COORDINATE, Y_COORDINATE, STREAM_ID, HABITAT, GLOBALID… |
+| denver-dcat → Subdivisions | flag | layer "ENG_SRVSUBDIVISIONS_A" is esriGeometryPolygon |
+| denver-dcat → Tree Canopy Assessment 2013 - Land Use | flag | layer "PARK_TREECANOPY2013LU_A" is esriGeometryPolygon |
+| denver-dcat → Wastewater Plat Map Index | flag | layer "PWWMD_IDX_PLATINDEX_A" is esriGeometryPolygon |
+| denver-dcat → Street Occupancy Permits | flag | layer "DEV_STREETOCCUPANCYPPERMITS_L" is esriGeometryPolyline |
+| denver-dcat → Demolition Permits | flag | fresh (newest 2026-09-02) but no lexicon status column among: OBJECTID, DATE_ISSUED, PERMIT_NUM, ADDRESS, LOCATION, CLASS, UNITS, VALUATION, PERMIT_FEE, CONTRACTOR_NAME, FINAL_DATE, CANCEL, DATE_RECEIVED, BID_AUTHNAME, LOG_NUM |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Foreign Trade Zones | flag | layer "Foreign Trade Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Urban Renewal Areas | flag | layer "Urban Renewal Areas" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Qualified Opportunity Zones | flag | layer "Qualified Opportunity Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Commercial Aeronautical Zones | flag | layer "Commercial Aeronautical Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Enterprise Zones | flag | layer "Enterprise Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/CHIPS Zones | flag | layer "CHIPS Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Signs | not-a-layer | no fields[] — unrecognized shape |
+| springs-gis-root → GeneralUse/PlanningAdmin/Coordinated Sign Plans | flag | layer "Coordinated Sign Plans" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Electronic Message Centers | flag | layer "Electronic Message Centers" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Planning Areas | flag | layer "Planning Areas" is esriGeometryPolygon |
+| sandiego-city-dcat | unreachable | DCAT HTTP 404 <html>
+<head><title>404 Not Found</title></head>
+<body>
+<h1>404 Not Found</h1>
+<ul>
+<li>Code: NoSuchKey</li>
+<li>Message: The specified key does not exist.</li>
+<li>Key: data.json</li>
+<li>RequestId:  |
+| sandiego-county-arcgis | no-candidates | 62 services listed; none match the permit/land-use pattern |
+| sanjose-ckan | flag | CKAN catalog with 7 permit-pattern dataset(s): Active Building Permits; Expired Building Permits; Last 30 days Planning Permits; Last 30 days building permits; Residential Parking Permit (RPP) Zones |
+| santaclara-county-socrata → County of Santa Clara Permitted Body Art Facilities and Permitted Body Art Practitioners (mqx2-w62f) | flag | updated 2026-09-05; columns: facility_name, permit_type, site_address, city, zip, permitexpdate, facility_id, geo_address… |
+| santaclara-county-socrata → County of Santa Clara Active Body Art Facilities and Permitted Body Art Practitioners (jwgu-xsep) | still-stale | rowsUpdatedAt = 2018-11-27 (> 400d old) |
+| sunnyvale-arcgis-hub | unreachable | DCAT HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| oakland-socrata → Residential Parking Permit Zones (su5x-2u99) | still-stale | rowsUpdatedAt = 2019-09-03 (> 400d old) |
+| alameda-county-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| orange-county-arcgis | no-candidates | 69 services listed; none match the permit/land-use pattern |
+| anaheim-dcat → Workforce Development Board | flag | layer "Workforce_Development_Board_Public" is (none) |
+| anaheim-dcat → Planning Commission | flag | layer "Planning_Commission_Public" is (none) |
+| anaheim-dcat → Housing and Community Development Commission | flag | layer "Housing_and_Community_Development_Commission_Public" is (none) |
+| anaheim-dcat → Hotel Permits | flag | layer "Hotel_Permits_Monthly" is (none) |
+| anaheim-dcat → Fire Permits Accela | flag | layer "Fire_Permits__Accela_Test" is (none) |
+| anaheim-dcat → Utilities Electrical Permits Monthly | flag | layer "Utilities_Electrical_Permits_Monthly_Accela_Test" is (none) |
+| anaheim-dcat → Building Permits | flag | fresh (newest 2026-08-06) but no lexicon status column among: OBJECTID, casenumber, casestatus, address, description, applicationreceived, permitissued, permitfinalized, parcel, censuscode, comres, jobvaluation, ownerbuilder, plancheck, typeofwork |
+| anaheim-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| anaheim-dcat → General Plan Land Use | flag | layer "General Plan Land Use" is esriGeometryPolygon |
+| contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning | flag | layer "PLA_DCD_Zoning" is esriGeometryPolygon |
+| contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning | flag | layer "PLA_DCD_Zoning" is esriGeometryPolygon |
+| sonoma-county-socrata → Sonoma County Planning Permits (m689-iiuu) | flag | updated 2026-09-03; columns: file, status, application_type, started, address, description, parcel, sub_type… |
+| sonoma-county-socrata → Sonoma County Rebuilding Permits (652y-5ihx) | flag | updated 2026-07-27; columns: record_id, date_opened, record_type, permit_status, category, permit_description, units, buildings, total_square_feet, situs_address, area_id, supervisors_district, event_title, first_inspection_date, parcel_number… |
+| sonoma-county-socrata → Sonoma County Construction Permits (88ms-k5e7) | flag | updated 2026-09-04; columns: file_number, status, application_type, started, issued, address, description, assessors_parcel_number, totfee, value… |
+| ventura-county-arcgis → DataDownloads/LandUse/Area plans | flag | layer "Area plans" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/General Plan | flag | layer "General Plan" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Zone Designation | flag | layer "Zone Designation" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Area plans | flag | layer "Area plans" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/General Plan | flag | layer "General Plan" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Zone Designation | flag | layer "Zone Designation" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Communication Facilities | still-stale | newest created_date = 2025-01-10 (> 400d old) |
+| ventura-county-arcgis → DataDownloads/Permitting/Mining Permits | flag | layer "Mining Permits" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Oil Permits | flag | layer "Oil Permits" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Communication Facilities | still-stale | newest created_date = 2025-01-10 (> 400d old) |
+| sanmateo-county-socrata | no-candidates | catalog reachable but 0 first-party datasets for q=permit (3 federated hits ignored — the Plano trap) |
+| slo-county-dcat → General Plan Land Use Designations | flag | layer "General Plan Land Use Designations" is esriGeometryPolygon |
+| slo-county-dcat → Completed Water Well Construction Permit Inventory Since 1965 | flag | layer "Completed Water Well Construction Permit Inventory Since 1965" is (none) |
+| slo-county-dcat → Land Use View | no-candidates | no ArcGIS/Socrata distribution |
+| slo-county-dcat → Planning Special Study Areas | flag | layer "Planning Special Study Areas" is esriGeometryPolygon |
+| slo-county-dcat → Planning Land Use By Parcel | flag | layer "Planning Land Use By Parcel" is (none) |
+| slo-county-dcat → Planning Areas | flag | layer "Planning Areas" is esriGeometryPolygon |
+| slo-county-dcat → Planning Area Standards | flag | layer "Planning Area Standards" is esriGeometryPolygon |
+| marin-county-socrata | unreachable | catalog HTTP 200 non-JSON response |
+| phoenix-ckan | flag | CKAN catalog with 2 permit-pattern dataset(s): Phoenix, AZ Building Permit Data; Proposed Zoning |
+| mesa-socrata → Building Permits (RETIRED) (2gkz-7z4f) | flag | updated 2026-01-07; columns: rowid, permit_number, property_address, street_number, street_direction, street_name, street_type, unit_number, council_district, issued_date, issued_year, issued_month, finaled_date, finaled_year, finaled_month… |
+| mesa-socrata → Turn Around Time - Permits (fhtq-vpmm) | flag | updated 2026-09-02; columns: record_id, customid, record_type, record_open_date, record_status, statusdate, task, istaskcompleted, assigneddate, taskstatus, duedate, actionbyuser, status_year, status_month, turnaroundtime… |
+| mesa-socrata → Temporary Traffic Control (TTC) Permits (822f-avdk) | flag | updated 2026-09-03; columns: rownum, record_id, customid, company, company_name, businessname, address_line1, application_date, review_date, calendardays, days_in_review, plan_review_days, status_date, record_status, received_date… |
+| mesa-socrata → Development Services - Permit Submittals and Resubmittals Logged In (kg7m-y6f3) | flag | updated 2026-09-04; columns: row_number, record_id, record_type, type_of_submittal, record_open_date, record_open_date_month, record_open_date_year, record_status, record_status_date, record_status_month, record_status_year, task, task_complete_flag, description, status… |
+| mesa-socrata → Planning - Board of Adjustment (BOA) Memos completed (qmv6-zhfq) | flag | updated 2026-09-05; columns: rowid, record_id, record_type, submittal_date, submission_deadline_date, distributed_date, review_consolidation_date, formal_submittal_deadline_date, permit_description, record_open_date, record_status_date, record_status_month, record_status_year, record_status, task… |
+| tempe-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| gilbert-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| chandler-dcat | unreachable | DCAT HTTP 404 
+<!doctype html>
+<html lang="en-US">
+	<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  < |
+| scottsdale-dcat → Planning and Development Plan Reviews | flag | layer "Plan Reviews" is (none) |
+| scottsdale-dcat → Planning and Development Encroachment Permits | flag | layer "Encroachment Permits" is (none) |
+| scottsdale-dcat → Planning and Development Cases | flag | layer "Cases" is (none) |
+| scottsdale-dcat → Planning and Development Case Meetings | flag | layer "Case Meetings" is (none) |
+| scottsdale-dcat → Planning and Development Code Violations | flag | layer "Code Violations" is (none) |
+| scottsdale-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| scottsdale-dcat → Subdivisions | flag | layer "Subdivisions" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Land Use Case (Case Type Class) | flag | layer "Land Use Case (Case Type Class)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Variance (Case Status) | flag | layer "Variance (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Comprehensive Plan Amendment (Case Status) | flag | layer "Comprehensive Plan Amendment (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Development Master Plan (Case Status) | flag | layer "Development Master Plan (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Military Compatibility Permit (Case Status) | flag | layer "Military Compatibility Permit (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Special Use Permit (Case Status) | flag | layer "Special Use Permit (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan | flag | layer "Area Plan" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan Land Use | flag | layer "Area Plan Land Use" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Scenic Corridor | flag | layer "Scenic Corridor" is esriGeometryPolygon |
+| tucson-dcat → Original City Zoning - Open Data | flag | layer "ZONE_OCZ" is esriGeometryPolygon |
+| tucson-dcat → Zoning - Tucson - Open Data | flag | layer "ZONE_COT" is esriGeometryPolygon |
+| tucson-dcat → Redevelopment Plans - Open Data | flag | layer "ZZ_PLAN_REDEV" is esriGeometryPolygon |
+| tucson-dcat → Subdivisions - Open Data | flag | layer "SUBDIV" is esriGeometryPolygon |
+| tucson-dcat → Rezonings - Open Data | flag | layer "AREA_ZONE_VIEW" is esriGeometryPolygon |
+| tucson-dcat → Mapped Planned Land Use - Open Data | flag | layer "PLAN_MAPPED_LAND_USE" is esriGeometryPolygon |
+| pima-county-arcgis | unreachable | root HTTP 404 <?xml version="1.0" encoding="iso-8859-1"?>
+
+     
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http |
+| montgomery-county-socrata → Mechanical Permits (ih88-a6aa) | flag | updated 2026-09-04; columns: permitno, status, stno, pre_direction, stname, suffix, postdir, city, state, zip, worktype, usecode, addeddate, issueddate, finaleddate… |
+| montgomery-county-socrata → Electrical Building Permits (qxie-8qnp) | flag | updated 2026-09-04; columns: permitno, status, stno, predir, stname, suffix, postdir, city, state, zip, worktype, usecode, addeddate, issueddate, finaleddate… |
+| montgomery-county-socrata → DPS - Antenna/Wireless Permits (djk9-h36c) | flag | updated 2026-09-05; columns: permit_number, permit_status, added_date, issue_date, final_date, tfcg_number, attachment_type, ozah, street_number, pre_direction, street_name, street_suffix, post_direction, city, state… |
+| montgomery-county-socrata → Fence Permits (9quz-avmj) | flag | updated 2026-09-04; columns: application_type, permit_number, work_type, user_code, added_date, issue_date, final_date, expired_date, status, building_area, description_of_work, street_number, pre_direction, street_name, street_suffix… |
+| montgomery-county-socrata → Sign Permits (piic-h4rw) | flag | updated 2026-09-02; columns: application_type, permit_no, work_type, use_code, added_date, issued_date, final_date, expired_date, status, building_area, description, st_no, pre_dir, st_name, suffix… |
+| howard-county-socrata → Office of Consumer Protection Permits And Licenses (9rfk-bak7) | still-stale | rowsUpdatedAt = 2024-12-03 (> 400d old) |
+| annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes | flag | layer "LU2040 Consistency Changes" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes Dissolved | flag | layer "LU2040 Consistency Changes Dissolved" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Area_Overlays_PreliminaryDraft/Development_Policy_Area_Overlays_PreliminaryDraft | flag | layer "Development_Policy_Area_Overlays_PreliminaryDraft" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Overlay Areas | flag | layer "Overlay Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Major_Roads | flag | layer "Major_Roads" is esriGeometryPolyline |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/City of Annapolis | flag | layer "City of Annapolis" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Policy Areas | flag | layer "Policy Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_Overlays_12042020/Development_Policy_Areas_Overlays_12042020 | flag | layer "Development_Policy_Areas_Overlays_12042020" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas/Development Policy Areas | flag | layer "Development Policy Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/GDP_Land_Use_Plan2040_May_2023/GDP_LandUse_Plan_2040_Update2023_04252023 | flag | layer "GDP_LandUse_Plan_2040_Update2023_04252023" is esriGeometryPolygon |
+| baltimore-county-dcat → Active Development Search | no-candidates | no ArcGIS/Socrata distribution |
+| baltimore-county-dcat → Current CBCA Land Use Designation | flag | layer "Current CBCA Land Use Designation" is esriGeometryPolygon |
+| baltimore-county-dcat → Zoning History | flag | layer "Zoning History Cases" is esriGeometryPolygon |
+| baltimore-county-dcat → Plumbing Permits | flag | fresh (newest 2026-09-01) |
+| baltimore-county-dcat → Gas Permits | flag | fresh (newest 2026-09-04) |
+| baltimore-county-dcat → Electrical Permits | flag | fresh (newest 2026-09-03) |
+| baltimore-county-dcat → Use and Occupancy Permits | flag | fresh (newest 2026-09-03) but no lexicon status column among: OBJECTID, CASE_NUMBER, CA_TASK_ID, ADDRESSSTREETNUMBER, ADDRESSSTREETNAME, ADDRESSCITY, ADDRESSSTATE, ADDRESSZIP, PEOPLEROLEID, OWNERNAME, OWNERADDRESS1, OWNERADDRESS2, OWNERADDRESS3, OWNERCITY, OWNERSTATE |
+| baltimore-county-dcat → Proposed Landuse | flag | layer "Proposed Land Use - Smart Code" is esriGeometryPolygon |
+| baltimore-county-dcat → Landuse | flag | layer "Landuse" is esriGeometryPolygon |
+| frederick-county-dcat | unreachable | DCAT HTTP 404 {"error":"Domain record(s) not found :: A domain record with hostname = data-frederickcountymd.opendata.arcgis.com does not exist :: 404"} |
+| harford-county-dcat | unreachable | DCAT HTTP 404 {"error":"Domain record(s) not found :: A domain record with hostname = data-harfordcountymd.opendata.arcgis.com does not exist :: 404"} |
+| baltimore-city-dcat → Housing and Building Permits 2019-Present | flag | fresh (newest 2028-10-20) but no lexicon status column among: OBJECTID, CaseNumber, Description, ExpirationDate, IssuedDate, Address, BLOCKLOT, ExistingUse, ProposedUse, csm_projname, prc_block_no, prc_lot, Neighborhood, Cost, Council_District |
+| baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents | flag | layer "Number of Event Permits Requested per 1,000 Residents - Community Statistical Area" is esriGeometryPolygon |
+| baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents - City | flag | layer "Number of Event Permits Requested per 1,000 Residents - City" is esriGeometryPolygon |
+| baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above 5,000 | flag | layer "Percent of Commercial Properties with Rehab Permits Above $5,000 - Community Statistical Area" is esriGeometryPolygon |
+| baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above $5,000 - City | flag | layer "Percent of Commercial Properties with Rehab Permits Above $5,000 - City" is esriGeometryPolygon |
+| baltimore-city-dcat → Residential Parking Permits | flag | layer "Residential Parking Permits" is esriGeometryPolygon |
+| baltimore-city-dcat → Zoning | skipped | host baltegis.baltimorecity.gov not on the target allowlist |
+| baltimore-city-dcat → Planning District | skipped | host baltegis.baltimorecity.gov not on the target allowlist |
+
+### Flagged shapes — what connector work each needs
+- **allen-current-development-projects** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **el-paso-new-commercial** — statuses unknown to the lexicon: a human to extend scripts/source-lexicon.json with these VERBATIM statuses (only from a human-approved mapping)
+- **syracuse-permit-requests** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **howard-county-permits** — socrata resource missing: status, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **houston-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **dallas-open-data → ROW Permits - Points (bw6g-a3ur)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **dallas-open-data → ROW Permits - Lines (xd3q-ipis)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/ETJ Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City and ETJ** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **jeffco-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Advancing Adams Future Land Use 2022** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Future Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Boulder Valley Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → BVCP Future Land Use 2020 Retired** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → BVCP Planning Areas 2020 Retired** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Zoning Districts** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Development Review Cases** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **fort-collins-hub-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **fort-collins-hub-dcat → Current Development** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Existing Landuse 2020** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Existing Landuse 2018** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → City and County of Denver Subdivision Lot Boundaries** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → South Platte River Glide Sites** — no date column: a human to identify the temporal column (none of the lexicon date candidates present)
+- **denver-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Tree Canopy Assessment 2013 - Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Wastewater Plat Map Index** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Street Occupancy Permits** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Demolition Permits** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Foreign Trade Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Urban Renewal Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Qualified Opportunity Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Commercial Aeronautical Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Enterprise Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/CHIPS Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Coordinated Sign Plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Electronic Message Centers** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **sanjose-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **santaclara-county-socrata → County of Santa Clara Permitted Body Art Facilities and Permitted Body Art Practitioners (mqx2-w62f)** — socrata resource missing: status, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **anaheim-dcat → Workforce Development Board** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Planning Commission** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Housing and Community Development Commission** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Hotel Permits** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Fire Permits Accela** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Utilities Electrical Permits Monthly** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Building Permits** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **anaheim-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → General Plan Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **sonoma-county-socrata → Sonoma County Planning Permits (m689-iiuu)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **sonoma-county-socrata → Sonoma County Rebuilding Permits (652y-5ihx)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **sonoma-county-socrata → Sonoma County Construction Permits (88ms-k5e7)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **ventura-county-arcgis → DataDownloads/LandUse/Area plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/General Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Zone Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Area plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/General Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Zone Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/Permitting/Mining Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/Permitting/Oil Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → General Plan Land Use Designations** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Completed Water Well Construction Permit Inventory Since 1965** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Special Study Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Land Use By Parcel** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Area Standards** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **phoenix-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **mesa-socrata → Building Permits (RETIRED) (2gkz-7z4f)** — socrata resource missing: type, native ZIP: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Turn Around Time - Permits (fhtq-vpmm)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Temporary Traffic Control (TTC) Permits (822f-avdk)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Development Services - Permit Submittals and Resubmittals Logged In (kg7m-y6f3)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Planning - Board of Adjustment (BOA) Memos completed (qmv6-zhfq)** — socrata resource missing: native ZIP, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **scottsdale-dcat → Planning and Development Plan Reviews** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Encroachment Permits** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Cases** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Case Meetings** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Code Violations** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Land Use Case (Case Type Class)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Variance (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Comprehensive Plan Amendment (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Development Master Plan (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Military Compatibility Permit (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Special Use Permit (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Scenic Corridor** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Original City Zoning - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Zoning - Tucson - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Redevelopment Plans - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Subdivisions - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Rezonings - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Mapped Planned Land Use - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **montgomery-county-socrata → Mechanical Permits (ih88-a6aa)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Electrical Building Permits (qxie-8qnp)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → DPS - Antenna/Wireless Permits (djk9-h36c)** — socrata resource missing: status, type, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Fence Permits (9quz-avmj)** — socrata resource missing: type, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Sign Permits (piic-h4rw)** — socrata resource missing: type, native ZIP: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes Dissolved** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Area_Overlays_PreliminaryDraft/Development_Policy_Area_Overlays_PreliminaryDraft** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Overlay Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Major_Roads** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/City of Annapolis** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Policy Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_Overlays_12042020/Development_Policy_Areas_Overlays_12042020** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas/Development Policy Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/GDP_Land_Use_Plan2040_May_2023/GDP_LandUse_Plan_2040_Update2023_04252023** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Current CBCA Land Use Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Zoning History** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Plumbing Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Gas Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Electrical Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Use and Occupancy Permits** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **baltimore-county-dcat → Proposed Landuse** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Landuse** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Housing and Building Permits 2019-Present** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents - City** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above 5,000** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above $5,000 - City** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Residential Parking Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+
+### Status-domain drift — unmapped statuses DROP records
+- Registry entries checked: **169** · **gating** (in-window unmapped or volume bound breached): **12** · unreachable: **9**
+- Every probe below applies that entry's OWN `extra_where` + `recency_days` + status field, so it asks the question the connector asks (Rule 13). The scope tested is printed with each entry.
+
+#### Unreachable — status domain could NOT be read · **not clean, not checked**
+
+These entries were **not** verified. Absence of a finding below is absence of evidence, not evidence of absence — a value could be dropping records here and this run would not know.
+
+| registry_id | family | status field | why the read failed |
+|---|---|---|---|
+| pierce-county-pals-permits | arcgis | applicationStatus | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| scottsdale-building-permits | arcgis | PermitStatus | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| fairfax-active-site-construction | arcgis | RECORD_STATUS | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| fairfax-recent-building-permits | arcgis | RECORD_STATUS | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| new-hanover-county-building-permits | arcgis | PERMIT_STATUS | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| savannah-commercial-building-permits | arcgis | PermitStatus | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| kytc-syp-highway-plan | arcgis | KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC,KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| pittsburgh-pli-permits | ckan | status | in-window status read returned null (ckan reader could not resolve a status domain) |
+| allegheny-county-asbestos-permits | ckan | status | in-window status read returned null (ckan reader could not resolve a status domain) |
+
+#### Tier 1 — IN-WINDOW unmapped · **these gate the run** (records the connector fetches and drops today)
+
+| registry_id | status field | window scope probed | unmapped value(s) — records dropped |
+|---|---|---|---|
+| tacoma-accela-permits | current_status | extra_where: permit_type IN ('Building','Land Use','Site') · recency: application_date >= DATE '2025-09-05' | `Review in Process - Cycle 2` (1), `Review in Process - Cycle 3` (1) |
+| irving-development-permits | Status | no recency window — whole dataset is in-window | `EXPIRED/CHANGED DESIGN` (1) |
+| arlington-planning-cases | STATUSDESC | no recency window — whole dataset is in-window | `Saved Application` (1) |
+| fort-worth-zoning-cases | ACTION_ | no recency window — whole dataset is in-window | `Withdrawn` (2) |
+| san-jose-permits | PERMITAPPROVAL | recency: ISSUEDATE >= DATE '2025-09-05' | `E-Complete, P-4. Complete, M-4. Complete` (1), `P-Complete, M-Complete` (1) |
+| kcmo-development-cases | STATUS | recency: APPLICATIONDATE >= DATE '2021-09-06' | `4` (1), `Submitted` (1) |
+| vtrans-project-locations | ProjectStatus | extra_where: ProjectStatus IS NOT NULL AND ExpectedConstructionStart IS NOT NULL · no recency window — whole dataset is in-window | `COMPLETE` (1) |
+| sonoma-county-fire-rebuild-permits | Permit_Status | no recency window — whole dataset is in-window | `Plan Check Started` (1) |
+| austin-subdivision-cases | status | no recency window — whole dataset is in-window | `Intake Accepted` (1) |
+| austin-site-plan-cases | status | no recency window — whole dataset is in-window | `Formal Intake Accepted - Fees Paid` (1) |
+| seattle-land-use-permits | statuscurrent | recency: applieddate > '2025-09-05T00:00:00' | `Final Reviews Completed` (4) |
+| cincinnati-building-permits | statuscurrentmapped | recency: applieddate > '2025-09-05T00:00:00' | `SUBPERM` (1) |
+
+Fix: add each value verbatim to that entry's `status_to_bucket`. Never normalize or re-case — the connectors match exactly after trim. If a value's meaning cannot be established from the publisher, put it in `status_unresolved` (with `first_seen`, `records_at_first_seen` and the question asked) rather than guessing a bucket.
+
+#### Tier 2 — OUT-OF-WINDOW unmapped · non-failing (latent: outside `recency_days`, so the connector cannot fetch them today)
+
+Map these anyway where the domain is bounded and enumerable — a `recency_days` widening or one re-issued historical record is all it takes to pull them in. They do not gate.
+
+| registry_id | status field | value(s) (records outside the window) |
+|---|---|---|
+| hartford-building-permits | RECORD_STATUS | `BO to Review` (5) |
+| virginia-beach-building-permits | Status | `Ready to Issue` (1) |
+| kcmo-development-cases | STATUS | `2` (990), `4` (91), `1` (19) |
+| new-orleans-permits | currentstatus | `Violations` (5), `PUBLIC WORKS` (1), `PRE OCC METER RELEASE` (1), `TEMPORARY METER RELEASE` (1), `IZ Compliance` (1), `TEMP POWER` (1) |
+
+#### Tier 3 — difference categories · non-failing
+
+| registry_id | live value (byte-level) | registry key (byte-level) | category | resolves in production? |
+|---|---|---|---|---|
+| denver-residential-construction-permits | `FOUNDATION·ONLY/·EXCAVATION` | `Foundation·Only/·Excavation` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `ADDITION` | `Addition` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `NEW·NON-BUILDING·STRUCTURE` | `New·Non-Building·Structure` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `PHASED·CONSTRUCTION` | `Phased·Construction` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `FOUNDATION·ONLY/EXCAVATION` | `Foundation·Only/Excavation` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `NEW·BUILDING` | `New·Building` | differs only in case | yes — case-folded lookup matches it |
+
+`·` marks a space. A case-only difference resolves via the case-insensitive lookup; a whitespace-only difference does **not** — `resolveNormalized` trims and case-folds but never collapses interior runs, so the registry key must be corrected to the publisher's exact bytes.
+
+#### status_unresolved — known values with no established meaning · non-failing below the 5% volume bound
+
+These are **not** bucketed and their records are still dropped, fail-closed. Listing one only records that a human looked and could not attribute a meaning — never that it is safe.
+
+| registry_id | value | in-window records | share of fetched | first seen | records at first seen | what was asked, and of whom |
+|---|---|---|---|---|---|---|
+| fort-collins-building-permits | `Issued FF` | 1 | 0.12% | 2026-07-30 | 1 | NOT YET ASKED by this pass, but ALREADY RECORDED as a deliberate non-mapping: this entry's own _receipts states "'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)" (20 |
+| san-jose-permits | `PME` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (1 record). Every other PERMITAPPROVAL value is a discipline-completion list (B-/E-/P-/M- Complete); 'PME' is bare  |
+| sussex-county-de-conditional-use | `8/19/2025` | 1 | 0.42% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net) — the row itself is the answer, and the answer is that no decision was recorded. Pulled the single matching feature in the connector's own scope: application_number 202503544, proposed_use 'Outd |
+| lee-county-fl-development-orders | `Closed-Partial Final` | 1 (+1 out-of-window) | 0.03% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net; the sandbox has no egress). The publisher documents NOTHING for this field: the layer's own field metadata returns "STATUS" with "domain": null, so there is no coded-value list to read a definit |
+| lee-county-fl-development-orders | `Enable Upload` | 1 (+1 out-of-window) | 0.03% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net) — same probe and same closed positive control as `Closed-Partial Final` above; STATUS carries no domain, so no published definition exists. ONE record layer-wide and OUT of the connector's 1095- |
+| cincinnati-building-permits | `REVIEWED` | 1 (+6 out-of-window) | 0.01% | 2026-07-30 | 3 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `ADD INS` | 1 | 0.01% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `PAID` | 27 (+256 out-of-window) | 0.24% | 2026-07-30 | 27 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `APRV_NR` | 18 (+66 out-of-window) | 0.16% | 2026-07-30 | 15 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `BILLED` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 0 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `CAGIS` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `RENEW` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 0 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| new-orleans-permits | `PILING AFFAVDAVIT` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — "The most recently completed event in the permit's work |
+| new-orleans-permits | `SMFA IZ Compliance` | 0 (+2 out-of-window) | 0.00% | 2026-07-30 | 2 | ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — "The most recently completed event in the permit's work |
+
+### Type-domain drift — an unlisted `include_types` value is NEVER FETCHED
+- Entries checked: **12** · **gating** (in-window, in neither list): **0** · baseline not established: **2** · unreachable: **2**
+- The whitelist is pushed down into the query, so an unlisted value produces no record, no quarantine and no `unclassified` pin — only a count that fails to grow. Cleveland's `Install Permits` was dropped this way for five months.
+- **No in-window unlisted type values on any entry with an established baseline.** Nothing gates.
+
+#### BASELINE NOT ESTABLISHED · non-failing, and **NOT clean** — these entries were not tested
+
+| registry_id | type field | why no baseline |
+|---|---|---|
+| portland-building-permits | NEWCLASS | no `observed_types_unreviewed` on this entry — its live vocabulary has never been enumerated, so the absence of findings here attests to NOTHING |
+| san-diego-approved-permits | APPROVAL_TYPE | no `observed_types_unreviewed` on this entry — its live vocabulary has never been enumerated, so the absence of findings here attests to NOTHING |
+
+An absent `observed_types_unreviewed` is a THIRD state, distinct from an empty one. Empty = enumerated, emits nothing unfetched. Absent = never enumerated, so silence here means nothing.
+
+#### Tier 2 — OUT-OF-WINDOW unlisted · non-failing (outside `recency_days`, unfetchable today)
+
+| registry_id | value(s) |
+|---|---|
+| columbus-building-permits | `Minor Alteration` (64113), `Repair Replace` (63682), `Illuminated` (9048), `Minor Limited Scope` (3511), `Non-Illuminated` (2632), `Resurface Illuminated Sign` (2180), `Regular` (1428), `NA` (982), `Resurface Non-Illuminated Sign` (436), `Emergency` (191), `Temporary` (63), `Billboard` (38), `Graph |
+| cleveland-issued-building-permits | `Mechanical` (3) |
+| nashville-building-permits-issued | `Building Commercial Rehab Storm Damage` (11), `Building Commercial New Storm Damage` (4), `Building Moving Permit` (3) |
+| aurora-building-permits | `Res.Fireplace/Wood Burning Stove-RT3` (9), `Hazardous Occupancy Bldg` (7), `Single Family Attached Plan` (6), `Hazardous Materials` (1), `Chicken Permit` (1) |
+| slo-county-planning-permits | `Time Extension` (103), `REV: After Issuance Revision` (19), `Long Range Planning` (12), `Vehicle Abatement` (5), `Condition Compliance Monitoring` (4), `CCM - Condition Compliance Montoring` (1) |
+| cincinnati-building-permits | `Repair` (511), `Fences` (35), `Certificates of Occupancy/Insp` (1) |
+
+#### Tier 3 — DECLARED but matching ZERO live rows · non-failing
+
+A permanent tier, not a one-time sweep. Cleveland's `Building` sat in `include_types` **and** `type_map` matching 0 rows all-time, which is exactly why a stale four-value enumeration read as confirmed. Harmless to fetching; corrosive to trust in the config.
+
+| registry_id | declared value(s) with no live rows |
+|---|---|
+| columbus-building-permits | `Addition`, `Major Alteration`, `New Construction` |
+| nashville-building-permits-issued | `Building Residential - Shell`, `Building Residential - Tenant Finish Out` |
+| aurora-building-permits | `Factory Use Building`, `Multi Family Plan`, `Sales Trailer - Residential` |
+| slo-county-planning-permits | `Land Use`, `Land Use (PRE 7/1/2021)`, `Renewable Energy`, `Subdivision (PRE 7/1/2021)`, `Zoning Clearance (PRE 7/1/2021)` |
+| bismarck-building-permits | `BUILDING COMMERCIAL ALTERATION` |
+
+#### observed_types_unreviewed — matched the baseline · non-failing, **UNREVIEWED**
+
+⚠️ These values were observed live when the gate was armed and are NOT fetched. Listing one records only that it already existed — **never that excluding it was reviewed or approved.**
+
+| registry_id | value(s) observed-not-fetched | records |
+|---|---|---|
+| columbus-building-permits | `Fire Protection`, `MEP`, `Plans Examination`, `Sign`, `Special` | 27912 |
+| nashville-building-permits-issued | `Building Use & Occupancy`, `Building Residential - Change Contractor`, `Building Residential - Roofing / Siding`, `Building Commercial - Change Contractor`, `Building Residential - Fire Damage`, `Building Sign Permit`, `Building Residential New Storm Damage`, `Building Commercial - Roofing / Siding | 1255 |
+| aurora-building-permits | `Fire Sprinkler Permit`, `Roofing-RT2`, `Electrical Permit`, `Mechanical Permit`, `Gating System`, `Hood Suppression Permit`, `Plumbing Permit`, `Roofing Commercial-NT2`, `Occupancy Load Sign Calculation`, `Fence Permit`, `Plan Revisions`, `Fire Alarm Permit`, `Residential Elevator Permit` | 9230 |
+| slo-county-planning-permits | `Public, Peace, Safety, and Morals`, `Septic`, `Code Enforcement`, `Auxiliary`, `Amendment`, `Map Number`, `Long-Range Planning`, `Research`, `Appeal`, `Renewable Energy `, `Septic ASB`, `Express `, `Mitigation Monitoring`, `CEQA`, `Cannabis Code - S`, `Events`, `Project Modification`, `Residential  | 17823 |
+| bismarck-building-permits | `IND SIGNIFICANT INDUSTRIAL USERS`, `FIRE FUEL TANK`, `ENG CONCRETE`, `IND DENTAL`, `FIRE FIREWORK`, `BUILDING PLUMBING`, `BUILDING SIGN`, `BUILDING ELECTRIC SELF-WIRE`, `ENG PRIVATE UTILITY`, `ENG REPAIR`, `BUILDING ELECTRIC`, `FIRE DAYCARE CENTER`, `ENG TRAFFIC`, `BUILDING TEMPORARY`, `ENG EXCAVAT | 4636 |
+| cincinnati-building-permits | `Fire Protection Systems`, `Signs`, `Non-Standard Permit Type`, `Parking Lots`, `Misc. Structures`, `Plumbing Permits`, `Elevator Permit`, `Excavation/Fill`, `HVAC` | 8244 |
+
+#### Type domain UNREACHABLE · non-failing, and **NOT clean**
+
+| registry_id | type field | reason |
+|---|---|---|
+| fairfax-active-site-construction | APPTYPEALIAS | in-window type read returned null (arcgis reader could not resolve a type domain) |
+| fairfax-recent-building-permits | APPTYPEALIAS | in-window type read returned null (arcgis reader could not resolve a type domain) |
+
+- Whitelist/mapping invariant holds: every whitelisted value has a `type_map` line or a `use_type_const`.
+
+## Run 2026-09-06T11:31:25.138Z
+
+- Sources re-probed: **18** · discovery targets walked: **44** · candidates evaluated: **190**
+- Auto-wired: **none**
+- Flagged new shapes (connector work needed — never guessed): **140**
+- Dev-backed ZIP pages (exact): **unavailable**
+
+| target | result | evidence |
+|---|---|---|
+| denton-county-dev-permits | still-stale | newest DateReceiv = 2023-06-09 (> 400d old) |
+| mckinney-underconstruction | still-stale | newest IssueDate = 2023-09-26 (> 400d old) |
+| frisco-active-building-permits | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| frisco-active-zoning-sup-cases | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| allen-current-development-projects | flag | layer "Current Development Projects" is esriGeometryPolygon |
+| el-paso-new-commercial | flag | fresh (newest 2026-08-31); lexicon maps 5120/11358 rows; unmapped:   (4201); Revisions Required (2); Hold for Corrections (8); Out for Corrections (4); TCO Issued (67); Inspection (1956) |
+| el-paso-accela-building-permits | error | service error 404: Service OpenData_Accela/BuildingPermits/MapServer not found  |
+| dallas-building-permits-e7gq | still-stale | rowsUpdatedAt = 2020-08-30 (> 400d old) |
+| dallas-building-permits-6ik7 | still-stale | rowsUpdatedAt = 2018-02-09 (> 400d old) |
+| fort-worth-development-permits-gate-validation | already-wired | registry entry exists |
+| denton-city-portal | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html lang="en"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8" />
+      <meta name="generator" con |
+| plano-portal | no-candidates | 1 first-party dataset(s) for q=permit but none matched the permit/land-use pattern (or all duplicate/already wired) |
+| stpaul-approved-building-permits | still-stale | newest ISSUEDATE = 2025-06-30 (> 400d old) |
+| worcester-building-permits | already-wired | registry entry exists |
+| syracuse-permit-requests | flag | fresh (newest 2025-08-16) but no lexicon status column among: Permit_Number, Full_Address, Owner, Issue_Date, Permit_Type, Description_of_Work, LONG, LAT, ObjectId |
+| howard-county-permits | flag | updated 2025-12-04; columns: permit_number, category, type, file_date, permit_type, census_tract, issue_date, city, zip, sewer, water… |
+| houston-ckan | flag | CKAN catalog with 4 permit-pattern dataset(s): Combustible Storage Permits (Waste or Dumpster Permits) Sold from May 2012 th...; City of Houston Active Commercial Vehicle Loading Zone Permits; City of Houston Residential Building Permits by Month and Year; All Paid Vehicle Permits 05/01/2011 to 04/3 |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6582 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6582 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6556 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| el-paso-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| arlington-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| dallas-open-data → Building Permits for Fiscal Year 2011 - 2012 (azf5-sdcr) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2017 - 2018 (w2uy-zn9f) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2013 - 2014 (fs84-rv8z) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2015 - 2016 (rzm4-tcqx) | still-stale | rowsUpdatedAt = 2021-07-29 (> 400d old) |
+| dallas-open-data → ROW Permits - Points (bw6g-a3ur) | flag | updated 2026-08-10; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| dallas-open-data → Jill SRF 14 08 Permit W Location (4xqw-i3tz) | still-stale | rowsUpdatedAt = 2014-11-04 (> 400d old) |
+| dallas-open-data → ROW Permits - Lines (xd3q-ipis) | flag | updated 2026-08-10; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit | flag | layer "Custer West Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Craig Ranch Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Honey Creek Investment District Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Huntington Park Land Use Plan Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit | flag | layer "MTC Regulating Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit | flag | layer "Stonebridge Ranch Exhibit" is (none) |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 1 | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Origin 1 | error | max(created_date) query failed |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1 | flag | layer "Drive Time Areas 1" is esriGeometryPolygon |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 2 | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → Addresses911Permits_GC/911 Addresses | error | max(created_date) query failed |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → CityETJPermits_GC/City Labels | flag | layer "City Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/ETJ Labels | flag | layer "ETJ Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | flag | layer "City and ETJ" is esriGeometryPolygon |
+| denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017 | flag | layer "1 Foot Contours - 2017" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005 | flag | layer "2 Foot Contours - 2005" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000 | flag | layer "2 Foot Contours - LIDAR 2000" is esriGeometryPolyline |
+| jeffco-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| adams-co-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| adams-co-dcat → Subdivisions | flag | layer "Subdivisions" is esriGeometryPolygon |
+| adams-co-dcat → Advancing Adams Future Land Use 2022 | flag | layer "Advancing_Adams_FLU" is esriGeometryPolygon |
+| boulder-city-dcat → Future Land Use | flag | layer "Future Land Use" is esriGeometryPolygon |
+| boulder-city-dcat → Boulder Valley Planning Areas | flag | layer "Boulder Valley Planning Areas" is esriGeometryPolygon |
+| boulder-city-dcat → BVCP Future Land Use 2020 Retired | flag | layer "Future Land Use" is esriGeometryPolygon |
+| boulder-city-dcat → BVCP Planning Areas 2020 Retired | flag | layer "BVCP Areas" is esriGeometryPolygon |
+| boulder-city-dcat → Zoning Districts | flag | layer "Zoning Districts" is esriGeometryPolygon |
+| boulder-city-dcat → Development Review Cases | flag | layer "Development Review" is esriGeometryPolygon |
+| fort-collins-hub-dcat → Zoning | flag | layer "City Zoning" is esriGeometryPolygon |
+| fort-collins-hub-dcat → Current Development | flag | layer "Current Development" is esriGeometryPolygon |
+| denver-dcat → South Platte River Glide Sites | flag | fields: OBJECTID, SITE, X_COORDINATE, Y_COORDINATE, STREAM_ID, HABITAT, GLOBALID… |
+| denver-dcat → Subdivisions | flag | layer "ENG_SRVSUBDIVISIONS_A" is esriGeometryPolygon |
+| denver-dcat → Tree Canopy Assessment 2013 - Land Use | flag | layer "PARK_TREECANOPY2013LU_A" is esriGeometryPolygon |
+| denver-dcat → Wastewater Plat Map Index | flag | layer "PWWMD_IDX_PLATINDEX_A" is esriGeometryPolygon |
+| denver-dcat → Development Review Areas | flag | layer "ADMN_DEVREVIEW_A" is esriGeometryPolygon |
+| denver-dcat → Public Works Development Services Projects | flag | fields: OBJECTID, PROJECT_ID, PROJECT_NAME, PROJECT_DESCR, DATE_ENTERED, FULL_ADDRESS, ADDRRESS_ID, GLOBALID… |
+| denver-dcat → Sewer Use and Drainage Permit Reviewer Areas | flag | layer "ADMN_SUDPREVIEWAREAS_A" is esriGeometryPolygon |
+| denver-dcat → Community Planning and Development Plan Areas | flag | layer "PLAN_AREAPLANS_A" is esriGeometryPolygon |
+| denver-dcat → Existing Landuse 2020 | flag | layer "PLAN_EXISTINGLANDUSE2020_A" is esriGeometryPolygon |
+| denver-dcat → Existing Landuse 2018 | flag | layer "PLAN_EXISTINGLANDUSE2018_A" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Foreign Trade Zones | flag | layer "Foreign Trade Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Urban Renewal Areas | flag | layer "Urban Renewal Areas" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Qualified Opportunity Zones | flag | layer "Qualified Opportunity Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Commercial Aeronautical Zones | flag | layer "Commercial Aeronautical Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/Enterprise Zones | flag | layer "Enterprise Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/EconomicDevelopment/CHIPS Zones | flag | layer "CHIPS Zones" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Signs | not-a-layer | no fields[] — unrecognized shape |
+| springs-gis-root → GeneralUse/PlanningAdmin/Coordinated Sign Plans | flag | layer "Coordinated Sign Plans" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Electronic Message Centers | flag | layer "Electronic Message Centers" is esriGeometryPolygon |
+| springs-gis-root → GeneralUse/PlanningAdmin/Planning Areas | flag | layer "Planning Areas" is esriGeometryPolygon |
+| sandiego-city-dcat | unreachable | DCAT HTTP 404 <html>
+<head><title>404 Not Found</title></head>
+<body>
+<h1>404 Not Found</h1>
+<ul>
+<li>Code: NoSuchKey</li>
+<li>Message: The specified key does not exist.</li>
+<li>Key: data.json</li>
+<li>RequestId:  |
+| sandiego-county-arcgis | no-candidates | 62 services listed; none match the permit/land-use pattern |
+| sanjose-ckan | flag | CKAN catalog with 7 permit-pattern dataset(s): Active Building Permits; Expired Building Permits; Last 30 days Planning Permits; Last 30 days building permits; Residential Parking Permit (RPP) Zones |
+| santaclara-county-socrata → County of Santa Clara Permitted Body Art Facilities and Permitted Body Art Practitioners (mqx2-w62f) | flag | updated 2026-09-06; columns: facility_name, permit_type, site_address, city, zip, permitexpdate, facility_id, geo_address… |
+| santaclara-county-socrata → County of Santa Clara Active Body Art Facilities and Permitted Body Art Practitioners (jwgu-xsep) | still-stale | rowsUpdatedAt = 2018-11-27 (> 400d old) |
+| sunnyvale-arcgis-hub | unreachable | DCAT HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| oakland-socrata → Residential Parking Permit Zones (su5x-2u99) | still-stale | rowsUpdatedAt = 2019-09-03 (> 400d old) |
+| alameda-county-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| orange-county-arcgis | no-candidates | 69 services listed; none match the permit/land-use pattern |
+| anaheim-dcat → Workforce Development Board | flag | layer "Workforce_Development_Board_Public" is (none) |
+| anaheim-dcat → Planning Commission | flag | layer "Planning_Commission_Public" is (none) |
+| anaheim-dcat → Housing and Community Development Commission | flag | layer "Housing_and_Community_Development_Commission_Public" is (none) |
+| anaheim-dcat → Hotel Permits | flag | layer "Hotel_Permits_Monthly" is (none) |
+| anaheim-dcat → Fire Permits Accela | flag | layer "Fire_Permits__Accela_Test" is (none) |
+| anaheim-dcat → Utilities Electrical Permits Monthly | flag | layer "Utilities_Electrical_Permits_Monthly_Accela_Test" is (none) |
+| anaheim-dcat → Building Permits | flag | fresh (newest 2026-08-06) but no lexicon status column among: OBJECTID, casenumber, casestatus, address, description, applicationreceived, permitissued, permitfinalized, parcel, censuscode, comres, jobvaluation, ownerbuilder, plancheck, typeofwork |
+| anaheim-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| anaheim-dcat → General Plan Land Use | flag | layer "General Plan Land Use" is esriGeometryPolygon |
+| contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning | flag | layer "PLA_DCD_Zoning" is esriGeometryPolygon |
+| contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning | flag | layer "PLA_DCD_Zoning" is esriGeometryPolygon |
+| sonoma-county-socrata → Sonoma County Planning Permits (m689-iiuu) | flag | updated 2026-09-03; columns: file, status, application_type, started, address, description, parcel, sub_type… |
+| sonoma-county-socrata → Sonoma County Rebuilding Permits (652y-5ihx) | flag | updated 2026-07-27; columns: record_id, date_opened, record_type, permit_status, category, permit_description, units, buildings, total_square_feet, situs_address, area_id, supervisors_district, event_title, first_inspection_date, parcel_number… |
+| sonoma-county-socrata → Sonoma County Construction Permits (88ms-k5e7) | flag | updated 2026-09-05; columns: file_number, status, application_type, started, issued, address, description, assessors_parcel_number, totfee, value… |
+| ventura-county-arcgis → DataDownloads/LandUse/Area plans | flag | layer "Area plans" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/General Plan | flag | layer "General Plan" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Zone Designation | flag | layer "Zone Designation" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Area plans | flag | layer "Area plans" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/General Plan | flag | layer "General Plan" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/LandUse/Zone Designation | flag | layer "Zone Designation" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Communication Facilities | still-stale | newest created_date = 2025-01-10 (> 400d old) |
+| ventura-county-arcgis → DataDownloads/Permitting/Mining Permits | flag | layer "Mining Permits" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Oil Permits | flag | layer "Oil Permits" is esriGeometryPolygon |
+| ventura-county-arcgis → DataDownloads/Permitting/Communication Facilities | still-stale | newest created_date = 2025-01-10 (> 400d old) |
+| sanmateo-county-socrata | no-candidates | catalog reachable but 0 first-party datasets for q=permit (3 federated hits ignored — the Plano trap) |
+| slo-county-dcat → General Plan Land Use Designations | flag | layer "General Plan Land Use Designations" is esriGeometryPolygon |
+| slo-county-dcat → Completed Water Well Construction Permit Inventory Since 1965 | flag | layer "Completed Water Well Construction Permit Inventory Since 1965" is (none) |
+| slo-county-dcat → Land Use View | no-candidates | no ArcGIS/Socrata distribution |
+| slo-county-dcat → Planning Special Study Areas | flag | layer "Planning Special Study Areas" is esriGeometryPolygon |
+| slo-county-dcat → Planning Land Use By Parcel | flag | layer "Planning Land Use By Parcel" is (none) |
+| slo-county-dcat → Planning Areas | flag | layer "Planning Areas" is esriGeometryPolygon |
+| slo-county-dcat → Planning Area Standards | flag | layer "Planning Area Standards" is esriGeometryPolygon |
+| marin-county-socrata | unreachable | catalog HTTP 200 non-JSON response |
+| phoenix-ckan | flag | CKAN catalog with 2 permit-pattern dataset(s): Phoenix, AZ Building Permit Data; Proposed Zoning |
+| mesa-socrata → Building Permits (RETIRED) (2gkz-7z4f) | flag | updated 2026-01-07; columns: rowid, permit_number, property_address, street_number, street_direction, street_name, street_type, unit_number, council_district, issued_date, issued_year, issued_month, finaled_date, finaled_year, finaled_month… |
+| mesa-socrata → Turn Around Time - Permits (fhtq-vpmm) | flag | updated 2026-09-02; columns: record_id, customid, record_type, record_open_date, record_status, statusdate, task, istaskcompleted, assigneddate, taskstatus, duedate, actionbyuser, status_year, status_month, turnaroundtime… |
+| mesa-socrata → Temporary Traffic Control (TTC) Permits (822f-avdk) | flag | updated 2026-09-03; columns: rownum, record_id, customid, company, company_name, businessname, address_line1, application_date, review_date, calendardays, days_in_review, plan_review_days, status_date, record_status, received_date… |
+| mesa-socrata → Development Services - Permit Submittals and Resubmittals Logged In (kg7m-y6f3) | flag | updated 2026-09-05; columns: row_number, record_id, record_type, type_of_submittal, record_open_date, record_open_date_month, record_open_date_year, record_status, record_status_date, record_status_month, record_status_year, task, task_complete_flag, description, status… |
+| mesa-socrata → Planning - Board of Adjustment (BOA) Memos completed (qmv6-zhfq) | flag | updated 2026-09-05; columns: rowid, record_id, record_type, submittal_date, submission_deadline_date, distributed_date, review_consolidation_date, formal_submittal_deadline_date, permit_description, record_open_date, record_status_date, record_status_month, record_status_year, record_status, task… |
+| mesa-socrata → DSD - Planning & Zoning and Design Review Memos Completion (u5a9-tj5y) | flag | updated 2026-09-03; columns: rowid, record_id, record_type, permit_description, record_open_date, record_status_date, record_status, submission_deadline_date, distributed_date, formal_submittal_deadline_date, review_consolidation_date, task, task_status, record_status_month, record_status_year… |
+| tempe-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| gilbert-socrata | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/catalog/v1</pre>
+</body>
+</html>
+ |
+| chandler-dcat | unreachable | DCAT HTTP 404 
+<!doctype html>
+<html lang="en-US">
+	<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  < |
+| scottsdale-dcat → Planning and Development Plan Reviews | flag | layer "Plan Reviews" is (none) |
+| scottsdale-dcat → Planning and Development Encroachment Permits | flag | layer "Encroachment Permits" is (none) |
+| scottsdale-dcat → Planning and Development Cases | flag | layer "Cases" is (none) |
+| scottsdale-dcat → Planning and Development Case Meetings | flag | layer "Case Meetings" is (none) |
+| scottsdale-dcat → Planning and Development Code Violations | flag | layer "Code Violations" is (none) |
+| scottsdale-dcat → Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| scottsdale-dcat → Subdivisions | flag | layer "Subdivisions" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Land Use Case (Case Type Class) | flag | layer "Land Use Case (Case Type Class)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Variance (Case Status) | flag | layer "Variance (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Comprehensive Plan Amendment (Case Status) | flag | layer "Comprehensive Plan Amendment (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Development Master Plan (Case Status) | flag | layer "Development Master Plan (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Military Compatibility Permit (Case Status) | flag | layer "Military Compatibility Permit (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningCaseInformation/Special Use Permit (Case Status) | flag | layer "Special Use Permit (Case Status)" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Zoning | flag | layer "Zoning" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan | flag | layer "Area Plan" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan Land Use | flag | layer "Area Plan Land Use" is esriGeometryPolygon |
+| maricopa-county-arcgis → BOS/PlanningDevelopment/Scenic Corridor | flag | layer "Scenic Corridor" is esriGeometryPolygon |
+| tucson-dcat → Original City Zoning - Open Data | flag | layer "ZONE_OCZ" is esriGeometryPolygon |
+| tucson-dcat → Zoning - Tucson - Open Data | flag | layer "ZONE_COT" is esriGeometryPolygon |
+| tucson-dcat → Redevelopment Plans - Open Data | flag | layer "ZZ_PLAN_REDEV" is esriGeometryPolygon |
+| tucson-dcat → Subdivisions - Open Data | flag | layer "SUBDIV" is esriGeometryPolygon |
+| tucson-dcat → Rezonings - Open Data | flag | layer "AREA_ZONE_VIEW" is esriGeometryPolygon |
+| tucson-dcat → Mapped Planned Land Use - Open Data | flag | layer "PLAN_MAPPED_LAND_USE" is esriGeometryPolygon |
+| pima-county-arcgis | unreachable | root HTTP 404 <?xml version="1.0" encoding="iso-8859-1"?>
+
+     
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http |
+| montgomery-county-socrata → Mechanical Permits (ih88-a6aa) | flag | updated 2026-09-04; columns: permitno, status, stno, pre_direction, stname, suffix, postdir, city, state, zip, worktype, usecode, addeddate, issueddate, finaleddate… |
+| montgomery-county-socrata → Electrical Building Permits (qxie-8qnp) | flag | updated 2026-09-04; columns: permitno, status, stno, predir, stname, suffix, postdir, city, state, zip, worktype, usecode, addeddate, issueddate, finaleddate… |
+| montgomery-county-socrata → DPS - Antenna/Wireless Permits (djk9-h36c) | flag | updated 2026-09-05; columns: permit_number, permit_status, added_date, issue_date, final_date, tfcg_number, attachment_type, ozah, street_number, pre_direction, street_name, street_suffix, post_direction, city, state… |
+| montgomery-county-socrata → Fence Permits (9quz-avmj) | flag | updated 2026-09-04; columns: application_type, permit_number, work_type, user_code, added_date, issue_date, final_date, expired_date, status, building_area, description_of_work, street_number, pre_direction, street_name, street_suffix… |
+| montgomery-county-socrata → Sign Permits (piic-h4rw) | flag | updated 2026-09-02; columns: application_type, permit_no, work_type, use_code, added_date, issued_date, final_date, expired_date, status, building_area, description, st_no, pre_dir, st_name, suffix… |
+| howard-county-socrata → Office of Consumer Protection Permits And Licenses (9rfk-bak7) | still-stale | rowsUpdatedAt = 2024-12-03 (> 400d old) |
+| annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes | flag | layer "LU2040 Consistency Changes" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes Dissolved | flag | layer "LU2040 Consistency Changes Dissolved" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Area_Overlays_PreliminaryDraft/Development_Policy_Area_Overlays_PreliminaryDraft | flag | layer "Development_Policy_Area_Overlays_PreliminaryDraft" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Overlay Areas | flag | layer "Overlay Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Major_Roads | flag | layer "Major_Roads" is esriGeometryPolyline |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/City of Annapolis | flag | layer "City of Annapolis" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Policy Areas | flag | layer "Policy Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas_Overlays_12042020/Development_Policy_Areas_Overlays_12042020 | flag | layer "Development_Policy_Areas_Overlays_12042020" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/Development_Policy_Areas/Development Policy Areas | flag | layer "Development Policy Areas" is esriGeometryPolygon |
+| annearundel-arcgis → Hosted/GDP_Land_Use_Plan2040_May_2023/GDP_LandUse_Plan_2040_Update2023_04252023 | flag | layer "GDP_LandUse_Plan_2040_Update2023_04252023" is esriGeometryPolygon |
+| baltimore-county-dcat → Active Development Search | no-candidates | no ArcGIS/Socrata distribution |
+| baltimore-county-dcat → Current CBCA Land Use Designation | flag | layer "Current CBCA Land Use Designation" is esriGeometryPolygon |
+| baltimore-county-dcat → Zoning History | flag | layer "Zoning History Cases" is esriGeometryPolygon |
+| baltimore-county-dcat → Plumbing Permits | flag | fresh (newest 2026-09-01) |
+| baltimore-county-dcat → Gas Permits | flag | fresh (newest 2026-09-04) |
+| baltimore-county-dcat → Electrical Permits | flag | fresh (newest 2026-09-03) |
+| baltimore-county-dcat → Use and Occupancy Permits | flag | fresh (newest 2026-09-03) but no lexicon status column among: OBJECTID, CASE_NUMBER, CA_TASK_ID, ADDRESSSTREETNUMBER, ADDRESSSTREETNAME, ADDRESSCITY, ADDRESSSTATE, ADDRESSZIP, PEOPLEROLEID, OWNERNAME, OWNERADDRESS1, OWNERADDRESS2, OWNERADDRESS3, OWNERCITY, OWNERSTATE |
+| baltimore-county-dcat → Proposed Landuse | flag | layer "Proposed Land Use - Smart Code" is esriGeometryPolygon |
+| baltimore-county-dcat → Landuse | flag | layer "Landuse" is esriGeometryPolygon |
+| frederick-county-dcat | unreachable | DCAT HTTP 404 {"error":"Domain record(s) not found :: A domain record with hostname = data-frederickcountymd.opendata.arcgis.com does not exist :: 404"} |
+| harford-county-dcat | unreachable | DCAT HTTP 404 {"error":"Domain record(s) not found :: A domain record with hostname = data-harfordcountymd.opendata.arcgis.com does not exist :: 404"} |
+| baltimore-city-dcat → Housing and Building Permits 2019-Present | flag | fresh (newest 2028-10-20) but no lexicon status column among: OBJECTID, CaseNumber, Description, ExpirationDate, IssuedDate, Address, BLOCKLOT, ExistingUse, ProposedUse, csm_projname, prc_block_no, prc_lot, Neighborhood, Cost, Council_District |
+| baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above 5,000 | flag | layer "Percent of Commercial Properties with Rehab Permits Above $5,000 - Community Statistical Area" is esriGeometryPolygon |
+| baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above $5,000 - City | flag | layer "Percent of Commercial Properties with Rehab Permits Above $5,000 - City" is esriGeometryPolygon |
+| baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents | flag | layer "Number of Event Permits Requested per 1,000 Residents - Community Statistical Area" is esriGeometryPolygon |
+| baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents - City | flag | layer "Number of Event Permits Requested per 1,000 Residents - City" is esriGeometryPolygon |
+| baltimore-city-dcat → Residential Parking Permits | flag | layer "Residential Parking Permits" is esriGeometryPolygon |
+| baltimore-city-dcat → Zoning | skipped | host baltegis.baltimorecity.gov not on the target allowlist |
+| baltimore-city-dcat → Planning District | skipped | host baltegis.baltimorecity.gov not on the target allowlist |
+
+### Flagged shapes — what connector work each needs
+- **allen-current-development-projects** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **el-paso-new-commercial** — statuses unknown to the lexicon: a human to extend scripts/source-lexicon.json with these VERBATIM statuses (only from a human-approved mapping)
+- **syracuse-permit-requests** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **howard-county-permits** — socrata resource missing: status, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **houston-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6582 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **dallas-open-data → ROW Permits - Points (bw6g-a3ur)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **dallas-open-data → ROW Permits - Lines (xd3q-ipis)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/ETJ Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City and ETJ** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **jeffco-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **adams-co-dcat → Advancing Adams Future Land Use 2022** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Future Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Boulder Valley Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → BVCP Future Land Use 2020 Retired** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → BVCP Planning Areas 2020 Retired** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Zoning Districts** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **boulder-city-dcat → Development Review Cases** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **fort-collins-hub-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **fort-collins-hub-dcat → Current Development** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → South Platte River Glide Sites** — no date column: a human to identify the temporal column (none of the lexicon date candidates present)
+- **denver-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Tree Canopy Assessment 2013 - Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Wastewater Plat Map Index** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Development Review Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Public Works Development Services Projects** — no date column: a human to identify the temporal column (none of the lexicon date candidates present)
+- **denver-dcat → Sewer Use and Drainage Permit Reviewer Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Community Planning and Development Plan Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Existing Landuse 2020** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denver-dcat → Existing Landuse 2018** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Foreign Trade Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Urban Renewal Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Qualified Opportunity Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Commercial Aeronautical Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/Enterprise Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/EconomicDevelopment/CHIPS Zones** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Coordinated Sign Plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Electronic Message Centers** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **springs-gis-root → GeneralUse/PlanningAdmin/Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **sanjose-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **santaclara-county-socrata → County of Santa Clara Permitted Body Art Facilities and Permitted Body Art Practitioners (mqx2-w62f)** — socrata resource missing: status, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **anaheim-dcat → Workforce Development Board** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Planning Commission** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Housing and Community Development Commission** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Hotel Permits** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Fire Permits Accela** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Utilities Electrical Permits Monthly** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → Building Permits** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **anaheim-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **anaheim-dcat → General Plan Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **contracosta-county-arcgis → _Authoritative/Zoning/PLA_DCD_Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **sonoma-county-socrata → Sonoma County Planning Permits (m689-iiuu)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **sonoma-county-socrata → Sonoma County Rebuilding Permits (652y-5ihx)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **sonoma-county-socrata → Sonoma County Construction Permits (88ms-k5e7)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **ventura-county-arcgis → DataDownloads/LandUse/Area plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/General Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Zone Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Area plans** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/General Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/LandUse/Zone Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/Permitting/Mining Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **ventura-county-arcgis → DataDownloads/Permitting/Oil Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → General Plan Land Use Designations** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Completed Water Well Construction Permit Inventory Since 1965** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Special Study Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Land Use By Parcel** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **slo-county-dcat → Planning Area Standards** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **phoenix-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **mesa-socrata → Building Permits (RETIRED) (2gkz-7z4f)** — socrata resource missing: type, native ZIP: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Turn Around Time - Permits (fhtq-vpmm)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Temporary Traffic Control (TTC) Permits (822f-avdk)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Development Services - Permit Submittals and Resubmittals Logged In (kg7m-y6f3)** — socrata resource missing: native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → Planning - Board of Adjustment (BOA) Memos completed (qmv6-zhfq)** — socrata resource missing: native ZIP, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mesa-socrata → DSD - Planning & Zoning and Design Review Memos Completion (u5a9-tj5y)** — socrata resource missing: native ZIP, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **scottsdale-dcat → Planning and Development Plan Reviews** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Encroachment Permits** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Cases** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Case Meetings** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Planning and Development Code Violations** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **scottsdale-dcat → Subdivisions** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Land Use Case (Case Type Class)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Variance (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Comprehensive Plan Amendment (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Development Master Plan (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Military Compatibility Permit (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningCaseInformation/Special Use Permit (Case Status)** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Zoning** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Area Plan Land Use** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **maricopa-county-arcgis → BOS/PlanningDevelopment/Scenic Corridor** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Original City Zoning - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Zoning - Tucson - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Redevelopment Plans - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Subdivisions - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Rezonings - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **tucson-dcat → Mapped Planned Land Use - Open Data** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **montgomery-county-socrata → Mechanical Permits (ih88-a6aa)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Electrical Building Permits (qxie-8qnp)** — socrata resource missing: type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → DPS - Antenna/Wireless Permits (djk9-h36c)** — socrata resource missing: status, type, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Fence Permits (9quz-avmj)** — socrata resource missing: type, date: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **montgomery-county-socrata → Sign Permits (piic-h4rw)** — socrata resource missing: type, native ZIP: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/2040_Land_Use_Changes/LU2040 Consistency Changes Dissolved** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Area_Overlays_PreliminaryDraft/Development_Policy_Area_Overlays_PreliminaryDraft** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Overlay Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Major_Roads** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/City of Annapolis** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_and_Overlay_Areas_WFL1/Policy Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas_Overlays_12042020/Development_Policy_Areas_Overlays_12042020** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/Development_Policy_Areas/Development Policy Areas** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **annearundel-arcgis → Hosted/GDP_Land_Use_Plan2040_May_2023/GDP_LandUse_Plan_2040_Update2023_04252023** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Current CBCA Land Use Designation** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Zoning History** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Plumbing Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Gas Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Electrical Permits** — no type column: a human to scope noise types (auto-wire requires an at-source type filter)
+- **baltimore-county-dcat → Use and Occupancy Permits** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **baltimore-county-dcat → Proposed Landuse** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-county-dcat → Landuse** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Housing and Building Permits 2019-Present** — no status column: a human to map the status semantics (San Antonio-style dataset-level status needs a judgment call)
+- **baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above 5,000** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Percent of Commercial Properties with Rehab Permits Above $5,000 - City** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Number of Event Permits Requested per 1,000 Residents - City** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **baltimore-city-dcat → Residential Parking Permits** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+
+### Status-domain drift — unmapped statuses DROP records
+- Registry entries checked: **169** · **gating** (in-window unmapped or volume bound breached): **12** · unreachable: **7**
+- Every probe below applies that entry's OWN `extra_where` + `recency_days` + status field, so it asks the question the connector asks (Rule 13). The scope tested is printed with each entry.
+
+#### Unreachable — status domain could NOT be read · **not clean, not checked**
+
+These entries were **not** verified. Absence of a finding below is absence of evidence, not evidence of absence — a value could be dropping records here and this run would not know.
+
+| registry_id | family | status field | why the read failed |
+|---|---|---|---|
+| pierce-county-pals-permits | arcgis | applicationStatus | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| scottsdale-building-permits | arcgis | PermitStatus | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| fairfax-active-site-construction | arcgis | RECORD_STATUS | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| fairfax-recent-building-permits | arcgis | RECORD_STATUS | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| kytc-syp-highway-plan | arcgis | KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC,KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG | in-window status read returned null (arcgis reader could not resolve a status domain) |
+| pittsburgh-pli-permits | ckan | status | in-window status read returned null (ckan reader could not resolve a status domain) |
+| allegheny-county-asbestos-permits | ckan | status | in-window status read returned null (ckan reader could not resolve a status domain) |
+
+#### Tier 1 — IN-WINDOW unmapped · **these gate the run** (records the connector fetches and drops today)
+
+| registry_id | status field | window scope probed | unmapped value(s) — records dropped |
+|---|---|---|---|
+| tacoma-accela-permits | current_status | extra_where: permit_type IN ('Building','Land Use','Site') · recency: application_date >= DATE '2025-09-06' | `Review in Process - Cycle 2` (1), `Review in Process - Cycle 3` (1) |
+| irving-development-permits | Status | no recency window — whole dataset is in-window | `EXPIRED/CHANGED DESIGN` (1) |
+| arlington-planning-cases | STATUSDESC | no recency window — whole dataset is in-window | `Saved Application` (1) |
+| fort-worth-zoning-cases | ACTION_ | no recency window — whole dataset is in-window | `Withdrawn` (2) |
+| san-jose-permits | PERMITAPPROVAL | recency: ISSUEDATE >= DATE '2025-09-06' | `E-Complete, P-4. Complete, M-4. Complete` (1), `P-Complete, M-Complete` (1) |
+| kcmo-development-cases | STATUS | recency: APPLICATIONDATE >= DATE '2021-09-07' | `4` (1), `Submitted` (1) |
+| vtrans-project-locations | ProjectStatus | extra_where: ProjectStatus IS NOT NULL AND ExpectedConstructionStart IS NOT NULL · no recency window — whole dataset is in-window | `COMPLETE` (1) |
+| sonoma-county-fire-rebuild-permits | Permit_Status | no recency window — whole dataset is in-window | `Plan Check Started` (1) |
+| austin-subdivision-cases | status | no recency window — whole dataset is in-window | `Intake Accepted` (1) |
+| austin-site-plan-cases | status | no recency window — whole dataset is in-window | `Formal Intake Accepted - Fees Paid` (1) |
+| seattle-land-use-permits | statuscurrent | recency: applieddate > '2025-09-06T00:00:00' | `Final Reviews Completed` (2) |
+| cincinnati-building-permits | statuscurrentmapped | recency: applieddate > '2025-09-06T00:00:00' | `SUBPERM` (1) |
+
+Fix: add each value verbatim to that entry's `status_to_bucket`. Never normalize or re-case — the connectors match exactly after trim. If a value's meaning cannot be established from the publisher, put it in `status_unresolved` (with `first_seen`, `records_at_first_seen` and the question asked) rather than guessing a bucket.
+
+#### Tier 2 — OUT-OF-WINDOW unmapped · non-failing (latent: outside `recency_days`, so the connector cannot fetch them today)
+
+Map these anyway where the domain is bounded and enumerable — a `recency_days` widening or one re-issued historical record is all it takes to pull them in. They do not gate.
+
+| registry_id | status field | value(s) (records outside the window) |
+|---|---|---|
+| hartford-building-permits | RECORD_STATUS | `BO to Review` (5) |
+| virginia-beach-building-permits | Status | `Ready to Issue` (1) |
+| kcmo-development-cases | STATUS | `2` (990), `4` (91), `1` (19) |
+| new-orleans-permits | currentstatus | `Violations` (5), `PUBLIC WORKS` (1), `PRE OCC METER RELEASE` (1), `TEMPORARY METER RELEASE` (1), `IZ Compliance` (1), `TEMP POWER` (1) |
+
+#### Tier 3 — difference categories · non-failing
+
+| registry_id | live value (byte-level) | registry key (byte-level) | category | resolves in production? |
+|---|---|---|---|---|
+| denver-residential-construction-permits | `FOUNDATION·ONLY/·EXCAVATION` | `Foundation·Only/·Excavation` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `ADDITION` | `Addition` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `NEW·NON-BUILDING·STRUCTURE` | `New·Non-Building·Structure` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `PHASED·CONSTRUCTION` | `Phased·Construction` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `FOUNDATION·ONLY/EXCAVATION` | `Foundation·Only/Excavation` | differs only in case | yes — case-folded lookup matches it |
+| denver-residential-construction-permits | `NEW·BUILDING` | `New·Building` | differs only in case | yes — case-folded lookup matches it |
+
+`·` marks a space. A case-only difference resolves via the case-insensitive lookup; a whitespace-only difference does **not** — `resolveNormalized` trims and case-folds but never collapses interior runs, so the registry key must be corrected to the publisher's exact bytes.
+
+#### status_unresolved — known values with no established meaning · non-failing below the 5% volume bound
+
+These are **not** bucketed and their records are still dropped, fail-closed. Listing one only records that a human looked and could not attribute a meaning — never that it is safe.
+
+| registry_id | value | in-window records | share of fetched | first seen | records at first seen | what was asked, and of whom |
+|---|---|---|---|---|---|---|
+| fort-collins-building-permits | `Issued FF` | 1 | 0.12% | 2026-07-30 | 1 | NOT YET ASKED by this pass, but ALREADY RECORDED as a deliberate non-mapping: this entry's own _receipts states "'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)" (20 |
+| san-jose-permits | `PME` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (1 record). Every other PERMITAPPROVAL value is a discipline-completion list (B-/E-/P-/M- Complete); 'PME' is bare  |
+| sussex-county-de-conditional-use | `8/19/2025` | 1 | 0.42% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net) — the row itself is the answer, and the answer is that no decision was recorded. Pulled the single matching feature in the connector's own scope: application_number 202503544, proposed_use 'Outd |
+| lee-county-fl-development-orders | `Closed-Partial Final` | 1 (+1 out-of-window) | 0.03% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net; the sandbox has no egress). The publisher documents NOTHING for this field: the layer's own field metadata returns "STATUS" with "domain": null, so there is no coded-value list to read a definit |
+| lee-county-fl-development-orders | `Enable Upload` | 0 (+1 out-of-window) | 0.00% | 2026-08-02 | 1 | ASKED 2026-08-02 (pg_net) — same probe and same closed positive control as `Closed-Partial Final` above; STATUS carries no domain, so no published definition exists. ONE record layer-wide and OUT of the connector's 1095- |
+| cincinnati-building-permits | `REVIEWED` | 1 (+6 out-of-window) | 0.01% | 2026-07-30 | 3 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `ADD INS` | 1 | 0.01% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `PAID` | 27 (+256 out-of-window) | 0.24% | 2026-07-30 | 27 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `APRV_NR` | 18 (+66 out-of-window) | 0.16% | 2026-07-30 | 15 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `BILLED` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 0 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `CAGIS` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| cincinnati-building-permits | `RENEW` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 0 | ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statu |
+| new-orleans-permits | `PILING AFFAVDAVIT` | 0 (+1 out-of-window) | 0.00% | 2026-07-30 | 1 | ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — "The most recently completed event in the permit's work |
+| new-orleans-permits | `SMFA IZ Compliance` | 0 (+2 out-of-window) | 0.00% | 2026-07-30 | 2 | ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — "The most recently completed event in the permit's work |
+
+### Type-domain drift — an unlisted `include_types` value is NEVER FETCHED
+- Entries checked: **12** · **gating** (in-window, in neither list): **1** · baseline not established: **2** · unreachable: **2**
+- The whitelist is pushed down into the query, so an unlisted value produces no record, no quarantine and no `unclassified` pin — only a count that fails to grow. Cleveland's `Install Permits` was dropped this way for five months.
+
+#### Tier 1 — IN-WINDOW unlisted · **these gate the run** (records the connector is not fetching today)
+
+| registry_id | type field | window scope probed | value(s) — records NOT fetched |
+|---|---|---|---|
+| cleveland-issued-building-permits | PERMIT_SUBTYPE | extra_where: PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL · recency: ISSUE_DATE >= DATE '2025-09-06' | `Fire Permits` (1) |
+
+Fix: add each value VERBATIM to that entry's `include_types` **and** give it a `type_map` line (or set `use_type_const`) — a whitelisted value with no mapping is fetched only to render `unclassified`. If the value is deliberate noise, add it to `observed_types_unreviewed` with that decision recorded; never silently widen the baseline to quiet the gate.
+
+#### BASELINE NOT ESTABLISHED · non-failing, and **NOT clean** — these entries were not tested
+
+| registry_id | type field | why no baseline |
+|---|---|---|
+| portland-building-permits | NEWCLASS | no `observed_types_unreviewed` on this entry — its live vocabulary has never been enumerated, so the absence of findings here attests to NOTHING |
+| san-diego-approved-permits | APPROVAL_TYPE | no `observed_types_unreviewed` on this entry — its live vocabulary has never been enumerated, so the absence of findings here attests to NOTHING |
+
+An absent `observed_types_unreviewed` is a THIRD state, distinct from an empty one. Empty = enumerated, emits nothing unfetched. Absent = never enumerated, so silence here means nothing.
+
+#### Tier 2 — OUT-OF-WINDOW unlisted · non-failing (outside `recency_days`, unfetchable today)
+
+| registry_id | value(s) |
+|---|---|
+| columbus-building-permits | `Minor Alteration` (64113), `Repair Replace` (63682), `Illuminated` (9048), `Minor Limited Scope` (3511), `Non-Illuminated` (2632), `Resurface Illuminated Sign` (2180), `Regular` (1428), `NA` (982), `Resurface Non-Illuminated Sign` (436), `Emergency` (191), `Temporary` (63), `Billboard` (38), `Graph |
+| cleveland-issued-building-permits | `Mechanical` (3) |
+| nashville-building-permits-issued | `Building Commercial Rehab Storm Damage` (11), `Building Commercial New Storm Damage` (4), `Building Moving Permit` (3) |
+| aurora-building-permits | `Res.Fireplace/Wood Burning Stove-RT3` (9), `Hazardous Occupancy Bldg` (7), `Single Family Attached Plan` (6), `Hazardous Materials` (1), `Chicken Permit` (1) |
+| slo-county-planning-permits | `Time Extension` (103), `REV: After Issuance Revision` (19), `Long Range Planning` (12), `Vehicle Abatement` (5), `Condition Compliance Monitoring` (4), `CCM - Condition Compliance Montoring` (1) |
+| cincinnati-building-permits | `Repair` (511), `Fences` (35), `Certificates of Occupancy/Insp` (1) |
+
+#### Tier 3 — DECLARED but matching ZERO live rows · non-failing
+
+A permanent tier, not a one-time sweep. Cleveland's `Building` sat in `include_types` **and** `type_map` matching 0 rows all-time, which is exactly why a stale four-value enumeration read as confirmed. Harmless to fetching; corrosive to trust in the config.
+
+| registry_id | declared value(s) with no live rows |
+|---|---|
+| columbus-building-permits | `Addition`, `Major Alteration`, `New Construction` |
+| nashville-building-permits-issued | `Building Residential - Shell`, `Building Residential - Tenant Finish Out` |
+| aurora-building-permits | `Factory Use Building`, `Multi Family Plan`, `Sales Trailer - Residential` |
+| slo-county-planning-permits | `Land Use`, `Land Use (PRE 7/1/2021)`, `Renewable Energy`, `Subdivision (PRE 7/1/2021)`, `Zoning Clearance (PRE 7/1/2021)` |
+| bismarck-building-permits | `BUILDING COMMERCIAL ALTERATION` |
+
+#### observed_types_unreviewed — matched the baseline · non-failing, **UNREVIEWED**
+
+⚠️ These values were observed live when the gate was armed and are NOT fetched. Listing one records only that it already existed — **never that excluding it was reviewed or approved.**
+
+| registry_id | value(s) observed-not-fetched | records |
+|---|---|---|
+| columbus-building-permits | `Fire Protection`, `MEP`, `Plans Examination`, `Sign`, `Special` | 27963 |
+| nashville-building-permits-issued | `Building Use & Occupancy`, `Building Residential - Change Contractor`, `Building Residential - Roofing / Siding`, `Building Commercial - Change Contractor`, `Building Residential - Fire Damage`, `Building Sign Permit`, `Building Residential New Storm Damage`, `Building Commercial - Roofing / Siding | 1247 |
+| aurora-building-permits | `Fire Sprinkler Permit`, `Roofing-RT2`, `Electrical Permit`, `Mechanical Permit`, `Gating System`, `Hood Suppression Permit`, `Plumbing Permit`, `Roofing Commercial-NT2`, `Occupancy Load Sign Calculation`, `Fence Permit`, `Plan Revisions`, `Fire Alarm Permit`, `Residential Elevator Permit` | 9197 |
+| slo-county-planning-permits | `Public, Peace, Safety, and Morals`, `Septic`, `Code Enforcement`, `Auxiliary`, `Amendment`, `Map Number`, `Long-Range Planning`, `Research`, `Appeal`, `Renewable Energy `, `Septic ASB`, `Express `, `Mitigation Monitoring`, `CEQA`, `Cannabis Code - S`, `Events`, `Project Modification`, `Residential  | 17823 |
+| bismarck-building-permits | `IND SIGNIFICANT INDUSTRIAL USERS`, `FIRE FUEL TANK`, `ENG CONCRETE`, `IND DENTAL`, `FIRE FIREWORK`, `BUILDING PLUMBING`, `BUILDING SIGN`, `BUILDING ELECTRIC SELF-WIRE`, `ENG PRIVATE UTILITY`, `ENG REPAIR`, `BUILDING ELECTRIC`, `FIRE DAYCARE CENTER`, `ENG TRAFFIC`, `BUILDING TEMPORARY`, `ENG EXCAVAT | 4612 |
+| cincinnati-building-permits | `Fire Protection Systems`, `Signs`, `Non-Standard Permit Type`, `Parking Lots`, `Misc. Structures`, `Plumbing Permits`, `Elevator Permit`, `Excavation/Fill`, `HVAC` | 8268 |
+
+#### Type domain UNREACHABLE · non-failing, and **NOT clean**
+
+| registry_id | type field | reason |
+|---|---|---|
+| fairfax-active-site-construction | APPTYPEALIAS | in-window type read returned null (arcgis reader could not resolve a type domain) |
+| fairfax-recent-building-permits | APPTYPEALIAS | in-window type read returned null (arcgis reader could not resolve a type domain) |
+
+- Whitelist/mapping invariant holds: every whitelisted value has a `type_map` line or a `use_type_const`.

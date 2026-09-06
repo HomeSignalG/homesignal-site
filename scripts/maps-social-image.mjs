@@ -33,6 +33,16 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
+// this module cannot carry a second copy of the rendering rules.
+globalThis.window = globalThis.window || globalThis;
+for (const f of ['../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+  (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
+}
+const HS = globalThis.window.HS;
+
+
+
 const BASE = (process.env.BASE || 'https://homesignal.net').replace(/\/$/, '');
 const SB = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim();
@@ -92,10 +102,20 @@ async function authoritativePresence(zip, sourceKey) {
   if (!r.ok) return { status: `rpc ${r.status}`, present: false, markers: null };
   const j = await r.json();
   const markers = Array.isArray(j?.markers) ? j.markers : null;
+  // PRESENCE IS WHAT THE PAGE DRAWS, NOT WHAT THE RPC RETURNS. The RPC hands back every
+  // project in the ZIP's authoritative membership; the page then applies the SHIPPED site
+  // builder, which drops records with no record_url and - since 2026-09-05 - Residential
+  // records that are routine work on an existing property rather than development
+  // (lib/residential-qualify.js). Matching on the raw marker list would claim a project is
+  // "on the ZIP page" when the page in fact draws nothing for it, and this module would then
+  // hunt for a marker that does not exist. Running the same builder here is what keeps one
+  // definition of the rendered set instead of two.
+  const sites = HS.zipAuthSitesFrom(j);
   return {
     status: j?.status || 'unknown',
     markers: markers ? markers.length : null,
-    present: !!markers && markers.some((m) => m && m.project_ref === sourceKey),
+    rendered: sites.length,
+    present: sites.some((s) => s && s.zip_project_ref === sourceKey),
   };
 }
 

@@ -484,8 +484,10 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
+<script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
+<script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="shell.js"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
@@ -554,6 +556,12 @@ HS.onReady(function(){
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
+  // The generated county -> sources map (lib/generated/county-sources.json). ZIP mode only:
+  // it answers "does any source covering this county still classify records as Commercial?",
+  // which is what stops an uncovered page implying it measured Commercial and found none.
+  // Non-blocking and failure-tolerant — if it never loads, HS.commercialCoverage returns
+  // covered:null and the page says nothing rather than guessing.
+  var COUNTY_SOURCES = null;
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
@@ -958,6 +966,22 @@ HS.onReady(function(){
   // async county lookup in loadZip() (sets ZIP_COUNTY) — whichever lands last paints the final text.
   function updateCovNote(){
     var el = $("covNote"); if(!el) return;
+    // COMMERCIAL COVERAGE (founder rule, 2026-09-05). Commercial-capable sources cover 100
+    // (state, county) pairs, so 9,481 of 12,722 ZIP pages can never draw a Commercial pin.
+    // Without this line such a page reads as "measured the whole ZIP, found no commercial
+    // development" — a measured-zero claim for a Type that was never searched.
+    // It is deliberately NOT limited to empty pages: the case it exists for is a ZIP that DOES
+    // show residential permits or road projects from a county with no Commercial source.
+    // Returns null when coverage is not established (no map, ambiguous county) — silence, never
+    // a guessed "uncovered". Declared here, ABOVE the guards, so the FAC_UNAVAILABLE ->
+    // FACILITIES_ONLY precedence shape stays exactly as facilities-unavailable-copy.test.mjs
+    // pins it; on a FAC_UNAVAILABLE page the EPA-outage note keeps sole possession of this
+    // element, which is that test's contract and not this unit's to change.
+    function commercialNote(){
+      if(!ZIP_MODE || !HS.commercialCoverage) return null;
+      return HS.commercialCoverage.note(COUNTY_SOURCES, ZIP_COUNTY, ZIP_STATE,
+        ZIP_COUNTY ? (ZIP_COUNTY + " County") : null);
+    }
     // Takes precedence: a page cannot simultaneously be "showing facilities but no planning items"
     // and "unable to show facilities at all". Says only what is certainly true of every flagged
     // page — FRS is unreachable NOW, so the count cannot be confirmed — rather than claiming
@@ -979,7 +1003,11 @@ HS.onReady(function(){
       el.style.display = "";
       return;
     }
-    if(!FACILITIES_ONLY){ el.style.display = "none"; el.textContent = ""; return; }
+    if(!FACILITIES_ONLY){
+      var _c0 = commercialNote();
+      if(_c0){ el.textContent = _c0; el.style.display = ""; return; }
+      el.style.display = "none"; el.textContent = ""; return;
+    }
     var where = ZIP_COUNTY ? (ZIP_COUNTY + " County") : "this area";
     // WAS: "Showing EPA-registered facilities for this ZIP." That was false - the facility set
     // is an EPA query around this ZIP, not a measurement of it, and on 50 ZIPs with authoritative
@@ -987,7 +1015,8 @@ HS.onReady(function(){
     // where facilities are the only content, so it was the strongest whole-ZIP claim on the page.
     el.textContent = "Nearby EPA-registered facilities are shown for additional local context. "
       + "Local planning-hearing and land-use coverage for " + where + " isn't available yet — "
-      + "we're adding counties over time.";
+      + "we're adding counties over time."
+      + (function(){ var c = commercialNote(); return c ? " " + c : ""; })();
     el.style.display = "";
   }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
@@ -1194,6 +1223,15 @@ HS.onReady(function(){
         setIndexable(ZIP_MODE && ZIP_INDEXABLE && HAS_CONTENT);
       }).catch(function(){});
     LAST_ADDR = "ZIP " + zip;
+    // The generated county -> sources map, fetched once. Failure is silent BY DESIGN: a page
+    // that cannot read it reports covered:null and says nothing about Commercial coverage,
+    // which is the honest state — never a guessed "uncovered".
+    if(!COUNTY_SOURCES){
+      fetch("lib/generated/county-sources.json")
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if(j){ COUNTY_SOURCES = j; updateCovNote(); } })
+        .catch(function(){});
+    }
     // Best-effort county name for the coverage note + the "Town Name (ZIP)" place label
     // for the header (the cache row has neither). Non-blocking: if it resolves after
     // render(), updateCovNote() re-paints. cs.{<zip>} = text[] contains; take the county
@@ -1774,11 +1812,34 @@ HS.onReady(function(){
       "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
+  // ONE PROJECT = ONE CARD. The rails are built from SITES, and one project can legitimately own
+  // several sites - a road corridor drawn as points along its length is the standard case. Until
+  // now the rails held that contract by ordering plus the 12-row cap, which truncated the repeats
+  // rather than removing them; scripts/probe-map1-card-grain.mjs has reported that as a LATENT
+  // condition with the words "de-dup the rails before any cap is raised". Narrowing the Residential
+  // population made room under the cap and turned it actual: 76135 rendered one TxDOT project 7
+  // times. De-duping on the project's own identity is that precondition, met. A row with NO project
+  // identity is never collapsed - it gets a unique key, so two genuinely distinct permits at one
+  // address both keep their card.
+  function railKey(s, i){
+    var k = s && (s.zip_project_ref || s.n5_source_key || s.source_id || s.project_ref);
+    return k ? 'ref:' + k : 'row:' + i;
+  }
+  function dedupeByProject(items){
+    var seen = Object.create(null), out = [];
+    (items || []).forEach(function(s, i){
+      var k = railKey(s, i);
+      if(seen[k]) return;
+      seen[k] = 1; out.push(s);
+    });
+    return out;
+  }
   function listInto(id, items, emptyMsg, opts){
     opts = opts || {};
     var el = $(id);
+    items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
-    el.innerHTML = items.slice(0,12).map(function(s){
+    el.innerHTML = items.slice(0,12).map(function(s, i){
       var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
@@ -1808,7 +1869,12 @@ HS.onReady(function(){
       var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
       var dm = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
-      return "<div class='rec'><span class='dot' style='background:"+col+"'></span>"+
+      // data-ref makes the row's PROJECT IDENTITY observable in the DOM. The card-grain probe
+      // used to simulate the rail by re-slicing the site list, which meant it was testing its own
+      // copy of the rendering rather than the rendering; with the rails now de-duped, that
+      // simulation disagreed with the DOM it was supposed to be checking. Reading identity off
+      // the rendered row is the fix, and it makes "one project = one card" checkable directly.
+      return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
         "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+v+"</div></div>";
     }).join("");
