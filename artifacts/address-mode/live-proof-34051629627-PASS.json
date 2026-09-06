@@ -1,0 +1,45 @@
+{
+  "run": 34051629627,
+  "head_sha": "fa1d99d128076af5f1df37daf82e9ac674be4f8a",
+  "base": "https://homesignal.net",
+  "address": "2200 CALDWELL LN, DEL VALLE, TX 78617",
+  "zip": "78617",
+  "radii_requested": [0.5, 1, 2, 5],
+  "geocoded_home": {
+    "endpoint": "functions/v1/geocode-address",
+    "matched": "2200 CALDWELL LN, DEL VALLE, TX, 78617",
+    "lat": 30.215054966235, "lng": -97.53885104845,
+    "rpc_centre_lat": 30.215054966235, "rpc_centre_lng": -97.53885104845,
+    "byte_identical": true
+  },
+  "per_radius": [
+    { "radius": 0.5, "rows_returned": 2,   "point_rows": 2,   "non_point_rows": 0,
+      "geometry_types": ["ST_Point"],
+      "max_recomputed_mi": 0.278336, "max_delta_mi": 0.000123, "max_rpc_distance_mi": 0.278213114517468,
+      "outside_radius_points": 0, "outside_radius_non_points": 0, "distance_disagreements": 0 },
+    { "radius": 1,   "rows_returned": 5,   "point_rows": 5,   "non_point_rows": 0,
+      "geometry_types": ["ST_Point"],
+      "max_recomputed_mi": 0.939314, "max_delta_mi": 0.002285,
+      "outside_radius_points": 0, "outside_radius_non_points": 0, "distance_disagreements": 0 },
+    { "radius": 2,   "rows_returned": 19,  "rendered_canonical": 19,
+      "outside_radius_points": 0, "outside_radius_non_points": 0, "distance_disagreements": 0 },
+    { "radius": 5,   "rows_returned": 246, "rendered_canonical": 245,
+      "point_rows": 234, "non_point_rows": 12,
+      "geometry_types": ["ST_Point", "ST_MultiLineString"],
+      "max_recomputed_mi": 4.993031, "max_delta_mi": 0.014703, "max_rpc_distance_mi": 4.9975802218233,
+      "outside_radius_points": 0, "outside_radius_non_points": 0, "distance_disagreements": 0,
+      "non_point_marker_diagnostics_note": "12 TxDOT ST_MultiLineString corridors. 5 have a PIN outside 5 mi (max 6.467125) while their NEAREST geometry is 2.72-4.73 mi from HOME - recorded as diagnostics, never as failures.",
+      "worst_line_row": { "source_key": "arcgis:txdot-projects-info-all:638675001",
+                          "rpc_distance_mi": 4.73184437437242, "marker_point_mi": 5.046255 } }
+  ],
+  "ladder_monotonic": "2 -> 5 -> 19 -> 246",
+  "zip_separation": {
+    "zip_parameter_in_radius_rpc": "absent at every radius",
+    "returning_to_zip": "no address-radius result survives, no HOME pin, no radius control",
+    "zip_headline_observed": "Across ZIP 78617",
+    "zip_fresh_observed": "Updated Sep 5, 2026 · 494 projects across the whole of ZIP 78617."
+  },
+  "gates": { "live_proof_fails": 0, "user_journey_fails": 0, "market_readiness_fails": 0 },
+  "result": "PASS",
+  "gh_artifact": { "name": "address-mode-evidence-34051629627", "id": 9994732216 }
+}
