@@ -11300,3 +11300,82 @@ page shows nothing and says nothing, which is the one state worse than an error.
 **Do not read this as the accounting being unproven.** Every state claim in this unit rests on
 SQL taken directly against the tables, and on a runner-side archive read that gated itself four
 ways. What is unproven is only the final full-sweep re-run.
+
+---
+
+## 2026-09-06 — ONE READ CONTRACT FOR `not_measured`: state decides, not historical cutover
+
+**The contradiction.** Two canonical ZIPs with the SAME truthful geography state — `not_measured
+/ NO_ZCTA_IN_TIGER_2025`, i.e. the pinned TIGER contract holds no ZCTA for them so whole-ZIP
+measurement was never possible — meant two different things to a resident, decided entirely by
+whether a historical cutover row happened to exist:
+
+```
+10015   stale cutover ENABLED  -> authoritative branch -> 0 rows  -> reads as a MEASURED ZERO
+                                  (and its 102 legacy rows sat hidden behind that)
+01004   no cutover row         -> LEGACY branch        -> 90 rows of pre-authoritative,
+                                  centroid/proxy-derived ZIP development
+```
+
+**Gate 1 — the consumer inventory, and it is wider than the previous unit found.**
+`app_projects_for_zip` is reached through `HS.data.projects` by **`lib/community-page.js` (every
+one of the 12,722 generated ZIP pages and `community.html`)**, `development.html`,
+`property.html`, `shell.js`, `dashboard.html`, `properties.html`, `today.html`, `reports.html`.
+Map 1 is the only surface on the other RPC. DB-side: `geo.refresh_maps_zip_export` and
+`public.app_projects_for_zip` are the only cutover readers; nothing calls
+`app_authoritative_projects_for_zip` directly and no client reads `app_projects` directly, so
+the gate cannot be bypassed.
+- ⚠️ **`.complete` is read by NOTHING.** `rpcAllRows` has carried a `{rows, complete}` contract
+  all along, and `maps.html` was its only consumer — retired in #1028. So `complete:false`
+  silently degrades to an empty array everywhere, which is why it could not be the fix on its
+  own.
+
+**Gate 4 — the answer is BOTH halves, and the order is load-bearing.** Disabling the 64 stale
+cutover rows alone would have made things worse: it moves them out of the false measured-zero
+and into the LEGACY branch where the other 642 already are, so 10015 would have *started*
+serving 102 centroid-derived records. The read path had to be corrected first.
+
+**Gate 2 — the contract, stated positively.**
+
+| state | read | page |
+|---|---|---|
+| `boundary_complete` + cut over | authoritative whole-ZIP development, possibly empty | empty here is a REAL measured zero and keeps the "no records on file" wording |
+| `boundary_complete`, not cut over | **UNAVAILABLE** — fails closed (0 ZIPs today) | — |
+| `not_measured` | **UNAVAILABLE**, carrying the status | names the reason, refuses the centroid substitute, says it is *not* a finding of zero |
+| pending / unresolved | **UNAVAILABLE:unknown** | same, unresolved wording |
+| facilities, any state | untouched legacy path | preserved — no authoritative ZIP development must never become an empty page |
+
+The unavailable answer is an OBJECT, not an array, so `Array.isArray` at every existing caller
+rejects it — the same shape `app_zip_projects_markers` already uses for this exact question.
+
+**Gate 3 — the stale set, derived not transcribed.** Canonical · `not_measured` ·
+`NO_ZCTA_IN_TIGER_2025` · enabled cutover · `membership_rows = 0` · no membership and no marker
+rows: **64 ZIPs, md5 `161ba702caee12bab4d0b1fd783cdf8a`** with the collation pinned — equal to
+the already-proven population. The migration re-derives it and refuses if it moved.
+
+**Gate 10 — measured after, never assumed:**
+```
+canonical                12,722     enabled cutover rows                  12,013
+boundary_complete        12,013     enabled outside boundary_complete          0
+not_measured                706     boundary_complete missing enabled          0
+pending                       3     verified rows                         12,013
+                         ------     verified outside boundary_complete         0
+TOTAL                    12,722     not_measured with enabled cutover          0
+                                    pending with enabled cutover               0
+```
+
+**Gate 9 — the control matrix, live:**
+
+| ZIP | role | state | cutover | development read | facilities | legacy rows no longer served |
+|---|---|---|---|---|---:|---:|
+| 10015 | repaired | not_measured | — | `UNAVAILABLE:not_measured` | 10 | 102 |
+| 78711 | repaired | not_measured | — | `UNAVAILABLE:not_measured` | 35 | 473 |
+| 01004 | established | not_measured | — | `UNAVAILABLE:not_measured` | 5 | 90 |
+| 01009 | measured zero | boundary_complete | enabled | **`ARRAY(0)`** | 26 | 79 |
+| 28456 | authoritative | boundary_complete | enabled | `ARRAY(12)` | 5 | 52 |
+| 30033 | dense | boundary_complete | enabled | `ARRAY(2261)` | 37 | 10,960 |
+| 76227 | Rule 5 control | boundary_complete | enabled | `ARRAY(5708)` | 12 | 414 |
+| 94128 | pending | *(no row)* | — | `UNAVAILABLE:unknown` | 20 | 32 |
+
+The three `not_measured` ZIPs now answer identically; `ARRAY(0)` keeps a measured zero distinct
+from an unmeasured one; pending is distinct again; facilities survive on every row.
