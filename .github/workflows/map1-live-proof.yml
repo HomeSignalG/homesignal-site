@@ -103,9 +103,31 @@ jobs:
           ZIP: ${{ inputs.zip }}
           R1: ${{ inputs.r1 }}
           R2: ${{ inputs.r2 }}
+          # The four radii the address-mode contract names. r1/r2 stay dispatch inputs so an
+          # existing dispatch behaves as before; RADII is what makes the run cover the whole
+          # ladder in ONE browser session rather than four separate ones.
+          RADII: '0.5,1,2,5'
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -o pipefail
           node scripts/map1-live-proof.mjs 2>&1 | tee /tmp/proof.log
+
+      - name: Print the address-mode evidence artifact into the log
+        if: always()
+        run: |
+          set -o pipefail
+          for f in artifacts/address-mode/*.json; do
+            [ -e "$f" ] || { echo "NO EVIDENCE ARTIFACT WRITTEN"; break; }
+            echo "===== $f ====="; cat "$f"
+          done 2>&1 | tee /tmp/evidence.log
+
+      - name: Upload the address-mode evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: address-mode-evidence-${{ github.run_id }}
+          path: artifacts/address-mode/
+          if-no-files-found: warn
 
       # The MARKET-READINESS GATE runs in the same session: the proof above certifies the
       # geographic contracts, this asks the user-level question - does what the resident READS

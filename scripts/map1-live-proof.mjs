@@ -41,10 +41,43 @@ page.on('request', r => {
 });
 function safe(r) { try { return JSON.parse(r.postData() || '{}'); } catch { return {}; } }
 const rpcResponses = [];
+// The geocoder's RESPONSE, not just the request. Without it "the radius is centred on the
+// geocoded HOME" is an inference: the request proves what address was SENT, and only the
+// response proves which point came BACK. Raw text is kept so the comparison against the RPC's
+// centre can be byte-identical rather than float-equal after two reparses.
+const geoResponses = [];
 page.on('response', async (res) => {
-  if (!/rpc\/n5_projects_within_radius/.test(res.url())) return;
+  const u = res.url();
+  if (/functions\/v1\/geocode-address/.test(u)) {
+    try { const t = await res.text(); geoResponses.push({ status: res.status(), raw: t, body: JSON.parse(t) }); }
+    catch { /* body already consumed */ }
+    return;
+  }
+  if (!/rpc\/n5_projects_within_radius/.test(u)) return;
   try { rpcResponses.push({ status: res.status(), rows: await res.json() }); } catch { /* body already consumed */ }
 });
+
+// GREAT-CIRCLE DISTANCE, computed here and never read from the row being judged. The RPC
+// reports its own distance_mi; asserting a row against that number only proves the RPC is
+// self-consistent. Recomputing from the HOME point the GEOCODER returned to the marker
+// coordinate the row CARRIES is what makes "a canonical physical location inside the selected
+// radius" a measurement instead of a restatement.
+const R_EARTH_MI = 3958.7613;
+function haversineMi(aLat, aLng, bLat, bLng) {
+  const rad = Math.PI / 180;
+  const dLat = (bLat - aLat) * rad, dLng = (bLng - aLng) * rad;
+  const h = Math.sin(dLat / 2) ** 2
+          + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R_EARTH_MI * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// The contract radii. Default preserves the original two-radius flow exactly, so an existing
+// dispatch behaves as it always did; a dispatch that names all four walks all four.
+const RADII = String(process.env.RADII || '').trim()
+  ? String(process.env.RADII).split(',').map(x => Number(x.trim())).filter(x => x > 0)
+  : [R1, R2];
+const EVIDENCE = { base: BASE, address: ADDRESS, zip: ZIP, radii_requested: RADII,
+                   geocoded_home: null, per_radius: [], started_utc: new Date().toISOString() };
 const sites = () => page.evaluate(() => (window.__HS_SITES || []).map(s => ({
   label: s.label, scope: s.scope, relevance: s.relevance, lat: s.lat, lng: s.lng,
   distance_mi: s.distance_mi, registry_id: s.registry_id,
@@ -101,6 +134,76 @@ info('radius sent', rpc && rpc.body.p_radius_mi);
 info('N5 rows returned', rpcRows.length);
 info('has_more', rpcRows.some(r => r.has_more === true));
 ok(rpc && rpc.body.p_radius_mi === R1, '5 — the selected radius was sent', rpc && rpc.body.p_radius_mi);
+
+// ═══ 5b. THE RADIUS IS CENTRED ON THE POINT THE GEOCODER RETURNED ═══
+// Requirement 4. Previously the HOME coordinate was only INFO'd, which proves nothing about
+// where it came from: a centroid, a cached value, or a ZIP anchor would print identically.
+const geoRes = geoResponses[0];
+ok(!!geoRes && geoRes.status === 200, '5b — production geocode-address answered 200',
+   geoRes && geoRes.status);
+const gm = geoRes && (geoRes.body.match || geoRes.body);
+const gLat = gm && (gm.lat != null ? gm.lat : gm.latitude);
+const gLng = gm && (gm.lng != null ? gm.lng : gm.longitude);
+ok(gLat != null && gLng != null, '5b — the geocoder returned a HOME coordinate',
+   gm && JSON.stringify(gm).slice(0, 200));
+info('geocoder matchedAddress', gm && (gm.matchedAddress || gm.address));
+info('geocoder HOME lat/lng', { lat: gLat, lng: gLng });
+// Byte-identical, not float-close: the page must pass the geocoder's point through unchanged.
+ok(String(rpc.body.p_lat) === String(gLat) && String(rpc.body.p_lng) === String(gLng),
+   '5b — the RPC is centred on EXACTLY the geocoded HOME point, unmodified',
+   { geocoder: [gLat, gLng], rpc_centre: [rpc.body.p_lat, rpc.body.p_lng] });
+// Requirement 6, at the request layer: ZIP geography must not enter address mode at all.
+const rpcKeys = Object.keys(rpc.body || {});
+ok(!rpcKeys.some(k => /zip/i.test(k)), '5b — the radius RPC carries NO zip parameter', rpcKeys);
+ok(!(calls.find(c => c.kind === 'report') || {}).body?.zip,
+   '5b — the report request carries no zip either — address geography is never ZIP geography');
+EVIDENCE.geocoded_home = { lat: gLat, lng: gLng,
+  matched: gm && (gm.matchedAddress || gm.address) || null,
+  rpc_centre_lat: rpc.body.p_lat, rpc_centre_lng: rpc.body.p_lng,
+  byte_identical: String(rpc.body.p_lat) === String(gLat) && String(rpc.body.p_lng) === String(gLng) };
+
+// ═══ 5c. EVERY RETURNED PROJECT IS PHYSICALLY INSIDE THE SELECTED RADIUS ═══
+// Requirement 5, measured independently of the number the row reports about itself.
+const HOME = { lat: Number(gLat), lng: Number(gLng) };
+function radiusEvidence(radius, rows, rendered) {
+  const withGeom = rows.filter(r => r.marker_lat != null && r.marker_lng != null);
+  const checks = withGeom.map(r => {
+    const d = haversineMi(HOME.lat, HOME.lng, Number(r.marker_lat), Number(r.marker_lng));
+    return { source_key: r.source_key, feature_id: r.feature_id, registry_id: r.registry_id,
+             provenance: r.provenance, geometry_type: r.geometry_type,
+             marker_lat: r.marker_lat, marker_lng: r.marker_lng,
+             rpc_distance_mi: r.distance_mi, recomputed_mi: Number(d.toFixed(6)),
+             delta_mi: Number(Math.abs(d - Number(r.distance_mi)).toFixed(6)),
+             inside: d <= radius + 1e-6 };
+  });
+  const outside = checks.filter(c => !c.inside);
+  const disagree = checks.filter(c => c.delta_mi > 0.02);
+  const noGeom = rows.length - withGeom.length;
+  EVIDENCE.per_radius.push({ radius, rows_returned: rows.length, rows_with_geometry: withGeom.length,
+    rows_without_geometry: noGeom, rendered_canonical: rendered,
+    max_recomputed_mi: checks.length ? Math.max(...checks.map(c => c.recomputed_mi)) : null,
+    max_delta_mi: checks.length ? Math.max(...checks.map(c => c.delta_mi)) : null,
+    outside_radius: outside.length, distance_disagreements: disagree.length,
+    sample: checks.slice(0, 5) });
+  info(`[${radius} mi] rows`, rows.length + ' (with geometry ' + withGeom.length + ')');
+  if (checks.length) {
+    info(`[${radius} mi] farthest recomputed`, Math.max(...checks.map(c => c.recomputed_mi)) + ' mi');
+    info(`[${radius} mi] worst distance delta`, Math.max(...checks.map(c => c.delta_mi)) + ' mi');
+  }
+  ok(rows.length === 0 || withGeom.length > 0,
+     `5c — [${radius} mi] returned rows carry canonical marker geometry`, { rows: rows.length, withGeom: withGeom.length });
+  ok(outside.length === 0,
+     `5c — [${radius} mi] EVERY returned project is physically within the selected radius`,
+     outside.slice(0, 4));
+  ok(disagree.length === 0,
+     `5c — [${radius} mi] the RPC's distance_mi matches an independent great-circle recompute from the geocoded HOME`,
+     disagree.slice(0, 4));
+  ok(checks.every(c => /point|polygon|linestring|geometry/i.test(String(c.geometry_type || ''))),
+     `5c — [${radius} mi] every result is a real canonical geometry, not a synthesised point`,
+     [...new Set(checks.map(c => c.geometry_type))]);
+  return checks;
+}
+radiusEvidence(R1, rpcRows, (await sites()).filter(x => x.n5_feature_id).length);
 
 const homePins = await page.locator('.homepin').count();
 ok(homePins === 1, '6 — the HOME marker is drawn', homePins);
@@ -214,6 +317,57 @@ if (rows2.some(r => r.has_more === true)) {
     '9 — has_more is surfaced, not presented as complete: ' + fresh2);
 }
 
+radiusEvidence(R2, rows2, n5b.length);
+
+// ═══════════ 7b. THE REMAINING CONTRACT RADII ═══════════
+// Requirement 4 names four controls — 0.5 / 1 / 2 / 5. The original flow proved two. The rest
+// are walked here through the SAME page in the SAME session, clicking the same control a
+// resident clicks, so nothing about the mechanism changes — only the coverage.
+for (const R of RADII.filter(r => r !== R1 && r !== R2)) {
+  calls.length = 0; rpcResponses.length = 0;
+  const sel = `#radSel button[data-r="${R}"]`;
+  const present = await page.locator(sel).count();
+  ok(present === 1, `7b — the page offers the ${R} mi control a resident would click`, present);
+  if (present !== 1) continue;
+  await page.click(sel);
+  await page.waitForFunction((lbl) => {
+    const el = document.getElementById('freshLine');
+    return !!el && el.textContent.indexOf(lbl) !== -1;
+  }, RLBL(R), { timeout: 90000 });
+  const rpcN = calls.find(c => c.kind === 'rpc');
+  ok(!!rpcN && rpcN.body.p_radius_mi === R, `7b — [${R} mi] the selected radius was queried`,
+     rpcN && rpcN.body.p_radius_mi);
+  // Requirement 4 again, at every control: the centre must still be the geocoded HOME.
+  ok(rpcN && String(rpcN.body.p_lat) === String(gLat) && String(rpcN.body.p_lng) === String(gLng),
+     `7b — [${R} mi] still centred on EXACTLY the geocoded HOME point`,
+     rpcN && { lat: rpcN.body.p_lat, lng: rpcN.body.p_lng });
+  ok(rpcN && !Object.keys(rpcN.body).some(k => /zip/i.test(k)),
+     `7b — [${R} mi] no zip parameter — ZIP geography is not substituted into address mode`);
+  const rowsN = (rpcResponses[0] && Array.isArray(rpcResponses[0].rows)) ? rpcResponses[0].rows : [];
+  const sN = await sites();
+  const n5N = sN.filter(x => x.n5_feature_id);
+  const keysN = new Set(rowsN.map(r => r.source_key + '|' + r.feature_id));
+  ok(n5N.every(x => keysN.has(x.n5_source_key + '|' + x.n5_feature_id)),
+     `7b — [${R} mi] every rendered result is one the RPC returned for THAT radius`,
+     { rendered: n5N.length, returned: rowsN.length });
+  radiusEvidence(R, rowsN, n5N.length);
+  const freshN = await page.textContent('#freshLine');
+  ok((freshN || '').indexOf(RLBL(R)) !== -1,
+     `7b — [${R} mi] the completeness line names THIS radius`, freshN);
+}
+
+// MONOTONICITY ACROSS THE WHOLE CONTRACT LADDER. A larger circle around a fixed centre
+// contains a smaller one, so the returned population can never shrink as the radius grows.
+// This is the property that would break first if any control were re-centred.
+{
+  const byR = EVIDENCE.per_radius.slice().sort((a, b) => a.radius - b.radius);
+  const shrinks = byR.filter((x, i) => i > 0 && x.rows_returned < byR[i - 1].rows_returned);
+  info('radius ladder', byR.map(x => x.radius + ' mi -> ' + x.rows_returned + ' rows').join('  |  '));
+  ok(shrinks.length === 0,
+     '7b — the returned population never shrinks as the radius grows (one fixed centre)',
+     shrinks.map(x => x.radius));
+}
+
 // ═══════════ 8. LIVE ZIP REGRESSION ═══════════
 calls.length = 0;
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -312,4 +466,15 @@ console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
 console.log('='.repeat(78));
 await browser.close();
+EVIDENCE.finished_utc = new Date().toISOString();
+EVIDENCE.fails = fails;
+EVIDENCE.result = fails ? 'FAIL' : 'PASS';
+try {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  mkdirSync('artifacts/address-mode', { recursive: true });
+  const out = 'artifacts/address-mode/live-proof-' + (process.env.RUN_ID || 'local') + '.json';
+  writeFileSync(out, JSON.stringify(EVIDENCE, null, 2));
+  console.log('\nEVIDENCE ARTIFACT: ' + out);
+} catch (e) { console.log('could not write evidence artifact: ' + e); }
+
 process.exit(fails ? 1 : 0);
