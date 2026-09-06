@@ -1406,7 +1406,16 @@ HS.onReady(function(){
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
+    // RULE 5 IS TOTAL AND IT RUNS HERE. render() is the ONE funnel every user-facing
+    // Residential population comes out of - rails, devCount, MAP_SITES and all three map
+    // views read `sites` below - so qualifying here is what makes "qualification = rail =
+    // count = marker" true rather than asserted. The per-mode gates in lib/zip-authoritative.js
+    // and lib/n5-radius.js stay: they run at site CONSTRUCTION, before zipAuthProjectCount,
+    // and they are what keeps a rejected record out of the ZIP note too. This one catches the
+    // third shape neither of them sees - cached report sites, of which 41,661 are scope 'area'
+    // relevance 'development' and 812 Residential (measured 2026-09-06).
     var sites = (data.sites || []).filter(sourced);
+    if(window.HS && HS.residentialQualifySites) sites = HS.residentialQualifySites(sites);
     window.__HS_SITES = sites;
     // SEO policy: index only a ZIP page whose stamped substance flag is true AND that rendered
     // real sourced content. Address mode (ZIP_MODE false), thin and empty ZIPs stay noindex.
@@ -2412,6 +2421,11 @@ HS.onReady(function(){
   function renderProperty(row){
     status("");
     var recs = (row.sites || []).filter(sourced);          // anti-fabrication gate, again at the page
+    // The property page is the SECOND funnel and it does not pass through render(), so Rule 5
+    // is applied here too. Exposure is small today (property_reports held 1 row / 5 sites when
+    // this was measured) and the architecture is the point: a resident must not see a Type on
+    // the address dossier that the same record could not earn on the ZIP page.
+    if(window.HS && HS.residentialQualifySites) recs = HS.residentialQualifySites(recs);
     window.__HS_PROP = recs; window.__HS_SITES = recs;
     var filings = recs.filter(isFiling);
     var federal = recs.filter(function(s){ return !isFiling(s); });
