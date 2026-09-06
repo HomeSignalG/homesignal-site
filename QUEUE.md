@@ -10800,3 +10800,86 @@ to render, and rendering something would be fabrication.
 ZIP is fast rather than merely correct; the payload intern encoding; and the national blast
 radius of the `type_raw` regression, which stays UNVERIFIED (the chunked measurement exceeded
 the 60 s client window). `geo.rule5_type_raw_diff(text)` remains as scratch to be dropped.
+
+---
+
+## 2026-09-06 — CORRECTION: the type_raw regression was 22,053 records, not 1
+
+**I under-reported this by four orders of magnitude earlier today, and the reason matters more
+than the number: I measured it on the six DENSITY controls, which are not a sample of the rule.**
+Over those 33,376 relation rows the loss was 1 record. Measured nationally it is **22,053**.
+
+The national run is complete and self-controlled — 512 of 512 ZIP-3 prefixes, resumable
+`not exists` driver, `remaining = 0`:
+
+```
+relation rows measured             884,944   control: 901,465 membership − 16,521 with no
+                                             development row (the stale class, read at 16,513
+                                             ~40 min earlier; the 8 is live ingest churn between
+                                             the two readings, not a reconciliation gap)
+DEVELOPMENT with type_raw           57,929
+DEVELOPMENT without type_raw        35,876
+LOST BY THE REGRESSION              22,053   across 717 ZIPs, 46 of 512 prefixes
+WRONGLY ADMITTED                         0
+```
+
+⚠️ **22,053 is an UPPER BOUND on what residents lost.** The Rule 5 gate only fires where
+`resolveTrackerMarker` resolves `typeKey === 'residential'`; a record whose verdict changed but
+which is not classified residential rendered either way. The SQL mirror also omits the
+`ACCESSORY_OBJECT` / `SCALE_NOUN` branch of the shipped JS — equally on both sides of the diff,
+so it does not bias the direction, but it makes this an approximation of the shipped rule rather
+than a replay of it. **Both halves stated because the number is otherwise easy to over-read.**
+
+**84% of it is two Texas metros** — Dallas `750xx` **9,440 lost across 10 ZIPs** and Fort Worth
+`762xx` **9,068 across 12** — then `660xx` 577, `972xx` 513, `210xx` 440, `662xx` 417. That is
+exactly the families `lib/residential-qualify.js` names in its own header as the ones whose
+`title[0]`/`type_raw` **is** the activity column (`denton-county-dev-permits` PermitType
+`HOUSE`/`DUPLEX`, and the family rules that key on `type_raw` directly). Blanking `type_raw`
+disabled `FAMILY_TYPE_RAW` and every `DEV_HEAD` anchored in the source's class text.
+
+**Why the controls lied, stated so the mistake is not repeated:** 20148 / 28428 / 28451 are
+counties whose records are UNRESOLVED with or without `type_raw` (Loudoun unit types, New
+Hanover trades), and 30033 / 19103 / 28456 happen not to depend on it. Six ZIPs chosen for
+DENSITY answered a question about density; they were never a sample of the RULE, and I read
+them as one. **A control set is only a sample of the axis it was chosen on.**
+
+Live since the fix (`zip_markers_single_scan_and_restore_type_raw`, 2026-09-06 ~15:00Z); the
+window of the regression was ~00:10Z → ~15:00Z the same day. The scratch measurement objects
+(`geo.rule5_type_raw_diff`, `geo.rule5_diff_step`, `geo.rule5_diff_result`) are **dropped**.
+
+---
+
+## 2026-09-06 — NATIONAL ACCOUNTING: the Phase 2 receipt's "authoritative 12,077" was a subtraction, not a measurement
+
+Re-measured today with every count paired to a control:
+
+```
+canonical registry                              12,722   control: 0 state rows off-registry
+state rows in geo.maps_zip_geography_status     12,655
+  boundary_complete                             12,013
+  not_measured (note NO_ZCTA_IN_TIGER_2025)        642
+canonical ZIPs with NO state row                    67   0 membership rows, 0 marker rows
+  of which the named pending exceptions              3   94128 · 95219 · 99128
+  of which unclassified                             64
+cutover enabled but not boundary_complete            0
+                                                ──────
+12,013 + 642 + 67                               12,722   ✓
+```
+
+**The 2026-09-05 receipt reported `authoritative 12,077` and `state rows 12,722`. Both are
+wrong**: 12,077 = 12,722 − 642 − 3, a subtraction that silently classed the 64 unclassified ZIPs
+as authoritative. The measured authoritative figure is **12,013**.
+
+- **Nothing a resident sees is wrong.** A ZIP with no state row returns status `unknown`, which
+  `HS.ZIP_AUTH_UNKNOWN` maps to the honest not-measured state — the same page the 642 get. The
+  defect is in the CLAIM, not in the product.
+- **The 67 are PO-box / administrative ZIPs** (10015, 10041, 10045, 11240–11243, 19110, 48231,
+  48232 …). Exactly **one** of them has boundary rows — 99128, the known Case C — control:
+  `geo.n5_boundary_membership` holds 907,297 rows across 9,302 ZIPs, so that 1 is real.
+- ⚠️ **I could NOT evidence "they have no ZCTA", and did not write it.** `geo.n5_zcta` returned
+  0 for all 67 — and its **positive control also returned 0: the table is EMPTY** (0 rows total,
+  and 0 for four known-good ZIPs). That is CLAUDE.md rule 5's dangerous zero exactly. The 64 are
+  therefore recorded as **unclassified**, and I did not stamp them `not_measured` with a
+  `NO_ZCTA_IN_TIGER_2025` note I cannot support — writing a provenance claim you did not perform
+  is the one thing that field exists to prevent. Classifying them needs the pinned TIGER archive,
+  which is geography acquisition, and is flagged rather than reopened unilaterally.
