@@ -130,6 +130,17 @@
   .read{padding:18px}
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
   .addr{font-weight:600;font-size:16px;margin-bottom:4px}
+  /* BACK TO THE WHOLE ZIP. Address mode is entered by JS (run() flips ZIP_MODE) and the URL
+     never changes, so before this existed a resident who searched an address had no control,
+     no history entry and no visible route back to the whole-ZIP view. It is a real anchor, not
+     a JS handler, so browser back/forward, middle-click and keyboard all behave normally. */
+  /* One small clarifier under the heading pair. The heading pair itself is eyebrow + PLACE
+     (".read h2" is a 12px muted label, ".addr" the 16px subject), so the explanatory sentence
+     cannot live in either without inverting that hierarchy - it gets its own quiet line. */
+  .scopenote{display:none;font-size:12px;color:var(--mute);margin:0 0 8px}
+  .backzip{display:none;margin:2px 0 10px;font-size:12.5px}
+  .backzip a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+  .backzip a:hover,.backzip a:focus{border-bottom-color:var(--ink)}
   .freshline{font-size:11.5px;color:var(--mute);margin-bottom:12px;min-height:14px}
   .freshline:empty{margin-bottom:0;min-height:0}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
@@ -231,6 +242,13 @@
   /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
      offered there - showing it would invite a circle around a ZIP centre. */
   body.zipmode .radsel{display:none}
+  /* "From home" re-frames the 3D view around the resident's HOME. In ZIP mode there IS no
+     home - a ZIP centroid is a page anchor, not somebody's house - so the control promises a
+     place the page cannot show. Written fail-closed (hidden unless `hashome` is set by a real
+     address search) rather than "hidden in zipmode", so any future no-HOME state inherits the
+     correct behaviour instead of leaking the control. Same standard the radius control already
+     applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED HOME CENTRE." */
+  body:not(.hashome) #homeViewBtn{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
     padding:4px 10px;border-radius:7px;cursor:pointer}
@@ -419,6 +437,10 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- Shown in ADDRESS MODE ONLY (render() sets it), so the two modes are never a
+               one-way door. Hidden in ZIP mode, where it would point at the page you are on. -->
+          <div class="scopenote" id="scopeNote"></div>
+          <div class="backzip" id="backZip"></div>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -1177,12 +1199,18 @@ HS.onReady(function(){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false;
     CUR_ADDRESS = address;
+    // A real geocoded HOME now exists, so the HOME-specific view control may appear.
+    document.body.classList.add("hashome");
     var token = ++REQ_SEQ;                  // stale-response guard for this whole search
     snapRadiusForAddress(); syncRadiusStops();
     // Back to address mode: bring back the radius control and reset the ZIP-scoped caption.
     document.body.classList.remove("zipmode");
+    // The caption sits ON the map canvas, which is what a resident looks at while reading the
+    // pins - so it names the radius too, not just "around this home". Set here in run(), which
+    // a radius change re-enters (radSel -> run(CUR_ADDRESS)), and after snapRadiusForAddress()
+    // above, so it can never state a radius the search did not use.
     var _cap2 = document.querySelector(".map-cap");
-    if(_cap2){ _cap2.textContent = "Development around this home"; }
+    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this home"; }
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1268,6 +1296,10 @@ HS.onReady(function(){
 
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    // HOME_ANCHOR is TRUE here and does NOT mean "there is a home" - it means area items
+    // anchor at the report centroid. There is no geocoded HOME on a ZIP page, so the
+    // HOME-specific control stays hidden.
+    document.body.classList.remove("hashome");
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
@@ -1423,8 +1455,22 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // "All development across ZIP X" - the whole-ZIP claim stated in the heading a resident
+      // reads first. It names DEVELOPMENT specifically: development is authoritative whole-ZIP
+      // membership, while the facilities layer beside it is nearby context (see the counters
+      // below), so this is precise rather than a blanket claim over everything on the page.
+      // Reads "All development across / ZIP 78617" - the founder's label, split across the
+      // eyebrow and the prominent PLACE line, exactly the shape address mode already uses
+      // ("Showing development within 2 miles of / 2200 CALDWELL LN"). Putting the whole
+      // sentence in the eyebrow would render the primary label in 12px muted grey.
+      $("withinLbl").textContent = "All development across";
+      $("rAddr").textContent = "ZIP " + ZIP_CODE;
+      if($("scopeNote")){
+        $("scopeNote").textContent = "The entire ZIP area — not only projects near one address.";
+        $("scopeNote").style.display = "block";
+      }
+      // Nothing to go back TO: this IS the whole-ZIP view.
+      if($("backZip")){ $("backZip").style.display = "none"; $("backZip").innerHTML = ""; }
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
@@ -1433,7 +1479,10 @@ HS.onReady(function(){
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      if($("scopeNote")){ $("scopeNote").style.display = "none"; $("scopeNote").textContent = ""; }
+      // "Showing development within 2 miles of / <address>" across the heading pair - the
+      // radius AND the centre, both named, so a near-home result is never read as ZIP-wide.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
@@ -1445,6 +1494,17 @@ HS.onReady(function(){
       // Address search: scope the App-map cross-link to this address's ZIP (same parse as the engine).
       var addrZip = (window.HS && HS.parseZipFromAddress) ? HS.parseZipFromAddress(data.address) : null;
       if(addrZip && window.HS && HS.state) HS.state.zip = addrZip;
+      // THE WAY BACK. Prefer the ZIP this page was opened with (known to have a page); fall
+      // back to the ZIP parsed out of the searched address. If neither exists there is no
+      // honest destination, so no control is drawn rather than a guessed one.
+      var backTo = ZIP_CODE || addrZip;
+      if($("backZip")){
+        if(backTo){
+          $("backZip").innerHTML = "<a href='homesignalmap.html?zip=" + esc(backTo) + "'>"
+            + "\u2190 Back to all development in ZIP " + esc(backTo) + "</a>";
+          $("backZip").style.display = "block";
+        } else { $("backZip").style.display = "none"; $("backZip").innerHTML = ""; }
+      }
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
@@ -1516,9 +1576,18 @@ HS.onReady(function(){
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
     $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
+    // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
+    // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
+    // development rather than passing it off as whole-ZIP (it is not a fallback), so the
+    // remaining count is 0 because we discarded it - not because the ZIP is quiet. Printing
+    // "0 New projects proposed across this ZIP" beside "not measured yet" states a measured
+    // zero we cannot support, and zero-vs-not-measured is precisely the distinction a
+    // resident has to be able to draw. Show the unknown as unknown; freshLine says why.
+    var DEV_UNMEASURED = ZIP_MODE && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
-    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
+      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
@@ -2440,6 +2509,9 @@ HS.onReady(function(){
     setView(b.getAttribute("data-v"));
   });
   document.getElementById("homeViewBtn").addEventListener("click",function(){
+    // Belt to the CSS braces: with no address-derived HOME there is nothing to frame from,
+    // so the control does nothing even if it is somehow reachable.
+    if(!CUR_ADDRESS) return;
     V3.homeView=!V3.homeView;this.classList.toggle("on",V3.homeView);
   });
   // On-screen zoom for the 3D aerial view (mirrors the wheel handler: same dist bounds).
