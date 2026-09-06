@@ -50,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon]
+        options: [validate, load, zcta-membership-probe, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire, n5-zcta-stats, n5-boundary-first, n5-unit-a, n5-a3-clip, n5-a3-marker, n5-a4-index, n5-a4-bench, n5-recon]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -335,3 +335,19 @@ jobs:
           EXPECT_GEOID_FP: ${{ github.event.inputs.expect_geoid_fp }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/phase2_b1_zcta.py
+
+      # READ-ONLY, and the reason it lives in THIS workflow rather than its own: a
+      # workflow_dispatch workflow must exist on the default branch to be dispatchable by
+      # name, so a new file on a feature branch cannot be run at all. This is the approved
+      # manual workflow that already carries the restrictions (no schedule, no production
+      # trigger, no new credential, concurrency 1) and already reaches www2.census.gov.
+      #
+      # It answers one question with its own positive control attached: does the pinned
+      # TIGER/ZCTA archive contain a given canonical ZIP? It writes NOTHING - the token is
+      # present for reads only, because the ZIP populations are computed by SQL rather than
+      # transcribed into the script (CLAUDE.md rule 7).
+      - name: 'zcta-membership-probe: is a canonical ZIP in the PINNED archive? (read-only)'
+        if: ${{ inputs.mode == 'zcta-membership-probe' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/zcta_membership_probe.py
