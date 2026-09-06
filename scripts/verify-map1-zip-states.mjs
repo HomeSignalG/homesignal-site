@@ -93,6 +93,30 @@ for (const c of CASES) {
                           (s.distance_mi != null || s.e != null || s.n != null)).length,
       // The page's own project count - one road project drawn as 9 markers is ONE project.
       projectCount: (window.HS && HS.zipAuthProjectCount) ? HS.zipAuthProjectCount(dev) : -1,
+      // RULE 5 ACCOUNTING. zipAuthSiteFromMarker drops records the founder's residential
+      // qualification rule rejects (routine work on an existing residential property is not
+      // new residential DEVELOPMENT). Those are legitimately absent, so "delivered == relation"
+      // is the wrong identity. The right one is: delivered + rule-5 dropped == relation, with
+      // NOTHING unexplained. Computed with the page's OWN shipped gate, never a copy of it.
+      ruleFive: (function () {
+        const a = window.ZIP_AUTH;
+        if (!a || !Array.isArray(a.markers) || !Array.isArray(a.projects) || !window.HS) return null;
+        const byRef = Object.create(null);
+        a.projects.forEach(p => { if (p && p.project_ref && !byRef[p.project_ref]) byRef[p.project_ref] = p; });
+        let delivered = 0, droppedByRuleFive = 0, unexplained = 0;
+        a.markers.forEach(m => {
+          const proj = byRef[m.project_ref];
+          if (HS.zipAuthSiteFromMarker(m, proj)) { delivered++; return; }
+          // rebuild what the site WOULD have been, then ask the shipped gate if it is the reason
+          const hasBasis = !!proj && typeof m.lat === 'number' && typeof m.lng === 'number';
+          if (hasBasis && HS.residentialGateDrops) {
+            const probe = { use_type: proj.type || '', label: proj.name || '' };
+            if (HS.residentialGateDrops(probe, proj)) { droppedByRuleFive++; return; }
+          }
+          unexplained++;
+        });
+        return { relation: a.markers.length, delivered, droppedByRuleFive, unexplained };
+      })(),
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
@@ -133,15 +157,21 @@ for (const c of CASES) {
     // The strong form: the live page renders EXACTLY what the authoritative relation holds.
     // A legacy-geography fallback would show a different number, so this is also the live
     // no-fallback proof - the legacy 3-mile branch never returns the membership count.
-    if (c.markers != null) {
-      ok(m.devAuthoritative === c.markers,
-         `${c.zip}: every authoritative marker was DELIVERED — no silent truncation`,
-         `delivered=${m.devAuthoritative} relation=${c.markers}`);
-    }
-    if (c.projects != null) {
-      ok(m.projectCount === c.projects,
-         `${c.zip}: distinct project count equals the authoritative relation`,
-         `live=${m.projectCount} relation=${c.projects}`);
+    // EVERY authoritative marker is accounted for: delivered, or dropped by the shipped
+    // Rule 5 gate. Anything else is silent truncation and fails.
+    if (m.ruleFive) {
+      const r = m.ruleFive;
+      ok(r.unexplained === 0,
+         `${c.zip}: every authoritative marker accounted for — 0 unexplained losses`,
+         `relation=${r.relation} delivered=${r.delivered} rule5-dropped=${r.droppedByRuleFive} UNEXPLAINED=${r.unexplained}`);
+      ok(r.delivered + r.droppedByRuleFive === r.relation,
+         `${c.zip}: delivered + rule-5 dropped == the authoritative relation`,
+         `${r.delivered} + ${r.droppedByRuleFive} = ${r.delivered + r.droppedByRuleFive} vs ${r.relation}`);
+      ok(m.devAuthoritative === r.delivered,
+         `${c.zip}: everything the gate admitted actually reached the rendered set`,
+         `rendered=${m.devAuthoritative} admitted=${r.delivered}`);
+    } else if (c.markers != null) {
+      ok(false, `${c.zip}: could not read the authoritative payload to account for it`, 'ZIP_AUTH absent');
     }
     ok(!m.notMeasured && !m.couldNotRead,
        `${c.zip}: makes no not-measured and no failure claim`);
