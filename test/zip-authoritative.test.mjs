@@ -122,8 +122,14 @@ const noteNM = HS.zipAuthNote(NOT_MEASURED, '01004', []);
 const noteMZ = HS.zipAuthNote(MEASURED_ZERO, '01009', []);
 ok(noteNM !== noteMZ, 'D3 ...but the two are DESCRIBED differently, which is the whole point');
 ok(/not measured yet/i.test(noteNM), 'D4 the unmeasured ZIP says it is not measured', noteNM);
-ok(/will not estimate/i.test(noteNM), 'D5 ...and says we will not estimate it from a circle', noteNM);
-ok(/No qualifying development/i.test(noteMZ) && /whole ZIP/i.test(noteMZ),
+// D5/D6 assert the CLAIM, not one phrasing. They used to key on the literal strings "will not
+// estimate" and "No qualifying development", which pinned engineer-facing wording ("a circle
+// around the ZIP centre") that the homeowner this text is written for cannot parse. The
+// guarantee is unchanged and still enforced: the not-measured state must say it is withholding
+// rather than estimating, and the zero state must claim a real whole-ZIP measurement.
+ok(/not showing development/i.test(noteNM) && /rather show nothing than guess/i.test(noteNM),
+  'D5 ...and says it is WITHHOLDING development rather than estimating it', noteNM);
+ok(/whole of ZIP|whole ZIP/i.test(noteMZ) && /real zero/i.test(noteMZ),
   'D6 the measured-zero ZIP claims a real whole-ZIP measurement', noteMZ);
 ok(/2 projects across the whole of ZIP 78617/.test(HS.zipAuthNote(COMPLETE, '78617', sites)),
   'D7 a measured ZIP counts projects across the WHOLE ZIP', HS.zipAuthNote(COMPLETE, '78617', sites));

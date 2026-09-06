@@ -131,6 +131,13 @@
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
   .addr{font-weight:600;font-size:16px;margin-bottom:4px}
   .freshline{font-size:11.5px;color:var(--mute);margin-bottom:12px;min-height:14px}
+  /* Back to the whole-ZIP view. Address mode only — in ZIP mode there is nothing to go back
+     to, so body.zipmode hides it rather than leaving a control that does nothing. */
+  .backzip{display:inline-block;margin:0 0 10px;font-size:13px;font-weight:600;
+           color:#1f5130;text-decoration:none;border:1px solid var(--line);border-radius:999px;
+           padding:5px 12px;background:#fff;cursor:pointer}
+  .backzip:hover{background:#f4f8f6}
+  body.zipmode .backzip{display:none}
   .freshline:empty{margin-bottom:0;min-height:0}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
   .cc{background:#f6f9f7;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
@@ -416,6 +423,9 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- THE WAY BACK. A resident who types an address on a ZIP page had no route back to
+               the whole-ZIP view except editing the URL. Set in render(); hidden in ZIP mode. -->
+          <a class="backzip" id="backToZip" href="#" style="display:none"></a>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -1440,17 +1450,22 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // NAME THE GEOGRAPHY IN THE HEADING ITSELF. "Across ZIP X" left a homeowner unsure
+      // whether they were seeing everything in the ZIP or only what happens to be nearby;
+      // "All development across ZIP X" answers that before they read anything else.
+      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      $("rAddr").textContent = "The entire ZIP — every project anywhere inside it, "
+                             + "not only the ones near one point.";
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
       if($("kDev")) $("kDev").textContent = "New projects proposed across this ZIP";
       if($("kFac")) $("kFac").textContent = "Nearby regulated facilities";
       if($("ccTot")) $("ccTot").style.display = "none";
+      if($("backToZip")) $("backToZip").style.display = "none";   // already here; nothing to go back to
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
@@ -1462,6 +1477,19 @@ HS.onReady(function(){
       // Address search: scope the App-map cross-link to this address's ZIP (same parse as the engine).
       var addrZip = (window.HS && HS.parseZipFromAddress) ? HS.parseZipFromAddress(data.address) : null;
       if(addrZip && window.HS && HS.state) HS.state.zip = addrZip;
+      // THE WAY BACK. Prefer the ZIP the resident actually came from (ZIP_CODE survives the
+      // switch into address mode); fall back to the ZIP inside the address they searched, so a
+      // cold address visit still gets the whole-ZIP view offered to it. No ZIP either way ->
+      // no control, rather than a link that goes nowhere.
+      var backZip = ZIP_CODE || addrZip;
+      var bz = $("backToZip");
+      if(bz){
+        if(backZip){
+          bz.textContent = "← Back to all development in ZIP " + backZip;
+          bz.setAttribute("href", "?zip=" + encodeURIComponent(backZip));
+          bz.style.display = "";
+        } else { bz.style.display = "none"; }
+      }
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
