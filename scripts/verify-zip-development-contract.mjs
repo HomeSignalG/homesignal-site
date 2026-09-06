@@ -16,6 +16,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEPLOYED = process.env.HS_BASE || 'https://homesignal.net';
@@ -43,6 +44,7 @@ const server = createServer(async (req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const LOCAL = 'http://127.0.0.1:' + server.address().port;
 
+surfaceBanner('verify-zip-development-contract');
 const browser = await chromium.launch();
 
 // One page load. Returns what the RPC answered and what the page then said.

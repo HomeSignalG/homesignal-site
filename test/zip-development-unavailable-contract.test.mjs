@@ -103,5 +103,28 @@ function load(rpcImpl) {
   ok(/facilit/i.test(nm), '5: ...and says what IS still there, so empty-development is not empty-page');
 }
 
+// ── 6. THE ZIP PAGE ITSELF, STRUCTURALLY ────────────────────────────────────────────────
+// lib/community-page.js renders inside one large template literal that needs a DOM and a live
+// client to execute, so this reads the shipped file. It is here because the branch it checks
+// was written and then found to be guarded by NOTHING: mutating it away left the whole suite
+// green. Both arms are asserted — the unavailable stamp AND the failed read — because they are
+// the two ways an empty development section can lie about a measurement.
+{
+  const page = readFileSync(join(root, 'lib/community-page.js'), 'utf8');
+  const i = page.indexOf('var devUnavailable');
+  const block = i === -1 ? '' : page.slice(i, i + 700);
+  ok(i !== -1, '6: the ZIP page resolves an unavailable state before rendering development');
+  ok(/projects\.unavailable/.test(block),
+     '6: ...from the unavailable stamp (not measured / pending)');
+  ok(/projects\.complete === false/.test(block),
+     '6: ...and from a FAILED read, which is not a zero either');
+  // The empty-section copy must be reached only when neither applies, or a not-measured ZIP
+  // still tells a resident there are no records on file.
+  ok(/devUnavailable \?/.test(page.slice(page.indexOf('Development &amp; growth'))),
+     '6: the development section branches on it before printing a count');
+  ok(/zipDevelopmentUnavailableNote/.test(page),
+     '6: and it uses the ONE shared helper, so two surfaces cannot diverge');
+}
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nzip-development-unavailable-contract: all checks passed');
 process.exit(fails ? 1 : 0);

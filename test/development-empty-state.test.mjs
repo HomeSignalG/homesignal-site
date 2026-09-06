@@ -66,8 +66,15 @@ if (!/No permit or planning records for this area/.test(emptyBranch)) {
 // "Nothing on the public record near here yet" — that asserts a measurement that never
 // happened. And the check must come BEFORE coverageHTML, which narrates what the page draws
 // on and would otherwise describe a measurement into existence.
-if (!/projects && projects\.unavailable/.test(emptyBranch)) {
+if (!/projects\.unavailable/.test(emptyBranch)) {
   failures.push('the empty branch does not distinguish an UNAVAILABLE whole-ZIP read from a zero');
+}
+// A FAILED read is not a zero either, and it is the door the defect returns through: under
+// load app_projects_for_zip times out, the page gets an empty array, and "Nothing on the
+// public record near here yet" becomes a false measured zero for a healthy ZIP. Measured
+// 2026-09-06: 28456 returned its correct 12 rows in 21,132 ms, far past the caller's budget.
+if (!/projects\.complete === false/.test(emptyBranch)) {
+  failures.push('a failed read still renders as a measured zero');
 }
 if (!/zipDevelopmentUnavailableNote/.test(emptyBranch)) {
   failures.push('the unavailable copy is not the ONE shared helper — two surfaces could diverge');

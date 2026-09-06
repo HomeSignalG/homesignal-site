@@ -118,11 +118,13 @@ HS.onReady(async function () {
         // record near here yet" would then assert a measurement that never happened. Checked
         // BEFORE coverageHTML, which describes what we draw on and would otherwise narrate a
         // measurement into existence. Same sentence as the ZIP page - one helper, one place.
-        body = (projects && projects.unavailable)
+        body = (projects && (projects.unavailable || projects.complete === false))
           ? ('<div class="card" style="text-align:center;padding:26px 18px">'
-             + '<h3 style="margin-bottom:6px">Whole-ZIP development is not measured for this ZIP</h3>'
+             + '<h3 style="margin-bottom:6px">' + (projects.unavailable
+                 ? 'Whole-ZIP development is not measured for this ZIP'
+                 : 'Development records could not be read just now') + '</h3>'
              + '<p class="sowhat" style="margin:0">'
-             + HS.esc(HS.zipDevelopmentUnavailableNote(String(projects.unavailable), S.zip))
+             + HS.esc(HS.zipDevelopmentUnavailableNote(String(projects.unavailable || 'read_failed'), S.zip))
              + '</p></div>')
           : coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
           + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'

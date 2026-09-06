@@ -137,6 +137,25 @@ export const SURFACES = {
     tables: [],
     capped: null,
   },
+  'verify-zip-development-contract': {
+    surface: 'The ZIP-development READ CONTRACT, on the community/ZIP page and development.html',
+    tables: ['app_projects'],
+    // CAPPED, and the distinction matters here more than usual: this verifier watches the
+    // MATERIALIZED layer only. Map 1's uncapped development_reports cache is a different read
+    // on a different page, covered by verify-map1-zip-states. A green run here is evidence
+    // about app_projects_for_zip's contract and about nothing Map 1 renders.
+    capped: true,
+    note: 'Deliberately the OTHER read path from verify-map1-zip-states. Map 1 reads '
+        + 'app_zip_projects_markers; every other ZIP surface — lib/community-page.js (all 12,722 '
+        + 'generated ZIP pages), development.html, property.html, dashboard, today, reports — '
+        + 'reads app_projects_for_zip through HS.data.projects, and until 2026-09-06 that RPC '
+        + 'decided eligibility from historical cutover metadata rather than current geography '
+        + 'state. Two ZIPs with the same truthful not_measured state meant different things: one '
+        + 'a false measured zero, the other legacy centroid geography. This verifier exists to '
+        + 'keep the four states — authoritative, measured zero, not measured, and a failed read — '
+        + 'distinguishable to a resident on that path. It reads the same ZIPs on the DEPLOYED '
+        + 'build and on the branch build so the DB half is held constant.',
+  },
   'verify-map1-zip-states': {
     surface: 'Map 1 ZIP mode (homesignalmap.html?zip=) — the geography-state contract',
     tables: ['app_projects', 'development_reports'],
