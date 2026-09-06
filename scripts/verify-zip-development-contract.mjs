@@ -49,19 +49,26 @@ const browser = await chromium.launch();
 async function read(base, zip) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
+  // KEY ON THE REQUEST BODY, NOT ON THE RESPONSE SHAPE. Development and facilities share this
+  // endpoint, and the first version of this probe took "the first array" as the development
+  // answer — which silently captured the FACILITY call every time. The tell was that every n it
+  // reported equalled that ZIP's facility count (10015 -> 10, 01004 -> 5, 01009 -> 26,
+  // 28456 -> 5, never 12). A probe that reads the wrong call reports a wrong product.
   let rpc = null;
   page.on('response', async (r) => {
-    if (r.url().includes('/rpc/app_projects_for_zip')) {
-      try {
-        const j = await r.json();
-        // facility calls use the same endpoint; keep the DEVELOPMENT answer only.
-        if (Array.isArray(j)) { if (rpc === null) rpc = { kind: 'array', n: j.length }; }
-        else if (j && j.unavailable) rpc = { kind: 'unavailable', status: j.zip_geography_status };
-      } catch (_e) { /* ignore */ }
-    }
+    if (!r.url().includes('/rpc/app_projects_for_zip')) return;
+    let kind = null;
+    try { kind = JSON.parse(r.request().postData() || '{}').p_kind; } catch (_e) { return; }
+    if (kind !== 'development') return;
+    try {
+      const j = await r.json();
+      rpc = Array.isArray(j) ? { kind: 'array', n: j.length }
+          : (j && j.unavailable) ? { kind: 'unavailable', status: j.zip_geography_status }
+          : { kind: 'other', body: JSON.stringify(j).slice(0, 80) };
+    } catch (_e) { rpc = { kind: 'unreadable' }; }
   });
   await page.goto(`${base}/community.html?zip=${zip}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(6000);
+  await page.waitForTimeout(9000);
   const txt = (await page.evaluate(() => document.body.innerText || '')).replace(/\s+/g, ' ');
   await ctx.close();
   return {
@@ -96,7 +103,8 @@ for (const label of ['DEPLOYED', 'THIS BRANCH']) {
       }
       if (c.state === 'authoritative') {
         ok(r.rpc && r.rpc.kind === 'array' && r.rpc.n > 0, `${c.zip}: authoritative development still served`, JSON.stringify(r.rpc));
-        ok(!r.saysNotMeasured && !r.claimsZero, `${c.zip}: ...and makes neither empty claim`);
+        ok(!r.saysNotMeasured && !r.claimsZero, `${c.zip}: ...and makes neither empty claim`,
+           `claims-zero=${r.claimsZero} says-not-measured=${r.saysNotMeasured}`);
       }
     } else {
       // The deployed build has the DB fix but not the page fix. Reported, not asserted — this
