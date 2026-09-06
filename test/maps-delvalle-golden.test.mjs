@@ -102,7 +102,7 @@ const tabs = dev.filter(r => r.source_registry_id === null);
      '3: no data-center record is INVENTED for Del Valle — the registry assertion stands alone');
 
   ok(R.every(r => r.symbol === reg[r.category].symbol), '3: every record uses its category\'s canonical symbol');
-  ok(fac.every(r => r.symbol === 'square' && r.category === 'facility' && r.color === '#6f42c1'),
+  ok(fac.every(r => r.symbol === 'square' && r.category === 'facility' && r.color === '#7d148c'),
      '3: every facility is a purple square');
   ok(dev.every(r => r.symbol !== 'square'), '3: NO development record uses the facility square');
   ok(dev.every(r => r.category !== 'facility'), '3: no development record crosses over into the facility category');

@@ -127,7 +127,7 @@ const readMarkers = () => page.evaluate(() => {
       primaryPoints: pts.trim().split(/\s+/).filter(Boolean).length,
       polygons: poly,
       rects: (html.match(/<rect/g) || []).length,
-      purple: /#6f42c1/i.test(html)
+      purple: /#7d148c/i.test(html)
     };
   }).filter(m => !m.home);
 });
