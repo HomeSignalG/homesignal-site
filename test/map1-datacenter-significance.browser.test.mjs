@@ -38,7 +38,10 @@ const P = [
   { ref: 'qts', name: 'QTS DATA CENTER',
     type: 'Development', type_raw: 'SIGN  PERMIT', status: 'Proposed', lat: 33.4520, lng: -112.0600 },
   { ref: 'sanjose', name: 'Data Center 123  GREAT OAKS BL  , SAN JOSE CA 95119',
-    type: 'Industrial', type_raw: 'Data Center', status: 'Operating', lat: 33.4400, lng: -112.0400 }
+    type: 'Industrial', type_raw: 'Data Center', status: 'Operating', lat: 33.4400, lng: -112.0400 },
+  // The record the competitor audit proved HomeSignal was discarding.
+  { ref: 'kcmo', name: 'ADDITIONS/ALTERATIONS/REPAIRS Construct data center and pump house renovations per plans reviewed for code compliance.',
+    type: 'Development', type_raw: 'ADDITIONS/ALTERATIONS/REPAIRS', status: 'Approved', lat: 33.4300, lng: -112.0500 }
 ];
 const ZIP_AUTH = { '85006': { zip: '85006', mode: 'development', status: 'boundary_complete',
   projects: P.map(p => ({ source_key: 'k:' + p.ref, project_ref: p.ref, name: p.name, type: p.type,
@@ -48,7 +51,7 @@ const ZIP_AUTH = { '85006': { zip: '85006', mode: 'development', status: 'bounda
   markers: P.map((p, i) => ({ project_ref: p.ref, lat: p.lat, lng: p.lng,
     marker_rule: 'POINT_AUTHORITATIVE', marker_seq: i })) } };
 const ZIP_ROW = { '85006': [{ zip: '85006', home_lat: 33.4520, home_lng: -112.0600,
-  counts: { facilities: 0, development: 3 }, sites: [], refreshed_at: '2026-09-06T00:00:00Z',
+  counts: { facilities: 0, development: 4 }, sites: [], refreshed_at: '2026-09-06T00:00:00Z',
   facilities_unavailable: false }] };
 const COMMUNITIES = { '85006': [{ name: 'Phoenix (85006)', level: 'zip', county: 'Maricopa', state: 'AZ' }] };
 
@@ -106,46 +109,58 @@ const read = () => page.evaluate(() => (window.__HS_SITES || []).map(s => ({
 const rows = await read();
 const by = (frag) => rows.filter(r => r.label.indexOf(frag) !== -1)[0];
 
-ok(rows.length === 3, '0: all three production records render on the authoritative ZIP path', rows.length);
+ok(rows.length === 4, '0: all four production records render on the authoritative ZIP path', rows.length);
 
 const mesa = by('New ground up 285,282 SF');
 const qts = by('QTS DATA CENTER');
 const sj = by('Data Center 123');
-ok(!!mesa && !!qts && !!sj, '0b: each of the three is present');
+const kcmo = by('ADDITIONS/ALTERATIONS/REPAIRS');
+ok(!!mesa && !!qts && !!sj && !!kcmo, '0b: each of the four is present');
 
 // ── THE PRODUCT PROBLEM, BEFORE AND AFTER ───────────────────────────────────────
 // BEFORE this unit all three read the same: their lifecycle stage and nothing else.
 ok(/Major development/.test(mesa.kind),
   '1: the 285,282 SF ground-up data hall now reads MAJOR DEVELOPMENT', mesa.kind);
-ok(/Ancillary work/.test(qts.kind),
-  '2: the data-centre SIGN PERMIT now reads ANCILLARY WORK', qts.kind);
+ok(/Sign permit/.test(qts.kind),
+  '2: the data-centre SIGN PERMIT now reads SIGN PERMIT — the activity the authority named, not a magnitude', qts.kind);
 // Stated so it cannot pass on the stage words alone: BOTH must carry a significance
 // phrase, and the two phrases must differ. Under a mutation that drops the significance
 // line these read "Approved / permitted" and "Proposed / hearing" — already different,
 // which is exactly why "!==" was not enough to prove anything.
-const SIG_RE = /(Major development|Ancillary work|Significance not stated)/;
+const SIG_RE = /(Major development|Work on existing data center|Sign permit|Fire-alarm permit|Battery-system permit|Supporting work|Scope not stated by source)/;
 const mesaSig = (mesa.kind.match(SIG_RE) || [])[1];
 const qtsSig = (qts.kind.match(SIG_RE) || [])[1];
 ok(!!mesaSig && !!qtsSig && mesaSig !== qtsSig,
   '3: THE ACCEPTANCE TEST — the ground-up build and the sign permit now carry DIFFERENT significance',
   mesaSig + ' vs ' + qtsSig);
-ok(/Significance not stated/.test(sj.kind),
-  '4: a record stating no activity says so — the resident is never left to infer "minor"', sj.kind);
+ok(/Scope not stated by source/.test(sj.kind),
+  '4: a record stating no activity attributes the silence to the SOURCE, not to a HomeSignal finding', sj.kind);
+
+// The record the audit proved was being discarded now says what its source establishes.
+ok(/Work on existing data center/.test(kcmo.kind),
+  '4b: the ADDITIONS/ALTERATIONS record now reads WORK ON EXISTING DATA CENTER, recovered from silence', kcmo.kind);
+ok(!/Major development/.test(kcmo.kind),
+  '4c: …and is still not Major — the permit-class veto survives the recovery');
+// The magnitude prohibition, on the rendered page rather than in the model.
+ok(![mesa, qts, sj, kcmo].some(r => /\b(minor|small|insignificant|unimportant)\b/i.test(r.kind)),
+  '4d: no rendered label implies smallness anywhere on the page');
+ok(![mesa, qts, sj, kcmo].some(r => /Ancillary work/.test(r.kind)),
+  '4e: "Ancillary work" is gone from the resident-facing page');
 
 // ── The stage is still there: significance ADDS, it does not replace ─────────────
 ok(/Approved \/ permitted/.test(mesa.kind) && /Proposed \/ hearing/.test(qts.kind),
   '5: each still carries its lifecycle stage — significance is a second dimension, not a swap');
 
 // ── TYPE AND SYMBOL UNCHANGED ───────────────────────────────────────────────────
-ok(mesa.category === 'datacenter' && qts.category === 'datacenter' && sj.category === 'datacenter',
-  '6: all three are still Data center');
-ok(mesa.shape === 'octagon' && qts.shape === 'octagon' && sj.shape === 'octagon',
-  '7: …and all three still draw the same octagon — significance never changes the symbol');
+ok([mesa, qts, sj, kcmo].every(r => r.category === 'datacenter'),
+  '6: all four are still Data center');
+ok([mesa, qts, sj, kcmo].every(r => r.shape === 'octagon'),
+  '7: …and all four still draw the same octagon — significance never changes the symbol');
 
 // ── The rendered marker count is unchanged: no record was split or duplicated ────
 const v = await page.evaluate(() => window.__HS_VERIFY);
-ok(v.mapMarkers === 3 && v.visibleMarkers === 3,
-  '8: three records, three markers — significance created no new pins', v.mapMarkers + '/' + v.visibleMarkers);
+ok(v.mapMarkers === 4 && v.visibleMarkers === 4,
+  '8: four records, four markers — significance created no new pins', v.mapMarkers + '/' + v.visibleMarkers);
 
 // ── Geography untouched ─────────────────────────────────────────────────────────
 const coords = await page.evaluate(() => (window.__HS_SITES || []).map(s => [s.label.slice(0, 20), s.lat, s.lng]));
