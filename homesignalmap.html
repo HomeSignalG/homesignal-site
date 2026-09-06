@@ -613,7 +613,19 @@ HS.onReady(function(){
   // can assert, live, that the label a resident sees agrees with the dot's colour — the regression
   // guard for the class of bug where the two were computed from different signals.
   function kindLabel(s){
-    if(frsRid(s) === "") return stageWord(s);
+    if(frsRid(s) === ""){
+      // DATA CENTER SIGNIFICANCE (2026-09-06). "Data center" alone told a resident what
+      // the record RELATES TO and nothing about what kind of activity it is — a 285,282
+      // SF ground-up data hall and a sign permit read identically. Where the source's own
+      // permit class or description establishes it, the popup now leads with the activity
+      // and then its stage; where it does not, it says so rather than implying "minor".
+      // Data centres only: every other type is byte-for-byte unchanged.
+      var mkd = HS.resolveTrackerMarker(s, frsRid);
+      if(mkd.significanceApplies && mkd.significance){
+        return mkd.significance.label + " · " + stageWord(s);
+      }
+      return stageWord(s);
+    }
     // DUAL IDENTITY: a regulated facility whose own EPA record names a data centre reads
     // as what it IS first and what it CARRIES second. The words come from the resolver's
     // category registry, so the popup can never disagree with the symbol drawn.
