@@ -11259,3 +11259,44 @@ the product at fault. Recorded together because the shape repeats.
 **Deployed commit at the time of these measurements: `96eade0`** (pages run 35, success,
 2026-09-06 15:48:54Z). Live function: `ships_type_raw true`, `has_lateral_repair true`,
 `statement_timeout=25s`.
+
+---
+
+## 2026-09-06 — GATE 9 COULD NOT BE CLOSED: production is saturated, and it is not the geography
+
+Four live verifier runs of substantially the same code against an unchanged deployment
+(`96eade0`, pages run 35, no redeploy since 15:48:54Z) produced **2 → 11 → 8 → 34** failures.
+An escalating count on stable code is a signal about the environment, not the assertions, so I
+stopped editing the harness and measured the environment instead.
+
+```
+pg_stat_activity, active, excluding self          15
+  … app_projects_for_zip                           9
+  … app_zip_projects_markers                       2
+  … via the PostgREST 'authenticator' role        11
+longest running                              1:11.88
+server-side app_zip_projects_markers('28456')   11,042 ms   ← a TWELVE-project ZIP
+```
+
+28456 answered in **1,169 ms live** at 15:17 and takes 11 s server-side now. The live probe at
+16:22 (run `34045196017`) shows the consequence on the flagship surface: **28451 — `rpc http
+status null`, `body bytes null`, `page total/auth 0 / 0`** — the response never arrives, so the
+page shows nothing and says nothing, which is the one state worse than an error.
+
+- **The load is NOT Map 1's.** Only 2 of 15 active queries are `app_zip_projects_markers`; **9
+  are `app_projects_for_zip`**, the `development.html` / `property.html` path. That path has no
+  function-scoped budget, and the longest was running 71 seconds.
+- ⚠️ **My own repair contributes and should be named.** Raising
+  `app_zip_projects_markers`'s budget to 25 s traded a fast 57014 failure for a connection held
+  up to 25 s. Under repeated dense reads that is pressure on the same pool. It is the right
+  trade for correctness — a complete answer beats a discarded one — but it is a trade, not a
+  free win, and the queued ZIP-contiguous storage is what removes the need for it.
+- **The Map 1 ZIP-state gate DID pass cleanly earlier**, at 16:05, run `34044240308`: 76227
+  green on every assertion including `relation=5869 delivered=5844 rule5-dropped=25
+  stale=0 UNEXPLAINED=0` and the type_raw counterfactual. The geography accounting is proven;
+  what cannot currently be re-proven end to end is the whole 17-case sweep, because the database
+  will not serve it reliably right now.
+
+**Do not read this as the accounting being unproven.** Every state claim in this unit rests on
+SQL taken directly against the tables, and on a runner-side archive read that gated itself four
+ways. What is unproven is only the final full-sweep re-run.
