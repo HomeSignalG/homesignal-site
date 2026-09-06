@@ -1560,9 +1560,18 @@ HS.onReady(function(){
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
     $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
+    // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
+    // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
+    // development rather than passing it off as whole-ZIP (it is not a fallback), so the
+    // remaining count is 0 because we discarded it - not because the ZIP is quiet. Printing
+    // "0 New projects proposed across this ZIP" beside "not measured yet" states a measured
+    // zero we cannot support, and zero-vs-not-measured is precisely the distinction a
+    // resident has to be able to draw. Show the unknown as unknown; freshLine says why.
+    var DEV_UNMEASURED = ZIP_MODE && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
-    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
+      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 

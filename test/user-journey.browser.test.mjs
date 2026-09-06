@@ -92,6 +92,13 @@ const ZIP_ROW = {
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
     sites: [{ scope: 'point', label: 'RIVERSIDE GRAIN CO', registry_id: '110000888888',
               url: 'https://echo.epa.gov/w', lat: 41.7180, lng: -112.1520, e: 0.1, n: 0.1 }] }],
+  // A ZIP with a cached report but NO authoritative development measurement, so the page
+  // takes its not_measured branch (the route falls through to status:'not_measured' for any
+  // ZIP absent from ZIP_AUTH). This is the state gate task 6 asks a resident to explain.
+  '84999': [{ zip: '84999', home_lat: 41.5105, home_lng: -112.0155, counts: { facilities: 1 },
+    refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
+    sites: [{ scope: 'point', label: 'UNMEASURED ZIP FACILITY', registry_id: '110000999999',
+              url: 'https://echo.epa.gov/v', lat: 41.5110, lng: -112.0160, e: 0.05, n: 0.03 }] }],
   '80210': [{ zip: '80210', home_lat: 39.6796, home_lng: -104.9611, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
     sites: [{ scope: 'point', label: 'DENVER FACILITY', registry_id: '110000777777',
@@ -467,6 +474,41 @@ ok(/entire ZIP area/i.test(bzZip.scopeNote || '') && /not only projects near one
   '13f a clarifier says plainly this is the whole ZIP, not nearby projects', bzZip.scopeNote);
 ok(bzZip.scopeNoteShown === true,
   '13g ...and it is actually visible, not merely present in the DOM', bzZip);
+
+// ── 14. THE NOT-MEASURED STATE IS SAYABLE OUT LOUD ─────────────────────────────────────
+// Launch-gate task 6: a resident must be able to explain what "not measured" means. The
+// sentence is unit-tested in zip-authoritative.test.mjs, but nothing proved it REACHES THE
+// SCREEN - and an honest state nobody can read is not an honest state.
+await page.goto(base + '/homesignalmap.html?zip=84999', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+await page.waitForTimeout(500);
+const nm = await page.evaluate(() => ({
+  fresh: (document.getElementById('freshLine') || {}).textContent || '',
+  within: (document.getElementById('withinLbl') || {}).textContent || '',
+  rAddr: (document.getElementById('rAddr') || {}).textContent || '',
+  dev: (document.getElementById('cDev') || {}).textContent || ''
+}));
+info('not-measured ZIP 84999', nm);
+ok(/not measured yet/i.test(nm.fresh),
+  '14a the page SAYS the ZIP is not measured yet', nm.fresh);
+ok(/will not estimate/i.test(nm.fresh),
+  '14b ...and says it will not estimate from a circle, so 0 is never implied', nm.fresh);
+ok(/street address/i.test(nm.fresh),
+  '14c ...and offers the address view as the way to get a real answer', nm.fresh);
+// The distinction that matters: not-measured must not read as a measured zero.
+ok(!/^0 projects across/i.test(nm.fresh.trim()),
+  '14d not-measured is never phrased as a measured zero', nm.fresh);
+// THE COUNTER MUST AGREE WITH THE SENTENCE. An unmeasured ZIP drops its radius-derived
+// development rather than passing it off as whole-ZIP, so the surviving count is 0 because we
+// discarded it - printing "0" beside "not measured yet" asserts a measured zero. Same em-dash
+// rule the facilities counter already uses when the EPA read failed.
+ok(nm.dev.trim() === '\u2014',
+  '14e the development counter shows UNKNOWN, not a measured 0, on a not-measured ZIP', nm.dev);
+// PAIRED CONTROL: a blanket em-dash would satisfy 14e while destroying every measured ZIP,
+// so assert a measured ZIP still prints a real number.
+ok(/^\d+$/.test((zc.dev || '').trim()),
+  '14f ...while a MEASURED ZIP still shows a real number (the em-dash is not blanket)', zc.dev);
 
 ok(pageErrors.length === 0, 'no fatal client error across the journey', pageErrors.slice(0, 3));
 
