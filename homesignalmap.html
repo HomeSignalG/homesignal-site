@@ -248,7 +248,10 @@
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
   .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
-  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
+  /* Caption for the two legend rows: spans the full map width and centers, so it
+     reads as a caption under the map rather than a narrow column flushed left. */
+  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.45;width:100%;
+    max-width:none;margin:2px auto 0;text-align:center;text-wrap:balance}
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
