@@ -123,8 +123,8 @@ console.log('\n-- anti-fabrication: unclassifiable records stay unclassified --'
   const honest = CORPUS.filter(([, , k]) => k === 'other');
   for (const [label, rec] of honest) {
     const r = HS.classifyProjectType({ ...rec, title: rec.name, use_type: rec.type }) || {};
-    check(`${label}: renders the honest "Other project" circle`,
-      r.typeKey === 'other' && r.shape === 'circle' && r.legendLabel === 'Other project',
+    check(`${label}: renders the honest "Other project" symbol`,
+      r.typeKey === 'other' && r.shape === REG.other.symbol && r.legendLabel === 'Other project',
       `${r.typeKey}/${r.shape}`);
   }
 }

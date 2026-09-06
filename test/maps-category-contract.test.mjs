@@ -21,6 +21,7 @@ const win = { HS: {} };
 globalThis.window = win;
 globalThis.document = { getElementById: () => null };
 new Function('window', 'document', readFileSync(join(root, 'lib/map.js'), 'utf8'))(win, globalThis.document);
+const SRC = readFileSync(join(root, 'lib/map.js'), 'utf8');
 const HS = win.HS;
 
 let pass = 0, fail = 0;
@@ -220,6 +221,128 @@ for (const k of Object.keys(REG)) {
   // above cannot become dead letters if the registry is ever rewritten to circles only.
   ok(Object.keys(REG).some((k) => ['triangle', 'diamond', 'pentagon', 'hexagon', 'octagon'].includes(REG[k].symbol)),
     '12c: some category still uses a polygon symbol');
+}
+
+// ── 13. TYPE symbols are GEOMETRICALLY distinguishable, not just differently named ──
+// §2 compares symbol NAMES. Necessary, and NOT sufficient: 'octagon' and 'circle' are
+// different strings whose rendered silhouettes are ~95% identical at the 14px legend
+// size, so Data center and Other project shipped to production as the same dot while §2
+// stayed green the whole time. A name-uniqueness test cannot see that class of defect,
+// so this section measures the SHIPPED geometry instead.
+//
+// METRIC — silhouette distance = 1 - IoU of the two filled shapes, rasterised from
+// HS.shapeEl at the real 14px legend/marker size. Max RADIAL deviation was tried first
+// and rejected: it scored cross-vs-circle at 0.98px, BELOW hexagon-vs-circle, because a
+// plus sign's arms reach nearly the circle's radius even though nobody would confuse the
+// two. Area disagreement tracks what a person actually sees.
+//
+// THRESHOLD — measured, not guessed. Among the seven symbols this repo pins, the weakest
+// pair is octagon vs hexagon (Data center vs Commercial) at ~8%. The proven production
+// failure was octagon vs circle at ~5%. FLOOR sits in that measured gap: it catches the
+// real defect without falsely condemning any symbol a completed workstream owns.
+{
+  const SIZE = 14, cc = SIZE / 2, rr = SIZE * 0.40;
+  const FLOOR = 0.07;        // every TYPE pair must clear this
+  const OTHER_BAR = 0.25;    // the residual bucket must be UNMISTAKABLE, not merely legal
+
+  // Parse a shapeEl string into an inside(x,y) predicate. Covers the three primitives
+  // shapeEl can emit; an unknown one throws rather than silently scoring as distinct.
+  function predicate(svg) {
+    let m;
+    if ((m = svg.match(/<circle cx="(\S+?)" cy="(\S+?)" r="(\S+?)"/))) {
+      const x0 = +m[1], y0 = +m[2], rad = +m[3];
+      return (x, y) => (x - x0) ** 2 + (y - y0) ** 2 <= rad * rad;
+    }
+    if ((m = svg.match(/<rect x="(\S+?)" y="(\S+?)" width="(\S+?)" height="(\S+?)" rx="(\S+?)"/))) {
+      const x0 = +m[1], y0 = +m[2], w = +m[3], h = +m[4], rx = +m[5];
+      const ix0 = x0 + rx, ix1 = x0 + w - rx, iy0 = y0 + rx, iy1 = y0 + h - rx;
+      return (x, y) => {
+        const px = Math.min(Math.max(x, ix0), ix1), py = Math.min(Math.max(y, iy0), iy1);
+        return (x - px) ** 2 + (y - py) ** 2 <= rx * rx + 1e-9;
+      };
+    }
+    if ((m = svg.match(/points="([^"]+)"/))) {
+      const pts = m[1].trim().split(/\s+/).map((p) => p.split(',').map(Number));
+      return (x, y) => {
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const [xi, yi] = pts[i], [xj, yj] = pts[j];
+          if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+        }
+        return inside;
+      };
+    }
+    throw new Error('13: unrecognised geometry from shapeEl: ' + svg.slice(0, 60));
+  }
+  const HALF = 12, STEP = 0.1, N = Math.round(2 * HALF / STEP);
+  function raster(sym) {
+    const inside = predicate(HS.shapeEl(sym, cc, cc, rr, '#000', 3));
+    const g = new Uint8Array(N * N);
+    for (let iy = 0; iy < N; iy++) {
+      const y = cc - HALF + (iy + 0.5) * STEP;
+      for (let ix = 0; ix < N; ix++) {
+        if (inside(cc - HALF + (ix + 0.5) * STEP, y)) g[iy * N + ix] = 1;
+      }
+    }
+    return g;
+  }
+  function distance(a, b) {
+    let inter = 0, uni = 0;
+    for (let i = 0; i < a.length; i++) { const x = a[i], y = b[i]; if (x && y) inter++; if (x || y) uni++; }
+    return uni ? 1 - inter / uni : 0;
+  }
+
+  const keys = Object.keys(REG);
+  const grid = {};
+  for (const k of keys) grid[REG[k].symbol] = raster(REG[k].symbol);
+
+  // 13a. THE GUARD IS LOAD-BEARING. Before asserting the live set passes, prove the metric
+  // FAILS the exact production defect this section exists to prevent. Without this, a
+  // metric that quietly stopped discriminating would score a clean green forever.
+  grid.circle = grid.circle || raster('circle');
+  const proven = distance(grid.circle, grid.octagon);
+  ok(proven < FLOOR,
+    `13a: the metric still catches the shipped defect — circle vs octagon scored ${(proven * 100).toFixed(1)}%, must be under the ${(FLOOR * 100).toFixed(0)}% floor`);
+
+  // 13b. No two TYPE symbols may be materially indistinguishable at production size.
+  let worst = { d: 1, a: '', b: '' };
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const sa = REG[keys[i]].symbol, sb = REG[keys[j]].symbol;
+      const d = distance(grid[sa], grid[sb]);
+      if (d < worst.d) worst = { d, a: keys[i], b: keys[j] };
+      ok(d >= FLOOR,
+        `13b: ${keys[i]} (${sa}) vs ${keys[j]} (${sb}) silhouette distance ${(d * 100).toFixed(1)}% — must be >= ${(FLOOR * 100).toFixed(0)}%`);
+    }
+  }
+  console.log(`      [13] weakest TYPE pair: ${worst.a} vs ${worst.b} at ${(worst.d * 100).toFixed(1)}% (floor ${(FLOOR * 100).toFixed(0)}%)`);
+
+  // 13c. Other project is the residual bucket — the one a resident is most likely to meet
+  // and the one that has no other cue to fall back on. It must be UNMISTAKABLE against
+  // every classified type, not merely past the floor.
+  for (const k of keys) {
+    if (k === 'other') continue;
+    const d = distance(grid[REG.other.symbol], grid[REG[k].symbol]);
+    ok(d >= OTHER_BAR,
+      `13c: Other project (${REG.other.symbol}) vs ${k} (${REG[k].symbol}) is ${(d * 100).toFixed(1)}% — must be >= ${(OTHER_BAR * 100).toFixed(0)}%`);
+  }
+
+  // 13d. The symbols two completed workstreams own are not collateral of this one.
+  eq(REG.datacenter.symbol, 'octagon', '13d: Data center still owns the octagon');
+  eq(REG.commercial.symbol, 'hexagon', '13d: Commercial still owns the hexagon');
+  eq(REG.facility.symbol, 'square', '13d: Regulated facility still owns the square');
+
+  // 13e. ORPHAN GEOMETRY. KEYWORD_RULES / NAME_RULES carry literal `shape:` values that
+  // bypass the registry, so a rule can emit a shape no legend row explains — exactly what
+  // the school rule did (it drew the Other-project circle while declaring typeKey 'civic',
+  // and moving `other` to the capsule would have left that circle explaining nothing).
+  // Every shape any rule can emit must be a symbol some category owns.
+  const owned = new Set(Object.values(REG).map((c) => c.symbol));
+  const literals = [...SRC.matchAll(/\{ re: \/(?:[^/\\]|\\.)*\/[a-z]*,[^}]*?shape: '([a-z]+)'/g)].map((m) => m[1]);
+  ok(literals.length >= 10, `13e: the rule scan still finds the rule table (found ${literals.length} literal shapes)`);
+  for (const sh of new Set(literals)) {
+    ok(owned.has(sh), `13e: rule-emitted shape "${sh}" is owned by a registry category`);
+  }
 }
 
 // ── 14. Marker totals are unchanged by classification (nothing may vanish) ───

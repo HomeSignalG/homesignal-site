@@ -1691,6 +1691,7 @@ HS.onReady(function(){
     // VERIFICATION ONLY — point-count → symbol-name lookup, the twin of the table in
     // maps.html. It draws nothing; HS.shapeEl in lib/map.js is the renderer.
     //   3 triangle · 4 diamond · 5 pentagon · 6 hexagon · 8 octagon · 12 cross
+    // (square and capsule are <rect>s and never reach this table.)
     // 8 (data center) and 12 (civic) were missing here, so both were named the generic
     // "polygon" and failed the assertion below while rendering correctly the whole time.
     // An unlisted count still returns "polygon", which FAILS loudly — a new symbol has to
@@ -1698,7 +1699,15 @@ HS.onReady(function(){
     var POLY_POINTS_TO_SYMBOL = { 3: "triangle", 4: "diamond", 5: "pentagon", 6: "hexagon", 8: "octagon", 12: "cross" };
     function geomFromSvg(svg) {
       if (!svg) return null;
-      if (svg.indexOf("<rect") !== -1) return "square";
+      // TWO symbols are rects: the facility SQUARE (1:1) and the Other-project CAPSULE
+      // (2.1:1, fully rounded ends). Returning "square" for any <rect> would have named the
+      // capsule wrongly and failed the assertion below while it rendered correctly. Scope the
+      // match to the <rect> TAG — the wrapping <svg> carries width/height attributes too.
+      var rect = svg.match(/<rect[^>]*>/);
+      if (rect) {
+        var rw = rect[0].match(/ width="([\d.]+)"/), rh = rect[0].match(/ height="([\d.]+)"/);
+        return (rw && rh && Math.abs(Number(rw[1]) - Number(rh[1])) > 0.01) ? "capsule" : "square";
+      }
       if (svg.indexOf("<circle") !== -1) return "circle";
       var m = svg.match(/points="([^"]+)"/);
       if (!m) return null;

@@ -32,6 +32,9 @@ window.HS = {};
 await import(join(root, 'lib/map.js'));
 const HS = window.HS;
 const REG = HS.CATEGORY_REGISTRY;
+// Read the residual bucket's symbol from the registry; it moved circle -> capsule when
+// the circle was measured indistinguishable from the Data center octagon at 14px.
+const OTHER = REG.other.symbol;
 
 // 30 records — every canonical category, plus honest-fallback records, ordered so
 // the interesting types land BOTH inside and outside the 16-letter head.
@@ -110,30 +113,30 @@ console.log('\n-- rest shapes equal what resolveMarker returns (head/tail parity
   const tailShapes = rest.map((it) => byName[it.name]);
   check('the tail uses the same shape vocabulary as the head',
     tailShapes.every((s) => Object.values(REG).some((c) => c.symbol === s)));
-  check('head and tail both produce non-circle shapes',
-    headShapes.some((s) => s !== 'circle') && tailShapes.some((s) => s !== 'circle'));
+  check('head and tail both produce CLASSIFIED shapes, not just the residual bucket',
+    headShapes.some((s) => s !== OTHER) && tailShapes.some((s) => s !== OTHER));
 }
 
-console.log('\n-- non-circle records do not render as circles --');
+console.log('\n-- classified records do not collapse to the residual symbol --');
 {
   const wrongly = rest.filter((it) => {
     const m = HS.resolveMarker(it);
     const f = fc.features.find((x) => x.properties.id === it.id);
-    return m.shape !== 'circle' && f.properties.shape === 'circle';
+    return m.shape !== OTHER && f.properties.shape === OTHER;
   });
-  check('zero classified rest records collapse to a circle', wrongly.length === 0,
+  check('zero classified rest records collapse to the residual symbol', wrongly.length === 0,
     wrongly.map((w) => w.name).join(', '));
 }
 
-console.log('\n-- anti-fabrication: honest fallbacks are STILL circles --');
+console.log('\n-- anti-fabrication: honest fallbacks STILL use the residual symbol --');
 {
   const honest = rest.filter((it) => HS.resolveMarker(it).shapeRule === 'FALLBACK:other');
   check('the rest tail contains honest-fallback records', honest.length > 0, String(honest.length));
   honest.forEach((it) => {
     const f = fc.features.find((x) => x.properties.id === it.id);
     const m = HS.resolveMarker(it);
-    check(`"${it.name}" stays a circle with a stated reason`,
-      f.properties.shape === 'circle' && !!m.fallbackReason, m.fallbackReason || '(no reason)');
+    check(`"${it.name}" stays the residual symbol with a stated reason`,
+      f.properties.shape === OTHER && !!m.fallbackReason, m.fallbackReason || '(no reason)');
   });
 }
 

@@ -15,6 +15,10 @@ global.window = { HS: {} };
 await import('../lib/templates.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
+// The residual bucket's symbol is read from the registry, never hard-coded: it moved
+// circle -> capsule once the circle was measured indistinguishable from the Data center
+// octagon at 14px. These cases assert "stays UNCLASSIFIED", not "is a circle".
+const OTHER = HS.CATEGORY_REGISTRY.other.symbol;
 const FAC = HS.markerRegistry.facilityHex;
 const shape = (type, name) => HS.resolveMarker({ type, name, status: 'Approved' }).shape;
 
@@ -46,25 +50,25 @@ ok(dc.shape === HS.CATEGORY_REGISTRY.datacenter.symbol && dc.shape !== HS.CATEGO
 // Infrastructure (diamond)
 ok(shape('Development', 'Neighborhood Development Permit Wireless Communication Facility(WCF)-Discretionary Project:9292/Miramar') === 'diamond', 'San Diego wireless facility → diamond (adversarial: NOT pentagon from "Neighborhood")');
 
-// ── 2. Honest neutral: class states no building type → circle stays ────────────────
-ok(shape('Development', 'Building Permits') === 'circle', 'bare "Building Permits" → circle');
-ok(shape('Development', 'Building: Alteration and Addition') === 'circle', 'Cambridge generic alteration → circle');
-ok(shape('Trades', 'Plumbing Permit Install sewer line') === 'circle', 'sewer LATERAL is a trade job → circle (not infrastructure)');
-ok(shape('Trades', 'Plumbing Permit DWSD LEAD SERVICE LINE REPLACEMENT -WORK ORDER #725821') === 'circle', 'Detroit lead service line → circle');
-ok(shape('Trades', 'Mechanical Permit HEATING') === 'circle', 'trades HVAC → circle');
-ok(shape('unclassified', 'Sign') === 'circle', 'sign permit → circle');
-ok(shape('Development', 'General Construction Exterior facade restoration; install temporary sidewalk shed for duration of the work.') === 'circle', 'facade job mentioning a sidewalk SHED → circle (adversarial: not infrastructure)');
-ok(shape('Development', 'PERMIT - RENOVATION/ALTERATION SPR 2019 CBRC: INTERIOR ALTERATIONS TO SUBDIVIDE SPACE.') === 'circle', 'typeless Chicago renovation → circle');
+// ── 2. Honest neutral: class states no building type → the Other-project symbol stays ────────────────
+ok(shape('Development', 'Building Permits') === OTHER, 'bare "Building Permits" → the Other-project symbol');
+ok(shape('Development', 'Building: Alteration and Addition') === OTHER, 'Cambridge generic alteration → the Other-project symbol');
+ok(shape('Trades', 'Plumbing Permit Install sewer line') === OTHER, 'sewer LATERAL is a trade job → the Other-project symbol (not infrastructure)');
+ok(shape('Trades', 'Plumbing Permit DWSD LEAD SERVICE LINE REPLACEMENT -WORK ORDER #725821') === OTHER, 'Detroit lead service line → the Other-project symbol');
+ok(shape('Trades', 'Mechanical Permit HEATING') === OTHER, 'trades HVAC → the Other-project symbol');
+ok(shape('unclassified', 'Sign') === OTHER, 'sign permit → the Other-project symbol');
+ok(shape('Development', 'General Construction Exterior facade restoration; install temporary sidewalk shed for duration of the work.') === OTHER, 'facade job mentioning a sidewalk SHED → the Other-project symbol (adversarial: not infrastructure)');
+ok(shape('Development', 'PERMIT - RENOVATION/ALTERATION SPR 2019 CBRC: INTERIOR ALTERATIONS TO SUBDIVIDE SPACE.') === OTHER, 'typeless Chicago renovation → the Other-project symbol');
 const blank = HS.resolveMarker({});
-ok(blank.shape === 'circle' && blank.color === HS.markerRegistry.neutralHex, 'no fields at all → neutral circle');
+ok(blank.shape === OTHER && blank.color === HS.markerRegistry.neutralHex, 'no fields at all → neutral Other-project symbol');
 
 // ── 2b. #373 keyword-recovery traps stay fixed (real strings, proven live) ─────────
 // Names must go through NAME_RULES, never the broad KEYWORD_RULES: 'road' inside a
 // street name and 'neighborhood' inside a permit-class name misfired on main (#373).
-ok(shape('Development', 'Building Permit General-Express-Building Construction:655/Broadway') === 'circle',
-   'San Diego street-name "Broadway" → circle (adversarial: broad keyword \'road\' must not fire on names)');
-ok(shape('Development', 'Building Permit General-Express-Building Construction:879/Harbor') === 'circle',
-   'San Diego street-name permit → circle');
+ok(shape('Development', 'Building Permit General-Express-Building Construction:655/Broadway') === OTHER,
+   'San Diego street-name "Broadway" → the Other-project symbol (adversarial: broad keyword \'road\' must not fire on names)');
+ok(shape('Development', 'Building Permit General-Express-Building Construction:879/Harbor') === OTHER,
+   'San Diego street-name permit → the Other-project symbol');
 
 // ── 3. Precedence invariants ────────────────────────────────────────────────────────
 // A SPECIFIC source type is never reinterpreted by the name.
