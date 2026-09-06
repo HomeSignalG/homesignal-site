@@ -60,6 +60,16 @@ console.log('LIVE Map 1 ZIP-state verification — ' + BASE + '\n');
 const facBaseline = {};
 
 for (const c of CASES) {
+  // ZIP_AUTH is module-scoped, NOT on window - reading it returned "absent" even on a ZIP
+  // that plainly rendered authoritative sites. Intercept the response instead, which is the
+  // technique scripts/probe-map1-record-loss.mjs proved works.
+  let authPayload = null;
+  const grab = async (res) => {
+    if (res.url().includes('/rpc/app_zip_projects_markers')) {
+      try { authPayload = JSON.parse(await res.text()); } catch (_e) { authPayload = null; }
+    }
+  };
+  page.on('response', grab);
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 60000 }).catch(() => {});
   // SETTLE, don't guess. A fixed 3s wait read 798 of 28428's 2,442 records and 0 of 30033's
@@ -73,7 +83,7 @@ for (const c of CASES) {
     prevLen = len;
   }
 
-  const m = await page.evaluate(() => {
+  const m = await page.evaluate((auth) => {
     const sites = window.__HS_SITES || [];
     const dev = sites.filter(s => s && s.relevance === 'development');
     const fac = sites.filter(s => s && s.relevance !== 'development');
@@ -99,7 +109,7 @@ for (const c of CASES) {
       // is the wrong identity. The right one is: delivered + rule-5 dropped == relation, with
       // NOTHING unexplained. Computed with the page's OWN shipped gate, never a copy of it.
       ruleFive: (function () {
-        const a = window.ZIP_AUTH;
+        const a = auth;
         if (!a || !Array.isArray(a.markers) || !Array.isArray(a.projects) || !window.HS) return null;
         const byRef = Object.create(null);
         a.projects.forEach(p => { if (p && p.project_ref && !byRef[p.project_ref]) byRef[p.project_ref] = p; });
@@ -125,7 +135,8 @@ for (const c of CASES) {
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
-  });
+  }, authPayload);
+  page.off('response', grab);
   facBaseline[c.zip] = m.fac;
 
   console.log(`── ${c.zip} (${c.kind}${c.tag ? ' · ' + c.tag : ''}) · development=${m.dev}`
