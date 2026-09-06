@@ -120,6 +120,12 @@ for (const c of CASES) {
       // Distance/offsets are forbidden on AUTHORITATIVE ZIP-mode records. Cached area-scope
       // civic notices legitimately carry synthetic offsets (engine v18 anchors them at the
       // report centroid), so they are counted separately rather than failed.
+      // Cached development that is POINT-scope. This is the one that matters on an
+      // unmeasured ZIP: a point inside a ZIP nobody has measured is a centroid-radius
+      // approximation wearing the clothes of a measurement, and zipAuthMergeSites drops it
+      // unconditionally. Area-scope jurisdiction notices legitimately survive - they make no
+      // whole-ZIP claim - so counting them as a violation would fail a healthy page.
+      devPoint: dev.filter(s => s && s.scope === 'point').length,
       authWithDistance: dev.filter(s => s.zip_authoritative === true &&
                           (s.distance_mi != null || s.e != null || s.n != null)).length,
       // The page's own project count - one road project drawn as 9 markers is ONE project.
@@ -217,7 +223,17 @@ for (const c of CASES) {
        `not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
     ok(m.addressCta, `${c.zip}: directs the resident to address mode`);
     ok(m.noCircle,   `${c.zip}: and says it will not estimate from a circle`);
-    ok(m.dev === 0,  `${c.zip}: renders NO development — nothing fabricated`, `dev=${m.dev}`);
+    // WHAT THE INVARIANT ACTUALLY SAYS, and 95219 is why this had to be rewritten. Its cached
+    // report holds 5 development sites - 3 area-scope and 2 point-scope - and the page renders
+    // 3. zipAuthMergeSites dropped BOTH point-scope records (a point inside an unmeasured ZIP
+    // is a centroid-radius approximation dressed as a measurement) and kept the 3 jurisdiction
+    // notices, which claim nothing about the ZIP. `dev === 0` passed only because the two
+    // pending ZIPs sampled first happened to carry no area notices; it was a property of the
+    // SAMPLE, not of the rule, and it failed the moment a third pending ZIP was added.
+    ok(m.devAuthoritative === 0, `${c.zip}: renders NO AUTHORITATIVE development — nothing fabricated`,
+       `authoritative=${m.devAuthoritative} of dev=${m.dev}`);
+    ok(m.devPoint === 0, `${c.zip}: renders NO POINT-scope development — no centroid-radius stand-in`,
+       `point-scope=${m.devPoint} of dev=${m.dev}`);
   }
   if (c.kind === 'authoritative') {
     ok(m.dev > 0, `${c.zip}: still renders whole-ZIP development (regression control)`, `dev=${m.dev}`);
@@ -274,7 +290,10 @@ for (const c of CASES) {
   }
   if (c.kind === 'not_measured') {
     ok(m.notMeasured && !m.couldNotRead, `${c.zip}: genuine not_measured wording unchanged`);
-    ok(m.dev === 0, `${c.zip}: renders no development`, `dev=${m.dev}`);
+    ok(m.devAuthoritative === 0, `${c.zip}: renders no AUTHORITATIVE development`,
+       `authoritative=${m.devAuthoritative}`);
+    ok(m.devPoint === 0, `${c.zip}: renders no POINT-scope development — no centroid-radius stand-in`,
+       `point-scope=${m.devPoint} of dev=${m.dev}`);
   }
   if (c.kind === 'measured_zero') {
     ok(!m.notMeasured, `${c.zip}: a MEASURED zero never claims to be unmeasured`);
@@ -319,6 +338,12 @@ page.on('request', (req) => {
   }
 });
 await page.goto(`${BASE}/homesignalmap.html`, { waitUntil: 'domcontentloaded' });
+// CLEAR THE GLOBAL, THEN REQUIRE IT BACK. Without this the address-mode assertion reads
+// whatever the LAST ZIP case left behind: it passed as `dev=0 with-distance=0` for as long as
+// the final case was a ZIP that renders nothing, which is a vacuous pass - it asserted that a
+// measurement which had not happened carried no distances. Adding a dense final case exposed
+// it as `dev=5852`, exactly the previous page's count. An instrument must prove it ran.
+await page.evaluate(() => { window.__HS_SITES = undefined; });
 await page.waitForTimeout(2000);
 // choose a radius explicitly, the way a resident does
 await page.evaluate(() => {
@@ -327,7 +352,8 @@ await page.evaluate(() => {
 });
 await page.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
 await page.click('#go');
-await page.waitForTimeout(9000);
+await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 30000 }).catch(() => {});
+await page.waitForTimeout(3000);
 
 ok(payload !== null, 'address mode issues its own report request', endpoint ? 'POST get-address-report' : 'none seen');
 if (payload) {
@@ -339,10 +365,18 @@ if (payload) {
      'zip=' + JSON.stringify(payload.zip));
 }
 const addrMode = await page.evaluate(() => {
-  const sites = window.__HS_SITES || [];
-  const dev = sites.filter(s => s && s.relevance === 'development');
-  return { dev: dev.length, withDistance: dev.filter(s => s.distance_mi != null).length };
+  const sites = window.__HS_SITES;
+  if (sites === undefined) return { rendered: false, dev: 0, withDistance: 0, auth: 0 };
+  const dev = (sites || []).filter(s => s && s.relevance === 'development');
+  return { rendered: true, dev: dev.length,
+           withDistance: dev.filter(s => s.distance_mi != null).length,
+           auth: dev.filter(s => s.zip_authoritative === true).length };
 });
+ok(addrMode.rendered, 'address mode actually rendered — the measurement is not of a stale page',
+   addrMode.rendered ? 'window.__HS_SITES repopulated' : 'window.__HS_SITES never came back');
+ok(addrMode.auth === 0,
+   'address mode carries NO ZIP-authoritative record — the two modes are never conflated',
+   `zip_authoritative=${addrMode.auth}`);
 ok(addrMode.dev === 0 || addrMode.withDistance > 0,
    'address-mode development is distance-bearing — the opposite of ZIP mode',
    `dev=${addrMode.dev} with-distance=${addrMode.withDistance}`);
