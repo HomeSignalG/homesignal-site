@@ -95,10 +95,26 @@ jobs:
           echo "live page sha256: $(sha256sum /tmp/live.html | cut -d' ' -f1)"
           echo "repo  page sha256: $(sha256sum homesignalmap.html | cut -d' ' -f1)"
 
+      # THE BRANCH'S PAGE, THE REAL PRODUCTION DATA. The UI changes under proof are not on main,
+      # so homesignal.net still serves the previous copy; asserting the new wording against it
+      # would fail for a reason that has nothing to do with whether the wording is right. The
+      # page is therefore served from this checkout, while every call it makes - geocode-address,
+      # the N5 radius RPC, app_projects, get-address-report - still goes to production exactly as
+      # a resident's browser does. Nothing about the geography half is mocked or changed.
+      - name: Serve the branch build (page only - all data still comes from production)
+        run: |
+          set -euo pipefail
+          nohup python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/serve.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sSf -o /dev/null http://127.0.0.1:8123/homesignalmap.html; then echo "serving"; exit 0; fi
+            sleep 0.25
+          done
+          echo "local server never came up"; cat /tmp/serve.log; exit 1
+
       - name: LIVE PROOF - one address search, one radius change, one ZIP regression
         id: proof
         env:
-          BASE: ${{ env.BASE }}
+          BASE: http://127.0.0.1:8123
           ADDRESS: ${{ inputs.address }}
           ZIP: ${{ inputs.zip }}
           R1: ${{ inputs.r1 }}
@@ -139,7 +155,7 @@ jobs:
       - name: USER JOURNEY - which page am I on, and where am I looking?
         if: always()
         env:
-          BASE: ${{ env.BASE }}
+          BASE: http://127.0.0.1:8123
           ZIP: ${{ inputs.zip }}
           ADDRESS: ${{ inputs.address }}
         run: |
@@ -149,7 +165,7 @@ jobs:
       - name: MARKET-READINESS GATE - Map 1 as a resident uses it
         if: always()
         env:
-          BASE: ${{ env.BASE }}
+          BASE: http://127.0.0.1:8123
           ADDRESS: ${{ inputs.address }}
           ZIP: ${{ inputs.zip }}
         run: |
