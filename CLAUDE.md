@@ -30,6 +30,39 @@ If you can't produce the evidence in the same message, you don't yet know it —
 
 ---
 
+## CONCURRENCY CHECK — run it BEFORE you edit, not before you merge (founder, 2026-09-06)
+
+**Many sessions write this repo at once. Check before you build, or you will build something
+that already exists.** Measured 2026-09-06 18:55Z: **eleven `claude/*` branches pushed within two
+hours**, and **four separate sessions independently built the same Map 1 two-mode clarity
+feature** — #1069 (merged and deployed 18:53:05Z), #1068, #1070 and #1071. Three of the four were
+wasted, and two of them were still open afterwards, one force-push away from shipping a competing
+implementation on top of the one already live.
+
+**Before editing any customer-facing file, or beginning implementation:**
+
+1. `git fetch origin main` and read the CURRENT tip. Not the one your session started on.
+2. Search **open and recently merged PRs** for the same feature, wording, element id, page, or
+   user journey. Search the thing a resident would notice, not your branch's vocabulary — the
+   four duplicates above carried four different branch names and one feature.
+3. Check whether another **active branch** is already implementing it:
+   `git for-each-ref --sort=-committerdate --format='%(committerdate:iso8601) %(refname:short)' refs/remotes/origin | head`
+4. If the outcome already exists or is in flight, **do not build a second one.** Verify whether
+   the existing work satisfies the acceptance criteria and report exactly one of:
+   **ALREADY IMPLEMENTED** · **DUPLICATE IN PROGRESS** · **GENUINE GAP**.
+5. Only edit after confirming there is no active duplicate and the work is still needed.
+
+**Before opening a PR:** re-fetch `main` and re-check what merged since you began. **If `main` now
+carries an equivalent approved implementation, close your PR and report the deployed result — do
+not merge.** A conflict in the very file your feature edits is the signal; on 2026-09-06 that was
+`mergeable_state: dirty` on `homesignalmap.html`, and the resolution was not to fix the conflict.
+
+⚠️ **The check that would have caught it is step 2, and it costs one API call.** The
+duplicate-work finding arrived only at merge time, after the feature had been built, proven with
+a live production run, and written up. Everything before the fetch was sunk cost.
+
+---
+
 ## Standing autonomy grant — ship this class without asking (founder, 2026-07-30)
 
 **Do not ask permission for work you have already verified.** Verifying first and asking after
