@@ -205,7 +205,7 @@ ok(!calls.some(c => c.kind === 'rpc'), 'ZIP mode makes NO N5 radius call');
 ok(s.some(x => x.label === 'ZIP-ONLY FACILITY') && s.some(x => x.label === 'ZIP-ONLY county notice'),
   'ZIP mode renders the ZIP population', s.map(x => x.label));
 const zipCaption = await page.textContent('#withinLbl');
-ok(/Across ZIP/.test(zipCaption || ''), 'ZIP mode is captioned as the whole ZIP: ' + zipCaption);
+ok(/development across ZIP/i.test(zipCaption || ''), 'ZIP mode is captioned as the whole ZIP: ' + zipCaption);
 
 // ══════════════ 2. ADDRESS MODE — home, ring, canonical markers ══════════════
 calls.length = 0;

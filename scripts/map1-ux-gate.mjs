@@ -106,7 +106,11 @@ ok(errors.length === 0, 'A1 the page loads with no fatal client error', errors.s
 ok(z.mapPresent, 'A2 the map renders');
 ok(z.sites_total > 0, 'A3 results appear', z.sites_total);
 ok(z.dev_points > 0, 'A4 development/projects appear', z.dev_points);
-ok(/Across ZIP/i.test(z.withinLbl || ''), 'A5 the page says it is showing the whole ZIP', z.withinLbl);
+// These two already used /i, so they kept PASSING through the #1068 wording change without
+// asserting any of it — a green check that had stopped checking. Pinned to the claim the new
+// copy makes ("development across ZIP" / "showing development within"), which the pre-#1068
+// bare "Across ZIP" and "Within" would both fail.
+ok(/development across ZIP/i.test(z.withinLbl || ''), 'A5 the page says it is showing the whole ZIP', z.withinLbl);
 ok(z.radiusVisible === false, 'A6 no radius control in ZIP mode (address-radius semantics do not leak)');
 ok(z.homePins === 0, 'A7 no HOME pin for a ZIP (a ZIP is not somebody’s home)');
 
@@ -156,7 +160,7 @@ ok(a.mapPresent, 'B1 the map renders for an address');
 ok(a.homePins === 1, 'B2 HOME is shown, so development is readable relative to the home', a.homePins);
 ok(a.radiusVisible === true, 'B3 the radius control is available in address mode');
 ok(a.sites_total > 0, 'B4 results appear', a.sites_total);
-ok(/Within/i.test(a.withinLbl || ''), 'B5 the page says results are within the chosen radius', a.withinLbl);
+ok(/showing development within/i.test(a.withinLbl || ''), 'B5 the page says results are within the chosen radius', a.withinLbl);
 ok(a.tile_proposed === a.rail_proposed,
   'B6 POSITIVE CONTROL — the proposed tile equals the drawn set in address mode',
   { tile: a.tile_proposed, drawn: a.rail_proposed });

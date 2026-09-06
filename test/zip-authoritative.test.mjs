@@ -154,7 +154,10 @@ ok(/HS\.zipAuthSitesFrom\(/.test(page) && /HS\.zipAuthMergeSites\(/.test(page),
 ok(/HS\.zipAuthNote\(/.test(page), 'F4 the honest note is rendered');
 ok(/body\.zipmode \.radsel\{display:none\}/.test(page),
   'F5 the radius control is not offered in ZIP mode');
-ok(/if\(!CUR_ADDRESS\) return;/.test(page),
+// Two guards, and the ZIP_MODE one is not redundant: CUR_ADDRESS deliberately survives a
+// return to the whole-ZIP view (the "Back to all development in ZIP" control, #1068), so the
+// address check alone stopped proving that address mode is active.
+ok(/if\(ZIP_MODE \|\| !CUR_ADDRESS\) return;/.test(page),
   'F6 the radius handler refuses to act without an address-derived HOME centre');
 ok(!/else if\(ZIP_MODE && LAST_DRAW\)\{ drawMap/.test(page),
   'F7 the old ZIP-mode radius re-cull is gone');

@@ -103,7 +103,11 @@ const z = await page.evaluate(() => ({
   fresh: (document.getElementById('freshLine') || {}).textContent
 }));
 info('ZIP ' + ZIP, z);
-ok(/Across ZIP/.test(z.within || ''), 'E ZIP mode still shows the whole ZIP', z.within);
+// "development across ZIP" is the mode claim. Deliberately NOT /across ZIP/i: the pre-#1068
+// heading was the bare "Across ZIP <zip>", which that would still accept, so the assertion
+// would stop proving the wording it exists to prove. "All" is not required here because a
+// not-measured ZIP correctly drops it (the completeness claim is earned, never decorative).
+ok(/development across ZIP/i.test(z.within || ''), 'E ZIP mode still shows the whole ZIP', z.within);
 ok(z.radiusVisible === false, 'E no address-radius control in ZIP mode');
 ok(z.homePins === 0, 'E no HOME pin in ZIP mode');
 ok(z.devPoints > 0 && z.devPoints === z.authoritative,
@@ -170,7 +174,7 @@ const a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
-ok(/Within/.test(a.within || ''), 'G address mode states the radius', a.within);
+ok(/showing development within/i.test(a.within || ''), 'G address mode states the radius', a.within);
 ok(a.radiusVisible === true, 'G the radius control is available in address mode');
 ok(a.homePins === 1, 'G HOME is pinned at the geocoded address', a.homePins);
 ok(a.canonical > 0, 'G canonical radius results render', a.canonical);
@@ -192,7 +196,7 @@ const back = await page.evaluate(() => ({
 info('back to ZIP ' + OTHER_ZIP, { loc: c.locLabel, ...back });
 ok(new RegExp(OTHER_ZIP).test(c.locLabel || '') && !/CALDWELL/i.test(c.locLabel || ''),
   'H returning to a ZIP drops the address from the current view', c.locLabel);
-ok(/Across ZIP/.test(back.within || ''), 'H ...and the page is back in whole-ZIP mode', back.within);
+ok(/development across ZIP/i.test(back.within || ''), 'H ...and the page is back in whole-ZIP mode', back.within);
 ok(back.stale === 0, 'H no address-radius result survives into ZIP mode', back.stale);
 ok(back.homePins === 0, 'H no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),

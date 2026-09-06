@@ -228,7 +228,10 @@ let z = await page.evaluate(() => ({
   distances: (window.__HS_SITES || []).filter(s => s.distance_mi != null).length
 }));
 info('ZIP 78617 map state', z);
-ok(/Across ZIP 78617/.test(z.within || ''), '6 ZIP mode still says it is showing the whole ZIP', z.within);
+// The heading is the resident's whole-ZIP claim, and "All" is the half that distinguishes it
+// from address mode's "projects near me" reading. Both halves are asserted (#1068).
+ok(/^All development across ZIP 78617$/.test((z.within || '').trim()),
+  '6 ZIP mode still says it is showing the whole ZIP', z.within);
 ok(z.radiusVisible === false, '6 no address-radius control in ZIP mode');
 ok(z.homePins === 0, '6 no HOME pin in ZIP mode');
 ok(z.devPoints > 0 && z.devPoints === z.authoritative,
@@ -301,7 +304,10 @@ let a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
-ok(/Within/.test(a.within || ''), '8 address mode states the radius', a.within);
+// "Showing development within <radius> of" — it must name the SUBJECT (development) and the
+// DISTANCE, not just be a "Within …" fragment that reads the same in either mode (#1068).
+ok(/^Showing development within .+ of$/.test((a.within || '').trim()),
+  '8 address mode states the radius', a.within);
 ok(a.radiusVisible === true, '8 the radius control is available in address mode');
 ok(a.homePins === 1, '8 HOME is pinned at the geocoded address');
 ok(a.canonical > 0, '8 canonical radius results render', a.canonical);
@@ -322,7 +328,8 @@ const back = await page.evaluate(() => ({
 info('back to ZIP 80210', { loc: c.locLabel, ...back });
 ok(/80210/.test(c.locLabel || '') && !/CALDWELL/i.test(c.locLabel || ''),
   '9 returning to a ZIP drops the address from the current view', c.locLabel);
-ok(/Across ZIP 80210/.test(back.within || ''), '9 ...and the page is back in whole-ZIP mode', back.within);
+ok(/^All development across ZIP 80210$/.test((back.within || '').trim()),
+  '9 ...and the page is back in whole-ZIP mode', back.within);
 ok(back.stale === 0, '9 no address-radius result survives into ZIP mode', back.stale);
 ok(back.homePins === 0, '9 no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
@@ -395,7 +402,8 @@ const am = await page.evaluate(() => ({
   canonical: (window.__HS_SITES || []).filter(s => s.n5_feature_id).length
 }));
 info('address mode after the ZIP change', { ...am, kDev: c.kDev, kFac: c.kFac, totalTileShown: c.totalTileShown });
-ok(/Within/.test(am.within || ''), '12a address mode still states its radius', am.within);
+ok(/^Showing development within .+ of$/.test((am.within || '').trim()),
+  '12a address mode still states its radius', am.within);
 ok(am.radiusVisible && am.homePins === 1 && am.canonical > 0,
   '12b HOME, the radius control and canonical radius results are untouched', am);
 ok(c.totalTileShown === true,
