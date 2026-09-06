@@ -8,7 +8,7 @@ on:
       zips:
         description: "Comma-separated ZIPs to account for"
         required: false
-        default: "28456,19103"
+        default: "28456,30033,20148,28451"
   push:
     branches: ["claude/**"]
     paths:
@@ -28,5 +28,5 @@ jobs:
       - name: Account for every authoritative record, stage by stage
         env:
           SITE_BASE: https://homesignal.net
-          PROBE_ZIPS: ${{ github.event.inputs.zips || '28456,19103' }}
+          PROBE_ZIPS: ${{ github.event.inputs.zips || '28456,30033,20148,28451' }}
         run: node scripts/probe-map1-record-loss.mjs
