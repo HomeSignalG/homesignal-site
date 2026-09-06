@@ -1379,12 +1379,10 @@ HS.onReady(function(){
     // can widen the 3D aerial view to reach cached records past the default frame.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
-    // The hero used to put "industrial facilities" inside the SAME "across ZIP" clause as the
-    // development records. Facilities are an EPA query around this ZIP, not a measurement of it,
-    // so the clause is split: what is measured across the ZIP, then what is shown nearby.
-    if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
-      + "data-center activity, planning hearings and open comment windows, plus nearby "
-      + "regulated facilities for context — every item linked to its official public record."; }
+    // Plain-language hero line (founder copy): the ZIP page leads with what the resident gets,
+    // not with an inventory of record types. The specifics (development records measured across
+    // the ZIP, facilities queried nearby for context) are still stated on the map caption below.
+    if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
     var _hint = document.querySelector(".hint");
     if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
       + "Free while we're in launch."; }
