@@ -68,6 +68,9 @@ const readScreen = () => page.evaluate(() => {
     freshLine: txt('freshLine'),
     withinLbl: txt('withinLbl'),
     mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
+    tileDevText: (document.getElementById('cDev') || {}).textContent || '',
+    homeBtnShown: (() => { const b = document.getElementById('homeViewBtn');
+      return !!b && getComputedStyle(b).display !== 'none'; })(),
     rAddr: txt('rAddr'),
     scopeNote: txt('scopeNote'),
     scopeNoteShown: (() => { const n = document.getElementById('scopeNote');
@@ -208,6 +211,83 @@ ok(/^Development within 2 miles of this home$/.test((a2.mapCap || '').trim()),
 ok(a2.tile_proposed === a2.rail_proposed,
   'B10 the tile still equals the drawn set after a radius change',
   { tile: a2.tile_proposed, drawn: a2.rail_proposed });
+
+// ══════════════ C. THE STATE CONTROLS, LIVE ON PRODUCTION ══════════════
+// The founder's launch controls that the A/B flows above do not reach.
+
+// C1 — a resident who searched an address can get back, and the return is CLEAN.
+await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
+const cZip = await readScreen();
+ok(cZip.homeBtnShown === false,
+  'C1 ZIP mode hides the HOME-specific "From home" control - there is no home on a ZIP page',
+  cZip.homeBtnShown);
+
+await page.fill('#addr', ADDRESS);
+await page.click('#go');
+await page.waitForFunction(() => /Showing development within/.test(
+  (document.getElementById('withinLbl') || {}).textContent || ''), null, { timeout: 90000 });
+await page.waitForTimeout(3000);
+const cAddr = await readScreen();
+ok(cAddr.homeBtnShown === true,
+  'C2 ...while address mode, which HAS a geocoded home, still offers it', cAddr.homeBtnShown);
+ok(cAddr.backZipShown === true, 'C3 the Back-to-ZIP control is present in address mode');
+
+// Actually CLICK it. "A link exists" is not "the return works".
+await page.click('#backZip a');
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
+await page.waitForTimeout(3000);
+const cBack = await readScreen();
+const backLine = ((cBack.withinLbl || '') + ' ' + (cBack.rAddr || '')).replace(/\s+/g, ' ').trim();
+info('after clicking Back to ZIP', { line: backLine, radiusVisible: cBack.radiusVisible,
+  homePins: cBack.homePins, backZipShown: cBack.backZipShown, homeBtnShown: cBack.homeBtnShown });
+ok(backLine === ('All development across ZIP ' + ZIP),
+  'C4 clicking Back returns to the SAME whole-ZIP view', backLine);
+ok(cBack.radiusVisible === false && cBack.homePins === 0,
+  'C5 ...and the return is CLEAN - no radius control, no HOME pin left behind',
+  { radiusVisible: cBack.radiusVisible, homePins: cBack.homePins });
+ok(cBack.backZipShown === false && cBack.homeBtnShown === false,
+  'C6 ...and neither the Back control nor the HOME control survives the return',
+  { backZip: cBack.backZipShown, homeBtn: cBack.homeBtnShown });
+
+// C7 — BARE ADDRESS FLOW: no ?zip= in the URL, so no ZIP is known from the page. The control
+// may only appear if the searched ADDRESS itself yields a ZIP; with neither it must be absent
+// rather than guessing one.
+await page.goto(BASE + '/homesignalmap.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForTimeout(4000);
+const bare = await page.evaluate(() => { const b = document.getElementById('backZip');
+  return { shown: !!b && getComputedStyle(b).display !== 'none',
+           html: b ? b.innerHTML : null }; });
+info('bare page, no ZIP known', bare);
+ok(bare.shown === false,
+  'C7 with no ZIP known, no Back-to-ZIP control is drawn (never a guessed ZIP)', bare);
+
+// C8/C9 — NOT-MEASURED vs MEASURED, read from whatever state production is actually in.
+// Each ZIP is judged by the state IT reports, and the pass requires having OBSERVED both
+// states, so a run where every candidate happened to be measured cannot score green on the
+// not-measured rule it never exercised.
+const CAND = (process.env.STATE_ZIPS || '78617,71104,84334,84999').split(',').map(z => z.trim()).filter(Boolean);
+let sawNotMeasured = 0, sawMeasured = 0, stateFails = 0;
+for (const z of CAND) {
+  await page.goto(BASE + '/homesignalmap.html?zip=' + z, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  const r = await readScreen();
+  const notMeasured = /not measured yet/i.test(r.freshLine || '');
+  const dev = (r.tileDevText || '').trim();
+  info('state ZIP ' + z, { notMeasured: notMeasured, dev: dev, fresh: (r.freshLine || '').slice(0, 120) });
+  if (notMeasured) {
+    sawNotMeasured++;
+    if (dev !== '\u2014') { stateFails++; console.log('   !! ' + z + ' is not_measured but shows dev "' + dev + '"'); }
+  } else if (/^\d+$/.test(dev)) {
+    sawMeasured++;   // authoritative measured value, including a real numeric zero
+  }
+}
+ok(stateFails === 0,
+  'C8 every not-measured ZIP shows UNKNOWN, never a false numeric zero', stateFails);
+ok(sawNotMeasured > 0 && sawMeasured > 0,
+  'C9 both states were actually OBSERVED live (not a vacuous pass)',
+  { notMeasured: sawNotMeasured, measured: sawMeasured });
 
 console.log('='.repeat(78));
 console.log('FAILS: ' + fails);
