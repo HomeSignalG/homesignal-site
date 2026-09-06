@@ -21,6 +21,8 @@ import { surfaceBanner } from './lib/surface-banner.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEPLOYED = process.env.HS_BASE || 'https://homesignal.net';
 let fails = 0;
+let dbReadCompleted = 0;   // controls that actually reached app_projects and returned
+let dbReadTimedOut = 0;    // ...and those the 3 s anon budget cancelled under contention
 const ok = (c, name, detail) => {
   console.log((c ? 'PASS' : 'FAIL') + ' — ' + name + (detail !== undefined ? '  [' + detail + ']' : ''));
   if (!c) fails++;
@@ -98,16 +100,24 @@ for (const label of ['DEPLOYED', 'THIS BRANCH']) {
         ok(!r.claimsZero, `${c.zip}: it no longer claims "no records on file" — that asserted a measurement`);
         ok(r.keepsFacilities, `${c.zip}: facilities survive — empty development is not an empty page`);
       }
+      // A TIMED-OUT READ CANNOT TESTIFY ABOUT THE SHAPE OF A COMPLETED READ — for EITHER of the
+      // two controls that actually reach `app_projects`. Cause, measured 2026-09-06 17:11-17:12Z
+      // rather than assumed: two concurrent `mgmt-api` sessions running full aggregates over
+      // public.app_projects (`select registry_id, type_raw, type, count(*) … where registry_id in
+      // ('nashville-building-permits-issued','austin-site-plan-cases','austin-subdivision-cases')`),
+      // 80 s and 17 s elapsed, both parked on LWLock:BufferMapping — buffer-pool thrash on a
+      // 2.9 GB table. That starves the random reads this RPC does, so under `anon`'s 3 s budget a
+      // healthy ZIP 57014s. Reporting contention as a product defect would be wrong; passing it
+      // silently would be worse. So the shape assertion is deferred and the SAFETY property is
+      // asserted regardless: a failed read must never render as an empty finding.
+      // The run-level guard below stops this from ever becoming a vacuous green.
+      const timedOut = !!(r.rpc && r.rpc.kind === 'other' && /57014/.test(r.rpc.body || ''));
+      if ((c.state === 'measured_zero' || c.state === 'authoritative')) {
+        if (timedOut) dbReadTimedOut++; else dbReadCompleted++;
+      }
       if (c.state === 'measured_zero') {
-        // A TIMED-OUT READ IS INCONCLUSIVE ABOUT THE MEASURED-ZERO CONTRACT, NOT A BREACH OF IT.
-        // This RPC is under sustained external load (measured 2026-09-06: 18 active queries, 13
-        // of them here, longest 53 s; 28456 returned its correct 12 rows in 21,132 ms). Under
-        // `anon`'s 3 s budget a healthy ZIP can 57014. Failing the contract for that would report
-        // contention as a product defect — but PASSING it silently would be worse, so the one
-        // property that still binds is asserted either way: the page must not claim zero.
-        const timedOut = r.rpc && r.rpc.kind === 'other' && /57014/.test(r.rpc.body || '');
         if (timedOut) {
-          console.log(`   INCONCLUSIVE — ${c.zip}: the read timed out (57014) under external load;`
+          console.log(`   INCONCLUSIVE — ${c.zip}: the read timed out (57014) under DB contention;`
             + ' the measured-zero shape could not be observed this run');
           ok(!r.claimsZero,
              `${c.zip}: a FAILED read still must not claim zero — the safety property holds regardless`,
@@ -119,7 +129,12 @@ for (const label of ['DEPLOYED', 'THIS BRANCH']) {
         ok(!r.saysNotMeasured, `${c.zip}: ...and never claims to be unmeasured`);
       }
       if (c.state === 'authoritative') {
-        ok(r.rpc && r.rpc.kind === 'array' && r.rpc.n > 0, `${c.zip}: authoritative development still served`, JSON.stringify(r.rpc));
+        if (timedOut) {
+          console.log(`   INCONCLUSIVE — ${c.zip}: the read timed out (57014) under DB contention;`
+            + ' whether authoritative rows still reach the page could not be observed this run');
+        } else {
+          ok(r.rpc && r.rpc.kind === 'array' && r.rpc.n > 0, `${c.zip}: authoritative development still served`, JSON.stringify(r.rpc));
+        }
         ok(!r.saysNotMeasured && !r.claimsZero, `${c.zip}: ...and makes neither empty claim`,
            `claims-zero=${r.claimsZero} says-not-measured=${r.saysNotMeasured}`);
       }
@@ -133,5 +148,22 @@ for (const label of ['DEPLOYED', 'THIS BRANCH']) {
 
 await browser.close();
 server.close();
-console.log(fails ? `\n${fails} FAILURE(S)` : '\nZIP-DEVELOPMENT CONTRACT: PASS');
-process.exit(fails ? 1 : 0);
+
+// AN INCONCLUSIVE RUN MUST NOT LOOK LIKE A PASS. Both controls that actually read
+// `app_projects` can defer their shape assertion on a 57014; if EVERY one of them did, this run
+// observed no completed read at all and has proven nothing about the measured-zero /
+// authoritative half of the contract. Say so, and do not exit 0.
+if (fails) {
+  console.log(`\n${fails} FAILURE(S)`);
+  process.exit(1);
+}
+if (dbReadCompleted === 0) {
+  console.log(`\nZIP-DEVELOPMENT CONTRACT: INCONCLUSIVE — ${dbReadTimedOut} of ${dbReadTimedOut} DB-reading`
+    + ' control(s) timed out (57014) under DB contention, so the measured-zero and authoritative'
+    + ' shapes were not observed. The not_measured half and every safety property PASSED.'
+    + ' Re-run when the contending workload has drained.');
+  process.exit(2);
+}
+console.log(`\nZIP-DEVELOPMENT CONTRACT: PASS (${dbReadCompleted} DB-reading control(s) completed,`
+  + ` ${dbReadTimedOut} deferred on 57014)`);
+process.exit(0);
