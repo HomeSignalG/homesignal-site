@@ -53,9 +53,31 @@ if (!/\.catch\(function \(\) \{ return null; \}\)/.test(src)) {
 
 // ── The fallback branch must also be free of the claim ───────────────────────────────
 // Both branches were wrong before; only one of them was replaced by the rich block.
-const emptyBranch = src.slice(src.indexOf('if (!a.length)'), src.indexOf('if (!a.length)') + 900);
+// 1,800 rather than 900: the branch grew when an UNAVAILABLE case was added ahead of it, and a
+// window sized to yesterday's code reports today's correct code as missing the copy. The window
+// is still bounded — it must not run on far enough to borrow another branch's text.
+const emptyBranch = src.slice(src.indexOf('if (!a.length)'), src.indexOf('if (!a.length)') + 1800);
 if (!/No permit or planning records for this area/.test(emptyBranch)) {
   failures.push('the fallback empty state does not state plainly what the page holds');
+}
+
+// ── UNAVAILABLE IS NOT EMPTY, AND IT IS CHECKED FIRST ────────────────────────────────
+// A ZIP whose geography state cannot support a whole-ZIP read must not be described as
+// "Nothing on the public record near here yet" — that asserts a measurement that never
+// happened. And the check must come BEFORE coverageHTML, which narrates what the page draws
+// on and would otherwise describe a measurement into existence.
+if (!/projects && projects\.unavailable/.test(emptyBranch)) {
+  failures.push('the empty branch does not distinguish an UNAVAILABLE whole-ZIP read from a zero');
+}
+if (!/zipDevelopmentUnavailableNote/.test(emptyBranch)) {
+  failures.push('the unavailable copy is not the ONE shared helper — two surfaces could diverge');
+}
+{
+  const iUnavail = emptyBranch.indexOf('projects.unavailable');
+  const iCoverage = emptyBranch.indexOf('coverageHTML ||');
+  if (iUnavail === -1 || iCoverage === -1 || iUnavail > iCoverage) {
+    failures.push('the UNAVAILABLE case is not checked before the coverage narration');
+  }
 }
 if (/\bwe (check|monitor|track) /i.test(emptyBranch)) {
   failures.push('the fallback empty state makes a checking claim');

@@ -113,7 +113,18 @@ HS.onReady(async function () {
         // That is unsupportable wherever no registry entry covers the county, so it is gone
         // from BOTH branches: the rich block when we can name what we draw on, and
         // otherwise a sentence that states only what the page holds.
-        body = coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
+        // UNAVAILABLE OUTRANKS BOTH. HS.data.projects stamps `unavailable` when the ZIP's
+        // geography state cannot support a whole-ZIP read at all, and "Nothing on the public
+        // record near here yet" would then assert a measurement that never happened. Checked
+        // BEFORE coverageHTML, which describes what we draw on and would otherwise narrate a
+        // measurement into existence. Same sentence as the ZIP page - one helper, one place.
+        body = (projects && projects.unavailable)
+          ? ('<div class="card" style="text-align:center;padding:26px 18px">'
+             + '<h3 style="margin-bottom:6px">Whole-ZIP development is not measured for this ZIP</h3>'
+             + '<p class="sowhat" style="margin:0">'
+             + HS.esc(HS.zipDevelopmentUnavailableNote(String(projects.unavailable), S.zip))
+             + '</p></div>')
+          : coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
           + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
           + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>');
       } else {
