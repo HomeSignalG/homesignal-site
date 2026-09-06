@@ -173,7 +173,10 @@ const a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
-ok(/Within/.test(a.within || ''), 'G address mode states the radius', a.within);
+// Case-sensitive /Within/ missed the new copy ("Showing development within ..."). Assert the
+// whole contract, and lowercase, so the literal cannot drift out from under the assertion again.
+ok(/^Showing development within .+ of$/.test((a.within || '').trim()),
+  'G address mode states what is shown and the radius it is within', a.within);
 ok(a.radiusVisible === true, 'G the radius control is available in address mode');
 ok(a.homePins === 1, 'G HOME is pinned at the geocoded address', a.homePins);
 ok(a.canonical > 0, 'G canonical radius results render', a.canonical);
