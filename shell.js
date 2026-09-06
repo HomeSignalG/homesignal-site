@@ -500,7 +500,7 @@
     } catch (e) { unavailable = true; }
     if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
     if (!m || !m.zip) {
-      throw new Error("We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.");
+      throw new Error("We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.");
     }
     if (!O.validCoords(m.lat, m.lng)) {
       throw new Error("We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.");
@@ -1014,7 +1014,7 @@
       return;
     }
     if (!m || m.lat == null || m.lng == null || !m.zip) {
-      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.";
+      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.";
       return;
     }
     _homeMatch = m;
