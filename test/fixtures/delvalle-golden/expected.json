@@ -176,7 +176,7 @@
   {
    "category": "industrial",
    "classification_rule": "LAYER_EXACT:animal-facility",
-   "color": "#6b7f76",
+   "color": "#706468",
    "dedupe_identity": "(null)|https://www.tdlr.texas.gov/TABS/Projects/TABS2023006449|(no-date)|River Bottoms Ranch Barn 2",
    "evidence_url": "https://www.tdlr.texas.gov/TABS/Projects/TABS2023006449",
    "fallback_reason": null,
@@ -202,7 +202,7 @@
   {
    "category": "industrial",
    "classification_rule": "LAYER_EXACT:research",
-   "color": "#6b7f76",
+   "color": "#706468",
    "dedupe_identity": "(null)|https://www.tdlr.texas.gov/TABS/Projects/TABS2023006483|(no-date)|Histology Lab",
    "evidence_url": "https://www.tdlr.texas.gov/TABS/Projects/TABS2023006483",
    "fallback_reason": null,
@@ -228,7 +228,7 @@
   {
    "category": "commercial",
    "classification_rule": "TYPE_EXACT:commercial",
-   "color": "#6b7f76",
+   "color": "#706468",
    "dedupe_identity": "(null)|https://www.tdlr.texas.gov/TABS/Projects/TABS2024016698|(no-date)|Barn 2 ACT Office",
    "evidence_url": "https://www.tdlr.texas.gov/TABS/Projects/TABS2024016698",
    "fallback_reason": null,
@@ -254,7 +254,7 @@
   {
    "category": "industrial",
    "classification_rule": "TYPE_EXACT:industrial",
-   "color": "#6b7f76",
+   "color": "#706468",
    "dedupe_identity": "(null)|https://www.tdlr.texas.gov/TABS/Projects/TABS2024022676|(no-date)|ATX1 New Construction",
    "evidence_url": "https://www.tdlr.texas.gov/TABS/Projects/TABS2024022676",
    "fallback_reason": null,
@@ -280,7 +280,7 @@
   {
    "category": "commercial",
    "classification_rule": "TYPE_EXACT:commercial",
-   "color": "#6b7f76",
+   "color": "#706468",
    "dedupe_identity": "(null)|https://www.tdlr.texas.gov/TABS/Projects/TABS2026011928|(no-date)|ATX1 - Third Floor Tenant Improvement",
    "evidence_url": "https://www.tdlr.texas.gov/TABS/Projects/TABS2026011928",
    "fallback_reason": null,
