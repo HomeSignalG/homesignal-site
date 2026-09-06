@@ -27,22 +27,27 @@ const ok = (c, name, detail) => {
 //   dev  = authoritative membership rows the production relation holds for that ZIP
 //   fac  = whether the page must still carry facilities (proves facilities are unaffected)
 const CASES = [
-  // ── controls that predate Phase 2, expectations unchanged ────────────────────────────────
-  { zip: '01001', kind: 'authoritative', dev: 12,   fac: false, tag: 'pre-Phase-2 control' },
-  { zip: '01004', kind: 'not_measured',              fac: false, tag: 'NO_ZCTA_IN_TIGER_2025' },
-  { zip: '01009', kind: 'measured_zero',             fac: false, tag: 'pre-Phase-2 control' },
+  // ── controls that predate Phase 2 ─────────────────────────────────────────────────────────
+  { zip: '01001', kind: 'authoritative', markers: 34,     projects: 12,    fac: false, tag: 'pre-Phase-2 control' },
+  { zip: '19103', kind: 'authoritative', markers: 303,    projects: 303,   fac: false, tag: 'pre-Phase-2 medium, 468 kB before' },
+  { zip: '01004', kind: 'not_measured',                                    fac: false, tag: 'NO_ZCTA_IN_TIGER_2025' },
+  { zip: '01009', kind: 'measured_zero',                                   fac: false, tag: 'pre-Phase-2 control' },
 
-  // ── Phase 2, shards 284/300 — authoritative NON-ZERO, the newly built population ──────────
-  { zip: '28428', kind: 'authoritative', dev: 2440, fac: true,  tag: 'shard 284 · retired 2,424 legacy' },
-  { zip: '30033', kind: 'authoritative', dev: 2261, fac: true,  tag: 'shard 300 · retired 10,960 legacy' },
-  { zip: '28456', kind: 'authoritative', dev: 12,   fac: true,  tag: 'shard 284 · small non-zero' },
+  // ── the two ZIPs whose live failure opened this unit ──────────────────────────────────────
+  { zip: '28428', kind: 'authoritative', markers: 2442,   projects: 2410,  fac: true,  tag: 'DENSE — rendered 798 of 2,442 before' },
+  { zip: '30033', kind: 'authoritative', markers: 2261,   projects: 2218,  fac: true,  tag: 'DENSE — "could not be read" before, 17.3 s' },
+  { zip: '28456', kind: 'authoritative', markers: 12,     projects: 12,    fac: true,  tag: 'shard 284 small non-zero' },
 
-  // ── Phase 2 — authoritative MEASURED ZERO, the state that must never read as unmeasured ───
-  { zip: '08005', kind: 'measured_zero',             fac: false, tag: 'manifest-gap 442' },
-  { zip: '38801', kind: 'measured_zero',             fac: true,  tag: 'manifest-gap 442 · 40 facilities' },
-  { zip: '30090', kind: 'measured_zero',             fac: true,  tag: 'shard 300 Case A · 40 facilities' },
+  // ── EXTREME density. Gate 6: a repair proven only at ~2,400 is not proven. ────────────────
+  { zip: '20148', kind: 'authoritative', markers: 13935,  projects: 13934, fac: false, tag: 'EXTREME pre-Phase-2, 13,934 memberships, 21.7 MB before' },
+  { zip: '28451', kind: 'authoritative', markers: 14705,  projects: 14636, fac: false, tag: 'EXTREME — densest in production, 14,702 memberships' },
 
-  // ── the 3 genuinely pending ZIPs — must NOT present as boundary_complete ──────────────────
+  // ── authoritative MEASURED ZERO ───────────────────────────────────────────────────────────
+  { zip: '08005', kind: 'measured_zero',                                   fac: false, tag: 'manifest-gap 442' },
+  { zip: '38801', kind: 'measured_zero',                                   fac: true,  tag: 'manifest-gap 442 · 40 facilities' },
+  { zip: '30090', kind: 'measured_zero',                                   fac: true,  tag: 'shard 300 Case A · keeps cached area notices' },
+
+  // ── the 3 genuinely pending ZIPs ──────────────────────────────────────────────────────────
   { zip: '99128', kind: 'pending', tag: 'Case C: intersection exists, membership unbuildable' },
   { zip: '94128', kind: 'pending', tag: 'unevaluatable legacy candidates' },
 ];
@@ -75,10 +80,19 @@ for (const c of CASES) {
     const txt = document.body.innerText || '';
     return {
       dev: dev.length, fac: fac.length,
-      // Which layer each development record came from. The authoritative RPC stamps
-      // authoritative:true; anything without it came from the development_reports cache.
-      devAuthoritative: dev.filter(s => s.authoritative === true).length,
-      devCached:        dev.filter(s => s.authoritative !== true).length,
+      // WHICH LAYER each development record came from. `authoritative` is NOT propagated
+      // into __HS_SITES - reading it returned 0 on every page including ones provably serving
+      // authoritative data. `zip_authoritative` is the flag zipAuthSiteFromMarker actually
+      // sets, and it is the correct discriminator.
+      devAuthoritative: dev.filter(s => s.zip_authoritative === true).length,
+      devCached:        dev.filter(s => s.zip_authoritative !== true).length,
+      // Distance/offsets are forbidden on AUTHORITATIVE ZIP-mode records. Cached area-scope
+      // civic notices legitimately carry synthetic offsets (engine v18 anchors them at the
+      // report centroid), so they are counted separately rather than failed.
+      authWithDistance: dev.filter(s => s.zip_authoritative === true &&
+                          (s.distance_mi != null || s.e != null || s.n != null)).length,
+      // The page's own project count - one road project drawn as 9 markers is ONE project.
+      projectCount: (window.HS && HS.zipAuthProjectCount) ? HS.zipAuthProjectCount(dev) : -1,
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
@@ -102,9 +116,9 @@ for (const c of CASES) {
   }
 
   // The invariant that applies to EVERY state: no fabricated ZIP-mode geography.
-  ok(m.devWithDistance === 0,
-     `${c.zip}: no ZIP-mode development record carries address-mode distance or offsets`,
-     `${m.devWithDistance} offenders`);
+  ok(m.authWithDistance === 0,
+     `${c.zip}: no AUTHORITATIVE ZIP-mode record carries address-mode distance or offsets`,
+     `${m.authWithDistance} offenders of ${m.devAuthoritative} authoritative`);
 
   if (c.kind === 'pending') {
     ok(m.notMeasured && !m.couldNotRead,
@@ -119,10 +133,15 @@ for (const c of CASES) {
     // The strong form: the live page renders EXACTLY what the authoritative relation holds.
     // A legacy-geography fallback would show a different number, so this is also the live
     // no-fallback proof - the legacy 3-mile branch never returns the membership count.
-    if (c.dev != null) {
-      ok(m.dev === c.dev,
-         `${c.zip}: live rendered development EQUALS the authoritative relation`,
-         `live=${m.dev} relation=${c.dev}`);
+    if (c.markers != null) {
+      ok(m.devAuthoritative === c.markers,
+         `${c.zip}: every authoritative marker was DELIVERED — no silent truncation`,
+         `delivered=${m.devAuthoritative} relation=${c.markers}`);
+    }
+    if (c.projects != null) {
+      ok(m.projectCount === c.projects,
+         `${c.zip}: distinct project count equals the authoritative relation`,
+         `live=${m.projectCount} relation=${c.projects}`);
     }
     ok(!m.notMeasured && !m.couldNotRead,
        `${c.zip}: makes no not-measured and no failure claim`);
@@ -135,7 +154,9 @@ for (const c of CASES) {
   if (c.kind === 'measured_zero') {
     ok(!m.notMeasured, `${c.zip}: a MEASURED zero never claims to be unmeasured`);
     ok(m.wholeZip, `${c.zip}: it asserts a real whole-ZIP measurement`);
-    ok(m.dev === 0, `${c.zip}: and shows nothing, because there is nothing`, `dev=${m.dev}`);
+    ok(m.devAuthoritative === 0,
+       `${c.zip}: zero AUTHORITATIVE development, because the measurement found none`,
+       `authoritative=${m.devAuthoritative} (cached area notices ${m.devCached} may remain)`);
   }
   console.log('');
 }
