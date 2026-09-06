@@ -195,8 +195,17 @@ ok(/window\.__HS_SITES = sites;/.test(page) && page.indexOf('HS.residentialQuali
 // The accusation this answers is "rails, counts and markers use different Residential
 // populations". They cannot: all four derive from the SAME `sites` array the gate produced.
 const afterGate = page.slice(page.indexOf('HS.residentialQualifySites(sites)'));
-ok(/var permits = sites\.filter\(isDevPoint\);/.test(afterGate), '9a: the permits rail reads the qualified array');
-ok(/var dev = sites\.filter\(function\(s\)\{ return s\.scope==="area"/.test(afterGate), '9b: the area rail reads it too');
+// The rails read `rows`, not `sites`, since the project-grain split (one road corridor is one
+// project, not one row per geometry marker). That does NOT loosen this guarantee: `rows` is
+// derived from `sites` AFTER the gate, so the rails still see exactly the qualified population
+// — asserted here as the whole chain rather than as one variable name, so a future rename
+// cannot make this pass while the rails quietly read a pre-gate array.
+ok(/var rows = HS\.zipAuthCollapseToProjects\(sites\);/.test(afterGate),
+  '9a-i: the rail source `rows` is derived from the qualified `sites`, after the gate');
+ok(/var permits = rows\.filter\(isDevPoint\);/.test(afterGate), '9a: the permits rail reads the qualified array');
+ok(/var dev = rows\.filter\(function\(s\)\{ return s\.scope==="area"/.test(afterGate), '9b: the area rail reads it too');
+ok(!/var (permits|dev|fac|civic) = sites\.filter\(/.test(afterGate),
+  '9c: no rail bypasses the gate by reading a pre-gate array');
 ok(/drawMap\(data, sites\.filter\(function\(s\)\{ return !isCivic\(s\); \}\)\);/.test(afterGate),
   '9c: all three map views are drawn from it');
 // devCount would otherwise take the ENGINE's counter, which counts records the gate removed.
