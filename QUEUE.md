@@ -11142,3 +11142,19 @@ admitting everything, and non-residential records are untouched by the gate. The
 carries this as a live case with a **counterfactual assertion** — it re-runs the shipped gate
 over the same production markers with `type_raw` blanked and requires the loss to exceed 5,000,
 so the field being load-bearing is measured in production rather than read off the SQL.
+
+**Gate 9 — and a correction to my own commit message, made in the same breath as the receipt.**
+Commit `288c7fe` says the first 17-case run "ran past 13 minutes against a 15-minute cap". **It
+did not.** Run `34044111371` was created 16:01:16Z and cancelled 16:03:43Z — **2 min 27 s**. I
+cancelled it myself, having mistaken repeated polls for elapsed time: `Bash(run_in_background)`
+returns immediately, so a chain of "sleep 240" calls advanced the conversation without advancing
+the clock, and the job's unchanged status read as a stall. Grounding it took one `date -u`, which
+showed 35 seconds had passed where I had assumed thirteen minutes.
+- **The change that commit made is still right for a different reason**: the counterfactual was
+  re-running the shipped Rule 5 gate over every authoritative case — ~29,000 extra classifier
+  runs on the two extreme ZIPs — to compute a number only 76227's assertion reads. Scoping it is
+  correct as *not doing work nothing consumes*, not as a timeout fix, and it now returns `null`
+  rather than 0 elsewhere so the absence cannot be misread as a measurement.
+- **The transferable lesson, which is the same one this file keeps re-learning:** an elapsed-time
+  claim needs a clock, exactly as a row count needs a query. "It has been running a long time"
+  felt like an observation and was an inference from my own polling cadence.
