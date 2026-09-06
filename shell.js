@@ -1602,6 +1602,23 @@
     const tpl = $('hs-content');
     const slot = root.querySelector('#hs-slot');
     if (tpl && slot) slot.appendChild(tpl.content.cloneNode(true));
+    // MAPS: the universal search control is SUPPRESSED, temporarily and on this page only.
+    // A resident on Maps who searches "data center" gets "No matches" from this index even
+    // though Data center is a first-class, populated Maps TYPE — the index holds projects,
+    // changes and saved properties, not map categories. Presenting a search that cannot
+    // answer the page's own vocabulary is worse than presenting none, so it is removed from
+    // the Maps header until universal search is Maps-aware.
+    //
+    // It is REMOVED FROM THE INJECTED FRAGMENT, before the shell is in the document. Hiding
+    // it with CSS would leave the button in the tab order and HS.openSearch() able to open
+    // the panel; with the node gone, wireSearch()/wireSearchToggle() find nothing and return,
+    // and HS.openSearch() no-ops on the missing panel. Nothing about the search
+    // implementation, its index, or its behaviour on any other page changes — every other
+    // page still injects the same markup and wires the same one control.
+    if (document.body.dataset.nav === 'maps') {
+      const sw = root.querySelector('#hs-searchwrap');
+      if (sw) sw.remove();
+    }
     document.body.insertBefore(root, document.body.firstChild);
     $('sidebackdrop').addEventListener('click', closeMenu);
     // active nav
