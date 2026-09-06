@@ -96,12 +96,22 @@ for (const c of CASES) {
   // SETTLE, don't guess. A fixed 3s wait read 798 of 28428's 2,442 records and 0 of 30033's
   // 2,261 - a partial render mid-load, which is indistinguishable from wrong data if you
   // sample once. Wait until the rendered set stops growing, then sample.
-  let prevLen = -1, stable = 0;
-  for (let i = 0; i < 60 && stable < 3; i++) {
+  //
+  // ⚠️ AND "SETTLED AT 0" IS NOT SETTLED. On 76227 (5,869 markers, ~3 MB) this loop reported
+  // `settled after 0 sites` on one run and 5,976 on the next, same commit - three consecutive
+  // zero polls while the payload was still in flight look exactly like a measured zero, which
+  // is the same confusion this whole surface exists to prevent. So stability alone is not the
+  // exit condition: when the intercepted RPC payload HAS markers, the render must reach a
+  // non-zero count before a stable reading is believed. The evidence, not the clock, decides.
+  let prevLen = -1, stable = 0, sawNonZero = false;
+  const expectSites = !!(authPayload && Array.isArray(authPayload.markers) && authPayload.markers.length > 0);
+  for (let i = 0; i < 90; i++) {
     await page.waitForTimeout(1000);
     const len = await page.evaluate(() => (window.__HS_SITES || []).length);
+    if (len > 0) sawNonZero = true;
     stable = (len === prevLen) ? stable + 1 : 0;
     prevLen = len;
+    if (stable >= 3 && (!expectSites || sawNonZero)) break;
   }
 
   const m = await page.evaluate(({ auth, wantCounterfactual }) => {
@@ -329,6 +339,10 @@ ok(/could not be read/i.test(f.noteFail),
 console.log('');
 
 // ── address mode: separate contract, real geocoded home + chosen radius, no ZIP ─────────────
+// Park on a blank document FIRST. A dense ZIP page whose render lands after its own case has
+// finished will otherwise repopulate window.__HS_SITES underneath the address-mode read - that
+// is exactly how `zip_authoritative=5844` appeared in an ADDRESS-mode assertion.
+await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
 console.log('── address mode, driven through the real form ──');
 let payload = null, endpoint = null;
 page.on('request', (req) => {
