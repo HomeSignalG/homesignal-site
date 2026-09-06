@@ -252,6 +252,10 @@
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
+  .backzip{display:inline-block;margin:6px 0 2px;font-size:12.5px;font-weight:600;
+    color:var(--green);text-decoration:none}
+  .backzip:hover{text-decoration:underline}
+  .backzip[hidden]{display:none}
   /* Type row heading + its dropdown. The chips remain the primary control; this is a
      second view of the SAME filter state for residents who look for an explicit control
      rather than trying the legend. */
@@ -414,8 +418,14 @@
           </div>
         </div>
         <div class="card read">
-          <h2 id="withinLbl">Within 1 mile of</h2>
+          <h2 id="withinLbl">Showing development within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- The way back. Address mode is a DIFFERENT geography from the ZIP page a resident
+               usually arrives on, and until now there was no way back to it except the browser
+               button - so the whole-ZIP view read as something you could leave but not return
+               to. Href, not a JS mode flip: re-entering through ?zip= reuses the shipped
+               loadZip path rather than inventing a second way into ZIP mode. -->
+          <a class="backzip" id="backZip" href="#" hidden></a>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -594,6 +604,9 @@ HS.onReady(function(){
   // per-ZIP report and centers on the ZIP centroid. The centroid is a page ANCHOR, not a
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
+  // The ZIP to offer as the way back out of address mode. Set from the ZIP page a resident
+  // arrived on, or from the geocoder's own resolved ZIP for a direct address search.
+  var RETURN_ZIP = null;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
   // The generated county -> sources map (lib/generated/county-sources.json). ZIP mode only:
   // it answers "does any source covering this county still classify records as Commercial?",
@@ -1201,6 +1214,10 @@ HS.onReady(function(){
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
+      // A resident who typed an address without arriving from a ZIP page still deserves the
+      // way out. Only the geocoder's OWN resolved ZIP is used - never one parsed out of the
+      // typed string, which would offer a return trip to a ZIP nobody verified.
+      if(!ZIP_CODE && m.zip && /^\d{5}$/.test(String(m.zip))) RETURN_ZIP = String(m.zip);
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -1264,7 +1281,7 @@ HS.onReady(function(){
   }
 
   function loadZip(zip){
-    ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true; RETURN_ZIP = zip;
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
@@ -1420,8 +1437,13 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // "All development across" - not "Across" - because the distinction a homeowner has to
+      // make is COMPLETE-ZIP versus NEAR-MY-HOUSE, and "Across ZIP 78617" does not say which
+      // of the two it is. Development here IS authoritative whole-ZIP membership (see
+      // zipAuthSitesFrom), so the stronger word is the true one.
+      $("withinLbl").textContent = "All development across ZIP " + ZIP_CODE;
+      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · the entire ZIP, not only nearby projects";
+      var _bz = $("backZip"); if(_bz) _bz.hidden = true;
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
@@ -1430,7 +1452,20 @@ HS.onReady(function(){
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // Reads as one sentence with the address line beneath it: "Showing development within
+      // 1 mile of / 2200 CALDWELL LN...". The old "Within 1 mile of" left the verb implicit,
+      // so it did not distinguish itself from the whole-ZIP heading at a glance.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
+      // Offer the way back whenever we know which ZIP to return to - the ZIP the resident
+      // arrived on, else the one the geocoder resolved for this address.
+      var _bz = $("backZip"), _rz = ZIP_CODE || RETURN_ZIP;
+      if(_bz){
+        if(_rz){
+          _bz.textContent = "\u2190 Back to all development in ZIP " + _rz;
+          _bz.setAttribute("href", "homesignalmap.html?zip=" + encodeURIComponent(_rz));
+          _bz.hidden = false;
+        } else { _bz.hidden = true; }
+      }
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
