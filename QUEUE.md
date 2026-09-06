@@ -40,6 +40,86 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — ✅ THE 28456 "12 → 6 LOSS" IS RULE 5 WORKING. It was never a defect
+
+**Gate 0.** `origin/main` `4a80502`; **deployed `b277dd1`** (pages #33, 11:19:19Z). All open PRs
+compared by HUNK, not title: #400 touches `MAP_SITES`, #287 touches `dedupe` in `lib/map.js`;
+neither touches `zipAuthSitesFrom`, `zipAuthSiteFromMarker`, `zipAuthMergeSites`, `__HS_SITES`,
+`loadZip` or `sourced(`. No supersession.
+
+#### The answer, with record-level evidence
+
+`scripts/probe-map1-record-loss.mjs` accounted for the same identities stage by stage against
+production (runs `34038653664`, `34038786374`):
+
+```
+28456   rpc HTTP 200 · 8,221 bytes · declared {membership 12, marker 12, project 12}
+        markers/projects 12 / 12 · complete=true
+        zipAuthSitesFrom -> 6      markers yielding null 6
+        authSites failing sourced() 0      converted-but-not-rendered 0
+19103   rpc 303 / 303 · zipAuthSitesFrom -> 259 · nulls 44 · sourced() 0 · not-rendered 0
+```
+
+The loss is entirely inside `zipAuthSiteFromMarker` — and the null-yielding markers report
+`hasProject: true`, `latType: "number"`, `lngType: "number"` with real coordinates, so **neither
+null exit in my branch's copy could fire.** The deployed function has a **third** exit my branch
+does not:
+
+```js
+if (HS.residentialGateDrops && HS.residentialGateDrops(site, project)) return null;
+```
+
+**RULE 5 — RESIDENTIAL DEVELOPMENT QUALIFICATION (founder, 2026-09-05)**, shipped to `main` as
+**#1048** *"Map 1 Residential: qualify on ACTIVITY, not on residential use"*. Map 1 Residential
+means meaningful NEW residential development, not routine work on an existing residential
+property; a rejected record is dropped, never relabelled. My branch predates it and does not
+contain `lib/residential-qualify.js` at all — which is exactly why reading my own working tree
+could not explain the drop.
+
+- **The corroboration is exact.** 19103's 44 dropped records are all carto **`RP-2025-*`**
+  (Residential Permit); the sampled survivors are **`CP-2025-*`** (Commercial Permit). 28456's
+  six are Brunswick County residential permits (`…:643170|1000` … `|1005`).
+- ✅ **Proven live after correcting the instrument** (run `34039097766`): **28456 —
+  `relation=12 delivered=6 rule5-dropped=6 UNEXPLAINED=0`**, `6 + 6 = 12 vs 12`, and
+  `rendered=6 admitted=6`. Nothing is lost; six records are deliberately not eligible.
+
+🛑 **CORRECTION TO MY OWN PREVIOUS UNIT.** I reported 28428's `2,442 → 798` as an unexplained
+authoritative loss and a launch-relevant defect. **That was wrong.** It is the same founder rule
+on a coastal county whose permit population is overwhelmingly residential.
+
+#### Three of my own instruments were wrong before this one was right
+
+Recorded because the pattern, not the individual bug, is the lesson: **each time I asserted
+against a surface I had not proven was reachable.**
+1. `authoritative === true` — not propagated into `__HS_SITES`; read 0 even on 01001, which
+   provably serves authoritative data.
+2. `dev === membership` — never the identity; the page renders per MARKER, then Rule 5 filters.
+3. `window.ZIP_AUTH` — **module-scoped, not a window property**; reported "absent" on every ZIP
+   including 28456, which had just rendered 6 authoritative sites. Fixed by intercepting the
+   `app_zip_projects_markers` response, the technique the forensic probe had already proven.
+
+The verifier now asserts the **accounting identity** — `delivered + rule-5 dropped == relation`,
+`unexplained == 0`, and `rendered == admitted` — computed with the page's OWN shipped gate. It
+still fails on genuine truncation, which is the point of it.
+
+⚠️ **28428 needs a THIRD bucket and does not have one yet:** `798 + 1614 = 2412 vs 2442`. The
+30-marker remainder are markers whose `source_key` has no `app_projects` development row (SQL
+independently shows 2,442 markers against 2,410 projects). They are unrenderable rather than
+truncated, and the accounting should name them explicitly rather than leaving them unexplained.
+
+#### ⛔ What genuinely REMAINS — manifestation A only
+
+```
+30033  2,261 markers  ->  live "could not be read"   (RPC response never completes)
+20148 13,935 markers  ->  live "could not be read"
+28451 14,705 markers  ->  live "could not be read"
+```
+
+Server-side these now return in ~0.9–1.4 s after the two previous migrations, so the failure is
+the **browser-facing read of a multi-megabyte payload**, not the query and not a record-level
+loss. That is the one remaining Map 1 delivery defect, and it is now the ONLY thing standing
+between here and the complete-result contract.
+
 ### 2026-09-06 — 🔴 DENSE-ZIP DELIVERY: root cause fixed at the DB, still FAILS live, and a SECOND loss found
 
 **Gate 0 — no collision.** `origin/main` `c1f1288`; deployed `538f47e` (pages.yml #32, success).
