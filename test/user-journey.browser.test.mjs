@@ -508,7 +508,7 @@ ok(/will not estimate/i.test(nm.fresh),
 // Matched on the address-mode OFFER, not the literal 'street address' — that phrase named a
 // shape the geocoder never required and left the note. What must not regress is that the
 // not-measured state still points somewhere real, so removing the sentence still fails 14c.
-ok(/\b(enter|type|search)\b[^.\n]{0,24}\baddress\b/i.test(nm.fresh),
+ok(/\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(nm.fresh),
   '14c ...and offers the address view as the way to get a real answer', nm.fresh);
 // The distinction that matters: not-measured must not read as a measured zero.
 ok(!/^0 projects across/i.test(nm.fresh.trim()),

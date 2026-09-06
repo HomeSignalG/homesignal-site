@@ -228,50 +228,48 @@ ok(await p2.evaluate(() => { const a = document.getElementById('zipAllLink'); re
    '5d with no ZIP context at all the link is hidden, never a placeholder ZIP');
 
 // ══════════════ 7. THE PRODUCTION addressCta GUARD STILL HAS A SOURCE ════════════════════════
-// verify-map1-zip-states asserts, against LIVE production, that a PENDING ZIP still directs the
-// resident to address mode. It tests document.body.innerText — which does NOT see a placeholder
-// attribute — with the predicate copied verbatim below. That check runs post-deploy and cannot
-// run from the sandbox, so removing the ZIP-mode hint override (#1088 recorded the hint as the
-// pending state's last rendered source) risked reddening it on production with nothing local to
-// catch it.
+// verify-map1-zip-states asserts against LIVE production that a ZIP page still directs the
+// resident to the address control. It reads document.body.innerText — which does NOT see a
+// placeholder attribute — so replacing the ZIP-mode hint is exactly the kind of edit that has
+// reddened it three times. It runs post-deploy and cannot run from the sandbox, so the risk has
+// to be closed here.
 //
-// Measured here instead, and measured on the RIGHT ELEMENT. Asserting over body.innerText looked
-// right and was not: this fixture's page also renders the loadZip() catch banner "Couldn't load
-// ZIP 08005. Enter your address for the live view.", which satisfies the pattern all by itself —
-// so a body-wide assertion PASSED even with the note's sentence deleted, i.e. it was measuring
-// fixture noise rather than the guarantee. The note element is the source that actually ships,
-// so that is what is read.
-const ADDRESS_CTA = /\b(enter|type|search)\b[^.\n]{0,24}\baddress\b/i;
-const p3 = await ctx.newPage();
-p3.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
-await p3.route('**/*', async (route) => {
-  const url = route.request().url();
-  if (url.startsWith(base)) return route.continue();
-  const J = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  // status 'unknown' is the PENDING outcome — nobody has measured this ZIP yet.
-  if (url.includes('/rpc/app_zip_projects_markers')) return J({ zip: '08005', mode: 'authoritative', status: 'unknown', projects: [], markers: [] });
-  if (url.includes('/rest/v1/development_reports')) return J([{ zip: '08005', home_lat: 39.76, home_lng: -74.31,
-    counts: { facilities: 0 }, refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false, sites: [] }]);
-  return routeHandler(route);
-});
-await p3.goto(base + '/homesignalmap.html?zip=08005', { waitUntil: 'domcontentloaded' });
-await p3.waitForTimeout(2500);
-const pending = await p3.evaluate(() => ({
-  fresh: (document.getElementById('freshLine') || {}).textContent || '',
-  hint: (document.querySelector('.hint') || {}).textContent || ''
+// MEASURED, and the measurement corrected a wrong assumption worth recording. Production's own
+// run on 08005 reports "not-measured=false" — the honest note does NOT render for that ZIP
+// (a pre-existing live-state defect, #1088) — so the note cannot be relied on as the source and
+// an earlier version of this section that asserted over body.innerText was passing on this
+// FIXTURE's loadZip error banner instead. The source that must carry it is the HERO, which
+// renders in every ZIP-mode state.
+//
+// The pattern is READ OUT OF THE SHIPPED VERIFIER, never retyped: a copy typed here would prove
+// only that this test agrees with itself. test/address-cta-guard.test.mjs proves the pattern
+// itself in both directions and pins it identical to user-journey 14c.
+const guardSrc = await readFile(join(root, 'scripts/verify-map1-zip-states.mjs'), 'utf8');
+const guardPat = (guardSrc.match(/\/\\b\([a-z|]+\)\\b\[\^\.\\n\]\{0,24\}\\baddress\\b\/i/) || [])[0];
+ok(!!guardPat, '7a the shipped verifier still carries a recognisable addressCta pattern', guardPat);
+const ADDRESS_CTA = guardPat ? eval(guardPat) : /$^/;
+
+// Back to ZIP mode: section 4 left this page in ADDRESS mode, and the guard's subject is the
+// ZIP page. Asserting it here without navigating would have measured the wrong mode.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitZip(); await page.waitForTimeout(400);
+const zipHero = await page.evaluate(() => ({
+  hint: (document.querySelector('.hint') || {}).textContent || '',
+  body: document.body.innerText || ''
 }));
-ok(/not measured yet/i.test(pending.fresh), '7a the fixture really is the PENDING state (control)',
-   pending.fresh.slice(0, 140));
-ok(ADDRESS_CTA.test(pending.fresh),
-   '7b the pending note itself directs the resident to address mode, with no help from the hint',
-   (ADDRESS_CTA.exec(pending.fresh) || [])[0] || pending.fresh.slice(0, 200));
-// The two controls that make 7b mean something. Without them it could be passing on the new
-// copy, or on a banner that only this fixture renders.
-ok(!ADDRESS_CTA.test(pending.hint),
-   '7c ...and the new helper text does NOT satisfy the guard, so 7b is the note carrying it',
-   pending.hint);
-ok(!/Couldn't load ZIP/i.test(pending.fresh),
-   '7d ...and the note is not the loadZip error banner, which also matches the pattern', pending.fresh);
+ok(ADDRESS_CTA.test(zipHero.hint),
+   '7b the ZIP-mode helper text itself satisfies the production guard',
+   zipHero.hint);
+// 7c is the BROADER mirror of what the verifier reads, and is deliberately weaker than 7b:
+// this fixture's body also carries the loadZip error banner, so 7c survives mutations that 7b
+// catches. 7b is the load-bearing one — do not read a green 7c as covering the hero.
+ok(ADDRESS_CTA.test(zipHero.body),
+   '7c ...so body.innerText — what the verifier actually reads — satisfies it too',
+   (ADDRESS_CTA.exec(zipHero.body) || [])[0] || zipHero.body.slice(0, 200));
+// The control that stops 7b/7c passing on a pattern so loose it proves nothing: the field's
+// own label is not a direction, and must not satisfy the guard.
+ok(!ADDRESS_CTA.test('Address'),
+   '7d ...and the pattern is not so loose that the bare label would satisfy it');
 
 // ══════════════ 6. NO FATAL CLIENT ERROR ═════════════════════════════════════════════════════
 ok(pageErrors.length === 0, '6 the whole journey ran with no fatal client error', pageErrors);
