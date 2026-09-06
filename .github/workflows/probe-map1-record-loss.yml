@@ -1,0 +1,32 @@
+# Forensic probe for the size-independent Map 1 record loss (28456: 12 authoritative
+# markers -> 6 delivered). Read-only against production, manual dispatch only.
+name: probe-map1-record-loss
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: "Comma-separated ZIPs to account for"
+        required: false
+        default: "28456,19103"
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "scripts/probe-map1-record-loss.mjs"
+      - ".github/workflows/probe-map1-record-loss.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -D playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Account for every authoritative record, stage by stage
+        env:
+          SITE_BASE: https://homesignal.net
+          PROBE_ZIPS: ${{ github.event.inputs.zips || '28456,19103' }}
+        run: node scripts/probe-map1-record-loss.mjs
