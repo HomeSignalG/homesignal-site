@@ -13,9 +13,12 @@
 // them only because none resolves to a project — which is precisely the incidental safety
 // this file exists to make deliberate.
 //
-// docs/frs-facility-kind-isolation-migration.sql is the fix (record_kind on both relations,
-// both reads filtered, both prefix-rebuild DELETEs scoped). It is parked, not applied, while
-// another session's national development build is still rebuilding those relations.
+// APPLIED TO PRODUCTION 2026-09-06 — docs/frs-facility-kind-isolation-migration.sql carries
+// both migrations and their receipts. The three geo reads are now kind-filtered, and a
+// facility read in a ZIP with no facility membership reports 'not_measured' rather than a
+// measured zero. The development payload is byte-identical (12-ZIP panel fingerprint
+// d0336e0646daaa0674f108f3bf33417d before and after both migrations). The PRODUCER half —
+// scoping the two per-prefix rebuild DELETEs — is still outstanding and gates the population.
 //
 // Until then — and after it, as a second line of defence — the PAGE is what stops a
 // contaminated payload from becoming a wrong pin: HS.zipAuthSitesFrom only builds a site when
@@ -100,14 +103,21 @@ ok(HS.zipAuthSitesFrom({ ...payload, status: 'not_measured', projects: null, mar
 ok(HS.zipAuthOutcome({ ...payload, status: 'not_measured', projects: null, markers: null }) === 'not_measured',
   '4: not_measured is reported as itself, never as measured-and-empty');
 
-// ── 5. the parked migration says what it must, so the fix cannot drift from this test ──
+// ── 5. the applied migration says what it must, so the fix cannot drift from this test ──
 const mig = readFileSync(join(root, 'docs/frs-facility-kind-isolation-migration.sql'), 'utf8');
 for (const needle of ['mm.record_kind = p_kind', 'k.record_kind = p_kind',
                       'zip_authoritative_membership', 'zip_authoritative_marker',
                       "record_kind = 'development'"]) {
   ok(mig.includes(needle), `5: migration carries ${needle}`);
 }
-ok(/NOT APPLIED/.test(mig), '5: the migration states its application status');
+ok(/STATUS: APPLIED TO PRODUCTION/.test(mig), '5: the migration states its application status');
+// The producer half is the part that is still outstanding, and it is the gate on writing any
+// facility row. If someone marks the whole file applied without landing those two DELETE
+// scopes, a prefix rebuild silently eats every facility row it finds.
+ok(/STILL NOT APPLIED/.test(mig), '5: the producer DELETE scoping is still called out as outstanding');
+for (const needle of ["record_kind = 'development';", 'n5_unit_a_shadow.py', 'n5_a3_markers.py']) {
+  ok(mig.includes(needle), `5: migration names the producer change ${needle}`);
+}
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

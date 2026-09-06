@@ -53,7 +53,10 @@ ok(/kept\.slice\(0, MAX_FACILITIES\)/.test(engine),
 // ── 2. the disclosure rule itself, evaluated from the shipped source ─────────────
 const block = (() => {
   const i = page.indexOf('    var facShown = (data.counts && data.counts.facilities) != null');
-  const j = page.indexOf('    // cDev is the PROPOSED counter', i);
+  // End at the DEVELOPMENT counter's own comment, not at cDev: main's development
+  // not-measured block sits between the two and reads `window`, which does not exist here.
+  // The span must be exactly the facility disclosure - this Type's block and nothing else.
+  const j = page.indexOf('    // DEVELOPMENT: same rule as facilities above', i);
   if (i < 0 || j < 0) throw new Error('the facility-count disclosure block moved or was removed');
   return page.slice(i, j);
 })();

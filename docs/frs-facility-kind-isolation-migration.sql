@@ -1,4 +1,10 @@
--- REGULATED FACILITY WHOLE-ZIP — KIND ISOLATION (PARKED; NOT APPLIED)
+-- REGULATED FACILITY — KIND ISOLATION.  STATUS: APPLIED TO PRODUCTION 2026-09-06.
+--
+-- Two migrations, applied in this order against project qwnnmljucajnexpxdgxr:
+--     regulated_facility_kind_isolation
+--     regulated_facility_zero_is_not_measured
+-- The SQL below is the record of what ran. It is idempotent: re-running it is a no-op
+-- (each DO block detects its own marker and returns), so it doubles as the reproduction.
 --
 -- WHY THIS EXISTS
 -- ---------------
@@ -7,65 +13,40 @@
 -- keyed 'epa_frs:<RegistryId>', and public.app_zip_projects_markers(zip,'facility',true)
 -- serves them. That reuse is correct and is not reopened here.
 --
--- But those two relations currently carry NO NOTION OF KIND, and three consumers read or
--- write them as if everything in them were development:
+-- Those two relations carried NO NOTION OF KIND, so the function's p_kind argument had no
+-- effect on the geography half at all. Measured on production immediately before applying
+-- (2026-09-06, 12-ZIP national panel — 02138 10001 19103 33101 48226 55401 60601 78617
+-- 80202 84302 89101 98101, spanning 10 states):
 --
---   1. app_zip_projects_markers filters PROJECTS by p_kind but reads MARKERS unfiltered:
---          select ... from geo.zip_authoritative_marker k where k.zcta5 = p_zip;
---      Today that is harmless because only development rows exist. The moment facility
---      rows land, every facility marker would ride out inside the p_kind='development'
---      payload. The page happens to drop them (lib/zip-authoritative.js only builds a site
---      when the marker's project_ref matches a hydrated project), so no resident would see
---      a wrong pin — but "the payload is contaminated and a downstream file saves us" is
---      not isolation, it is one refactor away from being a bug.
+--   p_kind='development' -> membership_count 4010 · markers 4227 · projects 4005
+--   p_kind='facility'    -> membership_count 4010 · markers 4227 · projects 0
 --
---   2. scripts/n5_unit_a_shadow.py POPULATE:
---          delete from geo.zip_authoritative_membership where left(zcta5,3) = PFX;
---      then re-inserts ONLY from geo.n5_boundary_membership, whose freeze basis is
---      record_kind='development'.
+-- and on ZIP 84302 the two marker arrays were BYTE-IDENTICAL, md5
+-- 52bf9b52666f3603a7963cd711b9603d, with 0 rows on either side of the symmetric difference.
+-- A caller asking for FACILITY geography was handed DEVELOPMENT geography, in full, on
+-- 11 of the 12 panel ZIPs (the twelfth, 33101, holds no membership at all).
 --
---   3. scripts/n5_a3_markers.py BUILD:
---          delete from geo.zip_authoritative_marker where left(zcta5,3) = PFX;
---      then re-inserts from membership x geo.n5_geom.
+-- Nothing a resident saw was wrong, because the shipped page calls this RPC only with
+-- p_kind:"development" (homesignalmap.html, the one call site). That is why the defect had
+-- to be repaired BEFORE the facility population runs, not after: the moment a facility read
+-- goes live, the leak becomes what residents see.
 --
--- (2) and (3) are the serious half: a prefix rebuild DELETES every facility row under that
--- prefix and never regenerates it, silently, because the rebuild's own verification counts
--- development rows and a missing facility row looks like nothing at all.
---
--- THE CORRECTION IS THE SMALLEST ONE THAT MAKES ALL FOUR REQUIRED PROPERTIES TRUE AT ONCE
--- ---------------------------------------------------------------------------------------
--- Kind becomes a PROPERTY OF THE ROW rather than something inferred from a join:
---
---   * facility markers cannot appear as development objects   -> marker read filtered on kind
---   * development markers cannot appear as facility objects   -> same filter, other direction
---   * the p_kind='development' payload is UNCHANGED           -> every existing row defaults
---                                                               to 'development', so the
---                                                               development result set is
---                                                               identical row-for-row
---   * p_kind='facility' returns only facility objects         -> same filter
---
--- Inferring kind from "does a matching app_projects row of this kind exist" was considered
--- and REJECTED: measured 2026-09-05, 6 markers under ZIP3 786 and 3 under 840 have no
--- development app_projects row at all, so a join-inferred filter would silently DROP nine
--- markers that ride in today's development payload. That is a payload change, and the gate
--- requires the development payload to be unchanged. A real column changes nothing.
---
--- APPLICATION STATUS: NOT APPLIED.
--- At the time of writing another session is running the N5 national development build
--- (workflow phase2-b1-zcta, runs 136-139 on 2026-09-05, branch
--- claude/homesignal-zip-forensics-13xkmw) and is actively rebuilding these very relations
--- prefix by prefix. Applying a schema change to tables under an in-flight destructive
--- rebuild, and populating facilities into them while that rebuild still has roughly half
--- the country to go, would be destroyed row by row. This file is the reviewed correction,
--- to be applied once that build completes; the facility population follows it, never
--- before it.
+-- ── WHAT THE FIRST DRAFT OF THIS FILE GOT WRONG, KEPT AS THE LESSON ────────────────────
+-- Drafted 2026-09-05, it spliced on the anchors '     where mm.zcta5 = p_zip)' and
+-- '   where k.zcta5 = p_zip;'. By 2026-09-06 the function body had been restructured (a
+-- `join lateral` replaced the earlier subselect) and the FIRST anchor occurred ZERO times —
+-- so the draft would have raised 'membership anchor is not unique' and changed nothing.
+-- That is the fail-closed design working, and it is the reason the anchors are re-asserted
+-- against pg_get_functiondef at apply time instead of trusted from a file. A crude
+-- position('record_kind' in body) probe ALSO reported the fix was already present: it was
+-- matching `p.record_kind = p_kind` on public.app_projects in the legacy branch. A substring
+-- is a lead, not a fact — the body was read before anything was written.
 
-begin;
+-- ══ MIGRATION 1 — regulated_facility_kind_isolation ════════════════════════════════════
 
--- ── 1. kind becomes a column, defaulting to what every existing row already is ──────────
--- A non-volatile default means Postgres records it in the catalogue rather than rewriting
--- the heap, so this is fast on both relations and does not hold a long lock. Existing
--- writers name their columns explicitly and are unaffected.
+-- kind becomes a column, defaulting to what every existing row already is. A non-volatile
+-- default is recorded in the catalogue rather than rewritten into the heap, so this is
+-- metadata-only on both relations and holds ACCESS EXCLUSIVE for milliseconds.
 alter table geo.zip_authoritative_membership
   add column if not exists record_kind text not null default 'development';
 alter table geo.zip_authoritative_marker
@@ -78,93 +59,165 @@ do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'zip_auth_membership_kind_ck') then
     alter table geo.zip_authoritative_membership
-      add constraint zip_auth_membership_kind_ck
-      check (record_kind in ('development','facility'));
+      add constraint zip_auth_membership_kind_ck check (record_kind in ('development','facility'));
   end if;
   if not exists (select 1 from pg_constraint where conname = 'zip_auth_marker_kind_ck') then
     alter table geo.zip_authoritative_marker
-      add constraint zip_auth_marker_kind_ck
-      check (record_kind in ('development','facility'));
+      add constraint zip_auth_marker_kind_ck check (record_kind in ('development','facility'));
   end if;
 end $$;
 
 -- The reads are (zcta5 = one ZIP) then kind, so the existing primary keys already do the
 -- selective work and no new index is created. A column is not a reason for an index.
 
--- ── 2. splice the two filters into the LIVE function, never a retyped copy ──────────────
--- Same technique as the pipeline-health monitor's check insertion: read
--- pg_get_functiondef, assert each anchor occurs EXACTLY once, replace, execute, then
--- re-read and prove the change took. Retyping a 3,452-character function body to change
--- two lines is how a body silently loses something (claims-discipline rule 7).
+-- Splice the THREE filters into the LIVE function, never a retyped copy (claims-discipline
+-- rule 7). Read pg_get_functiondef, assert each anchor occurs EXACTLY once, replace,
+-- execute, then re-read and prove the change took against the catalogue.
 do $$
 declare
-  d text;
-  d2 text;
-  a1 constant text := '     where mm.zcta5 = p_zip)';
-  a2 constant text := '   where k.zcta5 = p_zip;';
-  before_md5 text;
+  d text; d2 text; before_md5 text;
+  a1 constant text := '   where mm.zcta5 = p_zip;';                                    -- projects membership read
+  a2 constant text := '   where k.zcta5 = p_zip;';                                     -- marker read
+  a3 constant text := 'geo.zip_authoritative_membership mm where mm.zcta5 = p_zip)';   -- membership_count
 begin
   select pg_get_functiondef(p.oid) into d
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'app_zip_projects_markers';
-  if d is null then
-    raise exception 'app_zip_projects_markers not found';
-  end if;
+  if d is null then raise exception 'app_zip_projects_markers not found'; end if;
   before_md5 := md5(d);
 
-  -- Idempotent: a second application is a no-op rather than a double splice.
   if position('mm.record_kind = p_kind' in d) > 0
      and position('k.record_kind = p_kind' in d) > 0 then
-    raise notice 'kind isolation already present (md5 %) — nothing to splice', before_md5;
+    raise notice 'kind isolation already present (md5 %) - nothing to splice', before_md5;
     return;
   end if;
 
   if (length(d) - length(replace(d, a1, ''))) / length(a1) <> 1 then
-    raise exception 'membership anchor is not unique in the function body';
-  end if;
+    raise exception 'projects-membership anchor is not unique in the function body'; end if;
   if (length(d) - length(replace(d, a2, ''))) / length(a2) <> 1 then
-    raise exception 'marker anchor is not unique in the function body';
-  end if;
+    raise exception 'marker anchor is not unique in the function body'; end if;
+  if (length(d) - length(replace(d, a3, ''))) / length(a3) <> 1 then
+    raise exception 'membership_count anchor is not unique in the function body'; end if;
 
-  d2 := replace(d, a1, '     where mm.zcta5 = p_zip and mm.record_kind = p_kind)');
+  d2 := replace(d,  a1, '   where mm.zcta5 = p_zip and mm.record_kind = p_kind;');
   d2 := replace(d2, a2, '   where k.zcta5 = p_zip and k.record_kind = p_kind;');
+  d2 := replace(d2, a3, 'geo.zip_authoritative_membership mm where mm.zcta5 = p_zip and mm.record_kind = p_kind)');
 
   execute d2;
 
-  -- Prove the splice took, against the catalogue rather than against the string we sent.
   select pg_get_functiondef(p.oid) into d2
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'app_zip_projects_markers';
   if position('mm.record_kind = p_kind' in d2) = 0
      or position('k.record_kind = p_kind' in d2) = 0 then
-    raise exception 'splice did not take';
-  end if;
+    raise exception 'splice did not take'; end if;
   if md5(d2) = before_md5 then
-    raise exception 'function body unchanged after execute';
-  end if;
+    raise exception 'function body unchanged after execute'; end if;
   raise notice 'kind isolation applied: md5 % -> %', before_md5, md5(d2);
 end $$;
 
-commit;
-
--- ── 3. what must be true afterwards ────────────────────────────────────────────────────
--- Run these as the acceptance check; each is a separate fact, and the development one is
--- the one that must be IDENTICAL to its pre-application value.
+-- APPLIED RECEIPT (migration 1)
+--   function md5 953e236e3bd2551ea631da7aae077f86 -> 3d9a98850f4f659d6bd3945ea2895eb4
+--   body length 4452 -> 4535, i.e. EXACTLY +83 characters, which is
+--   len(' and mm.record_kind = p_kind') 28 + len(' and k.record_kind = p_kind') 27 + 28 = 83.
+--   Three insertions, zero collateral movement — the arithmetic is the proof, not the diff.
 --
---   select count(*) from geo.zip_authoritative_membership where record_kind <> 'development';
---     -- expected 0 immediately after this migration
---   select count(*) from geo.zip_authoritative_marker where record_kind <> 'development';
---     -- expected 0 immediately after this migration
---   select md5(public.app_zip_projects_markers('84302','development',true)::text);
---     -- expected: unchanged from the value recorded before applying
---   select public.app_zip_projects_markers('84302','facility',true) -> 'markers';
---     -- expected: [] until the facility population runs; never development markers
+--   development payload: UNCHANGED.  12-ZIP panel fingerprint
+--     md5(zip||'='||md5(payload) joined, order by zip collate "C")
+--     = d0336e0646daaa0674f108f3bf33417d  BEFORE and AFTER
+--   and 84302's development marker array md5 52bf9b52666f3603a7963cd711b9603d before and after.
+--   That "unchanged" is TOTAL over all 12,013 boundary_complete ZIPs, not a sample, because
+--   every pre-existing row is record_kind='development' (measured after: 901,465 membership
+--   rows and 1,004,080 marker rows, 0 non-development on either), so the added predicate is
+--   a tautology in the development direction.
+--
+--   facility payload: 4010 membership / 4227 markers -> 0 / 0 across the same panel.
 
--- ── 4. THE PRODUCER CHANGES THAT MUST LAND WITH THIS MIGRATION, NOT BEFORE IT ───────────
--- These are deliberately NOT applied to the scripts yet. Both files are being executed
--- right now by another session's national build, against a database where record_kind does
--- not exist; a script referencing the column before the migration lands would fail their
--- runs. They are recorded here so the change is reviewed as one unit.
+-- ══ MIGRATION 2 — regulated_facility_zero_is_not_measured ══════════════════════════════
+--
+-- A FACILITY ZERO MUST NOT WEAR A "MEASURED" STATUS.
+--
+-- Migration 1 leaves a subtler defect in the leak's place. `status` still comes from
+-- geo.maps_zip_geography_status, which has no notion of kind, so a facility read in a ZIP
+-- whose DEVELOPMENT boundary is complete returned
+--     status 'boundary_complete', markers [], membership_count 0
+-- and lib/zip-authoritative.js rule 1 reads empty ARRAYS under 'boundary_complete' as a
+-- MEASURED ZERO — "no regulated facilities in this ZIP". No facility geography has been
+-- populated anywhere yet, so that is a claim the data cannot support, on every ZIP.
+--
+-- Returning development markers was visibly wrong. Returning a measured zero looks correct,
+-- which is worse. Until facility membership exists for a ZIP, the facility direction reports
+-- the honest not-measured shape the consumer already understands: status 'not_measured',
+-- projects null, markers null — never empty arrays, per that file's rule 1.
+do $$
+declare
+  d text; d2 text; before_md5 text;
+  a constant text := '  if v_status is distinct from ''boundary_complete'' then';
+begin
+  select pg_get_functiondef(p.oid) into d
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'app_zip_projects_markers';
+  if d is null then raise exception 'app_zip_projects_markers not found'; end if;
+  before_md5 := md5(d);
+
+  if position('facility geography for this ZIP does not exist yet' in d) > 0 then
+    raise notice 'facility not-measured guard already present (md5 %)', before_md5;
+    return;
+  end if;
+
+  -- Fails closed: this REQUIRES kind isolation to be live, because without it the guard
+  -- would be reasoning about a marker set that is not kind-scoped in the first place.
+  if position('mm.record_kind = p_kind' in d) = 0 or position('k.record_kind = p_kind' in d) = 0 then
+    raise exception 'kind isolation is not applied - apply regulated_facility_kind_isolation first';
+  end if;
+  if (length(d) - length(replace(d, a, ''))) / length(a) <> 1 then
+    raise exception 'status anchor is not unique in the function body';
+  end if;
+
+  d2 := replace(d, a,
+    '  -- facility geography for this ZIP does not exist yet: say so, never a measured zero.'
+    || chr(10) ||
+    '  if p_kind = ''facility'' and not exists ('
+    || chr(10) ||
+    '       select 1 from geo.zip_authoritative_membership mm'
+    || chr(10) ||
+    '        where mm.zcta5 = p_zip and mm.record_kind = ''facility'') then'
+    || chr(10) ||
+    '    v_status := ''not_measured'';'
+    || chr(10) ||
+    '  end if;'
+    || chr(10) || chr(10) ||
+    a);
+
+  execute d2;
+
+  select pg_get_functiondef(p.oid) into d2
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'app_zip_projects_markers';
+  if position('facility geography for this ZIP does not exist yet' in d2) = 0 then
+    raise exception 'splice did not take'; end if;
+  if md5(d2) = before_md5 then
+    raise exception 'function body unchanged after execute'; end if;
+  raise notice 'facility not-measured guard applied: md5 % -> %', before_md5, md5(d2);
+end $$;
+
+-- APPLIED RECEIPT (migration 2)
+--   function md5 3d9a98850f4f659d6bd3945ea2895eb4 -> 4037cc5b35113c22869d3cc91fa6e1de
+--   body length 4535 -> 4834.
+--   development panel fingerprint STILL d0336e0646daaa0674f108f3bf33417d, markers still 4227.
+--   facility direction, all 12 panel ZIPs: status 'not_measured', markers JSON null.
+--   84302 facility payload verbatim:
+--     {"zip":"84302","mode":"authoritative","status":"not_measured","markers":null,"projects":null}
+--
+--   ⚠️ The first pass at that check asked `j->'markers' is not null`, which is TRUE for a
+--   JSON null, and reported 12 ZIPs "returning arrays". jsonb_typeof is the right instrument,
+--   and the corrected probe carries its own positive control: the SAME query shape over the
+--   DEVELOPMENT direction returns 'array' 12/12 and 'boundary_complete' 12/12, so the
+--   facility 12/12 'null' + 'not_measured' is a reading rather than an artefact.
+
+-- ══ 3. THE PRODUCER CHANGES THAT MUST LAND BEFORE ANY FACILITY ROW IS WRITTEN ══════════
+--
+-- STILL NOT APPLIED, deliberately, and they are the gate on the population step:
 --
 -- scripts/n5_unit_a_shadow.py, POPULATE:
 --     - delete from geo.zip_authoritative_membership where left(zcta5,3) = {PFX};
@@ -173,51 +226,17 @@ commit;
 --   and the INSERT names record_kind explicitly as 'development' rather than relying on the
 --   column default, so the writer states its kind instead of inheriting it.
 --
--- scripts/n5_a3_markers.py, BUILD:
---     - delete from geo.zip_authoritative_marker where left(zcta5,3) = {PFX};
---     + delete from geo.zip_authoritative_marker
---     +  where left(zcta5,3) = {PFX} and record_kind = 'development';
---   likewise for its INSERT.
+-- scripts/n5_a3_markers.py, BUILD: the same two edits on geo.zip_authoritative_marker.
 --
--- Both edits are provably no-ops on the day they land: measured 2026-09-05, both relations
--- contain 0 rows with record_kind <> 'development' (there are none to spare), so the same
--- rows are deleted and the same rows are inserted. Their whole purpose is what happens the
--- day AFTER, when facility rows exist and a prefix rebuild must leave them alone.
-
--- ── 5. THE MUTATION PROOF, run read-only against production 2026-09-05 ──────────────────
--- The post-population state was simulated in CTEs on ZIP 84302 — its 22 real EPA FRS
--- facilities injected as facility membership and markers beside the live development rows —
--- and both directions measured:
+-- Both are provably no-ops today — 0 rows carry a non-development kind — so they can land
+-- safely at any time. Their whole purpose is what happens the day AFTER: without them, a
+-- per-prefix rebuild DELETES every facility row under that prefix and never regenerates it,
+-- silently, because the rebuild's own verification counts development rows and a missing
+-- facility row looks like nothing at all.
 --
---   development membership 34 · facility membership 22
---   development markers, kind-filtered      188   <- identical to the live table's 188
---   facility markers, kind-filtered          22
---   facility rows inside the dev payload      0
---   development rows inside the fac payload   0
---   markers the SHIPPED unfiltered read would return  210  (= 188 + 22)
---
--- The last line is what makes the proof load-bearing rather than decorative: without the
--- filter the development payload gains all 22 facility markers. With it, the development
--- payload is unchanged and neither kind can reach the other.
---
--- ── 6. THE LEAK IS NOT PROSPECTIVE. IT IS LIVE TODAY, IN THE FACILITY DIRECTION ─────────
--- Measured on production 2026-09-05 18:1xZ, calling the shipped function directly:
---
---   app_zip_projects_markers('84302','facility',true)
---     -> status boundary_complete, projects 0, MARKERS 188
---   app_zip_projects_markers('84302','development',true)
---     -> status boundary_complete, projects 34, markers 188
---
--- The facility read returns ZERO projects and all 188 DEVELOPMENT markers. The projects
--- half is correctly kind-filtered; the marker half is not filtered at all, so it hands the
--- facility caller the development ZIP's entire marker set. Nothing a resident sees is wrong
--- yet, because lib/zip-authoritative.js draws a site only where a marker's project_ref
--- resolves to a hydrated project and here none do — but that is the page absorbing a
--- defective payload, not the payload being correct.
---
--- So this migration is not only a precondition for the facility population; it repairs a
--- kind-isolation defect that is already shipped. It stays parked only because applying a
--- schema change to relations under an in-flight destructive rebuild would queue an
--- ACCESS EXCLUSIVE lock behind that rebuild's per-prefix transaction and block live Map 1
--- ZIP reads while it waited. Apply it as soon as that build is done — first, before any
--- facility row is written.
+-- ⚠️ The N5 national development build is INCOMPLETE (7,996 of 12,719 ZIPs carry membership
+-- as of 2026-09-06) and idle — no writer, and no write to any of the three relations for
+-- 23h 03m at the time these migrations were applied (newest computed_at 2026-09-05 21:23Z,
+-- 0 non-idle backends other than the measuring one). That idleness is what made the ACCESS
+-- EXCLUSIVE lock safe to take; it is NOT evidence the build is finished, and the prefix
+-- rebuild can resume at any time. Land the two producer edits before writing facility rows.
