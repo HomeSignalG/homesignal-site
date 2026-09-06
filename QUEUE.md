@@ -779,6 +779,134 @@ because it was dispatched by hand (`workflow_dispatch` on `main`).
   and that is verified, not assumed: the legacy `pages build and deployment` workflow shows
   **0 runs in the last 60**, and its presence — not a green deploy job — is what would signal a
   revert.
+### 2026-09-06 — DATA CENTER SIGNIFICANCE: what KIND of activity, not just what it relates to
+
+`Data center` was the whole answer for a **285,282 SF ground-up data hall** AND for a
+**sign permit**. Both correct; neither told a resident whether something is being built.
+TYPE and SIGNIFICANCE are now separate dimensions — the type, octagon, colour, filters and
+counts are untouched.
+
+🔑 **THE FIELD INVENTORY DECIDED THE DESIGN.** Measured over the whole corpus (107 records /
+479 rows): `size` **0/479** · `investment` **0/479** · `jobs` **0/479** · `scope_text`
+**0/479** · `developer` **0/479**. **There is no structured scale anywhere.** Only two
+authoritative inputs exist: the issuing authority's own permit class (`type_raw`, 383/479)
+and the record's own description. Explicit square footage appears in **6 of 479 rows**.
+
+**Taxonomy — two established states and an explicit unknown:**
+- **Major development** — 5 records / 9 rows (new-construction/shell permit class, or "new
+  ground up" / "construct data center" wording)
+- **Ancillary work** — 15 records / 46 rows (the jurisdiction's OWN ancillary class: sign,
+  fire alarm, fire pump, stationary battery, access gates, fire-prevention service request;
+  or a named ancillary act like a roof or cooling-tower replacement)
+- **Significance not stated** — **87 records / 424 rows (81%)**, and that is the correct
+  outcome. Absence of scale is never read as "small".
+
+⛔ **EXPANSION WAS MEASURED AND REJECTED** — 2 of 5 candidates genuine. A rule on
+"addition"/"expansion" would have told residents that `DATA CENTER CRAC ADDITION` (a cooling
+unit) and `DATA CENTER & HVAC EXPANSION` (65 rows) are data-centre expansions.
+
+🔑 **THE VETO: the source's own class outranks its free text.** `ADDITIONS/ALTERATIONS/REPAIRS
+Construct data center and pump house renovations` reads as new construction and was filed by
+the jurisdiction as an alteration. 2 production records turn on this; both stay unknown.
+Proven load-bearing — strip the class and the identical text does read as major.
+
+⚠️ **`permit_class`, NOT `type_raw` — and the reason is the frozen classifier.** ZIP mode
+rebuilds development through `zipAuthSiteFromMarker`, which does not map `type_raw`. Without
+carrying the class, **ancillary loses 12 of 15 records / 41 of 46 rows** on the flagship
+surface (major loses none — every major record's evidence is also in its name). So the class
+travels under its own name: mapping it as `type_raw` would feed the FROZEN data-centre
+classifier a fifth evidence field and turn **2 more records** into data centres. Asserted both
+ways. Fails safe — a future projection dropping the column loses a verdict, never invents one.
+
+⚠️ **Postgres has no `\b` word boundary — it is `\y`.** The corpus-wide SQL mirror of these
+rules first reported 3 major / 0 vetoed; with `\y` the same query reports 5 / 2. The
+instrument was under-matching, not the shipped JavaScript.
+
+- **Resident-facing, proven in a real browser on the authoritative ZIP path:**
+  `Major development · Approved / permitted` · `Ancillary work · Proposed / hearing` ·
+  `Significance not stated · Recorded / operating`. Significance ADDS to the lifecycle stage,
+  never replaces it.
+- **Frozen and proven frozen:** the classifier (107/479 before and after) · dual identity (EPA
+  data centres keep the octagon + subordinate EPA square, and are pinned `significanceApplies:
+  false` — an operating facility is not a development record) · every other type carries
+  `significance: null` even when its permit class matches · geography untouched · 3 records
+  still make 3 markers.
+- Suites: `marker-datacenter-significance` 52 · `map1-datacenter-significance.browser` 12 ·
+  dual-identity 36 + 20 · `marker-datacenter-type` 87 · `user-journey.browser` 0 failed ·
+  **full offline 148 files, 0 failed**. Mutation-proved (veto→1 red, no-significance→30 red,
+  page line→4 red incl. the acceptance test, which was rewritten after a first mutation showed
+  it could pass on the lifecycle words alone).
+- 📌 **OPEN, logged not fixed:** 81% not stated (the evidence does not exist) · `name` is
+  truncated at ~120 chars by the connectors, so wording beyond that is invisible · square
+  footage is not a separate rendered field (it survives inside the displayed description; a
+  separate line would imply a structured field that does not exist) · 96 of 479 rows carry no
+  permit class at all · significance is per RECORD, not per project — no entity resolution.
+- Receipt: `docs/maps-datacenter-significance-2026-09-06.md`.
+
+### 2026-09-06 — DATA CENTER + EPA DUAL IDENTITY: one record, two truths (Map 1)
+
+**The founder-set contract, implemented:** a site that IS a data centre and separately
+CARRIES an EPA-FRS record keeps **Data center as its primary identity and primary symbol**,
+with the **EPA square as a subordinate signal beneath it**. It belongs to **both** filter
+memberships and renders as **ONE marker**. Filtering changes whether a record is visible;
+it never changes what the record is.
+
+**Before:** all 741 rows — `CORESITE - VA1 DATA CENTER`, `CYRUSONE NORTHERN VIRGINIA DATA
+CENTER`, `ALIGNED ENERGY DATA CENTERS (ASHBURN)`, `NTT GLOBAL DATA CENTERS AMERICAS - VA1` —
+drew an anonymous purple square identical to a plating works, said `Facility · operating now`
+in the popup, and the word "data center" appeared nowhere on the page. The octagon shipped
+in #1046 drew for PROJECTS only, so the two halves of one subject spoke two vocabularies.
+
+**Population measured 2026-09-06** (control: 215,305 facility rows / 114,039 FRS records):
+- **A — the FRS record's own stamped class is `datacenter`: 741 rows · 342 records · 512 ZIPs.**
+  0 of them lack data-centre wording in their own name · 0 are non-FRS · 0 duplicate rows for
+  the same `(zip, record)`. No project join needed and none performed.
+- **B — project↔FRS same-site join: not attempted** (Phase 8 forbids over-joining; Category A
+  needs no join).
+- **C — ambiguous grain: 1**, and it is deliberately NOT promoted. 🔑 `CYRUS ONE DATA HALL 1
+  POWER POD 1` (stamped `energy`) names the hall it powers; its siblings `POWER POD 5` and
+  `POWER POD 7` name nothing. Reading the free-text NAME would call one of three identical
+  power pods a data centre purely because of its label, so the facility path reads the
+  **stamped class field only**. A power pod at a data centre is not a data centre.
+- **D — untouched: 214,563 rows / 113,696 records** keep their purple square, their legend
+  row, their filter bucket and their popup, verbatim.
+
+**Architecture — three concepts, never conflated, no schema change and no DB write:**
+`categoryKey` = ENTITY IDENTITY (one value, drives the symbol) · `signal` = the subordinate
+symbol · `categories` = FILTER MEMBERSHIP (a set). `HS.categoryVisible` is an **any-of** test
+over one marker object, which is what makes "either filter shows it, exactly once"
+structural rather than conventional.
+
+🆕 **Map 1 gained a second filter dimension, because the acceptance test needs one.** It had
+only the lifecycle chips; "Type — pin shape" was a static caption, so *"turn off every type
+except EPA"* was not something a resident could do. The shape rows are now toggles (same
+pattern, `aria-pressed`, keyboard-operable), and one shared `siteVisible()` predicate serves
+2D, 3D aerial and satellite so a record can never be filtered in on one view and out on another.
+
+**The founder's acceptance test passes in a real browser, driven by clicking the legend**
+(`test/map1-dual-identity.browser.test.mjs`, 20 assertions, FAILS: 0, fixtures verbatim from
+production ZIP 20171): every type OFF except EPA → the data centre stays visible, keeps its
+Data center octagon, keeps its EPA square, appears once, popup reads
+`Data center · Regulated facility · operating now`.
+
+- Marker geometry: the primary symbol stays ON the icon anchor and the badge overflows
+  downward, so the composed icon box is **byte-identical** to every other pin — no offset, no
+  second coordinate, no geography touched anywhere.
+- Suites: `marker-dual-identity` 36 · `map1-dual-identity.browser` 20 · `marker-datacenter-type`
+  87 · **full offline 147 files, 0 failed**. Both new suites **mutation-proved load-bearing**
+  (removing the category test reddens 6; disabling dual identity reddens 8 + 12).
+- ⚠️ `user-journey.browser` reports 5 failures in the sandbox — **and the identical 5 on
+  unmodified `origin/main` (4a80502)**. Pre-existing, egress-caused. The control was run
+  before the number was quoted.
+- ⚖️ **This REVERSES the open question logged below**, which read "whether a regulated facility
+  that IS a data centre should draw the octagon … is a separate, resident-visible call."
+  The founder made the call. The two old assertions are kept in the test file, inverted, so
+  the change of contract is legible rather than silently deleted.
+- 📌 **OPEN, logged not fixed:** no project↔facility relationship is asserted anywhere (a
+  campus with both a permit record and an FRS record still shows two records — HomeSignal has
+  no evidence they are one entity) · the type filter is per-session like the lifecycle chips ·
+  3D aerial draws blocks, so the EPA signal shows in 2D and satellite only.
+- Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
 ### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
 
@@ -853,7 +981,11 @@ reached 452/214; the adversarial audit below added the last +27/+5.)
   ~30 operator-only record-level misses are structurally unreachable without a join this evidence
   shows is unsafe.
 
-📌 **OPEN, deliberately not taken — the 738 EPA-FRS facilities typed `datacenter`**
+✅ **ANSWERED 2026-09-06 — see the dual-identity entry above. The founder ruled: Data
+center is the primary identity and symbol, EPA is a subordinate signal beneath it, and the
+record holds both filter memberships. The question as it stood is retained below.**
+
+📌 **~~OPEN~~ RESOLVED — the 738 EPA-FRS facilities typed `datacenter`**
 (509 ZIPs, the larger population). `resolveMarker` checks the facility flag first, so they
 keep the purple square, the "Regulated facility" legend row and the `facility` filter
 bucket. `datacenter` is a project TYPE; `facility` is a record KIND. Moving them would change

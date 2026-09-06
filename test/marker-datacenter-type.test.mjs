@@ -82,15 +82,18 @@ ok(key({ layer: 'datacenter', name: 'x' }) === 'datacenter',     '4c: layer="dat
 ok(key({ type: 'Commercial', name: 'ALT REMODEL OF EXISTING 2-STORY DATA CENTE' }) === 'datacenter',
   '5: a name truncated to "DATA CENTE" still resolves');
 
-// ── 6. FACILITY PRECEDENCE IS UNCHANGED — deliberately out of scope ───────────────
-// All 738 type='datacenter' rows are EPA-FRS facilities. The purple square and the
-// `facility` filter bucket are a founder-set contract; whether a regulated facility
-// that IS a data centre should draw the octagon is a separate, resident-visible call.
+// ── 6. FACILITY PRECEDENCE — REVERSED BY FOUNDER RULING 2026-09-06 ───────────────
+// This section used to assert the OPPOSITE, and the reversal is the point: the
+// previous unit recorded "whether a regulated facility that IS a data centre should
+// draw the octagon is a separate, resident-visible call" and left it open. The founder
+// made that call: what the thing IS owns the primary symbol; the regulatory fact rides
+// beneath it as a subordinate signal. The old assertions are kept here, inverted, so
+// the change of contract is legible rather than silently deleted.
 const fac = m({ type: 'datacenter', record_kind: 'facility', name: 'IRON MOUNTAIN INCORPORATED' });
-ok(fac.categoryKey === 'facility' && fac.shape === 'square' && fac.shapeRule === 'PRECEDENCE:facility-flag',
-  '6a: an EPA facility typed datacenter keeps the Regulated facility square');
-ok(m({ _facility: true, name: 'SERVER FARM LLC' }).categoryKey === 'facility',
-  '6b: the _facility flag still short-circuits before the data-centre phase');
+ok(fac.categoryKey === 'datacenter' && fac.shape === 'octagon' && fac.shapeRule === 'DUAL:datacenter+facility',
+  '6a: an EPA facility whose own record states a data centre now draws the Data center octagon');
+ok(fac.isFacility === true && fac.signal && fac.signal.shape === 'square',
+  '6b: …and keeps its regulated-facility truth as the subordinate EPA square, not as its identity');
 
 // ── 7. NEGATIVE CONTROLS — the rule must not widen ────────────────────────────────
 // Street-name guard. Measured 0 collisions in production today (control: 1,188 rows
