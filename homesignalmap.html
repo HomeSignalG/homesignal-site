@@ -1233,6 +1233,25 @@ HS.onReady(function(){
     // above, so it can never state a radius the search did not use.
     var _cap2 = document.querySelector(".map-cap");
     if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this home"; }
+    // THE PAGE'S LARGEST TYPE HAS TO CHANGE MODE TOO — authorized change B.
+    // The heading pair, the map caption, the counters and the way back all moved to
+    // address-mode wording in #1070. The HERO did not: arriving here from a ZIP view left
+    // the H1 reading "Brigham City (84302)" and the standfirst reading "across ZIP 84302"
+    // directly above results that say "Showing development within 2 miles of". A resident
+    // reads top-down, so the biggest, first thing on the page was still making the
+    // whole-ZIP claim over near-home results — measured on main, 2026-09-06: address mode
+    // rendered kicker "Development overview" / H1 "ZIP 78617".
+    // loadZip() already restores all four for the ZIP view, so this is the missing half of
+    // a switch that was only ever written in one direction.
+    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Near-home view";
+    var _h1A = document.querySelector(".head h1");
+    if(_h1A) _h1A.textContent = "Development around this address";
+    var _subA = document.querySelector(".sub");
+    if(_subA){ _subA.textContent = "What's built and what's proposed within the distance you "
+      + "choose around one address — data-center activity, planning hearings and open comment "
+      + "windows, plus nearby regulated facilities for context — every item linked to its "
+      + "official public record."; }
+    document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
