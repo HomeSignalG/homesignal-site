@@ -95,11 +95,19 @@ const STREET = /[0-9]{2,6}\s+[A-Za-z]/;
 const REASONS = Object.create(null);
 const reason = (k) => { REASONS[k] = (REASONS[k] || 0) + 1; };
 
+// A HUNG REQUEST IS NOT A SLOW ONE. The RPC can stop answering entirely under load, and with
+// no timeout a single hung fetch holds its worker forever - one run sat 75 minutes on 3,180
+// ZIPs and produced no output at all, which is the "did not run" state this file already says
+// must never be indistinguishable from "no data". Every request now has a deadline and a
+// timeout is COUNTED as its own reason, so a slow production read reports as one.
+const REQ_TIMEOUT_MS = process.env.REQ_TIMEOUT_MS ? parseInt(process.env.REQ_TIMEOUT_MS, 10) : 30000;
+
 async function oneZip(zip) {
   let payload;
   try {
     const r = await fetch(`${SB}/rest/v1/rpc/app_zip_projects_markers`, {
       method: 'POST', headers: H,
+      signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
       body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
     });
     if (!r.ok) {
@@ -108,7 +116,11 @@ async function oneZip(zip) {
       T.zips_unavailable++; return;
     }
     payload = await r.json();
-  } catch (e) { reason('threw:' + String(e && e.message).slice(0, 120)); T.zips_unavailable++; return; }
+  } catch (e) {
+    const msg = String(e && e.message);
+    reason((e && (e.name === 'TimeoutError' || /timed out/i.test(msg)) ? 'timeout_' + REQ_TIMEOUT_MS + 'ms' : 'threw:' + msg.slice(0, 120)));
+    T.zips_unavailable++; return;
+  }
 
   const outcome = HS.zipAuthOutcome(payload);
   if (outcome !== 'complete') {
