@@ -190,5 +190,22 @@ ok(calls.length === 2, '8a: homesignalmap.html routes BOTH funnels through the g
 ok(/window\.__HS_SITES = sites;/.test(page) && page.indexOf('HS.residentialQualifySites(sites)') < page.indexOf('window.__HS_SITES = sites;'),
   '8b: the gate runs BEFORE __HS_SITES is exposed, so rails/counts/markers read the qualified set');
 
+
+// ── 9. FULL-PATH CONSISTENCY — one population, four surfaces ────────────────────────────────
+// The accusation this answers is "rails, counts and markers use different Residential
+// populations". They cannot: all four derive from the SAME `sites` array the gate produced.
+const afterGate = page.slice(page.indexOf('HS.residentialQualifySites(sites)'));
+ok(/var permits = sites\.filter\(isDevPoint\);/.test(afterGate), '9a: the permits rail reads the qualified array');
+ok(/var dev = sites\.filter\(function\(s\)\{ return s\.scope==="area"/.test(afterGate), '9b: the area rail reads it too');
+ok(/drawMap\(data, sites\.filter\(function\(s\)\{ return !isCivic\(s\); \}\)\);/.test(afterGate),
+  '9c: all three map views are drawn from it');
+// devCount would otherwise take the ENGINE's counter, which counts records the gate removed.
+// Both modes delete that counter so render() recomputes from what is on screen; if either
+// delete is ever removed the headline tile silently over-reports against its own map.
+ok(/\(permits\.length \+ dev\.length\)/.test(afterGate), '9d: devCount falls back to the qualified rails');
+const deletes = page.match(/delete (?:data\.counts|zipCounts)\.development;/g) || [];
+ok(deletes.length === 2,
+  '9e: BOTH modes drop the engine development counter, so the tile cannot out-count the map — found ' + deletes.length);
+
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURE(S)`);
 process.exit(fails === 0 ? 0 : 1);
