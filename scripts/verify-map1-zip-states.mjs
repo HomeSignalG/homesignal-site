@@ -104,7 +104,7 @@ for (const c of CASES) {
     prevLen = len;
   }
 
-  const m = await page.evaluate((auth) => {
+  const m = await page.evaluate(({ auth, wantCounterfactual }) => {
     const sites = window.__HS_SITES || [];
     const dev = sites.filter(s => s && s.relevance === 'development');
     const fac = sites.filter(s => s && s.relevance !== 'development');
@@ -165,14 +165,19 @@ for (const c of CASES) {
         // over the SAME markers with that one field blanked measures whether it is still
         // load-bearing IN PRODUCTION. `deliveredNoTypeRaw` materially below `delivered` is the
         // proof; equality would mean the field is not reaching the rule.
-        let deliveredNoTypeRaw = 0, projectsWithTypeRaw = 0;
-        a.projects.forEach(p => { if (p && typeof p.type_raw === 'string' && p.type_raw) projectsWithTypeRaw++; });
-        a.markers.forEach(m => {
-          const proj = byRef[m.project_ref];
-          if (!proj) return;
-          const blanked = Object.assign({}, proj); delete blanked.type_raw;
-          if (HS.zipAuthSiteFromMarker(m, blanked)) deliveredNoTypeRaw++;
-        });
+        // Only for the case that asks for it: on an extreme ZIP this doubles ~14,000 runs of
+        // the full classifier for a number nothing reads, which is work that buys nothing.
+        let deliveredNoTypeRaw = null, projectsWithTypeRaw = null;
+        if (wantCounterfactual) {
+          deliveredNoTypeRaw = 0; projectsWithTypeRaw = 0;
+          a.projects.forEach(p => { if (p && typeof p.type_raw === 'string' && p.type_raw) projectsWithTypeRaw++; });
+          a.markers.forEach(m => {
+            const proj = byRef[m.project_ref];
+            if (!proj) return;
+            const blanked = Object.assign({}, proj); delete blanked.type_raw;
+            if (HS.zipAuthSiteFromMarker(m, blanked)) deliveredNoTypeRaw++;
+          });
+        }
         return { relation: a.markers.length, membership: a.membership_count,
                  hydrated: a.projects.length,
                  delivered, droppedByRuleFive, staleMembership, unexplained,
@@ -186,7 +191,7 @@ for (const c of CASES) {
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
-  }, authPayload);
+  }, { auth: authPayload, wantCounterfactual: !!c.ruleFiveControl });
   page.off('response', grab);
   facBaseline[c.zip] = m.fac;
 

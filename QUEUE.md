@@ -11015,3 +11015,130 @@ as authoritative. The measured authoritative figure is **12,013**.
   `NO_ZCTA_IN_TIGER_2025` note I cannot support — writing a provenance claim you did not perform
   is the one thing that field exists to prevent. Classifying them needs the pinned TIGER archive,
   which is geography acquisition, and is flagged rather than reopened unilaterally.
+
+---
+
+## 2026-09-06 — CANONICAL GEOGRAPHY ACCOUNTING: all 12,722 directly measured, 67 stateless ZIPs reconciled
+
+**Gate 0.** `origin/main` `96eade0` (#1055/#1056/#1057, another session's data-centre work),
+merged in rather than overwritten — one QUEUE conflict, both sides kept. Deployed at the time
+of measurement: `6558f49` (pages run #34, 15:15:41Z), with #35 building `96eade0`. Live
+function verified before touching anything: `ships_type_raw true`, `has_lateral_repair true`,
+`lowest_id_limit1 true`, old `distinct on` gone, `statement_timeout=25s`. Open work inspected:
+**#1016 `claude/n5-canonical-provenance`** is unmerged N5 pipeline machinery, self-labelled
+NOT SAFE TO APPLY — untouched. ⚠️ `lib/zip-authoritative.js` on main now ALSO reads
+`project.type_raw` (as `permit_class`, for data-centre significance) — a feature that was
+authored while `type_raw` was missing from the live RPC and only works because of yesterday's
+repair.
+
+**Gate 1 — the inventory, from the canonical registry outward.** The registry is the product's
+ZIP-page population, proven in both directions: 12,722 registry rows, 12,722 `communities`
+rows at `level='zip'`, **0 canonical without a community and 0 community without a canonical**.
+
+| observed state | ZIPs |
+|---|---:|
+| A `boundary_complete` | 12,013 |
+| B `not_measured` | 642 |
+| C no geography-state row | 67 |
+
+**Gate 2 — the 67, from primary evidence, not from the export's own claim.** Uniform, and the
+last column is the one that matters:
+
+| bucket | ZIPs | boundary | membership | markers | p2_gap | excluded | shard for ZIP3 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `F_pending_acquisition` | 64 | 0 | 0 | 0 | 0 | 0 | exists, state **`done`** |
+| `E_no_shard_zero_dev_in_freeze` | 2 | 0 | 0 | 0 | 1 | 1 | none |
+| `E_no_shard_zero_dev_in_freeze` | 1 | **1** | 0 | 0 | 1 | 1 | none |
+
+The 64's shard ran to completion and produced nothing for them — the pipeline did not skip
+them, it measured their prefix and found no geometry to work with.
+- ⚠️ **A scare that resolved into a control:** `geo.n5_cutb_excluded` holds **14** ZIPs, 11 of
+  them with a different reason ("boundary intersections exist but no membership point could be
+  derived (polyline DOT sources)") and no state row — which would be a resident-facing defect
+  if they were canonical. **They are not: 0 of 11 are in the canonical registry**, so no
+  HomeSignal page exists for them. Only 94128/95219/99128 are canonical.
+
+**Gates 4 + 5 — the instrument, and why the last one was thrown away.** `geo.n5_zcta` returned
+0 for the ZIPs under test **and 0 for its own positive control — the table holds 0 rows**, its
+per-shard slices being correctly discarded at cleanup. It cannot establish absence and was not
+used. `geo.zcta_boundary` holds only 56 ZCTAs (a working subset), so it is not a national
+instrument either.
+The claim is made instead from the archive the pipeline is built on, read on a runner —
+`phase2-b1-zcta.yml mode=zcta-membership-probe`, **run `34043878981`**,
+`scripts/zcta_membership_probe.py`, which imports `TIGER_URL` / `TIGER_VINTAGE` /
+`EXPECTED_NATIONAL_FEATURES` and the DBF/SHP readers from `scripts/phase2_b1_zcta.py` rather
+than restating them. **It gates itself four ways before reporting anything:**
+
+```
+source            https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/tl_2025_us_zcta520.zip
+vintage           TIGER/Line 2025 (2020 Census ZCTA delineation)
+archive bytes     529,118,424
+archive sha256    e87129634eefe8719ef06ce4cfdf6588520be2e359360e590aaae90e4afb1911   PASS
+dbf 33,791 == shp 33,791 == distinct GEOIDs 33,791                                   PASS
+POSITIVE CONTROL  12 of 12 canonical ZIPs with proven authoritative membership
+                  PRESENT in the archive · 0 absent                                  PASS
+INVERSE CONTROL   12 of 12 sampled existing not_measured ZIPs ABSENT                 PASS
+VERDICT           of the 67 stateless canonical ZIPs: 64 ABSENT · 3 PRESENT
+```
+
+**The 3 PRESENT are exactly 94128, 95219, 99128** — an independent corroboration that they are
+pending *because* they have geometry, while the 64 have none. It also lives as a MODE of the
+approved workflow rather than a new file: a `workflow_dispatch` workflow must exist on the
+default branch to be dispatchable, so a standalone file on a feature branch 404s (it did,
+twice), and duplicating the approved workflow's restrictions would let the two drift.
+
+**Gate 3 — the three exceptions, reproven verbatim from `geo.n5_cutb_excluded`, not recalled:**
+- **94128** — 32 legacy `caltrans-sb1-projects` rows claim it; **26 of 32 source_keys have
+  geometry and 0 of those 26 intersect the 94128 ZCTA**, but 6 have no geometry in
+  `geo.n5_geom`, so their membership was never measurable. Not a valid measured zero.
+- **95219** — 2 legacy rows, **0 of 2 have geometry**; 100% of its candidates unevaluatable.
+- **99128** — **1 exact ZCTA intersection**, membership 0 and unbuildable: prefix 991 has no row
+  in the `phase1-2026-09-01` shard manifest, so `n5-unit-a` refuses it (requires a done shard)
+  and `n5-shard` refuses it (refuses any id not in the manifest). Neither guard weakened.
+
+**Gates 6 + 7 — one repair, one deliberate non-repair.**
+- **64 → `not_measured` / `NO_ZCTA_IN_TIGER_2025`**, the established reason the other 642 carry.
+  Safe as a metadata repair because the geography work DID run and correctly produced nothing,
+  and because it is **behaviourally neutral**: the RPC already returned `coalesce(v_status,
+  'unknown')` for a ZIP with no row, and `lib/zip-authoritative.js` maps `'unknown'` and
+  `'not_measured'` to the same honest state through an allow-list of exactly two. `cutover`
+  stays false. The set is computed INSIDE the database (rule 7) as "canonical · no state row ·
+  no exclusion record", and fingerprinted across the boundary (rules 8, 9):
+  **DB `md5(string_agg(zip, ',' order by zip collate "C")) = 161ba702caee12bab4d0b1fd783cdf8a`
+  == the md5 of the probe's own ABSENT list under python `sorted()`.** The migration re-derives
+  it and refuses to write if it has moved; it also re-reads the 64 back before returning.
+- **3 → left unresolved, deliberately.** `maps_zip_geography_status.status` carries two values;
+  inventing a third to make the count clean would reconcile arithmetic rather than record a
+  truth. Their reason is already explicit in `geo.n5_cutb_excluded` and their bucket in
+  `geo.maps_zip_export`.
+
+**Gate 10 — direct national reconciliation, every number read back from the table:**
+
+```
+canonical registry                 12,722    control: 0 state rows off-registry
+boundary_complete                  12,013    75 cutover
+not_measured (NO_ZCTA_IN_TIGER_2025)  706    = 642 established + 64 repaired, 0 cutover
+pending / unresolved                    3    94128 · 95219 · 99128, 0 cutover
+                                   ------
+TOTAL                              12,722
+```
+
+**Gate 8 — `type_raw` reaches Rule 5, proven against the shipped modules.** 76227 (Denton
+County TX) is the sharpest control available: **5,388 of its records are
+`denton-county-dev-permits` with `type_raw = 'HOUSE'` and `name = 'HOUSE'`** — the name carries
+no evidence beyond the type, so `FAMILY_TYPE_RAW`, which reads `type_raw` alone, is the only
+rule that can admit them. Driven through the real `HS.zipAuthSiteFromMarker`:
+
+| record | with `type_raw` | without |
+|---|---|---|
+| `HOUSE` (5,388) | **RENDERS** (DEVELOPMENT / FAMILY_TYPE_RAW) | **dropped** |
+| `MOBILE HOME` (32) | **RENDERS** (FAMILY_TYPE_RAW) | **dropped** |
+| `ADDITION TO HOUSE` (18) | dropped (ROUTINE) | dropped |
+| `GARAGE` (7) | dropped (ROUTINE) | dropped |
+| `COMMERCIAL BUILDING` (161) | renders | renders |
+
+The negative controls are what make the positive one mean something: a pass cannot be bought by
+admitting everything, and non-residential records are untouched by the gate. The verifier now
+carries this as a live case with a **counterfactual assertion** — it re-runs the shipped gate
+over the same production markers with `type_raw` blanked and requires the loss to exceed 5,000,
+so the field being load-bearing is measured in production rather than read off the SQL.
