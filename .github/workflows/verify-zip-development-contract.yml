@@ -1,0 +1,41 @@
+name: verify-zip-development-contract
+
+# The not_measured READ CONTRACT, on real pages against the live database.
+#
+# ⚠️ DELIBERATELY BOUNDED. The previous unit's live verifier saturated production - 15
+# concurrent PostgREST queries, 9 of them app_projects_for_zip, one running 71 s, and a
+# twelve-project ZIP slowed from 1.2 s to 11 s. This probe loads EIGHT pages, strictly
+# sequentially, and not one of them is a dense ZIP. A correctness probe must not manufacture
+# the outage it is looking for.
+#
+# It reads the four ZIP states twice - once on the DEPLOYED build, once on this branch's build
+# served locally - so the DB half is exercised identically by both and the only variable is the
+# page code.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'scripts/verify-zip-development-contract.mjs'
+      - 'lib/data.js'
+      - 'lib/community-page.js'
+      - 'development.html'
+      - '.github/workflows/verify-zip-development-contract.yml'
+
+concurrency:
+  group: verify-zip-development-contract
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm i -D playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Verify the not_measured read contract (bounded, sequential)
+        run: node scripts/verify-zip-development-contract.mjs
