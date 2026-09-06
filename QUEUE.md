@@ -11414,6 +11414,30 @@ assertion on either DB-reading control, still asserts the safety property that b
 vacuous green — **exits 2, not 0, when EVERY DB-reading control timed out**. Run `34048064884`:
 0 failures, 12 PASS, 2 INCONCLUSIVE, exit 2 with the reason named.
 
+🆕 **OPEN, UNRESOLVED, AND NOT THIS UNIT'S TO FIX — the PostgREST path cancels EARLIER than the
+function's own 25 s budget, and I could not explain it.** Recorded because the tempting move is
+to file it under "contention" and stop looking.
+
+Measured both ways, as `anon`, with the caller budget pinned to `anon`'s real
+`statement_timeout=3s`:
+
+| shape | result |
+|---|---|
+| plpgsql assignment (`r := public.app_projects_for_zip('28456','development')`) | **COMPLETED n=12 in 13,853 ms** |
+| SELECT, i.e. PostgREST's own shape (`select … from (select public.app_projects_for_zip(…)) s`) | **COMPLETED n=12 in 15,444 ms** |
+
+So the function-scoped `set statement_timeout to '25s'` **does re-arm over a smaller caller
+budget, in both shapes.** Yet through PostgREST the identical ZIPs return `57014` in three
+consecutive runs (`34047657926`, `34048064884`, `34048473795`), and the probe's per-control wall
+time was **~9.2 s including page load** — nowhere near the ≥50 s that two retries against a 25 s
+budget would cost. Something on the PostgREST path cancels well before 25 s. **Cause UNVERIFIED.**
+
+This is a TIMEOUT/TRANSPORT question, i.e. the dense-transport unit's territory, and this unit
+was instructed not to touch it. It changes no state's MEANING: under it the page shows the
+honest "could not be read just now" state, which is exactly the fourth state built here. But the
+dense-transport unit's live 500→200 results rest on that 25 s budget reaching the browser path,
+so **that claim needs re-proving there before it is relied on again.**
+
 ---
 
 ## 2026-09-06 — I BROKE `app_projects_for_zip` IN PRODUCTION FOR ~20 MINUTES. The cause is a testing vantage point, not a typo
