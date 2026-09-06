@@ -285,15 +285,32 @@
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
     padding:4px 10px;border-radius:7px;cursor:pointer}
   .radsel button.on{background:var(--green);border-color:var(--green);color:#fff}
-  .mapkey span{display:flex;align-items:center;gap:6px;white-space:nowrap;
+  /* LEGEND PILL — deliberately NEUTRAL, never a coloured block. A strongly coloured pill
+     reads as a selected filter or a button, which is exactly the confusion this row must
+     not create: the only thing carrying stage meaning here is the DOT. So the pill stays
+     white/very-light-grey with a subtle border and dark charcoal label text. */
+  .mapkey span{display:flex;align-items:center;gap:7px;white-space:nowrap;
     padding:4px 10px;border-radius:7px;cursor:pointer;user-select:none;font-size:12px;
-    border:1px solid var(--line);background:#f7faf8}
-  .mapkey span:hover{background:#f2f5f3}
+    color:var(--ink);border:1px solid var(--line);background:#fff}
+  .mapkey span:hover{background:#fafbfa;border-color:#d6ddda}
   .mapkey span:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
-  .mapkey span.off{opacity:.4}
+  /* SELECTION IS ITS OWN CHANNEL — a darker outline plus a very subtle tint, never the
+     stage colour. Colour = lifecycle stage, shape = project type, outline/tint = selected
+     state; overloading any one of the three is what makes a legend unreadable. Both legend
+     rows are filters, so both get the same selected treatment. */
+  .mapkey span[aria-pressed="true"]{border-color:#9aa8a3;background:#f4f6f5}
+  .mapkey span[aria-pressed="true"]:hover{background:#eef1ef}
+  /* UNSELECTED STAYS NEUTRAL and stays READABLE. The old `opacity:.4` dimmed the label
+     below accessible contrast to say "hidden"; the strike-through already says it in text,
+     which is also what keeps the on/off state from being carried by colour alone. */
+  .mapkey span.off{background:#fff;border-color:var(--line);color:var(--soft)}
   .mapkey span.off .t{text-decoration:line-through}
-  .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
-    border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .mapkey span.off .dot{opacity:.45}
+  /* THE STAGE DOT. A small solid circle and nothing else — no triangle, no marker
+     silhouette, no warning glyph. Map-marker SHAPES are reserved for the Type row below,
+     so nothing in this row can be mistaken for a pin or a project type. */
+  .mapkey .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;display:block;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
   .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
   .mapkey-shapes span.sh{border-style:dashed}
@@ -797,6 +814,21 @@ HS.onReady(function(){
     }
     return "Facility · operating now";
   }
+  // STATUS IS NEVER COMMUNICATED BY COLOUR ALONE. Every marker carries a text label of its
+  // own — "Proposed data center", "Approved residential" — so the stage is readable to
+  // anyone who cannot separate the palette, on hover and in the DOM, without opening the
+  // popup. The words come from the same two sources the mark itself is drawn from: the
+  // record's lifecycle bucket (the dot COLOUR) and the resolver's category label (the pin
+  // SHAPE), so the sentence can never disagree with the symbol.
+  var MARKER_TITLE_STAGE = { proposed:"Proposed", approved:"Approved",
+                             operating:"Operating", built:"Operating" };
+  function markerTitle(s, mk){
+    var type = (mk && mk.legendLabel) ? String(mk.legendLabel).toLowerCase() : "project";
+    var stage = MARKER_TITLE_STAGE[stageOf(s)];
+    // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
+    // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
+    return stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
+  }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
   function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
@@ -1103,6 +1135,14 @@ HS.onReady(function(){
                         'County Commission & county business'];
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  // esc() is a TEXT-NODE escape and leaves quotes alone, which is correct there and unsafe
+  // inside an attribute. Anything interpolated into title=/aria-label= goes through this.
+  function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+  // A colour written into a style attribute is validated as a literal hex, never escaped and
+  // hoped for: a non-hex value is dropped rather than passed into CSS. The legend's colours
+  // come from HS.STATUS_LEGEND_ROWS, so a rejection here means the registry changed shape —
+  // the chip then renders with no dot, which fails the verify assertion loudly.
+  function hexColor(c){ return /^#[0-9a-fA-F]{3,8}$/.test(String(c || "")) ? String(c) : ""; }
   function status(msg, isErr){ var el=$("status"); el.textContent=msg||""; el.className="status"+(isErr?" err":""); }
 
   // Turn an ISO date (YYYY-MM-DD) into plain-language urgency vs today, for a worried resident:
@@ -1920,7 +1960,7 @@ HS.onReady(function(){
       // render dashed + slightly smaller: the visual cue that the spot is representative.
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
-      var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint) });
+      var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint, markerTitle(s, mk)) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
       siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk, size:size, solidPoint:solidPoint });
@@ -2028,8 +2068,15 @@ HS.onReady(function(){
     });
     var shapes = document.getElementById("mapkeyShapes");
     if (!shapes || !shapes.querySelector("svg")) fails.push({ err: "tracker-missing-shape-legend" });
+    // THE STAGE ROW MUST CARRY COLOUR DOTS AND NO SHAPES. Both halves are asserted,
+    // because each guards a different regression: a missing dot loses the stage signal
+    // entirely, and an <svg> creeping back in re-creates the marker-silhouette confusion
+    // this row was rebuilt to remove (shape belongs to the Type legend, above).
     var lifecycle = document.getElementById("mapkey");
-    if (lifecycle && lifecycle.querySelectorAll("svg").length < 3) fails.push({ err: "tracker-lifecycle-legend-not-shaped" });
+    if (lifecycle) {
+      if (lifecycle.querySelectorAll("span.dot").length < 3) fails.push({ err: "tracker-lifecycle-legend-missing-dots" });
+      if (lifecycle.querySelector("svg")) fails.push({ err: "tracker-lifecycle-legend-has-shape" });
+    }
     var markers = document.querySelectorAll("#map .leaflet-marker-icon svg, #mapgl .maplibregl-marker svg");
     if (markers.length) {
       markers.forEach(function (svg, i) {
@@ -2093,14 +2140,24 @@ HS.onReady(function(){
   // redrawn when the regulatory switch moves are the same drawing. The primary symbol
   // stays centred on the icon anchor and the badge overflows the box, so re-icon-ing
   // never moves the record off its coordinate.
-  function siteIcon(mk, size, solidPoint){
+  function siteIcon(mk, size, solidPoint, title){
     // HS.visibleSignal is the ONLY place that decides whether the R is drawn: with the
     // regulatory switch off it returns null and the pin renders exactly as any other
     // project pin of its type and stage — the project is not hidden, its regulatory
     // annotation is.
     var svg = HS.markerSVG(mk.shape, mk.color, '', size,
                            HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
-    var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
+    var inner = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
+    // STATUS IS NEVER COLOUR ALONE — "Proposed data center" rides on the marker itself.
+    // It belongs HERE, inside the one icon builder, and not at the creation call: the
+    // regulatory switch repaints every badged marker through syncRegulatoryBadges() ->
+    // setIcon(siteIcon(...)), so a title applied only when the marker was first built
+    // would be silently dropped the first time a resident toggled that switch — the
+    // failure would look like nothing at all.
+    var html = title
+      ? '<span title="' + escAttr(title) + '" aria-label="' + escAttr(title)
+        + '" style="display:block;line-height:0">' + inner + '</span>'
+      : inner;
     return L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
   }
   // The 2D layer builds its icons ONCE and thereafter only adds/removes them, so the
@@ -2113,7 +2170,7 @@ HS.onReady(function(){
     if(on === REG_BADGES_DRAWN) return;
     REG_BADGES_DRAWN = on;
     siteMarkers.forEach(function(x){
-      if(x.mk && x.mk.signal && x.m && x.m.setIcon){ x.m.setIcon(siteIcon(x.mk, x.size, x.solidPoint)); }
+      if(x.mk && x.mk.signal && x.m && x.m.setIcon){ x.m.setIcon(siteIcon(x.mk, x.size, x.solidPoint, markerTitle(x.s, x.mk))); }
     });
   }
   function applyFilter(){
@@ -2141,7 +2198,15 @@ HS.onReady(function(){
       row.setAttribute("aria-label", it.t + " markers");
       if(!FILTER[it.b]) row.className = "off";
       row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
-      row.innerHTML = "<span class='ic'>" + HS.markerSVG("triangle", it.c, "", 14) + "</span><span class='t'>" + it.t + "</span>";
+      // COLOUR IS THE ONLY STAGE SIGNAL HERE, and it is carried by a plain solid dot.
+      // It used to be a filled TRIANGLE — a map-marker silhouette that also happens to be
+      // this product's Industrial project shape AND the universal warning glyph, so one
+      // mark was saying three different things at once. A circle says none of them: the
+      // Type row below owns marker shapes, and this row owns colour.
+      // aria-hidden on the dot because the label beside it already names the stage — the
+      // state is never announced by colour alone.
+      row.innerHTML = "<span class='dot' aria-hidden='true' style='background:" + hexColor(it.c)
+        + "'></span><span class='t'>" + esc(it.t) + "</span>";
       function toggle(){
         FILTER[it.b] = !FILTER[it.b];
         row.classList.toggle("off", !FILTER[it.b]);
@@ -2722,6 +2787,10 @@ HS.onReady(function(){
     el.style.width=el.style.height=size+"px"; el.style.lineHeight="0";
     if(approxPt) el.style.opacity="0.85";
     el.style.cursor="pointer";
+    // Same text-not-colour-alone rule as the 2D map, on the same words.
+    var title = markerTitle(s, mk);
+    el.setAttribute("title", title);
+    el.setAttribute("aria-label", title);
     el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size,
                                 HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     return el;
