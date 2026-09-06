@@ -10631,3 +10631,92 @@ is exactly the property the 101.3h-vs-113.8h measurement said elapsed time lacks
 GETs (`If-None-Match` / `If-Modified-Since`) and killing the per-endpoint `sess.warm()` — moves ahead
 of any new state expansion, per `homesignal-ingest/CLAUDE.md`'s own ordering. Every tranche of feeds
 raises the burn, so the fetch layer has to get cheaper before the footprint gets bigger.
+
+---
+
+## 2026-09-06 — DENSE TRANSPORT REPAIR, Gates 1–6: the boundary is a 3 s statement timeout, and I had also broken Rule 5
+
+**Gate 1 — the exact browser failure boundary, measured live** (run `34039978666`, job
+`101504844037`, `scripts/probe-map1-record-loss.mjs` rewritten to capture it):
+
+```
+20148  rpc network failed=no · http 500 · body bytes 100 · wall 3410 ms · JSON.parse ok
+       body {"code":"57014","message":"canceling statement due to statement timeout"}
+28451  http 500 · body bytes 100 · wall 3227 ms · same 57014
+```
+
+It is a **server-side PostgreSQL 57014 at `anon`'s 3 s `statement_timeout`** — not a network
+abort, not response size, not JSON parsing, not browser memory. The earlier ~1.4 s server-side
+reading stopped at function return and excluded jsonb assembly.
+
+**Gate 6 — and this is the part I got wrong yesterday.** `zip_markers_project_only_read_fields`
+narrowed the authoritative branch to 12 fields by reading `zipAuthSiteFromMarker`. It was right
+about that function and **missed `type_raw`**, which `HS.residentialActivity` reads off the same
+project object one call deeper, inside the Rule 5 gate. So from 2026-09-06 00:10 until the fix
+below, **every authoritative record was judged by Rule 5 with half its evidence** — `type_raw`
+undefined, normalised to `' '`, every verdict name-only. Nothing failed: a record Rule 5 rejects
+is DROPPED, so the loss is invisible by construction.
+
+- **Measured over the six density controls (33,376 relation rows), verdict with `type_raw` vs
+  with it blanked: 1 record lost (20148), 0 wrongly admitted, 0 on the other five.** The
+  national figure is not quoted — the chunked measurement exceeded the 60 s client window and
+  was not completed, so it stays UNVERIFIED rather than estimated.
+- The minimal field set Rule 5 requires, read out of the shipped code rather than assumed:
+  `type_raw` + `name` + `registry_id` (`HS.residentialActivity`), and `type` + `name` + `status`
+  reaching `resolveTrackerMarker` through `use_type`/`label`/`bucket`. `project.point_rule` is a
+  **dead read** — there is no `point_rule` column on `app_projects`, so `zip_point_rule` has
+  always been null. Left alone; noted so it is not "fixed" into existence.
+- **The durable control is `test/zip-auth-rpc-field-contract.test.mjs`**, which scans
+  `lib/zip-authoritative.js` for `project.<field>` and `lib/residential-qualify.js` for the
+  `p.<field>` reads behind the `const p = project || {}` alias — the aliasing is exactly what
+  made the miss invisible — and fails by name if the DDL of record drops one. Proven
+  load-bearing: clean → FAILS naming `type_raw` when it is removed → clean again. It also
+  asserts `zip`/`lat`/`lng`/`stage` stay ABSENT, so nobody re-inflates the payload with fields
+  nothing reads.
+
+**Gate 2/4 — where the time actually goes (all measured, `explain (analyze, buffers)`):**
+
+| variant | 20148 (13,934 memberships) |
+|---|---|
+| shipped two-pass, warm | **4,453 ms** / 9,625,811 bytes |
+| two-pass, cold | 4,666 ms, 10,963 buffer reads, 4,196 ms inside the `a_ids` nested loop |
+| single-pass narrow (projects half only), warm | **385 ms** |
+| **after the fix, whole function, warm** | **2,501 ms** / 8,913,711 bytes |
+| after the fix, whole function, cold | **15,521 ms** |
+
+The two-pass form made the planner walk `app_projects_source_key_kind_idx` **twice** — the
+first pass cold, the second warm off the pages the first had just loaded. That migration was
+itself the largest single regression. Fixed in `zip_markers_single_scan_and_restore_type_raw`.
+
+**Three further facts the fix does NOT resolve, recorded so the next step is chosen on evidence:**
+
+1. **Cold is dominated by ~14,000 random reads into a 2.9 GB / 3.22M-row `app_projects`.**
+   `VACUUM` helped the membership side (`Heap Fetches` 13,546 → 0) and nothing else: 28467
+   still reads 19,699 buffers / 4.9 s cold. A covering index reorders the same ~14k random
+   reads; it does not remove them. **Only ZIP-contiguous storage does.**
+2. **~1.5 s of the warm 2,501 ms is jsonb assembly inside plpgsql**, not the queries: the two
+   halves measure 385 ms + 246 ms, and the rest is materialising two large jsonb values and
+   rebuilding them into one 8.9 MB object.
+3. **The payload is 4–5× compressible with no data change at all.** Measured on 20148:
+   `source_ref` **3 distinct values / 1,156,564 bytes**, `registry_id` 3 / 473,748,
+   `type_raw` 10 / 301,825, `type` 2 / 153,266, `status` 3 / 125,404, `date_kind` 1;
+   `name` 13,410 distinct / 632,621 bytes is the only genuinely unique text. JSON **key names
+   alone are ~2.2 MB** of the 8.9 MB, and `project_ref` is shipped twice (once per array,
+   757,904 bytes each). A dictionary/intern encoding is a *transport* change — every
+   authoritative record still present, decodable to identical objects, no cap and no slice.
+
+**Shipped this step (live):** `zip_markers_single_scan_and_restore_type_raw` — one scan,
+`type_raw` restored, `zip`/`lat`/`lng`/`stage` dropped. `project_count` is unchanged by all
+three (the membership PK is `(zcta5, source_key)`, so the old `m join a` already emitted one
+object per source_key). Verified live on 20148: `project_count 13934 = membership_count 13934`,
+`marker_count 13935`, first project carries `type_raw`.
+
+**Not yet closed:** warm 2,501 ms has no margin against a 3 s budget and cold is 15 s, so this
+migration is **necessary and not sufficient**. Next is the live re-probe, then — only if the
+live evidence still fails — the two changes the measurements point at: ZIP-contiguous content
+storage (fact 1) and the intern encoding (fact 3). Gate 7's 28428 30-marker remainder is still
+open.
+
+⚠️ `geo.rule5_type_raw_diff(text)` is a **scratch measurement function** created today and
+revoked from `anon`/`authenticated`. Drop it once the national blast radius is measured or
+abandoned.

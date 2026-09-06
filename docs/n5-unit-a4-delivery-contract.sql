@@ -77,25 +77,47 @@ begin
 
   -- One project per (ZIP, source_key) membership. Descriptive row chosen by A3's rule:
   -- lowest stable id. last_seen_at is not a selector; source_seq is not geographic identity.
-  -- lat/lng are overwritten with the AUTHORITATIVE representative point so that no legacy
-  -- coordinate can reach the map through a card.
+  --
+  -- THE FIELD SET IS A CONTRACT, NOT A CONVENIENCE (2026-09-06). It carries exactly the
+  -- app_projects columns the ZIP-mode path reads, and `type_raw` is in it because
+  -- HS.residentialActivity reads it inside the Rule 5 gate - one call deeper than the site
+  -- builder, which is how an earlier narrowing dropped it and shipped Rule 5 with half its
+  -- evidence. test/zip-auth-rpc-field-contract.test.mjs fails if a field read anywhere in the
+  -- path is absent here, and also fails if zip/lat/lng/stage are re-added: the page positions
+  -- a site from the MARKER's coordinates and never reads project.stage, so those four were
+  -- pure payload repeated once per project.
+  --
+  -- ONE SCAN. An earlier form split this into a narrow `distinct on` plus a pk join, which
+  -- made the planner walk app_projects_source_key_kind_idx twice - measured on 20148 (13,934
+  -- memberships) at 4,453 ms warm against 385 ms for this single pass, against anon's 3 s
+  -- statement_timeout. The narrow projection is what keeps one pass safe on the
+  -- high-multiplier ZIPs too (30033: 40,404 candidate rows for 2,261 memberships).
+  --
+  -- NO LIMIT, NO SLICE, NO SAMPLE: every membership row that has a development row is emitted.
   with m as (
-    select mm.source_key, mm.lat, mm.lng
+    select mm.source_key
       from geo.zip_authoritative_membership mm
      where mm.zcta5 = p_zip),
   a as (
-    select distinct on (p.source_key) p.*
+    select distinct on (p.source_key)
+           p.source_key, p.id, p.name, p.type, p.type_raw, p.status,
+           p.submitted_at, p.date_kind, p.source_ref, p.registry_id,
+           p.impact_score, p.impact_dimensions
       from public.app_projects p
       join m on m.source_key = p.source_key
      where p.record_kind = p_kind
      order by p.source_key, p.id asc)
   select coalesce(jsonb_agg(
-           to_jsonb(a.*)
-             || jsonb_build_object('project_ref', a.source_key,
-                                   'zip', p_zip, 'lat', m.lat, 'lng', m.lng)
+           jsonb_build_object(
+             'project_ref', a.source_key,
+             'name', a.name, 'type', a.type, 'type_raw', a.type_raw,
+             'status', a.status, 'submitted_at', a.submitted_at,
+             'date_kind', a.date_kind, 'source_ref', a.source_ref,
+             'registry_id', a.registry_id,
+             'impact_score', a.impact_score, 'impact_dimensions', a.impact_dimensions)
            order by a.submitted_at desc nulls last, a.id), '[]'::jsonb)
     into v_projects
-    from m join a on a.source_key = m.source_key;
+    from a;
 
   select coalesce(jsonb_agg(jsonb_build_object(
            'project_ref', k.source_key, 'marker_seq', k.marker_seq,
