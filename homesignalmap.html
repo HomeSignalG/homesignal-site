@@ -123,6 +123,43 @@
   .map3d{position:absolute;inset:0;display:none;background:#0a1012;z-index:2}
   .map3d.on{display:block}
   .map3d canvas{display:block;width:100%;height:100%}
+  /* In-frame loading / failure notice for the two 3D views. Sits ABOVE both 3D panels
+     (z-index 5, under .mk3tip's 6) and is the reason a 3D view can never again present
+     as a silent black rectangle. Hidden entirely when nothing is wrong, so a working
+     map is pixel-identical to before. */
+  .map-msg{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:rgba(10,18,20,.92);
+    -webkit-backdrop-filter:blur(1px);backdrop-filter:blur(1px)}
+  .map-msg[hidden]{display:none}
+  /* FALLBACK NOTICE — a strip, never a cover. When a 3D view fails the resident is put back
+     on the 2D map, so the explanation must sit ABOVE that map without hiding it; covering it
+     would trade a black rectangle for a dark one. Loading keeps the full cover, because the
+     panel underneath it genuinely has nothing to show yet. */
+  /* MEASURED GAP, fixed here: the strip sat across the top of the frame and the 2D map's
+     zoom control sits top-left, so after a fallback elementFromPoint over the zoom button
+     returned the NOTICE — the control was covered and unclickable, which fails "2D remains
+     usable". Two changes, both minimal: start the strip clear of the control (left:56px,
+     the control is ~34px wide at a 10px inset), and let clicks through the bar itself so
+     nothing underneath is ever captured. The dismiss button re-enables pointer events for
+     itself, because it is the one thing in the bar that must be clickable. */
+  .map-msg.mm-bar{inset:auto 0 auto 56px;top:0;padding:10px 34px 10px 14px;background:rgba(10,18,20,.94);
+    align-items:flex-start;justify-content:flex-start;pointer-events:none}
+  .map-msg.mm-bar .mm-x{pointer-events:auto}
+  .map-msg.mm-bar .mm-in{max-width:none;text-align:left}
+  .map-msg .mm-in{max-width:430px;text-align:center;color:#eaf5f1;font-size:13px;line-height:1.55}
+  .map-msg .mm-t{font-weight:600;font-size:14px;margin-bottom:6px}
+  .map-msg .mm-x{position:absolute;top:8px;right:10px;border:0;background:transparent;cursor:pointer;
+    color:#eaf5f1;font:600 15px var(--font);line-height:1;padding:4px 6px;opacity:.75}
+  .map-msg .mm-x:hover{opacity:1}
+  .map-msg .mm-sub{margin-top:3px;opacity:.85}
+  /* The secondary line is optional by design — on a narrow screen the primary message and
+     the map matter more than the requirement note, so it is dropped rather than allowed to
+     grow the strip over the 2D map underneath it. */
+  @media (max-width: 560px){ .map-msg .mm-sub{display:none} }
+  .map-msg .mm-spin{width:22px;height:22px;margin:0 auto 10px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.25);border-top-color:#2dd4bf;animation:mmspin .9s linear infinite}
+  @keyframes mmspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){ .map-msg .mm-spin{animation:none} }
   .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
   .maplibregl-popup-content .pt{font-weight:600;margin-bottom:2px}
   .maplibregl-popup-content .pk{font-size:11.5px;color:var(--mute)}
@@ -513,6 +550,7 @@
             </div>
           </div>
           <div class="map-frame">
+            <div class="map-msg" id="mapMsg" hidden aria-live="polite"></div>
             <div class="mk3tip" id="mk3tip"></div>
             <div class="mk3info" id="mk3info"></div>
             <div id="map"><div id="mapInner"></div></div>
@@ -1172,18 +1210,80 @@ HS.onReady(function(){
   // out of the initial page load. Shows the loading status, then PROCEEDS automatically (no
   // second click). Queues callbacks if the same lib is requested twice before it lands.
   var _libLoading = {};
-  function ensureLib(globalName, src, label, cb){
-    if(window[globalName]){ status(""); cb(); return; }
+  function ensureLib(globalName, src, label, cb, onFail){
+    if(window[globalName]){ status(""); runLibCb(cb, onFail, label); return; }
     status(label + " is loading…");
-    if(_libLoading[src]){ _libLoading[src].push(cb); return; }
-    _libLoading[src] = [cb];
+    if(_libLoading[src]){ _libLoading[src].push([cb, onFail]); return; }
+    _libLoading[src] = [[cb, onFail]];
     var sc = document.createElement("script");
     sc.src = src;
     sc.onload = function(){ status(""); var cbs = _libLoading[src]; _libLoading[src] = null;
-      cbs.forEach(function(fn){ try{ fn(); }catch(e){} }); };
-    sc.onerror = function(){ _libLoading[src] = null;
-      status(label + " couldn't load — check your connection and try again.", true); };
+      cbs.forEach(function(pair){ runLibCb(pair[0], pair[1], label); }); };
+    sc.onerror = function(){ var cbs = _libLoading[src] || []; _libLoading[src] = null;
+      status(label + " couldn't load — check your connection and try again.", true);
+      cbs.forEach(function(pair){ if(pair[1]) pair[1]("load"); }); };
     document.head.appendChild(sc);
+  }
+
+  // Run a lazy-load callback and REPORT what it does, rather than discarding it.
+  //
+  // This wrapper replaces a bare `try{ fn(); }catch(e){}`, which was the reason a broken
+  // 3D view presented as a silent black rectangle with a clean console: setView() reveals
+  // the 3D panel BEFORE the library initialises, so a throw inside init3D()/initGL() left
+  // the panel's own #0a1012 background on screen and threw the explanation away.
+  // Reproduced against this page two ways — WebGL switched off (MapLibre raises "Failed to
+  // initialize WebGL") and a report with no home point (MapLibre raises "Invalid LngLat
+  // object: (NaN, NaN)") — in both cases the panel went black and nothing was logged.
+  // The catch is still here, because an init failure must never break the rest of the
+  // page; what changed is that it now hands the failure to a caller who shows it.
+  function runLibCb(cb, onFail, label){
+    try{ cb(); }
+    catch(e){
+      if(window.console && console.error) console.error("[HomeSignal] " + label + " failed to start:", e);
+      if(onFail) onFail("init", e);
+    }
+  }
+
+  // The in-frame notice that stands in for a blank 3D panel. `kind` is "load" while a
+  // library is on its way (spinner, no error styling) and any other value is a failure.
+  // Called with no arguments it clears itself, which is what a successful view does.
+  function mapMsg(title, body, kind){
+    var el = $("mapMsg"); if(!el) return;
+    if(!title){ el.hidden = true; el.className = "map-msg"; el.innerHTML = ""; return; }
+    var loading = (kind === "load");
+    el.className = "map-msg" + (loading ? "" : " mm-bar");
+    el.innerHTML = "<div class='mm-in'>" + (loading ? "<div class='mm-spin'></div>" : "")
+      + "<div class='mm-t'>" + esc(title) + "</div>"
+      + (body ? "<div class='mm-sub'>" + esc(body) + "</div>" : "") + "</div>"
+      + (loading ? "" : "<button type='button' class='mm-x' id='mapMsgX' aria-label='Dismiss'>\u00d7</button>");
+    el.hidden = false;
+    var x = $("mapMsgX"); if(x) x.addEventListener("click", function(){ mapMsg(); });
+  }
+
+  // A 3D view could not start. Say so where the resident is looking, then put them back on
+  // the 2D map — which needs no WebGL and carries the same records — instead of leaving a
+  // black rectangle behind. `reason` is 'nowebgl' | 'load' | 'init'; the copy lives in
+  // lib/map.js so it can be unit-tested offline.
+  function fail3D(mode, reason){
+    // The resident-facing string is browser-neutral and identical for every failure class:
+    // it names no browser, no vendor setting and no privacy control (founder ruling,
+    // 2026-09-06). WHICH failure occurred goes to the console, where it is a diagnostic.
+    if(window.console && console.warn) console.warn("[HomeSignal] 3D view unavailable (" + mode + "/" + reason + ")");
+    var copy   = (window.HS && HS.MAP3D_FALLBACK) ? HS.MAP3D_FALLBACK
+               : "3D view isn\u2019t available on this device or browser right now. "
+               + "You\u2019ve been returned to the 2D map.";
+    var detail = (window.HS && HS.MAP3D_FALLBACK_DETAIL) ? HS.MAP3D_FALLBACK_DETAIL : "";
+    setView("2d");                                  // never strand the resident on a dead panel
+    syncViewSeg("2d");
+    status("");                                     // one explanation, not two
+    mapMsg(copy, detail, "fail");
+  }
+
+  // Keep the segmented control's highlight honest when the page — not a click — chooses
+  // the view (the fall-back above). Mirrors what the click handler does.
+  function syncViewSeg(mode){
+    var seg = $("viewSeg"); if(!seg) return;
+    [].forEach.call(seg.children, function(b){ b.classList.toggle("on", b.getAttribute("data-v") === mode); });
   }
 
   // The honest facilities-only coverage note. Called by render() (sets FACILITIES_ONLY) and by the
@@ -2596,7 +2696,16 @@ HS.onReady(function(){
     // home at the origin — rebuilt by updateHome3D() so the address label stays current
     V3.homeGrp=new THREE.Group();sc.add(V3.homeGrp);
     V3.facil=new THREE.Group();sc.add(V3.facil);V3.proposed=[];V3.rise=1;
-    V3.sc=sc;V3.cam=cam;V3.rn=rn;V3.yaw=0.7;V3.pitch=0.82;V3.dist=mi(2.1);V3.auto=true;V3.inited=true;
+    V3.sc=sc;V3.cam=cam;V3.rn=rn;V3.yaw=0.7;V3.pitch=0.82;V3.dist=mi(2.1);V3.auto=true;V3.inited=true;V3.lost=false;
+    // A LOST CONTEXT IS THE BLACK PANEL ARRIVING AFTER A SUCCESSFUL START. Measured on the
+    // real renderer: forcing WEBGL_lose_context took the canvas from 0% to 100% dark while
+    // the view still claimed "3D aerial" and said nothing. No try/catch can see this — the
+    // context dies between frames — so it is handled where the browser reports it.
+    rn.domElement.addEventListener("webglcontextlost",function(){
+      V3.lost=true;                              // stop drawing into a dead context
+      if(V3.active) fail3D("3d","contextlost");
+    },false);
+    rn.domElement.addEventListener("webglcontextrestored",function(){ V3.lost=false; },false);
     var dom=rn.domElement,drag=false,lx,ly;
     var ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
     function pickAt(clientX,clientY){
@@ -2722,7 +2831,7 @@ HS.onReady(function(){
 
   function animate3D(){
     requestAnimationFrame(animate3D);
-    if(!V3.active||!V3.inited)return;
+    if(!V3.active||!V3.inited||V3.lost)return;   // V3.lost: never render into a dead context
     if(V3.homeView){
       V3.cam.position.set(mi(0.03),7,mi(-0.01));V3.cam.lookAt(mi(-0.5),20,mi(0.2));
     } else {
@@ -2768,6 +2877,7 @@ HS.onReady(function(){
   // Real satellite imagery (Esri) + terrain relief (AWS Terrarium DEM) — both keyless.
   // Same tier colors and hover popups as the 2D map; pins sit at real lat/lng.
   var GL = { inited:false, active:false, markers:[], home:LAST_HOME };
+  var GL_TILE_GRACE_MS = 8000;   // imagery has this long to deliver ONE tile before we fall back
   function glZoom(r){ return 14 - Math.log(r)/Math.log(2); }   // smaller radius -> zoom in
   function circlePoly(lat,lng,rMi,steps){
     var coords=[],R=rMi/69.0,latR=lat*Math.PI/180;
@@ -2797,6 +2907,10 @@ HS.onReady(function(){
   }
   function initGL(home){
     GL.home=home;
+    // Any throw here (a refused WebGL context, a non-finite centre) propagates to
+    // runLibCb, which logs it and routes the resident back to the 2D map with an
+    // explanation. It is deliberately NOT caught locally: a caught-and-ignored failure
+    // here is exactly what produced the silent black panel.
     GL.map=new maplibregl.Map({
       container:"mapgl",
       style:{ version:8,
@@ -2809,12 +2923,35 @@ HS.onReady(function(){
       center:[home.lng,home.lat],zoom:glZoom(CUR_RADIUS),pitch:62,bearing:-18,maxPitch:80
     });
     GL.map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-left");
+    // Asynchronous failures never reach the loader's try/catch — a lost WebGL context or a
+    // style error would otherwise blank the panel with nothing said. Report them the same way.
+    //
+    // TILE FAILURE IS A BLANK MAP, NOT AN EXCEPTION. Measured with every imagery request
+    // blocked: the map constructs, the controls and attribution appear, and the canvas is
+    // 100% dark — the black panel again, reached by a path no try/catch can see. A single
+    // missing tile must NOT fail the view, so the signal is deliberately narrow: the source
+    // errored AND not one tile ever arrived, judged once after a grace period.
+    GL.satTiles = 0; GL.satErrors = 0;
+    GL.map.on("data",function(e){ if(e && e.sourceId === "sat" && e.tile) GL.satTiles++; });
+    GL.map.on("error",function(e){
+      if(e && e.sourceId === "sat") GL.satErrors++;
+      if(window.console && console.error) console.error("[HomeSignal] 3D satellite:", e && e.error);
+    });
+    GL.map.on("webglcontextlost",function(){ if(GL.active) fail3D("gl","init"); });
     GL.map.on("load",function(){
-      try{ GL.map.setTerrain({source:"dem",exaggeration:1.3}); }catch(e){}
+      // Terrain relief is decoration: the imagery is the map, so a DEM failure must not
+      // fail the view. It is logged rather than discarded so it is diagnosable.
+      try{ GL.map.setTerrain({source:"dem",exaggeration:1.3}); }
+      catch(e){ if(window.console && console.warn) console.warn("[HomeSignal] terrain unavailable:", e); }
       GL.map.addSource("radius",{ type:"geojson", data:{ type:"FeatureCollection", features:[] } });
       GL.map.addLayer({ id:"radius-fill", type:"fill", source:"radius", paint:{ "fill-color":"#2dd4bf", "fill-opacity":0.07 } });
       GL.map.addLayer({ id:"radius-line", type:"line", source:"radius", paint:{ "line-color":"#13b8a6", "line-width":2, "line-opacity":0.8 } });
       GL.inited=true; buildGLMarkers();
+      // Grace period, then judge ONCE. Long enough that a slow connection is not called a
+      // failure; short enough that nobody sits in front of a dark rectangle.
+      setTimeout(function(){
+        if(GL.active && GL.satTiles === 0 && GL.satErrors > 0) fail3D("gl","tiles");
+      }, GL_TILE_GRACE_MS);
     });
   }
   function buildGLMarkers(){
@@ -2842,6 +2979,20 @@ HS.onReady(function(){
   }
 
   // ===================== VIEW SWITCH (2D / 3D aerial / 3D satellite) =====================
+  // A usable map centre. Both 3D views position everything relative to the home point, and
+  // MapLibre REFUSES a non-finite centre by throwing "Invalid LngLat object: (NaN, NaN)"
+  // out of its constructor — which is one of the two ways this page produced a black panel.
+  // render() can legitimately pass {lat:null,lng:null} (a ZIP whose authoritative geography
+  // is established but which has no cached report row), so the guard belongs here, and it
+  // reports rather than substituting a fabricated point.
+  // NOTE the typeof test: isFinite(null) is TRUE (Number(null) is 0), so a bare isFinite()
+  // guard would wave {lat:null,lng:null} straight through to MapLibre and back into the
+  // black panel it exists to prevent. Measured while writing this guard.
+  function homePointOK(h){
+    return !!h && typeof h.lat === "number" && typeof h.lng === "number"
+      && isFinite(h.lat) && isFinite(h.lng);
+  }
+
   function setView(mode){
     V3.active = (mode==="3d");
     GL.active = (mode==="gl");
@@ -2849,24 +3000,45 @@ HS.onReady(function(){
     document.getElementById("map3d").classList.toggle("on", mode==="3d");
     document.getElementById("mapgl").classList.toggle("on", mode==="gl");
     if(mode!=="3d"){ ["mk3tip","mk3info"].forEach(function(id){ var t=document.getElementById(id); if(t)t.style.display="none"; }); }
-    if(mode==="2d" && map){ setTimeout(function(){ map.invalidateSize(); },20); }
+    if(mode==="2d"){ mapMsg(); if(map) setTimeout(function(){ map.invalidateSize(); },20); }
+    if(mode==="2d") return;
+
+    // PREFLIGHT, before the dark panel is left on screen with nothing in it. Both 3D views
+    // need a WebGL context; where one cannot be created BOTH fail while the 2D Leaflet map,
+    // which needs no WebGL, keeps working. The causes are many and not attributable to any
+    // one browser — WebGL unavailable or switched off, no hardware acceleration, a driver
+    // denylist, a virtualised GPU, an older mobile device. Detected here so the resident is
+    // returned to a working map, instead of being shown a blank panel and a clean console.
+    if(!(window.HS && HS.webglSupported && HS.webglSupported(document))){ fail3D(mode, "nowebgl"); return; }
+    if(!homePointOK(LAST_HOME)){ fail3D(mode, "init"); return; }
+
     if(mode==="3d"){
       // Lazy-load three.js on first use, then proceed automatically (no second click).
+      mapMsg("3D aerial", "Loading the 3D view…", "load");
       ensureLib("THREE", "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js", "3D aerial", function(){
         if(!V3.active) return;                   // resident switched away while it loaded
         V3.userZoom=false;                       // re-frame to the data on entering 3D
         if(!V3.inited){ init3D(); } else { build3DFacilities(); }
         setTimeout(resize3D,30);
-      });
+        // three.js does NOT throw when the context is refused — it logs and hands back a
+        // renderer with no context — so success is confirmed from the renderer itself
+        // rather than from "init returned normally".
+        // V3.lost is checked too: after a context loss getContext() still returns the (dead)
+        // context object, so "a context exists" is not evidence the view can draw.
+        if(V3.lost || !V3.rn || !V3.rn.getContext || !V3.rn.getContext()){ fail3D("3d", V3.lost ? "contextlost" : "nowebgl"); return; }
+        mapMsg();
+      }, function(reason){ fail3D("3d", reason); });
     }
     if(mode==="gl"){
       // Lazy-load maplibre-gl on first use, then proceed automatically.
+      mapMsg("3D satellite", "Loading satellite imagery…", "load");
       ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite", function(){
         if(!GL.active) return;                   // resident switched away while it loaded
         if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
         else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
         setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
-      });
+        mapMsg();
+      }, function(reason){ fail3D("gl", reason); });
     }
   }
   document.getElementById("viewSeg").addEventListener("click",function(e){
