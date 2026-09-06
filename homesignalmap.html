@@ -249,6 +249,9 @@
   .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
   .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
+  .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
+    background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
+  .mapkey-empty[hidden]{display:none}
 
   /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
      The resolved-project data is a verified public-record anchor. Every honesty label the
@@ -342,6 +345,10 @@
               <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
               <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. A site that is a data center <em>and</em> carries an EPA record keeps its data-center shape with a small purple EPA square beneath, and appears under either filter. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <!-- Shown ONLY when every Type chip is off (HS.allCategoriesOff) and this ZIP
+                   actually has records to reveal. Sits under the legend it refers to, so the
+                   sentence and the control it names are read together. -->
+              <div class="mapkey-empty" id="mapkeyEmpty" hidden>All types are hidden, so the map is empty. Tap a type above to show records again.</div>
             </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
@@ -1649,6 +1656,9 @@ HS.onReady(function(){
       mapMarkers: siteMarkers.length,
       visibleMarkers: vis,
       dualIdentityMarkers: dual,
+      // Lets a check tell "no records here" apart from "the resident hid every type" —
+      // the two produce an identical visibleMarkers of 0.
+      allTypesOff: HS.allCategoriesOff ? HS.allCategoriesOff() : null,
       facilitiesOnly: FACILITIES_ONLY,
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
@@ -1739,11 +1749,32 @@ HS.onReady(function(){
   function markerVisible(x){
     return !!FILTER[x.bucket] && (HS.categoryVisible ? HS.categoryVisible(x.mk || x.s) : true);
   }
+  // A map emptied by the resident's OWN filters must say so. With every Type chip off the
+  // map goes blank, and a blank map is indistinguishable from a ZIP with no coverage — the
+  // same silence-vs-filtered ambiguity the category filter's fail-open default guards
+  // against, one layer up in the UI. HS.allCategoriesOff() is the SHIPPED predicate over
+  // the same CATEGORY_FILTER_KEYS the chips are built from; nothing here recomputes filter
+  // state or introduces a second notion of "off".
+  //
+  // Gated on there being records to reveal, deliberately: on a ZIP with no development
+  // records "turn a type back on to show records" would promise records that do not exist,
+  // which is the product-truth rule, not a nicety. That ZIP keeps its own honest coverage
+  // note instead.
+  //
+  // Scoped to the TYPE row only. Lifecycle chips can also empty the map, but that is a
+  // separate affordance and a separate product decision — this says exactly one true thing.
+  function syncAllTypesOffNote(){
+    var em = document.getElementById("mapkeyEmpty");
+    if(!em) return;
+    var allOff = HS.allCategoriesOff ? HS.allCategoriesOff() : false;
+    em.hidden = !(allOff && siteMarkers.length > 0);
+  }
   function applyFilter(){
     siteMarkers.forEach(function(x){
       if(markerVisible(x)){ x.m.addTo(layerGroup); }
       else { layerGroup.removeLayer(x.m); }
     });
+    syncAllTypesOffNote();
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
     publishVerifyState();
