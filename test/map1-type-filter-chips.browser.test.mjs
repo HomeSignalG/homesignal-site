@@ -45,10 +45,14 @@ const srv = createServer(async (q, s) => {
 await new Promise(r => srv.listen(8819, '127.0.0.1', r));
 const base = 'http://127.0.0.1:8819';
 
-// ── FIXTURES: four project types across two stages, plus one EPA facility ───────────
+// ── FIXTURES: four project types across two stages, plus one UNMAPPED EPA facility ──
+// The EPA record has no classifiable class field (no layer / use_type), so it stays
+// the standalone purple square. Classifiable EPA (Type shape + R) is pinned by the
+// overlay suites; this suite needs a regulatory pin that is independent of the Type
+// row — hidden when Regulatory is off, still drawn when every Type chip is off.
 const FACILITY = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
-  src: 'EPA FRS · registry 110071955663', type: 'built', label: 'CORESITE - VA1 DATA CENTER',
-  layer: 'industrial', scope: 'point', registry_id: '110071955663',
+  src: 'EPA FRS · registry 110071955663', type: 'built', label: 'GENERIC EPA SITE 99',
+  scope: 'point', registry_id: '110071955663',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 
 const mk = (n, ref, name, type, status) => ({
@@ -70,7 +74,9 @@ const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.364
   refreshed_at: '2026-09-07T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];

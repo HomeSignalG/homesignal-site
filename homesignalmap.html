@@ -2460,7 +2460,11 @@ HS.onReady(function(){
       { label: "Permit", cat: "industrial", use_type: "Industrial", type: "proposed", layer: "industrial" },
       { label: "DC", cat: "datacenter", use_type: "Data Center", type: "approved", layer: "datacenter" },
       { label: "Homes", cat: "residential", use_type: "Residential", type: "built", layer: "residential" },
-      { label: "EPA", cat: "facility", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" },
+      // Overlay-on-Type: a classifiable EPA record is Type shape + lifecycle colour + R,
+      // never a purple square. Coverage for registry key `facility` is the UNMAPPED
+      // fixture below (no layer / use_type — class fields only; the name is not a Type).
+      { label: "EPA overlay", cat: "industrial", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-OVERLAY" },
+      { label: "EPA", cat: "facility", type: "built", registry_id: "TX-VERIFY" },
       { label: "Infra", cat: "infrastructure", use_type: "Infrastructure", type: "approved", layer: "infrastructure" },
       { label: "Comm", cat: "commercial", use_type: "Commercial", type: "proposed", layer: "commercial" },
       { label: "Civic", cat: "civic", use_type: "Civic/Public", type: "approved", layer: "civic" },
@@ -2505,7 +2509,22 @@ HS.onReady(function(){
       var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
       var geom = geomFromSvg(svg);
       if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
-      if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
+      if (s.registry_id && (s.layer || s.use_type)) {
+        // Classifiable EPA: Type shape, operating colour, purple R. A purple square
+        // here is the keep-purple regression this verifier exists to catch.
+        if (!mk.overlayOnType || mk.shape === "square" || mk.color === HS.markerRegistry.facilityHex
+            || !mk.signal || mk.signal.letter !== "R") {
+          fails.push({ label: s.label, err: "tracker-overlay-not-type-plus-r",
+            want: "overlay Type+R", got: mk.shape + " " + mk.color });
+        }
+        if (s.use_type === "Industrial" && mk.shape !== "triangle") {
+          fails.push({ label: s.label, err: "tracker-overlay-industrial-not-triangle", want: "triangle", got: mk.shape });
+        }
+        if (mk.color !== HS.LIFECYCLE_HEX.operating) {
+          fails.push({ label: s.label, err: "tracker-overlay-not-operating-colour",
+            want: HS.LIFECYCLE_HEX.operating, got: mk.color });
+        }
+      } else if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex || mk.signal)) {
         fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
       }
       if (!s.registry_id && s.use_type === "Industrial" && mk.shape !== "triangle") {
