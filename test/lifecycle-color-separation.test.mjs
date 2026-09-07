@@ -206,14 +206,23 @@ ok(dE00('#2563EB', '#6f42c1') < FLOOR && Math.abs(dE00('#2563EB', '#6f42c1') - 1
 ok(dE00('#7b2d8e', LC.unknown) < FLOOR,
   '7e: control — a softer purple fails against the neutral, which is what forces the saturation');
 
-// §8 — THE 3D AERIAL VIEW MUST NOT RESTATE THE PALETTE. This is the other half of the
-// same defect and it was worse: build3DFacilities read
-//     var col = bkt === "approved" ? 0x2563EB : 0x1f5130;
-// so `unknown` was painted the operating green EXACTLY — not merely adjacent, identical
-// — and the 3D aerial asserted "operating now" about every record whose source states no
-// lifecycle. Recolouring lib/templates.js could never have reached it, because the value
-// was typed out again here. The fix routes it through lc3D(), which converts the SAME hex
-// the legend chip and the 2D/GL pins read; this check is what stops a literal coming back.
+// §8 — THE 3D AERIAL VIEW MUST NOT RESTATE THE PALETTE, AND MUST NOT PAINT
+// REGULATORY RECORDS AS A LIFECYCLE STAGE. Two defects, one slice:
+//
+//   (1) build3DFacilities used to read
+//         var col = bkt === "approved" ? 0x2563EB : 0x1f5130;
+//       so `unknown` was painted the operating green EXACTLY — not merely adjacent,
+//       identical — and the 3D aerial asserted "operating now" about every record
+//       whose source states no lifecycle.
+//   (2) It then painted by lifecycle bucket alone (`lc3D(bkt)`), so every EPA
+//       facility became a green "Operating now" block. The legend says
+//       "Purple R = regulatory record"; on 3D aerial that was a lie. Colour now
+//       comes from the SAME marker resolver the 2D / satellite pins use
+//       (`site3DPaint` → `mk.color`): purple for a regulatory-only location,
+//       lifecycle colour for a project.
+//
+// Recolouring lib/templates.js could never have reached a restated literal, and
+// fixing the 2D pin colour could never have reached a view that ignored mk.color.
 const mapPage = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
 const aerial = mapPage.slice(mapPage.indexOf('function build3DFacilities'),
   mapPage.indexOf('function resize3D'));
@@ -228,12 +237,34 @@ ok(aerialCode.indexOf('var col = bkt==="approved"') === -1 && aerial.indexOf('//
 const stageLiterals = Object.values(LC).map((h) => '0x' + String(h).replace('#', '').toLowerCase());
 stageLiterals.forEach((lit) => {
   ok(aerialCode.indexOf(lit) === -1,
-    `8b: the 3D aerial does not hardcode the stage colour ${lit} — it reads lc3D()`);
+    `8b: the 3D aerial does not hardcode the stage colour ${lit} — it reads the resolver`);
 });
-ok(/var col\s*=\s*lc3d\(bkt\)/.test(aerialCode),
-  '8c: the block colour is lc3D(bkt) — every bucket, including unknown, gets its own colour');
-ok(/lc3d\("proposed"\)/.test(aerialCode),
-  '8d: the proposed wireframe reads the palette too, not a second literal');
+ok(/site3dpaint\(p\)/.test(aerialCode) && /paint\.col/.test(aerialCode) && /var col\s*=\s*paint\.col/.test(aerialCode),
+  '8c: the block colour is site3DPaint → mk.color — the same hex the 2D pin uses');
+ok(!/lc3d\(bkt\)/.test(aerialCode) && !/lc3d\("proposed"\)/.test(aerialCode),
+  '8d: it no longer paints by lifecycle bucket alone — that is what made EPA facilities look green');
+ok(/paint\.signal/.test(aerialCode),
+  '8e: a dual-identity data centre still gets its purple R as a subordinate badge');
+// The facility purple must come FROM the resolver, never as a restated literal — the
+// same "do not restate the palette" rule, applied to the regulatory colour.
+const facLit = '0x' + String(FACILITY).replace('#', '').toLowerCase();
+ok(aerialCode.indexOf(facLit) === -1,
+  `8f: the 3D aerial does not hardcode the facility purple ${facLit} either`);
+const pageHelpers = mapPage.slice(mapPage.indexOf('function hex3D'), mapPage.indexOf('var LBL_BG'));
+ok(/function site3DPaint/.test(pageHelpers) && /mk\.color/.test(pageHelpers)
+   && /hex3D\(mk && mk\.color\)/.test(pageHelpers),
+  '8g: site3DPaint converts the resolver colour, not a bucket lookup');
+const facInt = parseInt(String(FACILITY).replace('#', ''), 16);
+const opInt = parseInt(String(LC.operating).replace('#', ''), 16);
+ok(facInt !== opInt,
+  '8h: facility purple and operating green are different 3D integers — collapsing them is the bug');
+const epaOnly = HS.resolveTrackerMarker({
+  type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
+  scope: 'point', registry_id: '110072041130', record_url: 'https://echo.epa.gov/x'
+}, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
+ok(epaOnly.color === FACILITY && parseInt(String(epaOnly.color).replace('#', ''), 16) === facInt,
+  '8i: an EPA-only site resolves to the purple the 3D aerial now paints, not operating green',
+  epaOnly.color);
 
 
 // §9 — A COLOUR YOU CANNOT SEE IS NOT A COLOUR. §1-§8 prove the palette is separated;
