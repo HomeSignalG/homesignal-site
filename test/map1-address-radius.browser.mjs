@@ -204,8 +204,11 @@ ok(calls.some(c => c.kind === 'zipcache'), 'ZIP mode reads the cached entire-ZIP
 ok(!calls.some(c => c.kind === 'rpc'), 'ZIP mode makes NO N5 radius call');
 ok(s.some(x => x.label === 'ZIP-ONLY FACILITY') && s.some(x => x.label === 'ZIP-ONLY county notice'),
   'ZIP mode renders the ZIP population', s.map(x => x.label));
-const zipCaption = await page.textContent('#withinLbl');
-ok(/Across ZIP/.test(zipCaption || ''), 'ZIP mode is captioned as the whole ZIP: ' + zipCaption);
+// The whole-ZIP label spans the eyebrow and the prominent place line - read both.
+const zipCaption = ((await page.textContent('#withinLbl')) + ' ' + (await page.textContent('#rAddr')))
+  .replace(/\s+/g, ' ').trim();
+ok(/^All development across ZIP \d{5}$/.test(zipCaption),
+  'ZIP mode is captioned as the whole ZIP: ' + zipCaption);
 
 // ══════════════ 2. ADDRESS MODE — home, ring, canonical markers ══════════════
 calls.length = 0;

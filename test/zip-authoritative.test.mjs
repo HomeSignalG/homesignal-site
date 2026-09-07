@@ -71,7 +71,12 @@ ok(HS.zipAuthOutcome(UNKNOWN) === 'not_measured',
 ok(HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('not measured yet') !== -1
    && HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('could not be read') === -1,
   'A9 ...so the page states the honest status, never a transient-failure claim');
-ok(HS.zipAuthNote(UNKNOWN, '08005', []).indexOf('street address') !== -1,
+// Matched on the ROUTE, not on the old literal 'street address'. The note used to say "Enter
+// your street address", which named a shape the geocoder never required and contradicted the
+// field's own copy; it now says "Enter an address". What must not regress is that the sentence
+// still SENDS the resident to address mode, so that is what is asserted - deleting the route
+// sentence still fails this, which is the whole point of the check.
+ok(/enter an address/i.test(HS.zipAuthNote(UNKNOWN, '08005', [])),
   'A10 ...and keeps the address-mode route, which is the only live answer for such a ZIP');
 // The allow-list must stay an allow-list of two. A9 above would also pass if every unrecognised
 // status were swept into not_measured, so A6's control is what makes this change safe, and it is

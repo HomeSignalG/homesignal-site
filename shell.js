@@ -500,7 +500,7 @@
     } catch (e) { unavailable = true; }
     if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
     if (!m || !m.zip) {
-      throw new Error("We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.");
+      throw new Error("We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.");
     }
     if (!O.validCoords(m.lat, m.lng)) {
       throw new Error("We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.");
@@ -1014,7 +1014,7 @@
       return;
     }
     if (!m || m.lat == null || m.lng == null || !m.zip) {
-      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.";
+      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.";
       return;
     }
     _homeMatch = m;
@@ -1479,28 +1479,7 @@
     clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2800);
   };
 
-  // -------------------------------------------------- search ------------------
-  async function wireSearch() {
-    const input = $('hs-search'), box = $('hs-search-results');
-    if (!input || !box) return;
-    const home = state.activeProperty;
-    const [projects, changes] = await Promise.all([
-      HS.data.projects(state.zip, home), HS.data.changes(state.zip, home)]);
-    const idx = [
-      ...projects.map(p => ({ label: p.name, sub: p.type, href: 'development.html?id=' + p.id })),
-      ...changes.map(c => ({ label: c.title, sub: c.category, href: c.related_project_id ? 'development.html?id=' + c.related_project_id : 'alerts.html' })),
-      ...state.properties.map(p => ({ label: p.address, sub: p.city + ', ' + p.state, href: 'property.html?id=' + p.id }))
-    ];
-    input.addEventListener('input', () => {
-      const q = input.value.trim().toLowerCase();
-      if (!q) { box.classList.add('hidden'); return; }
-      const hits = idx.filter(i => (i.label + ' ' + i.sub).toLowerCase().includes(q)).slice(0, 8);
-      box.innerHTML = hits.map(h => `<a href="${h.href}"><b>${HS.esc(h.label)}</b><span>${HS.esc(h.sub)}</span></a>`).join('')
-        || '<div class="empty">No matches</div>';
-      box.classList.remove('hidden');
-    });
-    document.addEventListener('click', e => { if (!box.contains(e.target) && e.target !== input) box.classList.add('hidden'); });
-  }
+
 
   // -------------------------------------------------- bell badge --------------
   async function paintBell() {
@@ -1604,7 +1583,6 @@
     paintTopbar();
     HS.paintWhereLine();   // shared header context line (async, never blocks boot)
     buildShare();
-    wireSearch();
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();

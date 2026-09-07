@@ -224,8 +224,12 @@ ok(calls.some(c => c.kind === 'zipcache'), '8 — ZIP mode reads the entire-ZIP 
 ok(!calls.some(c => c.kind === 'rpc'), '8 — ZIP mode makes NO N5 radius call', calls.map(c => c.kind));
 ok(!s.some(x => x.n5_feature_id), '8 — no address-radius result survives into ZIP mode',
   s.filter(x => x.n5_feature_id).map(x => x.label));
-const cap = await page.textContent('#withinLbl');
-ok(/Across ZIP/.test(cap || ''), '8 — ZIP mode presents the ENTIRE ZIP geography: ' + cap);
+// The whole-ZIP label spans the eyebrow (#withinLbl) and the prominent place line (#rAddr):
+// "All development across" + "ZIP 78617". Read both, or half a broken heading passes.
+const cap = ((await page.textContent('#withinLbl')) + ' ' + (await page.textContent('#rAddr')))
+  .replace(/\s+/g, ' ').trim();
+ok(/^All development across ZIP \d{5}$/.test(cap),
+  '8 — ZIP mode presents the ENTIRE ZIP geography: ' + cap);
 ok((await page.locator('.homepin').count()) === 0, '8 — no HOME pin is shown for a ZIP centroid');
 info('ZIP sites rendered', s.length);
 ok(s.length >= 0, '8 — the ZIP page renders');

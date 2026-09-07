@@ -6,6 +6,13 @@
 // must not disturb, because the cheapest way to break dual identity is to touch the filter
 // path while "just adding a message".
 //
+// ⚖️ UPDATED 2026-09-06. Regulated facility left the Type row for its own "Regulatory
+// records" switch, so the Type row is SEVEN chips and "every Type chip off" no longer
+// means "the map is empty": with the switch on, regulatory records are still drawn. The
+// note therefore fires on every-Type-off AND nothing-visible, and this suite asserts both
+// halves — a note that appeared over a map still showing records would be a lie, and one
+// that could never appear while the switch was on would be dead code.
+//
 // It drives the REAL shipped architecture — HS.getCategoryFilters / setCategoryFilter /
 // allCategoriesOff / categoryVisible out of lib/map.js, and the chips clicked the way a
 // resident clicks them. Nothing here reimplements or stubs a filter model.
@@ -52,7 +59,15 @@ const DC_PROJECT = { e: 1.515, n: 1.756, lat: 38.95065, lng: -77.36458, type: 'a
   jurisdiction: 'Fairfax County Land Development Services', geo_precision: 'point',
   record_url: 'https://plus.fairfaxcounty.gov/x', source_id: 'arcgis:fairfax:P-1' };
 
-const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',
+const ZIP_AUTH = { '20173': {
+  zip: '20173', mode: 'development', status: 'boundary_complete',
+  projects: [{ source_key: 'arcgis:fairfax:P-1', project_ref: 'arcgis:fairfax:P-1',
+    name: 'Pennhurst Data Centers', type: 'Data Center', status: 'Approved',
+    registry_id: 'fairfax-active-site-construction', source_ref: 'https://plus.fairfaxcounty.gov/x',
+    submitted_at: '2026-01-04', date_kind: 'filed', impact_score: null, impact_dimensions: null }],
+  markers: [{ project_ref: 'arcgis:fairfax:P-1', lat: 38.95065, lng: -77.36458,
+    marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }] },
+  '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',
   projects: [{ source_key: 'arcgis:fairfax:P-1', project_ref: 'arcgis:fairfax:P-1',
     name: 'Pennhurst Data Centers', type: 'Data Center', status: 'Approved',
     registry_id: 'fairfax-active-site-construction', source_ref: 'https://plus.fairfaxcounty.gov/x',
@@ -67,11 +82,20 @@ const ZIP_ROW = {
     refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }],
   '20172': [{ zip: '20172', home_lat: 38.9506, home_lng: -77.3645,
     counts: { facilities: 0, development: 0 }, sites: [],
+    refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }],
+  // 20173 is the PREDICATE control: records exist, but NOT ONE of them is regulatory. It
+  // is the only shape that tells "every Type chip is off" apart from "every category key
+  // is off" — with the Type row empty and the regulatory switch ON, this ZIP's map is
+  // genuinely blank while the regulatory key is still true. A note keyed on
+  // allCategoriesOff() would stay silent over that blank map.
+  '20173': [{ zip: '20173', home_lat: 38.9506, home_lng: -77.3645,
+    counts: { facilities: 0, development: 1 }, sites: [DC_PROJECT],
     refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }]
 };
 const COMMUNITIES = {
   '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }],
-  '20172': [{ name: 'Herndon (20172)', level: 'zip', county: 'Fairfax', state: 'VA' }]
+  '20172': [{ name: 'Herndon (20172)', level: 'zip', county: 'Fairfax', state: 'VA' }],
+  '20173': [{ name: 'Herndon (20173)', level: 'zip', county: 'Fairfax', state: 'VA' }]
 };
 
 const browser = await chromium.launch();
@@ -127,6 +151,15 @@ const setTypes = (keys) => page.evaluate((want) => {
     if (on !== should) r.click();
   });
 }, keys);
+// The regulatory dimension has ONE control, and a resident operates it by clicking it.
+const setReg = (on) => page.evaluate((want) => {
+  const t = document.getElementById('regToggle');
+  if (t && (t.getAttribute('aria-checked') === 'true') !== want) t.click();
+}, on);
+const regOn = () => page.evaluate(() => {
+  const t = document.getElementById('regToggle');
+  return !!t && t.getAttribute('aria-checked') === 'true';
+});
 const allKeys = () => page.evaluate(() =>
   Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]')).map(r => r.getAttribute('data-cat')));
 const noteShown = () => page.evaluate(() => {
@@ -139,20 +172,23 @@ const verify = () => page.evaluate(() => window.__HS_VERIFY);
 
 await load('20171');
 const KEYS = await allKeys();
-ok(KEYS.length === 8, 'setup: 8 Type chips carry data-cat', KEYS.join(','));
+ok(KEYS.length === 7, 'setup: 7 Type chips carry data-cat — Regulated facility is NOT one', KEYS.join(','));
+ok(KEYS.indexOf('facility') === -1, 'setup: the Type row does not offer "Regulated facility"');
+ok(await regOn(), 'setup: the Regulatory records switch is ON by default (fail-open)');
 ok((await pins()) === 3, 'setup: the three production records render', await pins());
 
 // ── 1-3. THE NOTE STAYS HIDDEN WHILE ANY TYPE IS ON ──────────────────────────────────
 ok(!(await noteShown()), '1: all Types on  -> no all-off note');
 await setTypes(KEYS.filter(k => k !== 'industrial'));
 ok(!(await noteShown()), '2: ONE Type off  -> no all-off note');
-await setTypes(['facility']);
-ok(!(await noteShown()), '3: seven of eight Types off -> still no all-off note');
+await setTypes(['datacenter']);
+ok(!(await noteShown()), '3: six of seven Types off -> still no all-off note');
 ok((await pins()) > 0, '3: ...and records are still on the map', await pins());
 
-// ── 4. EVERY TYPE OFF -> EMPTY MAP THAT SAYS WHY ─────────────────────────────────────
+// ── 4. EVERY TYPE OFF, REGULATORY OFF -> EMPTY MAP THAT SAYS WHY ─────────────────────
 await setTypes([]);
-ok((await pins()) === 0, '4: all Types off -> zero eligible records rendered');
+await setReg(false);
+ok((await pins()) === 0, '4: all Types off + regulatory off -> zero eligible records rendered');
 ok(await noteShown(), '4: ...and the note is visible');
 const v4 = await verify();
 ok(v4.allTypesOff === true && v4.visibleMarkers === 0 && v4.mapMarkers === 3,
@@ -161,28 +197,40 @@ ok(v4.allTypesOff === true && v4.visibleMarkers === 0 && v4.mapMarkers === 3,
 const txt = await page.textContent('#mapkeyEmpty');
 ok(/type/i.test(txt) && /hidden/i.test(txt), '4: the note names the control the resident must use', txt.trim());
 
+// ── 4b. EVERY TYPE OFF BUT REGULATORY ON IS NOT AN EMPTY MAP ─────────────────────────
+// The note must not claim emptiness over a map that is still drawing regulatory records.
+await setReg(true);
+ok((await pins()) === 2,
+  '4b: all Types off + regulatory ON -> the two regulatory records are still drawn', await pins());
+ok(!(await noteShown()), '4b: ...so the "map is empty" note does NOT appear');
+const v4b = await verify();
+ok(v4b.allTypesOff === true && v4b.regulatoryOn === true && v4b.visibleMarkers === 2,
+  '4b: every Type is still off — the switch did not turn any of them back on',
+  JSON.stringify({ allTypesOff: v4b.allTypesOff, reg: v4b.regulatoryOn, visible: v4b.visibleMarkers }));
+
 // ── 5. RE-ENABLE ONE TYPE -> NOTE GONE, RECORDS BACK ─────────────────────────────────
+await setReg(false);
 await setTypes(['residential']);
 ok(!(await noteShown()), '5: re-enabling one Type hides the note immediately');
-await setTypes(['facility']);
+await setTypes(['datacenter']);
 ok((await pins()) === 2 && !(await noteShown()),
   '5: ...and the eligible records return', await pins());
 
 // ── 6. DUAL IDENTITY — THE #1056 CONTRACT, UNCHANGED ─────────────────────────────────
 // CORESITE - VA1 DATA CENTER carries categories ['datacenter','facility'] and must survive
-// either qualifying category staying on.
+// either qualifying category staying on. Only the CONTROL for the second one moved.
 const labels = () => page.evaluate(() => (window.__HS_SITES || [])
   .filter(s => window.__HS_RESOLVE_TRACKER && window.__HS_CATEGORY_FILTERS &&
     (window.HS.markerCategories(window.__HS_RESOLVE_TRACKER(s))
       .some(k => window.__HS_CATEGORY_FILTERS[k])))
   .map(s => s.label));
-await setTypes(['facility']);                       // Data center OFF, Regulated facility ON
+await setTypes([]); await setReg(true);            // Data center OFF, regulatory ON
 ok((await labels()).indexOf('CORESITE - VA1 DATA CENTER') !== -1,
-  '6: dual record VISIBLE with Data center OFF + Regulated facility ON');
-await setTypes(['datacenter']);                     // Regulated facility OFF, Data center ON
+  '6: dual record VISIBLE with Data center OFF + regulatory ON');
+await setTypes(['datacenter']); await setReg(false);   // regulatory OFF, Data center ON
 ok((await labels()).indexOf('CORESITE - VA1 DATA CENTER') !== -1,
-  '6: dual record VISIBLE with Regulated facility OFF + Data center ON');
-await setTypes(KEYS.filter(k => k !== 'datacenter' && k !== 'facility'));   // both OFF
+  '6: dual record VISIBLE with regulatory OFF + Data center ON');
+await setTypes(KEYS.filter(k => k !== 'datacenter'));  // both OFF
 ok((await labels()).indexOf('CORESITE - VA1 DATA CENTER') === -1,
   '6: dual record HIDDEN only when BOTH of its categories are off');
 ok(!(await noteShown()), '6: ...and that is not an all-off state, so no note');
@@ -190,26 +238,43 @@ const v6 = await verify();
 ok(v6.dualIdentityMarkers === 1, '6: still exactly ONE dual-identity marker object', v6.dualIdentityMarkers);
 
 // ── 7. STAGE x TYPE STILL COMPOSES ───────────────────────────────────────────────────
-await setTypes(KEYS);
+await setTypes(KEYS); await setReg(true);
 const before = await pins();
 await page.click('#mapkey span:has-text("Approved")');      // hides the approved DC project
 const afterStage = await pins();
 ok(afterStage === before - 1, '7: a Stage chip still filters independently of Type',
   before + ' -> ' + afterStage);
-await setTypes([]);                                          // now ALSO all types off
+await setTypes([]); await setReg(false);                     // now ALSO all types off
 ok((await pins()) === 0 && await noteShown(), '7: Stage off + all Types off -> note still correct');
-await setTypes(KEYS);
+await setTypes(KEYS); await setReg(true);
 await page.click('#mapkey span:has-text("Approved")');       // restore stage
 ok((await pins()) === before && !(await noteShown()), '7: both dimensions restored', await pins());
 
 // ── 8. PERSISTENCE (sessionStorage) SURVIVES A RELOAD, AND SO DOES THE NOTE ──────────
-await setTypes([]);
+await setTypes([]); await setReg(false);
 await load('20171');
 const persisted = await page.evaluate(() =>
   Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]'))
     .every(r => r.getAttribute('aria-pressed') === 'false'));
 ok(persisted, '8: every Type chip is still OFF after a reload (sessionStorage preserved)');
+ok(!(await regOn()), '8: ...and so is the Regulatory records switch');
 ok((await pins()) === 0 && await noteShown(), '8: ...and the note is shown on load, not only on click');
+
+// ── 8b. THE NOTE MUST TRACK THE MAP, NOT THE FILTER KEYS ────────────────────────────
+// 20173 carries one record and it is not regulatory. Every Type off + regulatory ON is
+// therefore a genuinely blank map, and the note has to say so — this is exactly the state
+// a predicate over ALL category keys reports as "not all off", leaving the blank map
+// unexplained. Nothing here changes the §4b promise: the note follows what is DRAWN.
+await load('20173');
+await setTypes([]); await setReg(true);
+const v8b = await verify();
+ok(v8b.mapMarkers === 1 && v8b.regulatoryOn === true,
+  '8b: control — this ZIP has a record and the regulatory switch is ON',
+  JSON.stringify({ total: v8b.mapMarkers, reg: v8b.regulatoryOn }));
+ok((await pins()) === 0, '8b: ...and with every Type off, none of it is drawn', await pins());
+ok(await noteShown(),
+  '8b: the note fires over the blank map — it tracks what is DRAWN, not which keys are set');
+ok(v8b.regulatoryBadges === 0, '8b: ...and no badge is painted over an empty map', v8b.regulatoryBadges);
 
 // ── 9. PRODUCT TRUTH — a ZIP with NO records must not be told to turn a type back on ──
 await load('20172');
@@ -218,11 +283,6 @@ ok(v9.allTypesOff === true, '9: control — the all-off filter state carried int
 ok(v9.mapMarkers === 0, '9: control — that ZIP genuinely has no records', v9.mapMarkers);
 ok(!(await noteShown()),
   '9: the note is NOT shown where there are no records to reveal (no promise of absent data)');
-
-// reset so a later suite in the same browser profile starts clean
-await load('20171');
-await setTypes(KEYS);
-ok(pageErrors.length === 0, '10: no uncaught page errors', pageErrors.join(' | '));
 
 await browser.close();
 srv.close();

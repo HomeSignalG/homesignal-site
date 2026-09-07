@@ -9,14 +9,54 @@ name: pages
 # CLAUDE.md §0 prohibits maintained per-community source files, not deterministic
 # build output. Adding or removing a canonical ZIP needs no hand-written HTML.
 #
-# SAFETY: the `build` job runs on every push to this workflow's inputs and proves the
-# gates. The `deploy` job runs ONLY on main, so the existing "deploy from a branch"
-# production path is untouched until the repository Pages Source is switched to
-# "GitHub Actions" — a one-time setting change that is not performable from CI.
+# SAFETY: `deploy` runs ONLY on main (`if: github.ref == 'refs/heads/main'`), so no branch
+# or pull-request run can publish. `build` proves the gates before that.
+#
+# DEPLOYMENT RELIABILITY (2026-09-06). Two defects, which have to be fixed together:
+#
+#   1. The push filter named the ZIP GENERATOR's inputs while "Stage the static site"
+#      rsyncs the WHOLE repo minus .github/docs/test/node_modules into the artifact.
+#      339 of 344 shipped files - index.html, app.css, homesignalmap.html,
+#      partials/shell.html, every lib/*.js - could merge to main and never deploy.
+#
+#   2. `concurrency: pages-build` was ONE group shared by every run on every ref. GitHub
+#      keeps only the newest PENDING run per group, so a branch run queued behind a main
+#      run cancelled main's deploy. Measured: run #54 for 3e0f763 was cancelled 39s in
+#      with zero jobs, and that commit only reached production after a manual re-dispatch.
+#
+# Widening (1) ALONE is what forced the revert in #1072: more branch runs meant more
+# chances for a branch build to starve the production deploy. Both halves ship together.
+#
+#   push is scoped to main   -> a branch push cannot enter the group at all
+#   the group is per-ref     -> a branch DISPATCH, which is still allowed, gets its own
+#                               group and so cannot contend with refs/heads/main either
+#
+# pull_request keeps the pre-merge proof that branch pushes used to give, on the SAME
+# narrow generator inputs it has always covered. That is not extra scope: if the build
+# breaks, main does not deploy, so catching it before merge is part of deploying reliably.
+# Its ref is refs/pull/N/merge, a different concurrency group, so it cannot starve main.
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      # Everything the artifact ships. The three negations mirror the rsync --exclude flags
+      # in "Stage the static site" below, so the trigger and the artifact cannot drift apart
+      # as the repo grows. Patterns are evaluated in order and the last match wins, so the
+      # re-included paths below survive their tree's exclusion.
+      - '**'
+      - '!.github/**'
+      - '!docs/**'
+      - '!test/**'
+      # The gate inputs this build itself runs, and this workflow, so a change here proves
+      # itself.
+      - 'test/zip-pages-seo.test.mjs'
+      - 'test/zip-pages-no-point.test.mjs'
+      - 'test/community-page-contract.test.mjs'
+      - 'test/fixtures/zip-pages.json'
+      - '.github/workflows/pages.yml'
+  pull_request:
     paths:
       - 'scripts/gen_zip_pages.py'
       - 'scripts/prove-zip-pages.mjs'
@@ -35,7 +75,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-build
+  # PER REF, not one global group. main's deploys only ever contend with other main runs;
+  # a branch or pull-request run lands in its own group and cannot cancel a queued deploy.
+  # cancel-in-progress stays false so an in-flight actions/deploy-pages is never interrupted.
+  group: pages-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

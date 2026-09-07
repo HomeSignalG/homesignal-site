@@ -67,6 +67,15 @@ const readScreen = () => page.evaluate(() => {
     facilities: sites.filter(s => s.scope === 'point' && s.relevance !== 'development').length,
     freshLine: txt('freshLine'),
     withinLbl: txt('withinLbl'),
+    mapCap: (document.querySelector('.map-cap') || {}).textContent || '',
+    rAddr: txt('rAddr'),
+    scopeNote: txt('scopeNote'),
+    scopeNoteShown: (() => { const n = document.getElementById('scopeNote');
+      return !!n && getComputedStyle(n).display !== 'none'; })(),
+    backZipShown: (() => { const b = document.getElementById('backZip');
+      return !!b && getComputedStyle(b).display !== 'none'; })(),
+    backZipHref: (() => { const a = document.querySelector('#backZip a');
+      return a ? a.getAttribute('href') : null; })(),
     status: txt('status'),
     radiusVisible: (() => { const el = document.getElementById('radSel'); if (!el) return false;
       const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })(),
@@ -106,7 +115,16 @@ ok(errors.length === 0, 'A1 the page loads with no fatal client error', errors.s
 ok(z.mapPresent, 'A2 the map renders');
 ok(z.sites_total > 0, 'A3 results appear', z.sites_total);
 ok(z.dev_points > 0, 'A4 development/projects appear', z.dev_points);
-ok(/Across ZIP/i.test(z.withinLbl || ''), 'A5 the page says it is showing the whole ZIP', z.withinLbl);
+// A5 CHANGED 2026-09-06 (first-launch standard). The whole-ZIP label now spans the eyebrow
+// and the prominent place line, so assert the SENTENCE A RESIDENT READS rather than one
+// element - either half alone can pass while the rendered heading is broken.
+const zLine = ((z.withinLbl || '') + ' ' + (z.rAddr || '')).replace(/\s+/g, ' ').trim();
+ok(zLine === ('All development across ZIP ' + ZIP),
+  'A5 the page reads "All development across ZIP <zip>"', zLine);
+ok(z.scopeNoteShown === true && /entire ZIP area/i.test(z.scopeNote || ''),
+  'A5b ...with a visible clarifier that this is the entire ZIP, not nearby projects', z.scopeNote);
+ok(z.backZipShown === false,
+  'A5c ZIP mode offers no "back to ZIP" control - it IS the whole-ZIP view', z.backZipShown);
 ok(z.radiusVisible === false, 'A6 no radius control in ZIP mode (address-radius semantics do not leak)');
 ok(z.homePins === 0, 'A7 no HOME pin for a ZIP (a ZIP is not somebody’s home)');
 
@@ -156,11 +174,20 @@ ok(a.mapPresent, 'B1 the map renders for an address');
 ok(a.homePins === 1, 'B2 HOME is shown, so development is readable relative to the home', a.homePins);
 ok(a.radiusVisible === true, 'B3 the radius control is available in address mode');
 ok(a.sites_total > 0, 'B4 results appear', a.sites_total);
-ok(/Within/i.test(a.withinLbl || ''), 'B5 the page says results are within the chosen radius', a.withinLbl);
+ok(/^Showing development within .+ of$/.test((a.withinLbl || '').trim()),
+  'B5 the page says WHAT is shown and the radius it is within', a.withinLbl);
+// THE WAY BACK. run() flips ZIP_MODE in JS without touching the URL, so without this control
+// an address search is a one-way door: no control, no history entry, no visible route back.
+ok(a.backZipShown === true && /^homesignalmap\.html\?zip=\d{5}$/.test(a.backZipHref || ''),
+  'B5b address mode offers a real link back to the whole-ZIP view',
+  { shown: a.backZipShown, href: a.backZipHref });
+ok(a.scopeNoteShown === false,
+  'B5c the whole-ZIP clarifier does not leak into address mode', a.scopeNote);
 ok(a.tile_proposed === a.rail_proposed,
   'B6 POSITIVE CONTROL — the proposed tile equals the drawn set in address mode',
   { tile: a.tile_proposed, drawn: a.rail_proposed });
-ok(!/Across ZIP/i.test(a.withinLbl || ''), 'B7 ZIP semantics do not leak into address mode', a.withinLbl);
+ok(!/across ZIP/i.test(((a.withinLbl || '') + ' ' + (a.rAddr || ''))),
+  'B7 ZIP semantics do not leak into address mode', { withinLbl: a.withinLbl, rAddr: a.rAddr });
 
 const aPop = await openDossier();
 info('address dossier', aPop);
@@ -174,6 +201,10 @@ await page.waitForTimeout(9000);
 const a2 = await readScreen();
 info('after switching to 2 miles', { before: before, after: a2.sites_total, within: a2.withinLbl });
 ok(/2 miles/i.test(a2.withinLbl || ''), 'B9 the page states the NEW radius', a2.withinLbl);
+// The caption is ON the map canvas, so it must track the radius too - a caption still
+// naming the OLD radius beside re-scoped pins is worse than no caption.
+ok(/^Development within 2 miles of this home$/.test((a2.mapCap || '').trim()),
+  'B9b ...and the map caption states the NEW radius too', a2.mapCap);
 ok(a2.tile_proposed === a2.rail_proposed,
   'B10 the tile still equals the drawn set after a radius change',
   { tile: a2.tile_proposed, drawn: a2.rail_proposed });

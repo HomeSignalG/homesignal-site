@@ -48,19 +48,48 @@
   h1{font-weight:700;font-size:30px;letter-spacing:-.02em;margin:6px 0 4px}
   .sub{color:var(--soft);font-size:15px;max-width:640px}
 
-  form.search{display:flex;gap:10px;margin:18px 0 4px;flex-wrap:wrap}
-  .search input{flex:1;min-width:260px;font-family:var(--font);font-size:15px;padding:13px 15px;
-    border:1px solid var(--line);border-radius:11px;background:#fff}
+  /* The address field carries a VISIBLE label, not just a placeholder: a placeholder disappears
+     the moment the resident types, so it cannot name the field while it is being filled in. The
+     label sits above the field rather than inside it: the placeholder is now an EXAMPLE
+     address, which is guidance, not the field's name. */
+  .search-label{display:block;font-size:12.5px;font-weight:700;color:var(--ink);margin:18px 0 6px}
+  /* The search control is ONE field: the submit button lives INSIDE the input as a
+     magnifying-glass icon pinned to the far right. The full-width green "See development
+     nearby" button that used to sit beside the field was removed — it read as the page's
+     primary action when the primary action is typing an address, and on a phone it wrapped
+     below and pushed the field narrow. Nothing about the SEARCH changed: the button kept
+     its id (#go) and type="submit", so the click still goes through the form's own submit
+     handler, Enter still submits, and the disabled-while-searching state still applies. */
+  form.search{position:relative;display:block;margin:0 0 4px;max-width:640px}
+  .search input{width:100%;box-sizing:border-box;font-family:var(--font);font-size:15px;
+    padding:13px 52px 13px 15px;border:1px solid var(--line);border-radius:11px;background:#fff}
   .search input:focus{outline:none;border-color:var(--green-bright);box-shadow:0 0 0 3px #16a34a22}
-  .search button{font-family:var(--font);font-weight:600;font-size:15px;color:#fff;background:var(--green);
-    border:0;border-radius:11px;padding:13px 20px;cursor:pointer}
-  .search button:hover{background:#174026}
-  .search button:disabled{opacity:.6;cursor:default}
-  .hint{font-size:12.5px;color:var(--mute);margin-top:2px}
+  .search input[aria-invalid="true"]{border-color:var(--violation)}
+  /* 44x44 is the TAP TARGET, not the artwork: the button is a transparent 44px square centred
+     on the field's right edge and only the ~19px glyph inside it is drawn, so the minimum
+     touch size is met without the field itself growing — the input's own height is unchanged
+     (13px padding + 15px text ≈ 46px), which is why a 44px control fits inside it. */
+  .search button{position:absolute;top:50%;right:3px;transform:translateY(-50%);
+    width:44px;height:44px;display:flex;align-items:center;justify-content:center;padding:0;
+    border:0;border-radius:9px;background:none;color:var(--green);cursor:pointer}
+  .search button svg{width:19px;height:19px;display:block}
+  .search button:hover{background:#16a34a14;color:#174026}
+  .search button:focus-visible{outline:2px solid var(--green-bright);outline-offset:-2px}
+  .search button:disabled{opacity:.45;cursor:default;background:none}
+  .hint{font-size:12.5px;color:var(--mute);margin-top:6px}
+  /* Inline validation covers the ONE thing this page can judge client-side: an empty box.
+     Anything typed is handed to the geocoder, which reports its own honest no-match — the
+     field takes free-form text, so no address SHAPE is demanded here (the same reason the
+     no-match copy suggests a city or ZIP rather than prescribing a triple). */
+  .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
   /* Quiet text link (e.g. "See a sample") — a link, never a second primary button. */
   .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
     color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
   .linklike:hover{color:#174026}
+  /* Secondary text links under the field, stacked so each reads as its own quiet option
+     rather than a button row. Both are links, never a second primary action. */
+  .herolinks{margin-top:6px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+  .herolinks .linklike{margin-top:0}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -167,6 +196,17 @@
   .read{padding:18px}
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
   .addr{font-weight:600;font-size:16px;margin-bottom:4px}
+  /* BACK TO THE WHOLE ZIP. Address mode is entered by JS (run() flips ZIP_MODE) and the URL
+     never changes, so before this existed a resident who searched an address had no control,
+     no history entry and no visible route back to the whole-ZIP view. It is a real anchor, not
+     a JS handler, so browser back/forward, middle-click and keyboard all behave normally. */
+  /* One small clarifier under the heading pair. The heading pair itself is eyebrow + PLACE
+     (".read h2" is a 12px muted label, ".addr" the 16px subject), so the explanatory sentence
+     cannot live in either without inverting that hierarchy - it gets its own quiet line. */
+  .scopenote{display:none;font-size:12px;color:var(--mute);margin:0 0 8px}
+  .backzip{display:none;margin:2px 0 10px;font-size:12.5px}
+  .backzip a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+  .backzip a:hover,.backzip a:focus{border-bottom-color:var(--ink)}
   .freshline{font-size:11.5px;color:var(--mute);margin-bottom:12px;min-height:14px}
   .freshline:empty{margin-bottom:0;min-height:0}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
@@ -188,7 +228,10 @@
   .band{margin-top:22px}
   .band-h{font-weight:700;font-size:16px;color:#fff;
     margin:-18px -18px 0;padding:12px 18px;border-radius:16px 16px 0 0}
-  .band-h.t-built{background:#1f5130}
+  /* The three band headers ARE stage swatches — same three colours as the legend, same
+     stage names — so this tracks HS.LIFECYCLE_HEX. Left dark, an "Operating now" header
+     in brand green would sit above "Operating now" pins in a different green. */
+  .band-h.t-built{background:#00893a}
   .band-h.t-approved{background:#2563EB}
   .band-h.t-proposed{background:#E2772F}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
@@ -268,24 +311,71 @@
   /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
      offered there - showing it would invite a circle around a ZIP centre. */
   body.zipmode .radsel{display:none}
+  /* "From home" re-frames the 3D view around the resident's HOME. In ZIP mode there IS no
+     home - a ZIP centroid is a page anchor, not somebody's house - so the control promises a
+     place the page cannot show. Written fail-closed (hidden unless `hashome` is set by a real
+     address search) rather than "hidden in zipmode", so any future no-HOME state inherits the
+     correct behaviour instead of leaking the control. Same standard the radius control already
+     applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED HOME CENTRE." */
+  body:not(.hashome) #homeViewBtn{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
     padding:4px 10px;border-radius:7px;cursor:pointer}
   .radsel button.on{background:var(--green);border-color:var(--green);color:#fff}
-  .mapkey span{display:flex;align-items:center;gap:6px;white-space:nowrap;
+  /* LEGEND PILL — deliberately NEUTRAL, never a coloured block. A strongly coloured pill
+     reads as a selected filter or a button, which is exactly the confusion this row must
+     not create: the only thing carrying stage meaning here is the DOT. So the pill stays
+     white/very-light-grey with a subtle border and dark charcoal label text. */
+  .mapkey span{display:flex;align-items:center;gap:7px;white-space:nowrap;
     padding:4px 10px;border-radius:7px;cursor:pointer;user-select:none;font-size:12px;
-    border:1px solid var(--line);background:#f7faf8}
-  .mapkey span:hover{background:#f2f5f3}
+    color:var(--ink);border:1px solid var(--line);background:#fff}
+  .mapkey span:hover{background:#fafbfa;border-color:#d6ddda}
   .mapkey span:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
-  .mapkey span.off{opacity:.4}
+  /* SELECTION IS ITS OWN CHANNEL — a darker outline plus a very subtle tint, never the
+     stage colour. Colour = lifecycle stage, shape = project type, outline/tint = selected
+     state; overloading any one of the three is what makes a legend unreadable. Both legend
+     rows are filters, so both get the same selected treatment. */
+  .mapkey span[aria-pressed="true"]{border-color:#9aa8a3;background:#f4f6f5}
+  .mapkey span[aria-pressed="true"]:hover{background:#eef1ef}
+  /* UNSELECTED STAYS NEUTRAL and stays READABLE. The old `opacity:.4` dimmed the label
+     below accessible contrast to say "hidden"; the strike-through already says it in text,
+     which is also what keeps the on/off state from being carried by colour alone. */
+  .mapkey span.off{background:#fff;border-color:var(--line);color:var(--soft)}
   .mapkey span.off .t{text-decoration:line-through}
-  .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
-    border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .mapkey span.off .dot{opacity:.45}
+  /* THE STAGE DOT. A small solid circle and nothing else — no triangle, no marker
+     silhouette, no warning glyph. Map-marker SHAPES are reserved for the Type row below,
+     so nothing in this row can be mistaken for a pin or a project type. */
+  .mapkey .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;display:block;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
   .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
   .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
-  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
+  /* REGULATORY ROW. Deliberately NOT `.mapkey span` — those rules dim and strike through
+     a chip when it is off, and the founder's rule is that the regulatory control must
+     never gray out or strike anything. It is a switch, so it reads its state from the
+     switch, and the Stage and Type rows above are visually untouched by it. */
+  .mapkey-reg{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .regtog{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;
+    padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:#f7faf8;
+    font:600 12px var(--font);color:var(--ink)}
+  .regtog:hover{background:#f2f5f3}
+  .regtog:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  .regtog .sw{position:relative;flex:0 0 auto;width:28px;height:16px;border-radius:999px;
+    background:#c9d2cd;transition:background .12s}
+  .regtog .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;
+    border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28);transition:transform .12s}
+  .regtog[aria-checked="true"] .sw{background:var(--green)}
+  .regtog[aria-checked="true"] .sw::after{transform:translateX(12px)}
+  .regtog .ic{display:flex;align-items:center;line-height:0}
+  .regtog .st{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--mute)}
+  .regtog[aria-checked="true"] .st{color:var(--green)}
+  .mapkey-reghelp{font-size:11px;color:var(--mute);line-height:1.45;max-width:46em}
+  /* Caption for the two legend rows: spans the full map width and centers, so it
+     reads as a caption under the map rather than a narrow column flushed left. */
+  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.45;width:100%;
+    max-width:none;margin:2px auto 0;text-align:center;text-wrap:balance}
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
@@ -375,13 +465,35 @@
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
-      <form class="search" id="form">
-        <input id="addr" type="text" autocomplete="street-address"
-          placeholder="e.g. 20 North Main Street, Brigham City, UT 84302" required/>
-        <button id="go" type="submit">See development</button>
+      <label class="search-label" for="addr">Address</label>
+      <form class="search" id="form" role="search">
+        <!-- No `required`: the browser's own validity bubble PREEMPTS the submit event, so with
+             it the page could never show its own inline message. Emptiness is checked in the
+             submit handler instead, which is also the only check this page can honestly make —
+             the geocoder decides what resolves. -->
+        <input id="addr" type="text" autocomplete="street-address" enterkeyhint="search"
+          aria-describedby="addrHint" placeholder="Enter a street address, e.g., 13313 Coomes Dr"/>
+        <!-- SAME id and SAME type="submit" as the green button this replaced, so clicking the
+             icon takes the identical path it always did — the form's submit handler — and every
+             existing #go reference (the disabled-while-searching state, the browser suites that
+             click '#go') keeps working against the control it always addressed. -->
+        <button id="go" type="submit" aria-label="Search nearby development"
+                title="Search nearby development">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.9-3.9"/>
+          </svg>
+        </button>
       </form>
-      <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
-      <button type="button" class="linklike" id="sampleBtn">See a sample</button>
+      <div class="hint" id="addrHint">Choose an address from the suggestions, press Enter, or click search.</div>
+      <div class="search-err" id="addrErr" role="alert" hidden></div>
+      <div class="herolinks">
+        <button type="button" class="linklike" id="sampleBtn">See a sample</button>
+        <!-- The ZIP-wide "all development" view is THIS page at ?zip=NNNNN. The link is written
+             only when a ZIP is actually known (see setZipBrowseLink) — it never guesses one and
+             never prints a placeholder ZIP. -->
+        <a class="linklike" id="zipAllLink" hidden></a>
+      </div>
     </div>
 
     <div class="status" id="status"></div>
@@ -413,7 +525,14 @@
                 </span>
               </div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. A site that is a data center <em>and</em> carries an EPA record keeps its data-center shape with a small purple EPA square beneath, and appears under either filter. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+              <!-- THE THIRD ROW. Regulatory records are not a project type and not a lifecycle
+                   stage — they are context that OVERLAPS both — so they get their own row and
+                   their own on/off control rather than an eighth Type chip. Built from
+                   HS.REGULATORY_LEGEND; nothing here is hand-listed. -->
+              <div class="mapkey-hd" id="regLegHd">Regulatory records</div>
+              <div class="mapkey-reg" id="mapkeyReg"></div>
+              <div class="mapkey-reghelp" id="mapkeyRegHelp"></div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. Regulatory records are a separate overlay: a project that also carries a regulatory record keeps its own shape and color and gains a small purple <strong>R</strong> in the lower-right corner, while a location with a regulatory record but no mapped project draws a standalone purple square. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
               <!-- Shown ONLY when every Type chip is off (HS.allCategoriesOff) and this ZIP
                    actually has records to reveal. Sits under the legend it refers to, so the
                    sentence and the control it names are read together. -->
@@ -454,6 +573,10 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- Shown in ADDRESS MODE ONLY (render() sets it), so the two modes are never a
+               one-way door. Hidden in ZIP mode, where it would point at the page you are on. -->
+          <div class="scopenote" id="scopeNote"></div>
+          <div class="backzip" id="backZip"></div>
           <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
           <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
@@ -559,13 +682,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js"></script>
-<script src="lib/map.js?v=20260720b"></script>
+<script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/map.js?v=2f98ff11"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
-<script src="shell.js"></script>
+<script src="shell.js?v=d6e6818c"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -668,6 +791,22 @@ HS.onReady(function(){
     var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
     return lc || "unknown";   // operating | approved | proposed | unknown — verbatim
   }
+  // ONE lifecycle palette for the 3D aerial view. three.js wants a 0xRRGGBB integer, so this
+  // converts the SAME hex the 2D pins, the GL pins and the legend chip read (HS.LIFECYCLE_HEX
+  // via COLORS) rather than restating it as a literal. Every place a lifecycle colour was
+  // typed out by hand in this view has drifted from the legend at least once — most recently
+  // `unknown`, which was hardcoded to the operating green and therefore claimed a lifecycle
+  // the source never stated. An unrecognised bucket falls back to the neutral, never to a
+  // stage colour: guessing a stage is the failure this bucket exists to prevent.
+  function lc3D(bkt){
+    var hex = String((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468").replace("#","");
+    var n = parseInt(hex, 16);
+    return isNaN(n) ? 0x706468 : n;
+  }
+  // Label-chip backgrounds for the 3D aerial view — a dark plate behind white text, echoing
+  // the stage. `unknown` gets a NEUTRAL plate for the same reason its pin does; it used to
+  // fall through to the operating green.
+  var LBL_BG = { approved:"#14306e", operating:"#0E2A26", unknown:"#2A2A2C" };
   // ───────────────────── LIFECYCLE STAGE LABEL — the ONE source of truth for a record's words ──────────
   // A record's resident-facing stage MUST come from the SAME signal that colours its dot, or the two
   // disagree (the 12,000-page bug: an orange "proposed" dot whose popup read "operating now", and a
@@ -712,6 +851,21 @@ HS.onReady(function(){
       return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
     }
     return "Facility · operating now";
+  }
+  // STATUS IS NEVER COMMUNICATED BY COLOUR ALONE. Every marker carries a text label of its
+  // own — "Proposed data center", "Approved residential" — so the stage is readable to
+  // anyone who cannot separate the palette, on hover and in the DOM, without opening the
+  // popup. The words come from the same two sources the mark itself is drawn from: the
+  // record's lifecycle bucket (the dot COLOUR) and the resolver's category label (the pin
+  // SHAPE), so the sentence can never disagree with the symbol.
+  var MARKER_TITLE_STAGE = { proposed:"Proposed", approved:"Approved",
+                             operating:"Operating", built:"Operating" };
+  function markerTitle(s, mk){
+    var type = (mk && mk.legendLabel) ? String(mk.legendLabel).toLowerCase() : "project";
+    var stage = MARKER_TITLE_STAGE[stageOf(s)];
+    // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
+    // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
+    return stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
@@ -1019,6 +1173,14 @@ HS.onReady(function(){
                         'County Commission & county business'];
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  // esc() is a TEXT-NODE escape and leaves quotes alone, which is correct there and unsafe
+  // inside an attribute. Anything interpolated into title=/aria-label= goes through this.
+  function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+  // A colour written into a style attribute is validated as a literal hex, never escaped and
+  // hoped for: a non-hex value is dropped rather than passed into CSS. The legend's colours
+  // come from HS.STATUS_LEGEND_ROWS, so a rejection here means the registry changed shape —
+  // the chip then renders with no dot, which fails the verify assertion loudly.
+  function hexColor(c){ return /^#[0-9a-fA-F]{3,8}$/.test(String(c || "")) ? String(c) : ""; }
   function status(msg, isErr){ var el=$("status"); el.textContent=msg||""; el.className="status"+(isErr?" err":""); }
 
   // Turn an ISO date (YYYY-MM-DD) into plain-language urgency vs today, for a worried resident:
@@ -1183,12 +1345,60 @@ HS.onReady(function(){
   }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
 
+  // ---- address-field validation -------------------------------------------------------
+  // EMPTY is the only thing this page can judge client-side, and that is deliberate: the field
+  // takes FREE-FORM text and the geocoder decides what resolves, reporting its own honest
+  // no-match ("We couldn't find that address …"). Inventing a client-side address SHAPE test
+  // here would reject addresses the geocoder accepts — the same reason the field's copy asks
+  // for an address rather than demanding a street/city/state/ZIP triple.
+  function clearAddrError(){
+    var e = $("addrErr"); if(e){ e.hidden = true; e.textContent = ""; }
+    var a = $("addr"); if(a) a.removeAttribute("aria-invalid");
+  }
+  function showAddrError(){
+    var e = $("addrErr");
+    if(e){ e.textContent = "Enter or select a valid address to search nearby development."; e.hidden = false; }
+    var a = $("addr"); if(a){ a.setAttribute("aria-invalid","true"); try{ a.focus(); }catch(_e){} }
+  }
+
+  // ---- "Browse all development in ZIP NNNNN" --------------------------------------------
+  // The ZIP-wide / all-development view is this same page at ?zip=NNNNN, so the link points
+  // there and introduces no new view. It renders ONLY when a ZIP is genuinely known; with no
+  // ZIP it stays hidden rather than showing a guessed or placeholder one.
+  function knownZip(){
+    var u = new URL(window.location.href);
+    var z = u.searchParams.get("zip");
+    if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
+    if(!z && window.HS && HS.state && /^\d{5}$/.test(String(HS.state.zip))) z = String(HS.state.zip);
+    return /^\d{5}$/.test(String(z || "")) ? String(z) : "";
+  }
+  // Last resort in address mode: the ZIP the geocoder's OWN matched address ends with. Read
+  // from real returned text, never synthesised, and only used when no ZIP context exists.
+  function zipFromAddress(s){
+    var m = String(s || "").match(/\b(\d{5})(?:-\d{4})?\s*$/);
+    return m ? m[1] : "";
+  }
+  function setZipBrowseLink(zip){
+    var el = document.getElementById("zipAllLink"); if(!el) return;
+    if(!/^\d{5}$/.test(String(zip || ""))){ el.hidden = true; return; }
+    el.textContent = "Browse all development in ZIP " + zip + " \u2192";
+    el.setAttribute("href", "homesignalmap.html?zip=" + encodeURIComponent(zip));
+    el.hidden = false;
+  }
+
+  // ONE submit path for every way the search can start — the icon button (type="submit"),
+  // the Enter key, and "See a sample" (which calls requestSubmit). Exactly the path the old
+  // green button used; only the control's appearance changed.
   $("form").addEventListener("submit", function(e){
     e.preventDefault();
     var address = $("addr").value.trim();
-    if(!address) return;
+    if(!address){ showAddrError(); return; }   // never run an empty search
+    clearAddrError();
     run(address);
   });
+  // Typing is the resident correcting the thing the message complained about, so the message
+  // clears then rather than lingering under a field that now has content in it.
+  $("addr").addEventListener("input", clearAddrError);
 
   // "See a sample" — fill the box with a known address and submit via the normal search path.
   var _sampleBtn = document.getElementById("sampleBtn");
@@ -1274,12 +1484,42 @@ HS.onReady(function(){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false;
     CUR_ADDRESS = address;
+    // A real geocoded HOME now exists, so the HOME-specific view control may appear.
+    document.body.classList.add("hashome");
     var token = ++REQ_SEQ;                  // stale-response guard for this whole search
     snapRadiusForAddress(); syncRadiusStops();
     // Back to address mode: bring back the radius control and reset the ZIP-scoped caption.
     document.body.classList.remove("zipmode");
+    // The caption sits ON the map canvas, which is what a resident looks at while reading the
+    // pins - so it names the radius too, not just "around this home". Set here in run(), which
+    // a radius change re-enters (radSel -> run(CUR_ADDRESS)), and after snapRadiusForAddress()
+    // above, so it can never state a radius the search did not use.
     var _cap2 = document.querySelector(".map-cap");
-    if(_cap2){ _cap2.textContent = "Development around this home"; }
+    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this home"; }
+    // THE PAGE'S LARGEST TYPE HAS TO CHANGE MODE TOO — authorized change B.
+    // The heading pair, the map caption, the counters and the way back all moved to
+    // address-mode wording in #1070. The HERO did not: arriving here from a ZIP view left
+    // the H1 reading "Brigham City (84302)" and the standfirst reading "across ZIP 84302"
+    // directly above results that say "Showing development within 2 miles of". A resident
+    // reads top-down, so the biggest, first thing on the page was still making the
+    // whole-ZIP claim over near-home results — measured on main, 2026-09-06: address mode
+    // rendered kicker "Development overview" / H1 "ZIP 78617".
+    // loadZip() already restores all four for the ZIP view, so this is the missing half of
+    // a switch that was only ever written in one direction.
+    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Near-home view";
+    var _h1A = document.querySelector(".head h1");
+    if(_h1A) _h1A.textContent = "Development around this address";
+    var _subA = document.querySelector(".sub");
+    if(_subA){ _subA.textContent = "What's built and what's proposed within the distance you "
+      + "choose around one address — data-center activity, planning hearings and open comment "
+      + "windows, plus nearby regulated facilities for context — every item linked to its "
+      + "official public record."; }
+    document.title = "Development around " + address + " — HomeSignal";
+    // Address mode is exactly where the way BACK to the whole-ZIP view earns its place, so the
+    // link is written from the ZIP context we already hold (falling back to the ZIP the typed
+    // address itself ends with). It is refreshed after the geocode below with the ZIP from the
+    // geocoder's own matched address.
+    setZipBrowseLink(knownZip() || zipFromAddress(address));
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1295,12 +1535,19 @@ HS.onReady(function(){
       if(!m || typeof m.lat !== "number" || typeof m.lng !== "number"){
         // The geocoder's own honest no-match. Nothing is rendered, so the previous address's
         // records can never sit under an address the geocoder could not place.
+        // The recovery hint SUGGESTS, it does not prescribe a shape: the field takes free-form
+        // text and the geocoder requires no "street, city and ZIP" triple, so demanding one here
+        // contradicted the field's own copy at the exact moment the resident needed help.
         $("go").disabled = false;
-        status("We couldn't find that address. Check the street, city and ZIP and try again.", true);
+        status("We couldn't find that address. Try a different spelling, or add the city or ZIP.", true);
         return;
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
+      // The geocoder's own matched address is the most authoritative ZIP available here, so the
+      // browse link is re-derived from it once it exists. Still never synthesised: no match text
+      // with a trailing ZIP and no ZIP context leaves the link exactly as it was.
+      setZipBrowseLink(knownZip() || zipFromAddress(m.matchedAddress || address));
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -1365,6 +1612,10 @@ HS.onReady(function(){
 
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    // HOME_ANCHOR is TRUE here and does NOT mean "there is a home" - it means area items
+    // anchor at the report centroid. There is no geocoded HOME on a ZIP page, so the
+    // HOME-specific control stays hidden.
+    document.body.classList.remove("hashome");
     var token = ++REQ_SEQ;                  // same stale-response guard as address mode
     N5_NOTE = "";                           // ZIP mode never carries an address-radius note
     ZIP_AUTH = null;                        // cleared until this ZIP's authoritative read lands
@@ -1444,19 +1695,30 @@ HS.onReady(function(){
     // can widen the 3D aerial view to reach cached records past the default frame.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
-    // The hero used to put "industrial facilities" inside the SAME "across ZIP" clause as the
-    // development records. Facilities are an EPA query around this ZIP, not a measurement of it,
-    // so the clause is split: what is measured across the ZIP, then what is shown nearby.
-    if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
-      + "data-center activity, planning hearings and open comment windows, plus nearby "
-      + "regulated facilities for context — every item linked to its official public record."; }
-    var _hint = document.querySelector(".hint");
-    if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
-      + "Free while we're in launch."; }
+    // Founder copy: one plain line. The long inventory clause it replaced named the record types
+    // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
+    // seen any of them — the page below already labels each of those, so the hero just says why to read it.
+    if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
+    // The helper text is now the SAME sentence in both modes — it describes how to WORK the
+    // field (suggestions / Enter / the search icon), which does not change with the mode — so
+    // ZIP mode no longer overrides it and there is one string to keep true instead of two.
+    // The "suggestions" it names are the browser's own street-address autofill: this page has
+    // never had a suggestion list of its own (nothing listens for input), and the field still
+    // takes FREE-FORM text, so the copy deliberately does not demand a "full" address or a
+    // fixed "street, city, state, ZIP" shape the geocoder does not require.
+    //
+    // ⚠️ THIS DELIBERATELY SUPERSEDES #1086's OVERRIDE, which read "Enter a street address to
+    // switch from ZIP-wide results to development nearby." — do not restore it on the reading
+    // that it was lost to a bad conflict resolution. The founder specified this helper string
+    // verbatim, and it answers a different question: #1086's sentence explained the SCOPE
+    // CHANGE, this one explains how to operate the control. The scope information did not go
+    // anywhere — the kicker, H1 and standfirst already swap to near-home wording on search
+    // (#1070/#1081), and the ZIP-wide scope is now NAMED under the field as the way back:
+    setZipBrowseLink(zip);
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
-    var _addr = $("addr");
-    if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
+    // No placeholder override here any more: the example-address placeholder reads correctly in
+    // BOTH modes, and a second copy of it would be one more string to keep in sync for no gain.
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
@@ -1520,8 +1782,22 @@ HS.onReady(function(){
     status("");
     $("results").style.display = "block";
     if(ZIP_MODE){
-      $("withinLbl").textContent = "Across ZIP " + ZIP_CODE;
-      $("rAddr").textContent = "ZIP " + ZIP_CODE + " · development within this ZIP";
+      // "All development across ZIP X" - the whole-ZIP claim stated in the heading a resident
+      // reads first. It names DEVELOPMENT specifically: development is authoritative whole-ZIP
+      // membership, while the facilities layer beside it is nearby context (see the counters
+      // below), so this is precise rather than a blanket claim over everything on the page.
+      // Reads "All development across / ZIP 78617" - the founder's label, split across the
+      // eyebrow and the prominent PLACE line, exactly the shape address mode already uses
+      // ("Showing development within 2 miles of / 2200 CALDWELL LN"). Putting the whole
+      // sentence in the eyebrow would render the primary label in 12px muted grey.
+      $("withinLbl").textContent = "All development across";
+      $("rAddr").textContent = "ZIP " + ZIP_CODE;
+      if($("scopeNote")){
+        $("scopeNote").textContent = "The entire ZIP area — not only projects near one address.";
+        $("scopeNote").style.display = "block";
+      }
+      // Nothing to go back TO: this IS the whole-ZIP view.
+      if($("backZip")){ $("backZip").style.display = "none"; $("backZip").innerHTML = ""; }
       // Each counter says which geography it is a count OF. Development is authoritative
       // whole-ZIP membership; facilities come from EPA FRS around this ZIP and are context,
       // never a whole-ZIP claim - so they are never described as "in"/"for"/"across" the ZIP.
@@ -1530,7 +1806,10 @@ HS.onReady(function(){
       if($("ccTot")) $("ccTot").style.display = "none";
     } else {
       $("rAddr").textContent = data.address || "";
-      $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      if($("scopeNote")){ $("scopeNote").style.display = "none"; $("scopeNote").textContent = ""; }
+      // "Showing development within 2 miles of / <address>" across the heading pair - the
+      // radius AND the centre, both named, so a near-home result is never read as ZIP-wide.
+      $("withinLbl").textContent = "Showing development within " + radiusLabel(CUR_RADIUS) + " of";
       // Address mode is radius-shaped end to end, so its labels and its total stand as they
       // were. Restored explicitly because a resident can switch modes without a page load.
       if($("kDev")) $("kDev").textContent = "New projects proposed nearby";
@@ -1542,6 +1821,17 @@ HS.onReady(function(){
       // Address search: scope the App-map cross-link to this address's ZIP (same parse as the engine).
       var addrZip = (window.HS && HS.parseZipFromAddress) ? HS.parseZipFromAddress(data.address) : null;
       if(addrZip && window.HS && HS.state) HS.state.zip = addrZip;
+      // THE WAY BACK. Prefer the ZIP this page was opened with (known to have a page); fall
+      // back to the ZIP parsed out of the searched address. If neither exists there is no
+      // honest destination, so no control is drawn rather than a guessed one.
+      var backTo = ZIP_CODE || addrZip;
+      if($("backZip")){
+        if(backTo){
+          $("backZip").innerHTML = "<a href='homesignalmap.html?zip=" + esc(backTo) + "'>"
+            + "\u2190 Back to all development in ZIP " + esc(backTo) + "</a>";
+          $("backZip").style.display = "block";
+        } else { $("backZip").style.display = "none"; $("backZip").innerHTML = ""; }
+      }
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
@@ -1613,9 +1903,18 @@ HS.onReady(function(){
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
     $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
+    // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
+    // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
+    // development rather than passing it off as whole-ZIP (it is not a fallback), so the
+    // remaining count is 0 because we discarded it - not because the ZIP is quiet. Printing
+    // "0 New projects proposed across this ZIP" beside "not measured yet" states a measured
+    // zero we cannot support, and zero-vs-not-measured is precisely the distinction a
+    // resident has to be able to draw. Show the unknown as unknown; freshLine says why.
+    var DEV_UNMEASURED = ZIP_MODE && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
-    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
+      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
@@ -1761,15 +2060,10 @@ HS.onReady(function(){
       // render dashed + slightly smaller: the visual cue that the spot is representative.
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
       var size = solidPoint ? 14 : 12;
-      // mk.signal is the subordinate EPA square on a dual-identity record (Data center
-      // + Regulated facility). ONE marker at ONE coordinate — the badge hangs below the
-      // primary symbol, which stays on the icon anchor, so no geometry moves.
-      var svg = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
-      var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
-      var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
+      var m = L.marker(ll, { icon: siteIcon(mk, size, solidPoint, markerTitle(s, mk)) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
-      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s, mk:mk, size:size, solidPoint:solidPoint });
       bounds.push(ll);
     });
     applyFilter();
@@ -1799,7 +2093,13 @@ HS.onReady(function(){
       dualIdentityMarkers: dual,
       // Lets a check tell "no records here" apart from "the resident hid every type" —
       // the two produce an identical visibleMarkers of 0.
-      allTypesOff: HS.allCategoriesOff ? HS.allCategoriesOff() : null,
+      // The TYPE row only — regulatory records are their own dimension with their own
+      // switch, and folding the two together is what made the all-off note unreachable.
+      allTypesOff: HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff() : null,
+      regulatoryOn: HS.regulatoryVisible ? HS.regulatoryVisible() : null,
+      // Badges actually PAINTED, read off the rendered markup rather than from filter
+      // state — the point of a verify field is to prove what shipped to the screen.
+      regulatoryBadges: document.querySelectorAll("#map .leaflet-marker-icon:not(.homepin) svg text").length,
       facilitiesOnly: FACILITIES_ONLY,
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
@@ -1868,8 +2168,15 @@ HS.onReady(function(){
     });
     var shapes = document.getElementById("mapkeyShapes");
     if (!shapes || !shapes.querySelector("svg")) fails.push({ err: "tracker-missing-shape-legend" });
+    // THE STAGE ROW MUST CARRY COLOUR DOTS AND NO SHAPES. Both halves are asserted,
+    // because each guards a different regression: a missing dot loses the stage signal
+    // entirely, and an <svg> creeping back in re-creates the marker-silhouette confusion
+    // this row was rebuilt to remove (shape belongs to the Type legend, above).
     var lifecycle = document.getElementById("mapkey");
-    if (lifecycle && lifecycle.querySelectorAll("svg").length < 3) fails.push({ err: "tracker-lifecycle-legend-not-shaped" });
+    if (lifecycle) {
+      if (lifecycle.querySelectorAll("span.dot").length < 3) fails.push({ err: "tracker-lifecycle-legend-missing-dots" });
+      if (lifecycle.querySelector("svg")) fails.push({ err: "tracker-lifecycle-legend-has-shape" });
+    }
     var markers = document.querySelectorAll("#map .leaflet-marker-icon svg, #mapgl .maplibregl-marker svg");
     if (markers.length) {
       markers.forEach(function (svg, i) {
@@ -1913,13 +2220,61 @@ HS.onReady(function(){
   //
   // Scoped to the TYPE row only. Lifecycle chips can also empty the map, but that is a
   // separate affordance and a separate product decision — this says exactly one true thing.
+  //
+  // ⚠️ THE PREDICATE IS THE TYPE KEYS, NOT ALL CATEGORY KEYS (2026-09-06). Regulatory
+  // records left the Type row for their own switch, so "every Type chip is off" no longer
+  // implies an empty map: with the switch on, regulatory-only locations are still drawn.
+  // Reading HS.allCategoriesOff() here would have kept the note silent whenever the
+  // regulatory switch was on — the note would never fire in the exact state it exists for
+  // — and asserting "the map is empty" is only honest if it actually is, so the emptiness
+  // half is MEASURED against the same markerVisible() the layer uses rather than inferred.
   function syncAllTypesOffNote(){
     var em = document.getElementById("mapkeyEmpty");
     if(!em) return;
-    var allOff = HS.allCategoriesOff ? HS.allCategoriesOff() : false;
-    em.hidden = !(allOff && siteMarkers.length > 0);
+    var allOff = HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff()
+               : (HS.allCategoriesOff ? HS.allCategoriesOff() : false);
+    var nothingVisible = !siteMarkers.some(markerVisible);
+    em.hidden = !(allOff && nothingVisible && siteMarkers.length > 0);
+  }
+  // ONE icon builder for the 2D layer, so the marker drawn at load and the marker
+  // redrawn when the regulatory switch moves are the same drawing. The primary symbol
+  // stays centred on the icon anchor and the badge overflows the box, so re-icon-ing
+  // never moves the record off its coordinate.
+  function siteIcon(mk, size, solidPoint, title){
+    // HS.visibleSignal is the ONLY place that decides whether the R is drawn: with the
+    // regulatory switch off it returns null and the pin renders exactly as any other
+    // project pin of its type and stage — the project is not hidden, its regulatory
+    // annotation is.
+    var svg = HS.markerSVG(mk.shape, mk.color, '', size,
+                           HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
+    var inner = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
+    // STATUS IS NEVER COLOUR ALONE — "Proposed data center" rides on the marker itself.
+    // It belongs HERE, inside the one icon builder, and not at the creation call: the
+    // regulatory switch repaints every badged marker through syncRegulatoryBadges() ->
+    // setIcon(siteIcon(...)), so a title applied only when the marker was first built
+    // would be silently dropped the first time a resident toggled that switch — the
+    // failure would look like nothing at all.
+    var html = title
+      ? '<span title="' + escAttr(title) + '" aria-label="' + escAttr(title)
+        + '" style="display:block;line-height:0">' + inner + '</span>'
+      : inner;
+    return L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  }
+  // The 2D layer builds its icons ONCE and thereafter only adds/removes them, so the
+  // badge state has to be repainted explicitly when the switch moves. Guarded on an
+  // actual transition: every other filter click leaves the badges alone, and re-icon-ing
+  // every marker on every Stage/Type click would be churn with no visible effect.
+  var REG_BADGES_DRAWN = null;
+  function syncRegulatoryBadges(){
+    var on = HS.regulatoryVisible ? HS.regulatoryVisible() : true;
+    if(on === REG_BADGES_DRAWN) return;
+    REG_BADGES_DRAWN = on;
+    siteMarkers.forEach(function(x){
+      if(x.mk && x.mk.signal && x.m && x.m.setIcon){ x.m.setIcon(siteIcon(x.mk, x.size, x.solidPoint, markerTitle(x.s, x.mk))); }
+    });
   }
   function applyFilter(){
+    syncRegulatoryBadges();
     siteMarkers.forEach(function(x){
       if(markerVisible(x)){ x.m.addTo(layerGroup); }
       else { layerGroup.removeLayer(x.m); }
@@ -1943,7 +2298,15 @@ HS.onReady(function(){
       row.setAttribute("aria-label", it.t + " markers");
       if(!FILTER[it.b]) row.className = "off";
       row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
-      row.innerHTML = "<span class='ic'>" + HS.markerSVG("triangle", it.c, "", 14) + "</span><span class='t'>" + it.t + "</span>";
+      // COLOUR IS THE ONLY STAGE SIGNAL HERE, and it is carried by a plain solid dot.
+      // It used to be a filled TRIANGLE — a map-marker silhouette that also happens to be
+      // this product's Industrial project shape AND the universal warning glyph, so one
+      // mark was saying three different things at once. A circle says none of them: the
+      // Type row below owns marker shapes, and this row owns colour.
+      // aria-hidden on the dot because the label beside it already names the stage — the
+      // state is never announced by colour alone.
+      row.innerHTML = "<span class='dot' aria-hidden='true' style='background:" + hexColor(it.c)
+        + "'></span><span class='t'>" + esc(it.t) + "</span>";
       function toggle(){
         FILTER[it.b] = !FILTER[it.b];
         row.classList.toggle("off", !FILTER[it.b]);
@@ -1957,9 +2320,16 @@ HS.onReady(function(){
       d.appendChild(row);
     });
     // The SHAPE rows are the TYPE dimension, and they are toggles — the same pattern as
-    // the lifecycle chips above. Turning every type off except Regulated facility is the
-    // founder's acceptance scenario, and a dual-identity Data center survives it BECAUSE
-    // it holds a `facility` membership — while still drawing its Data center octagon.
+    // the lifecycle chips above.
+    //
+    // ⛔ REGULATED FACILITY IS NOT ONE OF THEM (founder, 2026-09-06). It used to be
+    // pushed on here as an eighth chip, which put a regulatory RECORD beside seven
+    // project TYPES and asked the resident to choose between things that are both true
+    // of the same site. It now has its own row and its own switch, below. The FILTER is
+    // unchanged — same `facility` key, same membership set, same any-of test — so the
+    // dual-identity contract still holds: a Data center that carries a regulatory record
+    // is still admitted by EITHER its Data center chip or the regulatory switch, and it
+    // still draws its Data center octagon whichever one admitted it.
     var shapes = document.getElementById("mapkeyShapes");
     if(shapes && HS.SHAPE_LEGEND && HS.setCategoryFilter){
       shapes.innerHTML = "";
@@ -1967,8 +2337,6 @@ HS.onReady(function(){
       var typeRows = HS.SHAPE_LEGEND.map(function(r){
         return { key: r.categoryKey, shape: r.shape, color: neutral, label: r.label };
       });
-      typeRows.push({ key: "facility", shape: HS.CATEGORY_REGISTRY.facility.symbol,
-                      color: HS.markerRegistry.facilityHex, label: HS.CATEGORY_REGISTRY.facility.label });
 
       // TWO CONTROLS OVER ONE STATE. The legend chips and the "Show types" dropdown are two
       // views of the SAME HS.getCategoryFilters() set - not a second filter model. Everything
@@ -2078,6 +2446,64 @@ HS.onReady(function(){
       }
       syncTypeControls();
     }
+    buildRegulatoryRow();
+  }
+
+  // ── THE REGULATORY ROW — a third dimension with ONE control ────────────────────
+  // Stage answers "where is it in its lifecycle", Type answers "what kind of thing is
+  // it", and this answers "does it carry an environmental regulatory record". The three
+  // are independent, so this control writes ONLY the `facility` key and never reads or
+  // touches the other seven: turning it off cannot dim, strike through, reset or hide a
+  // Stage or Type chip, which is the founder's rule and the reason it is a switch in its
+  // own row rather than an eighth chip wearing the chips' off-state styling.
+  //
+  // What the switch owns, exactly:
+  //   ON  — the purple R rides on every qualifying project marker (HS.visibleSignal),
+  //         and regulatory-only locations — a regulatory record with no mapped project
+  //         type — draw their standalone purple square.
+  //   OFF — the R is not drawn and the regulatory-only squares are filtered out. A
+  //         project that happens to carry a regulatory record is NOT hidden by this: it
+  //         keeps its own shape, its own colour and its own Type membership.
+  function buildRegulatoryRow(){
+    var host = document.getElementById("mapkeyReg");
+    var reg = HS.REGULATORY_LEGEND;
+    if(!host || !reg || !HS.setCategoryFilter) return;
+    var help = document.getElementById("mapkeyRegHelp");
+    var hd = document.getElementById("regLegHd");
+    if(hd) hd.textContent = reg.heading;
+    if(help) help.textContent = reg.helper;
+    host.innerHTML = "";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "regtog";
+    btn.id = "regToggle";
+    btn.setAttribute("role", "switch");
+    btn.setAttribute("data-cat", reg.key);
+    // The R the resident sees on the map, rendered from the SAME marker code that draws
+    // it on the pins — so the legend cannot show one badge while the map draws another.
+    var badge = HS.markerSVG(reg.symbol, reg.color, reg.letter, 15);
+    btn.innerHTML = "<span class='sw' aria-hidden='true'></span>"
+      + "<span class='ic' aria-hidden='true'>" + badge + "</span>"
+      + "<span class='t'>" + esc(reg.toggleLabel) + "</span>"
+      + "<span class='st' id='regToggleState' aria-hidden='true'></span>";
+
+    function sync(){
+      var on = HS.regulatoryVisible ? HS.regulatoryVisible() : !!HS.getCategoryFilters()[reg.key];
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+      var st = document.getElementById("regToggleState");
+      if(st) st.textContent = on ? "ON" : "OFF";
+      // The switch already states on/off; the accessible name says what it controls.
+      btn.setAttribute("aria-label", reg.toggleLabel);
+    }
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      HS.setCategoryFilter(reg.key, !HS.getCategoryFilters()[reg.key]);
+      sync();
+      applyFilter();
+    });
+    host.appendChild(btn);
+    sync();
   }
 
   // The class of official document the record link opens, so the label states it up
@@ -2375,19 +2801,26 @@ HS.onReady(function(){
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
         // label (they'd overlap into noise); the name shows on the 2D map and in the list.
+        var pcol=lc3D("proposed");
         var grp=new THREE.Group();grp.position.set(x,0,zc);
         var ge=new THREE.BoxGeometry(w,h,w);ge.translate(0,h/2,0);
-        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:0xE2772F,transparent:true,opacity:.85})));
-        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:0xE2772F,transparent:true,opacity:.10})));
+        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:pcol,transparent:true,opacity:.85})));
+        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:.10})));
         grp.scale.y=Math.max(0.0001,V3.rise);G.add(grp);V3.proposed.push(grp);
       } else {
-        // Built + approved are precise, fewer, and the point of the view — label these.
-        var col=bkt==="approved"?0x2563EB:0x1f5130;
+        // Operating, approved and lifecycle-UNKNOWN are precise, fewer, and the point of the
+        // view — label these. The colour comes from lc3D (the shared lifecycle palette), NOT
+        // from a hardcoded literal: this line used to read
+        //     var col = bkt==="approved" ? 0x2563EB : 0x1f5130;
+        // so `unknown` was painted the operating green EXACTLY, byte for byte — the 3D aerial
+        // said "operating now" about every record whose source states no lifecycle, which is
+        // the one claim the unknown bucket exists to avoid making.
+        var col=lc3D(bkt);
         var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:col,roughness:.7,emissive:0xffce8a,emissiveIntensity:.10}));
         bm.position.set(x,h/2,zc);bm.castShadow=true;bm.receiveShadow=true;bm.userData.site=p;G.add(bm);V3.pickable.push(bm);
         // Friendly building-TYPE label — only when the scene is sparse enough to read;
         // in a dense cluster hover/click shows it instead (see showLabels above).
-        if(showLabels){ var lb=lblSprite(facilityType(p),bkt==="approved"?"#14306e":"#0E2A26","#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
+        if(showLabels){ var lb=lblSprite(facilityType(p),LBL_BG[bkt]||LBL_BG.unknown,"#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });
@@ -2464,7 +2897,12 @@ HS.onReady(function(){
     el.style.width=el.style.height=size+"px"; el.style.lineHeight="0";
     if(approxPt) el.style.opacity="0.85";
     el.style.cursor="pointer";
-    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size, mk.signal);
+    // Same text-not-colour-alone rule as the 2D map, on the same words.
+    var title = markerTitle(s, mk);
+    el.setAttribute("title", title);
+    el.setAttribute("aria-label", title);
+    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size,
+                                HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     return el;
   }
   function initGL(home){
@@ -2609,6 +3047,9 @@ HS.onReady(function(){
     setView(b.getAttribute("data-v"));
   });
   document.getElementById("homeViewBtn").addEventListener("click",function(){
+    // Belt to the CSS braces: with no address-derived HOME there is nothing to frame from,
+    // so the control does nothing even if it is somehow reachable.
+    if(!CUR_ADDRESS) return;
     V3.homeView=!V3.homeView;this.classList.toggle("on",V3.homeView);
   });
   // On-screen zoom for the 3D aerial view (mirrors the wheel handler: same dist bounds).

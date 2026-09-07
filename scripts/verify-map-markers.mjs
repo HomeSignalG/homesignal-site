@@ -149,7 +149,10 @@ async function verifyDashboard(page, fails) {
     if (shapes.none) fails.push({ err: 'dashboard-marker-without-geometry', shapes });
     // Reported either way, so a shift in the rendered mix is visible rather than silent.
     fails.push({ info: 'dashboard-shape-histogram', shapes });
-    const mapJs = Array.from(document.scripts).some((s) => /lib\/map\.js\?v=20260720b/.test(s.src || ''));
+    // Matches lib/map.js with ANY cache key. It used to hard-code ?v=20260720b, which
+    // silently became an assertion that the file was STALE — the key is content-derived
+    // now and changes with every edit, so pinning one value would fail on the next fix.
+    const mapJs = Array.from(document.scripts).some((s) => /lib\/map\.js(\?|$)/.test(s.src || ''));
     if (!mapJs) fails.push({ err: 'dashboard-stale-mapjs-cache-bust' });
     return fails;
   });

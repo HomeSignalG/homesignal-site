@@ -40,6 +40,71 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-06 — MAP 1 MODE IDENTITY: the hero was the last surface still claiming the ZIP
+
+**Re-scoped after a concurrency check, and the re-scope is the finding.** The founder's
+single-owner decision authorised five changes (A–E). While this session was consolidating,
+**#1070 was merged to `main` as `35703db`** and shipped **four of the five**: the
+not-measured em dash (A), the way back (D), the mode wording (E), and the HOME control —
+which it does **better** than the version drafted here, keying on `body:not(.hashome)`
+(does a geocoded HOME exist?) rather than on ZIP mode.
+
+**Measured on `main` before writing anything** (real page, real browser, fixtures — the whole
+point of the check now in CLAUDE.md's concurrency rule): searching an address from a ZIP view
+rendered kicker `Development overview`, H1 `ZIP 78617`, standfirst `across ZIP 78617` —
+directly above `Showing development within 2 miles of / 2200 CALDWELL LN`. **Authorisation B
+was the one genuine gap**, and it is the surface a resident reads FIRST and LARGEST.
+
+So the consolidated PR (#1076, four files, 54 assertions) was **closed rather than
+force-rebased onto the merged version**, and this is a **19-line, one-file, additive** change.
+`loadZip()` had always set all four for the ZIP view; the switch simply was never written in
+the other direction.
+
+| | before (main) | after |
+|---|---|---|
+| kicker | `Development overview` | `Near-home view` |
+| H1 | `ZIP 78617` | `Development around this address` |
+| standfirst | `…across ZIP 78617…` | scoped to one address |
+| `document.title` | `Development around 78617` | the searched address |
+
+**The H1 deliberately names the MODE, not the radius** — a radius in the hero would go stale
+the moment the resident clicks a different one, and it is already stated where it is true.
+Asserted (`2i`).
+
+**Proof.** `test/map1-mode-identity.browser.test.mjs`, **22 assertions, all green**, no
+production service touched. Mutation-proved: reverting B fails **8**; a half-fix (H1 only,
+kicker left ZIP-scoped) still fails **5**; removing both ZIP-mode restores fails 2, which is
+what pins the return trip. Section 4 clicks the anchor INSIDE `#backZip` — what a resident
+clicks — and section 5 uses a **fresh browser context**, because the page's boot deliberately
+reuses a previously-viewed ZIP and reusing the context measures the wrong thing.
+
+Seven states re-captured on this branch with a screenshot and a wording readout each,
+**0 page errors**: measured ZIP `1` · **authoritative measured zero `0`** · **not-measured
+`—`** · address search · radius change · address→ZIP return · bare address. All Map 1 browser
+suites green (22/77/26/23/20/16/10); offline suite exit 0.
+
+⚠️ **CI CAUGHT A DEFECT THE LOCAL RUN COULD NOT, and the instrument lesson is the durable
+half.** The suite drafted for #1076 served Leaflet from a hardcoded `node_modules/leaflet`
+path. That resolves on a dev machine and **cannot** on a runner — the repo has no
+`package.json` and `unit-tests.yml` installs playwright **alone** into a scratch dir outside
+the checkout — so `readFile` threw `ENOENT` inside the Playwright route handler and killed
+the run **before a single assertion printed**. The new suite uses the sibling's
+resolve-or-`route.continue()` shape.
+- 🔑 **Searching the CI log for `FAIL` could not find it: a crash prints no failure lines.**
+  That is this repo's own *"an instrument must prove it ran"* rule, hit while investigating.
+  **Attribute a red job by the runner's non-zero exit count, never by absent failure text.**
+  GitHub's log API also caps the log **from the end**, so the first ~50 suites were in no
+  response; the name was found by grepping the capped log for the suite's own FILENAME.
+
+📌 **Recorded, not taken:** #1068 (also closed as superseded) derives a return ZIP from the
+**geocoder's own resolved `m.zip`**, never from the typed string. `main` currently falls back
+to `parseZipFromAddress`, which does read the typed string. Worth a look; outside this
+authorisation.
+
+⚠️ **THE HUMAN USABILITY GATE IS `NOT RUN`.** No participant was recruited, moderated or
+observed. `docs/map1-launch-usability-gate.md` on the merged #1070 carries the script and the
+pass bar. **Map 1 is not launch-ready on code proof.**
+
 ### 2026-09-06 — DATA CENTER SIGNIFICANCE, FINAL: say the activity, not a magnitude
 
 Second and last significance unit, implementing exactly what an adversarial competitor-CTO

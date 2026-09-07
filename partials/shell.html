@@ -36,7 +36,6 @@
 <div class="top" id="hs-top">
   <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
   <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
-  <div class="search"><input id="hs-search" placeholder="Search HomeSignal — addresses, projects, topics…" autocomplete="off"><div id="hs-search-results" class="hidden"></div></div>
   <div class="sp"></div>
   <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
   <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
@@ -127,7 +126,7 @@
       <button class="mclose" type="button" onclick="HS.closeModal('homeModal')" aria-label="Close">✕</button>
       <span class="mbadge">⌂ Your home</span>
       <h3 id="homeTitle">Add your home</h3>
-      <p class="msub">Enter your street address. We confirm it against U.S. Census address records and only pin the confirmed match.</p>
+      <p class="msub">Enter your address. We confirm it against U.S. Census address records and only pin the confirmed match.</p>
     </div>
     <div class="mbody">
       <div id="homeForm">
