@@ -907,7 +907,7 @@ Baseline before and after every mutation: **zero FAIL names**. Offline suite **1
 built later the same day — §17. Nothing in §16 depends on it.)*
 
 
-## 17. PHASE 2 · UNIT 4 — BUILT IN SOURCE, NOT DEPLOYED (2026-09-07)
+## 17. PHASE 2 · UNIT 4 — MERGED AND DEPLOYED, v249 (2026-09-07)
 
 **Scope: §6 only** — the FRS ladder on the report path is CAPPED (45s+grace), not removed.
 Units 1 and 3 untouched; `data_quality`, `indexable`, `coverage_state`, the crons and N5
@@ -995,8 +995,25 @@ default before printing anything. **Measure a mutation on the EXIT CODE.** The t
 pre-attaches a catch so that regression prints four named failures instead of a stack trace — a
 crash hides every later section. Same class as this file's own "an instrument must prove it ran".
 
-### 17.6 NOT DEPLOYED
+### 17.6 DEPLOYED — v249, and what production does and does not prove
 
-The repo source is the parked reference; the live function still runs `Promise.all`. Deploy is
-the operator step (one esbuild bundle via MCP — the ~30 KB payload ceiling, CLAUDE.md §8).
-`dist/get-address-report.bundle.mjs` is stale from `9c52841` and was deliberately NOT rebuilt.
+Merged as squash `6558112` (#1120) and deployed `v248 -> v249` by `deploy-edge-functions.yml`
+run `34164020261`. That workflow deploys the MULTI-FILE source with the Supabase CLI on a
+runner, so `dist/get-address-report.bundle.mjs` was never involved and remains stale from
+`9c52841`; the ~30 KB MCP inline-bundle ceiling does not apply to this path. The workflow has
+no ref/SHA guard and ran on `f3002e3`, not the merge commit — safe only because the
+edge-function tree hash is identical at both (`776c463c...`), verified rather than assumed.
+
+**Production-proven on v249 (overlay-miss OUTCOME):** 6 facility-dense ZIPs fired concurrently;
+2 refused live. 59044 and 48186 -> `epa.ok:false, reason:"transient", attempts:3,
+radius_used:null, counts.facilities:0`, **HTTP 200**, core present (proposed 1 / approved 1,
+development 1). `public.dev_epa_write_refused(true, <live payload>, ...)` -> **true** on both;
+stored `counts.facilities` still **40**; `facilities_unavailable` **true**. Re-fired a minute
+later: `ok:true`, 40 facilities restored.
+
+**NOT proven in production:** `reason:"deadline"` never fired. FRS refused fast (3 transients at
+one radius, the 2026-08-27 early return) rather than hanging slow, so the 45 s cap was never
+exercised. The three bracketed calls returned inside a 15 s client timeout, which times the FAST
+path and bounds nothing about a hang. The cap rests on the deployed source plus
+`test/epa-plane-deadlines.test.mjs` sections 7 and 8 under an injected clock. The 84302
+happy-path smoke shows the change is INERT when EPA is healthy; it is not evidence of the bound.
