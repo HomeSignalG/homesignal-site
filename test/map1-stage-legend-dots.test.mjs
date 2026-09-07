@@ -48,41 +48,25 @@ if (!(dotSize >= 10 && dotSize <= 12)) {
   failures.push(`.mapkey .dot is ${dotSize || '?'}px; the specified size is 10–12px`);
 }
 
-// ── 3-5. THE SHARED `.mapkey span` PILL. ⚖️ These three sections used to pin the STAGE
-//       chip. The Stage row is now a multi-select CHECKBOX group (§8 below), so `.mapkey
-//       span` — and with it aria-pressed and `.off` — is the TYPE row's pill, which lives
-//       in the same `.mapkey` container and still needs every rule below. Kept, re-scoped,
-//       and NOT deleted: the neutral-pill and readable-when-off rules are what the Type row
-//       relies on, and dropping them here would leave that row with no offline guard at all.
+// ── 3-5. RETIRED. ⚖️ These three sections pinned the toggle-button pill — `.mapkey span`'s
+//       background/border, `.mapkey span[aria-pressed="true"]`, and `.mapkey span.off`'s
+//       strike-through. They were kept through #1098 on the stated grounds that "`.mapkey
+//       span` … is the TYPE row's pill, which lives in the same `.mapkey` container". That
+//       was true then and is FALSE now: #1101 converted Type and Regulatory to the same
+//       <label>-wrapped checkbox chip, so no row uses that pill and nothing on the page
+//       carries `aria-pressed` or `.off` — measured in the rendered DOM, both match 0
+//       elements. §4 and §5 REQUIRED the dead rules to be present, which is what blocked
+//       their removal; assertions pinning CSS that matches nothing are not coverage.
 //
-//       3. The PILL stays neutral. A strongly coloured pill reads as a pressed button or an
-//       already-applied filter, which is the confusion this row must not create. ──
-const pillCss = (src.match(/\.mapkey span\{[^}]*\}/) || [''])[0];
-if (!/background:#fff/.test(pillCss)) {
-  failures.push('the legend pill is not on a white/very-light background');
-}
-if (!/border:1px solid var\(--line\)/.test(pillCss)) failures.push('the legend pill has no subtle border');
-if (!/color:var\(--ink\)/.test(pillCss)) {
-  failures.push('the legend LABEL is not dark charcoal — the label text must never be tinted with '
-    + 'the stage colour; the dot carries the colour');
-}
-
-// ── 4. Selection is its own channel: darker outline + a very subtle tint, never the stage hue ──
-const selCss = (src.match(/\.mapkey span\[aria-pressed="true"\]\{[^}]*\}/) || [''])[0];
-if (!selCss) failures.push('there is no selected-state rule; selection would be indistinguishable');
-if (!/border-color:#9aa8a3/.test(selCss)) failures.push('the selected chip has no darker outline');
-if (!/background:#f4f6f5/.test(selCss)) failures.push('the selected chip has no subtle tint');
-
-// ── 5. Unselected stays NEUTRAL and stays READABLE. `opacity:.4` on the whole chip put the
-//       label under accessible contrast; the strike-through is what carries "hidden" in text. ──
-const offCss = (src.match(/\.mapkey span\.off\{[^}]*\}/) || [''])[0];
-if (/opacity:\s*\.?[0-4]/.test(offCss)) {
-  failures.push('the unselected chip dims its whole self again — that fails contrast on the label. '
-    + 'Dim the dot, keep the words readable.');
-}
-if (!/\.mapkey span\.off \.t\{text-decoration:line-through\}/.test(src)) {
-  failures.push('the unselected chip has no strike-through — on/off would be carried by colour alone');
-}
+//       Nothing is left uncovered. The Stage chip's own neutral-pill / never-struck-through /
+//       never-dimmed guarantees are §8 below; the Type and Regulatory equivalents — including
+//       the shared `.t{color:var(--ink)}` label colour §3 used to assert — are in
+//       test/map1-filter-chip-parity.test.mjs.
+//
+//       ⚠️ `.mapkey span` ITSELF IS STILL LIVE and is deliberately NOT asserted away here: it
+//       matches every chip's inner .ck/.dot/.ic/.t span and is their only source of
+//       `display:flex`. That is pinned as observable layout in map1-stage-filter-chips.browser,
+//       where a computed style is the honest instrument for it rather than a source regex.
 
 // ── 6. STATUS IS NEVER COLOUR ALONE ON THE MAP EITHER. Every marker carries its own words. ──
 if (!/function markerTitle\(s, mk\)\{/.test(src)) {
