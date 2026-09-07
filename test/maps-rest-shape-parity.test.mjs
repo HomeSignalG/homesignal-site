@@ -50,7 +50,7 @@ const CORPUS = [
   mk(5, 'Industrial', 'Colorado Bend Industrial'),
   mk(6, 'Utility', 'Pearce Lane Wastewater Lift Station'),
   mk(7, 'unclassified', 'Hyperscale data center campus'),    // -> datacenter octagon
-  mk(8, 'industrial', 'DALFEN INDUSTRIAL', 'facility'),      // -> facility square
+  mk(8, 'industrial', 'DALFEN INDUSTRIAL', 'facility'),      // -> industrial triangle + R
   mk(9, 'Commercial', "O'Reilly Auto Parts"),
   mk(10, 'Residential', 'Berdoll Farms Ph 2 Sec 1'),
   mk(11, 'unclassified', 'Caldwell Lane'),                   // honest fallback
@@ -144,14 +144,17 @@ console.log('\n-- regulated facility stays distinct from data center --');
 {
   const fac = HS.resolveMarker(CORPUS.find((r) => r.name === 'SAND HILL ENERGY CENTER'));
   const dc = HS.resolveMarker(CORPUS.find((r) => r.name === 'ZYDECO DATA CENTER'));
-  check('facility renders the registry square', fac.shape === REG.facility.symbol && fac.shape === 'square');
+  check('overlay EPA draws its mapped Type, not the facility square',
+    fac.shape === REG.industrial.symbol && fac.shape === 'triangle' && fac.signal);
   check('data center renders the registry octagon', dc.shape === REG.datacenter.symbol && dc.shape === 'octagon');
   check('the two are visually different', fac.shape !== dc.shape);
-  // and both survive into the rest layer
   const dcF = fc.features.find((f) => f.properties.id === 'r23');
   const facF = fc.features.find((f) => f.properties.id === 'r24');
   check('data center keeps the octagon in the REST layer', dcF && dcF.properties.shape === 'octagon');
-  check('facility keeps the square in the REST layer', facF && facF.properties.shape === 'square');
+  check('overlay EPA keeps its Type shape in the REST layer', facF && facF.properties.shape === 'triangle');
+  const unmapped = HS.resolveMarker({ record_kind: 'facility', status: 'Operating', name: 'UNMAPPED EPA' });
+  check('unmapped EPA still renders the registry square',
+    unmapped.shape === REG.facility.symbol && unmapped.shape === 'square' && !unmapped.signal);
 }
 
 console.log('\n-- Street / Satellite / Focus agree on shape --');

@@ -102,8 +102,14 @@ const tabs = dev.filter(r => r.source_registry_id === null);
      '3: no data-center record is INVENTED for Del Valle — the registry assertion stands alone');
 
   ok(R.every(r => r.symbol === reg[r.category].symbol), '3: every record uses its category\'s canonical symbol');
-  ok(fac.every(r => r.symbol === 'square' && r.category === 'facility' && r.color === '#7d148c'),
-     '3: every facility is a purple square');
+  ok(fac.every(r => r.is_facility && r.filter_key === 'facility' && r.lifecycle === 'operating'),
+     '3: every facility still filters as facility and renders operating');
+  ok(fac.every(r => r.symbol !== 'square' && r.category !== 'facility' && r.color !== '#7d148c'),
+     '3: classifiable EPA draws Type + operating colour, not a purple square');
+  ok(fac.every(r => String(r.classification_rule).indexOf('DUAL:') === 0),
+     '3: overlay classification_rule is the dual overlay form');
+  ok(fac.every(r => r.symbol === golden.semantic_registry[r.category].symbol),
+     '3: overlay category and symbol agree with the registry');
   ok(dev.every(r => r.symbol !== 'square'), '3: NO development record uses the facility square');
   ok(dev.every(r => r.category !== 'facility'), '3: no development record crosses over into the facility category');
   ok(fac.every(r => r.is_facility) && dev.every(r => !r.is_facility), '3: the facility flag matches record_kind');
@@ -225,13 +231,12 @@ const tabs = dev.filter(r => r.source_registry_id === null);
   eq(p.rest.length, fac.length - NEAREST_FAC_CAP, '7: the remainder rides the rest layer');
   eq(new Set(p.nearest.concat(p.rest)).size, fac.length, '7: the partition is disjoint and total');
   // Membership is data-dependent (it moves when a coordinate moves) — what must NEVER differ is
-  // how the two halves RENDER. A facility in the tail is still a purple square that filters as
-  // `facility`; that is what makes the tail safe to cluster.
+  // how the two halves FILTER. Overlay Type + R rides on both the nearest-24 and the rest tail;
+  // filter_key stays `facility` so the Regulatory chip still owns show/hide.
   for (const tok of p.rest) {
     const r = byToken.get(tok);
     ok(!!r, '7: every rest-layer facility is in the baseline');
-    eq(r.symbol, 'square', `7: rest-layer ${tok} renders square`);
-    eq(r.category, 'facility', `7: rest-layer ${tok} category`);
+    ok(r.symbol !== 'square' && r.category !== 'facility', `7: rest-layer ${tok} draws its mapped Type`);
     eq(r.lifecycle, 'operating', `7: rest-layer ${tok} lifecycle`);
     eq(r.filter_key, 'facility', `7: rest-layer ${tok} filter key`);
     ok(/^https:\/\/echo\.epa\.gov\//.test(r.evidence_url), `7: rest-layer ${tok} keeps its evidence`);

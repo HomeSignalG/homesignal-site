@@ -37,10 +37,12 @@ const DUAL = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 const PLAIN_FAC = { type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
   scope: 'point', registry_id: '110072041130', record_url: 'https://echo.epa.gov/x' };
+const UNMAPPED_FAC = { type: 'built', label: 'UNKNOWN WORKS', scope: 'point',
+  registry_id: '110000000099', record_url: 'https://echo.epa.gov/x' };
 const DC_PROJECT = { type: 'approved', label: 'Pennhurst Data Centers', layer: 'datacenter',
   use_type: 'Data Center', scope: 'point', record_url: 'https://plus.fairfaxcounty.gov/x' };
 
-const dual = track(DUAL), plain = track(PLAIN_FAC), proj = track(DC_PROJECT);
+const dual = track(DUAL), plain = track(PLAIN_FAC), unmapped = track(UNMAPPED_FAC), proj = track(DC_PROJECT);
 const allOn = () => HS.categoryFilterKeys.forEach(k => HS.setCategoryFilter(k, true));
 allOn();
 
@@ -76,13 +78,17 @@ ok(dual.shape === HS.CATEGORY_REGISTRY.datacenter.symbol && dual.categoryKey ===
 ok(dual.color !== REG.color, '3b: …and its LIFECYCLE colour — purple is the badge, not the pin');
 ok(dual.signal && dual.signal.letter === 'R' && dual.signal.color === REG.color,
   '3c: …and carries the purple R as a subordinate signal');
-ok(proj.signal === null && plain.signal === null,
-  '3d: a project with no regulatory record, and a regulatory-only location, carry no badge');
+ok(proj.signal === null, '3d: a project with no regulatory record carries no badge');
+ok(plain.signal && plain.signal.letter === 'R' && plain.shape === HS.CATEGORY_REGISTRY.industrial.symbol
+   && plain.categoryKey === 'industrial' && JSON.stringify(plain.categories) === JSON.stringify(['facility']),
+  '3e: a classifiable EPA facility draws its Type + the purple R — membership stays facility-only');
+ok(plain.color !== REG.color, '3f: …and its LIFECYCLE colour — purple is the badge, not the pin');
 
-// ── 4. REGULATORY-ONLY LOCATIONS KEEP THE STANDALONE PURPLE SQUARE ────────────────
-ok(plain.categoryKey === 'facility' && plain.shape === 'square' && plain.color === REG.color,
+// ── 4. UNMAPPED REGULATORY-ONLY LOCATIONS KEEP THE STANDALONE PURPLE SQUARE ───────
+ok(unmapped.categoryKey === 'facility' && unmapped.shape === 'square' && unmapped.color === REG.color
+   && !unmapped.signal,
   '4: a regulatory record with no mapped project type is a standalone purple square');
-ok(REG.symbol === plain.shape,
+ok(REG.symbol === unmapped.shape,
   '4b: the legend names the same standalone symbol the renderer draws', REG.symbol);
 
 // ── 5. GEOMETRY — LOWER-RIGHT, SECONDARY, AND LEGIBLE ─────────────────────────────
@@ -131,10 +137,11 @@ ok(HS.markerSVG(dual.shape, dual.color, '', 26, HS.visibleSignal(dual))
    === HS.markerSVG(dual.shape, dual.color, '', 26, null),
   '6d: …drawn byte-identically to any other data centre of its stage');
 // …while the regulatory-ONLY location is hidden, because there the record IS the marker.
-ok(HS.categoryVisible(plain) === false,
-  '6e: switch OFF -> regulatory-only locations are hidden');
+ok(HS.categoryVisible(plain) === false && HS.categoryVisible(unmapped) === false,
+  '6e: switch OFF -> overlay EPA and standalone squares are both hidden');
 allOn();
-ok(HS.categoryVisible(plain) === true, '6f: switch ON  -> they come back');
+ok(HS.categoryVisible(plain) === true && HS.categoryVisible(unmapped) === true,
+  '6f: switch ON  -> they come back');
 
 // ── 7. THE DIMENSIONS ARE INDEPENDENT — the founder's "must NOT change" list ───────
 // Toggling regulatory must not change, reset or hide ANY Type filter, in either
@@ -164,7 +171,8 @@ HS.typeFilterKeys.forEach(k => HS.setCategoryFilter(k, false));
 HS.setCategoryFilter(REG.key, true);
 ok(HS.allTypeCategoriesOff() === true, '8: every Type off is reported as every Type off…');
 ok(HS.allCategoriesOff() === false, '8b: …while the map is NOT category-empty — regulatory is on');
-ok(HS.categoryVisible(plain) === true && HS.categoryVisible(dual) === true,
+ok(HS.categoryVisible(plain) === true && HS.categoryVisible(unmapped) === true
+   && HS.categoryVisible(dual) === true && HS.categoryVisible(proj) === false,
   '8c: …and the regulatory records are exactly what is still drawn');
 HS.setCategoryFilter(REG.key, false);
 ok(HS.allTypeCategoriesOff() === true && HS.allCategoriesOff() === true,
@@ -184,6 +192,9 @@ ok(HS.filterByCategory(list).length === 2,
   '9c: …and it is counted ONCE, not once per membership', HS.filterByCategory(list).length);
 allOn();
 ok(HS.filterByCategory(list).length === 3, '9d: everything on -> three records, not four');
+ok(JSON.stringify(plain.categories) === JSON.stringify(['facility'])
+   && JSON.stringify(dual.categories) === JSON.stringify(['datacenter', 'facility']),
+  '9e: overlay EPA does not gain Type membership — only dual-identity data centres keep both');
 
 console.log(fails ? `\n${fails} FAILED` : '\nAll passed');
 process.exit(fails ? 1 : 0);

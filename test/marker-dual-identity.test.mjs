@@ -40,9 +40,11 @@ const dual = track(DUAL), plain = track(PLAIN_FAC), proj = track(DC_PROJECT);
 // ── 1-3. The three record kinds resolve to the right primary identity ─────────────
 ok(proj.categoryKey === 'datacenter' && proj.shape === 'octagon' && !proj.isFacility && !proj.signal,
   '1: ordinary Data center project — octagon, no EPA signal');
-ok(plain.categoryKey === 'facility' && plain.shape === 'square'
-   && plain.color === HS.markerRegistry.facilityHex && !plain.signal,
-  '2: ordinary Regulated facility — purple square, unchanged, no secondary symbol');
+ok(plain.categoryKey === 'industrial' && plain.shape === 'triangle'
+   && plain.signal && plain.signal.letter === 'R'
+   && JSON.stringify(plain.categories) === JSON.stringify(['facility'])
+   && plain.color !== HS.markerRegistry.facilityHex,
+  '2: classifiable EPA facility — Type shape + purple R overlay, facility membership only');
 ok(dual.categoryKey === 'datacenter' && dual.shape === 'octagon' && dual.isFacility === true
    && dual.isDataCenter === true && dual.shapeRule === 'DUAL:datacenter+facility',
   '3: proven dual identity — PRIMARY identity is Data center, and it is still a facility');
@@ -115,8 +117,9 @@ ok(HS.filterByCategory(list).length === 3,
 ok(dual.popupLabel.indexOf('Data center') < dual.popupLabel.indexOf('Regulated facility')
    && dual.popupLabel.indexOf('Data center') !== -1 && dual.popupLabel.indexOf('Regulated facility') !== -1,
   '14: the popup states BOTH truths, identity first');
-ok(plain.popupLabel.indexOf('Data center') === -1 && plain.popupLabel.indexOf('Regulated facility') !== -1,
-  '14b: an ordinary facility popup is unchanged and claims no data centre');
+ok(plain.popupLabel.indexOf('Industrial') !== -1 && plain.popupLabel.indexOf('Regulated facility') !== -1
+   && plain.popupLabel.indexOf('Data center') === -1,
+  '14b: overlay EPA popup states the Type and the regulatory fact, never a data centre');
 // The popup must not editorialise EPA presence into harm.
 ok(!/pollut|danger|contamin|hazard|toxic|risk/i.test(dual.popupLabel),
   '14c: the EPA signal is stated as a regulatory fact — never as proof of harm');
@@ -130,17 +133,18 @@ ok(!/pollut|danger|contamin|hazard|toxic|risk/i.test(dual.popupLabel),
  ['CYRUSONE POWER POD 7', '110041734317']
 ].forEach(function (r, i) {
   const mk = track({ type: 'built', label: r[0], layer: 'energy', scope: 'point', registry_id: r[1] });
-  ok(mk.categoryKey === 'facility' && !mk.isDataCenter,
+  ok(!mk.isDataCenter && mk.categoryKey === 'infrastructure' && mk.signal
+     && JSON.stringify(mk.categories) === JSON.stringify(['facility']),
     '15.' + i + ': "' + r[0] + '" — campus grain: a power pod is not the data centre it powers');
 });
 // Similar name / same operator — CyrusOne runs data centres; that is not evidence about
 // THIS facility. The record's own class field says substation.
-ok(track({ type: 'built', label: 'CYRUSONE CHI 11 SUBSTATION MASS GRADING', layer: 'energy',
-           scope: 'point', registry_id: '110072130291' }).categoryKey === 'facility',
-  '16: operator brand alone never establishes identity — the substation stays a facility');
+ok(!track({ type: 'built', label: 'CYRUSONE CHI 11 SUBSTATION MASS GRADING', layer: 'energy',
+           scope: 'point', registry_id: '110072130291' }).isDataCenter,
+  '16: operator brand alone never establishes identity — the substation stays off Data center');
 // Proximity-only: a facility sitting at a data centre's coordinates is still not one.
-ok(track({ type: 'built', label: 'ACME PLATING WORKS', layer: 'industrial', scope: 'point',
-           lat: DUAL.lat, lng: DUAL.lng, registry_id: '110000000002' }).categoryKey === 'facility',
+ok(!track({ type: 'built', label: 'ACME PLATING WORKS', layer: 'industrial', scope: 'point',
+           lat: DUAL.lat, lng: DUAL.lng, registry_id: '110000000002' }).isDataCenter,
   '17: identical coordinates to a proven data centre prove nothing — no proximity join');
 
 // ── 18. Geography is untouched ───────────────────────────────────────────────────

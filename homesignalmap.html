@@ -1135,7 +1135,8 @@ HS.onReady(function(){
   //     when absent (EPA facilities, area notices, TABS, pre-connector cache rows) fall back to the
   //     coarse page bucket bucketOf(s.type) — the exact field COLORS keys on, so word ≡ colour.
   //   • An EPA FRS facility is the one physical-facility case; callers short-circuit on frsRid()
-  //     BEFORE stageWord (facilityType names the kind, popupHTML says "Facility · operating now").
+  //     BEFORE stageWord (facilityType names the kind; overlay EPA reads Type · Regulated
+  //     facility · operating now, unmapped EPA still says "Facility · operating now").
   var STAGE_WORD = { proposed:"Proposed / hearing", approved:"Approved / permitted",
                      operating:"Recorded / operating", built:"Built / operating" };
   function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type); }
@@ -1158,13 +1159,15 @@ HS.onReady(function(){
       }
       return stageWord(s);
     }
-    // DUAL IDENTITY: a regulated facility whose own EPA record names a data centre reads
-    // as what it IS first and what it CARRIES second. The words come from the resolver's
-    // category registry, so the popup can never disagree with the symbol drawn.
+    // Overlay-on-Type (and dual-identity data centre): the Type is the primary,
+    // "Regulated facility" is the overlay. A standalone purple square (unmapped
+    // EPA) still reads as Facility. Words come from the resolver's category
+    // registry, so the popup can never disagree with the symbol drawn.
     var mk = HS.resolveTrackerMarker(s, frsRid);
-    if(mk.isDataCenter){
-      var REG = HS.CATEGORY_REGISTRY;
-      return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
+    var REG = HS.CATEGORY_REGISTRY;
+    if(mk.isFacility && mk.categoryKey && mk.categoryKey !== "facility"){
+      var typeName = mk.typeLabel || (REG[mk.categoryKey] && REG[mk.categoryKey].label) || "";
+      return typeName + " · " + REG.facility.label + " · operating now";
     }
     return "Facility · operating now";
   }
@@ -2433,7 +2436,8 @@ HS.onReady(function(){
       { label: "Permit", cat: "industrial", use_type: "Industrial", type: "proposed", layer: "industrial" },
       { label: "DC", cat: "datacenter", use_type: "Data Center", type: "approved", layer: "datacenter" },
       { label: "Homes", cat: "residential", use_type: "Residential", type: "built", layer: "residential" },
-      { label: "EPA", cat: "facility", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" },
+      { label: "EPA overlay", cat: "industrial", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" },
+      { label: "EPA square", cat: "facility", type: "built", registry_id: "TX-UNMAPPED" },
       { label: "Infra", cat: "infrastructure", use_type: "Infrastructure", type: "approved", layer: "infrastructure" },
       { label: "Comm", cat: "commercial", use_type: "Commercial", type: "proposed", layer: "commercial" },
       { label: "Civic", cat: "civic", use_type: "Civic/Public", type: "approved", layer: "civic" },
@@ -2478,8 +2482,11 @@ HS.onReady(function(){
       var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
       var geom = geomFromSvg(svg);
       if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
-      if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
+      if (s.registry_id && mk.categoryKey === "facility" && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
         fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
+      }
+      if (s.registry_id && mk.categoryKey !== "facility" && (mk.shape === "square" || !mk.signal)) {
+        fails.push({ label: s.label, err: "tracker-facility-overlay-missing" });
       }
       if (!s.registry_id && s.use_type === "Industrial" && mk.shape !== "triangle") {
         fails.push({ label: s.label, err: "tracker-industrial-not-triangle" });
@@ -2747,7 +2754,16 @@ HS.onReady(function(){
     // the pins — so the chip cannot advertise one badge while the map paints another. It
     // is aria-hidden and full-strength in both states: it explains the RECORD, while the
     // checkbox says whether the overlay is currently drawn.
-    var badge = HS.markerSVG(reg.symbol, reg.color, reg.letter, 15);
+    // Overlay language, not an eighth Type: a Type shape with the purple R
+    // badge. A lettered purple square advertised a separate facility population
+    // (the 78617 screenshot).
+    var badge = HS.markerSVG(
+      HS.CATEGORY_REGISTRY.industrial.symbol,
+      (HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.operating) || "#1f9d5c",
+      "",
+      15,
+      { color: reg.color, letter: reg.letter, shape: reg.symbol }
+    );
     chip.innerHTML = "<span class='ck' aria-hidden='true'></span>"
       + "<span class='ic' aria-hidden='true'>" + badge + "</span>"
       + "<span class='t'>" + esc(reg.chipLabel) + "</span>";

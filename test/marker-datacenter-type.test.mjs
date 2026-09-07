@@ -5,7 +5,8 @@
 // our registry `type_map` collapsed it into. Every category this displaces —
 // Utility, Industrial, Commercial, Civic, Other — is strictly BROADER, so the stated
 // class is always the better answer. It never invents one: a record that states no
-// data centre is untouched, and a regulated facility keeps its own square.
+// data centre is untouched, and a name-only data-hall mention on an FRS row never
+// promotes the facility to Data center.
 //
 // Every string below is VERBATIM from production `app_projects` (pulled 2026-09-05)
 // unless marked "adversarial".
@@ -272,12 +273,18 @@ ok(key({ type: 'Development', name: '1100 DATACENTER RD SFR ADDITION' }) !== 'da
     '14c.' + i + ': "' + r[1].slice(0, 46) + '…" is a rejected neighbour — never a data centre');
 });
 
-// The one FRS facility the widened vocabulary reaches stays a regulated facility. The facility
-// flag short-circuits before the DATACENTER phase, so the 738 type='datacenter' facility
-// representations and this one are all untouched — no regulatory identity is overwritten.
-ok(key({ record_kind: 'facility', facility: true, type: 'energy',
-  name: 'CYRUS ONE DATA HALL 1 POWER POD 1' }) === 'facility',
-  '14d: an FRS facility naming a data hall keeps its regulated-facility square');
+// The one FRS facility the widened vocabulary reaches is NOT promoted to Data center.
+// Dual-identity / overlay read class fields only (`statedDataCenter(..., classOnly)`),
+// so "DATA HALL" in the name cannot mint a data-centre identity. The class field
+// `energy` overlays as infrastructure + R; membership stays facility-only.
+{
+  const cyrus = m({ record_kind: 'facility', facility: true, type: 'energy',
+    name: 'CYRUS ONE DATA HALL 1 POWER POD 1' });
+  ok(cyrus.categoryKey === 'infrastructure' && !cyrus.isDataCenter && !!cyrus.signal,
+    '14d: an FRS facility naming a data hall is overlay infrastructure, never a data centre');
+  ok(JSON.stringify(cyrus.categories) === JSON.stringify(['facility']),
+    '14d2: …membership stays facility-only so Regulatory OFF still hides it');
+}
 
 // ── 10. Symbol uniqueness still holds across the closed registry ──────────────────
 const symbols = Object.keys(HS.CATEGORY_REGISTRY).map((k) => HS.CATEGORY_REGISTRY[k].symbol);

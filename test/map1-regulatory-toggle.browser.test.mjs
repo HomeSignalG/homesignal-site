@@ -124,8 +124,10 @@ const markers = () => page.evaluate(() =>
   Array.from(document.querySelectorAll('#map .leaflet-marker-icon:not(.homepin)')).map((el) => {
     const html = (el.querySelector('svg') || {}).outerHTML || '';
     const rect = html.match(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)"/);
+    const pts = (html.match(/points="([^"]+)"/) || [])[1] || '';
     return {
       polygons: (html.match(/<polygon/g) || []).length,
+      primaryPoints: pts.trim().split(/\s+/).filter(Boolean).length,
       purple: /#7d148c/i.test(html),
       rBadge: />R<\/text>/.test(html) && /#7d148c/i.test(html),
       badgeX: rect ? Number(rect[1]) : null,
@@ -253,16 +255,18 @@ ok(await regState() === 'true', '2g: ...and restored for the rest of the suite')
 // ── 3. THE BADGE IS AN OVERLAY IN THE LOWER-RIGHT CORNER ──────────────────────────
 const on = await markers();
 ok(on.length === 3, '3: the three production records render', on.length);
-const dual = on.filter(m => m.polygons === 1 && m.rBadge);
+const dual = on.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(dual.length === 1, '3b: the regulated data centre keeps its octagon AND gains the R badge', dual.length);
 ok(dual[0].badgeX > 7 && dual[0].badgeY > 7,
   '3c: the badge sits in the LOWER-RIGHT corner of a 14px pin',
   dual[0].badgeX + ',' + dual[0].badgeY);
 ok(dual[0].badgeW < 14 * 0.8, '3d: …and is visually secondary to the project marker',
   dual[0].badgeW + ' < ' + (14 * 0.8));
-ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 1,
-  '3e: a regulatory-only location draws a standalone purple square');
-ok(on.filter(m => m.polygons === 1 && !m.purple).length === 1,
+ok(on.filter(m => m.primaryPoints === 3 && m.rBadge).length === 1,
+  '3e: a classifiable EPA facility draws its Type (triangle) + the purple R — not a standalone square');
+ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 0,
+  '3e2: no standalone purple square remains when the class field maps a Type');
+ok(on.filter(m => m.primaryPoints === 8 && !m.rBadge).length === 1,
   '3f: a project with no regulatory record gets no purple at all — nothing is invented');
 
 // ── 4. THE SWITCH OWNS THE BADGE AND THE REGULATORY-ONLY LOCATIONS, AND NOTHING ELSE ─
@@ -288,8 +292,8 @@ ok(lookAfter.type.every(r => r.split('|')[1] === 'true' && r.split('|')[4] === '
 await clickReg();
 ok(await regState() === 'true', '5: clicking again turns it back on');
 const back = await markers();
-ok(back.length === 3 && back.filter(m => m.rBadge).length === 1,
-  '5b: the badge is repainted on the pin that is already on the map', back.filter(m => m.rBadge).length);
+ok(back.length === 3 && back.filter(m => m.rBadge).length === 2,
+  '5b: the badge is repainted on every overlay pin already on the map', back.filter(m => m.rBadge).length);
 ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
   '5c: …and the other two rows are still untouched');
 

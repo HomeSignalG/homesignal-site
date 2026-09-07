@@ -18,23 +18,29 @@ const CASES = [
   { label: 'Infrastructure / Approved', item: { type: 'Infrastructure', status: 'Approved' }, shape: 'diamond', color: '#3f7fb0' },
   { label: 'Commercial / Proposed', item: { type: 'Commercial', status: 'Proposed' }, shape: 'hexagon', color: '#c47a1a' },
   { label: 'Unknown / On file', item: { type: 'Mystery', status: 'Pending review' }, shape: HS.CATEGORY_REGISTRY.other.symbol, color: '#706468' },
-  { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'square', color: '#7d148c', isFacility: true }
+  { label: 'Regulated facility / Operating', item: { type: 'Industrial', status: 'Operating', _facility: true }, shape: 'triangle', color: '#1f9d5c', isFacility: true, legendLabel: 'Industrial' },
+  { label: 'Unmapped facility / Operating', item: { status: 'Operating', _facility: true }, shape: 'square', color: '#7d148c', isFacility: true, legendLabel: 'Regulated facility' }
 ];
 
 CASES.forEach(function (c) {
   const m = HS.resolveMarker(c.item);
   ok(m.shape === c.shape, c.label + ' shape → ' + c.shape + ' (got ' + m.shape + ')');
   ok(m.color === c.color, c.label + ' color → ' + c.color + ' (got ' + m.color + ')');
-  if (c.isFacility) ok(m.isFacility === true && m.legendLabel === 'Regulated facility', c.label + ' facility flags');
+  if (c.isFacility) ok(m.isFacility === true && m.legendLabel === c.legendLabel, c.label + ' facility flags');
 });
 
 // Regression: ordinary Industrial must never resolve to square.
 const ind = HS.resolveMarker({ type: 'Industrial', status: 'Proposed' });
 ok(ind.shape === 'triangle' && ind.shape !== 'square', 'Industrial never resolves to square');
 
-// Regression: facility with Industrial type → purple square.
+// Overlay-on-Type: a facility whose class field maps a Type draws that Type + R.
 const fac = HS.resolveMarker({ type: 'Industrial', status: 'Operating', record_kind: 'facility' });
-ok(fac.shape === 'square' && fac.color === '#7d148c', 'facility Industrial → purple square');
+ok(fac.shape === 'triangle' && fac.color === '#1f9d5c' && fac.signal && fac.signal.letter === 'R'
+   && fac.categoryKey === 'industrial' && JSON.stringify(fac.categories) === JSON.stringify(['facility']),
+  'facility Industrial → industrial triangle + operating colour + R overlay');
+const unmappedFac = HS.resolveMarker({ status: 'Operating', record_kind: 'facility' });
+ok(unmappedFac.shape === 'square' && unmappedFac.color === '#7d148c' && !unmappedFac.signal,
+  'unmapped facility → standalone purple square');
 
 // Collision cases — deliberate precedence.
 ok(HS.resolveMarker({ type: 'Commercial Industrial Mixed-Use' }).shape === 'hexagon', 'Commercial Industrial Mixed-Use → hexagon (mixed-use)');
@@ -69,7 +75,8 @@ HS.MapProvider.render(el, {
 });
 ok(el.innerHTML.indexOf('<polygon') !== -1, 'schematic Industrial pin renders polygon (triangle)');
 const facMk = HS.resolveMarker({ type: 'Industrial', _facility: true, status: 'Operating' });
-ok(facMk.shape === 'square' && facMk.color === '#7d148c', 'schematic facility contract is purple square');
+ok(facMk.shape === 'triangle' && facMk.color === '#1f9d5c' && facMk.signal,
+  'schematic facility with a mapped Type is Type + R, not a purple square');
 
 // Tracker lifecycle color mode (Approach B).
 const site = { label: 'Permit', use_type: 'Industrial', type: 'proposed', layer: 'industrial' };
@@ -77,7 +84,11 @@ const tmk = HS.resolveTrackerMarker(site, function () { return ''; });
 ok(tmk.shape === 'triangle' && tmk.color === HS.LIFECYCLE_HEX.proposed, 'tracker dev item: triangle + lifecycle proposed color');
 const fsite = { label: 'EPA site', use_type: 'Industrial', type: 'built', layer: 'industrial', registry_id: 'TX123' };
 const fmk = HS.resolveTrackerMarker(fsite, function (s) { return s.registry_id; });
-ok(fmk.shape === 'square' && fmk.color === '#7d148c', 'tracker EPA facility: purple square regardless of lifecycle');
+ok(fmk.shape === 'triangle' && fmk.color === HS.LIFECYCLE_HEX.operating && fmk.signal,
+  'tracker EPA facility with a mapped Type: Type shape + lifecycle colour + R overlay');
+const umk = HS.resolveTrackerMarker({ label: 'EPA unknown', type: 'built', registry_id: 'TX999' }, function (s) { return s.registry_id; });
+ok(umk.shape === 'square' && umk.color === '#7d148c' && !umk.signal,
+  'tracker EPA facility with no class field: standalone purple square');
 
 if (fails) {
   console.error('\n' + fails + ' assertion(s) failed');
