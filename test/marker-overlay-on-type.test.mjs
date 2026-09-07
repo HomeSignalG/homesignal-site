@@ -20,6 +20,7 @@ global.window = { HS: {}, sessionStorage: { _v: null, getItem() { return this._v
 await import('../lib/templates.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
+const REG = HS.REGULATORY_LEGEND;
 const statusOperating = HS.resolveMarker({ type: 'Industrial', status: 'Operating' }).color;
 const lcOperating = HS.LIFECYCLE_HEX.operating;
 const frsRid = (s) => (s && s.registry_id != null) ? String(s.registry_id).trim() : '';
