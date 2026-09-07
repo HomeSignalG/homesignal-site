@@ -44,6 +44,12 @@ ok(/\.homepin/.test(GEN) && /\.homepin/.test(MAP1),
 ok(/HOME_ANCHOR = true/.test(MAP1), 'ZIP mode sets HOME_ANCHOR, so no home marker is drawn');
 ok(/if\(!ZIP_MODE\)\{?\s*\n\s*L\.circle/.test(MAP1) || /if\(!ZIP_MODE\)[\s\S]{0,200}L\.circle/.test(MAP1),
   'the radius circle is guarded behind !ZIP_MODE in Map 1');
+ok(/function updateHome3D\(\)\{[\s\S]{0,500}if\(ZIP_MODE\)return/.test(MAP1),
+  '3D aerial ZIP mode draws no home house at the report centroid');
+ok(/function drawRings\(\)\{[\s\S]{0,400}if\(ZIP_MODE\)return/.test(MAP1),
+  '3D aerial ZIP mode draws no mile rings around a ZIP centroid');
+ok(/function draw3DSoft\(\)\{[\s\S]{0,1600}if\(!ZIP_MODE\)\{[\s\S]{0,80}ringStops/.test(MAP1),
+  'the Canvas 2D aerial fallback is the same ZIP geography (no rings, no house)');
 ok(!/L\.circle|L\.polygon|1609\.34|\* *1609|milesTo|toMeters/i.test(GEN_CODE),
   'the generator creates no geographic circle and converts no distance to metres');
 ok(/homePins > 0.*refused|refused: a home marker/.test(GEN_CODE),
