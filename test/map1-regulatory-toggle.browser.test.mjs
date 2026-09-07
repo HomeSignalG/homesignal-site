@@ -111,9 +111,12 @@ await page.goto(base + '/homesignalmap.html?zip=20171', { waitUntil: 'domcontent
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await page.waitForTimeout(600);
 
+// The regulatory control is a CHECKBOX CHIP now, so its state is the checkbox's, not an
+// aria-checked attribute on a switch. Reported as the same 'true'/'false' strings so every
+// assertion below reads unchanged.
 const regState = () => page.evaluate(() => {
-  const t = document.getElementById('regToggle');
-  return t ? t.getAttribute('aria-checked') : null;
+  const b = document.getElementById('regToggleBox');
+  return b ? String(b.checked) : null;
 });
 const clickReg = async () => { await page.click('#regToggle'); await page.waitForTimeout(200); };
 // Every rendered marker, described by what a resident can see.
@@ -138,13 +141,13 @@ const rowsLook = () => page.evaluate(() => {
     const t = r.querySelector('.t');
     return [
       (r.getAttribute('data-cat') || (r.textContent || '').trim().slice(0, 14)),
-      r.getAttribute('aria-pressed'),
+      String(!!(r.querySelector('input') || {}).checked),
       cs.opacity,
       cs.display === 'none' ? 'hidden' : 'shown',
       t ? getComputedStyle(t).textDecorationLine : 'none'
     ].join('|');
   });
-  return { stage: read('#mapkey span'), type: read('#mapkeyShapes span.sh') };
+  return { stage: read('#mapkey .stagechip'), type: read('#mapkeyShapes .typechip') };
 });
 
 // ── 1. THREE ROWS, IN ORDER, AND THE THIRD IS NOT A TYPE ──────────────────────────
@@ -154,7 +157,7 @@ ok(/^Stage/.test(headings[0]), '1: row 1 is Stage — pin color', headings[0]);
 ok(/^Type/.test(headings[1]), '1b: row 2 is Type — pin shape', headings[1]);
 ok(headings[2] === 'Regulatory records', '1c: row 3 is Regulatory records', headings[2]);
 const typeLabels = await page.evaluate(() =>
-  Array.from(document.querySelectorAll('#mapkeyShapes span.sh .t')).map(t => t.textContent.trim()));
+  Array.from(document.querySelectorAll('#mapkeyShapes .typechip .t')).map(t => t.textContent.trim()));
 ok(typeLabels.length === 7 && !typeLabels.some(l => /regulated facility/i.test(l)),
   '1d: the Type row is the seven project types and offers no "Regulated facility"', typeLabels.join(' / '));
 // Reads `.stagechip .t` because the Stage chip is a <label> wrapping a real checkbox, not a
@@ -166,16 +169,45 @@ ok(stageLabels.length === 4 && !stageLabels.some(l => /regulated facility/i.test
   '1e: the Stage row is the four stages and offers no "Regulated facility"', stageLabels.join(' / '));
 
 // ── 2. THE CONTROL AND ITS COPY ───────────────────────────────────────────────────
-ok(await page.evaluate(() => document.getElementById('regToggle').getAttribute('role')) === 'switch',
-  '2: the control is a real on/off switch, exposed as one');
-ok((await page.textContent('#regToggle')).includes('Show regulatory facilities'),
-  '2b: the switch is labelled "Show regulatory facilities"', (await page.textContent('#regToggle')).trim());
+// ⚖️ THE SWITCH IS GONE. It is a checked filter chip, the same control the Stage and Type
+// rows use, so that one rule — "checked categories are shown on the map" — covers all
+// three rows. These two assertions changed with it; §2c-§6c below are untouched.
+const regCtl = await page.evaluate(() => {
+  const chip = document.getElementById('regToggle');
+  const box = document.getElementById('regToggleBox');
+  return { tag: chip && chip.tagName, box: box && box.tagName + ':' + box.type,
+           inside: !!(chip && box && chip.contains(box)),
+           role: chip && chip.getAttribute('role'),
+           sw: !!document.querySelector('.regtog, #regToggle .sw'),
+           name: box && box.getAttribute('aria-label') };
+});
+ok(regCtl.tag === 'LABEL' && regCtl.box === 'INPUT:checkbox' && regCtl.inside,
+  '2: the control is a checkbox chip — a real <input type=checkbox> inside its label', JSON.stringify(regCtl));
+ok(!regCtl.sw && regCtl.role !== 'switch',
+  '2a: NO on/off switch remains — not hidden beside it, gone', JSON.stringify(regCtl));
+ok((await page.textContent('#regToggle')).includes('Regulatory facilities'),
+  '2b: the chip is labelled "Regulatory facilities" — the checkmark carries the "Show"',
+  (await page.textContent('#regToggle')).trim());
+ok(regCtl.name === 'Regulatory facilities, shown on map',
+  '2b2: ...and its accessible name states the map effect in words', regCtl.name);
 const helper = (await page.textContent('#mapkeyRegHelp')).trim();
 ok(helper === 'Purple R = environmental regulatory record. Includes EPA and linked state, '
             + 'local, tribal, and federal records.', '2c: the helper text is the founder copy, verbatim', helper);
 ok(await page.evaluate(() => !!document.querySelector('#regToggle svg text')),
-  '2d: the switch shows the same purple R the map draws');
-ok(await regState() === 'true', '2e: it starts ON — a record is never hidden by default');
+  '2d: the chip shows the same purple R the map draws');
+ok(await regState() === 'true', '2e: it starts CHECKED — a record is never hidden by default');
+
+// THE PURPLE R SURVIVES THE UNCHECKED STATE. It explains what the RECORD is, so it is not
+// a state signal and must never be dimmed or dropped when the overlay is hidden.
+await clickReg();
+const rWhenOff = await page.evaluate(() => {
+  const ic = document.querySelector('#regToggle .ic');
+  return { svg: !!(ic && ic.querySelector('svg text')), opacity: ic ? getComputedStyle(ic).opacity : null };
+});
+ok(rWhenOff.svg && Number(rWhenOff.opacity) === 1,
+  '2f: the purple R is still there, full strength, while UNCHECKED', JSON.stringify(rWhenOff));
+await clickReg();
+ok(await regState() === 'true', '2g: ...and restored for the rest of the suite');
 
 // ── 3. THE BADGE IS AN OVERLAY IN THE LOWER-RIGHT CORNER ──────────────────────────
 const on = await markers();
@@ -224,7 +256,7 @@ ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
 await page.click('#mapkey span:has-text("Approved")');
 await page.waitForTimeout(150);
 ok(await regState() === 'true', '6: clicking a Stage chip does not touch the regulatory switch');
-await page.click('#mapkeyShapes span.sh[data-cat="datacenter"]');
+await page.click('#mapkeyShapes .typechip[data-cat="datacenter"]');
 await page.waitForTimeout(150);
 ok(await regState() === 'true', '6b: clicking a Type chip does not touch it either');
 // …and Stage still composes with the badge: hiding a stage hides the pin, badge and all.

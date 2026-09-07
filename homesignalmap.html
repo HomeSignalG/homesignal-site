@@ -354,44 +354,46 @@
      checkbox semantics come from the platform instead of from re-implemented ARIA.
      The input is visually hidden but NEVER display:none — a display:none input is
      unfocusable, which would quietly remove the whole row from keyboard use. */
-  #mapkey .stagechip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  #mapkeyShapes .typechip, #mapkeyReg .regchip, #mapkey .stagechip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
     padding:5px 11px;border-radius:7px;cursor:pointer;user-select:none;font-size:12px;
     color:var(--ink);border:1px solid var(--line);background:#fff;min-height:32px;position:relative}
   /* The pill styling belongs to the CHIP and to nothing inside it. `.mapkey span` is a
      DESCENDANT rule, so without this reset the dot and the label would each draw their
      own bordered, padded box inside the chip. */
-  #mapkey .stagechip>span{padding:0;border:0;background:none;min-height:0}
-  #mapkey .stagechip:hover{background:#fafbfa;border-color:#d6ddda}
+  #mapkeyShapes .typechip>span, #mapkeyReg .regchip>span, #mapkey .stagechip>span{padding:0;border:0;background:none;min-height:0}
+  #mapkeyShapes .typechip:hover, #mapkeyReg .regchip:hover, #mapkey .stagechip:hover{background:#fafbfa;border-color:#d6ddda}
   /* Focus rides on the CHIP: the input is clipped to 1px, and a focus ring drawn on a
      1px box is a focus ring nobody can see. */
-  #mapkey .stagechip:focus-within{outline:2px solid var(--green-bright);outline-offset:2px}
-  #mapkey .stagebox{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;
+  #mapkeyShapes .typechip:focus-within, #mapkeyReg .regchip:focus-within, #mapkey .stagechip:focus-within{outline:2px solid var(--green-bright);outline-offset:2px}
+  #mapkeyShapes .chipbox, #mapkeyReg .chipbox, #mapkey .stagebox{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;
     opacity:0;pointer-events:none}
   /* THE CHECK MARK — the inclusion signal, and it is a SHAPE plus a GLYPH, never a hue.
      Unchecked is an empty outlined square; checked is a filled square carrying a ✓. It
      keeps its size in both states, so toggling never reflows the row. This is the same
      "never colour alone" rule the dot already obeys, applied to the second channel:
      the DOT says which stage, the BOX says whether it is on the map. */
-  #mapkey .stagechip .ck{flex:0 0 auto;width:14px;height:14px;border-radius:4px;
+  #mapkeyShapes .typechip .ck, #mapkeyReg .regchip .ck, #mapkey .stagechip .ck{flex:0 0 auto;width:14px;height:14px;border-radius:4px;
     border:1.5px solid #7d8c86;background:#fff;display:inline-flex;align-items:center;
     justify-content:center;font-size:10px;line-height:1;color:transparent}
-  #mapkey .stagechip .ck::after{content:"\2713";font-weight:700}
-  #mapkey .stagebox:checked~.ck{background:var(--green);border-color:var(--green);color:#fff}
+  #mapkeyShapes .typechip .ck::after, #mapkeyReg .regchip .ck::after, #mapkey .stagechip .ck::after{content:"\2713";font-weight:700}
+  #mapkeyShapes .chipbox:checked~.ck, #mapkeyReg .chipbox:checked~.ck, #mapkey .stagebox:checked~.ck{background:var(--green);border-color:var(--green);color:#fff}
   /* Selected chip: a darker outline plus a very subtle tint — the same channel the Type
      row uses, and, as there, never the stage hue. */
-  #mapkey .stagechip.on{border-color:#9aa8a3;background:#f4f6f5}
-  #mapkey .stagechip.on:hover{background:#eef1ef}
+  #mapkeyShapes .typechip.on, #mapkeyReg .regchip.on, #mapkey .stagechip.on{border-color:#9aa8a3;background:#f4f6f5}
+  #mapkeyShapes .typechip.on:hover, #mapkeyReg .regchip.on:hover, #mapkey .stagechip.on:hover{background:#eef1ef}
   /* UNSELECTED IS NEUTRAL, NOT DISABLED. No strike-through and no heavy dimming: the
      resident is choosing what to see, not looking at something broken or deleted. The
      label stays full-contrast charcoal and the DOT stays at full strength, because the
      dot is still the pin-colour legend whether or not that stage is on the map. */
-  #mapkey .stagechip .t{color:var(--ink)}
+  #mapkeyShapes .typechip .t, #mapkeyReg .regchip .t, #mapkey .stagechip .t{color:var(--ink)}
   #mapkey .stagechip .dot{opacity:1}
   /* Touch targets. 44x44 on coarse pointers, where the WCAG target-size rule applies;
      the desktop chip stays compact. */
   @media (pointer:coarse){
     #mapkey .stagechip{min-height:44px;padding:9px 13px}
     #mapkey .stagechip .ck{width:18px;height:18px;font-size:12px}
+    #mapkeyShapes .typechip, #mapkeyReg .regchip{min-height:44px;padding:9px 13px}
+    #mapkeyShapes .typechip .ck, #mapkeyReg .regchip .ck{width:18px;height:18px;font-size:12px}
   }
   .mapkey-help{font-size:11px;color:var(--mute);line-height:1.45}
   /* The empty state's way out. A real <button> styled as a link: an <a href="#"> would
@@ -402,27 +404,14 @@
   .mk-linkbtn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
   .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
-  .mapkey-shapes span.sh{border-style:dashed}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
-  /* REGULATORY ROW. Deliberately NOT `.mapkey span` — those rules dim and strike through
-     a chip when it is off, and the founder's rule is that the regulatory control must
-     never gray out or strike anything. It is a switch, so it reads its state from the
-     switch, and the Stage and Type rows above are visually untouched by it. */
+  /* REGULATORY ROW. One chip, same pattern as the other two rows — the ON/OFF switch it
+     replaces is gone entirely, so there is no second control over the same layer. The
+     purple R keeps its own icon box and is never dimmed or struck: it explains what the
+     RECORD is, while the checkbox says whether the overlay is currently drawn. */
   .mapkey-reg{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-  .regtog{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;
-    padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:#f7faf8;
-    font:600 12px var(--font);color:var(--ink)}
-  .regtog:hover{background:#f2f5f3}
-  .regtog:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
-  .regtog .sw{position:relative;flex:0 0 auto;width:28px;height:16px;border-radius:999px;
-    background:#c9d2cd;transition:background .12s}
-  .regtog .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;
-    border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28);transition:transform .12s}
-  .regtog[aria-checked="true"] .sw{background:var(--green)}
-  .regtog[aria-checked="true"] .sw::after{transform:translateX(12px)}
-  .regtog .ic{display:flex;align-items:center;line-height:0}
-  .regtog .st{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--mute)}
-  .regtog[aria-checked="true"] .st{color:var(--green)}
+  #mapkeyShapes .ic, #mapkeyReg .ic{display:flex;align-items:center;line-height:0}
+  #mapkeyShapes .typechip .ic, #mapkeyReg .regchip .ic{opacity:1}
   .mapkey-reghelp{font-size:11px;color:var(--mute);line-height:1.45;max-width:46em}
   /* Caption for the two legend rows: spans the full map width and centers, so it
      reads as a caption under the map rather than a narrow column flushed left. */
@@ -431,27 +420,6 @@
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
-  /* Type row heading + its dropdown. The chips remain the primary control; this is a
-     second view of the SAME filter state for residents who look for an explicit control
-     rather than trying the legend. */
-  .typehd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .tfwrap{position:relative;display:inline-flex}
-  .tfbtn{font:inherit;font-size:11px;font-weight:600;color:var(--ink);cursor:pointer;
-    display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:7px;
-    border:1px solid var(--line);background:#fff}
-  .tfbtn:hover{background:#f2f5f3}
-  .tfbtn[aria-expanded="true"]{border-color:var(--green);color:var(--green)}
-  .tfct{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;
-    padding:0 4px;border-radius:999px;background:var(--green);color:#fff;font-size:10px;font-weight:700}
-  .tfct[hidden]{display:none}
-  .tfmenu{position:absolute;top:calc(100% + 5px);left:0;z-index:900;min-width:210px;padding:6px;
-    background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.13)}
-  .tfmenu[hidden]{display:none}
-  .tfrow{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:6px;cursor:pointer;
-    font-size:12px;color:var(--ink);white-space:nowrap}
-  .tfrow:hover{background:#f2f5f3}
-  .tfrow input{margin:0;cursor:pointer;accent-color:var(--green)}
-  .tfrow .ic{display:flex;align-items:center;line-height:0}
   .tfall{display:block;width:100%;margin-top:4px;padding:6px;font:inherit;font-size:11px;font-weight:600;
     color:var(--green);background:none;border:0;border-top:1px solid var(--line);cursor:pointer;text-align:left}
   .tfall:hover{background:#f2f5f3}
@@ -580,28 +548,36 @@
                    look broken. Non-blocking, and it carries its own way out. -->
               <div class="mapkey-empty" id="mapkeyStageEmpty" hidden><span>No project statuses are selected.</span>
                 <button type="button" class="mk-linkbtn" id="stageSelectAll">Select all statuses.</button></div>
-              <div class="mapkey-hd typehd" id="shapeLegHd"><span>Type — pin shape</span>
-                <span class="tfwrap">
-                  <button type="button" class="tfbtn" id="typeFilterBtn" aria-haspopup="true"
-                          aria-expanded="false" aria-controls="typeFilterMenu">Show types
-                    <span class="tfct" id="typeFilterCount" hidden></span> &#9662;</button>
-                  <div class="tfmenu" id="typeFilterMenu" hidden role="group"
-                       aria-label="Show or hide project types"></div>
-                </span>
-              </div>
-              <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
+              <!-- THE "Show types" DROPDOWN IS GONE. It was a SECOND control over the same
+                   state, which is one control too many once the chips are checkboxes: the
+                   chip now carries its own checked/unchecked state visibly, so the dropdown
+                   added a place for the two to disagree and nothing else. -->
+              <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
+              <div class="mapkey mapkey-shapes" id="mapkeyShapes" role="group"
+                   aria-label="Project type filters" aria-describedby="mapkeyTypeHelp"></div>
+              <div class="mapkey-help" id="mapkeyTypeHelp">Checked types are shown on the map.</div>
+              <!-- Zero types selected is a LEGAL state, answered exactly as the Stage row
+                   answers it. ⚖️ THE CLAIM CHANGED, WHICH IS WHY THE OLD RECORD-GATE IS GONE:
+                   the previous note asserted "the map is empty", so it had to be MEASURED
+                   against what was drawn and suppressed on a ZIP with no records (promising
+                   absent data is the product-truth rule). This one reports the CONTROL's own
+                   state, which is true whenever it is true — on an empty ZIP as much as a full
+                   one — and it is the only thing on screen explaining why nothing can appear. -->
+              <div class="mapkey-empty" id="mapkeyEmpty" hidden><span>No project types are selected.</span>
+                <button type="button" class="mk-linkbtn" id="typeSelectAll">Select all types.</button></div>
               <!-- THE THIRD ROW. Regulatory records are not a project type and not a lifecycle
                    stage — they are context that OVERLAPS both — so they get their own row and
                    their own on/off control rather than an eighth Type chip. Built from
                    HS.REGULATORY_LEGEND; nothing here is hand-listed. -->
               <div class="mapkey-hd" id="regLegHd">Regulatory records</div>
-              <div class="mapkey-reg" id="mapkeyReg"></div>
+              <div class="mapkey-reg" id="mapkeyReg" role="group"
+                   aria-label="Regulatory record filters" aria-describedby="mapkeyRegRule"></div>
+              <div class="mapkey-help" id="mapkeyRegRule">Checked records are shown on the map.</div>
+              <!-- The founder's copy, set from HS.REGULATORY_LEGEND.helper. It explains what the
+                   purple R MEANS and what the corpus covers; the chip's checkmark says only
+                   whether the overlay is currently drawn. Two different questions, two lines. -->
               <div class="mapkey-reghelp" id="mapkeyRegHelp"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. Both rows are filters — tap one to hide it. Regulatory records are a separate overlay: a project that also carries a regulatory record keeps its own shape and color and gains a small purple <strong>R</strong> in the lower-right corner, while a location with a regulatory record but no mapped project draws a standalone purple square. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
-              <!-- Shown ONLY when every Type chip is off (HS.allCategoriesOff) and this ZIP
-                   actually has records to reveal. Sits under the legend it refers to, so the
-                   sentence and the control it names are read together. -->
-              <div class="mapkey-empty" id="mapkeyEmpty" hidden>All types are hidden, so the map is empty. Tap a type above to show records again.</div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. All three rows are filters — checked categories are shown on the map. Regulatory records are a separate overlay: a project that also carries a regulatory record keeps its own shape and color and gains a small purple <strong>R</strong> in the lower-right corner, while a location with a regulatory record but no mapped project draws a standalone purple square. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
             </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
@@ -748,7 +724,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=84f97174"></script>
+<script src="lib/map.js?v=367a1b9d"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
@@ -910,6 +886,148 @@ HS.onReady(function(){
     if(!want) return;                     // no ?stages= at all -> keep the all-on default
     STAGE_KEYS.forEach(function(k){ FILTER[k] = !!want[k]; });
   })();
+
+  // ── THE TYPE FILTER — the same contract as Stage, over stable TYPE IDS ────────
+  // "Checked types are shown on the map." Independent multi-select, any combination
+  // legal, applied immediately. It reads and writes the SHIPPED category-filter state
+  // in lib/map.js (HS.getCategoryFilters / setCategoryFilter), so this is a new CONTROL
+  // over the existing filter model, never a second model — which is what lets the
+  // dual-identity contract and the visibility predicate stay exactly as they were.
+  var TYPE_KEYS = (HS.typeFilterKeys || []).slice();
+  var TYPE_LABEL = {};
+  (HS.SHAPE_LEGEND || []).forEach(function(r){ TYPE_LABEL[r.categoryKey] = r.label; });
+  var typeChipByKey = {}, typeBoxByKey = {};
+  function typeIdFor(k){ return (HS.typeIdForKey ? HS.typeIdForKey(k) : k) || k; }
+
+  // ?types= — same three-state reading as ?stages=, for the same reason: ABSENT means
+  // "the resident has expressed nothing" (all on), PRESENT-BUT-EMPTY means "they
+  // deselected everything" (none on), and an unrecognised id is DROPPED rather than
+  // treated as a match, so a stale link degrades to the types it does name.
+  function readTypesFromUrl(){
+    var raw;
+    try { raw = new URL(window.location.href).searchParams.get("types"); }
+    catch(e){ return null; }
+    if(raw === null) return null;
+    var want = {};
+    TYPE_KEYS.forEach(function(k){ want[k] = false; });
+    String(raw).split(",").forEach(function(tok){
+      var k = HS.typeKeyForId ? HS.typeKeyForId(tok) : "";
+      if(k && want.hasOwnProperty(k)) want[k] = true;
+    });
+    return want;
+  }
+  // Each writer owns ONE parameter and re-reads location.href, so the three accumulate
+  // into one URL without any of them having to know about the others — and the Stage
+  // writer stays byte-for-byte the approved implementation.
+  function writeTypesToUrl(){
+    if(!window.history || !window.history.replaceState) return;
+    try {
+      var u = new URL(window.location.href);
+      var st = HS.getCategoryFilters();
+      u.searchParams.set("types", TYPE_KEYS.filter(function(k){ return st[k]; }).map(typeIdFor).join(","));
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch(e){}
+  }
+  function syncTypeControls(){
+    var st = HS.getCategoryFilters();
+    TYPE_KEYS.forEach(function(k){
+      var on = !!st[k], chip = typeChipByKey[k], box = typeBoxByKey[k];
+      if(box) box.checked = on;
+      if(chip) chip.classList.toggle("on", on);
+      // The state, in words, on the control itself — so it is never carried by the tick
+      // or the tint alone. "projects" names what is being filtered; the shape icon is
+      // aria-hidden because it is the pin-shape legend, not the state.
+      if(box) box.setAttribute("aria-label",
+        (TYPE_LABEL[k] || k) + " projects, " + (on ? "shown on map" : "hidden from map"));
+    });
+    syncTypeEmptyNote();
+  }
+  // The ONLY writer for Type.
+  function setType(key, on){
+    if(TYPE_KEYS.indexOf(key) === -1) return;
+    HS.setCategoryFilter(key, on);
+    syncTypeControls();
+    writeTypesToUrl();
+    applyFilter();
+  }
+  function allTypesOff(){
+    return HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff()
+         : TYPE_KEYS.every(function(k){ return !HS.getCategoryFilters()[k]; });
+  }
+  (function applyTypesFromUrl(){
+    var want = readTypesFromUrl();
+    if(!want) return;                     // no ?types= -> keep the stored/all-on default
+    TYPE_KEYS.forEach(function(k){ HS.setCategoryFilter(k, !!want[k]); });
+  })();
+
+  // ── THE REGULATORY OVERLAY — one chip, the same pattern, its own dimension ────
+  // ⚠️ IT IS DELIBERATELY NOT FOLDED INTO THE PROJECT PREDICATE. Stage AND Type decide
+  // which PROJECT pins are drawn; this decides whether the regulatory overlay is drawn.
+  // The engine's dual-identity contract is what makes those two statements compatible:
+  // a record carrying BOTH a project type and a regulatory record is ONE marker admitted
+  // by EITHER membership, so unchecking its Type does not erase its regulatory identity
+  // and unchecking regulatory does not erase the project. That is the documented data
+  // model (#1056/#1093, test/map1-dual-identity.browser.test.mjs), and it is the reason
+  // the visibility predicate below is untouched by this change.
+  function readRegulatoryFromUrl(){
+    var raw;
+    try { raw = new URL(window.location.href).searchParams.get("regulatory"); }
+    catch(e){ return null; }
+    if(raw === null) return null;
+    var v = String(raw).trim();
+    if(v === "0") return false;
+    if(v === "1") return true;
+    return null;                          // anything else fails safe to the default (on)
+  }
+  function writeRegulatoryToUrl(){
+    if(!window.history || !window.history.replaceState) return;
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set("regulatory", HS.regulatoryVisible() ? "1" : "0");
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch(e){}
+  }
+  var regChip = null, regBox = null;
+  function syncRegulatoryChip(){
+    var on = HS.regulatoryVisible ? HS.regulatoryVisible() : true;
+    if(regBox) regBox.checked = on;
+    if(regChip) regChip.classList.toggle("on", on);
+    if(regBox) regBox.setAttribute("aria-label",
+      "Regulatory facilities, " + (on ? "shown on map" : "hidden from map"));
+  }
+  function setRegulatory(on){
+    HS.setCategoryFilter(HS.REGULATORY_LEGEND.key, !!on);
+    syncRegulatoryChip();
+    writeRegulatoryToUrl();
+    applyFilter();
+  }
+  (function applyRegulatoryFromUrl(){
+    var want = readRegulatoryFromUrl();
+    if(want === null) return;             // absent or unparseable -> keep the fail-open default
+    HS.setCategoryFilter(HS.REGULATORY_LEGEND.key, want);
+  })();
+
+  // Zero types selected — the Type row's half of the same affordance the Stage row has.
+  function syncTypeEmptyNote(){
+    var em = document.getElementById("mapkeyEmpty");
+    if(em) em.hidden = !allTypesOff();
+  }
+
+  // HISTORY. Filter clicks use replaceState on purpose (a filter is not a navigation, and
+  // twenty clicks must not become twenty Back presses), so they create no entries of their
+  // own. This restores state when the URL is changed by history navigation anyway — a
+  // Back out of a pin/detail route, or a forward into a shared link — so the map can never
+  // be showing one thing while the address bar says another.
+  window.addEventListener("popstate", function(){
+    var wantStages = readStagesFromUrl();
+    if(wantStages) STAGE_KEYS.forEach(function(k){ FILTER[k] = !!wantStages[k]; });
+    var wantTypes = readTypesFromUrl();
+    if(wantTypes) TYPE_KEYS.forEach(function(k){ HS.setCategoryFilter(k, !!wantTypes[k]); });
+    var wantReg = readRegulatoryFromUrl();
+    if(wantReg !== null) HS.setCategoryFilter(HS.REGULATORY_LEGEND.key, wantReg);
+    syncStageControls(); syncTypeControls(); syncRegulatoryChip();
+    applyFilter();
+  });
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
@@ -2379,36 +2497,6 @@ HS.onReady(function(){
   function markerVisible(x){
     return !!FILTER[x.bucket] && (HS.categoryVisible ? HS.categoryVisible(x.mk || x.s) : true);
   }
-  // A map emptied by the resident's OWN filters must say so. With every Type chip off the
-  // map goes blank, and a blank map is indistinguishable from a ZIP with no coverage — the
-  // same silence-vs-filtered ambiguity the category filter's fail-open default guards
-  // against, one layer up in the UI. HS.allCategoriesOff() is the SHIPPED predicate over
-  // the same CATEGORY_FILTER_KEYS the chips are built from; nothing here recomputes filter
-  // state or introduces a second notion of "off".
-  //
-  // Gated on there being records to reveal, deliberately: on a ZIP with no development
-  // records "turn a type back on to show records" would promise records that do not exist,
-  // which is the product-truth rule, not a nicety. That ZIP keeps its own honest coverage
-  // note instead.
-  //
-  // Scoped to the TYPE row only. Lifecycle chips can also empty the map, but that is a
-  // separate affordance and a separate product decision — this says exactly one true thing.
-  //
-  // ⚠️ THE PREDICATE IS THE TYPE KEYS, NOT ALL CATEGORY KEYS (2026-09-06). Regulatory
-  // records left the Type row for their own switch, so "every Type chip is off" no longer
-  // implies an empty map: with the switch on, regulatory-only locations are still drawn.
-  // Reading HS.allCategoriesOff() here would have kept the note silent whenever the
-  // regulatory switch was on — the note would never fire in the exact state it exists for
-  // — and asserting "the map is empty" is only honest if it actually is, so the emptiness
-  // half is MEASURED against the same markerVisible() the layer uses rather than inferred.
-  function syncAllTypesOffNote(){
-    var em = document.getElementById("mapkeyEmpty");
-    if(!em) return;
-    var allOff = HS.allTypeCategoriesOff ? HS.allTypeCategoriesOff()
-               : (HS.allCategoriesOff ? HS.allCategoriesOff() : false);
-    var nothingVisible = !siteMarkers.some(markerVisible);
-    em.hidden = !(allOff && nothingVisible && siteMarkers.length > 0);
-  }
   // ONE icon builder for the 2D layer, so the marker drawn at load and the marker
   // redrawn when the regulatory switch moves are the same drawing. The primary symbol
   // stays centred on the icon anchor and the badge overflows the box, so re-icon-ing
@@ -2452,7 +2540,7 @@ HS.onReady(function(){
       if(markerVisible(x)){ x.m.addTo(layerGroup); }
       else { layerGroup.removeLayer(x.m); }
     });
-    syncAllTypesOffNote();
+    syncTypeEmptyNote();
     syncStageEmptyNote();
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
@@ -2525,118 +2613,58 @@ HS.onReady(function(){
     // dual-identity contract still holds: a Data center that carries a regulatory record
     // is still admitted by EITHER its Data center chip or the regulatory switch, and it
     // still draws its Data center octagon whichever one admitted it.
+    // THE TYPE ROW — the same checkbox chip as the Stage row, one per project type.
+    // The "Show types" dropdown that used to sit beside the heading is GONE: it was a
+    // second view of this same state, and once the chip shows its own checked state
+    // there is nothing for a second control to add except a way for the two to disagree.
     var shapes = document.getElementById("mapkeyShapes");
     if(shapes && HS.SHAPE_LEGEND && HS.setCategoryFilter){
       shapes.innerHTML = "";
+      typeChipByKey = {}; typeBoxByKey = {};
       var neutral = HS.markerRegistry.neutralHex;
       var typeRows = HS.SHAPE_LEGEND.map(function(r){
         return { key: r.categoryKey, shape: r.shape, color: neutral, label: r.label };
       });
 
-      // TWO CONTROLS OVER ONE STATE. The legend chips and the "Show types" dropdown are two
-      // views of the SAME HS.getCategoryFilters() set - not a second filter model. Everything
-      // that mutates goes through setType(), and everything that displays is repainted by
-      // syncTypeControls(), so the two can never disagree about what is hidden. A resident who
-      // discovers the chips and one who opens the dropdown are operating the same switch.
-      var tfBtn = document.getElementById("typeFilterBtn");
-      var tfMenu = document.getElementById("typeFilterMenu");
-      var tfCount = document.getElementById("typeFilterCount");
-      var chipByKey = {}, boxByKey = {};
-
-      function syncTypeControls(){
-        var st = HS.getCategoryFilters(), hidden = 0;
-        typeRows.forEach(function(r){
-          var on = !!st[r.key];
-          if(!on) hidden++;
-          var chip = chipByKey[r.key];
-          if(chip){
-            chip.classList.toggle("off", !on);
-            chip.setAttribute("aria-pressed", on ? "true" : "false");
-          }
-          var box = boxByKey[r.key];
-          if(box) box.checked = on;
-        });
-        // The count is the honest read of the control: a resident who left types off and
-        // scrolled away can see, without opening anything, that the map is filtered.
-        if(tfCount){ tfCount.hidden = (hidden === 0); tfCount.textContent = hidden ? String(hidden) : ""; }
-        if(tfBtn) tfBtn.setAttribute("aria-label",
-          hidden ? (hidden + " of " + typeRows.length + " project types hidden") : "All project types shown");
-      }
-      // The ONLY writer. Both controls and the reset call it.
-      function setType(key, on){
-        HS.setCategoryFilter(key, on);
-        syncTypeControls();
-        applyFilter();
-      }
-
       typeRows.forEach(function(r){
-        var row = document.createElement("span");
-        row.className = "sh";
-        row.tabIndex = 0;
-        row.setAttribute("role", "button");
-        row.setAttribute("data-cat", r.key);
-        row.setAttribute("aria-label", r.label + " markers");
-        row.innerHTML = "<span class='ic'>" + HS.markerSVG(r.shape, r.color, "", 14) + "</span><span class='t'>" + esc(r.label) + "</span>";
-        chipByKey[r.key] = row;
-        function toggle(){ setType(r.key, !HS.getCategoryFilters()[r.key]); }
-        row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
-        row.addEventListener("keydown", function(e){
-          if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
-        });
-        shapes.appendChild(row);
+        var chip = document.createElement("label");
+        chip.className = "typechip";
+        // `data-cat` is kept verbatim — it is how every existing Map 1 suite addresses a
+        // Type control, and the control moved, not the category it stands for.
+        chip.setAttribute("data-cat", r.key);
+        chip.setAttribute("data-type-id", typeIdFor(r.key));
+        var box = document.createElement("input");
+        box.type = "checkbox";
+        box.className = "chipbox";
+        box.checked = !!HS.getCategoryFilters()[r.key];
+        // THE SHAPE ICON IS THE PIN-SHAPE LEGEND AND NOTHING ELSE. It is drawn from the
+        // SAME HS.markerSVG the map draws pins with, at full strength in BOTH states, and
+        // it is aria-hidden because the checkbox's own name already carries the state.
+        // Checkmark = shown on the map; shape = which project type. Two channels, and
+        // neither one is colour.
+        chip.innerHTML = "<span class='ck' aria-hidden='true'></span>"
+          + "<span class='ic' aria-hidden='true'>" + HS.markerSVG(r.shape, r.color, "", 14) + "</span>"
+          + "<span class='t'>" + esc(r.label) + "</span>";
+        chip.insertBefore(box, chip.firstChild);
+        typeChipByKey[r.key] = chip; typeBoxByKey[r.key] = box;
+        // `change`, not `click`: keyboard Space and a pointer click become ONE path, and
+        // the handler reads the control's resulting state instead of inferring a toggle.
+        box.addEventListener("change", function(){ setType(r.key, box.checked); });
+        shapes.appendChild(chip);
       });
 
-      // The dropdown, built from the SAME typeRows - never a hand-listed second roster, so a
-      // category added to CATEGORY_REGISTRY appears in both controls with no change here.
-      if(tfMenu){
-        tfMenu.innerHTML = "";
-        typeRows.forEach(function(r){
-          var lab = document.createElement("label");
-          lab.className = "tfrow";
-          var cb = document.createElement("input");
-          cb.type = "checkbox";
-          cb.setAttribute("data-cat-input", r.key);
-          cb.addEventListener("change", function(){ setType(r.key, cb.checked); });
-          boxByKey[r.key] = cb;
-          var ic = document.createElement("span");
-          ic.className = "ic";
-          ic.innerHTML = HS.markerSVG(r.shape, r.color, "", 14);
-          var t = document.createElement("span");
-          t.className = "t";
-          t.textContent = r.label;
-          lab.appendChild(cb); lab.appendChild(ic); lab.appendChild(t);
-          tfMenu.appendChild(lab);
-        });
-        var all = document.createElement("button");
-        all.type = "button";
-        all.className = "tfall";
-        all.id = "typeFilterAll";
-        all.textContent = "Show all types";
-        all.addEventListener("click", function(){
-          typeRows.forEach(function(r){ HS.setCategoryFilter(r.key, true); });
+      // The empty state's way out, wired once — buildLegend can run again on a redraw.
+      var typeAll = document.getElementById("typeSelectAll");
+      if(typeAll && !typeAll.__wired){
+        typeAll.__wired = true;
+        typeAll.addEventListener("click", function(e){
+          e.preventDefault();
+          TYPE_KEYS.forEach(function(k){ HS.setCategoryFilter(k, true); });
           syncTypeControls();
+          writeTypesToUrl();
           applyFilter();
-        });
-        tfMenu.appendChild(all);
-      }
-      // Open/close wired ONCE - buildLegend can run again on a redraw, and re-adding these
-      // would stack duplicate document-level listeners.
-      if(tfBtn && tfMenu && !tfBtn.getAttribute("data-wired")){
-        tfBtn.setAttribute("data-wired", "1");
-        var closeTf = function(){
-          tfMenu.hidden = true;
-          tfBtn.setAttribute("aria-expanded", "false");
-        };
-        tfBtn.addEventListener("click", function(e){
-          e.stopPropagation();
-          var opening = tfMenu.hidden;
-          tfMenu.hidden = !opening;
-          tfBtn.setAttribute("aria-expanded", opening ? "true" : "false");
-        });
-        tfMenu.addEventListener("click", function(e){ e.stopPropagation(); });
-        document.addEventListener("click", closeTf);
-        document.addEventListener("keydown", function(e){
-          if(e.key === "Escape" || e.key === "Esc"){ closeTf(); }
+          var first = typeBoxByKey[TYPE_KEYS[0]];
+          if(first) first.focus();
         });
       }
       syncTypeControls();
@@ -2669,36 +2697,32 @@ HS.onReady(function(){
     if(help) help.textContent = reg.helper;
     host.innerHTML = "";
 
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "regtog";
-    btn.id = "regToggle";
-    btn.setAttribute("role", "switch");
-    btn.setAttribute("data-cat", reg.key);
-    // The R the resident sees on the map, rendered from the SAME marker code that draws
-    // it on the pins — so the legend cannot show one badge while the map draws another.
+    // ONE CHIP, and the ON/OFF switch is gone — not hidden, not kept alongside. Two
+    // controls over one layer is exactly what the Type dropdown was, and the founder's
+    // rule for this row (never gray out, never strike through) is satisfied by the same
+    // chip the other two rows use, which does neither.
+    var chip = document.createElement("label");
+    chip.className = "regchip";
+    chip.id = "regToggle";                 // id kept: it is how existing suites address it
+    chip.setAttribute("data-cat", reg.key);
+    var box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "chipbox";
+    box.id = "regToggleBox";
+    box.checked = HS.regulatoryVisible ? HS.regulatoryVisible() : true;
+    // The R the resident sees on the map, drawn by the SAME marker code that draws it on
+    // the pins — so the chip cannot advertise one badge while the map paints another. It
+    // is aria-hidden and full-strength in both states: it explains the RECORD, while the
+    // checkbox says whether the overlay is currently drawn.
     var badge = HS.markerSVG(reg.symbol, reg.color, reg.letter, 15);
-    btn.innerHTML = "<span class='sw' aria-hidden='true'></span>"
+    chip.innerHTML = "<span class='ck' aria-hidden='true'></span>"
       + "<span class='ic' aria-hidden='true'>" + badge + "</span>"
-      + "<span class='t'>" + esc(reg.toggleLabel) + "</span>"
-      + "<span class='st' id='regToggleState' aria-hidden='true'></span>";
-
-    function sync(){
-      var on = HS.regulatoryVisible ? HS.regulatoryVisible() : !!HS.getCategoryFilters()[reg.key];
-      btn.setAttribute("aria-checked", on ? "true" : "false");
-      var st = document.getElementById("regToggleState");
-      if(st) st.textContent = on ? "ON" : "OFF";
-      // The switch already states on/off; the accessible name says what it controls.
-      btn.setAttribute("aria-label", reg.toggleLabel);
-    }
-    btn.addEventListener("click", function(e){
-      e.stopPropagation();
-      HS.setCategoryFilter(reg.key, !HS.getCategoryFilters()[reg.key]);
-      sync();
-      applyFilter();
-    });
-    host.appendChild(btn);
-    sync();
+      + "<span class='t'>" + esc(reg.chipLabel) + "</span>";
+    chip.insertBefore(box, chip.firstChild);
+    regChip = chip; regBox = box;
+    box.addEventListener("change", function(){ setRegulatory(box.checked); });
+    host.appendChild(chip);
+    syncRegulatoryChip();
   }
 
   // The class of official document the record link opens, so the label states it up
