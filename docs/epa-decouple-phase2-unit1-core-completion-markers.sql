@@ -60,6 +60,21 @@ comment on column public.app_community_meta.core_records_present is
 -- never transcribed).  Backfilled in the SAME script as the writer, so no tick of
 -- `dev-reports-rolling-refresh` or `app-content-refresh` can run a function that does
 -- not maintain a column that already exists.
+--
+-- 🔑 `category <> 'Local News'` IS LOAD-BEARING, AND ITS ABSENCE IS INVISIBLE.
+-- `app_refresh_zip`'s own `_nc` carries NO category filter — it is civic-only by
+-- ORDERING: the function deletes the ZIP's app_changes rows, inserts the civic ones,
+-- counts `_nc` at line 264, and only THEN inserts Local News at line 288.  A backfill
+-- runs long after that ordering has passed, with the news rows already in the table, so
+-- reproducing `_nc` requires the filter the function never needed.  `app_coverage_states`
+-- states the same rule the other way, as `count(*) filter (where a.category <> 'Local
+-- News') AS changes`.
+--
+-- Measured 2026-09-07: without the filter, **630 of 12,722 ZIPs** would have been stamped
+-- `core_records_present = true` on Local News alone (12,308 vs the correct 11,678) — the
+-- 2026-08-02 "news is content, not coverage" defect, reintroduced in a brand-new column.
+-- The corrected figure reconciles exactly with the Unit 2 partition: 11,678 core-content
+-- + 766 core-empty-with-EPA + 278 empty-either-way = 12,722.
 update public.app_community_meta m
    set core_project_scan_status =
          case when not exists (select 1 from public.development_reports d where d.zip = m.zip)
@@ -72,7 +87,8 @@ update public.app_community_meta m
          exists (select 1 from public.app_projects p
                   where p.zip = m.zip and p.record_kind = 'development')
          or exists (select 1 from public.app_changes  c
-                     where c.zip = m.zip and coalesce(c.source_ref,'') <> '');
+                     where c.zip = m.zip and coalesce(c.source_ref,'') <> ''
+                       and c.category <> 'Local News');
 
 alter table public.app_community_meta
   add constraint app_community_meta_core_scan_status_chk
@@ -191,6 +207,23 @@ begin
    where core_project_scan_status is null or core_records_present is null;
   if n_bad > 0 then
     raise exception 'VERIFY FAILED: % of % rows have a NULL core marker after backfill', n_bad, n_rows;
+  end if;
+
+  -- (e0) The backfill must reproduce the WRITER's semantics. Inside app_refresh_zip the
+  --      expression is `(_nd+_nc) > 0` with no category filter, which is civic-only
+  --      because `_nc` is counted before the Local News insert; the backfill needs the
+  --      explicit filter to reach the same answer after the fact. Assert the two agree
+  --      on the one shape that separates them: a ZIP whose only app_changes rows are
+  --      Local News must NOT be marked as having core records.
+  select count(*) into n_bad from public.app_community_meta m
+   where m.core_records_present
+     and not exists (select 1 from public.app_projects p
+                      where p.zip = m.zip and p.record_kind = 'development')
+     and not exists (select 1 from public.app_changes c
+                      where c.zip = m.zip and coalesce(c.source_ref,'') <> ''
+                        and c.category <> 'Local News');
+  if n_bad > 0 then
+    raise exception 'VERIFY FAILED: % rows claim core records on Local News alone', n_bad;
   end if;
 
   -- (e) A ZIP whose core plane is empty must never be reported as having projects, and

@@ -34,7 +34,18 @@
 -- `last_refresh_attempt_at`, which Phase 1B made core-only clocks when it introduced
 -- `facilities_refreshed_at`.  Nothing in the core ladder may read the overlay clock;
 -- the invariants below assert that.
-create or replace view public.app_coverage_states as
+--
+-- 🔒 `WITH (security_invoker = true)` IS RESTATED, AND OMITTING IT WOULD HAVE BEEN A
+-- SILENT PRIVILEGE ESCALATION.  The live view already carries
+-- `reloptions = {security_invoker=true}` and is owned by `postgres`.  Measured on this
+-- database rather than recalled: creating a view WITH the option and then issuing a
+-- bare `create or replace view` WITHOUT it leaves `reloptions = (none)` — the option is
+-- DROPPED, not preserved.  So the first draft of this file would have converted an
+-- anon-readable view into one executing with the owner's rights, bypassing RLS on
+-- app_community_meta, development_reports, app_projects and app_changes.  Restating it
+-- makes the file reproduce production exactly; against production it is a no-op.
+create or replace view public.app_coverage_states
+  with (security_invoker = true) as
  SELECT m.zip,
         CASE
             WHEN r.zip IS NULL THEN 'unsupported_source'::text
@@ -63,15 +74,15 @@ create or replace view public.app_coverage_states as
         END AS regulatory_overlay_state,
     r.facilities_refreshed_at,
     COALESCE(r.facilities_unavailable, false) AS facilities_unavailable
-   FROM app_community_meta m
-     LEFT JOIN development_reports r ON r.zip = m.zip
+   FROM public.app_community_meta m
+     LEFT JOIN public.development_reports r ON r.zip = m.zip
      LEFT JOIN LATERAL ( SELECT count(*) FILTER (WHERE p.record_kind = 'development'::text) AS dev_markers,
             count(*) FILTER (WHERE p.record_kind = 'facility'::text) AS fac_markers
-           FROM app_projects p
+           FROM public.app_projects p
           WHERE p.zip = m.zip) c ON true
      LEFT JOIN LATERAL ( SELECT count(*) FILTER (WHERE a.category <> 'Local News'::text) AS changes,
             count(*) FILTER (WHERE a.category = 'Local News'::text) AS news_items
-           FROM app_changes a
+           FROM public.app_changes a
           WHERE a.zip = m.zip) ch ON true;
 
 comment on view public.app_coverage_states is
@@ -97,12 +108,17 @@ declare
   n_rows    bigint;
   n_bad     bigint;
 begin
-  select pg_get_viewdef('public.app_coverage_states'::regclass, true) into def;
+  -- ⚠️ LOWERCASE BOTH SIDES. `pg_get_viewdef` renders keywords in upper case today, but
+  --    the isolation below must not depend on that: a slice anchored on a casing that
+  --    changes silently returns the WRONG substring, and an EPA term inside it would then
+  --    go unseen — a guard that stops guarding without failing. Every needle is lower
+  --    case and the haystack is lowered once.
+  select lower(pg_get_viewdef('public.app_coverage_states'::regclass, true)) into def;
 
   -- (a) THE CORE INVARIANT: no EPA term survives anywhere in the core ladder. The
   --     ladder is everything from the opening CASE to its END ... AS coverage_state.
-  core_def := substring(def from position('CASE' in def) for
-                        position('AS coverage_state' in def) - position('CASE' in def));
+  core_def := substring(def from position('case' in def) for
+                        position('as coverage_state' in def) - position('case' in def));
   if core_def is null or length(core_def) < 100 then
     raise exception 'VERIFY FAILED: could not isolate the coverage_state ladder';
   end if;
@@ -124,6 +140,16 @@ begin
      or position('overlay_unknown'         in def) = 0
      or position('facilities_refreshed_at' in def) = 0 then
     raise exception 'VERIFY FAILED: the regulatory overlay plane is not exposed';
+  end if;
+
+  -- (c2) The view must still execute with the INVOKER's rights. A bare
+  --      `create or replace view` drops reloptions (measured on this database), so this
+  --      is the difference between reproducing production and silently escalating it.
+  if not exists (
+        select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relname = 'app_coverage_states'
+           and 'security_invoker=true' = any (c.reloptions)) then
+    raise exception 'VERIFY FAILED: app_coverage_states is not security_invoker — it would bypass RLS';
   end if;
 
   -- (d) Every ZIP still classifies, on BOTH planes, with no NULLs and no strays.

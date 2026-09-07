@@ -209,12 +209,35 @@ for (const s of sample) {
 // rendering test cover both the pre-split and post-split shapes.
 const pickRow = (pred) => rows.find(pred);
 const rFacOnly = pickRow(r => nz(r).core === 'honestly_empty' && nz(r).overlay === 'overlay_records');
-const rEmpty   = pickRow(r => nz(r).core === 'honestly_empty' && nz(r).overlay !== 'overlay_records');
+// ⚠️ THE HONEST-EMPTY SAMPLE MUST MATCH THE PAGE'S OWN CONDITION, NOT ITS COMPLEMENT.
+// lib/community-page.js renders the "we checked every supported public source … including
+// the EPA facility registry" sentence only when the overlay AGREES it is empty —
+// overlay_empty | overlay_unsupported (or, pre-split, no overlay column at all). Picking
+// with `overlay !== 'overlay_records'` also admits overlay_unknown, where that sentence is
+// deliberately suppressed, so the sample would assert copy the page is right not to show.
+const EMPTY_OVERLAYS = new Set(['overlay_empty', 'overlay_unsupported']);
+const rEmpty   = pickRow(r => nz(r).core === 'honestly_empty' && EMPTY_OVERLAYS.has(nz(r).overlay));
 const rPop     = pickRow(r => nz(r).core === 'populated');
+// overlay_unknown can only exist once the view is SPLIT — normalize() never synthesises it
+// from the pre-split shape, because the pre-split view has no way to express "we could not
+// read EPA". Sampling it before then would pick nothing and assert nothing.
+const rUnknown = SPLIT_LIVE
+  ? pickRow(r => nz(r).core === 'honestly_empty' && nz(r).overlay === 'overlay_unknown')
+  : null;
+if (!SPLIT_LIVE) {
+  console.log('INFO overlay_unknown sample SKIPPED: the view is PRE-SPLIT, so no row can '
+    + 'carry overlay_unknown (normalize() maps the old shape onto records/empty/unsupported '
+    + 'only). This is not a failure — the sample arms itself when the migration lands.');
+} else if (!rUnknown) {
+  console.log('INFO overlay_unknown sample SKIPPED: the view is SPLIT but no ZIP is '
+    + 'core-empty with an unverified EPA read right now (every EPA read succeeded). '
+    + 'Not a failure — nothing to sample.');
+}
 const pages = [
-  rFacOnly && { zip: rFacOnly.zip, state: rFacOnly.coverage_state, kind: 'facilities_only', wantPass: true },
-  rEmpty   && { zip: rEmpty.zip,   state: rEmpty.coverage_state,   kind: 'honestly_empty',  wantPass: false },
-  rPop     && { zip: rPop.zip,     state: rPop.coverage_state,     kind: 'populated',       wantPass: true },
+  rFacOnly && { zip: rFacOnly.zip, state: rFacOnly.coverage_state, kind: 'facilities_only',  wantPass: true },
+  rEmpty   && { zip: rEmpty.zip,   state: rEmpty.coverage_state,   kind: 'honestly_empty',   wantPass: false },
+  rUnknown && { zip: rUnknown.zip, state: rUnknown.coverage_state, kind: 'overlay_unknown',  wantPass: false },
+  rPop     && { zip: rPop.zip,     state: rPop.coverage_state,     kind: 'populated',        wantPass: true },
 ].filter(Boolean);
 const b = await chromium.launch();
 for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844, isMobile: true, hasTouch: true }]) {
@@ -238,6 +261,15 @@ for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile
     // must read identically before and after the split, which is the whole no-op claim.
     if (t.kind === 'honestly_empty') ok(`${vp.name} ${t.zip} honest empty copy`, /checked every supported public source/i.test(got.txt));
     if (t.kind === 'facilities_only') ok(`${vp.name} ${t.zip} facilities-only note`, /still being wired/i.test(got.txt));
+    // An unverified EPA read must NOT claim we checked the registry. The page falls
+    // through to the existing non-assertive copy; both halves are asserted, because
+    // "the sentence is gone" and "something true replaced it" are different facts.
+    if (t.kind === 'overlay_unknown') {
+      ok(`${vp.name} ${t.zip} unverified EPA read does not claim a checked registry`,
+         !/checked every supported public source/i.test(got.txt));
+      ok(`${vp.name} ${t.zip} falls through to the being-wired copy`,
+         /Coverage for this ZIP is being wired/i.test(got.txt));
+    }
   }
   await page.close();
 }

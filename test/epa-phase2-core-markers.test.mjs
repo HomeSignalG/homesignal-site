@@ -33,6 +33,9 @@ const sql = executable(raw);
 
 const failures = [];
 const ok = (name, cond) => { if (cond) console.log(`PASS — ${name}`); else { console.log(`FAIL — ${name}`); failures.push(name); } };
+// A SKIP is a recorded open question, not a pass. It prints and does not fail, so an
+// unresolved product call cannot be mistaken for a verified one OR silently turn CI red.
+const skip = (name, why) => console.log(`SKIP — ${name}\n        ${why}`);
 
 // ───────────────────────── the model ─────────────────────────
 // Mirrors the spliced expressions. `nf`/`nfc` are accepted as arguments ON PURPOSE:
@@ -107,6 +110,17 @@ const CORE_GRID = [
   ok('4b. ... and is still not indexable (the pin-precision bar is unchanged)',
      indexableAfter(z) === false);
   ok('4c. ... and its core plane is present', coreRecords(z) === true);
+
+  // ⚠️ OPEN, AND DELIBERATELY NOT RESOLVED IN THIS PASS.
+  skip('4d. the modelled shape is NOT the production area-scope shape',
+       'Case 4 models {nd:3, ndp:0} — a ZIP with development app_projects rows but none '
+     + 'parcel-precise. Production\'s actual area-scope population is {nd:0, nc:N}: an '
+     + 'area-scope record materializes as an app_changes notice, not as a development '
+     + 'app_projects row, so it lands in _nc and never in _nd. Under the parked rule such '
+     + 'a ZIP therefore reports no_qualifying_projects_found while core_records_present is '
+     + 'true. Whether that is the right pair for an area-scope-only ZIP is a PRODUCT call '
+     + 'for the founder, not an engineering one. No new definition of projects_found is '
+     + 'spliced here and the parked SQL is unchanged by this note.');
 }
 
 // 5 — never scanned is distinguishable from scanned-and-empty. Collapsing the two is how
@@ -162,6 +176,30 @@ ok('10. SQL: the backfill derives its set from the DB',
    /from public\.development_reports d where d\.zip = m\.zip/.test(sql)
    && /from public\.app_projects p/.test(sql) && /from public\.app_changes\s+c/.test(sql));
 ok('10b. SQL: no hand-listed ZIP array', !/'\d{5}'\s*,\s*'\d{5}'\s*,\s*'\d{5}'/.test(sql));
+
+// 10c-e — NEWS IS NOT COVERAGE, IN THE BACKFILL TOO. `_nc` inside app_refresh_zip is
+// civic-only by ORDERING (counted at line 264, Local News inserted at line 288); a
+// backfill runs after that ordering has passed and needs the filter explicitly, or it
+// reintroduces the 2026-08-02 defect in a new column. Measured: 630 of 12,722 ZIPs.
+// ⚠️ SCOPED TO THE BACKFILL UPDATE. An unscoped `/and c.category <> 'Local News'/` over
+// the whole file passed even with the filter deleted, because the (e0) invariant names
+// the same string in order to forbid the shape — a pin that cannot fail is not a pin.
+// Caught by mutation M1, which failed 10d alone until this was narrowed.
+const backfillUpdate = (() => {
+  const i = sql.indexOf('update public.app_community_meta m');
+  const j = sql.indexOf(';', i);
+  return i >= 0 && j > i ? sql.slice(i, j) : '';
+})();
+ok('10c. SQL: the backfill UPDATE excludes Local News from core records',
+   backfillUpdate.length > 300 && /and c\.category <> 'Local News'/.test(backfillUpdate));
+ok('10d. SQL: the Local News filter is on the core-records half, not the scan status',
+   (() => {
+     const i = sql.indexOf('core_records_present =');
+     const j = sql.indexOf(';', i);
+     return i > 0 && j > i && /category <> 'Local News'/.test(sql.slice(i, j));
+   })());
+ok('10e. SQL: an invariant forbids core records claimed on Local News alone',
+   /claim core records on Local News alone/.test(sql));
 
 // 11 — no dead statements. A parked migration that looks complete and cannot run is the
 // Phase 1B review finding; an unreachable draft statement is the same defect one step on.

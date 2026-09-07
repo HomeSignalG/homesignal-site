@@ -978,6 +978,24 @@ robots and coverage states are untouched. Full record: audit §14.
   apply, or the repo would document behaviour that does not exist yet: `gen_sitemap.py:6` and
   `:124`, `verify-development.mjs:140`, `gen_zip_pages.py:383`, `homesignalmap.html:1089`,
   `lib/community-page.js:70`.
+- 🔑 **`_nc` IS CIVIC-ONLY BY ORDERING, NOT BY A FILTER — so a BACKFILL needs the filter the
+  function never did.** `app_refresh_zip` deletes the ZIP's `app_changes` rows, inserts the
+  civic ones, counts `_nc` at line 264, and inserts Local News at line 288. A backfill runs long
+  after that ordering has passed. Measured: without `category <> 'Local News'`, **630 of 12,722
+  ZIPs** would have been stamped `core_records_present = true` on Local News alone (12,308 vs
+  the correct 11,678) — the 2026-08-02 "news is content, not coverage" defect reintroduced in a
+  brand-new column. The corrected figure reconciles exactly with Unit 2's partition
+  (11,678 + 766 + 278 = 12,722). Invariant `(e0)` raises if any row claims core records on news
+  alone.
+- ⚠️ **A PIN THAT NAMES THE STRING IT FORBIDS CANNOT ALSO SEARCH THE WHOLE FILE FOR IT.** The
+  first pin for the above passed with the filter deleted, because the invariant mentions the
+  same string in order to forbid it. Only the narrower pin failed, which is what exposed it —
+  **scope a structural pin to the statement it is about.**
+- 📌 **OPEN, deliberately unresolved: the area-scope shape.** Test case 4 models `{nd:3, ndp:0}`;
+  production's area-scope population is `{nd:0, nc:N}` (an area-scope record materializes as an
+  `app_changes` notice, never a development `app_projects` row), so such a ZIP reports
+  `no_qualifying_projects_found` while `core_records_present` is true. Recorded as a printed
+  SKIP in the test; **no new definition of `projects_found` was spliced.** Founder product call.
 
 ### 🅿️ PHASE 2 · UNIT 2 IS BUILT AND PARKED (2026-09-07) — `facilities_only` leaves the CORE enum
 SQL of record `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` (executable, atomic,
@@ -1025,6 +1043,27 @@ mutations). **Independent of Unit 1** — either may be applied first. Full reco
   production. Both crons are `active` and the newest core write is minutes old — this is
   rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
   frequent, not less. Separate work; do not re-derive it.
+- 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
+  privilege escalation.** The live view carries `security_invoker=true` and is owned by
+  `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
+  `create or replace view` WITHOUT it → **`(none)`**. So the first draft of the Unit 2 file
+  would have turned an anon-readable view into one running with the OWNER's rights, bypassing
+  RLS on `app_community_meta`, `development_reports`, `app_projects` and `app_changes` — the
+  `page_cache` posture, arrived at by omission, with nothing in the SQL reporting it. **Always
+  restate `with (security_invoker = true)` on a replace**, schema-qualify every source relation
+  so `search_path` cannot re-point it, and assert `'security_invoker=true' = any (c.reloptions)`
+  after the replace.
+- ⚠️ **A `pg_get_viewdef` SLICE MUST NOT DEPEND ON KEYWORD CASING.** `position('CASE' in def)`
+  returns the wrong substring the day the renderer changes case, and an EPA term inside the
+  isolated ladder then goes unseen — a guard that stops guarding without failing. Lower the
+  haystack once and keep every needle lower case.
+- ⚠️ **A SAMPLER MUST USE THE PAGE'S OWN CONDITION, NEVER ITS COMPLEMENT.** The verifier picked
+  the honest-empty page with `overlay !== 'overlay_records'`, which also admits
+  `overlay_unknown` — where the page deliberately suppresses that sentence. It would have
+  asserted copy the page is right not to show and turned the DAILY job red on a correction. The
+  complement is still correct in the LEGACY `data_quality` rule (both empty and unknown are
+  `coverage_coming`), so the pin forbidding it is scoped to the sampler, not the file.
+  The `overlay_unknown` sample is gated on `SPLIT_LIVE` and names its skip reason.
 
 
 ### Status

@@ -120,12 +120,25 @@ ok('5. news is still not coverage after the split',
 // ───────────────────── structural pins on the SQL of record ─────────────────────
 
 ok('6. SQL: the view is REPLACED, never dropped (grants and dependents survive)',
-   /create or replace view public\.app_coverage_states as/.test(sql) && !/drop view/i.test(sql));
+   /create or replace view public\.app_coverage_states\s*\n?\s*with \(security_invoker = true\) as/.test(sql)
+   && !/drop view/i.test(sql));
+
+// 6a — SECURITY_INVOKER IS RESTATED, AND ITS ABSENCE WOULD BE SILENT. Measured on this
+// database: creating a view WITH the option and then issuing a bare `create or replace
+// view` WITHOUT it leaves reloptions = (none) — the option is DROPPED, not preserved.
+// The live view carries security_invoker=true and is owned by postgres, so omitting it
+// converts an anon-readable view into one running with the owner's rights, bypassing RLS
+// on four tables. Nothing in the SQL would have reported that.
+ok('6a. SQL: the view is restated WITH (security_invoker = true)',
+   /with \(security_invoker = true\) as/.test(sql));
+ok('6a2. SQL: an invariant fails if the view is not security_invoker',
+   /is not security_invoker — it would bypass RLS/.test(sql)
+   && /'security_invoker=true' = any \(c\.reloptions\)/.test(sql));
 // Scoped to the VIEW BODY, not the whole file: the invariant block deliberately NAMES
 // `facilities_only` in order to forbid it, and a guard that cannot mention what it
 // guards against is not a guard.
 const viewBody = (() => {
-  const i = sql.indexOf('create or replace view public.app_coverage_states as');
+  const i = sql.indexOf('create or replace view public.app_coverage_states');
   const j = sql.indexOf('comment on view');
   return i >= 0 && j > i ? sql.slice(i, j) : '';
 })();
@@ -145,6 +158,14 @@ ok('6e. SQL: new columns are APPENDED (create-or-replace cannot reorder)',
    sql.indexOf('AS regulatory_overlay_state') > sql.indexOf('AS news_items'));
 ok('6f. SQL: the anon read grant is restated',
    /grant select on public\.app_coverage_states to anon, authenticated;/.test(sql));
+// 6g — every relation the view reads is SCHEMA-QUALIFIED, so the definition cannot be
+// re-pointed by whatever search_path the applying session happens to carry.
+ok('6g. SQL: every source relation is schema-qualified',
+   /FROM public\.app_community_meta m/.test(viewBody)
+   && /LEFT JOIN public\.development_reports r/.test(viewBody)
+   && /FROM public\.app_projects p/.test(viewBody)
+   && /FROM public\.app_changes a/.test(viewBody)
+   && !/(FROM|JOIN) (app_community_meta|development_reports|app_projects|app_changes)\b/.test(viewBody));
 
 // 7 — the invariants must assert, not describe.
 ok('7. SQL: an invariant forbids the EPA plane in the core ladder',
@@ -157,6 +178,15 @@ ok('7d. SQL: an invariant forbids overlay_empty over an unverified read',
    /report overlay_empty over an unverified EPA read/.test(sql));
 ok('7e. SQL: an invariant pins core state against core content only',
    /whose core state disagrees with core content/.test(sql));
+// 7f — THE LADDER ISOLATION MUST NOT DEPEND ON pg_get_viewdef's KEYWORD CASING. A slice
+// anchored on a casing that changes silently returns the wrong substring, and an EPA term
+// inside it then goes unseen — a guard that stops guarding without failing.
+ok('7f. SQL: the ladder isolation lowercases both the haystack and the needles',
+   /select lower\(pg_get_viewdef\('public\.app_coverage_states'::regclass, true\)\) into def;/.test(sql)
+   && /position\('case' in def\)/.test(sql)
+   && /position\('as coverage_state' in def\)/.test(sql)
+   && !/position\('CASE' in def\)/.test(sql)
+   && !/position\('AS coverage_state' in def\)/.test(sql));
 
 // ───────────────────── structural pins on the shipped consumers ─────────────────────
 
@@ -193,6 +223,36 @@ ok('10e. the legacy data_quality rules are restated on the composed pair',
    /legacy: populated => pass/.test(ver)
    && /legacy: core-empty \+ overlay records => pass/.test(ver)
    && /legacy: core-empty \+ no overlay records => coverage_coming/.test(ver));
+
+// 13 — THE VERIFIER'S RENDERING SAMPLES MUST MATCH THE PAGE'S OWN CONDITIONS. Picking
+// the honest-empty sample with the COMPLEMENT (`overlay !== 'overlay_records'`) also
+// admits overlay_unknown, where the page deliberately suppresses that sentence — the
+// sample would then assert copy the page is right not to show, and turn the daily job red
+// on a correction. The page's condition and the sampler's must be the same set.
+ok('13. the verifier samples honest-empty from the SAME set as the page',
+   /const EMPTY_OVERLAYS = new Set\(\['overlay_empty', 'overlay_unsupported'\]\)/.test(ver)
+   && /EMPTY_OVERLAYS\.has\(nz\(r\)\.overlay\)/.test(ver));
+// Scoped to the SAMPLER block. The complement is still correct — and still used — in the
+// LEGACY data_quality assertion above it, where "no overlay records" genuinely covers
+// overlay_empty AND overlay_unknown because both are coverage_coming. Forbidding the
+// shape file-wide would have broken a rule that is right.
+const sampler = (() => {
+  const i = ver.indexOf('const pickRow = (pred)');
+  const j = ver.indexOf('].filter(Boolean);', i);
+  return i >= 0 && j > i ? ver.slice(i, j) : '';
+})();
+ok('13b. ... and never by the complement of overlay_records, in the sampler',
+   sampler.length > 400 && !/overlay !== 'overlay_records'/.test(sampler.replace(/^\s*\/\/.*$/gm, '')));
+ok('13c. the overlay_unknown sample is gated on SPLIT_LIVE',
+   /const rUnknown = SPLIT_LIVE/.test(ver));
+ok('13d. ... and says WHY it skipped rather than passing in silence',
+   /overlay_unknown sample SKIPPED: the view is PRE-SPLIT/.test(ver)
+   && /overlay_unknown sample SKIPPED: the view is SPLIT but no ZIP/.test(ver));
+ok('13e. ... and asserts BOTH halves: the claim is gone AND true copy replaced it',
+   /unverified EPA read does not claim a checked registry/.test(ver)
+   && /!\/checked every supported public source\/i\.test\(got\.txt\)/.test(ver)
+   && /falls through to the being-wired copy/.test(ver)
+   && /\/Coverage for this ZIP is being wired\/i\.test\(got\.txt\)/.test(ver));
 
 // 11 — SCOPE. This unit is the view and its readers. Units 1, 3, 4 and Phase 1 are not.
 ok('11. SCOPE: the parked SQL does not touch data_quality or the materializer',
