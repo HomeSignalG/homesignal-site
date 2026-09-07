@@ -292,6 +292,10 @@ Data center octagon, keeps its EPA square, appears once, popup reads
   facility read as operating-green while the legend still said "Purple R"; closed
   2026-09-07 — buildings now take `mk.color` from the same resolver as the 2D pin
   (PR #1119).
+- ⚖️ **REJECTED 2026-09-07 — overlay-on-Type (#1121).** An EPA-only facility with a
+  classifiable Type (ANDURIL `layer: 'industrial'`) stays a purple square/block with no
+  R. Dual-identity R is data-centre-only. Closed, not salvaged; do not treat purple-square
+  EPA pins as an opening.
 - Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
 ### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)

@@ -830,6 +830,13 @@ federal records, purple `R` markers, regulatory freshness and refresh) is an OPT
 layer. The core plane must function fully when EPA is unavailable, empty, wrong, replaced, or
 removed entirely.
 
+⚖️ **DISPLAY LANGUAGE — KEEP PURPLE FOR REGULATORY-ONLY (founder, 2026-09-07).** A
+regulatory-only location (EPA/FRS, no dual-identity data-centre membership) draws a **purple
+square / 3D block, no letter.** The purple **R** is reserved for dual identity. **Considered
+and rejected:** overlay-on-Type (#1121) — an EPA-only facility whose class fields map a Type
+(e.g. ANDURIL `layer: 'industrial'`) drawing Type shape + operating-green + R. Closed; nothing
+salvaged. Absence of that language on `main` is a DECISION, not a gap. Do not rebuild.
+
 **PHASE 1 IS SHIPPED (A + B). PHASE 2 IS NOT — and the difference matters.**
 
 ### ✅ Phase 1A — the EPA recovery path can no longer control the core cron
