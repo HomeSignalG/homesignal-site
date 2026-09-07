@@ -7,7 +7,7 @@
 //
 // What this suite pins is the part that is easy to break and invisible when it breaks: the
 // icon is not a new search path. It kept #go and type="submit", so the click still runs the
-// form's own submit handler — the same one Enter and "See a sample" run. A future session
+// form's own submit handler — the same one the Enter key runs. A future session
 // restyling this control could easily turn it into a type="button" with its own click
 // handler, and every screen would still LOOK right while the disabled-while-searching state
 // and the Enter key quietly diverged from it.
@@ -149,7 +149,13 @@ const ctl = await page.evaluate(() => {
     fieldH: ir ? Math.round(ir.height) : 0,
     placeholder: input ? input.getAttribute('placeholder') : null,
     required: !!(input && input.hasAttribute('required')),
-    hint: (document.querySelector('.hint') || {}).textContent || null,
+    // The helper sentence and the "See a sample" link were REMOVED, not hidden — so each is
+    // asserted absent from the DOM. A CSS hide would leave the text in body.innerText and in
+    // the accessibility tree, which is exactly the outcome the removal was asked to avoid.
+    hintEl: !!document.querySelector('.hint'),
+    describedBy: input ? input.getAttribute('aria-describedby') : null,
+    sampleEl: !!document.getElementById('sampleBtn'),
+    pageText: document.body.innerText || '',
     greenButtonGone: !/See development nearby/i.test(document.body.textContent || '')
   };
 });
@@ -160,9 +166,22 @@ ok(ctl.type === 'submit' && ctl.inForm, '1d ...and it is still the FORM\'s submi
 ok(ctl.w >= 44 && ctl.h >= 44, '1e the tap target is at least 44x44', { w: ctl.w, h: ctl.h });
 ok(ctl.insideField && ctl.rightAligned, '1f ...sitting inside the input at its far right', ctl);
 ok(ctl.fieldH <= 52, '1g ...without making the field look oversized', ctl.fieldH);
-ok(ctl.placeholder === 'Enter a street address, e.g., 13313 Coomes Dr', '1h the placeholder is the example address', ctl.placeholder);
-ok(/press Enter, or click search/i.test(ctl.hint || ''), '1i the helper text names all three ways to search', ctl.hint);
+ok(ctl.placeholder === 'Enter an address, e.g., 13313 Coomes Dr, Del Valle, TX 78617',
+   '1h the placeholder is a COMPLETE example — street, city, state and ZIP', ctl.placeholder);
+// The example must be an illustration, never a value: a placeholder written into the field
+// would submit the sample address on the resident's first Enter.
+ok(await page.evaluate(() => document.getElementById('addr').value === ''),
+   '1h2 ...and it is a placeholder only — the field is still empty');
+ok(!ctl.hintEl && !ctl.describedBy,
+   '1i the helper sentence is gone from the DOM, not hidden',
+   { hintEl: ctl.hintEl, describedBy: ctl.describedBy });
+ok(!/from the suggestions|press Enter, or click search/i.test(ctl.pageText),
+   '1i2 ...and its text is not left anywhere else on the page');
 ok(!ctl.required, '1j `required` is gone, so the page can show its own message instead of the browser bubble');
+// "See a sample" filled the box and submitted it. It is removed outright — the element is
+// gone, so nothing can re-run it and no sample address can reach the field.
+ok(!ctl.sampleEl && !/See a sample/i.test(ctl.pageText),
+   '1k the "See a sample" link is gone from the DOM', { el: ctl.sampleEl });
 
 // ══════════════ 2. AN EMPTY SUBMIT NEVER SEARCHES ════════════════════════════════════════════
 geocodeCalls = [];
@@ -258,19 +277,26 @@ await p2.waitForTimeout(700);
 const gone3 = await p2.evaluate(zipAllGone);
 ok(gone3.el && gone3.copy, '5g ...and it is absent on the bare page with no ZIP anywhere', gone3);
 
-// "See a sample" is a separate hero control and was deliberately kept — the control that stops
-// 5a-5g being satisfied by an empty .herolinks.
+// 5a-5g are absence assertions, so they need a control that fails if the hero simply did not
+// render. "See a sample" WAS that control; it has since been removed too, so the control is
+// now the field itself — the one hero element that must survive every removal here, checked
+// on the same page object 5g used.
 ok(await p2.evaluate(() => {
-  const b = document.getElementById('sampleBtn');
-  return !!b && /See a sample/i.test(b.textContent || '');
-}), '5h "See a sample" is still in the hero, so the row was not emptied wholesale');
+  const i = document.getElementById('addr');
+  return !!i && /Enter an address/i.test(i.placeholder || '') && !document.getElementById('sampleBtn');
+}), '5h control — the hero DID render (the field is there, carrying its instruction), so 5a-5g are absences rather than a blank page');
 
 // ══════════════ 7. THE PRODUCTION addressCta GUARD STILL HAS A SOURCE ════════════════════════
 // verify-map1-zip-states asserts against LIVE production that a ZIP page still directs the
-// resident to the address control. It reads document.body.innerText — which does NOT see a
-// placeholder attribute — so replacing the ZIP-mode hint is exactly the kind of edit that has
-// reddened it three times. It runs post-deploy and cannot run from the sandbox, so the risk has
-// to be closed here.
+// resident to the address control. It runs post-deploy and cannot run from the sandbox, so the
+// risk has to be closed here.
+//
+// ⚠️ THE SOURCE MOVED, AND THE GUARD'S INPUT MOVED WITH IT. The hero's helper sentence was the
+// ZIP-mode source; it is gone, and the field's own PLACEHOLDER now carries the direction.
+// document.body.innerText does not see a placeholder attribute, so the verifier applies the
+// same pattern to the placeholder as well — and 7b is the check that the placeholder really
+// satisfies it. Left unchanged, the guard would have gone red on every pending ZIP while the
+// page was in fact directing the resident correctly.
 //
 // MEASURED, and the measurement corrected a wrong assumption worth recording. Production's own
 // run on 08005 reports "not-measured=false" — the honest note does NOT render for that ZIP
@@ -292,18 +318,20 @@ const ADDRESS_CTA = guardPat ? eval(guardPat) : /$^/;
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(400);
 const zipHero = await page.evaluate(() => ({
-  hint: (document.querySelector('.hint') || {}).textContent || '',
+  placeholder: (document.getElementById('addr') || {}).placeholder || '',
   body: document.body.innerText || ''
 }));
-ok(ADDRESS_CTA.test(zipHero.hint),
-   '7b the ZIP-mode helper text itself satisfies the production guard',
-   zipHero.hint);
-// 7c is the BROADER mirror of what the verifier reads, and is deliberately weaker than 7b:
-// this fixture's body also carries the loadZip error banner, so 7c survives mutations that 7b
-// catches. 7b is the load-bearing one — do not read a green 7c as covering the hero.
-ok(ADDRESS_CTA.test(zipHero.body),
-   '7c ...so body.innerText — what the verifier actually reads — satisfies it too',
-   (ADDRESS_CTA.exec(zipHero.body) || [])[0] || zipHero.body.slice(0, 200));
+ok(ADDRESS_CTA.test(zipHero.placeholder),
+   '7b the ZIP-mode field placeholder itself satisfies the production guard',
+   zipHero.placeholder);
+// 7c mirrors what the verifier now actually evaluates: body text and the placeholder, joined
+// by a newline so [^.\n]{0,24} can never span the two — a stray verb in the body cannot reach
+// the word "address" in the placeholder to manufacture a match. It is deliberately weaker than
+// 7b: this fixture's body also carries the loadZip error banner, so 7c survives mutations that
+// 7b catches. 7b is the load-bearing one — do not read a green 7c as covering the field.
+ok(ADDRESS_CTA.test(zipHero.body + '\n' + zipHero.placeholder),
+   '7c ...so the verifier\'s combined input satisfies it too',
+   (ADDRESS_CTA.exec(zipHero.body + '\n' + zipHero.placeholder) || [])[0]);
 // The control that stops 7b/7c passing on a pattern so loose it proves nothing: the field's
 // own label is not a direction, and must not satisfy the guard.
 ok(!ADDRESS_CTA.test('Address'),

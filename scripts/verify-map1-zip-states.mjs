@@ -40,6 +40,11 @@ for (const c of CASES) {
     const dev = sites.filter(s => s && s.relevance === 'development');
     const fac = sites.filter(s => s && s.relevance !== 'development');
     const txt = document.body.innerText || '';
+    // The address control's own placeholder is part of what the page says, and since the
+    // hero's helper sentence was removed it is where the direction now LIVES. innerText
+    // cannot see a placeholder attribute, so it is read explicitly and tested with the
+    // SAME pattern — widening the input, never the pattern.
+    const ph = (document.getElementById('addr') || {}).placeholder || '';
     return {
       dev: dev.length, fac: fac.length,
       // ZIP mode must never carry address-mode geometry on a development record
@@ -64,16 +69,23 @@ for (const c of CASES) {
       // same: the guarantee is 'the page directs the resident to the address control', while the
       // regex can only enumerate ways of saying it. #1088 replaced a literal-phrase list with
       // verb+noun for exactly this reason; 'choose'/'select'/'pick' are the same imperative in
-      // the same guarantee and belong in the same set. The hero's helper text now reads 'Choose
-      // an address from the suggestions, press Enter, or click search.', which directs the
-      // resident to address mode as plainly as 'Enter an address' did.
+      // the same guarantee and belong in the same set.
+      //
+      // ⚠️ WHAT IS READ CHANGED, THE PATTERN DID NOT. The hero's helper sentence ('Choose an
+      // address from the suggestions, press Enter, or click search.') was removed — the field
+      // now carries its own instruction in a complete example PLACEHOLDER, which
+      // document.body.innerText cannot see. So the same pattern is applied to the placeholder
+      // as well as the body text. Without this the guard would have gone red on every pending
+      // ZIP the moment the sentence left, reporting a missing CTA on a page that has one.
       //
       // NOT A LOOSENING — every negative #1088 proved stays negative, because none of them
       // contains ANY of these verbs: the ZIP clarifier, the static Box Elder hint, and a note
-      // whose CTA sentence has been deleted all still fail. Proven in both directions offline by
-      // test/address-cta-guard.test.mjs, which also pins this pattern IDENTICAL to the copy in
-      // user-journey 14c — #1088 asked for that and nothing enforced it.
-      addressCta:  /\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(txt),
+      // whose CTA sentence has been deleted all still fail. Widening the INPUT cannot admit
+      // them: they are body text, and the body text is still tested by the same pattern.
+      // Proven in both directions offline by test/address-cta-guard.test.mjs, which also pins
+      // this pattern IDENTICAL to the copy in user-journey 14c — #1088 asked for that and
+      // nothing enforced it.
+      addressCta:  /\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(txt + '\n' + ph),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
