@@ -821,6 +821,124 @@ legal/framing change not covered by the one-time sign-off.
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
+## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
+
+**Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP
+coverage, Type, Lifecycle Status, location, source/evidence, detail, refresh + completion logic)
+is REQUIRED. The **regulatory overlay plane** (EPA/FRS facilities, EPA-linked state/local/tribal/
+federal records, purple `R` markers, regulatory freshness and refresh) is an OPTIONAL contextual
+layer. The core plane must function fully when EPA is unavailable, empty, wrong, replaced, or
+removed entirely.
+
+**PHASE 1 IS SHIPPED (A + B). PHASE 2 IS NOT — and the difference matters.**
+
+### ✅ Phase 1A — the EPA recovery path can no longer control the core cron
+`epa_recovery_proof_check()` paused `dev-reports-rolling-refresh` (jobid 14, the NATIONAL core
+project refresh) when ONE ZIP's EPA facility count came back short, and `epa_recovery_step2()`
+refused to resume it until EPA was healthy. Both `cron.alter_job` calls are gone; a **DB
+assertion refuses any `epa_*` function that can mutate a cron job**. EPA-only recovery work is
+untouched — step2 still refuses to fire the proof while EPA is failing, and
+`epa_recovery_repair()` still raises without a passed proof.
+SQL of record: `docs/epa-decouple-phase1a-core-cron-switch.sql`.
+
+### ✅ Phase 1B — the core write no longer rides on the EPA write
+ONE `update development_reports` set `sites`, `counts` and `refreshed_at` together with the EPA
+guard in its WHERE clause, so **refusing the regulatory half refused the core half**. Step (d) now
+composes two planes independently. SQL of record: `docs/epa-decouple-phase1b-split-write.sql`.
+
+- 🔑 **THE DISCRIMINATOR IS `x ? 'registry_id'`, and it was proven in BOTH directions before use.**
+  Across ALL 3,515,892 stored sites, three independent tests agree with **ZERO disagreements**:
+  has-a-`registry_id`-key (215,398), `relevance is null` (215,398), `src` starts with `EPA FRS`.
+  On 359 live payloads the registry_id count **equals `counts.facilities` on 359 of 359**, so the
+  split REPRODUCES the engine's number rather than recomputing it. Control: 3,300,494 non-facility
+  sites, so the zero means something.
+- ⚠️ **THE REFUSAL SEMANTICS ARE NOT RELAXED — only its BLAST RADIUS changed.** A failed or
+  untrustworthy EPA read still never overwrites a stored facility layer with zero. When it fires,
+  stored facility sites and count carry forward verbatim, `facilities_unavailable` still reports
+  the count as UNKNOWN rather than 0, and the overlay clock does not advance.
+- 🆕 **`development_reports.facilities_refreshed_at`** exists because the split created a NEW
+  honesty gap: core now advances while EPA is down, so a shared timestamp would have started
+  claiming the facility layer was refreshed when it was not. Backfilled to `refreshed_at`, the
+  correct historical value (before the split the planes could only move together).
+- **The old combined-zero guard is SUBSUMED, not dropped** — `cachedDev>0` → CORE GUARD 2 fires;
+  `cachedDev=0` → the core write is 0-over-0 and the facility half is caught by the EPA refusal.
+  Both limbs are pinned; removing either fails `test/dev-refresh-plane-split.test.mjs`.
+
+### What it was costing, measured live during a real FRS outage (2026-09-07)
+Both probes were failing (429 / peer-reset) while the audit ran, so this is measured, not modelled:
+**51 ZIP refreshes refused in ONE HOUR, 46 of them holding project data, 6,532 core project
+records fetched from first-party permit sources and discarded.** Structural exposure: **11,565 of
+12,722 cached reports (90.9%)** carry `counts.facilities > 0`; 10,344 also carry projects. The
+refusal also froze `refreshed_at`, so **2,533 of the 2,563** rows attempted-but-not-written in 48h
+carried cached facilities — EPA outages were rendering as core staleness.
+
+### Verified after apply (one `dev_refresh_collect()` run, 78 rows written)
+Cohort frozen beforehand in `public.epa_split_probe_20260907`. **26 EPA-refused → all 26 advanced
+their CORE plane (was 0), all 26 held the overlay clock, all 26 preserved facility count AND sites
+exactly, 0 zeroed.** 52 wrote both planes. **2 core-blocked** (22192, 22307 — `ArcGIS error: Token
+Required`, protecting 373→33 and 40→21, `epa_refused` FALSE on both, so the core guard fires
+independently of EPA). 26+52+2 = 80; 26+52 = 78 = rows written. Exact. Table-wide after:
+`counts.facilities` ≠ stored facility-site count on **0 of 12,722**; overlay clock ahead of core on
+**0**; legitimately behind on **32** (the split, visible in the data).
+
+### Two standing answers this build paid for
+- 🔑 **ADDING A COLUMN A HOT-PATH FUNCTION MUST MAINTAIN IS ONE MIGRATION, NOT TWO.** Part 1
+  (column + backfill) landed 14:25:50Z and part 2 (the writer) 14:26:57Z; `dev-reports-rolling-
+  refresh` runs `*/2`, so its 14:26:00Z tick ran the OLD function in the 67-second gap and
+  advanced `refreshed_at` while leaving the new clock at its backfill value. 6 rows.
+  **It surfaced as ONE row** failing a table-wide invariant ("overlay held BUT facilities = 0",
+  which the split makes structurally impossible) — a count of 1 against 12,722 is exactly the
+  anomaly size that gets rounded away. Repaired scoped BY TIME (the two migration versions), so
+  the 42 genuine refusals could not be touched; the repair migration raises on collateral damage.
+  Control: **0** rows with a behind clock BEFORE the window, which is what proves the backfill
+  itself was right.
+- 🔑 **NEVER `create table as` A COHORT IN `public`.** `epa_split_probe_20260907` inherited the
+  project's default grants and landed **RLS-disabled with `anon` holding `arwdDxtm`** — anon-
+  readable AND WRITABLE through PostgREST, the `page_cache` posture this file flags as a defect,
+  for a diagnostic with no consumer. Dropped; its findings live in the parked SQL. A cohort that
+  will be summarised into a doc should be TEMP or doc-only; one that must persist (the
+  gov-notices `gn_*_cohort_*` tables) gets RLS, no anon grant, and a named owner and expiry in
+  the same commit.
+
+### ⚠️ PHASE 1 WAS REVIEWED AND THREE DEFECTS IN IT WERE FIXED (PR #1102)
+Do not read the Phase 1A/1B sections above as the whole story — they describe the FIRST build.
+- 🔑 **A PARKED MIGRATION THAT IS MOSTLY COMMENTS IS NOT A MIGRATION.** The first
+  `docs/epa-decouple-phase1b-split-write.sql` reproduced step (d) as a COMMENT. Replaying it
+  added the column and skipped the writer — permanently recreating the 67-second hazard the same
+  file documents, while looking complete. It is now one executable atomic script (column +
+  backfill + predicate + the FULL `dev_refresh_collect` body + repair + invariants), and the
+  structural tests read EXECUTABLE statements only.
+- 🔑 **THE PARKED BODY NOW LEADS PRODUCTION BY TWO FIXES, AND THAT IS RECORDED IN THE FILE.**
+  Live is md5 `bccdb1149f85cc71d31f5e949cb9e47e`. Parity was PROVEN rather than asserted:
+  normalizing both bodies and removing the two fixes from the parked copy reproduces live
+  exactly (`1f75eb3d5a0205a908ff5e01dcf4d4a5`, 139 lines, both sides). **Apply the file and
+  re-record the md5 before any release.**
+- 🔑 **A NON-ARRAY `sites` PAYLOAD KILLED THE WHOLE TICK.** `jsonb_array_elements` raises 22023
+  and aborts the statement for every ZIP in the 20-minute window, re-failing every 2 minutes.
+  The split introduced it (the old code never iterated the payload). Guard:
+  `and jsonb_typeof(j->'sites') = 'array'` at the write eligibility boundary — withhold the row,
+  never the batch. NOT applied to `d.sites`: steps (a)/(c) already iterate the stored array, so
+  a malformed STORED value is pre-existing and out of scope.
+- 🔑 **A FLAG EXPRESSION WRITTEN FOR "BOTH PLANES WROTE" IS WRONG ONCE ONE PLANE CAN REFUSE.**
+  On the freshness limb (EPA healthy, legitimate 0, row <7d, cached >0) the pre-split
+  `facilities_unavailable` expression cleared to FALSE over a preserved count EPA had just
+  contradicted. 0 rows at review time; reachable on any EPA recovery. The refusal branch now
+  LEADS: no trusted facility write ⇒ the count renders UNKNOWN, never as fact.
+
+### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
+Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
+- `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
+  — `_nf`/`_nfc` are EPA. **766 ZIPs are `pass` only because of EPA facilities; 1,004 are
+  `indexable` with zero development records.**
+- `app_coverage_states`: `facilities_only` is a CORE coverage state and CI pins it to `⇒ pass`.
+- One `sites` jsonb still carries both planes (blocks "removable without a schema migration").
+- `Promise.all([devSites, facilitySites])` keeps EPA's 6-step radius back-off on the critical path.
+
+**Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
+sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
+
+
 ### Status
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
   RECORD** (DB-verified 2026-09-06; full receipt `docs/map1-residential-total-qualification-2026-09-06.md`).
