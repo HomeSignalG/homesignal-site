@@ -70,28 +70,58 @@ const SOURCE_CURRENT_DAYS = 90;
 const currentFloor = new Date(Date.now() - SOURCE_CURRENT_DAYS * 86400000)
   .toISOString()
   .slice(0, 10);
-// ⚠️ THE +90 CEILING IS DELIBERATELY *NOT* APPLIED HERE, AND THAT IS A DECISION WITH A
-// REASON, NOT AN OVERSIGHT. The founder refined the source-currentness window to a
-// symmetric -90/+90 on 2026-09-06, and the engine measurement
-// (homesignal-ingest scripts/measure_gov_notices.sql) enforces both ends. Applying the
-// ceiling HERE would drop 322 canonical ZIP pages across 17 counties from the artifact.
+// The window is SYMMETRIC, so the ceiling is the SAME constant mirrored — never a second
+// one. Two numbers can drift apart; one cannot drift from itself. Same UTC date-slice as
+// the floor, so both ends are built identically and a timezone change moves them together.
+const currentCeiling = new Date(Date.now() + SOURCE_CURRENT_DAYS * 86400000)
+  .toISOString()
+  .slice(0, 10);
+// ✅ THE +90 CEILING IS RESTORED — 2026-09-07. It was withheld on purpose, and the reason
+// it was withheld is gone, so this is the change that was promised rather than a loosening.
 //
-// Those 17 fail the ceiling because of a HomeSignal CONFIGURATION DEFECT, not because
-// their sources are stale. Every one is a CivicClerk feed configured
-// `$top=5&$orderby=startDateTime desc`; the vendor caps a page at ~15 rows, so descending
-// order returns only the far-future tail and the county's current meetings — which sit in
-// the middle of the tenant's history — are unreachable. Proven live 2026-09-06: the Anne
-// Arundel tenant holds 437 events and a date-bounded refetch returns 15, ALL inside
-// -90/+90 with 6 past-dated; Delaware County PA holds 1,390 and likewise returns 15 all
-// inside the window. The sources are current; our query cannot see them.
+// WHAT WAS WRONG: 322 canonical ZIP pages across 17 counties failed the ceiling because of
+// a HomeSignal CONFIGURATION DEFECT, not because their sources were stale. Every one is a
+// CivicClerk feed; the vendor caps a page at ~15 rows regardless of $top, so
+// `$orderby=startDateTime desc` returned only the tenant's far-future tail and the county's
+// current meetings — sitting in the middle of the tenant's history — were unreachable.
+// Applying the ceiling then would have deleted 322 pages of correct coverage to enforce a
+// rule against our own query.
 //
-// Removing 322 pages of correct coverage to enforce a rule against our own defect would
-// be trading correctness for nothing. The repair needs a RELATIVE date bound that a static
-// feeds.csv URL cannot express, so it is architectural and is HELD, not attempted.
-// Cohort frozen in public.gn_civicclerk_window_defect_20260906.
-// Restore the ceiling here in the same change that repairs those endpoints.
+// WHAT REPAIRED IT: homesignal-ingest PR #480, squash-merged to main 2026-09-07T17:19:32Z as
+// f67959ff7ef78b281fa2e350d92aebaf2b4496ba. adapters/civicclerk.py now bounds the fetch with
+// `$filter=startDateTime le {today+90}`, reading the 90 from
+// ingest.GOV_NOTICE_SOURCE_CURRENT_FUTURE_DAYS so the fetch bound cannot drift from the
+// window it serves.
+//
+// PROOF THE REPAIR REACHED STORED ROWS — ingest.yml run #597 (databaseId 34154189876,
+// workflow_dispatch, dry_run false, head_sha f67959f). Measured on the JOB, never the run:
+// job 101842478462 started 2026-09-07T19:04:59Z, completed 2026-09-07T20:25:11Z, conclusion
+// success, and the three write steps ("Classify news subtopics", "Sync feed inventory",
+// "Refresh & publish acquisition dashboard snapshot") all COMPLETED SUCCESS rather than
+// being skipped — which is what proves dry_run did not take. It wrote 15 in-window notices
+// to each of the 17 counties (10 to Benton WA).
+//
+// GATE 5, measured 2026-09-07 21:11Z: 17 of 17 cohort counties now hold at least one
+// government_notice alert dated inside -90/+90, and 0 of the cohort's 322 ZIP rows remain
+// stale. Cohort frozen in public.gn_civicclerk_window_defect_20260906.
+//
+// MEMBERSHIP IS UNCHANGED BY THIS CEILING, and that was measured BEFORE the edit rather
+// than hoped for afterwards: simulating this generator's own predicate with and without the
+// ceiling returns 7,121 ZIPs both ways, md5 3fa1825f8d5ddde0f3dd230c43e27407 both ways,
+// 0 dropped and 0 added.
+//
+// THE ENGINE SQL ALREADY ENFORCED BOTH ENDS and is NOT edited by this change — quoted here
+// so the two halves can be compared without opening the other repo
+// (homesignal-ingest scripts/measure_gov_notices.sql, current_notice_roots):
+//
+//     and a.published_at::date between current_date - 90 and current_date + 90
+//     and a.published_at::date between current_date - 365 and current_date + 730
+//
+// ⚠️ The second line is the RECORD-ELIGIBILITY window (-365/+730) and is a DIFFERENT
+// contract. Do not merge the two: a CURRENT source legitimately displays qualifying records
+// 91-365 days old, and nothing here filters what a page shows.
 const delivered = await all(
-  `alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}`,
+  `alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}&published_at=lte.${currentCeiling}`,
   'community_id',
 );
 
