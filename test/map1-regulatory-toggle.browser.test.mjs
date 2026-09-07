@@ -219,9 +219,21 @@ ok((await page.textContent('#regToggle')).includes('Regulatory facilities'),
   (await page.textContent('#regToggle')).trim());
 ok(regCtl.name === 'Regulatory facilities, shown on map',
   '2b2: ...and its accessible name states the map effect in words', regCtl.name);
-const helper = (await page.textContent('#mapkeyRegHelp')).trim();
-ok(helper === 'Purple R = environmental regulatory record. Includes EPA and linked state, '
-            + 'local, tribal, and federal records.', '2c: the helper text is the founder copy, verbatim', helper);
+// ⚖️ THE SECOND PURPLE-R EXPLANATION IS GONE (founder ruling, filter-panel hierarchy unit).
+// `HS.REGULATORY_LEGEND.helper` opened with "Purple R = environmental regulatory record",
+// which the map key at the foot of the panel already says — one explanation written twice,
+// which is exactly what that unit removed. The STRING is untouched in lib/map.js and still
+// carries its verbatim + anti-editorialising pins in test/marker-regulatory-badge.test.mjs;
+// what is asserted here is that the PANEL renders the explanation once and only once.
+const regHelp = await page.evaluate(() => ({
+  el: !!document.getElementById('mapkeyRegHelp'),
+  cls: document.querySelectorAll('.mapkey-reghelp').length,
+  purpleR: (document.querySelector('.maplegend-wrap').innerText.match(/Purple R =/g) || []).length,
+  epa: /Includes EPA and linked state/.test(document.querySelector('.maplegend-wrap').innerText) }));
+ok(!regHelp.el && regHelp.cls === 0 && !regHelp.epa,
+  '2c: the duplicated regulatory helper line is gone from the panel', JSON.stringify(regHelp));
+ok(regHelp.purpleR === 1,
+  '2c2: ...so "Purple R =" is explained exactly once, in the map key', regHelp.purpleR);
 ok(await page.evaluate(() => !!document.querySelector('#regToggle svg text')),
   '2d: the chip shows the same purple R the map draws');
 ok(await regState() === 'true', '2e: it starts CHECKED — a record is never hidden by default');
