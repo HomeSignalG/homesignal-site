@@ -52,11 +52,14 @@ function normalize(r) {
   };
 }
 
-async function rest(path) {
+async function rest(path, { soft = false } = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
   });
-  if (!res.ok) throw new Error(`REST ${path} -> ${res.status}`);
+  if (!res.ok) {
+    if (soft) return { __err: res.status, __body: (await res.text().catch(() => '')).slice(0, 200) };
+    throw new Error(`REST ${path} -> ${res.status}`);
+  }
   return res.json();
 }
 
@@ -66,16 +69,54 @@ const ok = (name, cond, extra) => {
   if (!cond) fails.push(name);
 };
 
-// ── 1-3: full-population invariants (keyset-paginated; PostgREST caps at 1000) ──
+// ── 1-3: full-population invariants (keyset-paginated) ──
+//
+// THE PAGE SIZE IS THE DEFECT, AND IT IS NOT UNIFORM. Keyset paging was already here;
+// what was not survivable is limit=1000. `app_coverage_states` runs two lateral
+// aggregates per ZIP, and their cost tracks how many app_projects rows that ZIP owns,
+// which varies by more than two orders of magnitude. Measured 2026-09-07 as `postgres`,
+// warm, EXPLAIN ANALYZE of the query this walk actually issues (select *, order zip,
+// keyset), fully materialized rather than a pruned count(*):
+//
+//   first page (sparse, ~170 app_projects/ZIP)   100 rows ->    201 ms  (~2 ms/row)
+//   zip > '60600' (dense, ~977 app_projects/ZIP) 100 rows -> 39,757 ms  (~398 ms/row)
+//                                                            (repeated: 44,743 ms cold)
+//
+// anon pays RLS on top of that. So limit=1000 across a dense block is ~400 s of work
+// against a 3 s anon statement_timeout: 57014, HTTP 500, thrown before assertion 1.
+// Everything downstream — SPLIT_LIVE, the overlay_unknown sample, every invariant —
+// never executed. The job reported red while attesting to nothing.
+//
+// ONE FIXED SIZE CANNOT WORK, which is why this is adaptive rather than a smaller
+// constant: a page that survives the dense block is wasteful everywhere else, and a
+// page tuned to the average still dies in Illinois. Same shape as the adaptive readers
+// verify-development and verify-geocodes already use (halve on failure, floor 1 = the
+// single-row read the live page itself performs, so the floor is known servable).
+const PAGE_MAX = 25;   // ~2 s at the measured dense rate as postgres; smaller still on anon
+const PAGE_MIN = 1;
 const rows = [];
+let pageSize = PAGE_MAX, shrinks = 0;
 for (let last = ''; ;) {
   // `select=*` on purpose: naming regulatory_overlay_state before the view migration
   // 400s the whole request, which would read as an outage rather than as a not-yet.
-  const page = await rest(`app_coverage_states?select=*&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+  const page = await rest(
+    `app_coverage_states?select=*&order=zip.asc&limit=${pageSize}` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''),
+    { soft: true });
+  if (page && page.__err) {
+    // A page too expensive for this ZIP block is a page-size problem, not an outage —
+    // halve and retry the SAME cursor. Only an unshrinkable page is a real failure.
+    if (pageSize > PAGE_MIN) {
+      pageSize = Math.max(PAGE_MIN, Math.floor(pageSize / 2)); shrinks++;
+      console.log(`INFO page shrink -> ${pageSize} after HTTP ${page.__err} at cursor '${last}'`);
+      continue;
+    }
+    throw new Error(`REST app_coverage_states -> ${page.__err} at limit=${PAGE_MIN}, cursor '${last}': ${page.__body}`);
+  }
   rows.push(...page);
-  if (page.length < 1000) break;
+  if (page.length < pageSize) break;
   last = page[page.length - 1].zip;
 }
+if (shrinks) console.log(`INFO the walk shrank its page ${shrinks} time(s); final size ${pageSize}`);
 const metaCount = Number(await fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?select=zip`, {
   method: 'HEAD',
   headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, Prefer: 'count=exact' },
