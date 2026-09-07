@@ -311,6 +311,58 @@
      so nothing in this row can be mistaken for a pin or a project type. */
   .mapkey .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;display:block;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+  /* ── STAGE CHIPS — a multi-select CHECKBOX group, not toggle buttons ────────────
+     "Checked statuses are shown on the map." The chip is a <label> wrapping a REAL
+     <input type=checkbox>, so focus order, Space-to-toggle and every screen reader's
+     checkbox semantics come from the platform instead of from re-implemented ARIA.
+     The input is visually hidden but NEVER display:none — a display:none input is
+     unfocusable, which would quietly remove the whole row from keyboard use. */
+  #mapkey .stagechip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+    padding:5px 11px;border-radius:7px;cursor:pointer;user-select:none;font-size:12px;
+    color:var(--ink);border:1px solid var(--line);background:#fff;min-height:32px;position:relative}
+  /* The pill styling belongs to the CHIP and to nothing inside it. `.mapkey span` is a
+     DESCENDANT rule, so without this reset the dot and the label would each draw their
+     own bordered, padded box inside the chip. */
+  #mapkey .stagechip>span{padding:0;border:0;background:none;min-height:0}
+  #mapkey .stagechip:hover{background:#fafbfa;border-color:#d6ddda}
+  /* Focus rides on the CHIP: the input is clipped to 1px, and a focus ring drawn on a
+     1px box is a focus ring nobody can see. */
+  #mapkey .stagechip:focus-within{outline:2px solid var(--green-bright);outline-offset:2px}
+  #mapkey .stagebox{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;
+    opacity:0;pointer-events:none}
+  /* THE CHECK MARK — the inclusion signal, and it is a SHAPE plus a GLYPH, never a hue.
+     Unchecked is an empty outlined square; checked is a filled square carrying a ✓. It
+     keeps its size in both states, so toggling never reflows the row. This is the same
+     "never colour alone" rule the dot already obeys, applied to the second channel:
+     the DOT says which stage, the BOX says whether it is on the map. */
+  #mapkey .stagechip .ck{flex:0 0 auto;width:14px;height:14px;border-radius:4px;
+    border:1.5px solid #7d8c86;background:#fff;display:inline-flex;align-items:center;
+    justify-content:center;font-size:10px;line-height:1;color:transparent}
+  #mapkey .stagechip .ck::after{content:"\2713";font-weight:700}
+  #mapkey .stagebox:checked~.ck{background:var(--green);border-color:var(--green);color:#fff}
+  /* Selected chip: a darker outline plus a very subtle tint — the same channel the Type
+     row uses, and, as there, never the stage hue. */
+  #mapkey .stagechip.on{border-color:#9aa8a3;background:#f4f6f5}
+  #mapkey .stagechip.on:hover{background:#eef1ef}
+  /* UNSELECTED IS NEUTRAL, NOT DISABLED. No strike-through and no heavy dimming: the
+     resident is choosing what to see, not looking at something broken or deleted. The
+     label stays full-contrast charcoal and the DOT stays at full strength, because the
+     dot is still the pin-colour legend whether or not that stage is on the map. */
+  #mapkey .stagechip .t{color:var(--ink)}
+  #mapkey .stagechip .dot{opacity:1}
+  /* Touch targets. 44x44 on coarse pointers, where the WCAG target-size rule applies;
+     the desktop chip stays compact. */
+  @media (pointer:coarse){
+    #mapkey .stagechip{min-height:44px;padding:9px 13px}
+    #mapkey .stagechip .ck{width:18px;height:18px;font-size:12px}
+  }
+  .mapkey-help{font-size:11px;color:var(--mute);line-height:1.45}
+  /* The empty state's way out. A real <button> styled as a link: an <a href="#"> would
+     announce as a link to nowhere and would push a history entry on every click. */
+  .mk-linkbtn{font:inherit;font-size:11px;font-weight:700;color:#8a4b12;background:none;
+    border:0;padding:2px 0;text-decoration:underline;cursor:pointer}
+  .mk-linkbtn:hover{color:#6d3a0d}
+  .mk-linkbtn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
   .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
   .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
   .mapkey-shapes span.sh{border-style:dashed}
@@ -476,8 +528,21 @@
           </div>
           <div class="maprow">
             <div class="maplegend-wrap">
-              <div class="mapkey-hd">Stage — pin color</div>
-              <div class="mapkey" id="mapkey"></div>
+              <div class="mapkey-hd" id="stageLegHd">Stage — pin color</div>
+              <!-- THE STAGE ROW IS A MULTI-SELECT CHECKBOX GROUP, not a row of toggle
+                   buttons. Each chip is a real <input type=checkbox> inside its label, so
+                   Tab / Space / screen-reader checkbox semantics come from the platform.
+                   role=group + aria-labelledby ties the four to their heading, and
+                   aria-describedby attaches the one rule that governs them all. -->
+              <div class="mapkey" id="mapkey" role="group" aria-labelledby="stageLegHd"
+                   aria-describedby="mapkeyStageHelp"></div>
+              <div class="mapkey-help" id="mapkeyStageHelp">Checked statuses are shown on the map.</div>
+              <!-- Zero statuses selected is a LEGAL state the resident chose, so the map
+                   honours it (no pins) and says so, rather than silently re-checking
+                   everything — which would overrule the resident and make the control
+                   look broken. Non-blocking, and it carries its own way out. -->
+              <div class="mapkey-empty" id="mapkeyStageEmpty" hidden><span>No project statuses are selected.</span>
+                <button type="button" class="mk-linkbtn" id="stageSelectAll">Select all statuses.</button></div>
               <div class="mapkey-hd typehd" id="shapeLegHd"><span>Type — pin shape</span>
                 <span class="tfwrap">
                   <button type="button" class="tfbtn" id="typeFilterBtn" aria-haspopup="true"
@@ -645,7 +710,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=2f98ff11"></script>
+<script src="lib/map.js?v=2504846a"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
@@ -705,6 +770,108 @@ HS.onReady(function(){
   var FILTER = {};
   LEGEND.forEach(function(it){ FILTER[it.b] = true; });
   FILTER.built = true;                          // legacy alias (cached rows stamp type='built')
+
+  // ── THE STAGE FILTER — one multi-select over STABLE STATUS IDS ────────────────
+  // The rule, and the only rule: CHECKED STATUSES ARE SHOWN ON THE MAP. Each stage is
+  // independent, any combination is legal (all, some, one, or none), and the choice
+  // applies immediately — there is no Apply button because there is nothing to batch.
+  //
+  // ⚠️ IT KEYS ON AN ID, NEVER ON A LABEL OR A COLOUR (HS.stageKeyForId, lib/map.js).
+  // FILTER is still keyed by the internal bucket the resolver returns, so nothing in the
+  // render path changed; the ID is the boundary vocabulary, used wherever the choice
+  // leaves the page — today, the URL. A label and a hue are presentation and both have
+  // already moved once; an id has not.
+  //
+  // STATE LIVES HERE, at module scope, which is what makes requirement 8 automatic: the
+  // 2D / 3D-aerial / 3D-satellite switch, opening a pin, and changing radius all re-read
+  // this same object rather than rebuilding it, so a stage choice survives every one of
+  // them without a save step.
+  var STAGE_KEYS = LEGEND.map(function(it){ return it.b; });
+  // The accessible name reuses the chip's OWN visible label, read from the same LEGEND
+  // row, so the name a screen reader speaks and the words on screen cannot drift apart.
+  var STAGE_LABEL = {};
+  LEGEND.forEach(function(it){ STAGE_LABEL[it.b] = it.t; });
+  var stageChipByKey = {}, stageBoxByKey = {};
+
+  function stageIdFor(k){ return (HS.stageIdForKey ? HS.stageIdForKey(k) : k) || k; }
+  // The ?stages= round trip. Written on every change and read once at boot, so a chosen
+  // set survives a refresh and can be shared as a link.
+  //
+  // ⚠️ ABSENT AND EMPTY ARE DIFFERENT, and conflating them is the one bug this reader
+  // can have. NO ?stages= at all means "the resident has expressed nothing" -> the
+  // all-on default. `?stages=` present but empty means "the resident deselected
+  // everything" -> none, which is a legal state we must not overrule. An unrecognised id
+  // is DROPPED rather than treated as a match, so a stale or hand-edited link degrades to
+  // the stages it does name instead of showing everything.
+  function readStagesFromUrl(){
+    var raw;
+    try { raw = new URL(window.location.href).searchParams.get("stages"); }
+    catch(e){ return null; }
+    if(raw === null) return null;                       // absent -> caller keeps the default
+    var want = {};
+    STAGE_KEYS.forEach(function(k){ want[k] = false; });
+    String(raw).split(",").forEach(function(tok){
+      var k = HS.stageKeyForId ? HS.stageKeyForId(tok) : "";
+      if(k && want.hasOwnProperty(k)) want[k] = true;
+    });
+    return want;
+  }
+  function writeStagesToUrl(){
+    // replaceState, never pushState: a filter click is not a navigation, and 20 clicks
+    // must not become 20 Back presses.
+    if(!window.history || !window.history.replaceState) return;
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set("stages", STAGE_KEYS.filter(function(k){ return FILTER[k]; })
+                                             .map(stageIdFor).join(","));
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch(e){ /* a blocked history API must never break the filter itself */ }
+  }
+  // Repaints the controls from state. Never the reverse — the checkbox is a view of
+  // FILTER, so the chips, the empty state and the URL can never disagree about what is
+  // hidden. Same one-writer discipline the Type row's syncTypeControls() uses.
+  function syncStageControls(){
+    STAGE_KEYS.forEach(function(k){
+      var on = !!FILTER[k], chip = stageChipByKey[k], box = stageBoxByKey[k];
+      if(box) box.checked = on;
+      if(chip){
+        chip.classList.toggle("on", on);
+        // THE STATE IS IN THE ACCESSIBLE NAME, IN WORDS. A screen reader already
+        // announces checked/unchecked; this says what checked MEANS here, so the
+        // control is understandable without seeing the map or the helper text.
+        var label = STAGE_LABEL[k] || k;
+        if(box) box.setAttribute("aria-label", label + " status, " + (on ? "shown on map" : "hidden from map"));
+      }
+    });
+    syncStageEmptyNote();
+  }
+  // The ONLY writer. Both the chips and the "Select all statuses" action call it, so
+  // there is exactly one path from a click to a repainted map.
+  function setStage(key, on){
+    if(STAGE_KEYS.indexOf(key) === -1) return;
+    FILTER[key] = !!on;
+    syncStageControls();
+    writeStagesToUrl();
+    applyFilter();
+  }
+  function allStagesOff(){ return STAGE_KEYS.every(function(k){ return !FILTER[k]; }); }
+  // Zero selected is a state the resident chose, so the note states the cause in their
+  // own terms and offers the way back. It is NOT gated on the ZIP having records: unlike
+  // the Type note — which asserts "the map is empty" and so must be true — this one
+  // reports the CONTROL's state, which is true whether or not this ZIP has anything to
+  // show, and it is the only thing on screen explaining why nothing can appear.
+  function syncStageEmptyNote(){
+    var em = document.getElementById("mapkeyStageEmpty");
+    if(em) em.hidden = !allStagesOff();
+  }
+  // BOOT. A ?stages= in the URL is the resident's own prior choice, so it is applied
+  // HERE — at module scope, before the first marker is built — rather than reconciled
+  // afterwards, which would draw the full set and then visibly remove pins from it.
+  (function applyStagesFromUrl(){
+    var want = readStagesFromUrl();
+    if(!want) return;                     // no ?stages= at all -> keep the all-on default
+    STAGE_KEYS.forEach(function(k){ FILTER[k] = !!want[k]; });
+  })();
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
@@ -2001,6 +2168,12 @@ HS.onReady(function(){
       // state — the point of a verify field is to prove what shipped to the screen.
       regulatoryBadges: document.querySelectorAll("#map .leaflet-marker-icon:not(.homepin) svg text").length,
       facilitiesOnly: FACILITIES_ONLY,
+      // The STAGE row's half of the same distinction allTypesOff draws for Type: a
+      // resident who deselected every status also produces visibleMarkers 0, and that is
+      // a choice, not an absence of records. Reported as the stable IDS, so a live check
+      // asserts against the same vocabulary the URL carries.
+      allStagesOff: allStagesOff(),
+      stagesOn: STAGE_KEYS.filter(function(k){ return FILTER[k]; }).map(stageIdFor),
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
     };
@@ -2180,6 +2353,7 @@ HS.onReady(function(){
       else { layerGroup.removeLayer(x.m); }
     });
     syncAllTypesOffNote();
+    syncStageEmptyNote();
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
     publishVerifyState();
@@ -2191,34 +2365,55 @@ HS.onReady(function(){
   function buildLegend(){
     var d = document.getElementById("mapkey"); if(!d) return;
     d.innerHTML = "";
+    stageChipByKey = {}; stageBoxByKey = {};
     LEGEND.forEach(function(it){
-      var row = document.createElement("span");
-      row.tabIndex = 0;
-      row.setAttribute("role", "button");
-      row.setAttribute("aria-label", it.t + " markers");
-      if(!FILTER[it.b]) row.className = "off";
-      row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
+      // A <label> wrapping a real checkbox: the WHOLE chip is the hit target (a label's
+      // click is forwarded to its control), and Tab/Space come from the platform rather
+      // than from a keydown handler that has to re-implement them.
+      var chip = document.createElement("label");
+      chip.className = "stagechip";
+      chip.setAttribute("data-stage", it.b);
+      chip.setAttribute("data-stage-id", stageIdFor(it.b));
+      var box = document.createElement("input");
+      box.type = "checkbox";
+      box.className = "stagebox";
+      box.checked = !!FILTER[it.b];
       // COLOUR IS THE ONLY STAGE SIGNAL HERE, and it is carried by a plain solid dot.
       // It used to be a filled TRIANGLE — a map-marker silhouette that also happens to be
       // this product's Industrial project shape AND the universal warning glyph, so one
       // mark was saying three different things at once. A circle says none of them: the
       // Type row below owns marker shapes, and this row owns colour.
-      // aria-hidden on the dot because the label beside it already names the stage — the
-      // state is never announced by colour alone.
-      row.innerHTML = "<span class='dot' aria-hidden='true' style='background:" + hexColor(it.c)
+      // aria-hidden on BOTH the box glyph and the dot: the checkbox's own state and its
+      // accessible name already carry "which stage" and "shown or hidden", so neither is
+      // ever announced by colour or by a decorative glyph.
+      chip.innerHTML = "<span class='ck' aria-hidden='true'></span><span class='dot' aria-hidden='true' style='background:" + hexColor(it.c)
         + "'></span><span class='t'>" + esc(it.t) + "</span>";
-      function toggle(){
-        FILTER[it.b] = !FILTER[it.b];
-        row.classList.toggle("off", !FILTER[it.b]);
-        row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");
-        applyFilter();
-      }
-      row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
-      row.addEventListener("keydown", function(e){
-        if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
-      });
-      d.appendChild(row);
+      chip.insertBefore(box, chip.firstChild);
+      stageChipByKey[it.b] = chip; stageBoxByKey[it.b] = box;
+      // `change` — not `click` — so keyboard Space and a click are ONE path, and the
+      // handler reads the control's resulting state instead of inferring a toggle.
+      box.addEventListener("change", function(){ setStage(it.b, box.checked); });
+      d.appendChild(chip);
     });
+    // The empty state's way out. It restores every stage, which is also what any future
+    // "Reset filters" must do for this row — one writer, so it cannot drift.
+    var selAll = document.getElementById("stageSelectAll");
+    if(selAll && !selAll.__wired){
+      selAll.__wired = true;
+      selAll.addEventListener("click", function(e){
+        e.preventDefault();
+        STAGE_KEYS.forEach(function(k){ FILTER[k] = true; });
+        syncStageControls();
+        writeStagesToUrl();
+        applyFilter();
+        // Focus goes back to the row the action just refilled, so a keyboard user is not
+        // stranded on a control that has this moment disappeared.
+        var first = stageBoxByKey[STAGE_KEYS[0]];
+        if(first) first.focus();
+      });
+    }
+    syncStageControls();
+
     // The SHAPE rows are the TYPE dimension, and they are toggles — the same pattern as
     // the lifecycle chips above.
     //
