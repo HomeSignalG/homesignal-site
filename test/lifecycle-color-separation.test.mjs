@@ -218,7 +218,8 @@ ok(dE00('#7b2d8e', LC.unknown) < FLOOR,
 //       facility became a green "Operating now" block. The legend says
 //       "Purple R = regulatory record"; on 3D aerial that was a lie. Colour now
 //       comes from the SAME marker resolver the 2D / satellite pins use
-//       (`site3DPaint` → `mk.color`): purple for a regulatory-only location,
+//       (`site3DPaint` → `mk.color`): Type/operating colour + R for a
+//       classifiable EPA overlay, purple for an unmapped EPA-only location,
 //       lifecycle colour for a project.
 //
 // Recolouring lib/templates.js could never have reached a restated literal, and
@@ -244,7 +245,7 @@ ok(/site3dpaint\(p\)/.test(aerialCode) && /paint\.col/.test(aerialCode) && /var 
 ok(!/lc3d\(bkt\)/.test(aerialCode) && !/lc3d\("proposed"\)/.test(aerialCode),
   '8d: it no longer paints by lifecycle bucket alone — that is what made EPA facilities look green');
 ok(/paint\.signal/.test(aerialCode),
-  '8e: a dual-identity data centre still gets its purple R as a subordinate badge');
+  '8e: overlay / dual-identity EPA still gets its purple R as a subordinate badge');
 // The facility purple must come FROM the resolver, never as a restated literal — the
 // same "do not restate the palette" rule, applied to the regulatory colour.
 const facLit = '0x' + String(FACILITY).replace('#', '').toLowerCase();
@@ -258,13 +259,22 @@ const facInt = parseInt(String(FACILITY).replace('#', ''), 16);
 const opInt = parseInt(String(LC.operating).replace('#', ''), 16);
 ok(facInt !== opInt,
   '8h: facility purple and operating green are different 3D integers — collapsing them is the bug');
-const epaOnly = HS.resolveTrackerMarker({
+const overlayFac = HS.resolveTrackerMarker({
   type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
   scope: 'point', registry_id: '110072041130', record_url: 'https://echo.epa.gov/x'
 }, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
-ok(epaOnly.color === FACILITY && parseInt(String(epaOnly.color).replace('#', ''), 16) === facInt,
-  '8i: an EPA-only site resolves to the purple the 3D aerial now paints, not operating green',
-  epaOnly.color);
+ok(overlayFac.color === LC.operating && overlayFac.signal && overlayFac.signal.letter === 'R'
+    && parseInt(String(overlayFac.color).replace('#', ''), 16) === opInt,
+  '8i: a classifiable EPA facility resolves to operating colour + R — the same paint 3D aerial uses',
+  overlayFac.color);
+const unmappedFac = HS.resolveTrackerMarker({
+  type: 'built', label: 'GENERIC TREATMENT WORKS',
+  scope: 'point', registry_id: '110000000001', record_url: 'https://echo.epa.gov/x'
+}, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
+ok(unmappedFac.color === FACILITY && !unmappedFac.signal
+    && parseInt(String(unmappedFac.color).replace('#', ''), 16) === facInt,
+  '8i2: an unmapped EPA-only site still resolves to the purple 3D aerial paints, with no Type overlay',
+  unmappedFac.color);
 ok(/__HS_AERIAL_PAINT/.test(aerial),
   '8j: the 3D aerial publishes the hex it painted, so a browser check can read colour without sampling pixels');
 // …and it publishes THE PAINT, not the intent. The first version of this hook recorded

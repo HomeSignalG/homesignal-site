@@ -332,10 +332,13 @@ ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
 
 // ── 5d. 3D AERIAL PAINTS THE SAME COLOURS THE 2D PINS DO ──────────────────────────
 // Production 3D aerial used to colour every building from the lifecycle bucket, so
-// an EPA-only location became a green "Operating now" block while the legend still
-// said "Purple R = regulatory record". Colour now comes from site3DPaint → mk.color.
-// The jsdelivr mock in this file does not serve three.js, so this path is the
-// Canvas-2D aerial fallback — the same paint function the WebGL path uses.
+// an unmapped EPA-only location became a green "Operating now" block while the
+// legend still said "Purple R = regulatory record". Colour now comes from
+// site3DPaint → mk.color, which is also the overlay-on-Type contract: ANDURIL's
+// class field maps Industrial, so 3D must paint operating colour + R, not a
+// standalone purple block. The jsdelivr mock in this file does not serve three.js,
+// so this path is the Canvas-2D aerial fallback — the same paint function the
+// WebGL path uses.
 await page.click('#viewSeg button[data-v="3d"]');
 await page.waitForFunction(
   () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length >= 3,
@@ -354,10 +357,10 @@ const aerialInfo = await page.evaluate(() => {
   };
 });
 ok(aerialInfo.n >= 3, '5d: 3D aerial painted the three fixture records', aerialInfo.n);
-ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.facility).toLowerCase()
-    && aerialInfo.anduril.signal === false,
-  '5e: an EPA-only location is purple on 3D aerial, not operating-green — and has no R (the R is dual-identity)',
-  JSON.stringify(aerialInfo.anduril) + ' facility=' + aerialInfo.facility);
+ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.operating).toLowerCase()
+    && aerialInfo.anduril.signal === true,
+  '5e: overlay EPA paints Type/operating colour + R on 3D aerial — not a standalone purple block',
+  JSON.stringify(aerialInfo.anduril) + ' operating=' + aerialInfo.operating);
 ok(aerialInfo.penn && String(aerialInfo.penn.color).toLowerCase() === String(aerialInfo.approved).toLowerCase()
     && aerialInfo.penn.signal === false,
   '5f: a project with no regulatory record keeps its status colour',
@@ -393,8 +396,8 @@ await clickReg();
 await page.waitForFunction(
   () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
   null, { timeout: 25000 });
-ok((await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).filter((r) => r.signal).length)) === 1,
-  '5l: ON again -> the R comes back on the dual-identity block, and the purple block returns');
+ok((await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).filter((r) => r.signal).length)) === 2,
+  '5l: ON again -> the R comes back on the dual-identity block and the overlay EPA block');
 
 const shotDir = process.env.HS_SCREENSHOT_DIR;
 if (shotDir) {
@@ -440,11 +443,11 @@ await page.waitForFunction(
   null, { timeout: 25000 });
 const addrPaint = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
   (r) => ({ label: r.label, color: String(r.color).toLowerCase(), signal: r.signal })));
-const facHex = String(aerialInfo.facility).toLowerCase();
 const find2 = (re) => addrPaint.find((r) => re.test(r.label || '')) || null;
 ok(addrPaint.length >= 3, '6d: address mode 3D aerial painted the three records', addrPaint.length);
-ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === facHex && find2(/ANDURIL/).signal === false,
-  '6e: address mode — the EPA-only building is purple, the same as 2D, and carries no R',
+ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === String(aerialInfo.operating).toLowerCase()
+   && find2(/ANDURIL/).signal === true,
+  '6e: address mode — overlay EPA is operating colour + R, the same as 2D',
   JSON.stringify(find2(/ANDURIL/)));
 ok(find2(/Pennhurst/) && find2(/Pennhurst/).color === String(aerialInfo.approved).toLowerCase(),
   '6f: address mode — a nearby project keeps its status colour', JSON.stringify(find2(/Pennhurst/)));
@@ -460,7 +463,7 @@ const addrOff = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
   (r) => ({ label: r.label, color: String(r.color).toLowerCase(), signal: r.signal })));
 ok(!addrOff.some((r) => /ANDURIL/.test(r.label || '')) && addrOff.length === 2
    && addrOff.filter((r) => r.signal).length === 0,
-  '6h: address mode — regulatory OFF removes the purple building and every R, and keeps both projects',
+  '6h: address mode — regulatory OFF removes the overlay EPA building and every R, and keeps both projects',
   JSON.stringify(addrOff));
 await clickReg();
 

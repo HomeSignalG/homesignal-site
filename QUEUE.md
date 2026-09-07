@@ -71,9 +71,11 @@ Those rows overlay on Type. Dual-identity **data centres** (#1093) are unchanged
 
 **Implementation already exists — do not rebuild.** Cursor PR
 **https://github.com/HomeSignalG/homesignal-site/pull/1121**
-(`cursor/map1-regulatory-overlay-on-type-324f`, CI green on `de16c00`). Concurrency verdict
-was GENUINE GAP vs #1093 (DC-only) and #1119 (3D aerial `mk.color`). A competing `claude/*`
-branch for the same resident-visible outcome is a duplicate.
+(`cursor/map1-regulatory-overlay-on-type-324f`). Concurrency verdict was GENUINE GAP vs
+#1093 (DC-only). **#1119 (3D aerial `mk.color`) is complementary, not competing:** 3D
+reads the same resolver. Overlay EPA paints Type/operating colour + R on 3D too;
+unmapped EPA stays purple with no Type overlay. A competing `claude/*` branch for the
+same resident-visible overlay-on-Type outcome is a duplicate.
 
 ⚠️ **Conflict with the 2026-09-02 sole-agent handoff (Cursor retired):** this display fix was
 built on a Cursor branch because that is where the founder reported it. Claude Code owns

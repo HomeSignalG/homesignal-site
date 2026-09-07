@@ -1117,19 +1117,21 @@ HS.onReady(function(){
   // Lifecycle-only helper. IT HAS NO CALLER TODAY, and that is the point rather than an
   // oversight: the 3D aerial BUILDINGS used to be its only caller, and painting by bucket
   // alone is exactly what made every EPA facility a green "Operating now" block. They now
-  // read the resolver's mk.color — the lifecycle hex for a project, the regulatory purple
-  // for an EPA-only facility. Retained as the ONE named bucket→3D-integer converter, so a
-  // future caller that genuinely has a bucket and no marker cannot restate the palette as
-  // a literal. An unrecognised bucket falls back to the neutral, never to a stage colour.
+  // read the resolver's mk.color — the lifecycle hex for a project or overlay Type,
+  // the regulatory purple for an unmapped EPA-only facility. Retained as the ONE named
+  // bucket→3D-integer converter, so a future caller that genuinely has a bucket and no
+  // marker cannot restate the palette as a literal. An unrecognised bucket falls back
+  // to the neutral, never to a stage colour.
   function lc3D(bkt){
     return hex3D((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468");
   }
   // THE 3D AERIAL PAINT. Same object the 2D pin and the 3D-satellite pin already read
   // (HS.resolveTrackerMarker). Painting by lifecycle bucket alone made every EPA facility
   // a green "Operating now" block, so the legend's "Purple R = regulatory record" was a
-  // lie on this view. The resolver already has the colour: purple square for a
-  // regulatory-only location, lifecycle colour for a project (and for a dual-identity
-  // data centre, whose purple R rides as signal).
+  // lie on this view. The resolver already has the colour: Type/operating colour + R for
+  // a classifiable EPA overlay, purple square for an unmapped regulatory-only location,
+  // lifecycle colour for a project (and for a dual-identity data centre, whose purple R
+  // rides as signal).
   function site3DPaint(p){
     var mk = HS.resolveTrackerMarker(p, frsRid);
     return {
