@@ -76,20 +76,11 @@
   .search button:hover{background:#16a34a14;color:#174026}
   .search button:focus-visible{outline:2px solid var(--green-bright);outline-offset:-2px}
   .search button:disabled{opacity:.45;cursor:default;background:none}
-  .hint{font-size:12.5px;color:var(--mute);margin-top:6px}
   /* Inline validation covers the ONE thing this page can judge client-side: an empty box.
      Anything typed is handed to the geocoder, which reports its own honest no-match — the
      field takes free-form text, so no address SHAPE is demanded here (the same reason the
      no-match copy suggests a city or ZIP rather than prescribing a triple). */
   .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
-  /* Quiet text link (e.g. "See a sample") — a link, never a second primary button. */
-  .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
-    color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
-  .linklike:hover{color:#174026}
-  /* Secondary text links under the field, stacked so each reads as its own quiet option
-     rather than a button row. Both are links, never a second primary action. */
-  .herolinks{margin-top:6px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
-  .herolinks .linklike{margin-top:0}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -512,8 +503,14 @@
              it the page could never show its own inline message. Emptiness is checked in the
              submit handler instead, which is also the only check this page can honestly make —
              the geocoder decides what resolves. -->
+        <!-- The placeholder IS the instruction. A complete example — street, city, state and
+             ZIP — shows the expected input without a sentence of helper copy beside it, so the
+             field explains itself the way a standard search control does. It is a placeholder
+             attribute and never a value: the box submits empty until the resident types. The
+             field still takes FREE-FORM text — the geocoder decides what resolves — so the
+             example is an illustration, not a required shape. -->
         <input id="addr" type="text" autocomplete="street-address" enterkeyhint="search"
-          aria-describedby="addrHint" placeholder="Enter a street address, e.g., 13313 Coomes Dr"/>
+          placeholder="Enter an address, e.g., 13313 Coomes Dr, Del Valle, TX 78617"/>
         <!-- SAME id and SAME type="submit" as the green button this replaced, so clicking the
              icon takes the identical path it always did — the form's submit handler — and every
              existing #go reference (the disabled-while-searching state, the browser suites that
@@ -526,11 +523,11 @@
           </svg>
         </button>
       </form>
-      <div class="hint" id="addrHint">Choose an address from the suggestions, press Enter, or click search.</div>
+      <!-- Nothing sits between the field and its error but the error itself. The helper
+           sentence and the "See a sample" link were removed (#1111 had already removed the
+           "Browse all development in ZIP NNNNN" self-link, emptying this row), because the
+           placeholder now carries the instruction the sentence used to. -->
       <div class="search-err" id="addrErr" role="alert" hidden></div>
-      <div class="herolinks">
-        <button type="button" class="linklike" id="sampleBtn">See a sample</button>
-      </div>
     </div>
 
     <div class="status" id="status"></div>
@@ -1678,9 +1675,9 @@ HS.onReady(function(){
     var a = $("addr"); if(a){ a.setAttribute("aria-invalid","true"); try{ a.focus(); }catch(_e){} }
   }
 
-  // ONE submit path for every way the search can start — the icon button (type="submit"),
-  // the Enter key, and "See a sample" (which calls requestSubmit). Exactly the path the old
-  // green button used; only the control's appearance changed.
+  // ONE submit path for every way the search can start — the icon button (type="submit")
+  // and the Enter key. Exactly the path the old green button used; only the control's
+  // appearance changed.
   $("form").addEventListener("submit", function(e){
     e.preventDefault();
     var address = $("addr").value.trim();
@@ -1691,14 +1688,6 @@ HS.onReady(function(){
   // Typing is the resident correcting the thing the message complained about, so the message
   // clears then rather than lingering under a field that now has content in it.
   $("addr").addEventListener("input", clearAddrError);
-
-  // "See a sample" — fill the box with a known address and submit via the normal search path.
-  var _sampleBtn = document.getElementById("sampleBtn");
-  if(_sampleBtn){ _sampleBtn.addEventListener("click", function(){
-    var a = $("addr"); a.value = "20 North Main Street, Brigham City, UT 84302";
-    if(typeof $("form").requestSubmit === "function"){ $("form").requestSubmit(); }
-    else { run(a.value.trim()); }
-  }); }
 
   // ADDRESS MODE, STEP 1 - the existing production geocoder. One call, no second geocoder,
   // never a ZIP centroid. Returns the endpoint's own match object, or null when it reports no
@@ -1982,13 +1971,8 @@ HS.onReady(function(){
     // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
     // seen any of them — the page below already labels each of those, so the hero just says why to read it.
     if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
-    // The helper text is now the SAME sentence in both modes — it describes how to WORK the
-    // field (suggestions / Enter / the search icon), which does not change with the mode — so
-    // ZIP mode no longer overrides it and there is one string to keep true instead of two.
-    // The "suggestions" it names are the browser's own street-address autofill: this page has
-    // never had a suggestion list of its own (nothing listens for input), and the field still
-    // takes FREE-FORM text, so the copy deliberately does not demand a "full" address or a
-    // fixed "street, city, state, ZIP" shape the geocoder does not require.
+    // NO helper text under the field in either mode, so ZIP mode has nothing to override.
+    // The field carries its own instruction in the placeholder, which reads correctly in both.
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
     // No placeholder override here any more: the example-address placeholder reads correctly in

@@ -49,7 +49,14 @@ const RE = eval(vPat);
 // ── 1. MUST MATCH — every wording this page has actually shipped, plus the current one ───────
 // Each string is REAL: taken from a shipped page, a shipped note, or this repo's own history.
 const MUST_MATCH = {
-  'the CURRENT helper text (#1090)': 'Choose an address from the suggestions, press Enter, or click search.',
+  // The CURRENT source, and the reason the guard's INPUT was widened: the hero's helper
+  // sentence was removed and the field's own placeholder now carries the direction. The
+  // pattern did not move — the verifier applies this same regex to the placeholder as well
+  // as to body.innerText, which cannot see a placeholder attribute.
+  'the CURRENT field placeholder': 'Enter an address, e.g., 13313 Coomes Dr, Del Valle, TX 78617',
+  // Shipped until the helper sentence was removed; kept because every string in this list is
+  // REAL, and a wording the page once carried must not start failing the guard.
+  'the former helper text (#1090)': 'Choose an address from the suggestions, press Enter, or click search.',
   'the shipped not-measured note': 'Development coverage for ZIP 08005 is not measured yet — we will not estimate it from a circle around the ZIP centre. Enter an address for the live view around your home.',
   "#1086's ZIP-mode hint": 'Enter a street address to switch from ZIP-wide results to development nearby.',
   "#1079's ZIP-mode hint": 'Enter an address to see development nearby.',
