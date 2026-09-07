@@ -99,10 +99,9 @@
   .mapcard{padding:14px}
   .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
-  /* In ZIP mode the radius selector controls how far out the 3D aerial view reaches: the cached
-     ZIP dataset can include records past the default frame (e.g. TABS filings a few miles out), and
-     the 3D view culls beyond CUR_RADIUS — so residents need this control to widen the view and see
-     them. (The 2D and 3D-satellite views already show every cached record and auto-fit.) */
+  /* ZIP mode hides #radSel (body.zipmode .radsel). A ZIP is not a radius around a point,
+     so there is no "widen the search" control. 2D / 3D aerial / 3D satellite all frame the
+     records' own extent (ZIP_FRAME). Address mode keeps the radius chips. */
   .viewseg{display:inline-flex;background:#eef2f1;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
@@ -1317,6 +1316,16 @@ HS.onReady(function(){
       V3.frameExt = Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
     }
     if(!V3.userZoom) V3.dist = mi(V3.frameExt * 2.0);
+    try{
+      if(window.__HS_VERIFY){
+        window.__HS_VERIFY.aerialFrameExt = V3.frameExt;
+        window.__HS_VERIFY.aerialDistMi = V3.dist / 120;
+        if(ZIP_MODE && ZIP_FRAME){
+          window.__HS_VERIFY.zipFrameSpanMi = ZIP_FRAME.spanMi;
+          window.__HS_VERIFY.zipFrameN = ZIP_FRAME.n;
+        }
+      }
+    }catch(e){}
   }
   function sceneOrigin(){
     return (ZIP_MODE && ZIP_FRAME) ? ZIP_FRAME : LAST_HOME;
@@ -2006,8 +2015,8 @@ HS.onReady(function(){
         if(window.HS && HS.setViewLabel) HS.setViewLabel(label);
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
-    CUR_RADIUS = 3;                                   // provisional ZIP-mode radius (development-tracker §3);
-    setRadiusButton(3);                               // render() re-picks it via zipFitRadius once the cached sites load
+    CUR_RADIUS = 3;                                   // unused in ZIP views — address mode owns the radius
+    setRadiusButton(3);                               // hidden in zipmode; restored on an address search
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
@@ -2259,10 +2268,9 @@ HS.onReady(function(){
     FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
     updateCovNote();
 
-    // ZIP mode: auto-frame to fit every cached record (loadZip seeds a fixed 3 mi, which can cull
-    // records the cache legitimately holds farther out — see zipFitRadius). render() runs once per
-    // ZIP load, so this never fights a manual radius pick (those re-render via drawMap directly).
-    if(ZIP_MODE){ CUR_RADIUS = zipFitRadius(sites); setRadiusButton(CUR_RADIUS); V3.userZoom = false; }
+    // ZIP mode is the records' own extent (ZIP_FRAME in drawMap), not a radius around a centroid.
+    // Reset 3D user-zoom so the aerial camera re-covers that extent on each ZIP load.
+    if(ZIP_MODE){ V3.userZoom = false; }
 
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
@@ -2292,22 +2300,6 @@ HS.onReady(function(){
       c.classList.toggle("on", parseFloat(c.getAttribute("data-r")) === r);
     });
   }
-  // ZIP mode default: the cache is the authoritative ZIP dataset, and the 3D aerial culls beyond
-  // CUR_RADIUS (+0.3 mi). Pick the smallest radius stop whose cull still contains every cached
-  // record, so nothing legitimately cached (e.g. TABS filings a few miles out) is hidden on first
-  // load. No point data → keep the documented 3-mi ZIP default; data past 20 mi → clamp to 20.
-  function zipFitRadius(sites){
-    var md = 0;
-    (sites||[]).forEach(function(s){
-      if(!mappable(s)) return;
-      var en = siteEN(s);
-      if(typeof en[0]==="number" && typeof en[1]==="number"){ md = Math.max(md, Math.hypot(en[0],en[1])); }
-    });
-    if(md <= 0) return 3;
-    for(var i=0;i<RADIUS_STOPS.length;i++){ if(RADIUS_STOPS[i] + 0.3 >= md) return RADIUS_STOPS[i]; }
-    return 20;
-  }
-
   function drawMap(data, sites){
     var home = data.home || { lat:41.5105, lng:-112.0155 };
     LAST_DRAW = { data:data, sites:sites };  // retained so a radius change can re-cull/re-frame without a re-fetch
@@ -2968,6 +2960,8 @@ HS.onReady(function(){
   // context is refused so the 3D aerial control still shows the buildings rather
   // than bouncing the resident back to the 2D street map.
   function projectSoft(px, py, pz){
+    // Scene origin is ZIP_FRAME (record bbox) in ZIP mode, LAST_HOME in address mode.
+    // (0,0) is camera math — nothing is drawn here in ZIP mode.
     var tgt={x:0,y:16,z:0};
     var cp=Math.cos(V3.pitch), sp=Math.sin(V3.pitch);
     var cam={
@@ -3225,8 +3219,7 @@ HS.onReady(function(){
   function ringStops(R){ return [0.5,1,2,3,5,10,20].filter(function(r){ return r<=R+1e-9; }); }
   function drawRings(){
     if(!V3.inited)return;var G=V3.ringGrp;while(G.children.length)G.remove(G.children[0]);
-    // Mile rings need an address-derived HOME. ZIP mode has none; zipFitRadius is
-    // only a silent camera fit, not displayed geography.
+    // Mile rings need an address-derived HOME. ZIP mode has none.
     if(ZIP_MODE)return;
     var stops=ringStops(V3.frameExt||CUR_RADIUS);
     stops.forEach(function(r){
@@ -3325,6 +3318,7 @@ HS.onReady(function(){
       V3.cam.position.set(mi(0.03),7,mi(-0.01));V3.cam.lookAt(mi(-0.5),20,mi(0.2));
     } else {
       if(V3.auto)V3.yaw+=0.0016;
+      // (0,0) is ZIP_FRAME in ZIP mode / LAST_HOME in address mode — camera math, not a drawn centre.
       var cp=Math.cos(V3.pitch),sp=Math.sin(V3.pitch),tgt=new THREE.Vector3(0,16,0);
       V3.cam.position.set(tgt.x+Math.sin(V3.yaw)*cp*V3.dist,tgt.y+sp*V3.dist,tgt.z+Math.cos(V3.yaw)*cp*V3.dist);
       V3.cam.lookAt(tgt);

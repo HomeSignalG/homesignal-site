@@ -215,6 +215,16 @@ ok(/function glFrameView\(\)\{[\s\S]{0,500}ZIP_FRAME\.west/.test(page)
   'F19 3D satellite ZIP mode fitBounds the record extent, not jumpTo the centroid');
 ok(/function siteEN\(s\)\{[\s\S]{0,200}ZIP_MODE && ZIP_FRAME[\s\S]{0,120}llToEN/.test(page),
   'F20 ZIP 3D positions records from lat/lng vs the record bbox, not centroid-relative e/n');
+ok(/function sceneOrigin\(\)\{[\s\S]{0,80}ZIP_MODE && ZIP_FRAME[\s\S]{0,40}ZIP_FRAME/.test(page)
+   && /if\(ZIP_MODE\)\{\s*\n\s*if\(!homePointOK\(ZIP_FRAME\)\)\{ fail3D/.test(page),
+  'F21 ZIP 3D origin is the record bbox, not LAST_HOME / the ZIP centroid');
+ok(!/zipFitRadius/.test(page),
+  'F22 ZIP mode no longer models the camera as a radius around a centroid');
+ok(/function viewSpanMi\(\)\{[\s\S]{0,80}ZIP_FRAME\.spanMi/.test(page)
+   && /mi\(viewSpanMi\(\)\*3\)/.test(page),
+  'F23 ZIP 3D zoom limits follow the record span, not CUR_RADIUS');
+ok(/function set3DFrame\(maxD\)\{[\s\S]{0,500}__HS_VERIFY\.aerialFrameExt = V3\.frameExt/.test(page),
+  'F24 after 3D frames, verify can read the aerial extent (not only the pre-3D drawMap snapshot)');
 
 // ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
 // Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed
