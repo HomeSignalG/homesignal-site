@@ -68,7 +68,9 @@ const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'bounda
   markers: [{ project_ref: 'arcgis:fairfax:P-1', lat: 38.95065, lng: -77.36458,
     marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }] } };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const page = await (await browser.newContext()).newPage();
 const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
@@ -292,6 +294,53 @@ ok(back.length === 3 && back.filter(m => m.rBadge).length === 1,
   '5b: the badge is repainted on the pin that is already on the map', back.filter(m => m.rBadge).length);
 ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
   '5c: …and the other two rows are still untouched');
+
+// ── 5d. 3D AERIAL PAINTS THE SAME COLOURS THE 2D PINS DO ──────────────────────────
+// Production 3D aerial used to colour every building from the lifecycle bucket, so
+// an EPA-only location became a green "Operating now" block while the legend still
+// said "Purple R = regulatory record". Colour now comes from site3DPaint → mk.color.
+// The jsdelivr mock in this file does not serve three.js, so this path is the
+// Canvas-2D aerial fallback — the same paint function the WebGL path uses.
+await page.click('#viewSeg button[data-v="3d"]');
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length >= 3,
+  null, { timeout: 25000 });
+const aerialInfo = await page.evaluate(() => {
+  const paints = window.__HS_AERIAL_PAINT || [];
+  const find = (re) => paints.find((r) => re.test(r.label || '')) || null;
+  return {
+    n: paints.length,
+    facility: (window.HS && HS.REGULATORY_LEGEND && HS.REGULATORY_LEGEND.color) || null,
+    approved: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.approved) || null,
+    operating: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.operating) || null,
+    anduril: find(/ANDURIL/),
+    coresite: find(/CORESITE/),
+    penn: find(/Pennhurst/)
+  };
+});
+ok(aerialInfo.n >= 3, '5d: 3D aerial painted the three fixture records', aerialInfo.n);
+ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.facility).toLowerCase()
+    && aerialInfo.anduril.signal === false,
+  '5e: an EPA-only location is purple on 3D aerial, not operating-green — and has no R (the R is dual-identity)',
+  JSON.stringify(aerialInfo.anduril) + ' facility=' + aerialInfo.facility);
+ok(aerialInfo.penn && String(aerialInfo.penn.color).toLowerCase() === String(aerialInfo.approved).toLowerCase()
+    && aerialInfo.penn.signal === false,
+  '5f: a project with no regulatory record keeps its status colour',
+  JSON.stringify(aerialInfo.penn));
+ok(aerialInfo.coresite && aerialInfo.coresite.signal === true
+    && String(aerialInfo.coresite.color).toLowerCase() === String(aerialInfo.operating).toLowerCase(),
+  '5g: a dual-identity data centre keeps its status colour and carries the purple R',
+  JSON.stringify(aerialInfo.coresite));
+const shotDir = process.env.HS_SCREENSHOT_DIR;
+if (shotDir) {
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: join(shotDir, 'map1_3d_aerial_regulatory_purple.png'), fullPage: false });
+}
+await page.click('#viewSeg button[data-v="2d"]');
+await page.waitForTimeout(300);
+if (shotDir) {
+  await page.screenshot({ path: join(shotDir, 'map1_2d_regulatory_purple.png'), fullPage: false });
+}
 
 // ── 6. THE OTHER DIRECTION — Stage and Type never move the regulatory switch ──────
 await page.click('#mapkey span:has-text("Approved")');

@@ -288,7 +288,10 @@ Data center octagon, keeps its EPA square, appears once, popup reads
 - 📌 **OPEN, logged not fixed:** no project↔facility relationship is asserted anywhere (a
   campus with both a permit record and an FRS record still shows two records — HomeSignal has
   no evidence they are one entity) · the type filter is per-session like the lifecycle chips ·
-  3D aerial draws blocks, so the EPA signal shows in 2D and satellite only.
+  3D aerial used to paint those blocks by lifecycle colour alone, so every EPA
+  facility read as operating-green while the legend still said "Purple R"; closed
+  2026-09-07 — buildings now take `mk.color` from the same resolver as the 2D pin
+  (PR #1119).
 - Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
 ### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)

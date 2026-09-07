@@ -265,6 +265,8 @@ const epaOnly = HS.resolveTrackerMarker({
 ok(epaOnly.color === FACILITY && parseInt(String(epaOnly.color).replace('#', ''), 16) === facInt,
   '8i: an EPA-only site resolves to the purple the 3D aerial now paints, not operating green',
   epaOnly.color);
+ok(/__HS_AERIAL_PAINT/.test(aerial),
+  '8j: the 3D aerial publishes the hex it painted, so a browser check can read colour without sampling pixels');
 
 
 // §9 — A COLOUR YOU CANNOT SEE IS NOT A COLOUR. §1-§8 prove the palette is separated;

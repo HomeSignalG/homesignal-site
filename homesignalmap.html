@@ -3262,6 +3262,23 @@ HS.onReady(function(){
 
   function build3DFacilities(){
     if(!V3.inited)return;
+    // What this view actually painted — same resolver hex the 2D pin uses. A browser
+    // check reads this rather than sampling pixels (lighting and the canvas fallback
+    // both shift the on-screen colour). Empty until the first successful build.
+    var aerialPaint=[];
+    function notePaint(p, paint){
+      aerialPaint.push({
+        label: String(p.label || "").split(" ·")[0],
+        color: (paint.mk && paint.mk.color) || null,
+        signal: !!(paint.signal)
+      });
+    }
+    function stampPaint(){
+      try{
+        window.__HS_AERIAL_PAINT = aerialPaint;
+        if(window.__HS_VERIFY) window.__HS_VERIFY.aerialPaint = aerialPaint;
+      }catch(e){}
+    }
     if(V3.soft){
       var maxD=0;
       V3.softSites=[];
@@ -3276,10 +3293,12 @@ HS.onReady(function(){
         var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1];
         var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
         var paint=site3DPaint(p);
+        notePaint(p, paint);
         V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:paint.col, wire:bkt==="proposed", site:p, signal:paint.signal});
       });
       set3DFrame(maxD);
       V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
+      stampPaint();
       return;
     }
     // Frame the view to where the buildings actually are (not the empty outer radius),
@@ -3310,6 +3329,7 @@ HS.onReady(function(){
       var raw=String(p.label||"").split(" ·")[0];
       var name=raw.length>20?raw.slice(0,19).trim()+"…":raw;
       var paint=site3DPaint(p);
+      notePaint(p, paint);
       var col=paint.col;
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
@@ -3344,6 +3364,7 @@ HS.onReady(function(){
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });
+    stampPaint();
   }
 
   function resize3D(){ if(!V3.inited)return;var h=document.getElementById("map3d");var w=h.clientWidth||560,ht=h.clientHeight||460;
