@@ -530,10 +530,6 @@
       <div class="search-err" id="addrErr" role="alert" hidden></div>
       <div class="herolinks">
         <button type="button" class="linklike" id="sampleBtn">See a sample</button>
-        <!-- The ZIP-wide "all development" view is THIS page at ?zip=NNNNN. The link is written
-             only when a ZIP is actually known (see setZipBrowseLink) — it never guesses one and
-             never prints a placeholder ZIP. -->
-        <a class="linklike" id="zipAllLink" hidden></a>
       </div>
     </div>
 
@@ -1682,31 +1678,6 @@ HS.onReady(function(){
     var a = $("addr"); if(a){ a.setAttribute("aria-invalid","true"); try{ a.focus(); }catch(_e){} }
   }
 
-  // ---- "Browse all development in ZIP NNNNN" --------------------------------------------
-  // The ZIP-wide / all-development view is this same page at ?zip=NNNNN, so the link points
-  // there and introduces no new view. It renders ONLY when a ZIP is genuinely known; with no
-  // ZIP it stays hidden rather than showing a guessed or placeholder one.
-  function knownZip(){
-    var u = new URL(window.location.href);
-    var z = u.searchParams.get("zip");
-    if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
-    if(!z && window.HS && HS.state && /^\d{5}$/.test(String(HS.state.zip))) z = String(HS.state.zip);
-    return /^\d{5}$/.test(String(z || "")) ? String(z) : "";
-  }
-  // Last resort in address mode: the ZIP the geocoder's OWN matched address ends with. Read
-  // from real returned text, never synthesised, and only used when no ZIP context exists.
-  function zipFromAddress(s){
-    var m = String(s || "").match(/\b(\d{5})(?:-\d{4})?\s*$/);
-    return m ? m[1] : "";
-  }
-  function setZipBrowseLink(zip){
-    var el = document.getElementById("zipAllLink"); if(!el) return;
-    if(!/^\d{5}$/.test(String(zip || ""))){ el.hidden = true; return; }
-    el.textContent = "Browse all development in ZIP " + zip + " \u2192";
-    el.setAttribute("href", "homesignalmap.html?zip=" + encodeURIComponent(zip));
-    el.hidden = false;
-  }
-
   // ONE submit path for every way the search can start — the icon button (type="submit"),
   // the Enter key, and "See a sample" (which calls requestSubmit). Exactly the path the old
   // green button used; only the control's appearance changed.
@@ -1836,11 +1807,6 @@ HS.onReady(function(){
       + "windows, plus nearby regulated facilities for context — every item linked to its "
       + "official public record."; }
     document.title = "Development around " + address + " — HomeSignal";
-    // Address mode is exactly where the way BACK to the whole-ZIP view earns its place, so the
-    // link is written from the ZIP context we already hold (falling back to the ZIP the typed
-    // address itself ends with). It is refreshed after the geocode below with the ZIP from the
-    // geocoder's own matched address.
-    setZipBrowseLink(knownZip() || zipFromAddress(address));
     $("go").disabled = true;
     N5_NOTE = "";
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
@@ -1865,10 +1831,6 @@ HS.onReady(function(){
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
-      // The geocoder's own matched address is the most authoritative ZIP available here, so the
-      // browse link is re-derived from it once it exists. Still never synthesised: no match text
-      // with a trailing ZIP and no ZIP context leaves the link exactly as it was.
-      setZipBrowseLink(knownZip() || zipFromAddress(m.matchedAddress || address));
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -2027,15 +1989,6 @@ HS.onReady(function(){
     // never had a suggestion list of its own (nothing listens for input), and the field still
     // takes FREE-FORM text, so the copy deliberately does not demand a "full" address or a
     // fixed "street, city, state, ZIP" shape the geocoder does not require.
-    //
-    // ⚠️ THIS DELIBERATELY SUPERSEDES #1086's OVERRIDE, which read "Enter a street address to
-    // switch from ZIP-wide results to development nearby." — do not restore it on the reading
-    // that it was lost to a bad conflict resolution. The founder specified this helper string
-    // verbatim, and it answers a different question: #1086's sentence explained the SCOPE
-    // CHANGE, this one explains how to operate the control. The scope information did not go
-    // anywhere — the kicker, H1 and standfirst already swap to near-home wording on search
-    // (#1070/#1081), and the ZIP-wide scope is now NAMED under the field as the way back:
-    setZipBrowseLink(zip);
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
     // No placeholder override here any more: the example-address placeholder reads correctly in
