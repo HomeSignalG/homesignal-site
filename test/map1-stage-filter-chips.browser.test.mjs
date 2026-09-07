@@ -192,10 +192,15 @@ const grp = await page.evaluate(() => {
   return { role: g.getAttribute('role'), help: help ? help.textContent.trim() : null,
     hd: hd ? hd.textContent.trim() : null };
 });
-ok(grp.role === 'group' && /Stage/.test(grp.hd || ''),
+ok(grp.role === 'group' && grp.hd === 'STATUS',
   '1: the four are a labelled group', JSON.stringify(grp));
-ok(grp.help === 'Checked statuses are shown on the map.',
-  '1: the governing rule is programmatically associated with the group', grp.help);
+// ⚖️ The per-row rule ("Checked statuses are shown on the map.") was removed by the
+// filter-panel hierarchy unit — it said three times, in three rows, what a ticked checkbox
+// already says. The group is now described by the one map key. The property under test is
+// unchanged: the group must carry a REAL, RESOLVABLE description, not a dangling id.
+ok(grp.help === 'How to read the map: Shape = project type · Color = status · '
+              + 'Purple R = regulatory record.',
+  '1: the group is programmatically described by the one map key', grp.help);
 // The accessible name states INCLUSION in words, so the state never rests on the tick alone.
 ok(C0[0].name === 'Operating now status, shown on map',
   '1: accessible name says what checked MEANS', C0[0].name);

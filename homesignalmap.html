@@ -346,8 +346,8 @@
      so nothing in this row can be mistaken for a pin or a project type. */
   .mapkey .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;display:block;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
-  /* ── STAGE CHIPS — a multi-select CHECKBOX group, not toggle buttons ────────────
-     "Checked statuses are shown on the map." The chip is a <label> wrapping a REAL
+  /* ── STATUS CHIPS — a multi-select CHECKBOX group, not toggle buttons ───────────
+     A checked chip is shown on the map. The chip is a <label> wrapping a REAL
      <input type=checkbox>, so focus order, Space-to-toggle and every screen reader's
      checkbox semantics come from the platform instead of from re-implemented ARIA.
      The input is visually hidden but NEVER display:none — a display:none input is
@@ -393,7 +393,6 @@
     #mapkeyShapes .typechip, #mapkeyReg .regchip{min-height:44px;padding:9px 13px}
     #mapkeyShapes .typechip .ck, #mapkeyReg .regchip .ck{width:18px;height:18px;font-size:12px}
   }
-  .mapkey-help{font-size:11px;color:var(--mute);line-height:1.45}
   /* The empty state's way out. A real <button> styled as a link: an <a href="#"> would
      announce as a link to nowhere and would push a history entry on every click. */
   .mk-linkbtn{font:inherit;font-size:11px;font-weight:700;color:#8a4b12;background:none;
@@ -401,7 +400,20 @@
   .mk-linkbtn:hover{color:#6d3a0d}
   .mk-linkbtn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
   .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
-  .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
+  /* SECTION HEADING — the three filter dimensions are the panel's major rank, so they
+     read as sections rather than as another line of helper text. This reuses the app's
+     existing section-label idiom (app.css `.groupHead` / `.kicker` / this page's own
+     `.dt-lbl`): uppercase, tracked, bold, ink — not a new typographic invention. It has
+     to outrank BOTH neighbours it sits between, which is why all four channels move at
+     once: 13.5px/700 ink uppercase against 12px/400 ink sentence-case chip labels and
+     11px mute helper copy. Size alone at this scale would not carry it. */
+  .mapkey-hd{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:.05em;
+    text-transform:uppercase;margin-top:12px}
+  /* The separation IS the grouping. `.maplegend-wrap` gaps 6px uniformly, which spaces a
+     heading from its own controls exactly as far as it spaces it from the previous
+     section's — so the three groups never read as three. The extra top margin belongs to
+     the heading (it opens a section) and is cancelled on the first, which opens nothing. */
+  .mapkey-hd:first-child{margin-top:0}
   .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
   /* REGULATORY ROW. One chip, same pattern as the other two rows — the ON/OFF switch it
      replaces is gone entirely, so there is no second control over the same layer. The
@@ -410,11 +422,22 @@
   .mapkey-reg{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   #mapkeyShapes .ic, #mapkeyReg .ic{display:flex;align-items:center;line-height:0}
   #mapkeyShapes .typechip .ic, #mapkeyReg .regchip .ic{opacity:1}
-  .mapkey-reghelp{font-size:11px;color:var(--mute);line-height:1.45;max-width:46em}
-  /* Caption for the two legend rows: spans the full map width and centers, so it
-     reads as a caption under the map rather than a narrow column flushed left. */
+  /* THE ONE MAP KEY. It reads the map's three encodings and nothing else — the three
+     "checked X are shown on the map" rules and the long legend paragraph that used to
+     restate them are gone, so this is the only explanation in the panel. It is
+     SUBORDINATE by construction: 11px mute against 13.5px ink headings, and it sits
+     under a hairline rule so it is plainly the panel's footer rather than a fourth
+     section. Left-aligned, because it now aligns with the controls it explains instead
+     of centring one short line under a left-aligned column. */
   .mapkey-note{font-size:11px;color:var(--mute);line-height:1.45;width:100%;
-    max-width:none;margin:2px auto 0;text-align:center;text-wrap:balance}
+    max-width:none;margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);
+    text-wrap:balance}
+  .mapkey-note strong{font-weight:700;color:var(--soft)}
+  /* Each `X = Y ·` is one unbreakable unit, so a narrow viewport wraps BETWEEN the
+     three clauses rather than stranding a lone separator at the head of a line. The
+     spans carry no text of their own, so the accessible description these groups are
+     aria-describedby is byte-identical to the sentence on screen. */
+  .mapkey-note .mk-clause{white-space:nowrap}
   .mapkey-empty{font-size:11px;line-height:1.35;max-width:42em;color:#8a4b12;
     background:#fff6ec;border:1px solid #f0d3b4;border-radius:7px;padding:5px 9px}
   .mapkey-empty[hidden]{display:none}
@@ -530,16 +553,29 @@
             </div>
           </div>
           <div class="maprow">
+            <!-- THREE FILTER SECTIONS, THEN ONE MAP KEY.
+                 The panel answers three separate questions — what STATUS is it in, what KIND
+                 of project is it, and do I want REGULATORY records drawn too — so it is laid
+                 out as three headed sections rather than three rows of similar-weight text.
+                 The headings carry the panel's major rank (.mapkey-hd); the chips carry the
+                 controls; ONE key at the foot says how those three dimensions appear on the
+                 map. The per-row "checked X are shown on the map." lines are GONE: they said
+                 the same thing three times, and a checkbox that is checked already says it.
+                 The long legend paragraph is gone for the same reason — it restated the two
+                 encodings the key now states once. Nothing about the controls, their values,
+                 their defaults or their filtering behaviour moved with the copy. -->
             <div class="maplegend-wrap">
-              <div class="mapkey-hd" id="stageLegHd">Stage — pin color</div>
-              <!-- THE STAGE ROW IS A MULTI-SELECT CHECKBOX GROUP, not a row of toggle
+              <div class="mapkey-hd" id="stageLegHd">STATUS</div>
+              <!-- THE STATUS ROW IS A MULTI-SELECT CHECKBOX GROUP, not a row of toggle
                    buttons. Each chip is a real <input type=checkbox> inside its label, so
                    Tab / Space / screen-reader checkbox semantics come from the platform.
                    role=group + aria-labelledby ties the four to their heading, and
-                   aria-describedby attaches the one rule that governs them all. -->
+                   aria-describedby now points at the ONE map key — the description that
+                   survived the copy cut — rather than at a per-row rule that no longer
+                   exists. A dangling aria-describedby is worse than none: it announces
+                   nothing while looking associated. -->
               <div class="mapkey" id="mapkey" role="group" aria-labelledby="stageLegHd"
-                   aria-describedby="mapkeyStageHelp"></div>
-              <div class="mapkey-help" id="mapkeyStageHelp">Checked statuses are shown on the map.</div>
+                   aria-describedby="mapkeyNote"></div>
               <!-- Zero statuses selected is a LEGAL state the resident chose, so the map
                    honours it (no pins) and says so, rather than silently re-checking
                    everything — which would overrule the resident and make the control
@@ -550,11 +586,10 @@
                    state, which is one control too many once the chips are checkboxes: the
                    chip now carries its own checked/unchecked state visibly, so the dropdown
                    added a place for the two to disagree and nothing else. -->
-              <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
+              <div class="mapkey-hd" id="shapeLegHd">PROJECT TYPE</div>
               <div class="mapkey mapkey-shapes" id="mapkeyShapes" role="group"
-                   aria-label="Project type filters" aria-describedby="mapkeyTypeHelp"></div>
-              <div class="mapkey-help" id="mapkeyTypeHelp">Checked types are shown on the map.</div>
-              <!-- Zero types selected is a LEGAL state, answered exactly as the Stage row
+                   aria-label="Project type filters" aria-describedby="mapkeyNote"></div>
+              <!-- Zero types selected is a LEGAL state, answered exactly as the Status row
                    answers it. ⚖️ THE CLAIM CHANGED, WHICH IS WHY THE OLD RECORD-GATE IS GONE:
                    the previous note asserted "the map is empty", so it had to be MEASURED
                    against what was drawn and suppressed on a ZIP with no records (promising
@@ -563,19 +598,22 @@
                    one — and it is the only thing on screen explaining why nothing can appear. -->
               <div class="mapkey-empty" id="mapkeyEmpty" hidden><span>No project types are selected.</span>
                 <button type="button" class="mk-linkbtn" id="typeSelectAll">Select all types.</button></div>
-              <!-- THE THIRD ROW. Regulatory records are not a project type and not a lifecycle
-                   stage — they are context that OVERLAPS both — so they get their own row and
-                   their own on/off control rather than an eighth Type chip. Built from
-                   HS.REGULATORY_LEGEND; nothing here is hand-listed. -->
-              <div class="mapkey-hd" id="regLegHd">Regulatory records</div>
+              <!-- THE THIRD SECTION. Regulatory records are not a project type and not a
+                   lifecycle status — they are context that OVERLAPS both — so they get their
+                   own section and their own on/off control rather than an eighth Type chip.
+                   Built from HS.REGULATORY_LEGEND; nothing here is hand-listed, and the
+                   heading text is written by that registry (`reg.heading`), which is why the
+                   uppercase treatment is CSS rather than a retyped registry value. -->
+              <div class="mapkey-hd" id="regLegHd">REGULATORY RECORDS</div>
               <div class="mapkey-reg" id="mapkeyReg" role="group"
-                   aria-label="Regulatory record filters" aria-describedby="mapkeyRegRule"></div>
-              <div class="mapkey-help" id="mapkeyRegRule">Checked records are shown on the map.</div>
-              <!-- The founder's copy, set from HS.REGULATORY_LEGEND.helper. It explains what the
-                   purple R MEANS and what the corpus covers; the chip's checkmark says only
-                   whether the overlay is currently drawn. Two different questions, two lines. -->
-              <div class="mapkey-reghelp" id="mapkeyRegHelp"></div>
-              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. All three rows are filters — checked categories are shown on the map. Regulatory records are a separate overlay: a project that also carries a regulatory record keeps its own shape and color and gains a small purple <strong>R</strong> in the lower-right corner, while a location with a regulatory record but no mapped project draws a standalone purple square. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+                   aria-label="Regulatory record filters" aria-describedby="mapkeyNote"></div>
+              <!-- THE ONE MAP KEY. Every claim in it was verified against the shipped
+                   renderer before it was written: shape comes from CATEGORY_REGISTRY[k].symbol
+                   per project type, colour from STATUS_TIERS keyed on the record's own status,
+                   and the badge is REGULATORY_BADGE_LETTER 'R' in FACILITY_HEX #7d148c
+                   (purple) — all three in lib/map.js. The copy describes the encoding; it did
+                   not change it. -->
+              <div class="mapkey-note" id="mapkeyNote"><strong>How to read the map:</strong> <span class="mk-clause">Shape = project type ·</span> <span class="mk-clause">Color = status ·</span> <span class="mk-clause">Purple R = regulatory record.</span></div>
             </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
@@ -885,8 +923,8 @@ HS.onReady(function(){
     STAGE_KEYS.forEach(function(k){ FILTER[k] = !!want[k]; });
   })();
 
-  // ── THE TYPE FILTER — the same contract as Stage, over stable TYPE IDS ────────
-  // "Checked types are shown on the map." Independent multi-select, any combination
+  // ── THE TYPE FILTER — the same contract as Status, over stable TYPE IDS ───────
+  // A checked chip is shown on the map. Independent multi-select, any combination
   // legal, applied immediately. It reads and writes the SHIPPED category-filter state
   // in lib/map.js (HS.getCategoryFilters / setCategoryFilter), so this is a new CONTROL
   // over the existing filter model, never a second model — which is what lets the
@@ -2689,10 +2727,15 @@ HS.onReady(function(){
     var host = document.getElementById("mapkeyReg");
     var reg = HS.REGULATORY_LEGEND;
     if(!host || !reg || !HS.setCategoryFilter) return;
-    var help = document.getElementById("mapkeyRegHelp");
     var hd = document.getElementById("regLegHd");
     if(hd) hd.textContent = reg.heading;
-    if(help) help.textContent = reg.helper;
+    // ⚖️ `reg.helper` IS DELIBERATELY NOT RENDERED HERE (founder ruling, filter-panel
+    // hierarchy unit). It opened "Purple R = environmental regulatory record", which the
+    // map key at the foot of the panel already states — the second copy of one explanation
+    // this unit exists to remove. The string stays in HS.REGULATORY_LEGEND: it is
+    // founder-signed-off framing with its own anti-editorialising guard
+    // (test/marker-regulatory-badge.test.mjs), and a consumer that renders it somewhere
+    // this panel's redundancy argument does not apply is a separate decision.
     host.innerHTML = "";
 
     // ONE CHIP, and the ON/OFF switch is gone — not hidden, not kept alongside. Two
