@@ -207,25 +207,63 @@ await waitAddr(); await page.waitForTimeout(400);
 ok(geocodeCalls.length === 1 && /Caldwell/i.test(geocodeCalls[0] || ''),
    '4a pressing Enter in the field runs the same search', geocodeCalls);
 
-// ══════════════ 5. THE WAY BACK TO THE WHOLE-ZIP VIEW ════════════════════════════════════════
-const link = await page.evaluate(() => {
-  const a = document.getElementById('zipAllLink');
-  return { hidden: !a || a.hidden, text: a ? a.textContent.trim() : null,
-           href: a ? a.getAttribute('href') : null };
+// ══════════════ 5. THE HERO SELF-LINK IS GONE; #backZip IS THE WAY BACK ══════════════════════
+// The hero used to carry `#zipAllLink` — "Browse all development in ZIP NNNNN →" — pointing at
+// THIS page at ?zip=NNNNN. On a ZIP page that is a self-link sitting above a heading that
+// already reads "All development across ZIP NNNNN", and the real way back from address mode
+// already exists as #backZip. It was removed, and this section now proves the removal in all
+// three states rather than the old presence.
+//
+// It is asserted as ABSENT FROM THE DOM, not merely hidden: `hidden` alone would still pass if
+// a future session re-added the element and only forgot to unhide it, which is exactly the
+// half-restore this section exists to catch. The element's writer (setZipBrowseLink) and its
+// two ZIP-derivation helpers went with it, so there is nothing left to show it.
+const zipAllGone = () => ({
+  el: !document.getElementById('zipAllLink'),
+  copy: !/Browse all development in ZIP/i.test(document.body.innerText || '')
 });
-ok(!link.hidden, '5a the ZIP browse link is offered in address mode');
-ok(/Browse all development in ZIP 78617/.test(link.text || ''), '5b ...naming the real ZIP', link.text);
-ok(/[?&]zip=78617\b/.test(link.href || ''), '5c ...and pointing at the existing ZIP-wide view', link.href);
 
-// A ZIP is never guessed: with no ZIP anywhere the link stays hidden rather than printing a
-// placeholder. This is the anti-fabrication rule applied to a link instead of a record.
+// (a) ADDRESS mode — the state section 4 left the page in, and the one state where the old
+// link was actually offered.
+const gone1 = await page.evaluate(zipAllGone);
+ok(gone1.el, '5a #zipAllLink is absent from the DOM in address mode');
+ok(gone1.copy, '5b ...and no "Browse all development in ZIP" copy is rendered there');
+
+// The way back was NOT deleted with it. #backZip carries it in address mode — named, pointing
+// at the real ZIP-wide view — which is why the hero duplicate had nothing left to add.
+const back = await page.evaluate(() => {
+  const d = document.getElementById('backZip');
+  const a = d ? d.querySelector('a') : null;
+  return { shown: !!(d && getComputedStyle(d).display !== 'none'),
+           text: a ? a.textContent.trim() : null, href: a ? a.getAttribute('href') : null };
+});
+ok(back.shown && /Back to all development in ZIP 78617/.test(back.text || ''),
+   '5c #backZip still offers the way back, naming the real ZIP', back);
+ok(/[?&]zip=78617\b/.test(back.href || ''), '5d ...and pointing at the ZIP-wide view', back.href);
+
+// (b) ZIP mode — where the link was a self-link, and the redundancy the removal is about.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitZip(); await page.waitForTimeout(400);
+const gone2 = await page.evaluate(zipAllGone);
+ok(gone2.el, '5e #zipAllLink is absent from the DOM in ZIP mode');
+ok(gone2.copy, '5f ...and the ZIP page never prints the self-link copy', gone2);
+
+// (c) THE BARE PAGE, no ZIP context at all — the state the old link had to special-case so it
+// never printed a placeholder ZIP. With the link gone there is nothing to special-case.
 const p2 = await ctx.newPage();
 p2.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
 await p2.route('**/*', r => routeHandler(r));
 await p2.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
 await p2.waitForTimeout(700);
-ok(await p2.evaluate(() => { const a = document.getElementById('zipAllLink'); return !a || a.hidden; }),
-   '5d with no ZIP context at all the link is hidden, never a placeholder ZIP');
+const gone3 = await p2.evaluate(zipAllGone);
+ok(gone3.el && gone3.copy, '5g ...and it is absent on the bare page with no ZIP anywhere', gone3);
+
+// "See a sample" is a separate hero control and was deliberately kept — the control that stops
+// 5a-5g being satisfied by an empty .herolinks.
+ok(await p2.evaluate(() => {
+  const b = document.getElementById('sampleBtn');
+  return !!b && /See a sample/i.test(b.textContent || '');
+}), '5h "See a sample" is still in the hero, so the row was not emptied wholesale');
 
 // ══════════════ 7. THE PRODUCTION addressCta GUARD STILL HAS A SOURCE ════════════════════════
 // verify-map1-zip-states asserts against LIVE production that a ZIP page still directs the
