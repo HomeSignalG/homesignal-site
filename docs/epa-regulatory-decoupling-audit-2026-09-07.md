@@ -967,9 +967,11 @@ the other side. Pinned: a 29 s successful read still succeeds under the 45 s bud
 
 ### 17.5 Verification
 
-`test/epa-plane-deadlines.test.mjs` — **43 assertions**, driving the shipped modules with a mocked
+`test/epa-plane-deadlines.test.mjs` — **44 assertions**, driving the shipped modules with a mocked
 fetch and an injected clock, so no assertion waits on real time, plus a composition grep of both
-`index.ts` call sites (a `Promise.all` revert of the wiring left the helper assertions green).
+`index.ts` call sites (a `Promise.all` revert of the wiring left the helper assertions green) and
+a pin that the overlay is handed `now+OVERLAY_DEADLINE_MS` (the same budget the outer guard uses;
+the two enforcers were previously only tested in separate scopes).
 Offline suite **163/163 files**, and the new file was confirmed present in that run rather than
 assumed.
 
@@ -983,6 +985,7 @@ assumed.
 | M6 drop the timeout CAP, keep the stop (half-fix) | 1 | `8b`, `8c` |
 | M7 forget to clear the timers | 1 | `1d`, `3h` |
 | M8 revert both `index.ts` joins to `Promise.all([devSites, …])` | 1 | `0a`–`0d` |
+| M9 hand the overlay `now + overlayMs*10` (ladder instant ≠ outer guard) | 1 | `3i` |
 
 Baseline and restored: **exit 0, zero FAIL lines.**
 

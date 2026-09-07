@@ -156,11 +156,17 @@ console.log('\n== 2. the planes run CONCURRENTLY, not one after the other ==');
 console.log('\n== 3. THE HEADLINE — EPA HANGS FOREVER; AFTER THE OVERLAY BUDGET, CORE IS STILL IN THE RESULT ==');
 {
   const c = fakeClock();
+  let handed = null;
   const p = resolvePlanes({
     core: async () => CORE_RECORDS,                       // core answers immediately
-    overlay: () => never(),                               // EPA never answers at all
+    overlay: (deadlineAt) => { handed = deadlineAt; return never(); },
     overlayUnavailable: UNAVAILABLE, now: c.now, timers: c.timers,
   });
+  // Pin BEFORE the clock advances: after advance, now() has moved and this equality is false
+  // for a reason that has nothing to do with the invariant.
+  ok(handed === c.now() + OVERLAY_DEADLINE_MS,
+    '3i. the instant handed to the overlay IS now+OVERLAY_DEADLINE_MS — the same budget the outer guard uses',
+    `handed=${handed} want=${c.now() + OVERLAY_DEADLINE_MS}`);
   let settled = false; p.then(() => { settled = true; }, () => { settled = true; });
 
   await c.advance(OVERLAY_DEADLINE_MS);                   // at the deadline itself: grace remains

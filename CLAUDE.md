@@ -1097,8 +1097,9 @@ is still PARKED.** Full record: audit §15.
 `supabase/functions/get-address-report/index.ts` is replaced by `sources/planes.ts::resolvePlanes`,
 which runs the two planes concurrently under **separate, capped deadlines, then still waits for
 both** (`max(core, overlay+grace)` — a bound, not independence). Pinned by
-`test/epa-plane-deadlines.test.mjs` (43 assertions, including a composition grep of both call
-sites, proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
+`test/epa-plane-deadlines.test.mjs` (44 assertions, including a composition grep of both call
+sites and a pin that the overlay is handed the same instant the outer guard is derived from,
+proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
 `indexable`, `coverage_state`, the crons and N5 are untouched.**
 
 - 🔑 **UNIT 4 NEEDED NO SQL, AND THAT IS THE FINDING — NOT AN OMISSION.** A deadline miss is
@@ -1136,11 +1137,13 @@ sites, proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_qu
   `echoEnrich` + `cwaPermitEnrich` are two sequential 25 s pairs. On a deadline miss `fac` is
   empty and both no-op. On a slow-but-successful FRS read they can still add EPA.gov I/O after
   the 45 s budget. Do not fold them into this unit.
-- **The deadline is an ABSOLUTE instant, enforced twice from ONE value.** `resolvePlanes` computes
-  it and hands it to the overlay, so the ladder's cooperative stop (which never STARTS an attempt
-  it cannot finish, and CAPS that attempt's timeout to the budget left) and the outer hard stop
-  (`+ OVERLAY_GRACE_MS`) cannot drift apart. With no `deadlineAt` the ladder is byte-for-byte its
-  previous self — ONE code path, asserted, so the deadlined and undeadlined ladders cannot diverge.
+- **The deadline is an ABSOLUTE instant, enforced twice from ONE budget.** `resolvePlanes` computes
+  `overlayDeadlineAt = now + overlayMs` and hands it to the overlay; the outer hard stop is
+  `overlayMs + OVERLAY_GRACE_MS` on the same clock. Pinned by §3i (the handed instant) plus §3a
+  (the outer wait). A mutation that hands `now + overlayMs*10` while leaving the outer timer
+  alone was previously survivable — the ladder tests never received the join's value. With no
+  `deadlineAt` the ladder is byte-for-byte its previous self — ONE code path, asserted, so the
+  deadlined and undeadlined ladders cannot diverge.
 - ⛔ **NOT DEPLOYED. The repo source is the parked reference; the live function still runs the old
   `Promise.all`.** Deploy is the operator step (§8 — one esbuild bundle via MCP, ~30 KB ceiling);
   `dist/get-address-report.bundle.mjs` is stale from `9c52841` and was deliberately NOT rebuilt here.
@@ -1152,6 +1155,14 @@ sites, proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_qu
 - ⚠️ **A SUITE THAT NEVER READS `index.ts` CANNOT SEE A CALL-SITE REVERT.** Replacing both
   `resolvePlanes` joins with `Promise.all([devSites, facilitySites])` left every helper assertion
   green (measured). §0 now greps the two call sites. **The composition is the load-bearing pin.**
+- ⚠️ **DO NOT READ THE `verify` BADGE AS A TYPE-CHECK.** `verify-edge-function` is pre-existing
+  dead (last changed on `main` in #1060): `git fetch --depth=1 origin main` then
+  `git diff origin/main...HEAD … || true` yields an empty diff when there is no merge base, and
+  the location regex cannot match Deno's ANSI-coloured `at file://` lines. Measured: 16 real
+  `deno check` errors, gate printed "0 error location(s)" and PASS. Zero of those 16 are in
+  `planes.ts` / `epa-frs.ts`. Repairing the gate is a **separate session**. Under a working gate
+  this PR would go red: the pre-existing `SupabaseClient` never-generic moved onto the new
+  `devSites(...)` lines. Do not repair the gate inside Unit 4.
 
 
 ### Status
