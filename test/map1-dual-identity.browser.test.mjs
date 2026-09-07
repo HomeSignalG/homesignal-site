@@ -73,7 +73,9 @@ const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.364
   refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];
@@ -170,8 +172,8 @@ ok(before.length === 3, '0b: all three production records render with every filt
 const dualMk = before.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(dualMk.length === 1,
   '1: the dual-identity record draws ONE marker: an octagon primary with a purple R badge', dualMk.length);
-ok(before.filter(m => m.rects === 1 && m.polygons === 0 && !m.rBadge).length === 1,
-  '2: a regulatory-only location still draws a plain purple square — unchanged', 'ANDURIL INDUSTRIES');
+ok(before.filter(m => m.primaryPoints === 3 && m.rBadge).length === 1,
+  '2: a classifiable EPA location draws Type triangle + purple R — regulatory is the overlay', 'ANDURIL INDUSTRIES');
 ok(before.filter(m => m.primaryPoints === 8 && m.rects === 0).length === 1,
   '3: the ordinary data-centre project draws a bare octagon — no EPA signal invented');
 
@@ -198,12 +200,12 @@ ok(dcOnly.filter(m => m.primaryPoints === 8).length === 2,
 ok(dcOnly.filter(m => m.rBadge).length === 0,
   '5b2: …and the R badge is gone — the switch hides the annotation, never the project');
 ok(dcOnly.filter(m => m.rects === 1 && m.polygons === 0).length === 0,
-  '5c: …and the regulatory-only location is correctly hidden');
+  '5c: …and no unmapped purple square is invented');
 // The switch is reversible and does not disturb the Type row it sits under.
 await setReg(true);
 await page.waitForTimeout(250);
-ok((await readMarkers()).filter(m => m.rBadge).length === 1,
-  '5d: turning it back on repaints the badge on the already-drawn pin');
+ok((await readMarkers()).filter(m => m.rBadge).length === 2,
+  '5d: turning it back on repaints the R on every overlay pin (dual DC and industrial EPA)');
 ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]'))
      .filter(r => !!(r.querySelector('input') || {}).checked).map(r => r.getAttribute('data-cat')).join(',')) === 'datacenter',
   '5e: …and every Type chip is exactly where the resident left it');
@@ -242,8 +244,8 @@ const plainPopup = await page.evaluate(() => {
   const site = (window.__HS_SITES || []).filter(s => /ANDURIL/.test(s.label || ''))[0];
   return site ? window.__HS_KIND(site) : '';
 });
-ok(/Facility/.test(plainPopup) && !/Data center/.test(plainPopup),
-  '8c: an ordinary EPA facility popup is unchanged and claims no data centre', plainPopup);
+ok(/Industrial/.test(plainPopup) && /Regulated facility/.test(plainPopup) && !/Data center/.test(plainPopup),
+  '8c: classifiable EPA popup is Type · Regulated facility, never a data centre', plainPopup);
 
 // ── 9. Geography untouched ────────────────────────────────────────────────────────
 const coords = await page.evaluate(() => (window.__HS_SITES || []).map(s => [s.label, s.lat, s.lng]));

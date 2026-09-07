@@ -98,7 +98,9 @@ const COMMUNITIES = {
   '20173': [{ name: 'Herndon (20173)', level: 'zip', county: 'Fairfax', state: 'VA' }]
 };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];

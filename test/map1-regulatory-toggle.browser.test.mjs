@@ -159,6 +159,7 @@ const markers = () => page.evaluate(() =>
     const rect = html.match(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)"/);
     return {
       polygons: (html.match(/<polygon/g) || []).length,
+      primaryPoints: ((html.match(/points="([^"]+)"/) || [])[1] || '').trim().split(/\s+/).filter(Boolean).length,
       purple: /#7d148c/i.test(html),
       rBadge: />R<\/text>/.test(html) && /#7d148c/i.test(html),
       badgeX: rect ? Number(rect[1]) : null,
@@ -286,15 +287,19 @@ ok(await regState() === 'true', '2g: ...and restored for the rest of the suite')
 // ── 3. THE BADGE IS AN OVERLAY IN THE LOWER-RIGHT CORNER ──────────────────────────
 const on = await markers();
 ok(on.length === 3, '3: the three production records render', on.length);
-const dual = on.filter(m => m.polygons === 1 && m.rBadge);
+const dual = on.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(dual.length === 1, '3b: the regulated data centre keeps its octagon AND gains the R badge', dual.length);
 ok(dual[0].badgeX > 7 && dual[0].badgeY > 7,
   '3c: the badge sits in the LOWER-RIGHT corner of a 14px pin',
   dual[0].badgeX + ',' + dual[0].badgeY);
 ok(dual[0].badgeW < 14 * 0.8, '3d: …and is visually secondary to the project marker',
   dual[0].badgeW + ' < ' + (14 * 0.8));
-ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 1,
-  '3e: a regulatory-only location draws a standalone purple square');
+// overlay-on-Type is GLOBAL: every Map 1 surface reads HS.resolveMarker. These
+// fixtures are production rows; the contract is not ZIP-scoped.
+ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 0,
+  '3e: no classifiable EPA record draws a standalone purple square — regulatory is the overlay');
+ok(on.filter(m => m.primaryPoints === 3 && m.rBadge).length === 1,
+  '3e2: industrial EPA draws a Type triangle + purple R — regulatory is the overlay');
 ok(on.filter(m => m.polygons === 1 && !m.purple).length === 1,
   '3f: a project with no regulatory record gets no purple at all — nothing is invented');
 
@@ -303,10 +308,10 @@ const lookBefore = await rowsLook();
 await clickReg();
 ok(await regState() === 'false', '4: clicking the switch turns it off');
 const off = await markers();
-ok(off.length === 2, '4b: OFF -> the regulatory-only location is hidden', off.length);
+ok(off.length === 3, '4b: OFF -> classifiable EPA stays as its Type pin; only the R is dropped', off.length);
 ok(off.filter(m => m.rBadge).length === 0, '4c: OFF -> no R badge is painted anywhere');
-ok(off.filter(m => m.polygons === 1).length === 2,
-  '4d: OFF -> BOTH data centres are still drawn — the project is never hidden by this switch', off.length);
+ok(off.filter(m => m.polygons >= 1).length === 3,
+  '4d: OFF -> both data centres AND the industrial EPA Type pin are still drawn', off.length);
 // The founder's list, measured against the rendered rows: nothing about Stage or Type may
 // change, gray out, strike through, hide or reset.
 const lookAfter = await rowsLook();
@@ -321,8 +326,8 @@ ok(lookAfter.type.every(r => r.split('|')[1] === 'true' && r.split('|')[4] === '
 await clickReg();
 ok(await regState() === 'true', '5: clicking again turns it back on');
 const back = await markers();
-ok(back.length === 3 && back.filter(m => m.rBadge).length === 1,
-  '5b: the badge is repainted on the pin that is already on the map', back.filter(m => m.rBadge).length);
+ok(back.length === 3 && back.filter(m => m.rBadge).length === 2,
+  '5b: the badge is repainted on every overlay pin that is already on the map', back.filter(m => m.rBadge).length);
 ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
   '5c: …and the other two rows are still untouched');
 
@@ -350,10 +355,10 @@ const aerialInfo = await page.evaluate(() => {
   };
 });
 ok(aerialInfo.n >= 3, '5d: 3D aerial painted the three fixture records', aerialInfo.n);
-ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.facility).toLowerCase()
-    && aerialInfo.anduril.signal === false,
-  '5e: an EPA-only location is purple on 3D aerial, not operating-green — and has no R (the R is dual-identity)',
-  JSON.stringify(aerialInfo.anduril) + ' facility=' + aerialInfo.facility);
+ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.operating).toLowerCase()
+    && aerialInfo.anduril.signal === true,
+  '5e: classifiable EPA is operating-green on 3D aerial with the purple R overlay — not a purple pin',
+  JSON.stringify(aerialInfo.anduril) + ' operating=' + aerialInfo.operating);
 ok(aerialInfo.penn && String(aerialInfo.penn.color).toLowerCase() === String(aerialInfo.approved).toLowerCase()
     && aerialInfo.penn.signal === false,
   '5f: a project with no regulatory record keeps its status colour',
@@ -370,18 +375,18 @@ ok(aerialInfo.coresite && aerialInfo.coresite.signal === true
 const look3DBefore = await rowsLook();
 await clickReg();
 await page.waitForFunction(
-  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 2,
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
   null, { timeout: 25000 });
 const aerialOff = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
   (r) => ({ label: r.label, color: r.color, signal: r.signal })));
-ok(aerialOff.length === 2 && !aerialOff.some((r) => /ANDURIL/.test(r.label || '')),
-  '5h: OFF -> the regulatory-only BLOCK is gone from 3D aerial, not merely uncoloured',
+ok(aerialOff.length === 3 && aerialOff.some((r) => /ANDURIL/.test(r.label || '')),
+  '5h: OFF -> the industrial EPA BLOCK stays on 3D aerial as its Type colour — the overlay is gone, not the pin',
   JSON.stringify(aerialOff.map((r) => r.label)));
 ok(aerialOff.filter((r) => r.signal).length === 0,
   '5i: OFF -> no purple R rides on any 3D block');
-ok(aerialOff.filter((r) => /CORESITE|Pennhurst/.test(r.label || '')).length === 2
+ok(aerialOff.filter((r) => /CORESITE|Pennhurst|ANDURIL/.test(r.label || '')).length === 3
    && aerialOff.every((r) => String(r.color).toLowerCase() !== String(aerialInfo.facility).toLowerCase()),
-  '5j: OFF -> both project blocks are still drawn, in their status colours — a project is never hidden by this switch',
+  '5j: OFF -> Type pins stay in their status colours — regulatory never owns the pin',
   JSON.stringify(aerialOff));
 ok(JSON.stringify(await rowsLook()) === JSON.stringify(look3DBefore),
   '5k: …and turning it off from the 3D view still moves neither the Stage nor the Type row');
@@ -389,8 +394,8 @@ await clickReg();
 await page.waitForFunction(
   () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
   null, { timeout: 25000 });
-ok((await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).filter((r) => r.signal).length)) === 1,
-  '5l: ON again -> the R comes back on the dual-identity block, and the purple block returns');
+ok((await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).filter((r) => r.signal).length)) === 2,
+  '5l: ON again -> the R comes back on every overlay block');
 
 const shotDir = process.env.HS_SCREENSHOT_DIR;
 if (shotDir) {
@@ -439,8 +444,9 @@ const addrPaint = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map
 const facHex = String(aerialInfo.facility).toLowerCase();
 const find2 = (re) => addrPaint.find((r) => re.test(r.label || '')) || null;
 ok(addrPaint.length >= 3, '6d: address mode 3D aerial painted the three records', addrPaint.length);
-ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === facHex && find2(/ANDURIL/).signal === false,
-  '6e: address mode — the EPA-only building is purple, the same as 2D, and carries no R',
+ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === String(aerialInfo.operating).toLowerCase()
+   && find2(/ANDURIL/).signal === true,
+  '6e: address mode — classifiable EPA is operating-green + R, the same as every other Map 1',
   JSON.stringify(find2(/ANDURIL/)));
 ok(find2(/Pennhurst/) && find2(/Pennhurst/).color === String(aerialInfo.approved).toLowerCase(),
   '6f: address mode — a nearby project keeps its status colour', JSON.stringify(find2(/Pennhurst/)));
@@ -450,13 +456,13 @@ ok(find2(/CORESITE/) && find2(/CORESITE/).signal === true
   JSON.stringify(find2(/CORESITE/)));
 await clickReg();
 await page.waitForFunction(
-  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 2,
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
   null, { timeout: 25000 });
 const addrOff = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
   (r) => ({ label: r.label, color: String(r.color).toLowerCase(), signal: r.signal })));
-ok(!addrOff.some((r) => /ANDURIL/.test(r.label || '')) && addrOff.length === 2
+ok(addrOff.some((r) => /ANDURIL/.test(r.label || '')) && addrOff.length === 3
    && addrOff.filter((r) => r.signal).length === 0,
-  '6h: address mode — regulatory OFF removes the purple building and every R, and keeps both projects',
+  '6h: address mode — regulatory OFF drops every R and keeps the Type pin',
   JSON.stringify(addrOff));
 await clickReg();
 

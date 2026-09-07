@@ -102,8 +102,16 @@ const tabs = dev.filter(r => r.source_registry_id === null);
      '3: no data-center record is INVENTED for Del Valle — the registry assertion stands alone');
 
   ok(R.every(r => r.symbol === reg[r.category].symbol), '3: every record uses its category\'s canonical symbol');
-  ok(fac.every(r => r.symbol === 'square' && r.category === 'facility' && r.color === '#7d148c'),
-     '3: every facility is a purple square');
+  ok(fac.every(r => r.is_facility && r.filter_key === 'facility'),
+     '3: every EPA record stays a facility for filtering');
+  ok(fac.filter(r => r.source_type_raw === 'logistics').every(r => r.category === 'industrial' && r.symbol === 'triangle'),
+     '3: logistics EPA (DE-ANDA TRUCKING and peers) overlay as Industrial globally — not a purple pin');
+  ok(fac.filter(r => r.source_type_raw === 'energy').every(r => r.category === 'infrastructure' && r.symbol === 'diamond'),
+     '3: energy EPA overlays as Roads & infrastructure');
+  ok(fac.filter(r => r.source_type_raw === 'industrial').every(r => r.category === 'industrial' && r.symbol === 'triangle'),
+     '3: industrial EPA overlays as Industrial');
+  ok(fac.every(r => r.color !== '#7d148c'),
+     '3: no classifiable Del Valle EPA record is a purple pin — purple is the overlay');
   ok(dev.every(r => r.symbol !== 'square'), '3: NO development record uses the facility square');
   ok(dev.every(r => r.category !== 'facility'), '3: no development record crosses over into the facility category');
   ok(fac.every(r => r.is_facility) && dev.every(r => !r.is_facility), '3: the facility flag matches record_kind');
@@ -225,15 +233,15 @@ const tabs = dev.filter(r => r.source_registry_id === null);
   eq(p.rest.length, fac.length - NEAREST_FAC_CAP, '7: the remainder rides the rest layer');
   eq(new Set(p.nearest.concat(p.rest)).size, fac.length, '7: the partition is disjoint and total');
   // Membership is data-dependent (it moves when a coordinate moves) — what must NEVER differ is
-  // how the two halves RENDER. A facility in the tail is still a purple square that filters as
-  // `facility`; that is what makes the tail safe to cluster.
+  // that both halves remain facilities for filtering. Overlay-on-Type means the tail draws
+  // Type shape, not a purple square; clustering is still safe because filter_key stays facility.
   for (const tok of p.rest) {
     const r = byToken.get(tok);
     ok(!!r, '7: every rest-layer facility is in the baseline');
-    eq(r.symbol, 'square', `7: rest-layer ${tok} renders square`);
-    eq(r.category, 'facility', `7: rest-layer ${tok} category`);
+    ok(r.is_facility === true, `7: rest-layer ${tok} is still a facility`);
     eq(r.lifecycle, 'operating', `7: rest-layer ${tok} lifecycle`);
     eq(r.filter_key, 'facility', `7: rest-layer ${tok} filter key`);
+    ok(r.symbol === golden.semantic_registry[r.category].symbol, `7: rest-layer ${tok} Type symbol`);
     ok(/^https:\/\/echo\.epa\.gov\//.test(r.evidence_url), `7: rest-layer ${tok} keeps its evidence`);
   }
 }
