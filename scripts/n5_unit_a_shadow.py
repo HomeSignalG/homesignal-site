@@ -108,6 +108,13 @@ create table if not exists {MEMB} (
   geom_family   text    not null,
   run_id        text    not null,
   computed_at   timestamptz not null default now(),
+  -- KIND. Production got this column from docs/frs-facility-kind-isolation-migration.sql;
+  -- it is declared here too so a fresh environment is not silently different. The primary
+  -- key deliberately stays (zcta5, source_key): facility keys live in their own namespace
+  -- ('epa_frs:<RegistryId>'), and measured 2026-09-07 ZERO of the 901,465 membership rows
+  -- and ZERO of the 1,004,080 marker rows use that prefix, so the two kinds cannot collide
+  -- on it. Widening the key would be a schema change with no defect behind it.
+  record_kind   text    not null default 'development',
   primary key (zcta5, source_key));
 alter table {MEMB} enable row level security;
 
@@ -190,12 +197,12 @@ def load_boundaries(pfx):
 # so a partial load can never commit. Held as a constant so the invariant test below runs
 # against the same shape production-of-record uses.
 POPULATE = f"""
-delete from {MEMB} where left(zcta5,3) = {{PFX}};
-insert into {MEMB} (zcta5, source_key, lat, lng, point_rule, clip_dim, feature_count, geom_family, run_id)
+delete from {MEMB} where left(zcta5,3) = {{PFX}} and record_kind = 'development';
+insert into {MEMB} (zcta5, source_key, lat, lng, point_rule, clip_dim, feature_count, geom_family, run_id, record_kind)
 select b.zcta5, m.source_key,
        case when p.pt is null then null else ST_Y(p.pt) end,
        case when p.pt is null then null else ST_X(p.pt) end,
-       p.rule, x.dim, x.nfeat, x.family, {{RUN}}
+       p.rule, x.dim, x.nfeat, x.family, {{RUN}}, 'development'
   from {SCRATCH} b
   join geo.n5_boundary_membership m on m.zcta5 = b.zcta5
   cross join lateral (
@@ -222,19 +229,56 @@ on conflict (zip) do update set status = excluded.status,
 """
 
 
+def facility_rows(pfx):
+    """Facility membership in this prefix, as a count AND a fingerprint.
+
+    A count alone cannot tell "untouched" from "deleted and coincidentally re-inserted at
+    the same cardinality", and a development rebuild has no business doing either. The
+    fingerprint is over the whole row, so a changed coordinate or run_id fails it too.
+    """
+    r = sql(f"""select count(*) n,
+                       coalesce(md5(string_agg(t.r, '|' order by t.r collate "C")), '') fp
+                  from (select (zcta5||'~'||source_key||'~'||coalesce(lat::text,'')||'~'
+                                ||coalesce(lng::text,'')||'~'||point_rule||'~'||run_id) r
+                          from {MEMB}
+                         where left(zcta5,3)={lit(pfx)} and record_kind='facility') t;""",
+             "facility rows")[0]
+    return int(r["n"]), r["fp"]
+
+
 def populate(pfx):
+    # The FACILITY half is measured on both sides of the write, because "the delete is
+    # scoped" is a claim about SQL text and this is a claim about what happened.
+    fac_before = facility_rows(pfx)
     sql(POPULATE.replace("{PFX}", lit(pfx)).replace("{RUN}", lit(RUN_ID)), f"populate {pfx}")
-    r = sql(f"""select (select count(*) from {MEMB} where left(zcta5,3)={lit(pfx)}) memb,
+    r = sql(f"""select (select count(*) from {MEMB} where left(zcta5,3)={lit(pfx)}
+                          and record_kind='development') memb,
+                       (select count(*) from {MEMB} where left(zcta5,3)={lit(pfx)}
+                          and record_kind='facility') memb_facility,
                        (select count(*) from {STATUS} where left(zip,3)={lit(pfx)}) status_rows,
-                       (select count(*) from {MEMB} where left(zcta5,3)={lit(pfx)} and lat is null) no_point,
+                       (select count(*) from {MEMB} where left(zcta5,3)={lit(pfx)}
+                          and record_kind='development' and lat is null) no_point,
                        (select count(*) from geo.n5_boundary_membership b
                           where left(b.zcta5,3)={lit(pfx)}
                             and b.zcta5 in (select zip from public.canonical_zip_registry)) expected;""",
              "prefix check")[0]
-    say("shadow membership / status rows / no point / expected",
+    fac_after = facility_rows(pfx)
+    # Reported SEPARATELY and named, never summed: the two kinds are different products and a
+    # combined total hides a facility loss inside a development gain of the same size.
+    say("shadow membership DEVELOPMENT / status rows / no point / expected",
         f"{r['memb']} / {r['status_rows']} / {r['no_point']} / {r['expected']}")
+    say("shadow membership FACILITY before -> after (count, fingerprint)",
+        f"{fac_before[0]} -> {fac_after[0]} , {fac_before[1][:12] or '-'} -> {fac_after[1][:12] or '-'}")
     if int(r["memb"]) != int(r["expected"]):
         raise SystemExit(f"STOP: prefix {pfx} shadow {r['memb']} != authoritative {r['expected']}")
+    # geo.n5_boundary_membership is a DEVELOPMENT freeze basis, so the equality above is only
+    # meaningful against the development half. This is the guard that makes that true.
+    if int(r["memb_facility"]) != fac_after[0]:
+        raise SystemExit(f"STOP: prefix {pfx} facility count disagrees with itself")
+    if fac_before != fac_after:
+        raise SystemExit(
+            f"STOP: prefix {pfx} development rebuild changed FACILITY membership "
+            f"{fac_before} -> {fac_after}")
     return int(r["memb"]), int(r["status_rows"]), int(r["no_point"])
 
 
@@ -242,7 +286,8 @@ def select_prefixes():
     """Completed shards to (re)build, honouring an optional PREFIXES restriction.
 
     Same production-safety property as n5_a3_markers.prefixes(): populate() is
-    `delete from zip_authoritative_membership where left(zcta5,3)=PFX` followed by an
+    `delete from zip_authoritative_membership where left(zcta5,3)=PFX and
+    record_kind='development'` followed by an
     insert, so a prefix under rebuild momentarily has zero membership rows. The
     authoritative producer raises on a membership/relation mismatch and never falls
     back to legacy, so rebuilding a prefix that is already production_geography_verified

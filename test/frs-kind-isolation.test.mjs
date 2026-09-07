@@ -111,12 +111,14 @@ for (const needle of ['mm.record_kind = p_kind', 'k.record_kind = p_kind',
   ok(mig.includes(needle), `5: migration carries ${needle}`);
 }
 ok(/STATUS: APPLIED TO PRODUCTION/.test(mig), '5: the migration states its application status');
-// The producer half is the part that is still outstanding, and it is the gate on writing any
-// facility row. If someone marks the whole file applied without landing those two DELETE
-// scopes, a prefix rebuild silently eats every facility row it finds.
-ok(/STILL NOT APPLIED/.test(mig), '5: the producer DELETE scoping is still called out as outstanding');
-for (const needle of ["record_kind = 'development';", 'n5_unit_a_shadow.py', 'n5_a3_markers.py']) {
-  ok(mig.includes(needle), `5: migration names the producer change ${needle}`);
+// The producer half landed 2026-09-07; test/n5-producer-kind-safety.test.mjs is what actually
+// holds it, by evaluating the shipped predicate rather than grepping for it. This only pins
+// that the record of it stays in the file the next session will read.
+ok(/APPLIED TO THE SCRIPTS/.test(mig), '5: the producer DELETE scoping is recorded as applied');
+for (const needle of ['n5_unit_a_shadow.py', 'n5_a3_markers.py',
+                      'facility_rows()', 'facility_markers()',
+                      'n5-producer-kind-safety.test.mjs']) {
+  ok(mig.includes(needle), `5: the record names the producer change ${needle}`);
 }
 
 console.log(`${pass} passed, ${fail} failed`);

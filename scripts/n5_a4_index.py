@@ -105,7 +105,8 @@ def build_index():
     # at its purpose.
     plan = sql("""explain (format text)
                   select count(*) from public.app_projects
-                   where source_key = (select source_key from geo.zip_authoritative_membership limit 1)
+                   where source_key = (select source_key from geo.zip_authoritative_membership
+                                        where record_kind='development' limit 1)
                      and record_kind = 'development';""", "planner check")
     txt = " ".join(str(v) for row in plan for v in row.values())
     say("planner uses the new index", "YES" if IDX in txt else f"NO -> {txt[:200]}")

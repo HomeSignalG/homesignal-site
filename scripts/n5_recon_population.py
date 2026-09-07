@@ -49,7 +49,8 @@ def producer_preflight():
 set statement_timeout='300s';
 with enabled as (select zip from public.app_zip_geography_cutover where enabled),
  j as (select e.zip, m.source_key from enabled e
-         join geo.zip_authoritative_membership m on m.zcta5 = e.zip)
+         join geo.zip_authoritative_membership m
+           on m.zcta5 = e.zip and m.record_kind = 'development')
 select (select count(*) from j) memberships_checked,
        (select count(*) from j where not exists (
           select 1 from public.app_projects p
@@ -72,7 +73,8 @@ select (select count(*) from j) memberships_checked,
 set statement_timeout='300s';
 with enabled as (select zip from public.app_zip_geography_cutover where enabled),
  j as (select e.zip, m.source_key from enabled e
-         join geo.zip_authoritative_membership m on m.zcta5 = e.zip),
+         join geo.zip_authoritative_membership m
+           on m.zcta5 = e.zip and m.record_kind = 'development'),
  drifted as (select zip from j group by zip having count(*) filter (where not exists (
                select 1 from public.app_projects p
                 where p.source_key = j.source_key and p.record_kind='development')) > 0
@@ -149,10 +151,12 @@ set statement_timeout='300s';
 with enabled as (select zip from public.app_zip_geography_cutover where enabled),
  prod as (select distinct f.zip, f.source_key from {FLAT} f),
  rel  as (select m.zcta5::text zip, m.source_key
-            from geo.zip_authoritative_membership m join enabled e on e.zip = m.zcta5),
+            from geo.zip_authoritative_membership m join enabled e on e.zip = m.zcta5
+           where m.record_kind = 'development'),
  pmark as (select zip, source_key, ord, lat, lng from {FLAT}),
  rmark as (select k.zcta5::text zip, k.source_key, k.marker_seq ord, k.lat, k.lng
-             from geo.zip_authoritative_marker k join enabled e on e.zip = k.zcta5)
+             from geo.zip_authoritative_marker k join enabled e on e.zip = k.zcta5
+            where k.record_kind = 'development')
 select
  (select count(*) from enabled) enabled_zips,
  (select count(*) from prod) production_projects,

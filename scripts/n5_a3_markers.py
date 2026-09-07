@@ -57,7 +57,7 @@ def disk():
 def load_boundaries(pfx):
     want = {r["zip"] for r in sql(
         "select distinct zcta5::text zip from geo.zip_authoritative_membership "
-        f"where left(zcta5,3)={lit(pfx)};", "memb zips")}
+        f"where record_kind='development' and left(zcta5,3)={lit(pfx)};", "memb zips")}
     if not want:
         return 0
     t = tiger_index()
@@ -100,7 +100,8 @@ select b.zcta5, m.source_key,
        case when ST_Dimension(d.geom)=2 then ST_Area(d.geom::geography) end,
        ST_Y(rp.p), ST_X(rp.p), {{RUN}}
   from {SCRATCH} b
-  join geo.zip_authoritative_membership m on m.zcta5 = b.zcta5
+  join geo.zip_authoritative_membership m
+    on m.zcta5 = b.zcta5 and m.record_kind = 'development'
   cross join lateral (
       select ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom) clip,
              min(ST_GeometryType(g.geom)) family
@@ -127,12 +128,13 @@ select b.zcta5, m.source_key,
 #            1 km apart, so one marker per membership would hide separate project areas.
 #   POINT    the authoritative point itself.
 BUILD = f"""
-delete from {MARK} where left(zcta5,3) = {{PFX}};
-insert into {MARK} (zcta5, source_key, marker_seq, lat, lng, marker_rule, family, dim, run_id)
+delete from {MARK} where left(zcta5,3) = {{PFX}} and record_kind = 'development';
+insert into {MARK} (zcta5, source_key, marker_seq, lat, lng, marker_rule, family, dim, run_id, record_kind)
 with base as (
   select b.zcta5, m.source_key, x.family, x.clip
     from {SCRATCH} b
-    join geo.zip_authoritative_membership m on m.zcta5 = b.zcta5
+    join geo.zip_authoritative_membership m
+      on m.zcta5 = b.zcta5 and m.record_kind = 'development'
     cross join lateral (
         select ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom) clip,
                min(ST_GeometryType(g.geom)) family
@@ -184,7 +186,7 @@ select zcta5, source_key,
        case when dim = 1 then 'LINE_MERGED_COMPONENT_INTERVAL_{{DTAG}}M'
             when dim = 2 then 'POLYGON_COMPONENT_POINT_ON_SURFACE'
             else 'POINT_AUTHORITATIVE' end,
-       family, dim::smallint, {{RUN}}
+       family, dim::smallint, {{RUN}}, 'development'
   from pt;
 """
 
@@ -201,7 +203,8 @@ select b.zcta5, m.source_key,
        ST_Dimension(d.geom)::smallint, ST_Length(d.geom::geography),
        ST_Y(ST_LineInterpolatePoint(d.geom,0.5)), ST_X(ST_LineInterpolatePoint(d.geom,0.5)), {RUN}
   from geo.n5_a3m_zcta b
-  join geo.zip_authoritative_membership m on m.zcta5 = b.zcta5
+  join geo.zip_authoritative_membership m
+    on m.zcta5 = b.zcta5 and m.record_kind = 'development'
   cross join lateral (
       select ST_LineMerge(ST_CollectionExtract(
                ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom), 2)) clip
@@ -232,14 +235,17 @@ returns void language plpgsql as $fn$
 declare t0 timestamptz; t1 timestamptz; t2 timestamptz; t3 timestamptz;
         rp int; rm int; nk int;
 begin
-  select count(*) into nk from geo.zip_authoritative_membership where zcta5 = p_zip;
+  select count(*) into nk from geo.zip_authoritative_membership
+   where zcta5 = p_zip and record_kind = 'development';
   t0 := clock_timestamp();
   select jsonb_array_length(geo.n5_a3_projects_one_pass(p_zip)) into rp;
   t1 := clock_timestamp();
-  select count(*) into rm from geo.zip_authoritative_marker where zcta5 = p_zip;
+  select count(*) into rm from geo.zip_authoritative_marker
+   where zcta5 = p_zip and record_kind = 'development';
   t2 := clock_timestamp();
   perform geo.n5_a3_projects_one_pass(p_zip);
-  perform count(*) from geo.zip_authoritative_marker where zcta5 = p_zip;
+  perform count(*) from geo.zip_authoritative_marker
+   where zcta5 = p_zip and record_kind = 'development';
   t3 := clock_timestamp();
   insert into geo.n5_a3_bench (zip, pass_no, n_keys, ms_project, rows_project,
                                ms_marker, rows_marker, ms_combined, run_id)
@@ -287,6 +293,22 @@ def bench():
             f"{row['p99']} / {row['mx']} / {row['marker_mx']}")
 
 
+def facility_markers(pfx):
+    """Facility markers in this prefix, as a count AND a whole-row fingerprint.
+
+    A count cannot distinguish "untouched" from "deleted and re-inserted at the same
+    cardinality"; a development rebuild must do neither.
+    """
+    r = sql(f"""select count(*) n,
+                       coalesce(md5(string_agg(t.r, '|' order by t.r collate "C")), '') fp
+                  from (select (zcta5||'~'||source_key||'~'||marker_seq::text||'~'||lat::text
+                                ||'~'||lng::text||'~'||marker_rule||'~'||run_id) r
+                          from {MARK}
+                         where left(zcta5,3)={lit(pfx)} and record_kind='facility') t;""",
+             "facility markers")[0]
+    return int(r["n"]), r["fp"]
+
+
 def prefixes():
     """Prefixes to (re)build, honouring an optional explicit PREFIXES restriction.
 
@@ -305,7 +327,8 @@ def prefixes():
     restriction that selects nothing looks exactly like one that worked.
     """
     live = [r["z3"].strip() for r in sql(
-        "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership order by 1;", "prefixes")]
+        "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership "
+        "where record_kind='development' order by 1;", "prefixes")]
     want = [p.strip() for p in os.environ.get("PREFIXES", "").split(",") if p.strip()]
     if not want:
         return live
@@ -352,6 +375,8 @@ def main():
                   lat double precision not null, lng double precision not null,
                   marker_rule text not null, family text, dim smallint,
                   run_id text not null, computed_at timestamptz not null default now(),
+                  -- see the note on geo.zip_authoritative_membership in n5_unit_a_shadow.py
+                  record_kind text not null default 'development',
                   primary key (zcta5, source_key, marker_seq));
                 alter table {MARK} enable row level security;
                 revoke all on {MARK} from public;""", "marker table")
@@ -385,9 +410,26 @@ def main():
         t0 = time.time()
         if not load_boundaries(pfx):
             continue
+        # Only the marker relation carries a kind; the measure tables do not, so the
+        # facility guard is armed for build mode alone rather than pretended everywhere.
+        fac_before = facility_markers(pfx) if tbl == MARK else None
         sql(stmt.replace("{PFX}", lit(pfx)).replace("{RUN}", lit(RUN_ID))
                 .replace("{DTAG}", str(int(D_M))), f"{MODE} {pfx}")
-        n = int(sql(f"select count(*) n from {tbl} where left(zcta5,3)={lit(pfx)};", "n")[0]["n"])
+        if tbl == MARK:
+            n = int(sql(f"select count(*) n from {tbl} where left(zcta5,3)={lit(pfx)} "
+                        f"and record_kind='development';", "n")[0]["n"])
+            fac_after = facility_markers(pfx)
+            # Separately reported and named. A single total would let a facility loss hide
+            # inside a development gain of the same size, which is exactly the failure this
+            # producer has to be unable to have.
+            say("  markers DEVELOPMENT / FACILITY before -> after",
+                f"{n} / {fac_before[0]} -> {fac_after[0]}")
+            if fac_before != fac_after:
+                raise SystemExit(
+                    f"STOP: prefix {pfx} development rebuild changed FACILITY markers "
+                    f"{fac_before} -> {fac_after}")
+        else:
+            n = int(sql(f"select count(*) n from {tbl} where left(zcta5,3)={lit(pfx)};", "n")[0]["n"])
         total += n
         free = disk()
         say("rows / seconds / free MB", f"{n} / {time.time()-t0:.1f} / {free:.1f}")
@@ -396,11 +438,16 @@ def main():
 
     if MODE == "build":
         # Prove it while the boundaries are still loaded: every marker inside its ZIP.
+        # Deliberately NOT kind-filtered - containment is true of every marker regardless of
+        # kind - but the counts are broken out so the line says what population it covered.
         r = sql(f"""select count(*) n,
+                      count(*) filter (where k.record_kind='development') n_dev,
+                      count(*) filter (where k.record_kind='facility') n_fac,
                       count(*) filter (where not ST_Intersects(
                         ST_SetSRID(ST_MakePoint(k.lng,k.lat),{CANON_SRID}), b.geom)) outside
                       from {MARK} k join {SCRATCH} b on b.zcta5 = k.zcta5;""", "containment")[0]
-        say("markers checked / OUTSIDE their ZIP", f"{r['n']} / {r['outside']}")
+        say("markers checked (development / facility) / OUTSIDE their ZIP",
+            f"{r['n']} ({r['n_dev']} / {r['n_fac']}) / {r['outside']}")
         if int(r["outside"]) != 0:
             raise SystemExit("STOP: markers outside their ZIP")
 

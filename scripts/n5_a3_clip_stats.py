@@ -60,7 +60,8 @@ def ddl():
 
 def load_boundaries(pfx):
     want = {r["zip"] for r in sql(
-        f"select distinct zcta5::text zip from geo.zip_authoritative_membership where left(zcta5,3)={lit(pfx)};",
+        f"select distinct zcta5::text zip from geo.zip_authoritative_membership "
+        f"where left(zcta5,3)={lit(pfx)} and record_kind='development';",
         "memb zips")}
     if not want:
         say("memberships in prefix", 0)
@@ -100,7 +101,8 @@ select b.zcta5, m.source_key, x.family,
        case when ST_Dimension(x.clip) = 2 then ST_Area(x.clip::geography) end,
        comp.max_len_m, lg.legacy_points, lg.legacy_on_clip, lg.max_nn_m, {{RUN}}
   from {SCRATCH} b
-  join geo.zip_authoritative_membership m on m.zcta5 = b.zcta5
+  join geo.zip_authoritative_membership m
+    on m.zcta5 = b.zcta5 and m.record_kind = 'development'
   cross join lateral (
       select ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom) clip,
              min(ST_GeometryType(g.geom)) family
@@ -128,7 +130,8 @@ select b.zcta5, m.source_key, x.family,
 
 def main():
     prefixes = [r["z3"].strip() for r in sql(
-        "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership order by 1;", "prefixes")]
+        "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership "
+        "where record_kind='development' order by 1;", "prefixes")]
     say("UNIT A3 - CLIP MEASUREMENT (no marker rule applied)", "")
     say("run id / prefixes", f"{RUN_ID} / {','.join(prefixes)}")
     free0, db0, wal0 = disk()

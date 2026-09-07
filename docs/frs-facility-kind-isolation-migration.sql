@@ -215,28 +215,48 @@ end $$;
 --   DEVELOPMENT direction returns 'array' 12/12 and 'boundary_complete' 12/12, so the
 --   facility 12/12 'null' + 'not_measured' is a reading rather than an artefact.
 
--- ══ 3. THE PRODUCER CHANGES THAT MUST LAND BEFORE ANY FACILITY ROW IS WRITTEN ══════════
+-- ══ 3. THE PRODUCER CHANGES — APPLIED TO THE SCRIPTS 2026-09-07 ══════════════════
 --
--- STILL NOT APPLIED, deliberately, and they are the gate on the population step:
+-- Scoping the DELETE was only half of it. An unscoped membership READ would have generated
+-- DEVELOPMENT markers FROM facility rows, so both directions are closed:
 --
--- scripts/n5_unit_a_shadow.py, POPULATE:
---     - delete from geo.zip_authoritative_membership where left(zcta5,3) = {PFX};
---     + delete from geo.zip_authoritative_membership
---     +  where left(zcta5,3) = {PFX} and record_kind = 'development';
---   and the INSERT names record_kind explicitly as 'development' rather than relying on the
---   column default, so the writer states its kind instead of inheriting it.
+--   scripts/n5_unit_a_shadow.py   POPULATE delete + insert; the membership-vs-authoritative
+--                                 equality now counts the DEVELOPMENT half only (its freeze
+--                                 basis, geo.n5_boundary_membership, has only ever held
+--                                 development), with the facility half measured beside it.
+--   scripts/n5_a3_markers.py      BUILD delete + insert; MEASURE, BUILD and MERGED membership
+--                                 joins; prefix selection; the per-prefix row count; the
+--                                 containment line's population breakdown; the bench harness.
+--   scripts/n5_a3_clip_stats.py   its ZIP list, its membership join and its prefix list — a
+--                                 development measure pass must not measure facility geometry.
+--   scripts/n5_recon_population.py  all four membership/marker reads: every number there is an
+--                                 equality against a development view, so an unscoped read
+--                                 would have reported every facility row as drift.
+--   scripts/n5_a4_index.py        the index probe picks a DEVELOPMENT key, not an arbitrary one.
 --
--- scripts/n5_a3_markers.py, BUILD: the same two edits on geo.zip_authoritative_marker.
+-- Both DDLs now declare record_kind too, so a fresh environment is not silently different from
+-- production. The primary keys deliberately stay (zcta5, source_key[, marker_seq]): facility
+-- keys live in their own namespace, and measured 2026-09-07 ZERO of the 901,465 membership rows
+-- and ZERO of the 1,004,080 marker rows carry an 'epa_frs:' prefix, so the kinds cannot collide.
 --
--- Both are provably no-ops today — 0 rows carry a non-development kind — so they can land
--- safely at any time. Their whole purpose is what happens the day AFTER: without them, a
--- per-prefix rebuild DELETES every facility row under that prefix and never regenerates it,
--- silently, because the rebuild's own verification counts development rows and a missing
--- facility row looks like nothing at all.
+-- Every edit is a PROVABLE NO-OP TODAY — record_kind='facility' is 0 in both relations — so the
+-- same rows are deleted and the same rows are inserted. The whole point is the day AFTER.
 --
--- ⚠️ The N5 national development build is INCOMPLETE (7,996 of 12,719 ZIPs carry membership
--- as of 2026-09-06) and idle — no writer, and no write to any of the three relations for
--- 23h 03m at the time these migrations were applied (newest computed_at 2026-09-05 21:23Z,
--- 0 non-idle backends other than the measuring one). That idleness is what made the ACCESS
--- EXCLUSIVE lock safe to take; it is NOT evidence the build is finished, and the prefix
--- rebuild can resume at any time. Land the two producer edits before writing facility rows.
+-- VERIFICATION NOW REPORTS AND ASSERTS BOTH KINDS. facility_rows() / facility_markers() take a
+-- count AND a whole-row md5 (collation pinned) on both sides of the write, and a difference is
+-- a hard SystemExit. A count alone cannot tell "untouched" from "deleted and re-inserted at the
+-- same cardinality", and a single combined total would hide a facility loss inside a
+-- development gain of the same size.
+--
+-- Proof: test/n5-producer-kind-safety.test.mjs PARSES the shipped DELETE's WHERE clause and
+-- EXECUTES it against a fixture holding both kinds across two prefixes, so what is asserted is
+-- which rows survive, not which words appear. Five mutations of the real sources were run and
+-- every one is caught: reverting either delete predicate (5 failures each), unscoping the
+-- membership joins (1), reducing the facility probe to a bare count (2), and reintroducing the
+-- double-WHERE shape (the suite raises "statement has a second WHERE"). Both deletes were also
+-- EXPLAINed against the live schema — planned, never executed — and each shows exactly
+-- Filter: ((record_kind = 'development') AND (left(zcta5,3) = '840')).
+--
+-- ⚠️ The N5 national development build is INCOMPLETE (7,996 of 12,719 ZIPs) and idle. These
+-- scripts are what it runs, so a resumed run now carries the guard. Nothing here resumes,
+-- completes or modifies that run.
