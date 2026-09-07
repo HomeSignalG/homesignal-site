@@ -173,7 +173,11 @@ async function scenario(name, opts) {
         leafletPane: !!document.querySelector('#map .leaflet-container'),
         glCanvas: !!document.querySelector('#mapgl canvas'),
         glControls: document.querySelectorAll('#mapgl .maplibregl-ctrl').length,
-        glLeaflet: !!document.querySelector('#mapgl .leaflet-container'),
+        // Leaflet stamps leaflet-container on the MAP ELEMENT itself when we
+        // reuse #mapgl (startGLRaster). A descendant selector misses that and
+        // reported a working raster map as a failure.
+        glLeaflet: !!(document.querySelector('#mapgl.leaflet-container')
+                    || document.querySelector('#mapgl .leaflet-container')),
         threeCanvas: !!document.querySelector('#map3d canvas'),
         panel,
       };

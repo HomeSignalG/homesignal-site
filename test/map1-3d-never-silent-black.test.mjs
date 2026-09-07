@@ -139,6 +139,8 @@ ok(/function start3DAerial\(/.test(page) && /function init3DSoft\(/.test(page),
   '§3 3D aerial has a no-WebGL engine so a negative probe cannot abort the view');
 ok(/function startGLRaster\(/.test(page) && /function buildGLRasterMarkers\(/.test(page),
   '§3 3D satellite degrades to Leaflet rasters when WebGL is refused');
+ok(/\.mapgl\.leaflet-container/.test(page),
+  '§3 raster satellite CSS targets #mapgl itself — Leaflet stamps leaflet-container on the container, not a child');
 ok(/function maplibreHasGL\(/.test(page) && /function start3DSatellite\(/.test(page),
   '§3 satellite start checks for a real WebGL context — MapLibre can construct without throwing');
 ok(/start3DSatellite\(\)/.test(page) && /ensureLib\("maplibregl"/.test(page),
