@@ -294,16 +294,25 @@ ok((await chips()).filter(c => c.checked).map(c => c.id).join(',') === 'approved
 
 // ── 9. CONTROLS — the neighbouring dimensions did not move ──────────────────────────
 await load();
+// ⚖️ THE NEIGHBOURS MOVED, THE STAGE ROW DID NOT. Type and Regulatory are now the same
+// checkbox chip this row introduced, so §9 asserts THEIR new shape — while §0-§8 above,
+// every one of this suite's Stage-behaviour assertions, are unchanged and still pass.
+// That is the point of keeping this section: it proves the Stage row is unaffected by a
+// change to the rows on either side of it.
 const nb = await page.evaluate(() => ({
-  typeChips: document.querySelectorAll('#mapkeyShapes span.sh[data-cat]').length,
-  typePressed: document.querySelectorAll('#mapkeyShapes span.sh[aria-pressed="true"]').length,
-  reg: document.getElementById('regToggle') ? document.getElementById('regToggle').getAttribute('aria-checked') : null,
+  typeChips: document.querySelectorAll('#mapkeyShapes .typechip[data-cat]').length,
+  typeChecked: Array.from(document.querySelectorAll('#mapkeyShapes .typechip input')).filter(b => b.checked).length,
+  reg: document.getElementById('regToggleBox') ? String(document.getElementById('regToggleBox').checked) : null,
+  legacyDropdown: !!document.querySelector('#typeFilterBtn, #typeFilterMenu'),
+  legacySwitch: !!document.querySelector('.regtog, [role="switch"]'),
   stageHasSvg: !!document.querySelector('#mapkey svg'),
   stageDots: document.querySelectorAll('#mapkey span.dot').length
 }));
-ok(nb.typeChips === 7 && nb.typePressed === 7,
-  '9: the seven Type chips are untouched and still aria-pressed toggles', JSON.stringify(nb));
-ok(nb.reg === 'true', '9: the Regulatory switch is untouched and still fail-open', nb.reg);
+ok(nb.typeChips === 7 && nb.typeChecked === 7,
+  '9: the seven Type chips are checkbox chips, all checked by default', JSON.stringify(nb));
+ok(nb.reg === 'true', '9: the Regulatory chip is checked by default (fail-open)', nb.reg);
+ok(!nb.legacyDropdown && !nb.legacySwitch,
+  '9: neither the "Show types" dropdown nor the ON/OFF switch survives', JSON.stringify(nb));
 // The two rules the page's own live verifier enforces, re-asserted here on the rebuilt row.
 ok(nb.stageDots === 4 && !nb.stageHasSvg,
   '9: the Stage row still carries colour DOTS and no marker shapes', JSON.stringify(nb));

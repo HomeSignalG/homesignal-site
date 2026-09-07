@@ -142,23 +142,23 @@ const readMarkers = () => page.evaluate(() => {
 });
 // Turn the type rows on/off exactly the way a resident does: by clicking them.
 const setTypes = (on) => page.evaluate((keys) => {
-  const rows = Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]'));
+  const rows = Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]'));
   rows.forEach(r => {
     const want = keys.indexOf(r.getAttribute('data-cat')) !== -1;
-    const isOn = r.getAttribute('aria-pressed') === 'true';
+    const isOn = !!(r.querySelector('input') || {}).checked;
     if (want !== isOn) r.click();
   });
-  return rows.map(r => r.getAttribute('data-cat') + '=' + r.getAttribute('aria-pressed'));
+  return rows.map(r => r.getAttribute('data-cat') + '=' + !!(r.querySelector('input') || {}).checked);
 }, on);
 // The regulatory dimension is ONE switch in its own row — clicked, like everything else.
 const setReg = (want) => page.evaluate((on) => {
   const t = document.getElementById('regToggle');
-  if (t && (t.getAttribute('aria-checked') === 'true') !== on) t.click();
+  if (t && (!!(t.querySelector('input')||{}).checked) !== on) t.click();
 }, want);
 
 // ── 0. the surface exists and is honest before anything is clicked ─────────────────
 const rowKeys = await page.evaluate(() =>
-  Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]')).map(r => r.getAttribute('data-cat')));
+  Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]')).map(r => r.getAttribute('data-cat')));
 ok(rowKeys.includes('datacenter') && !rowKeys.includes('facility'),
   '0a: the TYPE row exposes Data center and NOT Regulated facility', rowKeys.join(','));
 ok(await page.evaluate(() => !!document.getElementById('regToggle')),
@@ -204,8 +204,8 @@ await setReg(true);
 await page.waitForTimeout(250);
 ok((await readMarkers()).filter(m => m.rBadge).length === 1,
   '5d: turning it back on repaints the badge on the already-drawn pin');
-ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]'))
-     .filter(r => r.getAttribute('aria-pressed') === 'true').map(r => r.getAttribute('data-cat')).join(',')) === 'datacenter',
+ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]'))
+     .filter(r => !!(r.querySelector('input') || {}).checked).map(r => r.getAttribute('data-cat')).join(',')) === 'datacenter',
   '5e: …and every Type chip is exactly where the resident left it');
 
 // ── 6. Both on / both off ─────────────────────────────────────────────────────────
