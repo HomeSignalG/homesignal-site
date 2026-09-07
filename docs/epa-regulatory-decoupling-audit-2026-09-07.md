@@ -618,7 +618,7 @@ belongs to `indexable`, which is a different question. Pinned by test case 4.
   Reworking the state is **Unit 2**. *(This is why the two cannot be swapped in order: doing
   §3's `data_quality` half first would break that pin by construction.)*
 - The single `sites` jsonb carrying both planes — **Unit 3**, rule 11.
-- `Promise.all([devSites, facilitySites])` — **Unit 4**.
+- `Promise.all([devSites, facilitySites])` — **Unit 4** (BUILT IN SOURCE, §17; not deployed).
 
 ### 14.5 Six comment sites describe the CURRENT rule and must be corrected in the same change as the apply
 
@@ -809,8 +809,8 @@ migration being applied.
 - `docs/coverage-state-model.sql`, the DDL of record for this view, still describes
   production. It must be updated in the same change as the apply, like Unit 1's six comment
   sites (§14.5).
-- The single `sites` jsonb (**Unit 3**) and `Promise.all([devSites, facilitySites])`
-  (**Unit 4**).
+- The single `sites` jsonb (**Unit 3**). `Promise.all([devSites, facilitySites])` (**Unit 4**)
+  is now BUILT IN SOURCE — §17 — but the deployed function still runs the old join.
 
 ### 15.9 Observed while measuring, NOT acted on, NOT mine
 
@@ -903,4 +903,89 @@ Baseline before and after every mutation: **zero FAIL names**. Offline suite **1
 
 `data_quality`, `indexable`, the core health ladder, every resident-facing string, the
 `select('*')` reads (no named list, and no try/catch named-then-null fallback),
-`docs/coverage-state-model.sql` (still describes production), Units 3 and 4.
+`docs/coverage-state-model.sql` (still describes production), Units 3 and 4. *(Unit 4 was
+built later the same day — §17. Nothing in §16 depends on it.)*
+
+
+## 17. PHASE 2 · UNIT 4 — BUILT IN SOURCE, NOT DEPLOYED (2026-09-07)
+
+**Scope: §6 only** — EPA off the report's critical path. Units 1 and 3 untouched;
+`data_quality`, `indexable`, `coverage_state`, the crons and N5 untouched. **No SQL.**
+
+### 17.1 What §6 actually cost, bounded
+
+`facilitySites` → `frsFacilities` walks `frsRadii(3)` = **6 radii × 3 attempts = 18 attempts**,
+each bounded only by its own `AbortSignal.timeout(30000)`. Under `Promise.all` a finished core
+result waited for all of it. Measured on the shipped module with an injected clock and a fetch
+double: the mixed failure sequence runs **18 attempts / 360,000 ms** with no deadline, and stops
+near the 45 s budget with one.
+
+⚠️ **The unbounded shape is MIXED, not a pure hang, and the first version of the test asserted
+the wrong one.** Three transient failures at a single radius already return early — the
+2026-08-27 "a transient failure must not shrink the search area" rule — so a pure hang caps at 3
+attempts and was never the 18-attempt case. The worst case interleaves two slow transients with a
+FAST process-limit refusal, which `break`s to the next smaller radius and resets the transient
+counter. The test was corrected by the code, not the other way round.
+
+### 17.2 The fix
+
+`supabase/functions/get-address-report/sources/planes.ts` — one `resolvePlanes()` used by BOTH
+call sites (ZIP mode ~line 662, address mode ~line 913), so the two joins cannot drift apart.
+
+| plane | budget | a miss means |
+|---|---|---|
+| core (`devSites`) | `CORE_DEADLINE_MS` 60 s | **THROW** `CoreDeadlineError` → report fails → the refresh layer keeps the previous cached row |
+| overlay (`facilitySites`) | `OVERLAY_DEADLINE_MS` 45 s (+2 s grace on the outer guard) | `facilitiesUnavailable("deadline")` → `epa.ok:false` → refusal path → cached rows preserved, count UNKNOWN |
+
+The overlay deadline is an **absolute instant** computed once by `resolvePlanes` and handed to
+the overlay, so the ladder's cooperative stop and the outer hard stop derive from one value.
+The ladder never STARTS an attempt it cannot finish and CAPS that attempt's timeout to the budget
+remaining; with no `deadlineAt` it is byte-for-byte its previous self, on one code path.
+
+### 17.3 🔑 Why no SQL — and why inventing a state would have been the defect
+
+`public.dev_epa_write_refused()` reads exactly one field of the payload:
+`not (coalesce(_epa_ok,false) and coalesce((_j->'epa'->>'ok')::boolean, true))`. So routing a
+deadline miss into `ok:false` reuses the refusal path a 429 already takes: stored facility sites
+and count carry forward verbatim, `facilities_refreshed_at` holds, `facilities_unavailable`
+becomes true, `regulatory_overlay_state` reads `overlay_unknown`. **Nothing downstream learns a
+new state, and no fake zero can be persisted.** `reason` is observability only — grepped
+repo-wide, the only other mention of a reason value is `epa-result-semantics.test.mjs` asserting
+`process_limit`, which still passes; nothing switches on it, so adding `"deadline"` is additive.
+
+### 17.4 The floor that stops the fix causing its own harm
+
+`OVERLAY_DEADLINE_MS` (45 s) is deliberately **above** `FRS_ATTEMPT_TIMEOUT_MS` (30 s). A budget
+under one full attempt would cut off slow-but-SUCCESSFUL reads and manufacture `overlay_unknown`
+out of healthy ones — losing real facility records, the same harm as a false zero reached from
+the other side. Pinned: a 29 s successful read still succeeds under the 45 s budget.
+
+### 17.5 Verification
+
+`test/epa-plane-deadlines.test.mjs` — **39 assertions**, driving the shipped modules with a mocked
+fetch and an injected clock, so no assertion waits on real time. Offline suite **163/163 files**,
+and the new file was confirmed present in that run rather than assumed.
+
+| mutation | exit | named failures |
+|---|---|---|
+| M1 serialise the join | 13 | `2a` (both directions asserted, so a sequential join cannot pass) |
+| M2 overlay miss becomes an authoritative zero | 1 | `3d`, `3e`, `3g` |
+| M3 overlay rejection propagates | 1 | `4a`–`4d` |
+| M4 core miss returns an empty core | 1 | `5a`, `5b` |
+| M5 drop the ladder deadline check | 1 | `7b`, `7d`, `8b`, `8c` |
+| M6 drop the timeout CAP, keep the stop (half-fix) | 1 | `8b`, `8c` |
+| M7 forget to clear the timers | 1 | `1d`, `3h` |
+
+Baseline and restored: **exit 0, zero FAIL lines.**
+
+⚠️ **A MUTATION HARNESS THAT COUNTS `FAIL` LINES CANNOT SEE A CRASH.** M3 first reported **0 FAIL
+lines** and read as survivable; it was aborting the run at §4 on Node's unhandled-rejection
+default before printing anything. **Measure a mutation on the EXIT CODE.** The test now
+pre-attaches a catch so that regression prints four named failures instead of a stack trace — a
+crash hides every later section. Same class as this file's own "an instrument must prove it ran".
+
+### 17.6 NOT DEPLOYED
+
+The repo source is the parked reference; the live function still runs `Promise.all`. Deploy is
+the operator step (one esbuild bundle via MCP — the ~30 KB payload ceiling, CLAUDE.md §8).
+`dist/get-address-report.bundle.mjs` is stale from `9c52841` and was deliberately NOT rebuilt.
