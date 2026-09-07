@@ -997,10 +997,33 @@ robots and coverage states are untouched. Full record: audit §14.
   `no_qualifying_projects_found` while `core_records_present` is true. Recorded as a printed
   SKIP in the test; **no new definition of `projects_found` was spliced.** Founder product call.
 
-### 🅿️ PHASE 2 · UNIT 2 IS BUILT AND PARKED (2026-09-07) — `facilities_only` leaves the CORE enum
-SQL of record `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` (executable, atomic,
-**not applied**), pinned by `test/epa-phase2-coverage-state-split.test.mjs` (44 assertions, six
-mutations). **Independent of Unit 1** — either may be applied first. Full record: audit §15.
+### ✅ PHASE 2 · UNIT 2 IS APPLIED (2026-09-07) — `facilities_only` has LEFT the CORE enum
+Migration `20260907200252 epa_decouple_phase2_unit2_coverage_state_split_from_d25efff`, applied
+from `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` at `main` `d25efff`. DDL of
+record `docs/coverage-state-model.sql` updated in the same change. Pinned by
+`test/epa-phase2-coverage-state-split.test.mjs` (53 assertions). **Independent of Unit 1, which
+is still PARKED.** Full record: audit §15.
+
+- **Live after apply** (measured, not recalled): view md5 `20df44e40d53699183aadd4d8dbe3e8e` →
+  `a2fda9feca0bcc3d0ca412cd9b54b2b8`; `security_invoker=true` intact; `facilities_only` absent
+  from `pg_get_viewdef`; `anon`/`authenticated` select intact; columns APPENDED —
+  `… news_items, regulatory_overlay_state, facilities_refreshed_at, facilities_unavailable`.
+  The six keyed probe ZIPs read exactly as expected (01001/01002 `populated`+`overlay_records`;
+  03224/03268 `honestly_empty`+`overlay_records`, `data_quality` `pass`; 01034/02543
+  `honestly_empty`+`overlay_unknown`).
+- 🔑 **A MIGRATION WHOSE VERIFICATION CANNOT RUN IS NOT VERIFIED — IT IS ONLY LONG.** The first
+  Unit 2 file ran FIVE unfiltered aggregates over this view and could never finish, so it was
+  reviewed, mutation-tested, byte-fidelity-checked and **never once executed**. `EXPLAIN` proved
+  the plan CORRECT (index scans on both laterals) at cost **9,334,858**: 12,722 ZIPs × ~622
+  `app_projects` rows ≈ **7.9M index+heap reads PER PASS** against a **3,214,081**-row table.
+  One pass >60s warm; the slice `zip < '15000'` alone >50s; five passes >300s, past the DB's own
+  **120s** `statement_timeout` — not merely past a client cap. **Do not put an unfiltered
+  aggregate over `app_coverage_states` inside a migration.** #1116 replaced them with six KEYED
+  probes (49 ms) plus catalog reads; pin `14f` forbids the general shape, not just the old line.
+- ⚠️ **`honestly_empty` NO LONGER IMPLIES `coverage_coming`.** A core-empty ZIP whose overlay
+  holds records is legitimately `data_quality = 'pass'` — `data_quality` still counts EPA
+  because it is the LAYOUT gate (Unit 1 leaves it alone). `scripts/verify-coverage-state.mjs`
+  already states the composed pair.
 
 - **The defect:** `app_coverage_states.coverage_state`'s fifth branch is
   `WHEN fac_markers > 0 THEN 'facilities_only'`, so a ZIP whose CORE plane is genuinely empty
@@ -1033,10 +1056,10 @@ mutations). **Independent of Unit 1** — either may be applied first. Full reco
   Likewise `scripts/verify-coverage-state.mjs` normalizes both shapes: deleting
   `facilities_only` from a `VALID` set there would have turned that DAILY job red on merge,
   days before the change it describes.
-- **The parked SQL fails closed on a VACUOUS split** — if no ZIP is core-empty with overlay
-  records, it raises rather than reporting success over nothing.
-- **`docs/coverage-state-model.sql` still describes production** and must be updated in the
-  same change as the apply, like Unit 1's six comment sites.
+- **The SQL fails closed on a VACUOUS split** — keyed to 03224 since #1116; if that ZIP is not
+  core-empty-with-overlay-records it raises rather than reporting success over nothing.
+- ✅ **`docs/coverage-state-model.sql` was updated in the same change as the apply.** Unit 1's
+  six comment sites are deliberately still untouched — Unit 1 is not applied.
 - 📌 **OBSERVED WHILE MEASURING, NOT ACTED ON, NOT EPA'S FAULT: 3,575 of 12,722
   `development_reports` rows are older than 72 h** and 580 sit in the `failed_ingest` shape,
   so `verify-coverage-state`'s "zero unintentionally STALE ZIPs" assertion is failing in

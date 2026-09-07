@@ -81,6 +81,18 @@
 -- `changes` counts civic rows only; `news_items` is reported ADDITIVELY so the
 -- news is visible in the instrument rather than hidden by the narrower count.
 -- ============================================================================
+-- PHASE 2 UNIT 2 — APPLIED 2026-09-07, migration
+-- `20260907200252 epa_decouple_phase2_unit2_coverage_state_split_from_d25efff`.
+-- TWO INDEPENDENT PLANES. `coverage_state` describes the CORE project plane only and
+-- never reads an EPA facility count or the overlay clock; `regulatory_overlay_state`
+-- describes the EPA/FRS overlay with its own freshness in `facilities_refreshed_at`.
+-- `facilities_only` is GONE from the core enum — it was the composition of the two
+-- planes collapsed into one core value, which made a core state readable only by
+-- consulting EPA (founder rules #1 and #11).
+-- ⚠️ `with (security_invoker = true)` is RESTATED on purpose. Measured on this database:
+-- a bare `create or replace view` leaves `reloptions = (none)`, i.e. it DROPS the option
+-- and silently promotes the view to the owner's rights. Never replay this file without it.
+-- ============================================================================
 
 create or replace view public.app_coverage_states
 with (security_invoker = true) as
@@ -103,8 +115,9 @@ select
     -- coverage, and is reported separately as `news_items`.
     when coalesce(c.dev_markers,0) > 0 or coalesce(ch.changes,0) > 0
       then 'populated'
-    when coalesce(c.fac_markers,0) > 0
-      then 'facilities_only'
+    -- NOTE: the `facilities_only` branch that used to sit here is GONE (Phase 2 Unit 2,
+    -- applied 2026-09-07). A ZIP whose CORE plane is empty is `honestly_empty` even when
+    -- EPA has records for it; the overlay reports itself below.
     else 'honestly_empty'
   end as coverage_state,
   m.data_quality,
@@ -113,7 +126,19 @@ select
   coalesce(c.dev_markers,0)  as dev_markers,
   coalesce(c.fac_markers,0)  as fac_markers,
   coalesce(ch.changes,0)     as changes,
-  coalesce(ch.news_items,0)  as news_items
+  coalesce(ch.news_items,0)  as news_items,
+  -- ── the REGULATORY OVERLAY plane, reported separately and never mixed in ──
+  -- overlay_unknown exists because "we could not read EPA" and "EPA has nothing" are
+  -- different facts, and collapsing them is the exact dishonesty Phase 1B removed from
+  -- `counts.facilities`. An absent answer is never rendered as zero.
+  case
+    when r.zip is null then 'overlay_unsupported'
+    when coalesce(c.fac_markers,0) > 0 then 'overlay_records'
+    when coalesce(r.facilities_unavailable,false) then 'overlay_unknown'
+    else 'overlay_empty'
+  end as regulatory_overlay_state,
+  r.facilities_refreshed_at,
+  coalesce(r.facilities_unavailable,false) as facilities_unavailable
 from public.app_community_meta m
 left join public.development_reports r on r.zip = m.zip
 left join lateral (
@@ -130,26 +155,50 @@ left join lateral (
 grant select on public.app_coverage_states to anon, authenticated;
 
 -- ---------- Reproducible verification SQL ----------------------------------
--- Exactly one valid state per ZIP + no impossible combos + legacy consistency:
---   (see scripts/verify-coverage-state.mjs for the automated CI form)
+-- ⚠️ DO NOT RUN THE UNFILTERED FORM. Measured 2026-09-07: this view plans correctly
+-- (index scans on both laterals) and still costs ~9.3M — 12,722 ZIPs x ~622
+-- app_projects rows each, ~7.9M index+heap reads PER PASS against a 3.21M-row table.
+-- ONE unfiltered pass exceeded 60s warm; even the slice `zip < '15000'` exceeded 50s.
+-- The Unit 2 migration's first verify block ran FIVE such passes and could therefore
+-- never finish — it was structurally reviewed and NEVER ONCE EXECUTED. Verify by KEYED
+-- probe; the universe counts are a REPORTING question, run deliberately with a long
+-- statement_timeout and never inside a migration.
+--   (see scripts/verify-coverage-state.mjs for the automated CI form, which is
+--    keyset-paginated rather than a single unfiltered aggregate)
+--
+-- KEYED verification — what the applied migration itself asserts:
+-- select zip, coverage_state, regulatory_overlay_state, data_quality,
+--        dev_markers, changes, fac_markers, facilities_unavailable
+--   from public.app_coverage_states
+--  where zip in ('01001','01002','03224','03268','01034','02543') order by zip;
+-- expected: 01001/01002 populated + overlay_records
+--           03224/03268 honestly_empty + overlay_records, data_quality 'pass'
+--           01034/02543 honestly_empty + overlay_unknown
+--
+-- UNIVERSE counts (slow — set statement_timeout high, run outside a migration):
 -- with s as (select * from public.app_coverage_states)
 -- select
 --   (select count(*) from s) total,
 --   (select count(*) from s where coverage_state is null
---      or coverage_state not in ('populated','facilities_only','honestly_empty',
---        'unsupported_source','temporarily_unavailable','failed_ingest','stale_data')) invalid,
+--      or coverage_state not in ('populated','honestly_empty',
+--        'unsupported_source','temporarily_unavailable','failed_ingest','stale_data')
+--      or regulatory_overlay_state not in ('overlay_records','overlay_empty',
+--        'overlay_unknown','overlay_unsupported')) invalid,
 --   (select count(*) from s where coverage_state='honestly_empty'
---      and (dev_markers>0 or fac_markers>0 or changes>0)) imp1,
---   (select count(*) from s where coverage_state='facilities_only'
---      and (dev_markers>0 or changes>0)) imp2,
+--      and (dev_markers>0 or changes>0)) imp1,
 --   (select count(*) from s where coverage_state='populated'
 --      and dev_markers=0 and changes=0) imp3,
 --   (select count(*) from s where coverage_state='unsupported_source'
 --      and refreshed_at is not null) imp4,
+--   (select count(*) from s where regulatory_overlay_state='overlay_empty'
+--      and facilities_unavailable) imp5,
 --   (select count(*) from s where coverage_state='honestly_empty'
---      and data_quality<>'coverage_coming') legacy1,
---   (select count(*) from s where coverage_state in ('populated','facilities_only')
---      and data_quality<>'pass') legacy2;
+--      and regulatory_overlay_state='overlay_records') was_facilities_only,
+--   (select count(*) from s where coverage_state='honestly_empty'
+--      and regulatory_overlay_state='overlay_unknown') empty_but_epa_unverified;
+-- NOTE: `honestly_empty` no longer implies `coverage_coming` — a core-empty ZIP whose
+-- overlay holds records is legitimately data_quality 'pass' (data_quality still counts
+-- EPA; it is the LAYOUT gate, and Unit 1 deliberately leaves it alone).
 -- Rule-branch fixtures (states with no production rows):
 --   unsupported_source: a meta zip with no report row → left join r.zip is null.
 --   temporarily_unavailable: refreshed_at = now()-4 days, attempt = now()-1 hour.
