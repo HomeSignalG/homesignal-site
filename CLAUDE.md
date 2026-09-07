@@ -940,9 +940,9 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 - `app_coverage_states`: `facilities_only` is a CORE coverage state and CI pins it to `⇒ pass`.
 - One `sites` jsonb still carries both planes (blocks "removable without a schema migration").
 - ~~`Promise.all([devSites, facilitySites])` keeps EPA's 6-step radius back-off on the critical
-  path.~~ **UNIT 4 IS BUILT IN SOURCE (see below): the FRS ladder is CAPPED at 45s+grace, not
-  taken off the write.** The join still waits for both planes. The DEPLOYED function still runs
-  the old `Promise.all` until it is deployed.
+  path.~~ ✅ **UNIT 4 IS MERGED AND DEPLOYED (v249, see below): the FRS ladder is CAPPED at
+  45s+grace, not taken off the write.** The join still waits for both planes — a BOUND, not
+  independence — until Unit 3 splits `sites`.
 
 **Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
@@ -1099,7 +1099,7 @@ is still PARKED.** Full record: audit §15.
   The `overlay_unknown` sample is gated on `SPLIT_LIVE` and names its skip reason.
 
 
-### 🅿️ PHASE 2 · UNIT 4 IS BUILT IN SOURCE AND NOT DEPLOYED (2026-09-07) — code, no SQL
+### ✅ PHASE 2 · UNIT 4 IS MERGED AND DEPLOYED — v249 (2026-09-07) — code, no SQL
 `Promise.all([devSites(...), facilitySites(...)])` at both call sites in
 `supabase/functions/get-address-report/index.ts` is replaced by `sources/planes.ts::resolvePlanes`,
 which runs the two planes concurrently under **separate, capped deadlines, then still waits for
@@ -1151,9 +1151,42 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
   alone was previously survivable — the ladder tests never received the join's value. With no
   `deadlineAt` the ladder is byte-for-byte its previous self — ONE code path, asserted, so the
   deadlined and undeadlined ladders cannot diverge.
-- ⛔ **NOT DEPLOYED. The repo source is the parked reference; the live function still runs the old
-  `Promise.all`.** Deploy is the operator step (§8 — one esbuild bundle via MCP, ~30 KB ceiling);
-  `dist/get-address-report.bundle.mjs` is stale from `9c52841` and was deliberately NOT rebuilt here.
+- ✅ **DEPLOYED — `get-address-report` v248 → v249**, squash `6558112` (#1120), shipped by
+  `deploy-edge-functions.yml` run `34164020261` on `f3002e3`. The Supabase CLI bundles the
+  MULTI-FILE source on the runner, so **`dist/get-address-report.bundle.mjs` was never involved
+  and is still stale from `9c52841`** — the ~30 KB MCP inline-bundle ceiling does not apply to
+  this path. ⚠️ **That workflow has no ref/SHA guard: it always ships whatever `main` is.** It ran
+  on `f3002e3` (#1119 had merged on top), not on the merge commit — safe only because the
+  edge-function tree hash is identical at both (`776c463c…`), which was checked, not assumed.
+  The deployed artifact was then read back and greps clean: `resolvePlanes` at both call sites
+  with `deadlineAt`, `facilitiesUnavailable` → `ok:false`, the cooperative stop, `Math.min(
+  FRS_ATTEMPT_TIMEOUT_MS, remaining)`, 45_000/60_000/30000 — and the only `Promise.all([devSites`
+  left is inside a comment quoting what it replaced.
+- 🔑 **THE OVERLAY-MISS OUTCOME IS PRODUCTION-PROVEN ON v249; THE 45s CAP ITSELF IS NOT — say
+  which.** A batch of 6 facility-dense ZIPs fired concurrently drove **2 of 6 into the refusal
+  path live**: 59044 and 48186 returned `epa.ok:false, reason:"transient", attempts:3,
+  radius_used:null, counts.facilities:0` — **with HTTP 200 and core records present**
+  (proposed 1 / approved 1, development 1). Not an empty core, not a failed report. The payload's
+  zero was then fed to the REAL predicate: `public.dev_epa_write_refused(true, <payload>, …)` →
+  **true** on both, stored `counts.facilities` still **40**, `facilities_unavailable` **true**.
+  Re-fired a minute later both read `ok:true` with 40 back — preserve, hold unknown, recover.
+  ⛔ **`reason:"deadline"` never fired, so the 45s cap was NOT exercised in production.** FRS
+  refused FAST (3 transients at one radius → the 2026-08-27 early return), it did not hang slow;
+  the three bracketed calls all returned inside a 15s client timeout, which times the FAST path
+  and bounds nothing about a hang. **The cap is evidenced by the deployed source plus
+  `test/epa-plane-deadlines.test.mjs` §7/§8 under an injected clock — there is no production
+  receipt for it and none can be manufactured without an inject the engine does not have.**
+  ⚠️ **The 84302 happy-path smoke (200 / ok:true / radius 3 / 23 facilities) proves the change is
+  INERT when EPA is healthy. It is not, and was never, evidence of the bound.**
+- ⚠️ **THE PROBE INSTRUMENT FAILED TWICE BEFORE IT WORKED, AND BOTH ARE REUSABLE LESSONS.**
+  (a) **Not every canonical ZIP is pinned in `ZCTA_CENTROIDS`** — 8 dense ZIPs returned
+  `422 no pinned centroid for ZIP <zip>; pass {zip,lat,lng}` in 0.0s. Drive centroids from
+  `development_reports.home_lat/home_lng`, never assume the pin. (b) **12 concurrent requests on
+  ZIPs carrying ~19,000 development records each COLLAPSED pg_net**: `net._http_response` emptied
+  to 0 rows and request ids reset to 11, losing that batch entirely. Choose probe ZIPs by
+  FACILITY density (what stresses FRS), never by record count (what only inflates the payload).
+  (c) **`net._http_response.created` is NOT a response-arrival clock** — every delta read exactly
+  0.0s. Bracket wall time with `timeout_milliseconds` instead.
 - ⚠️ **A MUTATION HARNESS THAT COUNTS `FAIL` LINES CANNOT SEE A CRASH.** One mutation (letting an
   overlay rejection propagate) reported **0 FAIL lines** and looked survivable; it was aborting the
   run at §4 on Node's unhandled-rejection default, before printing anything. **Measure a mutation
