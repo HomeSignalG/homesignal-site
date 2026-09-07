@@ -1107,17 +1107,36 @@ HS.onReady(function(){
     var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
     return lc || "unknown";   // operating | approved | proposed | unknown — verbatim
   }
-  // ONE lifecycle palette for the 3D aerial view. three.js wants a 0xRRGGBB integer, so this
-  // converts the SAME hex the 2D pins, the GL pins and the legend chip read (HS.LIFECYCLE_HEX
-  // via COLORS) rather than restating it as a literal. Every place a lifecycle colour was
-  // typed out by hand in this view has drifted from the legend at least once — most recently
-  // `unknown`, which was hardcoded to the operating green and therefore claimed a lifecycle
-  // the source never stated. An unrecognised bucket falls back to the neutral, never to a
-  // stage colour: guessing a stage is the failure this bucket exists to prevent.
-  function lc3D(bkt){
-    var hex = String((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468").replace("#","");
-    var n = parseInt(hex, 16);
+  // three.js wants a 0xRRGGBB integer. ONE converter, so a hex from the resolver and a
+  // hex from the lifecycle palette cannot silently diverge in how they become a colour.
+  function hex3D(hex){
+    var h = String(hex || "").replace("#","");
+    var n = parseInt(h, 16);
     return isNaN(n) ? 0x706468 : n;
+  }
+  // Lifecycle-only helper. IT HAS NO CALLER TODAY, and that is the point rather than an
+  // oversight: the 3D aerial BUILDINGS used to be its only caller, and painting by bucket
+  // alone is exactly what made every EPA facility a green "Operating now" block. They now
+  // read the resolver's mk.color — the lifecycle hex for a project, the regulatory purple
+  // for an EPA-only facility. Retained as the ONE named bucket→3D-integer converter, so a
+  // future caller that genuinely has a bucket and no marker cannot restate the palette as
+  // a literal. An unrecognised bucket falls back to the neutral, never to a stage colour.
+  function lc3D(bkt){
+    return hex3D((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468");
+  }
+  // THE 3D AERIAL PAINT. Same object the 2D pin and the 3D-satellite pin already read
+  // (HS.resolveTrackerMarker). Painting by lifecycle bucket alone made every EPA facility
+  // a green "Operating now" block, so the legend's "Purple R = regulatory record" was a
+  // lie on this view. The resolver already has the colour: purple square for a
+  // regulatory-only location, lifecycle colour for a project (and for a dual-identity
+  // data centre, whose purple R rides as signal).
+  function site3DPaint(p){
+    var mk = HS.resolveTrackerMarker(p, frsRid);
+    return {
+      mk: mk,
+      col: hex3D(mk && mk.color),
+      signal: (HS.visibleSignal ? HS.visibleSignal(mk) : (mk && mk.signal)) || null
+    };
   }
   // Label-chip backgrounds for the 3D aerial view — a dark plate behind white text, echoing
   // the stage. `unknown` gets a NEUTRAL plate for the same reason its pin does; it used to
@@ -2926,7 +2945,11 @@ HS.onReady(function(){
 
   // ===================== 3D AERIAL VIEW (three.js) =====================
   // Same live data as the 2D map (each site carries e/n = miles East/North of home).
-  // Built = solid green block, Approved = solid blue block, Proposed = orange wireframe.
+  // Colour comes from the SAME marker resolver the 2D / satellite pins use: project
+  // blocks keep lifecycle colour (green / blue / orange), a regulatory-only EPA
+  // facility is the regulatory purple, and a dual-identity data centre keeps its
+  // lifecycle colour with the purple R as a subordinate badge. Proposed stays a
+  // wireframe.
   var V3 = { inited:false, active:false };
   function mi(v){ return v*120; }               // 120 scene units per mile
   function roundRect(ctx,x,y,w,h,r){ ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
@@ -3135,6 +3158,16 @@ HS.onReady(function(){
     (V3.softSites||[]).forEach(function(it){
       var p=drawSoftBox(ctx, it.x, it.z, it.w, it.h, hexCss(it.col), it.wire);
       var cx=(p[4].x+p[6].x)/2, cy=(p[4].y+p[6].y)/2;
+      if(it.signal){
+        var bx=p[6].x, by=p[6].y, s=9;
+        ctx.fillStyle=it.signal.color;
+        ctx.fillRect(bx-s/2, by-s/2, s, s);
+        ctx.fillStyle="#fff";
+        ctx.font="700 8px Inter,system-ui,sans-serif";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(it.signal.letter || "R", bx, by);
+        ctx.textAlign="start";
+      }
       V3.softHits.push({x:cx, y:cy, s:Math.max(10, it.w*0.35), site:it.site, depth:p[4].depth});
     });
     V3.softHits.sort(function(a,b){ return a.depth-b.depth; });
@@ -3255,6 +3288,33 @@ HS.onReady(function(){
 
   function build3DFacilities(){
     if(!V3.inited)return;
+    // What this view actually painted. A browser check reads this rather than sampling
+    // pixels (lighting and the canvas fallback both shift the on-screen colour) — so it
+    // must record the value that REACHED THE RENDERER, read back off the object that was
+    // built, never the resolver's mk.color. Reporting the resolver's intent would make
+    // this hook agree with the contract even if the painter ignored it: reverting the
+    // paint line to lc3D(bkt) would still publish purple, and the browser assertions
+    // would pass on the very defect they exist to catch (measured — they did).
+    // Empty until the first successful build.
+    var aerialPaint=[];
+    function noteHex(n){
+      var v = Number(n);
+      if(!isFinite(v) || v < 0) return null;
+      return "#" + ("000000" + (v >>> 0).toString(16)).slice(-6);
+    }
+    function notePaint(p, usedCol, drewBadge){
+      aerialPaint.push({
+        label: String(p.label || "").split(" ·")[0],
+        color: noteHex(usedCol),
+        signal: !!drewBadge
+      });
+    }
+    function stampPaint(){
+      try{
+        window.__HS_AERIAL_PAINT = aerialPaint;
+        if(window.__HS_VERIFY) window.__HS_VERIFY.aerialPaint = aerialPaint;
+      }catch(e){}
+    }
     if(V3.soft){
       var maxD=0;
       V3.softSites=[];
@@ -3268,10 +3328,15 @@ HS.onReady(function(){
         if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
         var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1];
         var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
-        V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:lc3D(bkt), wire:bkt==="proposed", site:p});
+        var paint=site3DPaint(p);
+        var box={x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:paint.col, wire:bkt==="proposed", site:p, signal:paint.signal};
+        V3.softSites.push(box);
+        // Read back off the box the canvas path will actually draw, not off `paint`.
+        notePaint(p, box.col, box.signal);
       });
       set3DFrame(maxD);
       V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
+      stampPaint();
       return;
     }
     // Frame the view to where the buildings actually are (not the empty outer radius),
@@ -3301,32 +3366,48 @@ HS.onReady(function(){
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);
       var raw=String(p.label||"").split(" ·")[0];
       var name=raw.length>20?raw.slice(0,19).trim()+"…":raw;
+      var paint=site3DPaint(p);
+      var col=paint.col;
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
         // label (they'd overlap into noise); the name shows on the 2D map and in the list.
-        var pcol=lc3D("proposed");
+        // Colour still comes from the resolver (mk.color), never a restated palette: the old
+        // line `var col = bkt==="approved" ? 0x2563EB : 0x1f5130` painted unknown as operating
+        // green, byte for byte. Proposed projects resolve to the proposed hex; a proposed
+        // record that somehow carried a regulatory identity would take that colour instead.
         var grp=new THREE.Group();grp.position.set(x,0,zc);
         var ge=new THREE.BoxGeometry(w,h,w);ge.translate(0,h/2,0);
-        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:pcol,transparent:true,opacity:.85})));
-        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:.10})));
+        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.85})));
+        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.10})));
         grp.scale.y=Math.max(0.0001,V3.rise);G.add(grp);V3.proposed.push(grp);
+        notePaint(p, grp.children[0].material.color.getHex(), false);
       } else {
         // Operating, approved and lifecycle-UNKNOWN are precise, fewer, and the point of the
-        // view — label these. The colour comes from lc3D (the shared lifecycle palette), NOT
-        // from a hardcoded literal: this line used to read
+        // view — label these. Colour is paint.col from site3DPaint → mk.color, NOT a
+        // hardcoded literal and NOT the lifecycle bucket alone (that is what made every
+        // EPA facility a green "Operating now" block). The quoted old line is the defect:
         //     var col = bkt==="approved" ? 0x2563EB : 0x1f5130;
-        // so `unknown` was painted the operating green EXACTLY, byte for byte — the 3D aerial
-        // said "operating now" about every record whose source states no lifecycle, which is
-        // the one claim the unknown bucket exists to avoid making.
-        var col=lc3D(bkt);
         var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:col,roughness:.7,emissive:0xffce8a,emissiveIntensity:.10}));
         bm.position.set(x,h/2,zc);bm.castShadow=true;bm.receiveShadow=true;bm.userData.site=p;G.add(bm);V3.pickable.push(bm);
         // Friendly building-TYPE label — only when the scene is sparse enough to read;
         // in a dense cluster hover/click shows it instead (see showLabels above).
         if(showLabels){ var lb=lblSprite(facilityType(p),LBL_BG[bkt]||LBL_BG.unknown,"#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
+        var drewBadge=false;
+        if(paint.signal){
+          var rb=lblSprite(paint.signal.letter || "R", paint.signal.color, "#fff");
+          rb.position.set(x+w*0.42, h+5, zc+w*0.42);
+          rb.scale.set(4.2*(rb.userData.asp||1), 4.2, 1);
+          rb.userData.regBadge=true;
+          G.add(rb);
+          drewBadge=true;
+        }
+        // Read back off the mesh that was added to the scene, and off whether the badge
+        // was really drawn — the hook reports the view, not the intent.
+        notePaint(p, bm.material.color.getHex(), drewBadge);
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });
+    stampPaint();
   }
 
   function resize3D(){ if(!V3.inited)return;var h=document.getElementById("map3d");var w=h.clientWidth||560,ht=h.clientHeight||460;

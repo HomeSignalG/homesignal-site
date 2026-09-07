@@ -32,6 +32,18 @@
 //                                  63118: FRS returns real rows at r=1; none are industrial.)
 //   ok:false                     → EPA could not give a trustworthy answer. NOT a zero. The
 //                                  caller must preserve last-known-good, or say "unknown".
+//
+// UNIT 4 (2026-09-07) — THE LADDER NOW HAS A DEADLINE, AND A MISS IS `ok:false`, NOT A ZERO.
+// The back-off walks up to 6 radii x 3 attempts, each attempt bounded only by its own 30s fetch
+// timeout, so a slow-but-not-refusing FRS could hold the caller for MINUTES. That cost was paid
+// by the CORE project plane, which ran beside this call under one `Promise.all` and could not
+// finish until EPA did. `deadlineAt` bounds the whole sequence: the ladder refuses to START an
+// attempt it cannot finish, and shortens the last attempt's timeout to the budget that is left.
+//
+// A deadline miss is deliberately routed into the EXISTING refusal path rather than a new one —
+// `ok:false` is the single discriminator `public.dev_epa_write_refused()` reads, so a timed-out
+// read preserves the stored facility layer and renders the count UNKNOWN, exactly like a 429.
+// `reason:"deadline"` is observability only; nothing switches on it.
 
 /** One attempt at one radius. `tooBig` = FRS's process-limit refusal (shrink; retrying is futile). */
 export type FrsAttempt = { ok: boolean; tooBig: boolean; rows: Record<string, unknown>[] };
@@ -44,10 +56,13 @@ export type FrsOutcome = {
   /** the radius that actually answered; null when nothing did */
   radius_used: number | null;
   /** null on success; else why the sequence gave up — for logs and for the cache guard */
-  reason: "process_limit" | "transient" | null;
+  reason: "process_limit" | "transient" | "deadline" | null;
   /** how many HTTP attempts were made (observability: a 1 means it worked first try) */
   attempts: number;
 };
+
+/** One attempt's own network timeout. The deadline may shorten it, never lengthen it. */
+export const FRS_ATTEMPT_TIMEOUT_MS = 30000;
 
 export const FRS_ENDPOINT =
   "https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities";
@@ -67,6 +82,7 @@ export async function frsAt(
   lng: number,
   rad: number,
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
+  timeoutMs: number = FRS_ATTEMPT_TIMEOUT_MS,
 ): Promise<FrsAttempt> {
   const q = new URLSearchParams({
     latitude83: lat.toFixed(6),
@@ -75,7 +91,9 @@ export async function frsAt(
     output: "JSON",
   });
   try {
-    const r = await fetchImpl(`${FRS_ENDPOINT}?${q}`, { signal: AbortSignal.timeout(30000) });
+    const r = await fetchImpl(`${FRS_ENDPOINT}?${q}`, {
+      signal: AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs))),
+    });
     // 5xx AND 429: a rate-limit is a refusal to answer, not an answer of zero. Observed live
     // 2026-08-13 — the atlanta-dense health probe took a 429 while rural took a 200.
     if (r.status >= 500 || r.status === 429) return { ok: false, tooBig: false, rows: [] };
@@ -98,19 +116,44 @@ export async function frsAt(
 
 // Radius back-off + transient retry (v12/v13), now returning an OUTCOME rather than a bare array
 // so that "EPA said zero" and "EPA said nothing" are distinguishable by the caller (v23).
+/**
+ * UNIT 4 — the overlay's own budget. `deadlineAt` is an ABSOLUTE epoch-ms instant, not a
+ * duration, so the same value can bound the ladder AND the caller's outer guard without the
+ * two drifting apart. `now` is injectable so the deadline is testable without real waiting.
+ */
+export type FrsOptions = { deadlineAt?: number; now?: () => number };
+
 export async function frsFacilities(
   lat: number,
   lng: number,
   radiusMi: number,
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
+  opts: FrsOptions = {},
 ): Promise<FrsOutcome> {
-  let reason: "process_limit" | "transient" | null = null;
+  const now = opts.now ?? (() => Date.now());
+  const deadlineAt = opts.deadlineAt;
+  let reason: "process_limit" | "transient" | "deadline" | null = null;
   let attempts = 0;
   for (const rad of frsRadii(radiusMi)) {
     let transientExhausted = false;
     for (let attempt = 0; attempt < 3; attempt++) {
+      // NEVER START AN ATTEMPT THE BUDGET CANNOT PAY FOR. Checked BEFORE the attempt, so the
+      // ladder cannot spend a whole 30s fetch only to discover it was already out of time; and
+      // the remaining budget CAPS this attempt's own timeout, which is what makes the last
+      // attempt honour the deadline instead of overrunning it by up to 30s. With no deadline
+      // the timeout is the historical constant and this whole block is a no-op — ONE code path,
+      // so the deadlined and undeadlined ladders can never drift apart.
+      let timeoutMs = FRS_ATTEMPT_TIMEOUT_MS;
+      if (deadlineAt !== undefined) {
+        const remaining = deadlineAt - now();
+        if (remaining <= 0) {
+          // NOT a zero — the same `ok:false` refusal a 429 produces. See the header.
+          return { ok: false, rows: [], radius_used: null, reason: "deadline", attempts };
+        }
+        timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
+      }
       attempts++;
-      const { ok, tooBig, rows } = await frsAt(lat, lng, rad, fetchImpl);
+      const { ok, tooBig, rows } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
       if (ok) return { ok: true, rows, radius_used: rad, reason: null, attempts };
       if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
       reason = "transient";                            // else transient → retry the same radius
