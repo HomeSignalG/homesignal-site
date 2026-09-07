@@ -38,7 +38,51 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ---
 
-## RESUME POINT — read this first (updated 2026-08-13)
+## RESUME POINT — read this first (updated 2026-09-07)
+
+### 2026-09-07 — MAP 1 REGULATORY DISPLAY: overlay on Type, not a second facility icon
+
+**Founder, live on ZIP 78617:** Regulatory was **not** reading as an overlay on Type. Checking
+**Regulatory facilities** painted a second population of standalone purple squares with a white
+**R**. Unchecking them hid those pins. Status/Type project markers never gained a badge. That
+is an eighth facility Type, not a regulatory overlay.
+
+**The DISPLAY contract (this supersedes dual-identity clause D below):**
+
+If an EPA facility’s **own class fields only** (`type` / `use_type` / `layer` / `category`)
+map to a project Type via TYPE_EXACT, LAYER_EXACT, or KEYWORD:
+
+- Draw **Type shape + operating lifecycle colour + lower-right purple R**
+- Popup / kind line: `"Industrial · Regulated facility · operating now"` (same pattern as dual
+  DC). Never `"Facility · operating now"`
+- Chip: Type shape + R badge, not a lettered purple square
+- **Membership stays `categories: ['facility']` only.** Do not add Industrial/etc. Regulatory
+  OFF must still hide those pins. Data-centre dual identity keeps `['datacenter', 'facility']`
+- Skip FALLBACK, TERMINAL_NEUTRAL, `facility`, and `other`. Do **not** call
+  `classifyProjectType()` (it reads names without `classOnly` and would promote
+  `CYRUS ONE DATA HALL 1 POWER POD 1`)
+
+If the class fields do **not** map a Type, keep the standalone purple square — nothing for the
+R to ride on.
+
+**SUPERSEDED:** the 2026-09-06 dual-identity line *"D — untouched: … keep their purple square"*
+is false for any EPA row whose class fields already name Industrial / Energy / Logistics / …
+Those rows overlay on Type. Dual-identity **data centres** (#1093) are unchanged.
+
+**Implementation already exists — do not rebuild.** Cursor PR
+**https://github.com/HomeSignalG/homesignal-site/pull/1121**
+(`cursor/map1-regulatory-overlay-on-type-324f`, CI green on `de16c00`). Concurrency verdict
+was GENUINE GAP vs #1093 (DC-only) and #1119 (3D aerial `mk.color`). A competing `claude/*`
+branch for the same resident-visible outcome is a duplicate.
+
+⚠️ **Conflict with the 2026-09-02 sole-agent handoff (Cursor retired):** this display fix was
+built on a Cursor branch because that is where the founder reported it. Claude Code owns
+`QUEUE.md` and should **take #1121 as the source of truth**, not re-implement. After squash-merge,
+reset the designated branch to `origin/main` per CLAUDE.md.
+
+Measured on the branch against live 78617: **30 Type+R, 0 standalone purple squares.** Popup:
+`LONGVIEW OFFSITE UTILITIES PHASE 1` / `Industrial · Regulated facility · operating now` /
+EPA FRS `110071347034`. Regulatory OFF drops those 30 (546 → 516); project Type pins remain.
 
 ### 2026-09-06 — MAP 1 MODE IDENTITY: the hero was the last surface still claiming the ZIP
 
@@ -251,8 +295,11 @@ in #1046 drew for PROJECTS only, so the two halves of one subject spoke two voca
   `POWER POD 7` name nothing. Reading the free-text NAME would call one of three identical
   power pods a data centre purely because of its label, so the facility path reads the
   **stamped class field only**. A power pod at a data centre is not a data centre.
-- **D — untouched: 214,563 rows / 113,696 records** keep their purple square, their legend
-  row, their filter bucket and their popup, verbatim.
+- **D — SUPERSEDED 2026-09-07 for classifiable Types.** The original line was *"untouched:
+  214,563 rows / 113,696 records keep their purple square"*. Founder, live 78617: that
+  reads as a separate facility, not an overlay on Type. Class fields that map a Type now
+  draw Type+R (see the 2026-09-07 resume point). Dual-identity **data centres** in A–C are
+  unchanged. Unmapped class fields still use the standalone square.
 
 **Architecture — three concepts, never conflated, no schema change and no DB write:**
 `categoryKey` = ENTITY IDENTITY (one value, drives the symbol) · `signal` = the subordinate

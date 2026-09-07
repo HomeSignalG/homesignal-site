@@ -830,6 +830,19 @@ federal records, purple `R` markers, regulatory freshness and refresh) is an OPT
 layer. The core plane must function fully when EPA is unavailable, empty, wrong, replaced, or
 removed entirely.
 
+⚖️ **DISPLAY LANGUAGE IS NOT THE DATA PLANE (founder, 2026-09-07, live ZIP 78617).** §7.1
+is about whether EPA can refuse a core write. Separately: a resident checking **Regulatory
+facilities** must **not** see a second population of standalone purple squares. That reads
+as an eighth facility Type.
+
+If the EPA record’s **own class fields** (`type` / `use_type` / `layer` / `category`) map to
+a project Type: draw **Type shape + operating colour + lower-right purple R**. Popup:
+`Type · Regulated facility · operating now`. **Membership stays `['facility']` only**
+(Regulatory OFF still hides the pin). Data-centre dual identity (#1093) keeps
+`['datacenter', 'facility']`. Unmapped class fields keep the standalone purple square.
+Do not call `classifyProjectType()` on the facility path (name-only promotion). Do not
+rebuild #1093. Implementation: PR #1121. Full resume: `QUEUE.md` 2026-09-07.
+
 **PHASE 1 IS SHIPPED (A + B). PHASE 2 IS NOT — and the difference matters.**
 
 ### ✅ Phase 1A — the EPA recovery path can no longer control the core cron
