@@ -81,15 +81,38 @@ need(!/#mapkeyShapes \.typechip\{[^}]*opacity:\s*0?\.[0-8]/.test(src),
 need(/#mapkeyShapes \.typechip \.ic, #mapkeyReg \.regchip \.ic\{opacity:1\}/.test(src),
   'the pin-shape icon and the purple R are not pinned to full strength in both states');
 
-// ── 5. THE GOVERNING SENTENCE, ONCE PER GROUP, PROGRAMMATICALLY ATTACHED ─────────────
-[['stage', 'mapkeyStageHelp', 'Checked statuses are shown on the map.'],
- ['type', 'mapkeyTypeHelp', 'Checked types are shown on the map.'],
- ['regulatory', 'mapkeyRegRule', 'Checked records are shown on the map.']].forEach(([row, id, copy]) => {
-  need(src.includes('id="' + id + '"') && src.includes(copy),
-    'the ' + row + ' row is missing its rule copy "' + copy + '"');
-  need(new RegExp('aria-describedby="' + id + '"').test(src),
-    'the ' + row + ' rule is not programmatically associated with its group');
+// ── 5. ONE MAP KEY, PROGRAMMATICALLY ATTACHED TO ALL THREE GROUPS ───────────────────
+// ⚖️ WHAT CHANGED, AND WHY THIS IS NOT A WEAKENED ASSERTION. The three per-row rules
+// ("Checked statuses/types/records are shown on the map.") were one sentence written three
+// times to say what a ticked checkbox already says; the filter-panel hierarchy unit removed
+// them along with the long legend paragraph that restated the map's encodings a fourth
+// time. The PROGRAMMATIC ASSOCIATION is the part that must not regress, so it is asserted
+// harder than before: every one of the three groups must point at the surviving key, and
+// the removed ids must be gone from the page rather than merely unreferenced — a dangling
+// aria-describedby announces nothing while looking associated.
+['mapkeyStageHelp', 'mapkeyTypeHelp', 'mapkeyRegRule'].forEach((id) => {
+  need(!src.includes(id),
+    'the retired per-row rule id "' + id + '" is still on the page');
 });
+['Checked statuses are shown on the map.', 'Checked types are shown on the map.',
+ 'Checked records are shown on the map.'].forEach((copy) => {
+  need(!src.includes(copy), 'the redundant per-row rule "' + copy + '" is back');
+});
+need(!/Pin shape shows project type; color shows lifecycle stage/.test(src),
+  'the long legend paragraph is back — the map key already states the encodings once');
+need((src.match(/aria-describedby="mapkeyNote"/g) || []).length === 3,
+  'the three filter groups are not all described by the one map key');
+// Compared as TEXT with the tags stripped, so the assertion pins the sentence a customer
+// reads rather than the markup it is wrapped in — the clause spans exist only to control
+// where the line breaks on a narrow viewport and carry no words of their own.
+const keyHtml = (src.match(/id="mapkeyNote"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
+need(keyHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+     === 'How to read the map: Shape = project type · Color = status · Purple R = regulatory record.',
+  'the single map key is missing or reworded');
+need(/<strong>How to read the map:<\/strong>/.test(keyHtml),
+  'the map key label has lost its emphasis');
+need((src.match(/How to read the map:/g) || []).length === 1,
+  'the map key is stated more than once');
 need(/aria-label="Project type filters"/.test(src), 'the Type group has no screen-reader label');
 need(/aria-label="Regulatory record filters"/.test(src), 'the Regulatory group has no screen-reader label');
 

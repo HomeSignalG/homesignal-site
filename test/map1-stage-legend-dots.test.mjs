@@ -147,8 +147,14 @@ if (!/id="mapkeyStageEmpty"/.test(src) || !/No project statuses are selected\./.
 if (!/id="stageSelectAll"/.test(src) || !/Select all statuses\./.test(src)) {
   failures.push('the empty-state offers no way back — a resident could be stranded on a blank map');
 }
-if (!/Checked statuses are shown on the map\./.test(src) || !/aria-describedby="mapkeyStageHelp"/.test(src)) {
-  failures.push('the governing rule is missing or is not programmatically associated with the group');
+// ⚖️ THE RULE COPY MOVED, THE ASSOCIATION DID NOT. "Checked statuses are shown on the
+// map." was one of three per-row sentences saying what a ticked checkbox already says;
+// the filter-panel hierarchy unit replaced all three with the single map key at the foot
+// of the panel. What still has to hold is that the group carries a real, resolvable
+// description — so this asserts the group points at the key that exists, and that the
+// retired id is gone rather than dangling.
+if (!/aria-describedby="mapkeyNote"/.test(src) || /mapkeyStageHelp/.test(src)) {
+  failures.push('the Status group is not programmatically described by the one map key');
 }
 // The filter's boundary vocabulary. A label and a hue are presentation and have both moved
 // once already; the id is the part a redesign may not move.
@@ -156,9 +162,17 @@ if (!/HS\.stageKeyForId/.test(src) || !/HS\.stageIdForKey/.test(src)) {
   failures.push('the Stage filter is not keying on stable status IDs (lib/map.js stageIdForKey/stageKeyForId)');
 }
 
-// ── 7. The caption still states the rule, because the rule is the thing being taught ──
-if (!/Pin shape shows project type; color shows lifecycle stage/.test(src)) {
-  failures.push('the legend caption no longer states shape=type / colour=stage');
+// ── 7. The key still states the rule, because the rule is the thing being taught ──────
+// The claim is unchanged — the panel must say that shape carries type and colour carries
+// status — but it is now said ONCE, in the map key, instead of in a paragraph that also
+// restated the three per-row rules. Asserted on the surviving sentence.
+const keyText = ((src.match(/id="mapkeyNote"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '')
+  .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+if (keyText !== 'How to read the map: Shape = project type · Color = status · Purple R = regulatory record.') {
+  failures.push('the map key no longer states shape=type / colour=status');
+}
+if (/Pin shape shows project type; color shows lifecycle stage/.test(src)) {
+  failures.push('the long legend paragraph is back alongside the map key');
 }
 
 if (failures.length) {

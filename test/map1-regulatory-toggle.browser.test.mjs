@@ -153,9 +153,38 @@ const rowsLook = () => page.evaluate(() => {
 // ── 1. THREE ROWS, IN ORDER, AND THE THIRD IS NOT A TYPE ──────────────────────────
 const headings = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.maplegend-wrap .mapkey-hd')).map(h => h.textContent.trim().replace(/\s+/g, ' ')));
-ok(/^Stage/.test(headings[0]), '1: row 1 is Stage — pin color', headings[0]);
-ok(/^Type/.test(headings[1]), '1b: row 2 is Type — pin shape', headings[1]);
-ok(headings[2] === 'Regulatory records', '1c: row 3 is Regulatory records', headings[2]);
+// ⚖️ THE HEADINGS WERE RENAMED BY THE FILTER-PANEL HIERARCHY UNIT: "Stage — pin color"
+// and "Type — pin shape" folded the map's ENCODING into the section NAME, which is why the
+// same encoding then had to be repeated in a paragraph below. The encoding now lives once,
+// in the map key; the headings name the dimension a customer is filtering on. Read from
+// `textContent`, so the third is still the registry's own `HS.REGULATORY_LEGEND.heading` —
+// the uppercase treatment is CSS (asserted separately below), never a retyped data value.
+ok(headings[0] === 'STATUS', '1: section 1 is STATUS', headings[0]);
+ok(headings[1] === 'PROJECT TYPE', '1b: section 2 is PROJECT TYPE', headings[1]);
+ok(headings[2] === 'Regulatory records', '1c: section 3 is the registry heading', headings[2]);
+// The rendered label is what a customer scans, and it must read as the third of three
+// peers — same treatment, same case — not as a differently-styled outlier.
+const hdStyle = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('.maplegend-wrap .mapkey-hd')).map((h) => {
+    const cs = getComputedStyle(h);
+    return { tt: cs.textTransform, size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight) };
+  }));
+ok(hdStyle.length === 3 && hdStyle.every(h => h.tt === 'uppercase'),
+  '1c2: all three headings render uppercase — REGULATORY RECORDS included',
+  JSON.stringify(hdStyle));
+// THE HIERARCHY ITSELF, MEASURED. A heading that does not outrank the chip labels beneath
+// it is not a heading, and this is the one property a copy change can silently undo.
+const chipStyle = await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('#mapkeyShapes .typechip .t'));
+  const nt = getComputedStyle(document.getElementById('mapkeyNote'));
+  return { chip: parseFloat(cs.fontSize), chipW: Number(cs.fontWeight),
+           key: parseFloat(nt.fontSize), keyW: Number(nt.fontWeight) };
+});
+ok(hdStyle.every(h => h.size > chipStyle.chip && h.weight > chipStyle.chipW),
+  '1c3: every section heading outranks the filter labels below it',
+  JSON.stringify({ hd: hdStyle[0], ...chipStyle }));
+ok(hdStyle.every(h => h.size > chipStyle.key),
+  '1c4: ...and the map key is subordinate to all three', JSON.stringify(chipStyle));
 const typeLabels = await page.evaluate(() =>
   Array.from(document.querySelectorAll('#mapkeyShapes .typechip .t')).map(t => t.textContent.trim()));
 ok(typeLabels.length === 7 && !typeLabels.some(l => /regulated facility/i.test(l)),

@@ -170,7 +170,12 @@ const grp = await page.evaluate(() => {
   return { role: g.getAttribute('role'), name: g.getAttribute('aria-label'), help: h ? h.textContent.trim() : null };
 });
 ok(grp.role === 'group' && grp.name === 'Project type filters', '0: labelled group', JSON.stringify(grp));
-ok(grp.help === 'Checked types are shown on the map.', '0: the governing rule is attached to the group', grp.help);
+// ⚖️ The per-row rule was removed with the filter-panel hierarchy unit (it restated what a
+// ticked checkbox already says); all three groups now point at the single map key. The
+// assertion is the same one — the description must resolve to real text.
+ok(grp.help === 'How to read the map: Shape = project type · Color = status · '
+              + 'Purple R = regulatory record.',
+  '0: the one map key is attached to the group', grp.help);
 
 // ── 1. THE DROPDOWN IS GONE ─────────────────────────────────────────────────────────
 const legacy = await page.evaluate(() => ({
