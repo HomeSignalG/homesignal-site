@@ -1184,7 +1184,14 @@ HS.onReady(function(){
     var stage = MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
     // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
-    return stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
+    var base = stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
+    // Overlay / dual-identity EPA pins draw a Type shape. The title must still name the
+    // regulatory fact, or hover would read as a project pin and recreate the "separate
+    // facility" confusion in words. Standalone squares already use legendLabel
+    // "Regulated facility", so they are not doubled here.
+    if (mk && mk.isFacility && mk.categoryKey && mk.categoryKey !== "facility")
+      return base + " · regulated facility";
+    return base;
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).

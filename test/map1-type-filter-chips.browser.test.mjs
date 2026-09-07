@@ -142,9 +142,21 @@ const setReg = (on) => page.evaluate((want) => {
   if (b && b.checked !== want) b.click();
 }, on);
 // Visible pins, named by what the resident can actually read off each marker.
+// Overlay EPA pins now DRAW a Type shape (Industrial triangle + purple R) while
+// remaining Type-filter NON-MEMBERS (`categories: ['facility']` only). Counting
+// `/industrial/` across every title therefore mixes a project pin with a
+// regulatory overlay. Split on the R badge — the same discriminator the map uses.
 const visible = () => page.evaluate(() =>
   Array.from(document.querySelectorAll('#map .leaflet-marker-icon:not(.homepin)'))
-    .map(m => { const s = m.querySelector('[title]'); return (s ? s.getAttribute('title') : '').toLowerCase(); }));
+    .map(m => {
+      const s = m.querySelector('[title]');
+      return {
+        title: (s ? s.getAttribute('title') : '').toLowerCase(),
+        overlay: />R<\/text>/.test(m.innerHTML || '')
+      };
+    }));
+const projects = (list) => list.filter(x => !x.overlay).map(x => x.title);
+const overlays = (list) => list.filter(x => x.overlay).map(x => x.title);
 const has = (list, re) => list.filter(t => re.test(t)).length;
 const typesParam = () => page.evaluate(() => new URL(location.href).searchParams.get('types'));
 const noteShown = () => page.evaluate(() => {
@@ -186,23 +198,29 @@ ok(!legacy.btn && !legacy.menu && !legacy.showTypes && legacy.sh === 0,
 
 // ── 2. TOGGLING ONE TYPE MOVES ONLY THAT TYPE ───────────────────────────────────────
 const V0 = await visible();
-ok(has(V0, /data center/) === 1 && has(V0, /industrial/) === 1 && has(V0, /commercial/) === 1
-   && has(V0, /regulated facility/) === 1,
-  '2: setup — one pin per project type, plus the EPA facility on its own', V0.join(' / '));
+ok(has(projects(V0), /data center/) === 1 && has(projects(V0), /industrial/) === 1
+   && has(projects(V0), /commercial/) === 1
+   && overlays(V0).length === 1 && /regulated facility/.test(overlays(V0)[0]),
+  '2: setup — one pin per project type, plus the EPA overlay on Type',
+  projects(V0).join(' / ') + ' || overlay: ' + overlays(V0).join(' / '));
 await clickType('data_center');
 const V1 = await visible();
-ok(has(V1, /data center/) === 0, '2: unchecking Data center removes the Data center pin');
-ok(has(V1, /industrial/) === 1 && has(V1, /commercial/) === 1,
-  '2: ...and moves NOTHING else', V1.join(' / '));
+ok(has(projects(V1), /data center/) === 0, '2: unchecking Data center removes the Data center pin');
+ok(has(projects(V1), /industrial/) === 1 && has(projects(V1), /commercial/) === 1
+   && overlays(V1).length === 1,
+  '2: ...and moves NOTHING else', projects(V1).join(' / '));
 ok((await chips()).filter(c => !c.checked).map(c => c.id).join(',') === 'data_center',
   '2: exactly one chip is unchecked');
 await clickType('data_center');
-ok(has(await visible(), /data center/) === 1, '3: re-checking restores it');
+ok(has(projects(await visible()), /data center/) === 1, '3: re-checking restores it');
 
 await clickType('industrial');
 const V2 = await visible();
-ok(has(V2, /industrial/) === 0 && has(V2, /data center/) === 1 && has(V2, /commercial/) === 1,
-  '3b: unchecking Industrial removes only Industrial', V2.join(' / '));
+ok(has(projects(V2), /industrial/) === 0 && has(projects(V2), /data center/) === 1
+   && has(projects(V2), /commercial/) === 1,
+  '3b: unchecking Industrial removes only Industrial', projects(V2).join(' / '));
+ok(overlays(V2).length === 1,
+  '3b: ...and the EPA overlay stays — Regulatory is not a Type membership', overlays(V2).join(' / '));
 await clickType('industrial');
 
 // ── 4. UNSELECTED LOOKS UNSELECTED, NOT DELETED ─────────────────────────────────────
@@ -222,14 +240,15 @@ await clickType('commercial');
 // Approved is checked and Data center is NOT: an approved data centre must stay hidden.
 await clickStage('proposed'); await clickStage('lifecycle_unknown'); await clickStage('operating_now');
 const VS = await visible();
-ok(has(VS, /commercial/) === 0, '5: Stage alone filters — the PROPOSED commercial pin is gone');
-ok(has(VS, /data center/) === 1 && has(VS, /industrial/) === 1,
-  '5: ...and the approved pins remain', VS.join(' / '));
+ok(has(projects(VS), /commercial/) === 0, '5: Stage alone filters — the PROPOSED commercial pin is gone');
+ok(has(projects(VS), /data center/) === 1 && has(projects(VS), /industrial/) === 1,
+  '5: ...and the approved pins remain', projects(VS).join(' / '));
 await clickType('data_center');
 const VA = await visible();
-ok(has(VA, /data center/) === 0,
-  '5: AND LOGIC — Approved checked + Data center unchecked -> the approved data centre is HIDDEN', VA.join(' / '));
-ok(has(VA, /industrial/) === 1, '5: ...while the approved industrial pin is untouched');
+ok(has(projects(VA), /data center/) === 0,
+  '5: AND LOGIC — Approved checked + Data center unchecked -> the approved data centre is HIDDEN',
+  projects(VA).join(' / '));
+ok(has(projects(VA), /industrial/) === 1, '5: ...while the approved industrial pin is untouched');
 await clickType('data_center');
 await clickStage('proposed'); await clickStage('lifecycle_unknown'); await clickStage('operating_now');
 ok((await chips()).every(c => c.checked), '5: both dimensions restored');
@@ -238,8 +257,8 @@ ok((await chips()).every(c => c.checked), '5: both dimensions restored');
 for (const c of await chips()) await clickType(c.id);
 ok((await chips()).every(c => !c.checked), '6: all seven can be unchecked');
 const V6 = await visible();
-ok(has(V6, /data center/) + has(V6, /industrial/) + has(V6, /commercial/) === 0,
-  '6: no normal project pins remain', V6.join(' / '));
+ok(has(projects(V6), /data center/) + has(projects(V6), /industrial/) + has(projects(V6), /commercial/) === 0,
+  '6: no normal project pins remain', projects(V6).join(' / ') + ' || overlay: ' + overlays(V6).join(' / '));
 const n6 = await noteShown();
 ok(n6.shown && /No project types are selected\./.test(n6.text), '6: a non-blocking note states the cause', n6.text);
 ok(/Select all types\./.test(n6.text), '6: ...and carries a visible action', n6.text);
@@ -249,7 +268,8 @@ ok((await chips()).every(c => !c.checked), '6: nothing was silently re-enabled')
 ok(await page.evaluate(() => !!document.getElementById('regToggleBox').checked),
   '7: the Regulatory chip is untouched by every Type going off');
 ok((await visible()).length > 0,
-  '7: ...and the regulatory overlay is STILL DRAWN with no project type selected', (await visible()).join(' / '));
+  '7: ...and the regulatory overlay is STILL DRAWN with no project type selected',
+  overlays(await visible()).join(' / '));
 await setReg(false);
 ok((await visible()).length === 0, '7: with regulatory off as well, the map is genuinely empty');
 await setReg(true);
@@ -258,7 +278,7 @@ await setReg(true);
 await page.click('#typeSelectAll');
 ok((await chips()).every(c => c.checked), '8: the action re-checks all seven');
 ok(!(await noteShown()).shown, '8: ...and the note goes away');
-ok(has(await visible(), /data center/) === 1, '8: ...and the pins return');
+ok(has(projects(await visible()), /data center/) === 1, '8: ...and the pins return');
 
 // ── 9. THE URL IS THE STATE ─────────────────────────────────────────────────────────
 await clickType('industrial');
@@ -269,8 +289,9 @@ const C9 = await chips();
 ok(C9.filter(c => c.checked).map(c => c.id).join(',') === 'data_center,commercial',
   '9b: ?types= initialises state on load', C9.filter(c => c.checked).map(c => c.id).join(','));
 const V9 = await visible();
-ok(has(V9, /industrial/) === 0 && has(V9, /commercial/) === 1,
-  '9b: ...and the map honours it before the first paint', V9.join(' / '));
+ok(has(projects(V9), /industrial/) === 0 && has(projects(V9), /commercial/) === 1,
+  '9b: ...and the map honours it before the first paint',
+  projects(V9).join(' / ') + ' || overlay: ' + overlays(V9).join(' / '));
 await load('&types=');
 ok((await chips()).every(c => !c.checked) && (await noteShown()).shown,
   '9c: an EMPTY ?types= is honoured as none-selected, distinct from the default');
@@ -337,7 +358,7 @@ ok(foc.isBox, '12: the Type checkbox is focusable by Tab order');
 ok(/solid/.test(foc.ring), '12: ...with a visible focus indicator', foc.ring);
 await page.keyboard.press('Space');
 ok((await chips()).find(c => c.id === 'industrial').checked === false, '12: Space toggles the focused Type');
-ok(has(await visible(), /industrial/) === 0, '12: ...and the map follows immediately, with no Apply step');
+ok(has(projects(await visible()), /industrial/) === 0, '12: ...and the map follows immediately, with no Apply step');
 await page.keyboard.press('Space');
 ok((await chips()).find(c => c.id === 'industrial').checked === true, '12: Space toggles it back');
 const touch = await page.evaluate(() => {
