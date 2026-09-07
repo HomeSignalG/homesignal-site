@@ -53,6 +53,13 @@ ok('news-only ZIP reports its news additively (not hidden by the narrower count)
 // 1b. The 5,072-ZIP class: EPA facility floor + news => facilities_only, NOT populated.
 // This is the state that renders the accurate "meeting and permit feeds … still being
 // wired" banner on community.html, which those pages were being denied.
+//
+// ⚠️ `facilities_only` is the PRE-SPLIT spelling and this pin keeps testing it, because
+// it is what production computes today. After the EPA/regulatory Unit 2 view migration
+// the identical input reads `honestly_empty` + `overlay_records` — the same composition,
+// no longer collapsed into the core enum — and the same banner. That equivalence is
+// pinned separately in test/epa-phase2-coverage-state-split.test.mjs; nothing about the
+// news rule below changes either way, which is exactly why this file was left alone.
 ok('facility floor + news is facilities_only',
   classify({ dev_markers: 0, fac_markers: 40, changes: civic(NEWS_ONLY) }) === 'facilities_only');
 
@@ -92,11 +99,18 @@ ok('SQL of record explains the correction (so the next session does not re-deriv
   /CORRECTION 2026-08-02/.test(sql) && /content, not coverage|not coverage/i.test(sql));
 
 // ── 3. The live verifier must assert the rule, not merely report it.
+//
+// ⚠️ THESE TWO PINS ARE SHAPE-AGNOSTIC ON PURPOSE (EPA/regulatory decoupling, Unit 2).
+// The verifier now reads the view with `select=*` — because naming a column that does
+// not exist yet 400s the whole request — and states its assertions on a normalized
+// (core, overlay) pair, so the literal `coverage_state === ` spelling became
+// `nz(r).core === `. What is being pinned is unchanged: the verifier must READ
+// news_items and must FAIL when a news-only ZIP is anything but honestly_empty.
 const ver = readFileSync(new URL('../scripts/verify-coverage-state.mjs', import.meta.url), 'utf8');
 ok('verify-coverage-state reads news_items from the view',
-  /select=[^'"`]*\bnews_items\b/.test(ver));
+  /select=(\*|[^'"`]*\bnews_items\b)/.test(ver) && /\bnews_items\s*>\s*0/.test(ver));
 ok('verify-coverage-state fails on a news-only ZIP that is not honestly_empty',
-  /ok\('news is not coverage[\s\S]{0,400}?coverage_state === 'honestly_empty'/.test(ver));
+  /ok\('news is not coverage[\s\S]{0,400}?(coverage_state|\.core) === 'honestly_empty'/.test(ver));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

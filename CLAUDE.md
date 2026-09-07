@@ -938,6 +938,133 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
+### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
+**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
+load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
+robots and coverage states are untouched. Full record: audit §14.
+
+- 🔑 **THE AUDIT'S OWN §10.2 RECOMMENDATION IS WRONG ON ITS `data_quality` HALF — do not
+  implement it.** `data_quality` is not only a completeness claim, it is the **layout gate** in
+  `lib/community-page.js` (`if (status !== 'pass')`), and the non-pass branch renders neither
+  Development nor the *"Regulated facilities nearby"* section. Dropping `_nf` there would stop
+  **766** pages rendering **real, sourced EPA facility records they hold today** and replace them
+  with *"Coverage for this ZIP is being wired."* A page with public records claiming it has none
+  is the same dishonesty this workstream exists to remove, reached from the other direction.
+  **Unit 1 therefore leaves `data_quality` alone** and gives core its own EPA-free markers —
+  `core_project_scan_status` (`not_scanned` · `projects_found` · `no_qualifying_projects_found`)
+  and `core_records_present`, both computed from `_has_report`/`_nd`/`_nc` only.
+- **What Unit 1 changes is `indexable`, and only `indexable`:**
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`.
+  Stored-stamp measurement: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb on
+  1,005 of 1,005, 0 pages newly advertised**, all 1,005 carrying a `development_reports` row.
+  *(The "1,004" above was an estimate; −1,005 is exact.)*
+- ⚠️ **NAME THE INSTRUMENT WITH THE NUMBER — two correct readings disagree by 463.** The 766
+  comes from the STORED stamps (`component_scores`, one self-consistent row read). Recomputing
+  the same question live from `app_projects`/`app_changes` returns **303**, and again later
+  something else, because `app_changes` is deleted and reinserted per ZIP refresh and `_ndp` is
+  stricter than `_nd`. The stamped read is the stable one.
+- 🔑 **`_nd`, NOT `_ndp`, decides the scan status.** A ZIP with area-scope development records
+  HAS projects — it just has none precise enough to pin. `no_qualifying_projects_found` there
+  would be a §11 false negative; pin-precision is `indexable`'s question, not completeness's.
+- **Community / Alerts pages are unaffected.** Their robots and sitemap entries come from
+  **Rule F** at build time; `gen_zip_pages.py` fetches `indexable` and never reads it. The
+  −1,005 is entirely Map 1 / development pages, which stay real, reachable and fully rendered.
+- **Unit order is forced:** doing §3's `data_quality` half first would break the CI pin
+  `legacy: populated/facilities_only => pass` (`scripts/verify-coverage-state.mjs:64`) by
+  construction. Unit 1 leaves that pin true; reworking `facilities_only` is Unit 2, the
+  `sites` split Unit 3, and taking EPA off `Promise.all` Unit 4.
+- **Six comment sites describe the CURRENT rule and are deliberately untouched** until the
+  apply, or the repo would document behaviour that does not exist yet: `gen_sitemap.py:6` and
+  `:124`, `verify-development.mjs:140`, `gen_zip_pages.py:383`, `homesignalmap.html:1089`,
+  `lib/community-page.js:70`.
+- 🔑 **`_nc` IS CIVIC-ONLY BY ORDERING, NOT BY A FILTER — so a BACKFILL needs the filter the
+  function never did.** `app_refresh_zip` deletes the ZIP's `app_changes` rows, inserts the
+  civic ones, counts `_nc` at line 264, and inserts Local News at line 288. A backfill runs long
+  after that ordering has passed. Measured: without `category <> 'Local News'`, **630 of 12,722
+  ZIPs** would have been stamped `core_records_present = true` on Local News alone (12,308 vs
+  the correct 11,678) — the 2026-08-02 "news is content, not coverage" defect reintroduced in a
+  brand-new column. The corrected figure reconciles exactly with Unit 2's partition
+  (11,678 + 766 + 278 = 12,722). Invariant `(e0)` raises if any row claims core records on news
+  alone.
+- ⚠️ **A PIN THAT NAMES THE STRING IT FORBIDS CANNOT ALSO SEARCH THE WHOLE FILE FOR IT.** The
+  first pin for the above passed with the filter deleted, because the invariant mentions the
+  same string in order to forbid it. Only the narrower pin failed, which is what exposed it —
+  **scope a structural pin to the statement it is about.**
+- 📌 **OPEN, deliberately unresolved: the area-scope shape.** Test case 4 models `{nd:3, ndp:0}`;
+  production's area-scope population is `{nd:0, nc:N}` (an area-scope record materializes as an
+  `app_changes` notice, never a development `app_projects` row), so such a ZIP reports
+  `no_qualifying_projects_found` while `core_records_present` is true. Recorded as a printed
+  SKIP in the test; **no new definition of `projects_found` was spliced.** Founder product call.
+
+### 🅿️ PHASE 2 · UNIT 2 IS BUILT AND PARKED (2026-09-07) — `facilities_only` leaves the CORE enum
+SQL of record `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` (executable, atomic,
+**not applied**), pinned by `test/epa-phase2-coverage-state-split.test.mjs` (44 assertions, six
+mutations). **Independent of Unit 1** — either may be applied first. Full record: audit §15.
+
+- **The defect:** `app_coverage_states.coverage_state`'s fifth branch is
+  `WHEN fac_markers > 0 THEN 'facilities_only'`, so a ZIP whose CORE plane is genuinely empty
+  is reported as `facilities_only` **because EPA has records for it** — rule #1 in the
+  presence direction, and rule #11 outright (delete the overlay and a core enum value goes
+  with it). The health ladder above it is already core-correct: Phase 1B gave the overlay its
+  own clock, so `refreshed_at` is core-only.
+- **The split:** `coverage_state` keeps `populated | honestly_empty | unsupported_source |
+  failed_ingest | temporarily_unavailable | stale_data`; a new `regulatory_overlay_state`
+  carries `overlay_records | overlay_empty | overlay_unknown | overlay_unsupported` with
+  `facilities_refreshed_at` and `facilities_unavailable` beside it. `create or replace view`,
+  columns APPENDED, so no grant or dependent is lost.
+- 🔑 **`overlay_unknown` EXISTS BECAUSE "WE COULD NOT READ EPA" AND "EPA HAS NOTHING" ARE
+  DIFFERENT FACTS** — the same rule Phase 1B applied to `counts.facilities`, now applied to
+  the state.
+- 🔑 **ONE RENDERED SENTENCE CHANGES, ON UP TO 226 PAGES, AND IT IS A CORRECTION.** The
+  honest-empty copy claims *"We checked … the EPA facility registry … and found no qualifying
+  records yet."* Measured: of the 278 ZIPs empty on both planes, **226 carry
+  `facilities_unavailable = true`** (1,197 ZIPs carry it overall) — the read was REFUSED, so
+  they assert a verified absence they never verified. The sentence is now gated on the overlay
+  agreeing; those pages fall through to the existing *"Coverage for this ZIP is being wired"*
+  copy. A dedicated "could not reach the EPA registry" sentence is a founder copy decision and
+  was deliberately not invented.
+- **The 766 keep their banner, in the same words.** `lib/community-page.js` re-keys it on the
+  composition (`honestly_empty` + `overlay_records`) **while still accepting `facilities_only`**.
+- ⚠️ **EVERY READER MUST SURVIVE BOTH SHAPES, AND `select('*')` IS LOAD-BEARING, NOT LAZY.**
+  Naming a column PostgREST does not have 400s the whole request, and both readers swallow
+  that into a null — a named column list would silently blank the coverage copy AND the
+  `data-coverage-state` attribute between the code shipping and the migration landing.
+  Likewise `scripts/verify-coverage-state.mjs` normalizes both shapes: deleting
+  `facilities_only` from a `VALID` set there would have turned that DAILY job red on merge,
+  days before the change it describes.
+- **The parked SQL fails closed on a VACUOUS split** — if no ZIP is core-empty with overlay
+  records, it raises rather than reporting success over nothing.
+- **`docs/coverage-state-model.sql` still describes production** and must be updated in the
+  same change as the apply, like Unit 1's six comment sites.
+- 📌 **OBSERVED WHILE MEASURING, NOT ACTED ON, NOT EPA'S FAULT: 3,575 of 12,722
+  `development_reports` rows are older than 72 h** and 580 sit in the `failed_ingest` shape,
+  so `verify-coverage-state`'s "zero unintentionally STALE ZIPs" assertion is failing in
+  production. Both crons are `active` and the newest core write is minutes old — this is
+  rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
+  frequent, not less. Separate work; do not re-derive it.
+- 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
+  privilege escalation.** The live view carries `security_invoker=true` and is owned by
+  `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
+  `create or replace view` WITHOUT it → **`(none)`**. So the first draft of the Unit 2 file
+  would have turned an anon-readable view into one running with the OWNER's rights, bypassing
+  RLS on `app_community_meta`, `development_reports`, `app_projects` and `app_changes` — the
+  `page_cache` posture, arrived at by omission, with nothing in the SQL reporting it. **Always
+  restate `with (security_invoker = true)` on a replace**, schema-qualify every source relation
+  so `search_path` cannot re-point it, and assert `'security_invoker=true' = any (c.reloptions)`
+  after the replace.
+- ⚠️ **A `pg_get_viewdef` SLICE MUST NOT DEPEND ON KEYWORD CASING.** `position('CASE' in def)`
+  returns the wrong substring the day the renderer changes case, and an EPA term inside the
+  isolated ladder then goes unseen — a guard that stops guarding without failing. Lower the
+  haystack once and keep every needle lower case.
+- ⚠️ **A SAMPLER MUST USE THE PAGE'S OWN CONDITION, NEVER ITS COMPLEMENT.** The verifier picked
+  the honest-empty page with `overlay !== 'overlay_records'`, which also admits
+  `overlay_unknown` — where the page deliberately suppresses that sentence. It would have
+  asserted copy the page is right not to show and turned the DAILY job red on a correction. The
+  complement is still correct in the LEGACY `data_quality` rule (both empty and unknown are
+  `coverage_coming`), so the pin forbidding it is scoped to the sampler, not the file.
+  The `overlay_unknown` sample is gated on `SPLIT_LIVE` and names its skip reason.
+
 
 ### Status
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
