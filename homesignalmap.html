@@ -120,6 +120,7 @@
   #mapInner{position:absolute;inset:0}
   .mapgl{position:absolute;inset:0;display:none;background:#0a1012;z-index:1}
   .mapgl.on{display:block}
+  .mapgl .leaflet-container{width:100%;height:100%;background:#0a1012}
   .map3d{position:absolute;inset:0;display:none;background:#0a1012;z-index:2}
   .map3d.on{display:block}
   .map3d canvas{display:block;width:100%;height:100%}
@@ -760,7 +761,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=3ce16798"></script>
+<script src="lib/map.js?v=eca20492"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
@@ -2928,9 +2929,200 @@ HS.onReady(function(){
     sp.scale.set(c.width*0.16,7,1);sp.renderOrder=10;return sp;
   }
 
+  // Try several WebGL attribute sets. The original `{antialias, preserveDrawingBuffer}`
+  // pair is the preferred picture, but a desktop GPU that refuses it can still grant a
+  // simpler context — and a refused context here used to look like "this machine has
+  // no WebGL" (console `3d/nowebgl`) even when a later attempt would have worked.
+  function makeThreeRenderer(){
+    var tries = [
+      {antialias:true, preserveDrawingBuffer:true, failIfMajorPerformanceCaveat:false, powerPreference:"default"},
+      {antialias:false, preserveDrawingBuffer:false, failIfMajorPerformanceCaveat:false, powerPreference:"low-power"},
+      {antialias:false, alpha:true, failIfMajorPerformanceCaveat:false}
+    ];
+    var last = null;
+    for(var i=0;i<tries.length;i++){
+      try{
+        var rn = new THREE.WebGLRenderer(tries[i]);
+        var gl = rn.getContext && rn.getContext();
+        if(gl && !(gl.isContextLost && gl.isContextLost())) return rn;
+        if(rn.dispose) rn.dispose();
+      }catch(e){ last = e; }
+    }
+    if(last) throw last;
+    return null;
+  }
+  function abandonWebGL3D(){
+    try{
+      if(V3.rn && V3.rn.dispose) V3.rn.dispose();
+      if(V3.rn && V3.rn.domElement && V3.rn.domElement.parentNode)
+        V3.rn.domElement.parentNode.removeChild(V3.rn.domElement);
+    }catch(e){}
+    V3.inited=false; V3.rn=null; V3.sc=null; V3.lost=false; V3.soft=false;
+  }
+  function ensure3DLoop(){
+    if(V3.looping) return;
+    V3.looping=true;
+    animate3D();
+  }
+
+  // Canvas-2D aerial: same records, same orbit/zoom, no WebGL. Used when the GPU
+  // context is refused so the 3D aerial control still shows the buildings rather
+  // than bouncing the resident back to the 2D street map.
+  function projectSoft(px, py, pz){
+    var tgt={x:0,y:16,z:0};
+    var cp=Math.cos(V3.pitch), sp=Math.sin(V3.pitch);
+    var cam={
+      x:tgt.x+Math.sin(V3.yaw)*cp*V3.dist,
+      y:tgt.y+sp*V3.dist,
+      z:tgt.z+Math.cos(V3.yaw)*cp*V3.dist
+    };
+    var fx=tgt.x-cam.x, fy=tgt.y-cam.y, fz=tgt.z-cam.z;
+    var fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
+    var rx=fy*0-fz*1, ry=fz*0-fx*0, rz=fx*1-fy*0;
+    var rl=Math.hypot(rx,ry,rz)||1; rx/=rl; ry/=rl; rz/=rl;
+    var ux=ry*fz-rz*fy, uy=rz*fx-rx*fz, uz=rx*fy-ry*fx;
+    var dx=px-cam.x, dy=py-cam.y, dz=pz-cam.z;
+    var camZ=dx*fx+dy*fy+dz*fz; if(camZ<8) camZ=8;
+    var camX=dx*rx+dy*ry+dz*rz;
+    var camY=dx*ux+dy*uy+dz*uz;
+    var f=(V3.vh/2)/Math.tan((60*Math.PI/180)/2);
+    return {x:V3.vw/2+camX*f/camZ, y:V3.vh/2-camY*f/camZ, depth:camZ};
+  }
+  function hexCss(n){
+    var s=(n>>>0).toString(16); while(s.length<6)s="0"+s; return "#"+s;
+  }
+  function drawSoftBox(ctx, x, z, w, h, col, wire){
+    var hw=w/2;
+    var corners=[[x-hw,0,z-hw],[x+hw,0,z-hw],[x+hw,0,z+hw],[x-hw,0,z+hw],
+                 [x-hw,h,z-hw],[x+hw,h,z-hw],[x+hw,h,z+hw],[x-hw,h,z+hw]];
+    var p=corners.map(function(c){ return projectSoft(c[0],c[1],c[2]); });
+    function face(idx, alpha){
+      ctx.beginPath();
+      ctx.moveTo(p[idx[0]].x, p[idx[0]].y);
+      for(var i=1;i<idx.length;i++) ctx.lineTo(p[idx[i]].x, p[idx[i]].y);
+      ctx.closePath();
+      if(wire){ ctx.strokeStyle=col; ctx.globalAlpha=0.85; ctx.lineWidth=1.2; ctx.stroke(); ctx.globalAlpha=1; }
+      else { ctx.fillStyle=col; ctx.globalAlpha=alpha; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle="rgba(0,0,0,.25)"; ctx.lineWidth=1; ctx.stroke(); }
+    }
+    if(wire){ face([4,5,6,7],1); face([0,1,5,4],1); face([1,2,6,5],1); }
+    else { face([4,5,6,7],1); face([0,1,5,4],0.92); face([1,2,6,5],0.78); }
+    return p;
+  }
+  function init3DSoft(){
+    var host=document.getElementById("map3d");
+    if(!host) throw new Error("3D aerial panel missing");
+    [].slice.call(host.querySelectorAll("canvas[data-hs-soft3d]")).forEach(function(old){
+      if(old.parentNode) old.parentNode.removeChild(old);
+    });
+    var c=document.createElement("canvas");
+    c.setAttribute("data-hs-soft3d","1");
+    host.insertBefore(c, host.firstChild);
+    V3.soft=true; V3.canvas=c; V3.lost=false; V3.inited=true;
+    V3.yaw=0.7; V3.pitch=0.82; V3.dist=mi(2.1); V3.auto=true; V3.rise=1;
+    V3.rn={
+      domElement:c,
+      getContext:function(){ return c.getContext("2d"); },
+      setSize:function(w,h){
+        var dpr=Math.min(2, window.devicePixelRatio||1);
+        c.width=Math.max(1, Math.round(w*dpr)); c.height=Math.max(1, Math.round(h*dpr));
+        c.style.width=w+"px"; c.style.height=h+"px";
+        V3.vw=w; V3.vh=h; V3.dpr=dpr;
+      }
+    };
+    var drag=false, lx, ly;
+    c.addEventListener("pointerdown", function(ev){
+      drag=true; V3.auto=false; lx=ev.clientX; ly=ev.clientY; V3.downX=ev.clientX; V3.downY=ev.clientY; V3.dragMoved=false;
+      var t=document.getElementById("mk3tip"); if(t)t.style.display="none";
+    });
+    window.addEventListener("pointermove", function(ev){
+      if(!drag) return;
+      if(Math.abs(ev.clientX-V3.downX)>5||Math.abs(ev.clientY-V3.downY)>5) V3.dragMoved=true;
+      V3.yaw-=(ev.clientX-lx)*0.006; V3.pitch=Math.max(0.1, Math.min(1.4, V3.pitch+(ev.clientY-ly)*0.005));
+      lx=ev.clientX; ly=ev.clientY;
+    });
+    window.addEventListener("pointerup", function(){ drag=false; });
+    c.addEventListener("wheel", function(ev){
+      V3.userZoom=true; V3.dist=Math.max(mi(0.3), Math.min(mi(CUR_RADIUS*3), V3.dist+(ev.deltaY>0?26:-26)));
+      ev.preventDefault();
+    }, {passive:false});
+    c.addEventListener("pointermove", function(ev){
+      if(drag) return;
+      var s=pickSoft(ev.clientX, ev.clientY), rect=c.getBoundingClientRect(), tip=document.getElementById("mk3tip");
+      if(s){
+        tip.innerHTML=tip3(s); tip.style.display="block";
+        tip.style.left=Math.max(6, Math.min(ev.clientX-rect.left+14, rect.width-236))+"px";
+        tip.style.top=Math.max(6, Math.min(ev.clientY-rect.top+14, rect.height-72))+"px";
+        c.style.cursor="pointer";
+      } else { tip.style.display="none"; c.style.cursor=""; }
+    });
+    c.addEventListener("click", function(ev){
+      if(V3.dragMoved) return;
+      var s=pickSoft(ev.clientX, ev.clientY);
+      if(s) showInfoCard(s); else { var inf=document.getElementById("mk3info"); if(inf) inf.style.display="none"; }
+    });
+    resize3D();
+    setTimeout(resize3D, 30);
+    build3DFacilities();
+    ensure3DLoop();
+    if(window.console && console.info) console.info("[HomeSignal] 3D aerial running without WebGL");
+    mapMsg();
+  }
+  function pickSoft(clientX, clientY){
+    var hits=V3.softHits||[];
+    var rect=V3.canvas.getBoundingClientRect();
+    var x=clientX-rect.left, y=clientY-rect.top;
+    for(var i=hits.length-1;i>=0;i--){
+      var h=hits[i];
+      if(x>=h.x-h.s && x<=h.x+h.s && y>=h.y-h.s && y<=h.y+h.s) return h.site;
+    }
+    return null;
+  }
+  function draw3DSoft(){
+    var c=V3.canvas, ctx=c && c.getContext("2d"); if(!ctx) return;
+    var dpr=V3.dpr||1;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var tt=(document.getElementById("todSlider")||{}).value; tt=tt==null?0.64:(+tt/100);
+    var day=Math.max(0, Math.sin(tt*Math.PI));
+    var top=day>0.4?"#4a8fd0":"#1b2b4a", bot=day>0.4?"#cfe0ec":"#d99560";
+    var g=ctx.createLinearGradient(0,0,0,V3.vh);
+    g.addColorStop(0, top); g.addColorStop(1, bot);
+    ctx.fillStyle=g; ctx.fillRect(0,0,V3.vw,V3.vh);
+    ctx.fillStyle="#3c463f";
+    var ground=[projectSoft(-3500,0,-3500), projectSoft(3500,0,-3500), projectSoft(3500,0,3500), projectSoft(-3500,0,3500)];
+    ctx.beginPath(); ctx.moveTo(ground[0].x,ground[0].y);
+    for(var i=1;i<4;i++) ctx.lineTo(ground[i].x,ground[i].y);
+    ctx.closePath(); ctx.fill();
+    if(V3.auto) V3.yaw+=0.0016;
+    var stops=ringStops(V3.frameExt||CUR_RADIUS);
+    stops.forEach(function(r){
+      var R=mi(r), steps=64, outer=(r===stops[stops.length-1]);
+      ctx.beginPath();
+      for(var k=0;k<=steps;k++){
+        var a=k/steps*2*Math.PI;
+        var p=projectSoft(Math.sin(a)*R, 0.4, Math.cos(a)*R);
+        if(k===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+      }
+      ctx.strokeStyle="rgba(45,212,191,"+(outer?0.7:0.4)+")";
+      ctx.lineWidth=outer?2.4:1.4; ctx.stroke();
+    });
+    var home=projectSoft(0, 9, 0);
+    ctx.fillStyle="#13b89a"; ctx.beginPath(); ctx.arc(home.x, home.y, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#1f5130"; ctx.fillRect(home.x-5, home.y-12, 10, 12);
+    ctx.fillStyle="#2f7d4f";
+    ctx.beginPath(); ctx.moveTo(home.x-7, home.y-12); ctx.lineTo(home.x, home.y-20); ctx.lineTo(home.x+7, home.y-12); ctx.fill();
+    V3.softHits=[];
+    (V3.softSites||[]).forEach(function(it){
+      var p=drawSoftBox(ctx, it.x, it.z, it.w, it.h, hexCss(it.col), it.wire);
+      var cx=(p[4].x+p[6].x)/2, cy=(p[4].y+p[6].y)/2;
+      V3.softHits.push({x:cx, y:cy, s:Math.max(10, it.w*0.35), site:it.site, depth:p[4].depth});
+    });
+    V3.softHits.sort(function(a,b){ return a.depth-b.depth; });
+  }
+
   function init3D(){
     var host=document.getElementById("map3d");
-    var rn=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+    var rn=makeThreeRenderer();
+    if(!rn) throw new Error("Error creating WebGL context.");
     rn.setPixelRatio(Math.min(2,window.devicePixelRatio));
     rn.shadowMap.enabled=true;rn.shadowMap.type=THREE.PCFSoftShadowMap;
     rn.outputEncoding=THREE.sRGBEncoding;
@@ -2961,9 +3153,13 @@ HS.onReady(function(){
     // real renderer: forcing WEBGL_lose_context took the canvas from 0% to 100% dark while
     // the view still claimed "3D aerial" and said nothing. No try/catch can see this — the
     // context dies between frames — so it is handled where the browser reports it.
-    rn.domElement.addEventListener("webglcontextlost",function(){
+    rn.domElement.addEventListener("webglcontextlost",function(ev){
+      if(ev && ev.preventDefault) ev.preventDefault();
       V3.lost=true;                              // stop drawing into a dead context
-      if(V3.active) fail3D("3d","contextlost");
+      if(V3.active){
+        abandonWebGL3D();
+        init3DSoft();                            // keep the aerial view up without WebGL
+      }
     },false);
     rn.domElement.addEventListener("webglcontextrestored",function(){ V3.lost=false; },false);
     var dom=rn.domElement,drag=false,lx,ly;
@@ -3004,7 +3200,7 @@ HS.onReady(function(){
       var s=pickAt(ev.clientX,ev.clientY);
       if(s){ showInfoCard(s); } else { var c=document.getElementById("mk3info"); if(c)c.style.display="none"; }
     });
-    build3DFacilities();setTimeOfDay(document.getElementById("todSlider").value/100);animate3D();
+    build3DFacilities();setTimeOfDay(document.getElementById("todSlider").value/100);ensure3DLoop();
   }
 
   function updateHome3D(){
@@ -3030,6 +3226,26 @@ HS.onReady(function(){
 
   function build3DFacilities(){
     if(!V3.inited)return;
+    if(V3.soft){
+      var maxD=0;
+      V3.softSites=[];
+      var dims={datacenter:[26,70],industrial:[16,32],logistics:[24,18],residential:[16,44],energy:[14,26]};
+      MAP_SITES.forEach(function(p){
+        var en=siteEN(p);
+        if(typeof en[0]!=="number"||typeof en[1]!=="number")return;
+        if(!mappable(p))return;
+        var bkt=bucketOf(p.type, p);
+        if(!siteVisible(p))return;
+        if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
+        var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1];
+        var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
+        V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:lc3D(bkt), wire:bkt==="proposed", site:p});
+      });
+      V3.frameExt=Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
+      if(!V3.userZoom) V3.dist=mi(V3.frameExt*2.0);
+      V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
+      return;
+    }
     // Frame the view to where the buildings actually are (not the empty outer radius),
     // so it reads well at every radius. maxD = farthest visible facility from home.
     var maxD=0, nLabelable=0;
@@ -3087,11 +3303,13 @@ HS.onReady(function(){
   }
 
   function resize3D(){ if(!V3.inited)return;var h=document.getElementById("map3d");var w=h.clientWidth||560,ht=h.clientHeight||460;
-    V3.rn.setSize(w,ht);V3.cam.aspect=w/ht;V3.cam.updateProjectionMatrix(); }
+    V3.rn.setSize(w,ht); if(V3.soft) return; V3.cam.aspect=w/ht;V3.cam.updateProjectionMatrix(); }
 
   function animate3D(){
+    if(!V3.looping) return;
     requestAnimationFrame(animate3D);
     if(!V3.active||!V3.inited||V3.lost)return;   // V3.lost: never render into a dead context
+    if(V3.soft){ draw3DSoft(); return; }
     if(V3.homeView){
       V3.cam.position.set(mi(0.03),7,mi(-0.01));V3.cam.lookAt(mi(-0.5),20,mi(0.2));
     } else {
@@ -3121,6 +3339,7 @@ HS.onReady(function(){
   }
 
   function setTimeOfDay(tt){ if(!V3.inited)return;
+    if(V3.soft) return;
     var day=Math.max(0,Math.sin(tt*Math.PI));
     var elev=Math.max(0.06,Math.sin(tt*Math.PI))*(Math.PI*0.46),az=(tt-0.5)*2.3,R=420;
     V3.sun.position.set(R*Math.cos(elev)*Math.sin(az),R*Math.sin(elev)+20,R*Math.cos(elev)*Math.cos(az));
@@ -3146,7 +3365,9 @@ HS.onReady(function(){
     return { type:"Feature", geometry:{ type:"Polygon", coordinates:[coords] } };
   }
   function updateGLRadius(){
-    if(!GL.inited)return;var src=GL.map.getSource("radius");if(!src)return;
+    if(!GL.inited)return;
+    if(GL.soft){ buildGLRasterMarkers(); return; }
+    var src=GL.map.getSource("radius");if(!src)return;
     var feats = ZIP_MODE ? [] : [circlePoly(GL.home.lat,GL.home.lng,CUR_RADIUS,96)];  // no 1-mi ring in ZIP mode
     src.setData({ type:"FeatureCollection", features:feats });
   }
@@ -3195,9 +3416,11 @@ HS.onReady(function(){
     GL.map.on("data",function(e){ if(e && e.sourceId === "sat" && e.tile) GL.satTiles++; });
     GL.map.on("error",function(e){
       if(e && e.sourceId === "sat") GL.satErrors++;
+      var msg = e && e.error && String(e.error.message || e.error);
       if(window.console && console.error) console.error("[HomeSignal] 3D satellite:", e && e.error);
+      if(msg && /webgl/i.test(msg) && GL.active && !GL.soft) startGLRaster(LAST_HOME);
     });
-    GL.map.on("webglcontextlost",function(){ if(GL.active) fail3D("gl","init"); });
+    GL.map.on("webglcontextlost",function(){ if(GL.active) startGLRaster(LAST_HOME); });
     GL.map.on("load",function(){
       // Terrain relief is decoration: the imagery is the map, so a DEM failure must not
       // fail the view. It is logged rather than discarded so it is diagnosable.
@@ -3216,6 +3439,7 @@ HS.onReady(function(){
   }
   function buildGLMarkers(){
     if(!GL.inited)return;
+    if(GL.soft){ buildGLRasterMarkers(); return; }
     if(GL.homeMarker)GL.homeMarker.remove();
     GL.markers.forEach(function(x){ x.marker.remove(); });GL.markers=[];
     updateGLRadius();
@@ -3253,6 +3477,85 @@ HS.onReady(function(){
       && isFinite(h.lat) && isFinite(h.lng);
   }
 
+  function startGLRaster(home){
+    if(!homePointOK(home)){ fail3D("gl","init"); return; }
+    if(GL.soft && GL.mapL){
+      GL.home=home; buildGLRasterMarkers();
+      try{ GL.mapL.setView([home.lat, home.lng], glZoom(CUR_RADIUS)); GL.mapL.invalidateSize(); }catch(e){}
+      mapMsg(); return;
+    }
+    try{ if(GL.map) GL.map.remove(); }catch(e){}
+    GL.map=null;
+    var el=document.getElementById("mapgl");
+    el.innerHTML="";
+    if(!(window.L && L.map)){ fail3D("gl","nowebgl"); return; }
+    GL.home=home; GL.soft=true; GL.markers=[];
+    GL.mapL=L.map(el, { zoomSnap:0.2, scrollWheelZoom:false });
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution:"© Esri, Maxar, Earthstar Geographics", maxZoom:19
+    }).addTo(GL.mapL);
+    GL.mapL.setView([home.lat, home.lng], glZoom(CUR_RADIUS));
+    GL.inited=true;
+    buildGLRasterMarkers();
+    setTimeout(function(){ try{ GL.mapL.invalidateSize(); }catch(e){} }, 40);
+    mapMsg();
+  }
+  function buildGLRasterMarkers(){
+    if(!GL.soft || !GL.mapL) return;
+    if(GL.rasterLayer){ try{ GL.mapL.removeLayer(GL.rasterLayer); }catch(e){} }
+    GL.rasterLayer=L.layerGroup().addTo(GL.mapL);
+    if(!ZIP_MODE){
+      L.circle([GL.home.lat, GL.home.lng], {
+        radius:CUR_RADIUS*1609.34, color:"#13b8a6", weight:2,
+        fillColor:"#2dd4bf", fillOpacity:0.07
+      }).addTo(GL.rasterLayer);
+    }
+    if(!HOME_ANCHOR){
+      var pin=homePinEl();
+      L.marker([GL.home.lat, GL.home.lng], {
+        icon:L.divIcon({ html:pin.outerHTML, className:"", iconSize:[30,30], iconAnchor:[15,15] })
+      }).addTo(GL.rasterLayer);
+    }
+    MAP_SITES.forEach(function(s){
+      var ll=siteLL(s);
+      if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
+      if(!mappable(s))return;
+      if(!siteVisible(s))return;
+      var approxPt=isApproxPoint(s);
+      var el=glMarkerEl(s, approxPt);
+      var size=parseInt(el.style.width,10)||15;
+      var mk=L.marker([ll[0], ll[1]], {
+        icon:L.divIcon({ html:el.outerHTML, className:"", iconSize:[size,size], iconAnchor:[size/2, size/2] })
+      });
+      mk.bindPopup(popupHTML(s), { maxWidth:260 });
+      mk.addTo(GL.rasterLayer);
+    });
+  }
+
+  function start3DAerial(){
+    if(V3.soft && V3.inited){ build3DFacilities(); setTimeout(resize3D,30); mapMsg(); return; }
+    if(V3.inited && !V3.lost && V3.rn && V3.rn.getContext && V3.rn.getContext()){
+      build3DFacilities(); setTimeout(resize3D,30); mapMsg(); return;
+    }
+    if(window.THREE){
+      try{
+        V3.userZoom=false;
+        if(!V3.inited) init3D(); else build3DFacilities();
+        setTimeout(resize3D,30);
+        if(!V3.lost && V3.rn && V3.rn.getContext && V3.rn.getContext()){ mapMsg(); return; }
+      }catch(e){
+        if(window.console && console.error) console.error("[HomeSignal] 3D aerial failed to start:", e);
+      }
+      abandonWebGL3D();
+    }
+    try{
+      init3DSoft();
+    }catch(e){
+      if(window.console && console.error) console.error("[HomeSignal] 3D aerial canvas fallback failed:", e);
+      fail3D("3d","init");
+    }
+  }
+
   function setView(mode){
     V3.active = (mode==="3d");
     GL.active = (mode==="gl");
@@ -3263,42 +3566,48 @@ HS.onReady(function(){
     if(mode==="2d"){ mapMsg(); if(map) setTimeout(function(){ map.invalidateSize(); },20); }
     if(mode==="2d") return;
 
-    // PREFLIGHT, before the dark panel is left on screen with nothing in it. Both 3D views
-    // need a WebGL context; where one cannot be created BOTH fail while the 2D Leaflet map,
-    // which needs no WebGL, keeps working. The causes are many and not attributable to any
-    // one browser — WebGL unavailable or switched off, no hardware acceleration, a driver
-    // denylist, a virtualised GPU, an older mobile device. Detected here so the resident is
-    // returned to a working map, instead of being shown a blank panel and a clean console.
-    if(!(window.HS && HS.webglSupported && HS.webglSupported(document))){ fail3D(mode, "nowebgl"); return; }
+    // A usable home point is still required — software fallbacks also position relative
+    // to it. A negative WebGL probe is NOT a reason to abort: that probe was a false
+    // negative on a capable desktop (console `3d/nowebgl`) while the same browser loaded
+    // 3D on a phone. Try the real renderer; if it cannot start, keep the view up with a
+    // Canvas-2D aerial / Leaflet satellite engine that needs no WebGL.
     if(!homePointOK(LAST_HOME)){ fail3D(mode, "init"); return; }
+    if(window.HS && HS.webglProbe){
+      var probe=HS.webglProbe(document);
+      if(!probe.ok && window.console && console.info)
+        console.info("[HomeSignal] WebGL probe negative; starting 3D without a preflight abort");
+    }
 
     if(mode==="3d"){
-      // Lazy-load three.js on first use, then proceed automatically (no second click).
       mapMsg("3D aerial", "Loading the 3D view…", "load");
-      ensureLib("THREE", "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js", "3D aerial", function(){
-        if(!V3.active) return;                   // resident switched away while it loaded
-        V3.userZoom=false;                       // re-frame to the data on entering 3D
-        if(!V3.inited){ init3D(); } else { build3DFacilities(); }
-        setTimeout(resize3D,30);
-        // three.js does NOT throw when the context is refused — it logs and hands back a
-        // renderer with no context — so success is confirmed from the renderer itself
-        // rather than from "init returned normally".
-        // V3.lost is checked too: after a context loss getContext() still returns the (dead)
-        // context object, so "a context exists" is not evidence the view can draw.
-        if(V3.lost || !V3.rn || !V3.rn.getContext || !V3.rn.getContext()){ fail3D("3d", V3.lost ? "contextlost" : "nowebgl"); return; }
-        mapMsg();
-      }, function(reason){ fail3D("3d", reason); });
+      if(V3.inited){ start3DAerial(); return; }
+      ensureLib("THREE", "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js", "3D aerial",
+        function(){ if(!V3.active) return; start3DAerial(); },
+        function(){ if(!V3.active) return; start3DAerial(); });
     }
     if(mode==="gl"){
-      // Lazy-load maplibre-gl on first use, then proceed automatically.
       mapMsg("3D satellite", "Loading satellite imagery…", "load");
-      ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite", function(){
-        if(!GL.active) return;                   // resident switched away while it loaded
-        if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
-        else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
+      if(GL.soft && GL.inited){ startGLRaster(LAST_HOME); return; }
+      if(GL.inited && GL.map){
+        GL.home=LAST_HOME; buildGLMarkers();
+        try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
         setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
-        mapMsg();
-      }, function(reason){ fail3D("gl", reason); });
+        mapMsg(); return;
+      }
+      ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite",
+        function(){
+          if(!GL.active) return;
+          try{
+            if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
+            else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
+            setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
+            mapMsg();
+          }catch(e){
+            if(window.console && console.error) console.error("[HomeSignal] 3D satellite failed to start:", e);
+            startGLRaster(LAST_HOME);
+          }
+        },
+        function(){ if(!GL.active) return; startGLRaster(LAST_HOME); });
     }
   }
   document.getElementById("viewSeg").addEventListener("click",function(e){

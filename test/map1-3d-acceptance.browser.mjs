@@ -173,6 +173,7 @@ async function scenario(name, opts) {
         leafletPane: !!document.querySelector('#map .leaflet-container'),
         glCanvas: !!document.querySelector('#mapgl canvas'),
         glControls: document.querySelectorAll('#mapgl .maplibregl-ctrl').length,
+        glLeaflet: !!document.querySelector('#mapgl .leaflet-container'),
         threeCanvas: !!document.querySelector('#map3d canvas'),
         panel,
       };
@@ -181,7 +182,9 @@ async function scenario(name, opts) {
     const label = `[${ENGINE}${MOBILE ? '/mobile' : ''}] ${name} · ${viewName}`;
 
     // OUTCOME A — the 3D view loaded.
-    const loadedA = st.active === v && (v === 'gl' ? (st.glCanvas && st.glControls > 0) : st.threeCanvas);
+    const loadedA = st.active === v && (v === 'gl'
+      ? ((st.glCanvas && st.glControls > 0) || st.glLeaflet)
+      : st.threeCanvas);
     // OUTCOME B — returned to a FUNCTIONING 2D map, with the approved neutral notice.
     const loadedB = st.active === '2d' && st.map2dShown && st.leafletPane
                     && st.notice === APPROVED && st.noticeIsStrip;
@@ -245,9 +248,11 @@ async function contextLossScenario() {
     active: document.querySelector('#viewSeg button.on').getAttribute('data-v'),
     notice: document.getElementById('mapMsg').hidden ? null : (document.querySelector('#mapMsg .mm-t') || {}).textContent,
     leaflet: !!document.querySelector('#map .leaflet-container'),
+    aerialCanvas: !!document.querySelector('#map3d canvas'),
   }));
-  ok(st.active === '2d' && st.notice === APPROVED && st.leaflet,
-    `${label} — falls back to a usable 2D map with the approved notice`, st);
+  ok((st.active === '2d' && st.notice === APPROVED && st.leaflet)
+      || (st.active === '3d' && st.aerialCanvas),
+    `${label} — keeps a usable aerial view or falls back to 2D`, st);
   await ctx.close();
 }
 

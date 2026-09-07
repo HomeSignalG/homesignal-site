@@ -60,6 +60,28 @@ ok(HS.webglSupported({ createElement: () => ({}) }) === false,
 ok(HS.webglSupported(docWith(() => { throw new Error('blocked'); })) === false,
   '§1 a throwing getContext returns false rather than propagating');
 ok(HS.webglSupported(null) === false, '§1 no document reports unsupported, never throws');
+ok(typeof HS.webglProbe === 'function' && HS.webglProbe(docWith((t) => (t === 'webgl' ? {} : null))).ok === true,
+  '§1 webglProbe reports the type that succeeded');
+// THE FALSE NEGATIVE: one canvas asked for webgl2 (null) then webgl on the SAME canvas.
+// Desktop GPUs that grant WebGL 1 and not WebGL 2 look like "no WebGL" under that shape.
+// A fresh canvas per type is the fix — this document simulates the lock on each canvas.
+function lockingDoc() {
+  return {
+    createElement: () => {
+      let askedWebgl2 = false;
+      return {
+        getContext(t) {
+          if (t === 'webgl2') { askedWebgl2 = true; return null; }
+          if (askedWebgl2) return null;
+          if (t === 'webgl') return {};
+          return null;
+        }
+      };
+    }
+  };
+}
+ok(HS.webglSupported(lockingDoc()) === true,
+  '§1 a canvas that locks after a failed webgl2 request still reports supported via a fresh canvas');
 
 // ── §2 the failure copy is BROWSER-NEUTRAL and never asks anyone to weaken a setting ────
 // Founder ruling, 2026-09-06. HomeSignal must work across supported browsers and must never
@@ -113,8 +135,14 @@ ok(!/cbs\.forEach\(function\(fn\)\{\s*try\{\s*fn\(\);\s*\}catch/.test(page),
   '§3 the loader no longer invokes its callback into an empty catch');
 ok(/function runLibCb\(cb, onFail, label\)\{/.test(page),
   '§3 the reporting wrapper replaced it');
-ok(/HS\.webglSupported\(document\)/.test(page) && /fail3D\(mode,\s*"nowebgl"\)/.test(page),
-  '§3 setView preflights WebGL and routes the no-WebGL case to the failure path');
+ok(/function start3DAerial\(/.test(page) && /function init3DSoft\(/.test(page),
+  '§3 3D aerial has a no-WebGL engine so a negative probe cannot abort the view');
+ok(/function startGLRaster\(/.test(page) && /function buildGLRasterMarkers\(/.test(page),
+  '§3 3D satellite degrades to Leaflet rasters when WebGL is refused');
+ok(!/if\(!\(window\.HS && HS\.webglSupported && HS\.webglSupported\(document\)\)\)\{ fail3D\(mode, "nowebgl"\)/.test(page),
+  '§3 setView no longer aborts on a negative WebGL probe — that was the 3d/nowebgl false negative');
+ok(/start3DAerial\(\)/.test(page) && /ensureLib\("THREE"/.test(page),
+  '§3 3D aerial still lazy-loads three.js, then falls through to the canvas engine if it cannot start');
 ok(/homePointOK\(LAST_HOME\)/.test(page),
   '§3 setView refuses a non-finite home before handing it to MapLibre');
 // THE TRAP. isFinite(null) === true, so typeof is what actually holds the line.
@@ -157,14 +185,12 @@ ok(/GL\.map\.on\("error"/.test(page) && /webglcontextlost/.test(page),
 //     0% to 100% dark while the segmented control still read "3D aerial" and nothing was said.
 ok(/rn\.domElement\.addEventListener\("webglcontextlost"/.test(page),
   '§6a three.js listens for context loss on its own canvas');
-ok(/V3\.lost=true;[\s\S]{0,120}fail3D\("3d","contextlost"\)/.test(page),
-  '§6a a lost context marks the view dead AND falls back');
+ok(/V3\.lost=true;[\s\S]{0,250}init3DSoft\(\)/.test(page),
+  '§6a a lost context marks the view dead AND keeps aerial up without WebGL');
 ok(/if\(!V3\.active\|\|!V3\.inited\|\|V3\.lost\)return;/.test(page),
   '§6a the render loop stops drawing into a dead context');
-// getContext() still returns the (dead) context object after a loss, so "a context exists"
-// is not evidence the view can draw — re-entry must consult V3.lost as well.
-ok(/if\(V3\.lost \|\| !V3\.rn/.test(page),
-  '§6a re-entering 3D after a loss does not present the dead canvas again');
+ok(/abandonWebGL3D\(\)/.test(page) && /init3DSoft\(\)/.test(page),
+  '§6a a lost WebGL context is abandoned and the aerial view continues without it');
 ok(/webglcontextrestored/.test(page),
   '§6a a restored context clears the flag rather than failing forever');
 
