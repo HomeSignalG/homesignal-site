@@ -313,6 +313,7 @@ ok(nb.typeChips === 7 && nb.typeChecked === 7,
 ok(nb.reg === 'true', '9: the Regulatory chip is checked by default (fail-open)', nb.reg);
 ok(!nb.legacyDropdown && !nb.legacySwitch,
   '9: neither the "Show types" dropdown nor the ON/OFF switch survives', JSON.stringify(nb));
+
 // The two rules the page's own live verifier enforces, re-asserted here on the rebuilt row.
 ok(nb.stageDots === 4 && !nb.stageHasSvg,
   '9: the Stage row still carries colour DOTS and no marker shapes', JSON.stringify(nb));
@@ -320,6 +321,34 @@ const trackerFails = await page.evaluate(() =>
   (window.__HS_TRACKER_MARKER_VERIFY ? window.__HS_TRACKER_MARKER_VERIFY() : ['verifier missing']));
 ok(Array.isArray(trackerFails) && trackerFails.length === 0,
   '9: the page\'s own marker/legend verifier still passes', JSON.stringify(trackerFails).slice(0, 300));
+// ── 10. THE LEGACY TOGGLE-BUTTON MODEL IS GONE FROM THE DOM, NOT JUST FROM THE STYLESHEET.
+// The `[aria-pressed]` and `.off` CSS was deleted once all three rows became checkboxes. A
+// source regex can only say the rules are absent; these two say NOTHING ON THE PAGE WANTS
+// THEM — which is the fact that made the deletion safe, and the one that would be false again
+// the moment someone reintroduces a toggle chip. Scoped to the legend, so an unrelated
+// aria-pressed control elsewhere on the page could never make this pass or fail by accident.
+const legacyDom = await page.evaluate(() => ({
+  ariaPressed: document.querySelectorAll('#mapkey [aria-pressed], #mapkeyShapes [aria-pressed], #mapkeyReg [aria-pressed]').length,
+  offClass: document.querySelectorAll('#mapkey .off, #mapkeyShapes .off, #mapkeyReg .off').length,
+  roleButton: document.querySelectorAll('#mapkey [role="button"], #mapkeyShapes [role="button"], #mapkeyReg [role="button"]').length
+}));
+ok(legacyDom.ariaPressed === 0 && legacyDom.offClass === 0 && legacyDom.roleButton === 0,
+  '10: no legend control carries aria-pressed, .off or role=button', JSON.stringify(legacyDom));
+
+// `.mapkey span` SURVIVED that cleanup ON PURPOSE and has no other guard. It is the only
+// source of `display:flex` on every chip's inner .ck/.dot/.t span, so deleting it along with
+// the legacy rules — the obvious next "tidy-up" — would silently reflow all three rows. A
+// computed style is the honest instrument here; the stylesheet text is not.
+const innerLayout = await page.evaluate(() => {
+  const t = document.querySelector('#mapkey .stagechip > .t');
+  const d = document.querySelector('#mapkey .stagechip > .dot');
+  const cs = (el) => (el ? getComputedStyle(el).display : null);
+  return { t: cs(t), dot: cs(d), spans: document.querySelectorAll('.mapkey span').length };
+});
+ok(innerLayout.t === 'flex' && innerLayout.dot === 'block' && innerLayout.spans > 0,
+  '10: the chip\'s inner spans keep their laid-out display — `.mapkey span` is still load-bearing',
+  JSON.stringify(innerLayout));
+
 
 ok(pageErrors.length === 0, 'no uncaught page errors', pageErrors.join(' | '));
 

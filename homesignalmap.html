@@ -331,18 +331,16 @@
     color:var(--ink);border:1px solid var(--line);background:#fff}
   .mapkey span:hover{background:#fafbfa;border-color:#d6ddda}
   .mapkey span:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
-  /* SELECTION IS ITS OWN CHANNEL — a darker outline plus a very subtle tint, never the
-     stage colour. Colour = lifecycle stage, shape = project type, outline/tint = selected
-     state; overloading any one of the three is what makes a legend unreadable. Both legend
-     rows are filters, so both get the same selected treatment. */
-  .mapkey span[aria-pressed="true"]{border-color:#9aa8a3;background:#f4f6f5}
-  .mapkey span[aria-pressed="true"]:hover{background:#eef1ef}
-  /* UNSELECTED STAYS NEUTRAL and stays READABLE. The old `opacity:.4` dimmed the label
-     below accessible contrast to say "hidden"; the strike-through already says it in text,
-     which is also what keeps the on/off state from being carried by colour alone. */
-  .mapkey span.off{background:#fff;border-color:var(--line);color:var(--soft)}
-  .mapkey span.off .t{text-decoration:line-through}
-  .mapkey span.off .dot{opacity:.45}
+  /* The `[aria-pressed="true"]` and `.off` rules that used to sit here are GONE. They dressed
+     the toggle-button legend: Stage left it in #1098 and Type/Regulatory in #1101, so all three
+     rows are now <label>-wrapped checkboxes and nothing on the page carries either hook —
+     measured in the rendered DOM, not inferred: `[aria-pressed]` and `.off` each match 0
+     elements. The live selected/unselected treatment is the shared chip block below
+     (`.chipbox:checked~.ck` and `.typechip.on, .regchip.on, .stagechip.on`).
+     ⚠️ `.mapkey span` above is NOT part of that legacy set — do not delete it with them. It
+     matches 33 live elements (every chip's inner .ck/.dot/.ic/.t span) and is the only source
+     of their `display:flex`/`gap`/`font-size`. Its pill background/border/padding are overridden
+     by the id-scoped inner reset further down, which is why only these rules were removable. */
   /* THE STAGE DOT. A small solid circle and nothing else — no triangle, no marker
      silhouette, no warning glyph. Map-marker SHAPES are reserved for the Type row below,
      so nothing in this row can be mistaken for a pin or a project type. */
