@@ -443,3 +443,62 @@ md5 `eeb571d626bdaa595fbdfc8dc034718a`, 12,444 pass / 11,708 indexable / 12,722 
   no assertion touches the deployed function, because CI has no database. Mitigated by recording
   normalized MD5s in the parked file, not eliminated.
 - **EPA remains on the report critical path** (`Promise.all`) — Phase 2.
+
+
+---
+
+## 13. PHASE 1 IS APPLIED IN PRODUCTION — implementation evidence
+
+§11 above was written while the reviewed Phase 1B file was still PARKED. It has since been
+applied. This section is the completion record; §11 and §12 stand as the dated account of how
+it got here.
+
+### What is live
+
+| item | evidence |
+|---|---|
+| **A — cron decoupling** | migration `epa_decouple_phase1a_core_cron_switch`. **0** functions in any non-system schema can `alter_job` / `cron.schedule` / `cron.unschedule` the core job. `dev-reports-rolling-refresh` **active**, `*/2 * * * *`. |
+| **B — write split** | migration `epa_decouple_phase1b_reviewed_apply_from_bcc0a65`, version `20260907162032`, applied **16:20:32Z**. `dev_refresh_collect` md5 **`bccdb1149f85cc71d31f5e949cb9e47e` → `6fe77ceeb720f3a99a3866734feafc73`** (9,596 → 10,697 chars). |
+| **parity with the reviewed file** | the live body, normalized (comments/blank lines stripped, whitespace collapsed), is **`1d2020c1ba7d78bc50d50c53f34c87b9` / 141 lines** — identical to the parked definition in `docs/epa-decouple-phase1b-split-write.sql`. |
+| **overlay clock** | `development_reports.facilities_refreshed_at` present; backfilled to `refreshed_at`. |
+| **EPA-only recovery still fail-closed** | `epa_recovery_step2` still raises "refusing to start step 2" while EPA is failing; `epa_recovery_proof_check` still records its verdict; `epa_recovery_repair` still raises without a passed proof. None of them touches scheduling. |
+
+### Behaviour observed in production under the applied body
+
+One scheduled cron tick immediately after the apply wrote **69 rows**:
+
+- **57 healthy** — both planes advanced together, 50 carrying facilities, all 57 with
+  `facilities_unavailable = false`;
+- **12 refused** — all 12 held the overlay clock, retained non-zero facility counts, and kept
+  `facilities_unavailable = true`;
+- 57 + 12 = 69, exact. **1 tick since apply, 0 failed, no error messages.**
+
+Table-wide at that point (control 12,722 rows): `counts.facilities` disagreeing with the stored
+facility-site count **0**; overlay clock ahead of core **0**; null overlay clocks **0**; refused
+rows retaining facilities **162 of 162**, zeroed **0**, flag true **162 of 162**.
+
+### Tests
+
+`test/dev-refresh-plane-split.test.mjs` — **62 assertions**, all passing inside the full offline
+suite. Mutation-proved: removing the SQL shape guard, removing the model shape guard, reverting
+the SQL flag expression, reverting the model flag, commenting out the parked function,
+**restoring the old shared gate** (an EPA facilities predicate back in the core `WHERE`), and
+**restoring the job-control linkage** (an executable `alter_job` on the core job) each fail the
+suite; a clean tree passes.
+
+### ⛔ PHASE 2 IS PENDING PRODUCT / SEO APPROVAL — not started
+
+No completion-marker, coverage-state, sitemap, robots, indexing or eligibility semantics have
+changed at any point in Phase 1. Verified against production after the apply: `app_refresh_zip`
+still computes `data_quality` as `(_nd+_nf+_nc)>0` and `indexable` as
+`… and (_ndp > 0 or _nfc >= 3)`; `app_coverage_states` still carries `facilities_only`;
+distribution unchanged at **12,444 `pass` / 11,704 `indexable` / 12,722 total**.
+
+Still open, and each one requires product/SEO sign-off before any work begins:
+
+- **§3** `data_quality` / `indexable` count EPA facilities — correcting this moves roughly
+  **1,000 pages out of `indexable`**, a visible sitemap and robots delta.
+- **§4** `facilities_only` is a core coverage state and CI pins it to `⇒ pass`.
+- **§5** one `sites` jsonb still carries both planes, so rule 11 ("removable without a schema
+  migration") is not yet met. Mitigated in the write, not in the schema.
+- **§6** EPA remains on the report critical path via `Promise.all([devSites, facilitySites])`.
