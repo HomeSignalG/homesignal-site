@@ -157,8 +157,11 @@ const typeLabels = await page.evaluate(() =>
   Array.from(document.querySelectorAll('#mapkeyShapes span.sh .t')).map(t => t.textContent.trim()));
 ok(typeLabels.length === 7 && !typeLabels.some(l => /regulated facility/i.test(l)),
   '1d: the Type row is the seven project types and offers no "Regulated facility"', typeLabels.join(' / '));
+// Reads `.stagechip .t` because the Stage chip is a <label> wrapping a real checkbox, not a
+// <span> toggle — the row became a multi-select checkbox group (test/map1-stage-filter-chips
+// .browser.test.mjs). The CLAIM below is unchanged; only the element it hangs on moved.
 const stageLabels = await page.evaluate(() =>
-  Array.from(document.querySelectorAll('#mapkey span .t')).map(t => t.textContent.trim()));
+  Array.from(document.querySelectorAll('#mapkey .stagechip .t')).map(t => t.textContent.trim()));
 ok(stageLabels.length === 4 && !stageLabels.some(l => /regulated facility/i.test(l)),
   '1e: the Stage row is the four stages and offers no "Regulated facility"', stageLabels.join(' / '));
 
