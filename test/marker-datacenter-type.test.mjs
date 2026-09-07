@@ -276,8 +276,8 @@ ok(key({ type: 'Development', name: '1100 DATACENTER RD SFR ADDITION' }) !== 'da
 // flag short-circuits before the DATACENTER phase, so the 738 type='datacenter' facility
 // representations and this one are all untouched — no regulatory identity is overwritten.
 ok(key({ record_kind: 'facility', facility: true, type: 'energy',
-  name: 'CYRUS ONE DATA HALL 1 POWER POD 1' }) === 'facility',
-  '14d: an FRS facility naming a data hall keeps its regulated-facility square');
+  name: 'CYRUS ONE DATA HALL 1 POWER POD 1' }) === 'infrastructure',
+  '14d: an FRS facility stamped energy is Roads & infrastructure overlay, not a data centre from its name');
 
 // ── 10. Symbol uniqueness still holds across the closed registry ──────────────────
 const symbols = Object.keys(HS.CATEGORY_REGISTRY).map((k) => HS.CATEGORY_REGISTRY[k].symbol);

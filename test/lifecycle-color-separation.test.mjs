@@ -262,9 +262,17 @@ const epaOnly = HS.resolveTrackerMarker({
   type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
   scope: 'point', registry_id: '110072041130', record_url: 'https://echo.epa.gov/x'
 }, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
-ok(epaOnly.color === FACILITY && parseInt(String(epaOnly.color).replace('#', ''), 16) === facInt,
-  '8i: an EPA-only site resolves to the purple the 3D aerial now paints, not operating green',
-  epaOnly.color);
+ok(epaOnly.color === LC.operating && parseInt(String(epaOnly.color).replace('#', ''), 16) === opInt,
+  '8i: a classifiable EPA-only site resolves to operating green, which 3D aerial paints — purple is the overlay');
+ok(epaOnly.shape === 'triangle' && epaOnly.signal && epaOnly.signal.letter === 'R'
+   && epaOnly.color === LC.operating,
+  '8i2: ANDURIL (layer industrial) is Industrial overlay globally, not a purple block');
+const unmappedEpa = HS.resolveTrackerMarker({
+  type: 'built', label: 'GENERIC EPA SITE 99',
+  scope: 'point', registry_id: '110000000099', record_url: 'https://echo.epa.gov/x'
+}, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
+ok(unmappedEpa.color === FACILITY && unmappedEpa.shape === 'square' && !unmappedEpa.signal,
+  '8i3: an unmapped EPA site still resolves to the purple square');
 ok(/__HS_AERIAL_PAINT/.test(aerial),
   '8j: the 3D aerial publishes the hex it painted, so a browser check can read colour without sampling pixels');
 // …and it publishes THE PAINT, not the intent. The first version of this hook recorded

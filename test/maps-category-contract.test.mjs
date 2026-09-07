@@ -51,8 +51,13 @@ for (const k of Object.keys(REG)) {
 // ── 3/4. Facility precedence is absolute, both directions ────────────────────
 {
   const f = M({ record_kind: 'facility', type: 'Residential', name: 'Kingswood Apartments' });
-  eq(f.shape, REG.facility.symbol, '3: facility keeps the facility symbol despite a residential type');
-  eq(f.categoryKey, 'facility', '3: facility categoryKey');
+  eq(f.shape, REG.residential.symbol, '3: classifiable facility draws its Type symbol (residential pentagon)');
+  eq(f.categoryKey, 'residential', '3: overlay categoryKey is the Type');
+  ok(f.signal && f.signal.letter === 'R' && JSON.stringify(f.categories) === JSON.stringify(['residential', 'facility']),
+    '3: …and keeps facility membership plus the purple R');
+  const bare = M({ record_kind: 'facility', name: 'Unmapped EPA' });
+  eq(bare.shape, REG.facility.symbol, '3b: unmapped EPA keeps the facility square');
+  eq(bare.categoryKey, 'facility', '3b: unmapped categoryKey');
   const devShapes = Object.keys(REG).filter((k) => !REG[k].isFacility).map((k) => REG[k].symbol);
   for (const t of ['Residential', 'Commercial', 'Industrial', 'Data center', 'Civic/Public', 'unclassified']) {
     const m = M({ type: t, status: 'Approved', name: 'X' });

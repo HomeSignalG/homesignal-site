@@ -80,9 +80,13 @@ ok(shape('Residential', 'Commercial building fit-out') === 'pentagon', 'specific
 // category the legend never explained.
 ok(shape('Civic/Public', 'Residential shelter renovation') === 'cross', 'Civic/Public is terminal — a stated civic type is never re-read from the name');
 ok(shape('Industrial', 'Residential-adjacent warehouse') === 'triangle', 'specific Industrial type wins');
-// Facilities untouched: explicit flag only, always purple square.
+// Facilities: class fields map Type; the name is not a Type.
 const fac = HS.resolveMarker({ type: 'industrial', name: 'Residential Water Treatment Co', record_kind: 'facility', status: 'Operating' });
-ok(fac.shape === 'square' && fac.color === FAC && fac.isFacility === true, 'facility flag beats every name rule — purple square');
+ok(fac.shape === 'triangle' && fac.color !== FAC && fac.isFacility === true && fac.signal,
+  'classifiable facility keeps Type shape — name does not steal it, purple is the R');
+const facBare = HS.resolveMarker({ name: 'Residential Water Treatment Co', record_kind: 'facility', status: 'Operating' });
+ok(facBare.shape === 'square' && facBare.color === FAC && !facBare.signal,
+  'facility with no class field stays a purple square — NAME_RULES do not fire');
 // A non-facility can never gain purple from the name phase.
 const nn = HS.resolveMarker({ type: 'Development', name: 'Regulated facility annex expansion', status: 'Approved' });
 ok(nn.color !== FAC, 'name text can never paint a non-facility purple');

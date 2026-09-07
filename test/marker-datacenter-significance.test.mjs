@@ -205,8 +205,9 @@ ok(dual.popupLabel.indexOf('Scope not stated') === -1 && dual.popupLabel.indexOf
   '10c: …and its popup appends no significance verdict it cannot support');
 const plainFac = track({ type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
   scope: 'point', registry_id: '110072041130' });
-ok(plainFac.significance === null && plainFac.shape === 'square' && !plainFac.signal,
-  '10d: an ordinary regulated facility is untouched and carries no significance at all');
+ok(plainFac.significance === null && plainFac.shape === 'triangle' && plainFac.signal
+   && plainFac.signal.letter === 'R' && plainFac.categoryKey === 'industrial',
+  '10d: a classifiable EPA facility carries no development significance and draws Type + R');
 
 // ── 11. EVERY OTHER MAP 1 TYPE IS UNTOUCHED (Gate 8.25) ─────────────────────────
 [['industrial', { type: 'Industrial', type_raw: 'NEW CONSTRUCTION', name: 'NEW CONSTRUCTION Steel Mill' }],

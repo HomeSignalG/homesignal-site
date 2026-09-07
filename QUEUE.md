@@ -292,10 +292,15 @@ Data center octagon, keeps its EPA square, appears once, popup reads
   facility read as operating-green while the legend still said "Purple R"; closed
   2026-09-07 — buildings now take `mk.color` from the same resolver as the 2D pin
   (PR #1119).
-- ⚖️ **REJECTED 2026-09-07 — overlay-on-Type (#1121).** An EPA-only facility with a
-  classifiable Type (ANDURIL `layer: 'industrial'`) stays a purple square/block with no
-  R. Dual-identity R is data-centre-only. Closed, not salvaged; do not treat purple-square
-  EPA pins as an opening.
+- ⚖️ **REVERSED 2026-09-07 — overlay-on-Type, GLOBAL, Type membership kept.**
+  Regulatory is an overlay on every Map 1 (~12,722 ZIP reports, address mode, 2D / 3D /
+  satellite). #1121's *display* (Type shape + operating-green + R) is the ruling;
+  #1121's *membership* (`categories: ['facility']` only, so toggle OFF hid the pin)
+  stays rejected. Classifiable EPA (ANDURIL `layer: 'industrial'`, DE-ANDA TRUCKING
+  `type: 'logistics'` → Industrial) keep Type shape + status colour + purple R;
+  Regulatory OFF leaves the Type pin. Unmapped EPA stay a purple square, hidden when
+  overlay is off. Dual-identity R is unchanged. Do not rebuild facility-only
+  membership. Not a 78617 exception.
 - Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
 ### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)

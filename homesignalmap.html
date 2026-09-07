@@ -753,7 +753,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=eca20492"></script>
+<script src="lib/map.js?v=7861759b"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260907b"></script>
@@ -1127,9 +1127,10 @@ HS.onReady(function(){
   // THE 3D AERIAL PAINT. Same object the 2D pin and the 3D-satellite pin already read
   // (HS.resolveTrackerMarker). Painting by lifecycle bucket alone made every EPA facility
   // a green "Operating now" block, so the legend's "Purple R = regulatory record" was a
-  // lie on this view. The resolver already has the colour: purple square for a
-  // regulatory-only location, lifecycle colour for a project (and for a dual-identity
-  // data centre, whose purple R rides as signal).
+  // lie on this view. The resolver already has the colour: Type shape + lifecycle
+  // colour + purple R for a classifiable EPA record (overlay-on-Type); purple square
+  // for an unmapped regulatory-only location; lifecycle colour for a project (and
+  // for a dual-identity data centre, whose purple R rides as signal).
   function site3DPaint(p){
     var mk = HS.resolveTrackerMarker(p, frsRid);
     return {
@@ -2728,12 +2729,12 @@ HS.onReady(function(){
   // own row rather than an eighth chip wearing the chips' off-state styling.
   //
   // What the switch owns, exactly:
-  //   ON  — the purple R rides on every qualifying project marker (HS.visibleSignal),
-  //         and regulatory-only locations — a regulatory record with no mapped project
-  //         type — draw their standalone purple square.
-  //   OFF — the R is not drawn and the regulatory-only squares are filtered out. A
-  //         project that happens to carry a regulatory record is NOT hidden by this: it
-  //         keeps its own shape, its own colour and its own Type membership.
+  //   ON  — the purple R rides on every qualifying Type marker (HS.visibleSignal),
+  //         and unmapped regulatory-only locations — a regulatory record whose class
+  //         fields map no project Type — draw their standalone purple square.
+  //   OFF — the R is not drawn and the unmapped squares are filtered out. A
+  //         classifiable EPA record is NOT hidden by this: it keeps its Type shape,
+  //         its operating colour and its Type membership.
   function buildRegulatoryRow(){
     var host = document.getElementById("mapkeyReg");
     var reg = HS.REGULATORY_LEGEND;

@@ -84,8 +84,13 @@ ok(devEntries.every(p => p.color !== FAC), 'no non-facility record is painted pu
 ok(devEntries.every(p => p.shape !== 'square'), 'no non-facility record receives the facility (square) shape');
 // regulated records retain the regulated treatment.
 const facEntries = focusSet.filter(p => p.isFacility);
-ok(facEntries.length === facs.length + restFacs.length && facEntries.every(p => p.color === FAC && p.shape === 'square'),
-   'every facility keeps the purple-square regulated treatment');
+ok(facEntries.length === facs.length + restFacs.length
+   && facEntries.every(p => p.isFacility && p.color !== FAC && p.shape !== 'square'),
+   'every classifiable facility is Type colour + Type shape, not a purple-square pin');
+ok(facEntries.filter(p => p.item.type === 'industrial').every(p => p.shape === 'triangle'),
+   'industrial EPA overlays draw the industrial triangle');
+ok(facEntries.filter(p => p.item.type === 'energy').every(p => p.shape === 'diamond'),
+   'energy EPA overlays draw the infrastructure diamond');
 
 // every canonical STATUS → correct color; every canonical TYPE → correct shape.
 eq(HS.resolveMarker({ type: 'X', status: 'Proposed' }).color, '#c47a1a', 'Proposed → orange');

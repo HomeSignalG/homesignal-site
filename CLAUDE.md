@@ -830,12 +830,29 @@ federal records, purple `R` markers, regulatory freshness and refresh) is an OPT
 layer. The core plane must function fully when EPA is unavailable, empty, wrong, replaced, or
 removed entirely.
 
-⚖️ **DISPLAY LANGUAGE — KEEP PURPLE FOR REGULATORY-ONLY (founder, 2026-09-07).** A
-regulatory-only location (EPA/FRS, no dual-identity data-centre membership) draws a **purple
-square / 3D block, no letter.** The purple **R** is reserved for dual identity. **Considered
-and rejected:** overlay-on-Type (#1121) — an EPA-only facility whose class fields map a Type
-(e.g. ANDURIL `layer: 'industrial'`) drawing Type shape + operating-green + R. Closed; nothing
-salvaged. Absence of that language on `main` is a DECISION, not a gap. Do not rebuild.
+⚖️ **DISPLAY LANGUAGE — OVERLAY ON TYPE, GLOBAL (founder, 2026-09-07, reversing the
+keep-purple pin).** This is **every Map 1**, not a ZIP or a pin. `HS.resolveMarker` is
+the sole pin authority for all ~12,722 ZIP reports, address mode, 2D / 3D aerial /
+satellite, and the dashboard preview. Regulatory is an **overlay**, never the pin.
+
+An EPA/FRS record whose **class fields** (`type` / `use_type` / `layer` / `category`)
+map a project Type draws that **Type shape + operating/lifecycle colour**, with a
+**purple R** on the Type pin. Turning Regulatory **OFF** drops the R and **leaves the
+Type pin** (membership is `[typeKey, 'facility']`). Turning Type off and Regulatory on
+still shows it via `facility`. Unmapped EPA (no classifiable class field;
+FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter**, hidden when the
+overlay is off.
+
+Logistics (`LAYER_EXACT`) maps to **Industrial**, not Commercial: that is how
+**DE-ANDA TRUCKING** (`type: 'logistics'`) lands on the Industrial chip. It is an
+example of the global rule, not a special case. Classification is class-fields-only —
+the name is not a Type.
+
+**Considered and rejected as #1121 wrote it:** overlay-on-Type with
+`categories: ['facility']` only, so toggle OFF **removed the pin**. That membership
+was the defect; the Type-shape + R language is now the ruling. Do not revive
+facility-only membership. Dual-identity data centres are unchanged
+(`[datacenter, facility]`, octagon + R).
 
 **PHASE 1 IS SHIPPED (A + B). PHASE 2 IS NOT — and the difference matters.**
 
