@@ -3386,12 +3386,30 @@ HS.onReady(function(){
                                 HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     return el;
   }
+  // MapLibre 4.x can CONSTRUCT without throwing when getContext('webgl') returns
+  // null — measured in Chromium with WebGL stubbed: no canvas, no error event, the
+  // satellite panel stays the empty #0a1012 background. A throw-only guard therefore
+  // misses the exact Mac/desktop failure. Ask the canvas the same question the
+  // aerial path asks.
+  function maplibreHasGL(map){
+    try{
+      var c = map && map.getCanvas && map.getCanvas();
+      if(!c || !c.getContext) return false;
+      var types = ["webgl2","webgl","experimental-webgl"];
+      for(var i=0;i<types.length;i++){
+        try{
+          var gl = c.getContext(types[i]);
+          if(gl && !(gl.isContextLost && gl.isContextLost())) return true;
+        }catch(e){}
+      }
+    }catch(e){}
+    return false;
+  }
+
   function initGL(home){
     GL.home=home;
-    // Any throw here (a refused WebGL context, a non-finite centre) propagates to
-    // runLibCb, which logs it and routes the resident back to the 2D map with an
-    // explanation. It is deliberately NOT caught locally: a caught-and-ignored failure
-    // here is exactly what produced the silent black panel.
+    // A throw still matters (non-finite centre). A silent construct-without-context
+    // is handled by start3DSatellite via maplibreHasGL — do not catch locally.
     GL.map=new maplibregl.Map({
       container:"mapgl",
       style:{ version:8,
@@ -3418,7 +3436,8 @@ HS.onReady(function(){
       if(e && e.sourceId === "sat") GL.satErrors++;
       var msg = e && e.error && String(e.error.message || e.error);
       if(window.console && console.error) console.error("[HomeSignal] 3D satellite:", e && e.error);
-      if(msg && /webgl/i.test(msg) && GL.active && !GL.soft) startGLRaster(LAST_HOME);
+      if(GL.active && !GL.soft && ((msg && /webgl/i.test(msg)) || !maplibreHasGL(GL.map)))
+        startGLRaster(LAST_HOME);
     });
     GL.map.on("webglcontextlost",function(){ if(GL.active) startGLRaster(LAST_HOME); });
     GL.map.on("load",function(){
@@ -3532,6 +3551,33 @@ HS.onReady(function(){
     });
   }
 
+  function start3DSatellite(){
+    if(GL.soft && GL.inited){ startGLRaster(LAST_HOME); return; }
+    if(GL.inited && GL.map && maplibreHasGL(GL.map)){
+      GL.home=LAST_HOME; buildGLMarkers();
+      try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
+      setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
+      mapMsg(); return;
+    }
+    if(window.maplibregl){
+      try{
+        if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
+        else if(GL.inited && GL.map){
+          GL.home=LAST_HOME; buildGLMarkers();
+          try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
+        }
+        if(maplibreHasGL(GL.map)){
+          setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
+          mapMsg();
+          return;
+        }
+      }catch(e){
+        if(window.console && console.error) console.error("[HomeSignal] 3D satellite failed to start:", e);
+      }
+    }
+    startGLRaster(LAST_HOME);
+  }
+
   function start3DAerial(){
     if(V3.soft && V3.inited){ build3DFacilities(); setTimeout(resize3D,30); mapMsg(); return; }
     if(V3.inited && !V3.lost && V3.rn && V3.rn.getContext && V3.rn.getContext()){
@@ -3587,26 +3633,9 @@ HS.onReady(function(){
     }
     if(mode==="gl"){
       mapMsg("3D satellite", "Loading satellite imagery…", "load");
-      if(GL.soft && GL.inited){ startGLRaster(LAST_HOME); return; }
-      if(GL.inited && GL.map){
-        GL.home=LAST_HOME; buildGLMarkers();
-        try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
-        setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
-        mapMsg(); return;
-      }
+      if(GL.inited){ start3DSatellite(); return; }
       ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite",
-        function(){
-          if(!GL.active) return;
-          try{
-            if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
-            else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
-            setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
-            mapMsg();
-          }catch(e){
-            if(window.console && console.error) console.error("[HomeSignal] 3D satellite failed to start:", e);
-            startGLRaster(LAST_HOME);
-          }
-        },
+        function(){ if(!GL.active) return; start3DSatellite(); },
         function(){ if(!GL.active) return; startGLRaster(LAST_HOME); });
     }
   }

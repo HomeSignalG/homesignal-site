@@ -139,6 +139,10 @@ ok(/function start3DAerial\(/.test(page) && /function init3DSoft\(/.test(page),
   '§3 3D aerial has a no-WebGL engine so a negative probe cannot abort the view');
 ok(/function startGLRaster\(/.test(page) && /function buildGLRasterMarkers\(/.test(page),
   '§3 3D satellite degrades to Leaflet rasters when WebGL is refused');
+ok(/function maplibreHasGL\(/.test(page) && /function start3DSatellite\(/.test(page),
+  '§3 satellite start checks for a real WebGL context — MapLibre can construct without throwing');
+ok(/start3DSatellite\(\)/.test(page) && /ensureLib\("maplibregl"/.test(page),
+  '§3 3D satellite still lazy-loads MapLibre, then falls through to Leaflet rasters if it has no GL');
 ok(!/if\(!\(window\.HS && HS\.webglSupported && HS\.webglSupported\(document\)\)\)\{ fail3D\(mode, "nowebgl"\)/.test(page),
   '§3 setView no longer aborts on a negative WebGL probe — that was the 3d/nowebgl false negative');
 ok(/start3DAerial\(\)/.test(page) && /ensureLib\("THREE"/.test(page),
