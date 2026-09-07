@@ -2,12 +2,18 @@ name: epa-recovery-watch
 
 # Watches for EPA FRS recovery and, only then, runs the already-approved 5-step gate.
 #
-# ⛔ THE SCHEDULE IS DELIBERATELY COMMENTED OUT, AND THAT IS ENFORCED, NOT MERELY DOCUMENTED.
-#    test/epa-recovery-arming.test.mjs (inside the offline suite the `unit` check gates on every
-#    PR) FAILS if `schedule:` is uncommented without a committed `.github/epa-recovery-armed`
-#    marker. Arming is therefore a deliberate TWO-PART act — uncomment the schedule AND add the
-#    marker — and neither half does anything on its own. Verified by running the check against a
-#    temporarily-uncommented copy: it failed, then passed again once restored.
+# ⚠️ THIS WORKFLOW IS CURRENTLY ARMED. The `schedule:` below is ACTIVE and
+#    `.github/epa-recovery-armed` is committed, so it fires hourly.
+#
+#    ⛔ THIS HEADER USED TO SAY "THE SCHEDULE IS DELIBERATELY COMMENTED OUT" while the cron was
+#    live. Corrected 2026-09-07 during the EPA/regulatory decoupling audit. It was wrong about
+#    the single fact a reader most needs, and it is the reason the arming state is now stated
+#    rather than asserted: test/epa-recovery-arming.test.mjs REPORTS the state it observes
+#    (`ARMED` / `disarmed`) instead of hardcoding one, precisely so this cannot rot again.
+#
+#    Arming remains a deliberate TWO-PART act: that test (inside the offline suite the `unit`
+#    check gates on every PR) FAILS if `schedule:` is active without the marker file, AND fails
+#    if the marker exists while the schedule is commented out. Neither half does anything alone.
 #
 # WHAT IT CAN AND CANNOT DO — enforced structurally, not by wording:
 #   • PERMISSIONS, IN FULL: `contents: read` + `issues: write`. There is no write token for code —
@@ -18,7 +24,14 @@ name: epa-recovery-watch
 #   • No service-role key. It holds the PUBLIC anon key plus a per-function token, and can call
 #     exactly four epa_recovery_* RPCs. Arbitrary SQL is not reachable from here.
 #   • The 82801 proof is enforced by the DATABASE: epa_recovery_repair() raises unless a PASSED
-#     proof row exists, and epa_recovery_proof_check() RE-PAUSES the refresh on failure. Proven
+#     proof row exists.
+#     ⚖️ CHANGED 2026-09-07 (Phase 1A, docs/epa-decouple-phase1a-core-cron-switch.sql): this
+#     line used to read "and epa_recovery_proof_check() RE-PAUSES the refresh on failure." It
+#     no longer can, and must not again. That statement paused `dev-reports-rolling-refresh`,
+#     the NATIONAL core project refresh, on a single ZIP's EPA facility count — coupling the
+#     core project plane to the regulatory overlay in both directions. A failed proof still
+#     stops the EPA REPAIR (repair raises without a passed proof row); it no longer touches
+#     core scheduling. A DB assertion refuses any epa_* function that can mutate a cron job. Proven
 #     live, 2026-08-09, with a valid token so the gate was the thing being tested:
 #       repair → "the 82801 proof has not passed — refusing to repair (this is the hard gate)"
 #       step2  → "EPA has not recovered on the latest resolved probe — refusing to start step 2"
@@ -73,7 +86,7 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       TOKEN: ${{ secrets.EPA_RECOVERY_TOKEN }}
     steps:
-      - name: Step 2a — un-pause the refresh and fire the 82801 proof
+      - name: Step 2a — fire the 82801 proof (does NOT touch core refresh scheduling)
         run: |
           set -euo pipefail
           rpc() { curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/$1" \

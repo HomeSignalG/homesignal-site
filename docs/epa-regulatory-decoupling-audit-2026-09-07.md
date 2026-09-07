@@ -1,6 +1,9 @@
 # EPA / Regulatory decoupling — dependency audit (2026-09-07)
 
-**Status: AUDIT ONLY. No code, schema, function, job, workflow or test was changed by this pass.**
+**Status: AUDIT (2026-09-07). PHASE 1 HAS SINCE SHIPPED — see §11 at the end.**
+The findings below describe the state at audit time and are retained verbatim as the dated
+receipt; §1 and §2 are now FIXED, §3-§6 are not. Do not read §9's verdict table as current
+without reading §11.
 
 Founder architecture decision: Map 1 has **two independent data planes** — a required
 **core project plane** and an optional **regulatory overlay plane** (EPA / FRS / ECHO /
@@ -315,3 +318,37 @@ Recorded so the next session does not re-derive it. Each item is a separate revi
 ⚠️ Item 2 changes what residents and crawlers see on ~1,000 pages, and item 1 changes a
 guard the founder previously approved twice. Both are founder decisions, not autonomous
 work under the §3 standing grant.
+
+
+---
+
+## 11. PHASE 1 SHIPPED (2026-09-07) — what this audit still describes correctly
+
+Founder authorised Phase 1 only: **A** (remove the EPA-controlled core-refresh switch) and
+**B** (split the core project write from the EPA facilities write). Phase 2 —
+completion-marker, coverage-state, sitemap, robots, indexing and eligibility changes — was
+explicitly deferred and has NOT been done.
+
+| finding | state |
+|---|---|
+| §1 EPA can pause the core cron | ✅ **FIXED** — `docs/epa-decouple-phase1a-core-cron-switch.sql` |
+| §2 EPA refusal blocks the entire core write | ✅ **FIXED** — `docs/epa-decouple-phase1b-split-write.sql` |
+| §2a EPA failure renders as core staleness | ✅ **FIXED** — `refreshed_at` is now unconditional on an accepted core write |
+| §3 `data_quality` / `indexable` count EPA | ⛔ **OPEN — Phase 2** (766 `pass`-only-by-EPA, 1,004 `indexable` with no projects) |
+| §4 `facilities_only` is a core coverage state | ⛔ **OPEN — Phase 2** |
+| §5 one `sites` array carries both planes | ⛔ **OPEN** — mitigated in the write (composed per plane), not in the schema |
+| §6 EPA latency on the report critical path | ⛔ **OPEN** |
+
+**Rule verdicts that moved:** rule 6, 7 and 8 now hold for the refresh path and the cron path.
+Rule 8 still FAILS through §3/§4 (an EPA-only ZIP is still reported `pass`). Rules 1, 5
+(partial) and 11 are unchanged and remain Phase 2.
+
+**The measurements in §0 were taken during a real FRS outage and are what justified the fix.**
+EPA recovered at 14:15Z the same day (both probes 200), so the post-apply verification exercised
+the freshness limb of the same code path; the EPA-down limb is pinned deterministically by
+`test/dev-refresh-plane-split.test.mjs`, which is proven load-bearing by three mutations
+(reintroduce a facilities predicate into the core WHERE → fails; ungate the overlay clock →
+fails; restore an executable `alter_job` in Phase 1A → fails).
+
+Frozen cohort receipt: `public.epa_split_probe_20260907` (80 responding ZIPs, captured before
+the first split run).
