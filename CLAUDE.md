@@ -979,6 +979,53 @@ robots and coverage states are untouched. Full record: audit §14.
   `:124`, `verify-development.mjs:140`, `gen_zip_pages.py:383`, `homesignalmap.html:1089`,
   `lib/community-page.js:70`.
 
+### 🅿️ PHASE 2 · UNIT 2 IS BUILT AND PARKED (2026-09-07) — `facilities_only` leaves the CORE enum
+SQL of record `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` (executable, atomic,
+**not applied**), pinned by `test/epa-phase2-coverage-state-split.test.mjs` (44 assertions, six
+mutations). **Independent of Unit 1** — either may be applied first. Full record: audit §15.
+
+- **The defect:** `app_coverage_states.coverage_state`'s fifth branch is
+  `WHEN fac_markers > 0 THEN 'facilities_only'`, so a ZIP whose CORE plane is genuinely empty
+  is reported as `facilities_only` **because EPA has records for it** — rule #1 in the
+  presence direction, and rule #11 outright (delete the overlay and a core enum value goes
+  with it). The health ladder above it is already core-correct: Phase 1B gave the overlay its
+  own clock, so `refreshed_at` is core-only.
+- **The split:** `coverage_state` keeps `populated | honestly_empty | unsupported_source |
+  failed_ingest | temporarily_unavailable | stale_data`; a new `regulatory_overlay_state`
+  carries `overlay_records | overlay_empty | overlay_unknown | overlay_unsupported` with
+  `facilities_refreshed_at` and `facilities_unavailable` beside it. `create or replace view`,
+  columns APPENDED, so no grant or dependent is lost.
+- 🔑 **`overlay_unknown` EXISTS BECAUSE "WE COULD NOT READ EPA" AND "EPA HAS NOTHING" ARE
+  DIFFERENT FACTS** — the same rule Phase 1B applied to `counts.facilities`, now applied to
+  the state.
+- 🔑 **ONE RENDERED SENTENCE CHANGES, ON UP TO 226 PAGES, AND IT IS A CORRECTION.** The
+  honest-empty copy claims *"We checked … the EPA facility registry … and found no qualifying
+  records yet."* Measured: of the 278 ZIPs empty on both planes, **226 carry
+  `facilities_unavailable = true`** (1,197 ZIPs carry it overall) — the read was REFUSED, so
+  they assert a verified absence they never verified. The sentence is now gated on the overlay
+  agreeing; those pages fall through to the existing *"Coverage for this ZIP is being wired"*
+  copy. A dedicated "could not reach the EPA registry" sentence is a founder copy decision and
+  was deliberately not invented.
+- **The 766 keep their banner, in the same words.** `lib/community-page.js` re-keys it on the
+  composition (`honestly_empty` + `overlay_records`) **while still accepting `facilities_only`**.
+- ⚠️ **EVERY READER MUST SURVIVE BOTH SHAPES, AND `select('*')` IS LOAD-BEARING, NOT LAZY.**
+  Naming a column PostgREST does not have 400s the whole request, and both readers swallow
+  that into a null — a named column list would silently blank the coverage copy AND the
+  `data-coverage-state` attribute between the code shipping and the migration landing.
+  Likewise `scripts/verify-coverage-state.mjs` normalizes both shapes: deleting
+  `facilities_only` from a `VALID` set there would have turned that DAILY job red on merge,
+  days before the change it describes.
+- **The parked SQL fails closed on a VACUOUS split** — if no ZIP is core-empty with overlay
+  records, it raises rather than reporting success over nothing.
+- **`docs/coverage-state-model.sql` still describes production** and must be updated in the
+  same change as the apply, like Unit 1's six comment sites.
+- 📌 **OBSERVED WHILE MEASURING, NOT ACTED ON, NOT EPA'S FAULT: 3,575 of 12,722
+  `development_reports` rows are older than 72 h** and 580 sit in the `failed_ingest` shape,
+  so `verify-coverage-state`'s "zero unintentionally STALE ZIPs" assertion is failing in
+  production. Both crons are `active` and the newest core write is minutes old — this is
+  rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
+  frequent, not less. Separate work; do not re-derive it.
+
 
 ### Status
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A

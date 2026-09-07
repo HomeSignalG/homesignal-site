@@ -640,3 +640,148 @@ the apply would make the repo describe behaviour that does not exist yet.
   live body (`app_refresh_zip`, md5 `6591d7f79f9a6cd0b476bbcfc2065b9a`, length 19,428), and
   the script refuses to run if any anchor count is not 1. It also proves the splice is
   reversible before executing, and re-reads the stored body afterwards to prove it took.
+
+---
+
+## 15. PHASE 2 · UNIT 2 — BUILT AND PARKED (2026-09-07)
+
+Same branch. SQL of record: `docs/epa-decouple-phase2-unit2-coverage-state-split.sql`
+(executable, atomic, **not applied**). Pins: `test/epa-phase2-coverage-state-split.test.mjs`,
+44 assertions. **Independent of Unit 1** — Unit 1 touches `app_community_meta` and
+`app_refresh_zip`, Unit 2 touches only the view and its readers; either may be applied
+first, or one without the other.
+
+### 15.1 The defect, precisely
+
+`public.app_coverage_states.coverage_state` is one CASE ladder and its fifth branch is:
+
+```sql
+WHEN COALESCE(c.fac_markers, 0) > 0 THEN 'facilities_only'
+```
+
+So a ZIP whose CORE plane is genuinely empty is reported as `facilities_only` rather than
+`honestly_empty` **because EPA has records for it**. That is rule #1 in the direction
+nobody looks at — EPA *presence* deciding a core state — and rule #11 outright: remove the
+overlay and a value of the core enum disappears with it, so the overlay is not
+"removable or replaceable" without changing the core model.
+
+The health ladder above it (`unsupported_source` · `failed_ingest` ·
+`temporarily_unavailable` · `stale_data`) is **already core-correct** and is untouched: it
+reads `refreshed_at` / `last_refresh_attempt_at`, which Phase 1B made core-only clocks when
+it introduced `facilities_refreshed_at`.
+
+### 15.2 The split
+
+| plane | column | values |
+|---|---|---|
+| core | `coverage_state` | `populated` · `honestly_empty` · `unsupported_source` · `failed_ingest` · `temporarily_unavailable` · `stale_data` |
+| overlay | `regulatory_overlay_state` | `overlay_records` · `overlay_empty` · `overlay_unknown` · `overlay_unsupported` |
+
+Plus `facilities_refreshed_at` and `facilities_unavailable` exposed, so the overlay carries
+its own freshness. `overlay_unknown` exists because *"we could not read EPA"* and *"EPA has
+nothing"* are different facts — collapsing them is exactly what Phase 1B removed from
+`counts.facilities`, and the same rule now applies to the state.
+
+`create or replace view`, not drop-and-create: the new columns are **appended**, so every
+existing column keeps its name, type and position, and no grant or dependent is lost.
+
+### 15.3 Measured
+
+Stored stamps, 2026-09-07 (`growth_pressure IS NULL` is the stamped proxy for `_nd = 0`):
+
+| | ZIPs |
+|---|---:|
+| core content present | 11,678 |
+| core empty + EPA facilities → was `facilities_only` | **766** |
+| core empty + no EPA facilities | 278 |
+| 11,678 + 766 + 278 | **12,722, exact** |
+| of the 766, `data_quality = 'pass'` | 766 / 766 |
+
+### 15.4 Dry run — the parked SQL was RUN, read-only, before being called executable
+
+The SELECT was executed against production beside the live view for six ZIPs; the view
+itself was not replaced.
+
+| zip | now | after (core + overlay) |
+|---|---|---|
+| 01001 | `populated` | `populated` + `overlay_records` |
+| 01002 | `populated` | `populated` + `overlay_records` |
+| 03224 | `facilities_only` | `honestly_empty` + `overlay_records`, `data_quality` still `pass` |
+| 03268 | `facilities_only` | `honestly_empty` + `overlay_records`, `data_quality` still `pass` |
+| 01034 | `honestly_empty` | `honestly_empty` + **`overlay_unknown`** |
+| 02543 | `honestly_empty` | `honestly_empty` + **`overlay_unknown`** |
+
+### 15.5 🔑 ONE RENDERED SENTENCE CHANGES, ON UP TO 226 PAGES — and it is a correction
+
+The last two dry-run rows are a finding, not a formality. `community.html`'s honest-empty
+copy reads:
+
+> We checked every supported public source for this area — government registries, permit
+> feeds, and the EPA facility registry — and found no qualifying records yet.
+
+Measured 2026-09-07: of the 278 ZIPs empty on both planes, **226 carry
+`facilities_unavailable = true`** — the EPA read was REFUSED, so its count is UNKNOWN
+rather than zero, and those pages are asserting a verified absence they did not verify.
+1,197 ZIPs carry that flag overall. The split is what makes the distinction expressible.
+
+The same commit gates that sentence on the overlay agreeing (`overlay_empty` /
+`overlay_unsupported` / the pre-split shape), so those pages fall through to the existing
+*"Coverage for this ZIP is being wired"* copy — true, and claiming nothing about EPA. A
+dedicated *"we could not reach the EPA registry"* sentence would be more precise and is a
+founder copy decision, deliberately not invented here.
+
+**Apart from that sentence, nothing a resident sees changes.** The 766 keep their banner,
+in the same words, because `lib/community-page.js` re-keys it on the composition
+(`honestly_empty` + `overlay_records`) **while still accepting `facilities_only`** — which
+is what lets the code merge before the migration is applied.
+
+### 15.6 Every reader survives BOTH shapes, and that is load-bearing
+
+Naming a column PostgREST does not have 400s the whole request, and both readers swallow
+that into a null — so a named column list would have silently blanked the coverage copy
+**and** the `data-coverage-state` attribute in the window between the code shipping and the
+migration being applied.
+
+- `lib/data.js::coverageState` now reads `select('*')`.
+- `scripts/verify-coverage-state.mjs` reads `select=*` and states **every** assertion on a
+  normalized `(core, overlay)` pair produced by `normalize()`, which maps the pre-split
+  shape onto it. Deleting `facilities_only` from a `VALID` set there would have turned that
+  daily job red on merge, days before the change it describes.
+- Its legacy `data_quality` rules are restated rather than dropped: `populated ⇒ pass` ·
+  `core-empty + overlay records ⇒ pass` · `core-empty + no overlay records ⇒
+  coverage_coming`. The pre-split spelling of the first two was
+  `populated/facilities_only ⇒ pass`.
+- `test/coverage-state-news-not-coverage.test.mjs` (another unit's regression pin) keeps
+  every assertion it had; only its two verifier regexes were widened to accept either
+  spelling, and a note records why.
+
+### 15.7 Verification
+
+- Offline unit suite: **162 files, all pass**.
+- The new suite is **proven load-bearing by six mutations**, each failing it and each
+  restored clean: restoring the `facilities_only` branch (3 failures) · deleting the
+  vacuous-split invariant (2) · collapsing `overlay_unknown` into `overlay_empty` (3) ·
+  reverting `lib/data.js` to a named column list (3) · dropping the pre-split spelling from
+  the page (2) · letting the verifier treat `fac_markers` as core content (2).
+- The parked SQL's invariants fail closed on a vacuous split: if **no** ZIP is core-empty
+  with overlay records, the migration raises rather than reporting success over nothing.
+
+### 15.8 Deliberately not in this unit
+
+- `data_quality` — unchanged, still the layout gate (§14.1).
+- `docs/coverage-state-model.sql`, the DDL of record for this view, still describes
+  production. It must be updated in the same change as the apply, like Unit 1's six comment
+  sites (§14.5).
+- The single `sites` jsonb (**Unit 3**) and `Promise.all([devSites, facilitySites])`
+  (**Unit 4**).
+
+### 15.9 Observed while measuring, NOT acted on, NOT mine
+
+`development_reports` carries **3,575 of 12,722** rows with `refreshed_at` older than 72 h
+and 580 in the `failed_ingest` shape, so `verify-coverage-state`'s
+*"zero unintentionally STALE ZIPs"* assertion is currently failing in production. Both
+crons are `active` (`dev-reports-rolling-refresh` `*/2`, `app-content-refresh` `*/15`) and
+the newest core write is minutes old, so this is **rolling-refresh throughput against a
+12,722-ZIP corpus**, not an EPA fault and not a Phase 1 regression — Phase 1B made core
+writes *more* frequent by removing the EPA refusal from their path. Logged here so it is
+not re-derived; it is a separate piece of work.

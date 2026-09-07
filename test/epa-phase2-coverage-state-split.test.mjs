@@ -1,0 +1,230 @@
+// PHASE 2 · UNIT 2 — `facilities_only` leaves the CORE coverage enum.
+// Offline: CI has no database, so this pins the SQL OF RECORD
+// (docs/epa-decouple-phase2-unit2-coverage-state-split.sql), the three shipped
+// consumers, and the classification rule as a model.
+//
+// WHY THIS FILE EXISTS. `app_coverage_states.coverage_state` is one CASE ladder whose
+// fifth branch reads `fac_markers` — so a ZIP whose CORE plane is genuinely empty was
+// reported as `facilities_only` BECAUSE EPA had records for it. That is founder rule #1
+// in the direction nobody looks at (EPA PRESENCE deciding a core state), and rule #11
+// outright: remove the overlay and a value of the core enum disappears with it.
+//
+// Measured from the stored stamps 2026-09-07: 11,678 core-content + 766 core-empty-with-
+// EPA + 278 empty-either-way = 12,722, exact; all 766 are data_quality 'pass'.
+//
+// ⚖️ THE NO-OP CLAIM IS THE POINT, so most of this file exists to pin it: the 766 pages
+// keep the same banner, in the same words, and every consumer reads BOTH shapes so the
+// code is correct before AND after the view migration is applied.
+
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p) => readFileSync(join(root, p), 'utf8');
+const rawSql = read('docs/epa-decouple-phase2-unit2-coverage-state-split.sql');
+/** Executable SQL only: every whole-line comment removed (see the Unit 1 suite). */
+const executable = (s) => s.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
+const sql = executable(rawSql);
+const page = read('lib/community-page.js');
+const data = read('lib/data.js');
+const ver = read('scripts/verify-coverage-state.mjs');
+
+const failures = [];
+const ok = (name, cond) => { if (cond) console.log(`PASS — ${name}`); else { console.log(`FAIL — ${name}`); failures.push(name); } };
+
+// ───────────────────────── the model ─────────────────────────
+// PRE-split: production today. Content branches only; the freshness branches above them
+// are unchanged by this unit and are already core-only (Phase 1B gave the overlay its
+// own clock, `facilities_refreshed_at`).
+function classifyPre({ dev_markers = 0, fac_markers = 0, changes = 0 }) {
+  if (dev_markers > 0 || changes > 0) return 'populated';
+  if (fac_markers > 0) return 'facilities_only';
+  return 'honestly_empty';
+}
+// POST-split: two answers, neither derived from the other.
+function classifyPost({ dev_markers = 0, fac_markers = 0, changes = 0, facilities_unavailable = false, has_report = true }) {
+  const core = (dev_markers > 0 || changes > 0) ? 'populated' : 'honestly_empty';
+  const overlay = !has_report ? 'overlay_unsupported'
+                : fac_markers > 0 ? 'overlay_records'
+                : facilities_unavailable ? 'overlay_unknown'
+                : 'overlay_empty';
+  return { core, overlay };
+}
+
+const GRID = [];
+for (const dev of [0, 4]) for (const ch of [0, 9]) for (const fac of [0, 40]) for (const un of [false, true]) {
+  GRID.push({ dev_markers: dev, changes: ch, fac_markers: fac, facilities_unavailable: un });
+}
+
+// 1 — RULE #1 AS AN INVARIANCE. For every core shape, the CORE state must be identical
+// across every EPA value. This is the assertion the old ladder could not satisfy.
+{
+  let varied = 0;
+  for (const dev of [0, 4]) for (const ch of [0, 9]) {
+    const answers = new Set(GRID.filter((g) => g.dev_markers === dev && g.changes === ch)
+      .map((g) => classifyPost(g).core));
+    if (answers.size !== 1) varied++;
+  }
+  ok('1. the CORE state is invariant across the whole EPA grid (rule #1)', varied === 0);
+  ok('1b. control: the PRE-split ladder DID vary with EPA',
+     new Set(GRID.filter((g) => g.dev_markers === 0 && g.changes === 0).map(classifyPre)).size > 1);
+}
+
+// 2 — RULE #11. Deleting the overlay entirely must not remove a value from the core
+// enum. Modelled by running every case with the overlay stripped out.
+{
+  const withOverlay = GRID.map((g) => classifyPost(g).core);
+  const withoutOverlay = GRID.map((g) => classifyPost({ ...g, fac_markers: 0, facilities_unavailable: false, has_report: true }).core);
+  ok('2. removing the overlay changes no core state (rule #11)',
+     JSON.stringify(withOverlay) === JSON.stringify(withoutOverlay));
+  ok('2b. control: the PRE-split ladder DID lose a value when the overlay was stripped',
+     new Set(GRID.map(classifyPre)).has('facilities_only')
+     && !new Set(GRID.map((g) => classifyPre({ ...g, fac_markers: 0 }))).has('facilities_only'));
+}
+
+// 3 — THE EQUIVALENCE, both directions. `facilities_only` IS core-empty + overlay-records
+// and nothing else, so the split renames a composition rather than reclassifying anything.
+{
+  const mismatches = GRID.filter((g) => {
+    const pre = classifyPre(g), post = classifyPost(g);
+    return pre === 'facilities_only'
+      ? !(post.core === 'honestly_empty' && post.overlay === 'overlay_records')
+      : pre !== post.core;
+  });
+  ok('3. every pre-split verdict maps onto exactly one composed pair', mismatches.length === 0);
+  ok('3b. ... and the mapping is onto: some case really is facilities_only',
+     GRID.some((g) => classifyPre(g) === 'facilities_only'));
+}
+
+// 4 — THE OVERLAY NEVER CLAIMS AN EMPTINESS IT DID NOT VERIFY (Phase 1B's rule, applied
+// to the state as well as to the count).
+{
+  ok('4. a refused EPA read with no records is overlay_unknown, not overlay_empty',
+     classifyPost({ fac_markers: 0, facilities_unavailable: true }).overlay === 'overlay_unknown');
+  ok('4b. a verified zero is overlay_empty',
+     classifyPost({ fac_markers: 0, facilities_unavailable: false }).overlay === 'overlay_empty');
+  ok('4c. preserved records still read overlay_records even while the read is refused',
+     classifyPost({ fac_markers: 40, facilities_unavailable: true }).overlay === 'overlay_records');
+  ok('4d. no report at all is overlay_unsupported, never overlay_empty',
+     classifyPost({ has_report: false }).overlay === 'overlay_unsupported');
+  ok('4e. overlay_empty is never returned over an unverified read',
+     !GRID.some((g) => g.facilities_unavailable && classifyPost(g).overlay === 'overlay_empty'));
+}
+
+// 5 — LOCAL NEWS STILL CANNOT LIFT A COVERAGE STATE (the 2026-08-02 rule survives the
+// split; `changes` is civic-only and news rides in news_items).
+ok('5. news is still not coverage after the split',
+   classifyPost({ dev_markers: 0, changes: 0, fac_markers: 0 }).core === 'honestly_empty');
+
+// ───────────────────── structural pins on the SQL of record ─────────────────────
+
+ok('6. SQL: the view is REPLACED, never dropped (grants and dependents survive)',
+   /create or replace view public\.app_coverage_states as/.test(sql) && !/drop view/i.test(sql));
+// Scoped to the VIEW BODY, not the whole file: the invariant block deliberately NAMES
+// `facilities_only` in order to forbid it, and a guard that cannot mention what it
+// guards against is not a guard.
+const viewBody = (() => {
+  const i = sql.indexOf('create or replace view public.app_coverage_states as');
+  const j = sql.indexOf('comment on view');
+  return i >= 0 && j > i ? sql.slice(i, j) : '';
+})();
+ok('6b. SQL: facilities_only appears nowhere in the view body',
+   viewBody.length > 500 && !/facilities_only/.test(viewBody));
+ok('6c. SQL: the core ladder reads no EPA term',
+   (() => {
+     const i = sql.indexOf('CASE'), j = sql.indexOf('AS coverage_state');
+     const ladder = i >= 0 && j > i ? sql.slice(i, j) : '';
+     return ladder.length > 100 && !/fac_markers|facilities_/.test(ladder);
+   })());
+ok('6d. SQL: the overlay plane is exposed with its own state and clock',
+   /AS regulatory_overlay_state/.test(sql) && /overlay_records/.test(sql)
+   && /overlay_unknown/.test(sql) && /overlay_unsupported/.test(sql)
+   && /r\.facilities_refreshed_at/.test(sql));
+ok('6e. SQL: new columns are APPENDED (create-or-replace cannot reorder)',
+   sql.indexOf('AS regulatory_overlay_state') > sql.indexOf('AS news_items'));
+ok('6f. SQL: the anon read grant is restated',
+   /grant select on public\.app_coverage_states to anon, authenticated;/.test(sql));
+
+// 7 — the invariants must assert, not describe.
+ok('7. SQL: an invariant forbids the EPA plane in the core ladder',
+   /the core coverage ladder still reads the EPA plane/.test(sql));
+ok('7b. SQL: an invariant forbids facilities_only surviving anywhere',
+   /facilities_only survives in the view definition/.test(sql));
+ok('7c. SQL: an invariant fails on a VACUOUS split',
+   /the split is vacuous/.test(sql));
+ok('7d. SQL: an invariant forbids overlay_empty over an unverified read',
+   /report overlay_empty over an unverified EPA read/.test(sql));
+ok('7e. SQL: an invariant pins core state against core content only',
+   /whose core state disagrees with core content/.test(sql));
+
+// ───────────────────── structural pins on the shipped consumers ─────────────────────
+
+// 8 — THE READ MUST SURVIVE BOTH SHAPES. Naming a column PostgREST does not have 400s
+// the whole request, and both readers swallow that into a null — so a named column list
+// would silently blank the coverage copy in the window before the migration.
+ok('8. lib/data.js reads the view with select(*)',
+   /from\('app_coverage_states'\)\s*\n?\s*\.select\('\*'\)/.test(data));
+ok('8b. lib/data.js no longer names coverage_state in the select',
+   !/\.select\('coverage_state/.test(data));
+ok('8c. the verifier reads the view with select=*',
+   /app_coverage_states\?select=\*/.test(ver));
+
+// 9 — THE BANNER IS A COMPOSITION, and accepts the pre-split spelling too.
+ok('9. community-page composes core-empty + overlay-records',
+   /coverage_state === 'honestly_empty' && c\.regulatory_overlay_state === 'overlay_records'/.test(page));
+ok('9b. ... and still accepts the pre-split facilities_only',
+   /c\.coverage_state === 'facilities_only'/.test(page));
+ok('9c. the banner wording is unchanged (the no-op claim)',
+   /Local government meeting and permit feeds for this area are still being wired — the EPA-registered facility records below are live public data\./.test(page));
+ok('9d. the honest-empty copy is gated on the overlay agreeing',
+   /coverage_state === 'honestly_empty'[\s\S]{0,240}regulatory_overlay_state === 'overlay_empty'/.test(page));
+
+// 10 — THE VERIFIER MUST BE SHAPE-AGNOSTIC AND NON-VACUOUS.
+ok('10. the verifier normalizes both shapes',
+   /function normalize\(r\)/.test(ver) && /coverage_state === 'facilities_only'/.test(ver));
+ok('10b. the verifier validates each plane against its own vocabulary',
+   /CORE_VALID/.test(ver) && /OVERLAY_VALID/.test(ver) && !/const VALID = new Set/.test(ver));
+ok('10c. the verifier asserts the planes are INDEPENDENT, non-vacuously',
+   /the two planes are independent \(core-empty ZIPs with overlay records exist\)/.test(ver));
+ok('10d. the verifier no longer treats fac_markers as core content',
+   !/honestly_empty' && \(r\.dev_markers > 0 \|\| r\.fac_markers > 0/.test(ver));
+ok('10e. the legacy data_quality rules are restated on the composed pair',
+   /legacy: populated => pass/.test(ver)
+   && /legacy: core-empty \+ overlay records => pass/.test(ver)
+   && /legacy: core-empty \+ no overlay records => coverage_coming/.test(ver));
+
+// 11 — SCOPE. This unit is the view and its readers. Units 1, 3, 4 and Phase 1 are not.
+ok('11. SCOPE: the parked SQL does not touch data_quality or the materializer',
+   !/data_quality\s*=/.test(sql) && !/app_refresh_zip|create or replace function/.test(sql));
+ok('11b. SCOPE: no cron job and no Phase 1 write path is touched',
+   !/cron\.(alter_job|schedule|unschedule)/.test(sql) && !/dev_refresh_collect|dev_epa_write_refused/.test(sql));
+ok('11c. SCOPE: Unit 1 markers do not ride along',
+   !/core_project_scan_status|core_records_present|indexable/.test(sql));
+ok('11d. SCOPE: no table is altered — this unit is a view and its readers',
+   !/alter table/i.test(sql));
+
+// 12 — THE HONEST-EMPTY COPY MAY ONLY CLAIM AN ABSENCE IT VERIFIED. Mirrors the shipped
+// condition in lib/community-page.js. Measured 2026-09-07: of the 278 ZIPs empty on both
+// planes, 226 carry facilities_unavailable — the EPA read was REFUSED, so the page was
+// claiming "we checked … the EPA facility registry … and found no qualifying records"
+// over an unknown, not a zero. The split is what makes that expressible.
+{
+  const showsHonestEmptyCopy = (c) => c.coverage_state === 'honestly_empty'
+    && (c.regulatory_overlay_state === undefined
+        || c.regulatory_overlay_state === 'overlay_empty'
+        || c.regulatory_overlay_state === 'overlay_unsupported');
+  ok('12. the honest-empty copy renders over a VERIFIED empty overlay',
+     showsHonestEmptyCopy({ coverage_state: 'honestly_empty', regulatory_overlay_state: 'overlay_empty' }));
+  ok('12b. ... and NOT over an unverified EPA read (the 226)',
+     !showsHonestEmptyCopy({ coverage_state: 'honestly_empty', regulatory_overlay_state: 'overlay_unknown' }));
+  ok('12c. ... and not where the overlay holds records',
+     !showsHonestEmptyCopy({ coverage_state: 'honestly_empty', regulatory_overlay_state: 'overlay_records' }));
+  ok('12d. ... and pre-split rows still render it (backward compatible)',
+     showsHonestEmptyCopy({ coverage_state: 'honestly_empty' }));
+  ok('12e. ... and it never renders on a populated page',
+     !showsHonestEmptyCopy({ coverage_state: 'populated', regulatory_overlay_state: 'overlay_empty' }));
+}
+
+console.log(`\n${failures.length ? `FAILED: ${failures.length}` : 'ALL PASS'} — EPA phase 2 unit 2 coverage-state split`);
+if (failures.length) process.exit(1);
