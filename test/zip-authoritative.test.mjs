@@ -171,6 +171,22 @@ ok(/classList\.remove\("zipmode"\)/.test(page),
   'F10 an address search restores the radius control');
 ok(/HS\.n5SitesFrom\(/.test(page) && /HS\.n5MergeSites\(/.test(page),
   'F11 address mode still builds its own radius sites');
+// 3D aerial used to draw a house labelled LAST_ADDR ("ZIP 78617") and ½/1/2 mi rings
+// around the report centroid. The heading already says the view is the entire ZIP,
+// not projects near one address. 2D and 3D satellite already omit both. 3D aerial
+// must too — including the Canvas 2D fallback that paints the same objects.
+ok(/function updateHome3D\(\)\{[\s\S]{0,500}if\(ZIP_MODE\)return/.test(page)
+   && /function updateHome3D\(\)\{[\s\S]{0,700}BoxGeometry\(11,9,11\)/.test(page),
+  'F12 3D aerial draws no house in ZIP mode (address mode still does)');
+ok(/function drawRings\(\)\{[\s\S]{0,400}if\(ZIP_MODE\)return/.test(page)
+   && /function drawRings\(\)\{[\s\S]{0,700}RingGeometry/.test(page),
+  'F13 3D aerial draws no mile rings in ZIP mode (address mode still does)');
+ok(/function draw3DSoft\(\)\{[\s\S]{0,1600}if\(!ZIP_MODE\)\{[\s\S]{0,80}ringStops/.test(page)
+   && /function draw3DSoft\(\)\{[\s\S]{0,2000}if\(!ZIP_MODE\)\{[\s\S]{0,600}projectSoft\(0, 9, 0\)/.test(page),
+  'F14 the Canvas 2D aerial fallback also omits rings and a house in ZIP mode');
+ok(/function tip3\(s\)\{[\s\S]{0,400}scope==="point" && !ZIP_MODE/.test(page)
+   && /function infoCard3\(s\)\{[\s\S]{0,200}scope==="point" && !ZIP_MODE/.test(page),
+  'F15 3D hover/card never quote "mi from home" in ZIP mode');
 
 // ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
 // Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed

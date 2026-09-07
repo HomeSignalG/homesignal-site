@@ -1431,9 +1431,10 @@ HS.onReady(function(){
   // line) — envTag() folds the headline env signal into it — and the type line is toned by
   // severity when a facility carries an environmental record.
   function tip3(s){
-    // Distance only for precise (point) sites: area items' raw e/n come from the engine's
-    // untrusted jurisdiction coordinate, and their display spot is representative anyway.
-    var d = (s.scope==="point") ? siteDistMi(s) : null;
+    // Distance only for precise (point) sites in ADDRESS mode: ZIP mode has no HOME,
+    // so "N mi from home" would be distance from a ZIP centroid. Area items' raw e/n
+    // come from the engine's untrusted jurisdiction coordinate anyway.
+    var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
     var h = envHeadline(s);
     var tyStyle = h ? " style='color:"+envColor(h.tone,true)+"'" : "";
@@ -1450,7 +1451,7 @@ HS.onReady(function(){
   // Environmental records render through the shared helpers: every interpreted signal (colored by
   // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
   function infoCard3(s){
-    var d = (s.scope==="point") ? siteDistMi(s) : null;
+    var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
     var link = s.url || s.record_url || "";
     // Type line: bare facility type for points (env shows in its own block below, not duplicated);
@@ -3030,23 +3031,28 @@ HS.onReady(function(){
     for(var i=1;i<4;i++) ctx.lineTo(ground[i].x,ground[i].y);
     ctx.closePath(); ctx.fill();
     if(V3.auto) V3.yaw+=0.0016;
-    var stops=ringStops(V3.frameExt||CUR_RADIUS);
-    stops.forEach(function(r){
-      var R=mi(r), steps=64, outer=(r===stops[stops.length-1]);
-      ctx.beginPath();
-      for(var k=0;k<=steps;k++){
-        var a=k/steps*2*Math.PI;
-        var p=projectSoft(Math.sin(a)*R, 0.4, Math.cos(a)*R);
-        if(k===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
-      }
-      ctx.strokeStyle="rgba(45,212,191,"+(outer?0.7:0.4)+")";
-      ctx.lineWidth=outer?2.4:1.4; ctx.stroke();
-    });
-    var home=projectSoft(0, 9, 0);
-    ctx.fillStyle="#13b89a"; ctx.beginPath(); ctx.arc(home.x, home.y, 7, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#1f5130"; ctx.fillRect(home.x-5, home.y-12, 10, 12);
-    ctx.fillStyle="#2f7d4f";
-    ctx.beginPath(); ctx.moveTo(home.x-7, home.y-12); ctx.lineTo(home.x, home.y-20); ctx.lineTo(home.x+7, home.y-12); ctx.fill();
+    // ZIP mode is the whole ZIP, not a radius around a house. Mile rings and a home
+    // mesh would invent an address-shaped geography the heading already rejects
+    // ("All development across ZIP …" / "not only projects near one address").
+    if(!ZIP_MODE){
+      var stops=ringStops(V3.frameExt||CUR_RADIUS);
+      stops.forEach(function(r){
+        var R=mi(r), steps=64, outer=(r===stops[stops.length-1]);
+        ctx.beginPath();
+        for(var k=0;k<=steps;k++){
+          var a=k/steps*2*Math.PI;
+          var p=projectSoft(Math.sin(a)*R, 0.4, Math.cos(a)*R);
+          if(k===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+        }
+        ctx.strokeStyle="rgba(45,212,191,"+(outer?0.7:0.4)+")";
+        ctx.lineWidth=outer?2.4:1.4; ctx.stroke();
+      });
+      var home=projectSoft(0, 9, 0);
+      ctx.fillStyle="#13b89a"; ctx.beginPath(); ctx.arc(home.x, home.y, 7, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle="#1f5130"; ctx.fillRect(home.x-5, home.y-12, 10, 12);
+      ctx.fillStyle="#2f7d4f";
+      ctx.beginPath(); ctx.moveTo(home.x-7, home.y-12); ctx.lineTo(home.x, home.y-20); ctx.lineTo(home.x+7, home.y-12); ctx.fill();
+    }
     V3.softHits=[];
     (V3.softSites||[]).forEach(function(it){
       var p=drawSoftBox(ctx, it.x, it.z, it.w, it.h, hexCss(it.col), it.wire);
@@ -3080,9 +3086,11 @@ HS.onReady(function(){
     // clean solid ground (no distracting grid) — everything above it is real data
     var grd=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000),new THREE.MeshStandardMaterial({color:0x3c463f,roughness:1}));
     grd.rotation.x=-Math.PI/2;grd.receiveShadow=true;sc.add(grd);
-    // distance "radius circles" — rebuilt by drawRings() to match the chosen radius
+    // distance "radius circles" — rebuilt by drawRings() in address mode; ZIP mode
+    // leaves this group empty (no mile rings around a ZIP centroid).
     V3.ringGrp=new THREE.Group();sc.add(V3.ringGrp);
-    // home at the origin — rebuilt by updateHome3D() so the address label stays current
+    // home at the origin — rebuilt by updateHome3D() after an address search. ZIP
+    // mode has no HOME, so this group stays empty.
     V3.homeGrp=new THREE.Group();sc.add(V3.homeGrp);
     V3.facil=new THREE.Group();sc.add(V3.facil);V3.proposed=[];V3.rise=1;
     V3.sc=sc;V3.cam=cam;V3.rn=rn;V3.yaw=0.7;V3.pitch=0.82;V3.dist=mi(2.1);V3.auto=true;V3.inited=true;V3.lost=false;
@@ -3142,6 +3150,10 @@ HS.onReady(function(){
 
   function updateHome3D(){
     if(!V3.inited)return;var G=V3.homeGrp;while(G.children.length)G.remove(G.children[0]);
+    // A house at the origin is an address-mode object. ZIP mode has no HOME — the
+    // heading is "All development across ZIP …", not a radius around a point — so
+    // drawing LAST_ADDR ("ZIP 78617") as a house would invent a centre.
+    if(ZIP_MODE)return;
     var pad=new THREE.Mesh(new THREE.CircleGeometry(13,40),new THREE.MeshBasicMaterial({color:0x13b89a,transparent:true,opacity:.40}));pad.rotation.x=-Math.PI/2;pad.position.y=.4;G.add(pad);
     var base=new THREE.Mesh(new THREE.BoxGeometry(11,9,11),new THREE.MeshStandardMaterial({color:0x1f5130,roughness:.6}));base.position.y=4.5;base.castShadow=true;base.receiveShadow=true;G.add(base);
     var roof=new THREE.Mesh(new THREE.ConeGeometry(9.2,6,4),new THREE.MeshStandardMaterial({color:0x2f7d4f,roughness:.6}));roof.position.y=12;roof.rotation.y=Math.PI/4;roof.castShadow=true;G.add(roof);
@@ -3152,6 +3164,9 @@ HS.onReady(function(){
   function ringStops(R){ return [0.5,1,2,3,5,10,20].filter(function(r){ return r<=R+1e-9; }); }
   function drawRings(){
     if(!V3.inited)return;var G=V3.ringGrp;while(G.children.length)G.remove(G.children[0]);
+    // Mile rings need an address-derived HOME. ZIP mode has none; zipFitRadius is
+    // only a silent camera fit, not displayed geography.
+    if(ZIP_MODE)return;
     var stops=ringStops(V3.frameExt||CUR_RADIUS);
     stops.forEach(function(r){
       var outer=(r===stops[stops.length-1]), t=outer?2.6:1.7;
