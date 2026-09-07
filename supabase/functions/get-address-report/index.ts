@@ -62,6 +62,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { frsFacilities } from "./sources/epa-frs.ts";
+import { resolvePlanes } from "./sources/planes.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -277,12 +278,25 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
 // `epa` rides out in the report body so the CACHE GUARD (dev_refresh_collect) can decide per-ZIP
 // instead of inferring from a global two-point health probe. `raw_rows` vs `kept` is what makes an
 // intentional filter distinguishable from an empty area in the logs (Phase 13 observability).
+type FacilityPlane = { sites: Record<string, unknown>[]; epa: Record<string, unknown> };
+// UNIT 4 — the ONE definition of "we could not read EPA", shared by both call sites so the two
+// can never describe the same fact differently. `ok:false` is load-bearing, not decorative: it
+// is the single field `public.dev_epa_write_refused()` reads, so this value PRESERVES the stored
+// facility rows and renders the count as UNKNOWN. `sites: []` here is an absence of an answer,
+// never an answer of zero — the empty array plus `ok:false` is exactly the shape a 429 already
+// produces, which is why no downstream consumer needs to learn a new state.
+function facilitiesUnavailable(reason: "deadline" | "error"): FacilityPlane {
+  return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, kept: 0 } };
+}
 async function facilitySites(
   homeLat: number,
   homeLng: number,
   radiusMi: number,
-): Promise<{ sites: Record<string, unknown>[]; epa: Record<string, unknown> }> {
-  const outcome = await frsFacilities(homeLat, homeLng, radiusMi);
+  deadlineAt?: number,
+): Promise<FacilityPlane> {
+  // `undefined` selects frsFacilities' own default fetch; the deadline rides in opts.
+  // With no deadlineAt the ladder is byte-for-byte its previous self.
+  const outcome = await frsFacilities(homeLat, homeLng, radiusMi, undefined, { deadlineAt });
   const rows = outcome.rows;
   const kept: Record<string, unknown>[] = [];
   for (const rr of rows) {
@@ -643,7 +657,17 @@ async function handleRequest(req: Request): Promise<Response> {
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const communityIds = await resolveCommunityIds(supabase, zip);
-    const [devRaw, facResult] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
+    // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
+    // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
+    // FRS ladder. Core still throws on failure (the refresh layer keeps the previous cached
+    // row); the EPA overlay can only ever degrade to "unavailable".
+    const planes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
+      core: () => devSites(supabase, clat, clng, communityIds),
+      overlay: (deadlineAt) => facilitySites(clat, clng, zipRadius, deadlineAt),
+      overlayUnavailable: facilitiesUnavailable,
+    });
+    const devRaw = planes.core;
+    const facResult = planes.overlay;
     const facRaw = facResult.sites;
     await enrichViolations(supabase, facRaw);
     // v19: live EPA ECHO compliance enrichment (real violations/programs, keyed on registry_id).
@@ -887,7 +911,14 @@ async function handleRequest(req: Request): Promise<Response> {
   try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
-  const [dev, facResult] = await Promise.all([devSites(supabase, lat, lng, communityIds), facilitySites(lat, lng, radiusMi)]);
+  // UNIT 4 — same bounded-deadline join as ZIP mode above, same module, one implementation.
+  const addrPlanes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
+    core: () => devSites(supabase, lat, lng, communityIds),
+    overlay: (deadlineAt) => facilitySites(lat, lng, radiusMi, deadlineAt),
+    overlayUnavailable: facilitiesUnavailable,
+  });
+  const dev = addrPlanes.core;
+  const facResult = addrPlanes.overlay;
   const fac = facResult.sites;
   await enrichViolations(supabase, fac);
   // v19: same environmental-records layer as ZIP mode — live ECHO compliance + TCEQ Central
