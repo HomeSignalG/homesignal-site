@@ -1,8 +1,8 @@
 // PHASE 1B — the CORE project plane and the REGULATORY (EPA/FRS) plane must write
 // independently. Offline: CI has no database, so this pins the SQL OF RECORD
 // (docs/epa-decouple-phase1b-split-write.sql, docs/epa-decouple-phase1a-core-cron-switch.sql)
-// with structural checks, and re-implements the write's decision semantics as a model that
-// is exercised over the five cases the founder specified.
+// and re-implements the write's decision semantics as a model exercised over every case
+// the review required.
 //
 // WHY THIS FILE EXISTS. Before the split, ONE `update development_reports` wrote `sites`,
 // `counts` and `refreshed_at` together while the EPA guard sat in its WHERE clause — so
@@ -11,17 +11,38 @@
 // project records discarded. 90.9% of cached reports were structurally exposed.
 //
 // ⚠️ THE MODEL IS NOT THE PRODUCT. A truth table can only prove the RULE is right; it cannot
-// prove the shipped SQL implements it. That is why every semantic case below is paired with a
-// structural assertion that the SQL of record still has the shape the model assumes — the same
-// two-halves approach as test/dev-refresh-per-report-epa-guard.test.mjs.
+// prove the shipped SQL implements it. Every semantic case below is therefore paired with a
+// structural assertion against the SQL of record.
+//
+// ⚖️ THE STRUCTURAL PINS READ EXECUTABLE STATEMENTS ONLY (review fix). The first version of
+// this file regexed the whole parked document — and the parked document reproduced the
+// function as a COMMENT, so the pins were asserting prose. `executable()` strips every
+// comment line before any structural assertion runs, which is also why the scope checks can
+// no longer be tripped by documentation that merely NAMES a Phase 2 identifier.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const sqlB = readFileSync(join(root, 'docs/epa-decouple-phase1b-split-write.sql'), 'utf8');
-const sqlA = readFileSync(join(root, 'docs/epa-decouple-phase1a-core-cron-switch.sql'), 'utf8');
+const rawB = readFileSync(join(root, 'docs/epa-decouple-phase1b-split-write.sql'), 'utf8');
+const rawA = readFileSync(join(root, 'docs/epa-decouple-phase1a-core-cron-switch.sql'), 'utf8');
+
+/** Executable SQL only: every whole-line comment removed. */
+const executable = (sql) => sql.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
+const sqlB = executable(rawB);
+const sqlA = executable(rawA);
+
+/** The dev_refresh_collect body, as parked, comments stripped. */
+function collectBody(sql) {
+  const i = sql.indexOf('create or replace function public.dev_refresh_collect()');
+  if (i === -1) return '';
+  const seg = sql.slice(i);
+  const a = seg.indexOf('$function$');
+  const b = seg.indexOf('$function$', a + 10);
+  return a === -1 || b === -1 ? '' : seg.slice(a + 10, b);
+}
+const collect = collectBody(sqlB);
 
 const failures = [];
 const ok = (name, cond) => { if (cond) console.log(`PASS — ${name}`); else { console.log(`FAIL — ${name}`); failures.push(name); } };
@@ -38,9 +59,16 @@ function epaWriteRefused({ epaOk, payload, cached, cachedFreshDays }) {
       && (cached.counts.facilities ?? 0) > 0;
 }
 
-// Mirrors the composed write. Returns the row as it would be stored, or null if the CORE
-// write was refused (in which case the whole row is left alone, as before).
+/** jsonb_typeof(j->'sites') = 'array' — SQL NULL and JSON null both fail the test. */
+function sitesIsArray(payload) {
+  return Object.prototype.hasOwnProperty.call(payload, 'sites') && Array.isArray(payload.sites);
+}
+
+// Mirrors the composed write. Returns the row as it would be stored, or null when the row
+// is WITHHELD (shape guard or a core guard) — in which case nothing at all is written.
 function applyWrite({ epaOk, payload, cached, cachedFreshDays, coreBlocked = false, explained = false }) {
+  // SHAPE GUARD — withhold a malformed payload rather than abort the batch.
+  if (!sitesIsArray(payload)) return null;
   // CORE GUARD 1 — per-source fetch failure where that source already contributes.
   if (coreBlocked) return null;
   // CORE GUARD 2 — unexplained development reduction while fresh.
@@ -50,10 +78,10 @@ function applyWrite({ epaOk, payload, cached, cachedFreshDays, coreBlocked = fal
       && !explained) return null;
 
   const refused = epaWriteRefused({ epaOk, payload, cached, cachedFreshDays });
-  const coreSites = payload.sites.filter((s) => !('registry_id' in s));
+  const coreSites = payload.sites.filter((s) => !(s && typeof s === 'object' && 'registry_id' in s));
   const facSites = refused
-    ? cached.sites.filter((s) => 'registry_id' in s)
-    : payload.sites.filter((s) => 'registry_id' in s);
+    ? cached.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s)
+    : payload.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s);
 
   const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : true;
   return {
@@ -64,8 +92,11 @@ function applyWrite({ epaOk, payload, cached, cachedFreshDays, coreBlocked = fal
     },
     refreshed_at: 'NOW',
     facilities_refreshed_at: refused ? cached.facilities_refreshed_at : 'NOW',
+    // REVIEW FIX 2 — the refusal branch LEADS. If the facility plane took no trusted
+    // write, the stored result is not current and must render as UNKNOWN, never as fact.
     facilities_unavailable:
-      (payload.counts.facilities ?? 0) > 0 ? false
+      refused ? true
+      : (payload.counts.facilities ?? 0) > 0 ? false
       : !((epaOk === true) && reportEpaOk) ? true
       : false,
   };
@@ -153,7 +184,6 @@ const cachedRow = {
 }
 
 // ── CASE 6 — the per-report EPA signal still overrides a healthy global probe ──
-// The 2026-08-13 density-dependence finding: global healthy + THIS ZIP failed.
 {
   const out = applyWrite({
     epaOk: true,
@@ -165,13 +195,10 @@ const cachedRow = {
 }
 
 // ── CASE 7 — the old combined-zero guard is SUBSUMED, not lost ──────────────
-// It fired on (fresh AND newFac=0 AND newDev=0 AND (cachedFac+cachedDev)>0 AND unexplained).
 {
-  // limb 1: cachedDev > 0 → CORE GUARD 2 refuses.
   ok('case 7 limb 1: cached development > 0 → core guard refuses',
      applyWrite({ epaOk: true, payload: { sites: [], counts: { development: 0, facilities: 0 }, epa: { ok: true } },
                   cached: cachedRow, cachedFreshDays: 1 }) === null);
-  // limb 2: cachedDev = 0, cachedFac > 0 → core write is a no-op, facilities preserved.
   const facOnlyCached = { sites: [fac(900)], counts: { development: 0, facilities: 1 }, facilities_refreshed_at: 'T0' };
   const out = applyWrite({ epaOk: true, payload: { sites: [], counts: { development: 0, facilities: 0 }, epa: { ok: true } },
                            cached: facOnlyCached, cachedFreshDays: 1 });
@@ -179,82 +206,158 @@ const cachedRow = {
   ok('case 7 limb 2: …and loses no project data (there was none to lose)', out.sites.filter((s) => !('registry_id' in s)).length === 0);
 }
 
-// ───────────────────── structural pins on the SQL of record ─────────────────────
-// The model above is only meaningful if the shipped SQL still has this shape.
+// ── CASE 8 (REVIEW FIX 2) — the FRESHNESS limb must not clear the flag ──────
+// EPA healthy · incoming facility result a legitimate ZERO · cached count positive ·
+// row inside the freshness window ⇒ facility write refused, core may advance, facility
+// sites/count and the overlay clock unchanged, and the flag STAYS TRUE.
 //
-// ⚠️ WHAT THESE READ, STATED PLAINLY. Part 1 of the Phase 1B doc (the column + the
-// dev_epa_write_refused definition) is EXECUTABLE SQL. Step (d) is parked as a COMMENTED
-// reproduction of the applied body, because it was applied as an anchored splice of the
-// live pg_get_functiondef output rather than as a standalone CREATE. So the step-(d) pins
-// below assert the shape of the RECORD, not of the live function — CI has no database.
-// The record's fidelity to the live body was established at apply time by the migration's
-// own post-checks (prefix re-asserted byte-for-byte, split predicate present, no facilities
-// predicate left in the core WHERE) and by the md5 stated in the doc. If you change the
-// live function, update the doc in the same commit or these pins go quietly stale.
-
-// The EPA refusal must have exactly ONE definition.
-ok('SQL: dev_epa_write_refused is defined once',
-   (sqlB.match(/create or replace function public\.dev_epa_write_refused/g) || []).length === 1);
-
-// The CORE guards must not mention facilities. This is the whole fix: if a facilities
-// predicate reappears in the WHERE clause, EPA can gate the core write again.
+// This is the case the first Phase 1B build got wrong: it kept the pre-split flag
+// expression, which had only ever run on rows where both planes wrote, and so reported
+// "confirmed" over a count EPA had just contradicted.
 {
-  const where = sqlB.slice(sqlB.indexOf('--   where d.zip = (j->>\'zip\')'));
-  const coreGuardRegion = where.slice(0, where.indexOf('-- Live body after apply'));
-  ok('SQL: no facilities predicate gates the core write',
-     !/facilities/.test(coreGuardRegion));
-  ok('SQL: CORE GUARD 1 (fetch failure) is present', /CORE GUARD 1/.test(sqlB));
-  ok('SQL: CORE GUARD 2 (development reduction) is present', /CORE GUARD 2/.test(sqlB));
+  const out = applyWrite({
+    epaOk: true,                                     // EPA healthy…
+    payload: { sites: [proj(1), proj(2)], counts: { development: 2, facilities: 0 }, epa: { ok: true } }, // …legitimate zero
+    cached: cachedRow,                               // cached facilities = 3 (positive)
+    cachedFreshDays: 1,                              // inside the 7-day freshness window
+  });
+  ok('case 8: the facility write is refused', out !== null && out.counts.facilities === 3);
+  ok('case 8: the CORE plane may still advance', out.refreshed_at === 'NOW' && out.counts.development === 2);
+  ok('case 8: facility SITES unchanged',
+     out.sites.filter((s) => 'registry_id' in s).map((s) => s.registry_id).join() === '900,901,902');
+  ok('case 8: facilities_refreshed_at unchanged', out.facilities_refreshed_at === 'T0');
+  ok('case 8: facilities_unavailable REMAINS TRUE (never "confirmed" over a stale count)',
+     out.facilities_unavailable === true);
+}
+
+// ── CASE 9 (REVIEW FIX 1) — malformed `sites` is WITHHELD, never fatal ──────
+// jsonb_array_elements raises 22023 on a non-array, which aborts the entire statement —
+// every ZIP in the 20-minute window, re-failing every 2 minutes until the bad response
+// ages out. Withholding the row is the fail-closed answer.
+{
+  const base = { counts: { development: 2, facilities: 0 }, epa: { ok: false } };
+  const malformed = [
+    ['SQL NULL sites (key absent)', { ...base }],
+    ['JSON null sites',            { ...base, sites: null }],
+    ['scalar string sites',        { ...base, sites: 'not-an-array' }],
+    ['numeric scalar sites',       { ...base, sites: 42 }],
+    ['object sites',               { ...base, sites: { a: 1 } }],
+  ];
+  // A THROW here is the faithful model of the SQL failure: without the guard,
+  // jsonb_array_elements raises 22023 and aborts the whole statement. So "withheld"
+  // must mean `null`, and BOTH a wrong value and an exception are failures — caught
+  // here so the mutation proof names the broken protection instead of crashing the run.
+  const withheld = (payload) => {
+    try {
+      return applyWrite({ epaOk: false, payload, cached: cachedRow, cachedFreshDays: 30 }) === null;
+    } catch (e) {
+      console.log(`      (threw: ${e.message} — models the 22023 statement abort)`);
+      return false;
+    }
+  };
+  for (const [label, payload] of malformed) {
+    ok(`case 9: ${label} → row WITHHELD (no write at all)`, withheld(payload));
+  }
+  // An EMPTY array is valid, not malformed: it is a real "nothing here" answer.
+  const empty = applyWrite({
+    epaOk: false, payload: { sites: [], counts: { development: 0, facilities: 0 }, epa: { ok: false } },
+    cached: { sites: [fac(900)], counts: { development: 0, facilities: 1 }, facilities_refreshed_at: 'T0' },
+    cachedFreshDays: 30,
+  });
+  ok('case 9: EMPTY array is valid and still processed', empty !== null);
+  ok('case 9: …and the EPA refusal still preserves its facilities', empty.counts.facilities === 1);
+
+  // A valid MIXED array processes normally — the guard must not withhold good rows.
+  const mixed = applyWrite({
+    epaOk: true,
+    payload: { sites: [proj(1), fac(900), fac(901)], counts: { development: 1, facilities: 2 }, epa: { ok: true } },
+    cached: cachedRow, cachedFreshDays: 30,
+  });
+  ok('case 9: valid MIXED core/facility array processes normally',
+     mixed !== null && mixed.counts.development === 1 && mixed.counts.facilities === 2);
+  ok('case 9: …splitting the mixed array to the right planes',
+     mixed.sites.filter((s) => 'registry_id' in s).length === 2
+     && mixed.sites.filter((s) => !('registry_id' in s)).length === 1);
+
+  // BATCH ISOLATION: a malformed row must not stop a valid row from being written.
+  const batch = [
+    { label: 'malformed', payload: { ...base, sites: 'oops' } },
+    { label: 'valid',     payload: { sites: [proj(9)], counts: { development: 1, facilities: 0 }, epa: { ok: false } } },
+  ].map((r) => ({ label: r.label, out: applyWrite({ epaOk: false, payload: r.payload, cached: cachedRow, cachedFreshDays: 30 }) }));
+  ok('case 9: BATCH ISOLATION — the malformed row is skipped',
+     batch.find((r) => r.label === 'malformed').out === null);
+  ok('case 9: BATCH ISOLATION — the valid row still writes',
+     batch.find((r) => r.label === 'valid').out !== null);
+}
+
+// ───────────────────── structural pins on the SQL of record ─────────────────────
+// All of these read EXECUTABLE statements — see `executable()` above.
+
+// The parked migration must be REPLAYABLE: the column and the writer in ONE file, so no
+// interval can exist where the column is present and the old all-or-nothing body still runs.
+ok('SQL: the parked migration adds the overlay column',
+   /alter table public\.development_reports\s+add column if not exists facilities_refreshed_at/.test(sqlB));
+ok('SQL: …and backfills it',
+   /update public\.development_reports\s+set facilities_refreshed_at = refreshed_at/.test(sqlB));
+ok('SQL: …and defines the refusal predicate exactly once',
+   (sqlB.match(/create or replace function public\.dev_epa_write_refused/g) || []).length === 1);
+ok('SQL: …and carries a FULL EXECUTABLE dev_refresh_collect definition (not a comment)',
+   (sqlB.match(/create or replace function public\.dev_refresh_collect\(\)/g) || []).length === 1);
+ok('SQL: the parked function body is non-trivial (steps a-d present)',
+   collect.length > 4000
+   && /\(a\) per-source FETCH FAILURES|dev_failed_sources/.test(collect)
+   && /dev_truncated_sources/.test(collect)
+   && /dev_retired_sources/.test(collect)
+   && /update public\.development_reports d set/.test(collect));
+ok('SQL: the scoped clock repair is retained with its fail-loud guard',
+   /refusing: expected 6 migration-window rows/.test(sqlB)
+   && /COLLATERAL DAMAGE: genuine refusals moved/.test(sqlB));
+
+// The CORE guards must not mention facilities — the whole point of the split.
+{
+  const where = collect.slice(collect.indexOf("where d.zip = (j->>'zip')"));
+  ok('SQL: no facilities predicate gates the core write', !/facilities/.test(where));
+  ok('SQL: the shape guard is at the write eligibility boundary',
+     /and jsonb_typeof\(j->'sites'\) = 'array'/.test(where));
+  ok('SQL: CORE GUARD 1 (fetch failure) is present',
+     /not exists \(select 1 from blocked b where b\.zip = d\.zip\)/.test(where));
+  ok('SQL: CORE GUARD 2 (development reduction) is present',
+     /counts->>'development'/.test(where));
 }
 
 // refreshed_at must be unconditional — that is what stops an EPA outage aging a ZIP.
-ok('SQL: core refreshed_at is unconditional (no case/when around it)',
-   /refreshed_at\s+= now\(\),/.test(sqlB));
-// …while the overlay clock must be conditional on the refusal.
+ok('SQL: core refreshed_at is unconditional', /refreshed_at\s+= now\(\),/.test(collect));
+// …while the overlay clock is gated by the refusal.
 ok('SQL: the overlay clock is gated by the refusal predicate',
-   /facilities_refreshed_at = case\s*\n\s*--?\s*when public\.dev_epa_write_refused|facilities_refreshed_at = case[\s\S]{0,120}dev_epa_write_refused/.test(sqlB));
+   /facilities_refreshed_at = case\s*when public\.dev_epa_write_refused/.test(collect));
+// REVIEW FIX 2: the refusal branch must LEAD the flag expression.
+ok('SQL: facilities_unavailable is led by the refusal branch (refused ⇒ true)',
+   /facilities_unavailable = case\s*when public\.dev_epa_write_refused\(epa_ok, j, d\.counts, d\.refreshed_at\) then true/.test(collect));
+ok('SQL: …and an untrusted EPA read still flags unavailable',
+   /when not \(epa_ok and coalesce\(\(j->'epa'->>'ok'\)::boolean, true\)\) then true/.test(collect));
 
-// The plane discriminator, and that it is used in both directions.
+// The plane discriminator, used in both directions, with explicit ordering.
 ok('SQL: the discriminator is the registry_id key',
-   /where not \(x \? 'registry_id'\)/.test(sqlB) && /where x \? 'registry_id'/.test(sqlB));
-// Order must be explicit, not incidental.
+   /where not \(x \? 'registry_id'\)/.test(collect) && /where x \? 'registry_id'/.test(collect));
 ok('SQL: site order is explicit (with ordinality + order by)',
-   /with ordinality t\(x, o\)/.test(sqlB) && /jsonb_agg\(x order by o\)/.test(sqlB));
+   /with ordinality t\(x, o\)/.test(collect) && /jsonb_agg\(x order by o\)/.test(collect));
 
-// The honest-unknown rule must survive untouched.
-ok('SQL: facilities_unavailable still flags an untrusted EPA read',
-   /facilities_unavailable = case[\s\S]{0,300}then true/.test(sqlB));
-
-// Phase 1A — the recovery path must not be able to touch the core cron.
-ok('SQL 1A: no epa_* function may mutate a cron job (invariant present)',
+// Phase 1A — the recovery path must not be able to touch any cron job.
+ok('SQL 1A: the no-cron-mutation invariant is present',
    /alter_job\|cron\\\.schedule\|cron\\\.unschedule/.test(sqlA));
-{
-  // The two rewritten bodies must not CALL alter_job. Strip comment lines first, so the
-  // documentation of what was removed does not read as the thing itself.
-  const executable = sqlA.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
-  ok('SQL 1A: proof_check/step2 contain no executable alter_job call',
-     !/perform\s+cron\.alter_job/.test(executable));
-  ok('SQL 1A: the core job name appears in no executable statement',
-     !/dev-reports-rolling-refresh/.test(executable));
-}
-// The EPA-only gate that SHOULD exist must still be there.
+ok('SQL 1A: proof_check/step2 contain no executable alter_job call',
+   !/perform\s+cron\.alter_job/.test(sqlA));
+ok('SQL 1A: the core job name appears in no executable statement',
+   !/dev-reports-rolling-refresh/.test(sqlA));
 ok('SQL 1A: step2 still refuses to fire the proof while EPA is failing',
    /refusing to start step 2/.test(sqlA));
-ok('SQL 1A: a failed proof still records its verdict',
-   /'proof_checked'/.test(sqlA));
+ok('SQL 1A: a failed proof still records its verdict', /'proof_checked'/.test(sqlA));
 
-// Phase 2 must not have leaked in. Read EXECUTABLE statements only — the doc's
-// "OUT OF SCOPE, DELIBERATELY" section names these very identifiers, and a check that
-// cannot tell a statement from a note about a statement is a spelling rule, not a gate.
-// (This is the same distinction the Phase 1A checks draw, and the first run of this file
-// failed here for exactly that reason.)
-{
-  const executableB = sqlB.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
-  ok('SCOPE: no completion-marker / coverage-state change rode along',
-     !/data_quality|indexable|app_coverage_states|facilities_only/.test(executableB));
-  ok('SCOPE: no sitemap / robots / eligibility change rode along',
-     !/sitemap|robots|noindex/i.test(executableB));
-}
+// Phase 2 must not have leaked in (executable statements only).
+ok('SCOPE: no completion-marker / coverage-state change rode along',
+   !/data_quality|indexable|app_coverage_states|facilities_only/.test(sqlB));
+ok('SCOPE: no sitemap / robots / eligibility change rode along',
+   !/sitemap|robots|noindex/i.test(sqlB));
 
 console.log(`\n${failures.length ? `FAILED: ${failures.length}` : 'ALL PASS'} — dev-refresh plane split`);
 if (failures.length) process.exit(1);

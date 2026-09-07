@@ -900,6 +900,31 @@ independently of EPA). 26+52+2 = 80; 26+52 = 78 = rows written. Exact. Table-wid
   gov-notices `gn_*_cohort_*` tables) gets RLS, no anon grant, and a named owner and expiry in
   the same commit.
 
+### ⚠️ PHASE 1 WAS REVIEWED AND THREE DEFECTS IN IT WERE FIXED (PR #1102)
+Do not read the Phase 1A/1B sections above as the whole story — they describe the FIRST build.
+- 🔑 **A PARKED MIGRATION THAT IS MOSTLY COMMENTS IS NOT A MIGRATION.** The first
+  `docs/epa-decouple-phase1b-split-write.sql` reproduced step (d) as a COMMENT. Replaying it
+  added the column and skipped the writer — permanently recreating the 67-second hazard the same
+  file documents, while looking complete. It is now one executable atomic script (column +
+  backfill + predicate + the FULL `dev_refresh_collect` body + repair + invariants), and the
+  structural tests read EXECUTABLE statements only.
+- 🔑 **THE PARKED BODY NOW LEADS PRODUCTION BY TWO FIXES, AND THAT IS RECORDED IN THE FILE.**
+  Live is md5 `bccdb1149f85cc71d31f5e949cb9e47e`. Parity was PROVEN rather than asserted:
+  normalizing both bodies and removing the two fixes from the parked copy reproduces live
+  exactly (`1f75eb3d5a0205a908ff5e01dcf4d4a5`, 139 lines, both sides). **Apply the file and
+  re-record the md5 before any release.**
+- 🔑 **A NON-ARRAY `sites` PAYLOAD KILLED THE WHOLE TICK.** `jsonb_array_elements` raises 22023
+  and aborts the statement for every ZIP in the 20-minute window, re-failing every 2 minutes.
+  The split introduced it (the old code never iterated the payload). Guard:
+  `and jsonb_typeof(j->'sites') = 'array'` at the write eligibility boundary — withhold the row,
+  never the batch. NOT applied to `d.sites`: steps (a)/(c) already iterate the stored array, so
+  a malformed STORED value is pre-existing and out of scope.
+- 🔑 **A FLAG EXPRESSION WRITTEN FOR "BOTH PLANES WROTE" IS WRONG ONCE ONE PLANE CAN REFUSE.**
+  On the freshness limb (EPA healthy, legitimate 0, row <7d, cached >0) the pre-split
+  `facilities_unavailable` expression cleared to FALSE over a preserved count EPA had just
+  contradicted. 0 rows at review time; reachable on any EPA recovery. The refusal branch now
+  LEADS: no trusted facility write ⇒ the count renders UNKNOWN, never as fact.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`

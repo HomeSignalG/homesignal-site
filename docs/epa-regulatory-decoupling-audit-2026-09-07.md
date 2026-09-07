@@ -352,3 +352,94 @@ fails; restore an executable `alter_job` in Phase 1A → fails).
 
 Frozen cohort receipt: `public.epa_split_probe_20260907` (80 responding ZIPs, captured before
 the first split run).
+
+
+---
+
+## 12. REVIEW OF PR #1102 — three defects found in the Phase 1 change itself, and fixed
+
+Phase 1 was reviewed at head `d9dfdd8` before merge. The review found one blocking defect and
+two required fixes **in the Phase 1 work itself**. All three are corrected; the corrections are
+in this branch, and none of them touches production (the migrations are parked, not applied).
+
+### 12.1 BLOCKING — the parked Phase 1B migration was not replayable
+
+`docs/epa-decouple-phase1b-split-write.sql` carried, as *executable* SQL, only the column, the
+backfill and `dev_epa_write_refused()`. **Step (d) — the split itself — existed solely as a
+commented reproduction**; the only non-comment mention of `dev_refresh_collect` was inside a
+`comment on function` string literal.
+
+Replaying that file therefore produced exactly the hazard the file documents: the column
+present, the backfill done, and `dev_refresh_collect()` still the OLD all-or-nothing body —
+advancing `refreshed_at` without ever maintaining the new clock, and still letting EPA block
+core writes. The 67-second window became unbounded, and the replay silently did not deliver
+Phase 1B while appearing complete. It also broke CLAUDE.md §1 row 3, whose whole purpose is that
+`docs/*.sql` stays reproducible. (Phase 1A never had this problem — both its function bodies are
+executable.)
+
+**Fixed:** the file is now a complete, executable, atomic migration — column, backfill,
+predicate, the FULL `create or replace function public.dev_refresh_collect()` body, the retained
+scoped repair, and post-apply invariant checks, in one script. There is no ordering in which the
+column exists while the old body runs.
+
+🔑 **Standing answer: a parked migration that is mostly comments is not a migration.** Park
+executable SQL, and make the structural tests read executable statements rather than the prose
+around them.
+
+### 12.2 REQUIRED — a malformed `sites` payload could kill the whole refresh batch
+
+The split iterates `j->'sites'`. `jsonb_array_elements` raises `22023: cannot extract elements
+from a scalar` on anything that is not an array, which aborts the ENTIRE statement — every ZIP in
+the 20-minute window — and re-fails every 2 minutes until the bad response ages out. The
+pre-split code assigned `sites = j->'sites'` without iterating, so **this failure mode was
+introduced by the split**. The repo has precedent for the blast radius: `commercial_fire_batch`
+records collect() exceeding its statement timeout and failing 6 consecutive shared ticks.
+
+**Fixed:** `and jsonb_typeof(j->'sites') = 'array'` at the write eligibility boundary. A
+malformed row is withheld — no core write, no facility write, no freshness advanced, no facility
+data zeroed — and every other row in the batch proceeds. `jsonb_typeof(NULL)` is NULL and
+`NULL = 'array'` is NULL, so a missing `sites` key is withheld too. Deliberately NOT applied to
+`d.sites`: steps (a) and (c) already iterate the stored array, so a malformed STORED value is a
+pre-existing condition this guard neither creates nor claims to fix.
+
+### 12.3 REQUIRED — the freshness limb cleared `facilities_unavailable` over a stale count
+
+The first Phase 1B build kept the pre-split `facilities_unavailable` expression. That expression
+had only ever run on rows where BOTH planes wrote; under the split it also runs on REFUSED rows.
+On the **freshness limb** — EPA healthy, legitimately returns 0, row < 7 days old, cached count
+> 0 — it evaluated to **false** while the stale cached count was preserved, so the page asserted
+as confirmed fact a count EPA had just contradicted. Pre-split the row was not written at all, so
+the flag kept its prior "unknown".
+
+Verified by evaluating the shipped predicate and the shipped flag expression on synthetic inputs:
+`refused=true, flag_written=false, stored_count = preserved 5`. Measured **0 rows** in that state
+at review time (all 90 held rows carried the flag true), but reachable the moment EPA recovers for
+a recently-refreshed ZIP.
+
+**Fixed:** the refusal branch now LEADS the expression — if the facility plane took no trusted
+write, the stored result is not current and renders as UNKNOWN, never as fact. Reversion is still
+a side-effect of the repair: once a refresh stores a real count, `refused` is false and the flag
+clears.
+
+### 12.4 What the review verified as already correct
+
+Re-measured during a second live FRS degradation: **299 ZIPs refreshed their core plane in 60
+minutes while EPA was unhealthy**, 95 holding the overlay; 0 overlay clocks ahead of core, 0 null
+clocks, 0 held-and-zeroed, 0 `counts.facilities` mismatches, 73 core-source failures still
+blocking. Composition fidelity on stored data: across 12,444 rows with sites, **0 interleaved, 0
+where facilities are not a contiguous suffix, 0 duplicated (zip, registry_id) pairs**. Cron: an
+exhaustive scan of ALL non-system schemas found **no function anywhere** that can mutate the core
+job. Phase 2 unchanged: `app_refresh_zip` md5 `0cc790b942d391da6de5b37c7ade86a6`, coverage view
+md5 `eeb571d626bdaa595fbdfc8dc034718a`, 12,444 pass / 11,708 indexable / 12,722 total.
+
+### 12.5 Logged, NOT fixed
+
+- **The plane discriminator is a convention, not a constraint.** `index.ts:297` is the sole
+  emitter of a site-level `registry_id`; core connectors emit `source_registry_id`. If a connector
+  ever emitted `registry_id`, its core records would silently migrate into the overlay plane and be
+  frozen with EPA. The invariant that catches it — `counts.facilities` = count of registry_id
+  sites — held on 0 mismatches of 12,722 but is enforced nowhere.
+- **CI cannot detect parked-vs-deployed drift.** The suite drives a JS model and reads parked SQL;
+  no assertion touches the deployed function, because CI has no database. Mitigated by recording
+  normalized MD5s in the parked file, not eliminated.
+- **EPA remains on the report critical path** (`Promise.all`) — Phase 2.
