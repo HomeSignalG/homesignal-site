@@ -90,8 +90,28 @@ const ok = (name, cond, extra) => {
 // ONE FIXED SIZE CANNOT WORK, which is why this is adaptive rather than a smaller
 // constant: a page that survives the dense block is wasteful everywhere else, and a
 // page tuned to the average still dies in Illinois. Same shape as the adaptive readers
-// verify-development and verify-geocodes already use (halve on failure, floor 1 = the
-// single-row read the live page itself performs, so the floor is known servable).
+// verify-development and verify-geocodes already use: halve on failure, retry the SAME
+// cursor.
+//
+// ⚠️ AND IT IS STILL NOT ENOUGH — THE FLOOR IS NOT SERVABLE. An earlier version of this
+// comment claimed "floor 1 = the single-row read the live page itself performs, so the
+// floor is known servable." That was reasoned from a similar-looking precedent and is
+// FALSE. The live page reads development_reports and app_community_meta for one ZIP; it
+// never reads app_coverage_states, which is where the two lateral aggregates live.
+//
+// Refuted by run #59 on this branch (2026-09-07, 6 min 27 s, anon): the walk shrank
+// 25 -> 12 -> 6 -> 3 -> 1 and then limit=1 ITSELF returned 57014 at cursor '20147'.
+// The next ZIP is 20148, which owns 13,611 app_projects rows; at the measured ~0.4 ms
+// per scanned row that is ~5.4 s of lateral aggregation for ONE row of this view,
+// against a 3 s anon statement_timeout. No page size reaches it, because the smallest
+// possible page is one row and one row is already too expensive.
+//
+// So page size is A defect here, not THE defect. This change is a real improvement --
+// the walk reaches '20147', roughly 40% of the corpus, where limit=1000 died at row 1
+// in 37 s -- and it does NOT make the job green. app_coverage_states cannot be walked
+// in full by anon at any page size. Closing that needs a lever outside this file (an
+// index, a precomputed projection count, or a different read path); none is attempted
+// here. Total runtime is NOT the obstacle: 40% in 6.5 min fits the 15-minute budget.
 const PAGE_MAX = 25;   // ~2 s at the measured dense rate as postgres; smaller still on anon
 const PAGE_MIN = 1;
 const rows = [];
