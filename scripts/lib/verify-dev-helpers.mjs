@@ -12,7 +12,42 @@ export function validRecordUrl(u) {
   }
 }
 
-export const LIFECYCLE_BUCKETS = new Set(['built', 'approved', 'proposed']);
+// ⚖️ THE LIFECYCLE VOCABULARY IS FOUR BUCKETS, NOT THREE — corrected 2026-09-07 after this
+// set failed 8 of 12 representative ZIPs on records the page renders perfectly.
+//
+// `HS.trackerSiteItem` (lib/map.js) resolves a site's lifecycle from its RAW `type`/`bucket`
+// to one of `operating | approved | proposed | unknown`, and its comment states why the
+// fourth exists: "a record with NO lifecycle evidence resolves to the first-class `unknown`
+// state … A source with nothing to say must leave the page saying nothing." The Map 1 stage
+// work then legended it — "Lifecycle unknown" is one of the four Status chips a resident can
+// filter on. This set predated all of that and still whitelisted the old three, so every
+// record carrying `operating`, `unknown`, `onfile` or an honest blank was reported as
+// "out-of-map" while rendering correctly: 411 on Phoenix, 144 on Del Valle, 112 on Cambridge.
+//
+// RECOGNISED, i.e. values the shipped resolver maps to a legended bucket:
+export const LIFECYCLE_BUCKETS = new Set([
+  'built', 'operating',   // → Operating now
+  'approved',             // → Approved
+  'proposed',             // → Proposed
+  'unknown', 'onfile',    // → Lifecycle unknown ('onfile' is the retained legacy read alias)
+]);
+
+/**
+ * Is this site's raw lifecycle value one the page can bucket, or an honest absence?
+ *
+ * ⚠️ THIS IS DELIBERATELY NOT "does it resolve to a valid bucket". That question is VACUOUS:
+ * `trackerSiteItem` ends in `: 'unknown'`, so EVERY input resolves to a legended bucket and a
+ * check written that way could never fail. What is worth catching is a source emitting a
+ * lifecycle string nobody has mapped — it silently becomes `unknown`, which looks identical
+ * to a source that honestly said nothing, and hides the mapping gap. So: a recognised value
+ * passes, a genuinely absent one passes (that is what `unknown` is FOR), and an unrecognised
+ * non-empty string fails and is named.
+ */
+export function lifecycleValueRecognised(site) {
+  const raw = (site && site.type) == null ? '' : String(site.type).trim().toLowerCase();
+  if (raw === '') return true;                 // honest absence → the first-class unknown state
+  return LIFECYCLE_BUCKETS.has(raw);
+}
 
 export const TABS_URL_RE = /^https:\/\/www\.tdlr\.texas\.gov\/TABS\/Projects\/(TABS\d{10})$/;
 
@@ -122,10 +157,29 @@ export const REPRESENTATIVE_ZIPS = [
     // New Hampshire is wired at all — at which point re-picking is deliberate, not a surprise.
     // Verified live 2026-08-02: development 0, facilities 0, civic 0, news 0, cached sites 0,
     // coverage_state honestly_empty, refreshed the same day.
+    // ⚖️ 2026-09-07: AND IT GRADUATED TOO — the third time this slot has gone stale, so the
+    // rule above is corrected rather than the ZIP merely re-picked again.
+    //
+    // WHAT THE RULE MISSED. It says a zero-content exemplar must sit in "a state with NO
+    // registry entry at all", and NH still has none. The content did not come through the map
+    // source registry: it came through the CIVIC/AGENDA plane — Carroll County NH's CivicPlus
+    // AgendaCenter, wired on the ingest side, which puts county meeting records on every ZIP
+    // page in the county. Measured 2026-09-07: facilities 0, development 0, **civic 20**, 24
+    // sites rendered, every one sourced, link probe 200 against www.carrollcountynh.gov.
+    //
+    // THE CORRECTED SELECTION RULE: a zero-content exemplar must have no coverage on EITHER
+    // plane — no map source-registry entry reaching its state, AND no civic/agenda feed on any
+    // community in its ancestor chain. Checking only the first is what made this graduate.
+    //
+    // The slot keeps its ZIP and becomes what it now IS, the same treatment 85004 and 01012
+    // got: the first exemplar of a rural page carried ENTIRELY by the civic plane — no
+    // facilities, no permits, only county meeting records. That pattern was not otherwise in
+    // the panel. The honest-empty contract it used to carry is still covered by 58102 (Fargo
+    // ND, devMax 0 + facilitiesOnly, passing), which asserts the EPA-only coverage copy.
     zip: '03227',
-    label: 'Center Sandwich NH — honest zero-content empty',
+    label: 'Center Sandwich NH — rural page carried by the civic/agenda plane alone',
     state: 'NH',
-    expect: { totalMax: 0, emptyState: true, mapMarkers: true },
+    expect: { civicMin: 1, mapMarkers: true },
   },
   {
     // And 01012 keeps its slot as what it now IS: the first exemplar of a STATEWIDE source
@@ -194,10 +248,11 @@ export function assertZip(zip, rep, isIndexable, st) {
   }
   // 3) no bucket outside the lifecycle map: every development record's type ∈ {built,approved,proposed}.
   const devRecs = check.filter((s) => s && s.relevance === 'development');
-  const badBucket = devRecs.filter((s) => !LIFECYCLE_BUCKETS.has(s.type));
+  const badBucket = devRecs.filter((s) => !lifecycleValueRecognised(s));
   if (badBucket.length) {
-    fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) with a bucket outside the map ` +
-      `(type ∉ built/approved/proposed) [${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${s.type}`).join(', ')}]`);
+    fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) carrying an UNRECOGNISED ` +
+      `lifecycle value (not one of ${[...LIFECYCLE_BUCKETS].join('/')}, and not honestly absent) ` +
+      `[${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${JSON.stringify(s.type)}`).join(', ')}]`);
   }
   // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the rendered array it heads.
   const c = rep.counts || {};
