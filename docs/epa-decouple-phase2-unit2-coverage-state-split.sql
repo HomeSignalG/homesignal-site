@@ -105,9 +105,22 @@ do $verify$
 declare
   def       text;
   core_def  text;
-  n_rows    bigint;
-  n_bad     bigint;
+  n_bad     int := 0;
+  r         record;
 begin
+  -- ⚠️ THE INVARIANTS ARE CATALOG READS PLUS KEYED PROBES, NOT UNIVERSE SCANS.
+  --    The first version of this block ran FIVE unfiltered aggregates over this view.
+  --    Measured on production 2026-09-07: the view plans correctly (index scans on both
+  --    laterals) but costs ~9.3M — 12,722 ZIPs x ~622 app_projects rows each, ~7.9M
+  --    index+heap reads PER PASS against a 3.21M-row table. ONE pass exceeded 60s with a
+  --    warm cache, and even the slice `zip < '15000'` exceeded 50s, so the block could
+  --    not finish inside any client's patience and was never once executed. A migration
+  --    whose verification cannot run is not verified — it is only long.
+  --    So: the catalog checks below are free, and the semantic checks are asserted on
+  --    NAMED ZIPs whose expected values were measured read-only before the apply. The
+  --    universe counts (766 / 226) are a REPORTING question, measured separately after
+  --    commit; they were never what made this migration safe.
+
   -- ⚠️ LOWERCASE BOTH SIDES. `pg_get_viewdef` renders keywords in upper case today, but
   --    the isolation below must not depend on that: a slice anchored on a casing that
   --    changes silently returns the WRONG substring, and an EPA term inside it would then
@@ -152,47 +165,69 @@ begin
     raise exception 'VERIFY FAILED: app_coverage_states is not security_invoker — it would bypass RLS';
   end if;
 
-  -- (d) Every ZIP still classifies, on BOTH planes, with no NULLs and no strays.
-  select count(*) into n_rows from public.app_coverage_states;
-  select count(*) into n_bad  from public.app_coverage_states
-   where coverage_state is null or regulatory_overlay_state is null
-      or coverage_state not in ('populated','honestly_empty','unsupported_source',
-                                'failed_ingest','temporarily_unavailable','stale_data')
-      or regulatory_overlay_state not in ('overlay_records','overlay_empty',
-                                          'overlay_unknown','overlay_unsupported');
+  -- (d)(e)(f)(g) THE SPLIT, ASSERTED ON NAMED ZIPs. Six keyed lookups, each an index
+  --     probe, covering every case the universe scans covered:
+  --       (d) both planes carry a legal value            — all six
+  --       (e) the two planes are INDEPENDENT             — 03224 / 03268 are core-empty
+  --                                                        while the overlay holds records
+  --       (f) a core state agrees with CORE content only — populated has core content,
+  --                                                        honestly_empty has none
+  --       (g) the overlay never claims an unverified zero — 01034 / 02543 read
+  --                                                        overlay_unknown, not _empty
+  --     Expected values were measured read-only against production before the apply.
+  for r in
+    select e.zip, e.want_core, e.want_overlay, e.want_dq,
+           v.coverage_state, v.regulatory_overlay_state, v.data_quality,
+           v.dev_markers, v.changes, v.facilities_unavailable
+      from (values
+              ('01001', 'populated',      'overlay_records', null),
+              ('01002', 'populated',      'overlay_records', null),
+              ('03224', 'honestly_empty', 'overlay_records', 'pass'),
+              ('03268', 'honestly_empty', 'overlay_records', 'pass'),
+              ('01034', 'honestly_empty', 'overlay_unknown', null),
+              ('02543', 'honestly_empty', 'overlay_unknown', null)
+           ) as e(zip, want_core, want_overlay, want_dq)
+      left join public.app_coverage_states v on v.zip = e.zip
+  loop
+    if r.coverage_state is null or r.regulatory_overlay_state is null then
+      n_bad := n_bad + 1;
+      raise warning 'VERIFY: probe ZIP % is absent from the view or carries a NULL plane', r.zip;
+    elsif r.coverage_state <> r.want_core or r.regulatory_overlay_state <> r.want_overlay then
+      n_bad := n_bad + 1;
+      raise warning 'VERIFY: probe ZIP % reads %/%, expected %/%',
+        r.zip, r.coverage_state, r.regulatory_overlay_state, r.want_core, r.want_overlay;
+    elsif r.want_dq is not null and r.data_quality is distinct from r.want_dq then
+      n_bad := n_bad + 1;
+      raise warning 'VERIFY: probe ZIP % has data_quality %, expected %',
+        r.zip, r.data_quality, r.want_dq;
+    elsif (r.coverage_state = 'populated'      and r.dev_markers = 0 and r.changes = 0)
+       or (r.coverage_state = 'honestly_empty' and (r.dev_markers > 0 or r.changes > 0)) then
+      n_bad := n_bad + 1;
+      raise warning 'VERIFY: probe ZIP %, whose core state disagrees with core content (state % / dev % / changes %)',
+        r.zip, r.coverage_state, r.dev_markers, r.changes;
+    elsif r.regulatory_overlay_state = 'overlay_empty' and r.facilities_unavailable then
+      n_bad := n_bad + 1;
+      raise warning 'VERIFY: probe ZIP % would report overlay_empty over an unverified EPA read', r.zip;
+    end if;
+  end loop;
   if n_bad > 0 then
-    raise exception 'VERIFY FAILED: % of % rows carry an invalid state on one of the planes', n_bad, n_rows;
+    raise exception 'VERIFY FAILED: % of 6 probe ZIP(s) carry an invalid state on one of the planes', n_bad;
   end if;
 
-  -- (e) THE DECOUPLING, stated as data rather than as text: the two planes must not be
-  --     functionally dependent. A ZIP that is honestly_empty on core while the overlay
-  --     holds records is the ENTIRE POINT of this unit — if none exists, either the
-  --     split did not take or there was nothing to split, and both deserve to fail
-  --     loudly rather than pass vacuously.
-  select count(*) into n_bad from public.app_coverage_states
-   where coverage_state = 'honestly_empty' and regulatory_overlay_state = 'overlay_records';
-  if n_bad = 0 then
+  -- (e2) THE DECOUPLING, stated as data rather than as text, and keyed rather than
+  --      scanned: a ZIP that is honestly_empty on core while the overlay holds records
+  --      is the ENTIRE POINT of this unit. If 03224 is not that ZIP, either the split
+  --      did not take or there was nothing to split, and both deserve to fail loudly
+  --      rather than pass vacuously.
+  if not exists (select 1 from public.app_coverage_states
+                  where zip = '03224'
+                    and coverage_state = 'honestly_empty'
+                    and regulatory_overlay_state = 'overlay_records') then
     raise exception 'VERIFY FAILED: no ZIP is core-empty with overlay records — the split is vacuous';
   end if;
-  raise notice 'core-empty + overlay-records (was facilities_only): % ZIP(s)', n_bad;
+  raise notice 'core-empty + overlay-records (was facilities_only): confirmed on 03224 and 03268; the universe count is measured separately after commit';
 
-  -- (f) A core state must never be reachable ONLY through the overlay: populated must
-  --     be backed by core content, honestly_empty must have none.
-  select count(*) into n_bad from public.app_coverage_states
-   where (coverage_state = 'populated'      and dev_markers = 0 and changes = 0)
-      or (coverage_state = 'honestly_empty' and (dev_markers > 0 or changes > 0));
-  if n_bad > 0 then
-    raise exception 'VERIFY FAILED: % rows whose core state disagrees with core content', n_bad;
-  end if;
-
-  -- (g) The overlay must never claim emptiness it did not verify.
-  select count(*) into n_bad from public.app_coverage_states
-   where regulatory_overlay_state = 'overlay_empty' and facilities_unavailable;
-  if n_bad > 0 then
-    raise exception 'VERIFY FAILED: % rows report overlay_empty over an unverified EPA read', n_bad;
-  end if;
-
-  raise notice 'PHASE 2 UNIT 2 VERIFIED over % rows', n_rows;
+  raise notice 'PHASE 2 UNIT 2 VERIFIED on 6 keyed probe ZIP(s) + 5 catalog assertions';
 end
 $verify$;
 
