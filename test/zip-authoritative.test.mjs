@@ -225,6 +225,8 @@ ok(/function viewSpanMi\(\)\{[\s\S]{0,80}ZIP_FRAME\.spanMi/.test(page)
   'F23 ZIP 3D zoom limits follow the record span, not CUR_RADIUS');
 ok(/function set3DFrame\(maxD\)\{[\s\S]{0,500}__HS_VERIFY\.aerialFrameExt = V3\.frameExt/.test(page),
   'F24 after 3D frames, verify can read the aerial extent (not only the pre-3D drawMap snapshot)');
+ok(/CUR_RADIUS = 1;?\s+\/\/ address-mode default; ZIP views do not use a radius/.test(page),
+  'F25 ZIP mode does not leave a 3-mile radius that address mode would snap to 2 miles');
 
 // ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
 // Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed

@@ -1797,8 +1797,8 @@ HS.onReady(function(){
   }
 
   // Address mode may only ask for a radius the canonical RPC accepts (0.5/1/2/5). The extra
-  // 3/10/20 stops exist for ZIP mode, where they widen the 3D frame over already-cached data and
-  // hit no server at all. Two guards, because either alone leaves a hole:
+  // 3/10/20 stops are leftover from when ZIP mode widened a 3D radius over cached data.
+  // ZIP mode no longer uses a radius (the records' bbox is the frame), and #radSel is hidden.
   //   * the stops are DISABLED in address mode, so they cannot be picked;
   //   * entering address mode while one is active SNAPS to the nearest supported radius and
   //     repaints the button row, so the resident sees the geography actually queried.
@@ -2015,8 +2015,8 @@ HS.onReady(function(){
         if(window.HS && HS.setViewLabel) HS.setViewLabel(label);
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
-    CUR_RADIUS = 3;                                   // unused in ZIP views — address mode owns the radius
-    setRadiusButton(3);                               // hidden in zipmode; restored on an address search
+    CUR_RADIUS = 1;                                   // address-mode default; ZIP views do not use a radius
+    setRadiusButton(1);                               // hidden in zipmode; restored on an address search
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
@@ -2025,8 +2025,8 @@ HS.onReady(function(){
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
     // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
-    // Elder, which is wrong on every other ZIP page). The radius selector stays visible so residents
-    // can widen the 3D aerial view to reach cached records past the default frame.
+    // Elder, which is wrong on every other ZIP page). The radius selector is hidden; ZIP views
+    // frame the records' own extent, not a circle the resident widens.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
     // Founder copy: one plain line. The long inventory clause it replaced named the record types
