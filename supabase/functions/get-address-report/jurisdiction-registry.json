@@ -247,7 +247,8 @@
           "Intake Accepted - Fees Due",
           "Formal Intake Accepted - Fees Due",
           "Update Intake Pending - Fees due",
-          "Awaiting Update"
+          "Awaiting Update",
+          "Formal Intake Accepted - Fees Paid"
         ],
         "approved": [
           "Approved",
