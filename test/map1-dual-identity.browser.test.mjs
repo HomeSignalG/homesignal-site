@@ -73,7 +73,9 @@ const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.364
   refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];
@@ -242,7 +244,7 @@ const plainPopup = await page.evaluate(() => {
   const site = (window.__HS_SITES || []).filter(s => /ANDURIL/.test(s.label || ''))[0];
   return site ? window.__HS_KIND(site) : '';
 });
-ok(/Industrial/.test(plainPopup) && /Facility/.test(plainPopup) && !/Data center/.test(plainPopup),
+ok(/Industrial/.test(plainPopup) && /Regulated facility/.test(plainPopup) && !/Data center/.test(plainPopup),
   '8c: classifiable EPA popup is Type · Regulated facility, never a data centre', plainPopup);
 
 // ── 9. Geography untouched ────────────────────────────────────────────────────────

@@ -1186,6 +1186,13 @@ HS.onReady(function(){
       var REG = HS.CATEGORY_REGISTRY;
       return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
     }
+    // Overlay-on-Type, GLOBAL: the pin is the Type; purple is the overlay. The
+    // popup must say the Type first, same order as dual identity, or the map
+    // would still read as "Facility" while the pin is an Industrial triangle.
+    if(mk.overlayOnType){
+      var REGo = HS.CATEGORY_REGISTRY;
+      return (mk.typeLabel || mk.legendLabel) + " · " + REGo.facility.label + " · operating now";
+    }
     return "Facility · operating now";
   }
   // STATUS IS NEVER COMMUNICATED BY COLOUR ALONE. Every marker carries a text label of its
