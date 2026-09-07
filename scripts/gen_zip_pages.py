@@ -29,7 +29,16 @@ SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = "https://homesignal.net"
 STEP = 1000
 
-LN_CAP, GN_CAP, UM_CAP = 6, 10, 12          # what the document renders
+# What the document renders. LN_CAP matches lib/community-page.js::LOCAL_NEWS_CAP so the
+# SSR list and the hydrated list agree in LENGTH. Measured 2026-09-07: at a cap of 6, 665
+# ZIPs lost at least one DISTINCT authorized topic (872 topic-cells); at 20, 30 ZIPs / 37
+# cells. Display-only: rule_f is computed from the FULL p["ln"] above this slice, so the
+# cap can never move robots or indexability.
+#
+# ONE DIVERGENCE REMAINS, DELIBERATELY: ln_show strips weather (journalism-only, which is
+# what Rule F counts), while HS.data.news() returns the whole Local News population
+# including weather. Same cap, different populations - the SSR list is a subset.
+LN_CAP, GN_CAP, UM_CAP = 20, 10, 12
 RULE_F_MIN = 3                               # >= 3 legitimate non-weather items
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
