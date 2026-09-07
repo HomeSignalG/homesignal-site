@@ -1989,14 +1989,6 @@ HS.onReady(function(){
     // never had a suggestion list of its own (nothing listens for input), and the field still
     // takes FREE-FORM text, so the copy deliberately does not demand a "full" address or a
     // fixed "street, city, state, ZIP" shape the geocoder does not require.
-    //
-    // ⚠️ THIS DELIBERATELY SUPERSEDES #1086's OVERRIDE, which read "Enter a street address to
-    // switch from ZIP-wide results to development nearby." — do not restore it on the reading
-    // that it was lost to a bad conflict resolution. The founder specified this helper string
-    // verbatim, and it answers a different question: #1086's sentence explained the SCOPE
-    // CHANGE, this one explains how to operate the control. The scope information did not go
-    // anywhere — the kicker, H1 and standfirst already swap to near-home wording on search
-    // (#1070/#1081).
     var _cap = document.querySelector(".map-cap");
     if(_cap){ _cap.textContent = "Development across ZIP " + zip + " · nearby facilities for context"; }
     // No placeholder override here any more: the example-address placeholder reads correctly in
