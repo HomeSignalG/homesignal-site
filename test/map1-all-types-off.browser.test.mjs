@@ -145,8 +145,8 @@ const load = async (zip) => {
 };
 // A resident sets types by CLICKING the chips — never by poking filter state directly.
 const setTypes = (keys) => page.evaluate((want) => {
-  Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]')).forEach((r) => {
-    const on = r.getAttribute('aria-pressed') === 'true';
+  Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]')).forEach((r) => {
+    const on = !!(r.querySelector('input') || {}).checked;
     const should = want.indexOf(r.getAttribute('data-cat')) !== -1;
     if (on !== should) r.click();
   });
@@ -154,14 +154,14 @@ const setTypes = (keys) => page.evaluate((want) => {
 // The regulatory dimension has ONE control, and a resident operates it by clicking it.
 const setReg = (on) => page.evaluate((want) => {
   const t = document.getElementById('regToggle');
-  if (t && (t.getAttribute('aria-checked') === 'true') !== want) t.click();
+  if (t && (!!(t.querySelector('input')||{}).checked) !== want) t.click();
 }, on);
 const regOn = () => page.evaluate(() => {
   const t = document.getElementById('regToggle');
-  return !!t && t.getAttribute('aria-checked') === 'true';
+  return !!t && !!(t.querySelector('input')||{}).checked;
 });
 const allKeys = () => page.evaluate(() =>
-  Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]')).map(r => r.getAttribute('data-cat')));
+  Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]')).map(r => r.getAttribute('data-cat')));
 const noteShown = () => page.evaluate(() => {
   const el = document.getElementById('mapkeyEmpty');
   return !!el && !el.hidden && el.offsetParent !== null;
@@ -195,14 +195,19 @@ ok(v4.allTypesOff === true && v4.visibleMarkers === 0 && v4.mapMarkers === 3,
   '4: __HS_VERIFY separates "resident hid everything" from "no records"',
   JSON.stringify({ allTypesOff: v4.allTypesOff, visible: v4.visibleMarkers, total: v4.mapMarkers }));
 const txt = await page.textContent('#mapkeyEmpty');
-ok(/type/i.test(txt) && /hidden/i.test(txt), '4: the note names the control the resident must use', txt.trim());
+ok(/no project types are selected/i.test(txt) && /select all types/i.test(txt),
+  '4: the note names the control and carries the way back', txt.trim().replace(/\s+/g, ' '));
 
 // ── 4b. EVERY TYPE OFF BUT REGULATORY ON IS NOT AN EMPTY MAP ─────────────────────────
 // The note must not claim emptiness over a map that is still drawing regulatory records.
 await setReg(true);
 ok((await pins()) === 2,
   '4b: all Types off + regulatory ON -> the two regulatory records are still drawn', await pins());
-ok(!(await noteShown()), '4b: ...so the "map is empty" note does NOT appear');
+// ⚖️ THE NOTE'S CLAIM CHANGED, so this assertion inverts — deliberately, not by accident.
+// It used to assert "the map is empty", which is FALSE here (regulatory records are still
+// drawn), so it had to stay silent. It now reports the CONTROL's own state, "No project
+// types are selected", which is TRUE here and stays true whatever else the map is drawing.
+ok(await noteShown(), '4b: ...and the note still fires, because it reports the CONTROL, not emptiness');
 const v4b = await verify();
 ok(v4b.allTypesOff === true && v4b.regulatoryOn === true && v4b.visibleMarkers === 2,
   '4b: every Type is still off — the switch did not turn any of them back on',
@@ -254,8 +259,8 @@ ok((await pins()) === before && !(await noteShown()), '7: both dimensions restor
 await setTypes([]); await setReg(false);
 await load('20171');
 const persisted = await page.evaluate(() =>
-  Array.from(document.querySelectorAll('#mapkeyShapes span.sh[data-cat]'))
-    .every(r => r.getAttribute('aria-pressed') === 'false'));
+  Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]'))
+    .every(r => !(r.querySelector('input') || {}).checked));
 ok(persisted, '8: every Type chip is still OFF after a reload (sessionStorage preserved)');
 ok(!(await regOn()), '8: ...and so is the Regulatory records switch');
 ok((await pins()) === 0 && await noteShown(), '8: ...and the note is shown on load, not only on click');
@@ -276,13 +281,21 @@ ok(await noteShown(),
   '8b: the note fires over the blank map — it tracks what is DRAWN, not which keys are set');
 ok(v8b.regulatoryBadges === 0, '8b: ...and no badge is painted over an empty map', v8b.regulatoryBadges);
 
-// ── 9. PRODUCT TRUTH — a ZIP with NO records must not be told to turn a type back on ──
+// ── 9. AN EMPTY ZIP: the note reports the CONTROL, so it fires there too ─────────────
+// ⚖️ ALSO INVERTED, and for the same reason as 4b. The old note promised records ("tap a
+// type to show records again"), so showing it on a ZIP with nothing to reveal would have
+// promised absent data — the product-truth rule — and it was suppressed there. The new
+// note promises nothing: it states that no types are selected, which is equally true on an
+// empty ZIP, and it is still the only thing on screen explaining why nothing can appear.
 await load('20172');
 const v9 = await verify();
 ok(v9.allTypesOff === true, '9: control — the all-off filter state carried into the empty ZIP');
 ok(v9.mapMarkers === 0, '9: control — that ZIP genuinely has no records', v9.mapMarkers);
-ok(!(await noteShown()),
-  '9: the note is NOT shown where there are no records to reveal (no promise of absent data)');
+ok(await noteShown(), '9: the note reports the control state, so it fires on an empty ZIP too');
+const txt9 = await page.textContent('#mapkeyEmpty');
+ok(!/record/i.test(txt9),
+  '9: ...and it promises no records — nothing on screen implies data that is not there',
+  txt9.trim().replace(/\s+/g, ' '));
 
 await browser.close();
 srv.close();
