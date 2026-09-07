@@ -502,3 +502,141 @@ Still open, and each one requires product/SEO sign-off before any work begins:
 - **§5** one `sites` jsonb still carries both planes, so rule 11 ("removable without a schema
   migration") is not yet met. Mitigated in the write, not in the schema.
 - **§6** EPA remains on the report critical path via `Promise.all([devSites, facilitySites])`.
+
+---
+
+## 14. PHASE 2 · UNIT 1 — BUILT AND PARKED (2026-09-07)
+
+Branch `claude/epa-phase2-unit1-core-completion-markers`. SQL of record:
+`docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic, **not
+applied**). Pins: `test/epa-phase2-core-markers.test.mjs`, 41 assertions.
+
+**Nothing outward-facing has moved.** Production still stamps `data_quality` as
+`(_nd+_nf+_nc)>0` and `indexable` as `… and (_ndp > 0 or _nfc >= 3)`; the sitemap, robots
+directives and coverage states are untouched. This unit is a reviewable artifact, exactly
+as Phase 1B was between PR #1102 and its authorized apply.
+
+### 14.1 ⚠️ §10 ITEM 2 IS SUPERSEDED ON ITS `data_quality` HALF — the recommendation was wrong
+
+§10.2 says to *"recompute `data_quality` and `indexable` from `_nd`/`_ndp`/`_nc` only"*. The
+`indexable` half is right. **The `data_quality` half would cause a product regression, and
+it is not recorded anywhere else in this audit, so it would have been implemented.**
+
+`data_quality` is not only a completeness claim. It is the **layout gate** for the community
+page — `lib/community-page.js`:
+
+```js
+// DATA-QUALITY GATE: only render the full page when the ZIP has real, sourced data.
+var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
+...
+if (status !== 'pass') {   // renders coverage copy + local news ONLY
+```
+
+The non-`pass` branch renders neither Development nor the *"Regulated facilities nearby"*
+section. So dropping `_nf` from `data_quality` does not merely retitle those pages — it
+**stops them rendering real, sourced EPA facility records they hold today**, replacing them
+with *"Coverage for this ZIP is being wired."* That is a page that has public records and
+claims it has none: the exact class of dishonesty this workstream exists to remove, arrived
+at from the other direction.
+
+**Measured from the stored stamps** (one self-consistent read of `app_community_meta`;
+`_ndp`, `_nc`, `_nfc` are the values the materializer itself wrote):
+
+| | ZIPs |
+|---|---:|
+| `app_community_meta` rows | 12,722 |
+| `data_quality = 'pass'` | 12,444 |
+| `pass` with stamped `_ndp = 0` **and** `_nc = 0` | **766** |
+| ... of those, carrying `_nfc > 0` | **766 / 766** |
+
+⚠️ **Instrument note, because two correct numbers disagree.** Recomputing the same question
+LIVE from `app_projects` / `app_changes` returns **303**, not 766 — and a third read returns
+something else again, because `app_changes` is deleted and reinserted per ZIP refresh and
+`_ndp` (parcel-precise) is stricter than `_nd` (all development records). The stamped read is
+the stable one and is what is quoted; the live recount measures a moving table. **Name the
+instrument with the number.** An earlier statement of "766" in this workstream was taken from
+the stamps and is correct as such; it is not interchangeable with a live recount.
+
+### 14.2 What Unit 1 does instead
+
+**`indexable` drops the EPA limb, and nothing else changes.**
+
+```
+before   ((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))
+after    ((_nd+_nc)>0 and _ndp > 0)
+```
+
+Measured from the stored stamps:
+
+| | ZIPs |
+|---|---:|
+| `indexable` before | 11,704 |
+| `indexable` after | 10,699 |
+| **leaving the advertised set** | **−1,005** |
+| ... sole cause the `_nfc >= 3` limb | **1,005 / 1,005** |
+| entering the advertised set | **0** |
+| of the 1,005, carrying a `development_reports` row | **1,005 / 1,005** |
+
+*(The audit's earlier "~1,000 / 1,004" was an estimate. **−1,005** is the exact figure, and
+the change is strictly a removal — no page is newly advertised by it.)*
+
+**And core completeness gets its own EPA-free markers**, which is what §10.2 was reaching for
+and what the founder's own spec named:
+
+| column | values | reads |
+|---|---|---|
+| `app_community_meta.core_project_scan_status` | `not_scanned` · `projects_found` · `no_qualifying_projects_found` | `_has_report`, `_nd` |
+| `app_community_meta.core_records_present` | boolean | `_nd`, `_nc` |
+
+Neither reads `_nf` or `_nfc`. `no_qualifying_projects_found` is a **complete** result, not a
+failed one — rule #8 in one value.
+
+🔑 **`_nd`, not `_ndp`, decides the scan status.** A ZIP with area-scope development records
+HAS projects; it just has none precise enough to pin. Reporting
+`no_qualifying_projects_found` there would be a false negative, and the pin-precision bar
+belongs to `indexable`, which is a different question. Pinned by test case 4.
+
+### 14.3 What this changes for residents and crawlers
+
+- **Community / Alerts pages: nothing.** Their robots directive and their sitemap entries
+  come from **Rule F** at build time (`scripts/gen_zip_pages.py`), not from `indexable` —
+  `gen_zip_pages.py` fetches the column and never reads it (`dev_indexable` is assigned at
+  line 227 and referenced nowhere).
+- **Map 1 / development pages: 1,005 stop being advertised.** They remain real, reachable
+  pages, keep every record they render today including their facilities, and flip to
+  `noindex` (`homesignalmap.html` reads the flag live) and out of the sitemap's development
+  half (`scripts/gen_sitemap.py::fetch_index_zips`, which `reconcile_sitemap` deliberately
+  leaves alone).
+- **No rendering changes anywhere**, because `data_quality` is untouched.
+
+### 14.4 Deliberately NOT in this unit
+
+- `data_quality` and its `_nf` limb — §14.1.
+- `app_coverage_states.facilities_only` and the CI pin
+  `legacy: populated/facilities_only => pass` (`scripts/verify-coverage-state.mjs:64`).
+  That assertion stays **true by construction** here, because `data_quality` does not move.
+  Reworking the state is **Unit 2**. *(This is why the two cannot be swapped in order: doing
+  §3's `data_quality` half first would break that pin by construction.)*
+- The single `sites` jsonb carrying both planes — **Unit 3**, rule 11.
+- `Promise.all([devSites, facilitySites])` — **Unit 4**.
+
+### 14.5 Six comment sites describe the CURRENT rule and must be corrected in the same change as the apply
+
+Left untouched on purpose: each states what production does today, and editing them before
+the apply would make the repo describe behaviour that does not exist yet.
+
+`scripts/gen_sitemap.py:6` · `scripts/gen_sitemap.py:124` · `scripts/verify-development.mjs:140`
+· `scripts/gen_zip_pages.py:383` · `homesignalmap.html:1089` · `lib/community-page.js:70`.
+
+### 14.6 Verification
+
+- Offline unit suite: **161 files, all pass** (`node scripts/run-unit-tests.mjs --offline`).
+- The new suite is **proven load-bearing by six mutations**, each failing it and each
+  restored clean: restoring the EPA limb in the spliced value (2 failures) · deleting one
+  anchor-uniqueness check (3) · deleting the reversibility check (2) · moving the backfill
+  out of the writer's migration (3) · letting the model read `_nfc` again (2) · reintroducing
+  an unreachable draft statement (2).
+- The splice is anchored on three strings, **each verified to occur exactly once** in the
+  live body (`app_refresh_zip`, md5 `6591d7f79f9a6cd0b476bbcfc2065b9a`, length 19,428), and
+  the script refuses to run if any anchor count is not 1. It also proves the splice is
+  reversible before executing, and re-reads the stored body afterwards to prove it took.

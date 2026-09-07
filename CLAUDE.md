@@ -938,6 +938,47 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
+### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
+**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
+load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
+robots and coverage states are untouched. Full record: audit §14.
+
+- 🔑 **THE AUDIT'S OWN §10.2 RECOMMENDATION IS WRONG ON ITS `data_quality` HALF — do not
+  implement it.** `data_quality` is not only a completeness claim, it is the **layout gate** in
+  `lib/community-page.js` (`if (status !== 'pass')`), and the non-pass branch renders neither
+  Development nor the *"Regulated facilities nearby"* section. Dropping `_nf` there would stop
+  **766** pages rendering **real, sourced EPA facility records they hold today** and replace them
+  with *"Coverage for this ZIP is being wired."* A page with public records claiming it has none
+  is the same dishonesty this workstream exists to remove, reached from the other direction.
+  **Unit 1 therefore leaves `data_quality` alone** and gives core its own EPA-free markers —
+  `core_project_scan_status` (`not_scanned` · `projects_found` · `no_qualifying_projects_found`)
+  and `core_records_present`, both computed from `_has_report`/`_nd`/`_nc` only.
+- **What Unit 1 changes is `indexable`, and only `indexable`:**
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`.
+  Stored-stamp measurement: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb on
+  1,005 of 1,005, 0 pages newly advertised**, all 1,005 carrying a `development_reports` row.
+  *(The "1,004" above was an estimate; −1,005 is exact.)*
+- ⚠️ **NAME THE INSTRUMENT WITH THE NUMBER — two correct readings disagree by 463.** The 766
+  comes from the STORED stamps (`component_scores`, one self-consistent row read). Recomputing
+  the same question live from `app_projects`/`app_changes` returns **303**, and again later
+  something else, because `app_changes` is deleted and reinserted per ZIP refresh and `_ndp` is
+  stricter than `_nd`. The stamped read is the stable one.
+- 🔑 **`_nd`, NOT `_ndp`, decides the scan status.** A ZIP with area-scope development records
+  HAS projects — it just has none precise enough to pin. `no_qualifying_projects_found` there
+  would be a §11 false negative; pin-precision is `indexable`'s question, not completeness's.
+- **Community / Alerts pages are unaffected.** Their robots and sitemap entries come from
+  **Rule F** at build time; `gen_zip_pages.py` fetches `indexable` and never reads it. The
+  −1,005 is entirely Map 1 / development pages, which stay real, reachable and fully rendered.
+- **Unit order is forced:** doing §3's `data_quality` half first would break the CI pin
+  `legacy: populated/facilities_only => pass` (`scripts/verify-coverage-state.mjs:64`) by
+  construction. Unit 1 leaves that pin true; reworking `facilities_only` is Unit 2, the
+  `sites` split Unit 3, and taking EPA off `Promise.all` Unit 4.
+- **Six comment sites describe the CURRENT rule and are deliberately untouched** until the
+  apply, or the repo would document behaviour that does not exist yet: `gen_sitemap.py:6` and
+  `:124`, `verify-development.mjs:140`, `gen_zip_pages.py:383`, `homesignalmap.html:1089`,
+  `lib/community-page.js:70`.
+
 
 ### Status
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
