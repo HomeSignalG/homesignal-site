@@ -53,6 +53,15 @@ ok(!/news\.slice\(0,\s*6\)/.test(rt), 'no Local News list is sliced to 6 any mor
 const capUses = (rt.match(/slice\(0,\s*LOCAL_NEWS_CAP\)/g) || []).length;
 ok(capUses === 2, `both Local News lists use the constant (found ${capUses})`);
 
+// ---- SSR and hydrate agree in LENGTH ------------------------------------------------------
+// gen_zip_pages.py renders the canonical /community/<zip>/ list; community-page.js renders
+// the dynamic one. Two different caps meant two different pages for the same ZIP.
+const gen = readFileSync(join(root, 'scripts', 'gen_zip_pages.py'), 'utf8');
+ok(/^LN_CAP, GN_CAP, UM_CAP = 20, /m.test(gen),
+   'gen_zip_pages.py LN_CAP is 20 — the same cap the hydrated list uses');
+ok(/rule_f/.test(gen) && gen.indexOf('n_ln_journalism') < gen.indexOf('[:LN_CAP]'),
+   'rule_f is computed BEFORE the LN_CAP slice — the cap cannot move robots');
+
 // ---- ordering is NOT a decision this change makes ----------------------------------------
 ok(!/\.sort\(/.test(branch), "the non-'pass' branch does not re-sort — ordering stays HS.data.news's");
 
