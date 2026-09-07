@@ -722,7 +722,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=5f115d87"></script>
+<script src="lib/map.js?v=3ce16798"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260904"></script>
@@ -1553,7 +1553,7 @@ HS.onReady(function(){
     // 2026-09-06). WHICH failure occurred goes to the console, where it is a diagnostic.
     if(window.console && console.warn) console.warn("[HomeSignal] 3D view unavailable (" + mode + "/" + reason + ")");
     var copy   = (window.HS && HS.MAP3D_FALLBACK) ? HS.MAP3D_FALLBACK
-               : "3D view isn\u2019t available on this device or browser right now. "
+               : "3D view couldn\u2019t load right now. "
                + "You\u2019ve been returned to the 2D map.";
     var detail = (window.HS && HS.MAP3D_FALLBACK_DETAIL) ? HS.MAP3D_FALLBACK_DETAIL : "";
     setView("2d");                                  // never strand the resident on a dead panel

@@ -69,11 +69,11 @@ ok(HS.webglSupported(null) === false, '§1 no document reports unsupported, neve
 // that guards a PRODUCT rule rather than a defect. The vendor names below appear ONLY as
 // prohibition patterns: a guard cannot detect a word it is not allowed to spell.
 const EXPECTED =
-  '3D view isn\u2019t available on this device or browser right now. ' +
+  '3D view couldn\u2019t load right now. ' +
   'You\u2019ve been returned to the 2D map.';
 ok(HS.MAP3D_FALLBACK === EXPECTED,
   '§2 the fallback message is the approved string, character for character', HS.MAP3D_FALLBACK);
-ok(HS.MAP3D_FALLBACK_DETAIL === '3D views require WebGL and hardware-accelerated graphics.',
+ok(HS.MAP3D_FALLBACK_DETAIL === 'You can try 3D again in a moment.',
   '§2 the optional secondary line is the approved string', HS.MAP3D_FALLBACK_DETAIL);
 // Every failure class yields the SAME resident-facing string. A per-reason message is how
 // vendor-specific copy re-enters: one branch gets "helpful" and names a browser.

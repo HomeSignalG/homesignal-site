@@ -72,7 +72,7 @@ const mkRow = (home) => ({
            mkSite(-0.5, -0.2, 41.503, -112.021, 'approved', 'New Subdivision', 'point') ],
   paywall: false, refreshed_at: new Date().toISOString(), facilities_unavailable: false });
 
-const APPROVED = '3D view isn’t available on this device or browser right now. '
+const APPROVED = '3D view couldn’t load right now. '
                + 'You’ve been returned to the 2D map.';
 
 const browser = await LAUNCHER.launch();
