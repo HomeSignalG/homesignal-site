@@ -133,6 +133,22 @@ ok(/No qualifying development/i.test(noteMZ) && /whole ZIP/i.test(noteMZ),
 ok(/2 projects across the whole of ZIP 78617/.test(HS.zipAuthNote(COMPLETE, '78617', sites)),
   'D7 a measured ZIP counts projects across the WHOLE ZIP', HS.zipAuthNote(COMPLETE, '78617', sites));
 
+console.log('\nD+. ZIP frame is the records, never a centroid');
+ok(typeof HS.zipFrameFromSites === 'function', 'D8 zipFrameFromSites is exported');
+ok(HS.zipFrameFromSites([]) === null, 'D9 no records → no invented origin');
+ok(HS.zipFrameFromSites([{ scope: 'area', lat: 30.17, lng: -97.61 }]) === null,
+  'D10 area items do not invent a centre');
+const far = HS.zipFrameFromSites([
+  { scope: 'point', lat: 30.10, lng: -97.70 },
+  { scope: 'point', lat: 30.20, lng: -97.50 }
+]);
+ok(far && Math.abs(far.lat - 30.15) < 1e-9 && Math.abs(far.lng - (-97.60)) < 1e-9,
+  'D11 the frame midpoint is the records\' bbox, not a ZIP centroid', far);
+ok(far && far.spanMi > 8, 'D12 the span covers those records — not a 3-mile centroid radius', far && far.spanMi);
+const one = HS.zipFrameFromSites([{ scope: 'point', lat: 30.1745, lng: -97.6134 }]);
+ok(one && one.lat === 30.1745 && one.lng === -97.6134 && one.spanMi === 0.4,
+  'D13 a single record is itself — 0.4 mi is camera padding, not a ZIP radius', one);
+
 // ── E. the merge keeps what it must and replaces what it must ────────────────────────────────
 console.log('\nE. merge: authoritative development replaces radius-derived development');
 const report = [
@@ -187,6 +203,30 @@ ok(/function draw3DSoft\(\)\{[\s\S]{0,1600}if\(!ZIP_MODE\)\{[\s\S]{0,80}ringStop
 ok(/function tip3\(s\)\{[\s\S]{0,400}scope==="point" && !ZIP_MODE/.test(page)
    && /function infoCard3\(s\)\{[\s\S]{0,200}scope==="point" && !ZIP_MODE/.test(page),
   'F15 3D hover/card never quote "mi from home" in ZIP mode');
+ok(/HS\.zipFrameFromSites/.test(page) && /ZIP_FRAME = ZIP_MODE && window\.HS && HS\.zipFrameFromSites/.test(page),
+  'F16 ZIP views frame from the records\' own bbox, not a ZIP centroid');
+ok(/function set3DFrame\(maxD\)\{[\s\S]{0,400}ZIP_FRAME\.spanMi/.test(page)
+   && /function set3DFrame\(maxD\)\{[\s\S]{0,250}Never cap to a radius/.test(page),
+  'F17 3D aerial ZIP camera covers the record extent and is not capped to CUR_RADIUS');
+ok(/if\(ZIP_MODE\)\{\s*\n\s*bounds = \[\];/.test(page) || /if\(ZIP_MODE\)\{[\s\S]{0,40}bounds = \[\]/.test(page),
+  'F18 2D ZIP fit is not seeded with the ZIP centroid');
+ok(/function glFrameView\(\)\{[\s\S]{0,500}ZIP_FRAME\.west/.test(page)
+   && /function glFrameView\(\)\{[\s\S]{0,200}fitBounds/.test(page),
+  'F19 3D satellite ZIP mode fitBounds the record extent, not jumpTo the centroid');
+ok(/function siteEN\(s\)\{[\s\S]{0,200}ZIP_MODE && ZIP_FRAME[\s\S]{0,120}llToEN/.test(page),
+  'F20 ZIP 3D positions records from lat/lng vs the record bbox, not centroid-relative e/n');
+ok(/function sceneOrigin\(\)\{[\s\S]{0,80}ZIP_MODE && ZIP_FRAME[\s\S]{0,40}ZIP_FRAME/.test(page)
+   && /if\(ZIP_MODE\)\{\s*\n\s*if\(!homePointOK\(ZIP_FRAME\)\)\{ fail3D/.test(page),
+  'F21 ZIP 3D origin is the record bbox, not LAST_HOME / the ZIP centroid');
+ok(!/zipFitRadius/.test(page),
+  'F22 ZIP mode no longer models the camera as a radius around a centroid');
+ok(/function viewSpanMi\(\)\{[\s\S]{0,80}ZIP_FRAME\.spanMi/.test(page)
+   && /mi\(viewSpanMi\(\)\*3\)/.test(page),
+  'F23 ZIP 3D zoom limits follow the record span, not CUR_RADIUS');
+ok(/function set3DFrame\(maxD\)\{[\s\S]{0,500}__HS_VERIFY\.aerialFrameExt = V3\.frameExt/.test(page),
+  'F24 after 3D frames, verify can read the aerial extent (not only the pre-3D drawMap snapshot)');
+ok(/CUR_RADIUS = 1;?\s+\/\/ address-mode default; ZIP views do not use a radius/.test(page),
+  'F25 ZIP mode does not leave a 3-mile radius that address mode would snap to 2 miles');
 
 // ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
 // Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed

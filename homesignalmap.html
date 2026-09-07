@@ -99,10 +99,9 @@
   .mapcard{padding:14px}
   .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
-  /* In ZIP mode the radius selector controls how far out the 3D aerial view reaches: the cached
-     ZIP dataset can include records past the default frame (e.g. TABS filings a few miles out), and
-     the 3D view culls beyond CUR_RADIUS — so residents need this control to widen the view and see
-     them. (The 2D and 3D-satellite views already show every cached record and auto-fit.) */
+  /* ZIP mode hides #radSel (body.zipmode .radsel). A ZIP is not a radius around a point,
+     so there is no "widen the search" control. 2D / 3D aerial / 3D satellite all frame the
+     records' own extent (ZIP_FRAME). Address mode keeps the radius chips. */
   .viewseg{display:inline-flex;background:#eef2f1;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
@@ -757,7 +756,7 @@
 <script src="lib/map.js?v=eca20492"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
-<script src="lib/zip-authoritative.js?v=20260904"></script>
+<script src="lib/zip-authoritative.js?v=20260907b"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="shell.js?v=d6e6818c"></script>
 
@@ -1067,9 +1066,11 @@ HS.onReady(function(){
   var CUR_ADDRESS = "";            // last searched address, for re-running on radius change
   var LAST_ADDR = "This address";  // matched address, shown in the home marker popup
   // ZIP mode (the crawlable /development/<zip> landing surface): the page reads a cached
-  // per-ZIP report and centers on the ZIP centroid. The centroid is a page ANCHOR, not a
-  // home — no "this address" pin until the resident searches (development-tracker §0/§3).
+  // per-ZIP report plus authoritative whole-ZIP membership. There is no HOME and no
+  // centroid-as-centre: the map covers the records' own lat/lng extent. A cached
+  // home_lat/lng is never drawn as a centre. No "this address" pin until the resident searches.
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
+  var ZIP_FRAME = null;            // bbox of ZIP point records — camera math, never a drawn centre
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
   // The generated county -> sources map (lib/generated/county-sources.json). ZIP mode only:
   // it answers "does any source covering this county still classify records as Commercial?",
@@ -1197,12 +1198,30 @@ HS.onReady(function(){
   function placeAreaSites(sites, home){
     var area = sites.filter(function(s){ return s.scope==="area"; });
     var N = area.length;
+    // ZIP mode: spread jurisdiction-wide notices inside the ZIP's record extent, not
+    // a circle around a ZIP centroid. Address mode keeps the viewed-radius spread.
+    var origin = (ZIP_MODE && ZIP_FRAME) ? ZIP_FRAME : home;
+    if(!origin || typeof origin.lat!=="number" || typeof origin.lng!=="number") return;
+    var cos = Math.cos(origin.lat*Math.PI/180) || 1;
+    var spanE, spanN;
+    if(ZIP_MODE && ZIP_FRAME){
+      spanE = Math.max(0.25, (ZIP_FRAME.east - ZIP_FRAME.west) * 69 * cos * 0.45);
+      spanN = Math.max(0.25, (ZIP_FRAME.north - ZIP_FRAME.south) * 69 * 0.45);
+    }
     area.forEach(function(s, i){
       var ang = i*2.399963;                                     // golden angle — even, deterministic
-      var rad = CUR_RADIUS*(0.18 + 0.6*Math.sqrt((i+0.5)/N));   // miles, bounded inside the radius
-      s._mE = rad*Math.cos(ang); s._mN = rad*Math.sin(ang);
-      s._mLat = home.lat + s._mN/69;
-      s._mLng = home.lng + s._mE/(69*Math.cos(home.lat*Math.PI/180));
+      var t = Math.sqrt((i+0.5)/N);
+      var e, n;
+      if(ZIP_MODE && ZIP_FRAME){
+        e = spanE * (0.2 + 0.8*t) * Math.cos(ang);
+        n = spanN * (0.2 + 0.8*t) * Math.sin(ang);
+      } else {
+        var rad = CUR_RADIUS*(0.18 + 0.6*t);                    // miles, bounded inside the radius
+        e = rad*Math.cos(ang); n = rad*Math.sin(ang);
+      }
+      s._mE = e; s._mN = n;
+      s._mLat = origin.lat + n/69;
+      s._mLng = origin.lng + e/(69*cos);
     });
   }
   // Precise POINT records (EPA facilities, permit filings) pin at their exact coordinates. When
@@ -1269,7 +1288,48 @@ HS.onReady(function(){
     if(s && typeof s.distance_mi === "number" && isFinite(s.distance_mi)) return s.distance_mi;
     return (s && typeof s.e === "number" && typeof s.n === "number") ? Math.hypot(s.e, s.n) : null;
   }
-  function siteEN(s){ return (s._mE!=null) ? [s._mE, s._mN] : [s.e, s.n]; }
+  // Miles east/north of an origin. ZIP mode uses the record bbox (ZIP_FRAME), never the
+  // cached ZIP centroid and never the engine's centroid-relative e/n.
+  function llToEN(lat, lng, origin){
+    if(typeof lat!=="number"||typeof lng!=="number"||!origin) return [null, null];
+    if(typeof origin.lat!=="number"||typeof origin.lng!=="number") return [null, null];
+    var e = (lng - origin.lng) * 69 * Math.cos(origin.lat * Math.PI/180);
+    var n = (lat - origin.lat) * 69;
+    return [e, n];
+  }
+  function siteEN(s){
+    if(ZIP_MODE && ZIP_FRAME){
+      var ll = siteLL(s);
+      return llToEN(ll[0], ll[1], ZIP_FRAME);
+    }
+    return (s._mE!=null) ? [s._mE, s._mN] : [s.e, s.n];
+  }
+  function viewSpanMi(){
+    if(ZIP_MODE && ZIP_FRAME) return Math.max(ZIP_FRAME.spanMi, 1);
+    return CUR_RADIUS;
+  }
+  function set3DFrame(maxD){
+    if(ZIP_MODE && ZIP_FRAME){
+      // Cover the ZIP's record extent. Never cap to a radius around a centroid.
+      V3.frameExt = Math.max(ZIP_FRAME.spanMi * 0.55, maxD * 1.05, 0.6);
+    } else {
+      V3.frameExt = Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
+    }
+    if(!V3.userZoom) V3.dist = mi(V3.frameExt * 2.0);
+    try{
+      if(window.__HS_VERIFY){
+        window.__HS_VERIFY.aerialFrameExt = V3.frameExt;
+        window.__HS_VERIFY.aerialDistMi = V3.dist / 120;
+        if(ZIP_MODE && ZIP_FRAME){
+          window.__HS_VERIFY.zipFrameSpanMi = ZIP_FRAME.spanMi;
+          window.__HS_VERIFY.zipFrameN = ZIP_FRAME.n;
+        }
+      }
+    }catch(e){}
+  }
+  function sceneOrigin(){
+    return (ZIP_MODE && ZIP_FRAME) ? ZIP_FRAME : LAST_HOME;
+  }
   // GEOCODE-QUALITY DISPLAY — data-driven, dormant until precise points exist.
   // Marker style reads the stored match_type (from the write-once geocode cache), never a
   // hardcoded rule. A point is "precise" only at rooftop/parcel quality. Today every point is
@@ -1737,8 +1797,8 @@ HS.onReady(function(){
   }
 
   // Address mode may only ask for a radius the canonical RPC accepts (0.5/1/2/5). The extra
-  // 3/10/20 stops exist for ZIP mode, where they widen the 3D frame over already-cached data and
-  // hit no server at all. Two guards, because either alone leaves a hole:
+  // 3/10/20 stops are leftover from when ZIP mode widened a 3D radius over cached data.
+  // ZIP mode no longer uses a radius (the records' bbox is the frame), and #radSel is hidden.
   //   * the stops are DISABLED in address mode, so they cannot be picked;
   //   * entering address mode while one is active SNAPS to the nearest supported radius and
   //     repaints the button row, so the resident sees the geography actually queried.
@@ -1765,7 +1825,7 @@ HS.onReady(function(){
 
   function run(address){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
-    ZIP_MODE = false; HOME_ANCHOR = false;
+    ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
     CUR_ADDRESS = address;
     // A real geocoded HOME now exists, so the HOME-specific view control may appear.
     document.body.classList.add("hashome");
@@ -1955,8 +2015,8 @@ HS.onReady(function(){
         if(window.HS && HS.setViewLabel) HS.setViewLabel(label);
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
-    CUR_RADIUS = 3;                                   // provisional ZIP-mode radius (development-tracker §3);
-    setRadiusButton(3);                               // render() re-picks it via zipFitRadius once the cached sites load
+    CUR_RADIUS = 1;                                   // address-mode default; ZIP views do not use a radius
+    setRadiusButton(1);                               // hidden in zipmode; restored on an address search
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
@@ -1965,8 +2025,8 @@ HS.onReady(function(){
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
     // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
-    // Elder, which is wrong on every other ZIP page). The radius selector stays visible so residents
-    // can widen the 3D aerial view to reach cached records past the default frame.
+    // Elder, which is wrong on every other ZIP page). The radius selector is hidden; ZIP views
+    // frame the records' own extent, not a circle the resident widens.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
     // Founder copy: one plain line. The long inventory clause it replaced named the record types
@@ -2208,10 +2268,9 @@ HS.onReady(function(){
     FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
     updateCovNote();
 
-    // ZIP mode: auto-frame to fit every cached record (loadZip seeds a fixed 3 mi, which can cull
-    // records the cache legitimately holds farther out — see zipFitRadius). render() runs once per
-    // ZIP load, so this never fights a manual radius pick (those re-render via drawMap directly).
-    if(ZIP_MODE){ CUR_RADIUS = zipFitRadius(sites); setRadiusButton(CUR_RADIUS); V3.userZoom = false; }
+    // ZIP mode is the records' own extent (ZIP_FRAME in drawMap), not a radius around a centroid.
+    // Reset 3D user-zoom so the aerial camera re-covers that extent on each ZIP load.
+    if(ZIP_MODE){ V3.userZoom = false; }
 
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
@@ -2241,41 +2300,32 @@ HS.onReady(function(){
       c.classList.toggle("on", parseFloat(c.getAttribute("data-r")) === r);
     });
   }
-  // ZIP mode default: the cache is the authoritative ZIP dataset, and the 3D aerial culls beyond
-  // CUR_RADIUS (+0.3 mi). Pick the smallest radius stop whose cull still contains every cached
-  // record, so nothing legitimately cached (e.g. TABS filings a few miles out) is hidden on first
-  // load. No point data → keep the documented 3-mi ZIP default; data past 20 mi → clamp to 20.
-  function zipFitRadius(sites){
-    var md = 0;
-    (sites||[]).forEach(function(s){
-      if(!mappable(s)) return;
-      var en = siteEN(s);
-      if(typeof en[0]==="number" && typeof en[1]==="number"){ md = Math.max(md, Math.hypot(en[0],en[1])); }
-    });
-    if(md <= 0) return 3;
-    for(var i=0;i<RADIUS_STOPS.length;i++){ if(RADIUS_STOPS[i] + 0.3 >= md) return RADIUS_STOPS[i]; }
-    return 20;
-  }
-
   function drawMap(data, sites){
     var home = data.home || { lat:41.5105, lng:-112.0155 };
     LAST_DRAW = { data:data, sites:sites };  // retained so a radius change can re-cull/re-frame without a re-fetch
     MAP_SITES = sites;                       // feed both 3D views the same (sourced) data
+    // ZIP frame FIRST, from the records' own coordinates. A ZIP centroid is not a frame.
+    ZIP_FRAME = ZIP_MODE && window.HS && HS.zipFrameFromSites ? HS.zipFrameFromSites(sites) : null;
     placeAreaSites(sites, home);             // display positions for jurisdiction-level items
     placeStackedPoints(sites, home);         // fan co-located precise points so none is hidden
     LAST_HOME = home;
     LAST_ADDR = ZIP_MODE ? ("ZIP " + ZIP_CODE) : (data.address || "This address");
     if(V3.active){ build3DFacilities(); }
-    if(GL.active && GL.inited){ GL.home = home; buildGLMarkers(); GL.map.jumpTo({ center:[home.lng,home.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
+    if(GL.active && GL.inited){ GL.home = sceneOrigin(); buildGLMarkers(); glFrameView(); }
+    var boot = sceneOrigin();
+    if(!homePointOK(boot) && homePointOK(home)) boot = home;
     if(!map){
-      map = L.map("mapInner", { scrollWheelZoom:false }).setView([home.lat, home.lng], 13);
+      map = L.map("mapInner", { scrollWheelZoom:false });
+      if(homePointOK(boot)) map.setView([boot.lat, boot.lng], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom:19, attribution:"&copy; OpenStreetMap"
       }).addTo(map);
       layerGroup = L.layerGroup().addTo(map);
       map.on("zoomend", spreadStackedMarkers);   // keep the pixel fan constant as the reader zooms
+    } else if(homePointOK(boot)) {
+      map.setView([boot.lat, boot.lng], 13);
+      layerGroup.clearLayers();
     } else {
-      map.setView([home.lat, home.lng], 13);
       layerGroup.clearLayers();
     }
 
@@ -2299,12 +2349,10 @@ HS.onReady(function(){
     // order (test/map1-address-radius.browser.mjs).
     try { window.siteMarkers = siteMarkers; } catch(e){}
     // Address mode: fit the whole radius circle, even when few points fall inside it. ZIP mode:
-    // there's no home-centered radius, and the radius selector can go wider than the data — so seed
-    // the bounds with just the centroid and let the cached sites drive the fit (a 20-mi pick must
-    // not zoom the 2D map out past the records, which all sit within the ZIP's cached extent).
+    // the records' own lat/lng are the geography — never seed the fit with a ZIP centroid.
     var bounds;
     if(ZIP_MODE){
-      bounds = [[home.lat, home.lng]];
+      bounds = [];
     } else {
       var dLat = CUR_RADIUS/69, dLng = CUR_RADIUS/(69*Math.cos(home.lat*Math.PI/180));
       bounds = [[home.lat+dLat, home.lng+dLng], [home.lat-dLat, home.lng-dLng]];
@@ -2328,7 +2376,7 @@ HS.onReady(function(){
     });
     applyFilter();
     // animate:false so the zoom is final synchronously and the pixel fan lands on the settled zoom.
-    if(bounds.length>1){ map.fitBounds(bounds, { padding:[30,30], maxZoom:14, animate:false }); }
+    if(bounds.length){ map.fitBounds(bounds, { padding:[30,30], maxZoom:14, animate:false }); }
     spreadStackedMarkers();   // fan co-located dots in screen pixels at the settled zoom
     // If the resolved-project parcels have already loaded, draw them onto this same map (and let
     // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
@@ -2368,7 +2416,12 @@ HS.onReady(function(){
       allStagesOff: allStagesOff(),
       stagesOn: STAGE_KEYS.filter(function(k){ return FILTER[k]; }).map(stageIdFor),
       covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
-      leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
+      leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length,
+      // ZIP camera math — the record bbox span, never a centroid radius. Null in address mode.
+      zipMode: !!ZIP_MODE,
+      zipFrameSpanMi: ZIP_FRAME ? ZIP_FRAME.spanMi : null,
+      zipFrameN: ZIP_FRAME ? ZIP_FRAME.n : 0,
+      aerialFrameExt: V3.frameExt || null
     };
   }
   // Marker-backbone verification (scripts/verify-map-markers.mjs): tracker pins + legend.
@@ -2907,6 +2960,8 @@ HS.onReady(function(){
   // context is refused so the 3D aerial control still shows the buildings rather
   // than bouncing the resident back to the 2D street map.
   function projectSoft(px, py, pz){
+    // Scene origin is ZIP_FRAME (record bbox) in ZIP mode, LAST_HOME in address mode.
+    // (0,0) is camera math — nothing is drawn here in ZIP mode.
     var tgt={x:0,y:16,z:0};
     var cp=Math.cos(V3.pitch), sp=Math.sin(V3.pitch);
     var cam={
@@ -2980,7 +3035,7 @@ HS.onReady(function(){
     });
     window.addEventListener("pointerup", function(){ drag=false; });
     c.addEventListener("wheel", function(ev){
-      V3.userZoom=true; V3.dist=Math.max(mi(0.3), Math.min(mi(CUR_RADIUS*3), V3.dist+(ev.deltaY>0?26:-26)));
+      V3.userZoom=true; V3.dist=Math.max(mi(0.3), Math.min(mi(viewSpanMi()*3), V3.dist+(ev.deltaY>0?26:-26)));
       ev.preventDefault();
     }, {passive:false});
     c.addEventListener("pointermove", function(ev){
@@ -3127,7 +3182,7 @@ HS.onReady(function(){
       V3.yaw-=(ev.clientX-lx)*0.006;V3.pitch=Math.max(0.1,Math.min(1.4,V3.pitch+(ev.clientY-ly)*0.005));lx=ev.clientX;ly=ev.clientY;
     });
     window.addEventListener("pointerup",function(){drag=false;});
-    dom.addEventListener("wheel",function(ev){V3.userZoom=true;V3.dist=Math.max(mi(0.3),Math.min(mi(CUR_RADIUS*3),V3.dist+(ev.deltaY>0?26:-26)));ev.preventDefault();},{passive:false});
+    dom.addEventListener("wheel",function(ev){V3.userZoom=true;V3.dist=Math.max(mi(0.3),Math.min(mi(viewSpanMi()*3),V3.dist+(ev.deltaY>0?26:-26)));ev.preventDefault();},{passive:false});
     // Hover a building -> quick tooltip (name/type/distance/violations).
     dom.addEventListener("pointermove",function(ev){
       if(drag)return;
@@ -3164,8 +3219,7 @@ HS.onReady(function(){
   function ringStops(R){ return [0.5,1,2,3,5,10,20].filter(function(r){ return r<=R+1e-9; }); }
   function drawRings(){
     if(!V3.inited)return;var G=V3.ringGrp;while(G.children.length)G.remove(G.children[0]);
-    // Mile rings need an address-derived HOME. ZIP mode has none; zipFitRadius is
-    // only a silent camera fit, not displayed geography.
+    // Mile rings need an address-derived HOME. ZIP mode has none.
     if(ZIP_MODE)return;
     var stops=ringStops(V3.frameExt||CUR_RADIUS);
     stops.forEach(function(r){
@@ -3193,8 +3247,7 @@ HS.onReady(function(){
         var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
         V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:lc3D(bkt), wire:bkt==="proposed", site:p});
       });
-      V3.frameExt=Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
-      if(!V3.userZoom) V3.dist=mi(V3.frameExt*2.0);
+      set3DFrame(maxD);
       V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
       return;
     }
@@ -3208,8 +3261,7 @@ HS.onReady(function(){
     // cluster (a whole ZIP of downtown facilities) the labels pile into an unreadable wall —
     // above the threshold we drop them and let hover/click reveal each building instead.
     var showLabels = nLabelable <= 12;
-    V3.frameExt = Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
-    if(!V3.userZoom){ V3.dist = mi(V3.frameExt*2.0); }
+    set3DFrame(maxD);
     updateHome3D();drawRings();
     // scale fog to the framed extent so the rings + facilities stay crisp
     if(V3.sc&&V3.sc.fog){ V3.sc.fog.near=mi(V3.frameExt)*0.9; V3.sc.fog.far=mi(V3.frameExt)*5+300; }
@@ -3266,6 +3318,7 @@ HS.onReady(function(){
       V3.cam.position.set(mi(0.03),7,mi(-0.01));V3.cam.lookAt(mi(-0.5),20,mi(0.2));
     } else {
       if(V3.auto)V3.yaw+=0.0016;
+      // (0,0) is ZIP_FRAME in ZIP mode / LAST_HOME in address mode — camera math, not a drawn centre.
       var cp=Math.cos(V3.pitch),sp=Math.sin(V3.pitch),tgt=new THREE.Vector3(0,16,0);
       V3.cam.position.set(tgt.x+Math.sin(V3.yaw)*cp*V3.dist,tgt.y+sp*V3.dist,tgt.z+Math.cos(V3.yaw)*cp*V3.dist);
       V3.cam.lookAt(tgt);
@@ -3310,6 +3363,31 @@ HS.onReady(function(){
   var GL = { inited:false, active:false, markers:[], home:LAST_HOME };
   var GL_TILE_GRACE_MS = 8000;   // imagery has this long to deliver ONE tile before we fall back
   function glZoom(r){ return 14 - Math.log(r)/Math.log(2); }   // smaller radius -> zoom in
+  function glFrameView(){
+    if(!GL.inited) return;
+    if(ZIP_MODE && ZIP_FRAME && homePointOK(ZIP_FRAME)){
+      if(GL.soft && GL.mapL){
+        try{ GL.mapL.fitBounds([[ZIP_FRAME.south, ZIP_FRAME.west],[ZIP_FRAME.north, ZIP_FRAME.east]], { padding:[40,40], maxZoom:13, animate:false }); }catch(e){}
+        return;
+      }
+      if(GL.map && GL.map.fitBounds){
+        try{
+          GL.map.fitBounds([[ZIP_FRAME.west, ZIP_FRAME.south],[ZIP_FRAME.east, ZIP_FRAME.north]],
+            { padding:48, maxZoom:13, pitch:62, bearing:-18, duration:0 });
+        }catch(e){}
+        return;
+      }
+    }
+    var o = sceneOrigin();
+    if(!homePointOK(o)) return;
+    if(GL.soft && GL.mapL){
+      try{ GL.mapL.setView([o.lat, o.lng], glZoom(CUR_RADIUS)); }catch(e){}
+      return;
+    }
+    if(GL.map){
+      try{ GL.map.jumpTo({ center:[o.lng,o.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
+    }
+  }
   function circlePoly(lat,lng,rMi,steps){
     var coords=[],R=rMi/69.0,latR=lat*Math.PI/180;
     for(var i=0;i<=steps;i++){ var a=i/steps*2*Math.PI;
@@ -3371,7 +3449,7 @@ HS.onReady(function(){
         },
         layers:[{id:"sat",type:"raster",source:"sat"}]
       },
-      center:[home.lng,home.lat],zoom:glZoom(CUR_RADIUS),pitch:62,bearing:-18,maxPitch:80
+      center:[home.lng,home.lat],zoom:ZIP_MODE && ZIP_FRAME ? glZoom(Math.max(ZIP_FRAME.spanMi,1)) : glZoom(CUR_RADIUS),pitch:62,bearing:-18,maxPitch:80
     });
     GL.map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-left");
     // Asynchronous failures never reach the loader's try/catch — a lost WebGL context or a
@@ -3389,9 +3467,9 @@ HS.onReady(function(){
       var msg = e && e.error && String(e.error.message || e.error);
       if(window.console && console.error) console.error("[HomeSignal] 3D satellite:", e && e.error);
       if(GL.active && !GL.soft && ((msg && /webgl/i.test(msg)) || !maplibreHasGL(GL.map)))
-        startGLRaster(LAST_HOME);
+        startGLRaster(sceneOrigin());
     });
-    GL.map.on("webglcontextlost",function(){ if(GL.active) startGLRaster(LAST_HOME); });
+    GL.map.on("webglcontextlost",function(){ if(GL.active) startGLRaster(sceneOrigin()); });
     GL.map.on("load",function(){
       // Terrain relief is decoration: the imagery is the map, so a DEM failure must not
       // fail the view. It is logged rather than discarded so it is diagnosable.
@@ -3400,7 +3478,7 @@ HS.onReady(function(){
       GL.map.addSource("radius",{ type:"geojson", data:{ type:"FeatureCollection", features:[] } });
       GL.map.addLayer({ id:"radius-fill", type:"fill", source:"radius", paint:{ "fill-color":"#2dd4bf", "fill-opacity":0.07 } });
       GL.map.addLayer({ id:"radius-line", type:"line", source:"radius", paint:{ "line-color":"#13b8a6", "line-width":2, "line-opacity":0.8 } });
-      GL.inited=true; buildGLMarkers();
+      GL.inited=true; buildGLMarkers(); glFrameView();
       // Grace period, then judge ONCE. Long enough that a slow connection is not called a
       // failure; short enough that nobody sits in front of a dark rectangle.
       setTimeout(function(){
@@ -3434,12 +3512,14 @@ HS.onReady(function(){
   }
 
   // ===================== VIEW SWITCH (2D / 3D aerial / 3D satellite) =====================
-  // A usable map centre. Both 3D views position everything relative to the home point, and
-  // MapLibre REFUSES a non-finite centre by throwing "Invalid LngLat object: (NaN, NaN)"
-  // out of its constructor — which is one of the two ways this page produced a black panel.
+  // A usable map origin. Address mode is the geocoded HOME. ZIP mode is the bounding
+  // box of the ZIP's own records — never a ZIP centroid. MapLibre REFUSES a non-finite
+  // centre by throwing "Invalid LngLat object: (NaN, NaN)" out of its constructor —
+  // which is one of the two ways this page produced a black panel.
   // render() can legitimately pass {lat:null,lng:null} (a ZIP whose authoritative geography
-  // is established but which has no cached report row), so the guard belongs here, and it
-  // reports rather than substituting a fabricated point.
+  // is established but which has no cached report row). ZIP 3D then frames from ZIP_FRAME
+  // (the records). A missing ZIP_FRAME and a missing HOME both fail closed rather than
+  // substituting a fabricated point.
   // NOTE the typeof test: isFinite(null) is TRUE (Number(null) is 0), so a bare isFinite()
   // guard would wave {lat:null,lng:null} straight through to MapLibre and back into the
   // black panel it exists to prevent. Measured while writing this guard.
@@ -3449,10 +3529,12 @@ HS.onReady(function(){
   }
 
   function startGLRaster(home){
-    if(!homePointOK(home)){ fail3D("gl","init"); return; }
+    var origin = home || sceneOrigin();
+    if(!homePointOK(origin)){ fail3D("gl","init"); return; }
     if(GL.soft && GL.mapL){
-      GL.home=home; buildGLRasterMarkers();
-      try{ GL.mapL.setView([home.lat, home.lng], glZoom(CUR_RADIUS)); GL.mapL.invalidateSize(); }catch(e){}
+      GL.home=origin; buildGLRasterMarkers();
+      glFrameView();
+      try{ GL.mapL.invalidateSize(); }catch(e){}
       mapMsg(); return;
     }
     try{ if(GL.map) GL.map.remove(); }catch(e){}
@@ -3460,14 +3542,14 @@ HS.onReady(function(){
     var el=document.getElementById("mapgl");
     el.innerHTML="";
     if(!(window.L && L.map)){ fail3D("gl","nowebgl"); return; }
-    GL.home=home; GL.soft=true; GL.markers=[];
+    GL.home=origin; GL.soft=true; GL.markers=[];
     GL.mapL=L.map(el, { zoomSnap:0.2, scrollWheelZoom:false });
     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
       attribution:"© Esri, Maxar, Earthstar Geographics", maxZoom:19
     }).addTo(GL.mapL);
-    GL.mapL.setView([home.lat, home.lng], glZoom(CUR_RADIUS));
     GL.inited=true;
     buildGLRasterMarkers();
+    glFrameView();
     setTimeout(function(){ try{ GL.mapL.invalidateSize(); }catch(e){} }, 40);
     mapMsg();
   }
@@ -3504,19 +3586,18 @@ HS.onReady(function(){
   }
 
   function start3DSatellite(){
-    if(GL.soft && GL.inited){ startGLRaster(LAST_HOME); return; }
+    var origin = sceneOrigin();
+    if(GL.soft && GL.inited){ startGLRaster(origin); return; }
     if(GL.inited && GL.map && maplibreHasGL(GL.map)){
-      GL.home=LAST_HOME; buildGLMarkers();
-      try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
+      GL.home=origin; buildGLMarkers(); glFrameView();
       setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
       mapMsg(); return;
     }
     if(window.maplibregl){
       try{
-        if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
+        if(!GL.inited && !GL.map){ initGL(origin); }
         else if(GL.inited && GL.map){
-          GL.home=LAST_HOME; buildGLMarkers();
-          try{ GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }catch(e){}
+          GL.home=origin; buildGLMarkers(); glFrameView();
         }
         if(maplibreHasGL(GL.map)){
           setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
@@ -3527,7 +3608,7 @@ HS.onReady(function(){
         if(window.console && console.error) console.error("[HomeSignal] 3D satellite failed to start:", e);
       }
     }
-    startGLRaster(LAST_HOME);
+    startGLRaster(origin);
   }
 
   function start3DAerial(){
@@ -3569,7 +3650,11 @@ HS.onReady(function(){
     // negative on a capable desktop (console `3d/nowebgl`) while the same browser loaded
     // 3D on a phone. Try the real renderer; if it cannot start, keep the view up with a
     // Canvas-2D aerial / Leaflet satellite engine that needs no WebGL.
-    if(!homePointOK(LAST_HOME)){ fail3D(mode, "init"); return; }
+    if(ZIP_MODE){
+      if(!homePointOK(ZIP_FRAME)){ fail3D(mode, "init"); return; }
+    } else {
+      if(!homePointOK(LAST_HOME)){ fail3D(mode, "init"); return; }
+    }
     if(window.HS && HS.webglProbe){
       var probe=HS.webglProbe(document);
       if(!probe.ok && window.console && console.info)
@@ -3588,7 +3673,7 @@ HS.onReady(function(){
       if(GL.inited){ start3DSatellite(); return; }
       ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite",
         function(){ if(!GL.active) return; start3DSatellite(); },
-        function(){ if(!GL.active) return; startGLRaster(LAST_HOME); });
+        function(){ if(!GL.active) return; startGLRaster(sceneOrigin()); });
     }
   }
   document.getElementById("viewSeg").addEventListener("click",function(e){
@@ -3609,7 +3694,7 @@ HS.onReady(function(){
     if(!V3.inited)return;
     V3.userZoom=true;
     if(V3.homeView){ V3.homeView=false; document.getElementById("homeViewBtn").classList.remove("on"); }
-    V3.dist=Math.max(mi(0.3),Math.min(mi(CUR_RADIUS*3),V3.dist+dir*V3.dist*0.22));
+    V3.dist=Math.max(mi(0.3),Math.min(mi(viewSpanMi()*3),V3.dist+dir*V3.dist*0.22));
   }
   document.getElementById("zoomInBtn").addEventListener("click",function(){ zoom3D(-1); });
   document.getElementById("zoomOutBtn").addEventListener("click",function(){ zoom3D(1); });
