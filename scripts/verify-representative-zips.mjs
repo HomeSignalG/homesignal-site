@@ -17,6 +17,7 @@ import {
   validRecordUrl,
   validateTabsSite,
   LIFECYCLE_BUCKETS,
+  lifecycleValueRecognised,
   ingestionIssues,
 } from './lib/verify-dev-helpers.mjs';
 
@@ -99,6 +100,14 @@ async function verifyZipPage(page, spec, cached) {
   const pass = (name, detail = '') => {
     result.checks.push({ name, pass: true, detail });
   };
+  // A THIRD OUTCOME, because two were not enough. A check that could not run is not a check
+  // that passed: reporting it as PASS is how `legend filtering` sat green for four months
+  // while clicking a selector that matched nothing. A skip does not fail the run — it is
+  // genuinely not applicable — but it renders as SKIP everywhere a pass would render, so the
+  // difference is visible to anyone reading the report rather than only to whoever wrote it.
+  const skip = (name, detail = '') => {
+    result.checks.push({ name, pass: true, skipped: true, detail });
+  };
 
   if (!cached) {
     fail('cache row exists', 'no development_reports row');
@@ -152,7 +161,12 @@ async function verifyZipPage(page, spec, cached) {
       const covEl = document.getElementById('covNote');
       const covNote = verify.covNote
         || ((covEl && covEl.style.display !== 'none') ? (covEl.textContent || '').trim() : '');
-      const legendRows = Array.from(document.querySelectorAll('#mapkey span[role="button"]'));
+      // ⚠️ WAS `#mapkey span[role="button"]`, WHICH HAS MATCHED ZERO ELEMENTS SINCE #1098.
+      // The Status row became <label>-wrapped real checkboxes; #1103 measured the old hook at
+      // 0 occurrences page-wide. Because `legendRows` fed an `>= 3` guard, the ONLY check
+      // exercising the filter panel silently stopped running and reported PASS while doing
+      // nothing — the exact "an instrument must prove it ran" failure this repo names.
+      const legendRows = Array.from(document.querySelectorAll('#mapkey .stagechip'));
       const civicVisible = (() => {
         const band = document.getElementById('civicBand');
         return !!(band && band.style.display !== 'none' && document.querySelectorAll('#civicList .rec').length);
@@ -218,6 +232,19 @@ async function verifyZipPage(page, spec, cached) {
       else pass('hearing data', `${st.civic} civic record(s) · band visible=${st.civicVisible}`);
     }
 
+    // ⚠️ `expect.civicMin` WAS DECLARED IN THE FIXTURES AND READ BY NOBODY — measured
+    // 2026-09-07, consumed 0 times while 84302 had carried `civicMin: 1` for months. A
+    // fixture key that looks like an assertion and asserts nothing is worse than no key: it
+    // reads as coverage. Wired here rather than deleted, because the civic plane is now the
+    // ONLY thing carrying 03227 and something has to hold that page to account.
+    if (expect.civicMin) {
+      if (st.civic < expect.civicMin) {
+        fail('civic records', `${st.civic} civic record(s), expected >= ${expect.civicMin}`);
+      } else {
+        pass('civic records', `${st.civic} civic record(s) (>= ${expect.civicMin})`);
+      }
+    }
+
     const noSource = rendered.filter((s) => !(s && (s.url || s.record_url)));
     if (noSource.length) fail('official links (sourced)', `${noSource.length} unsourced site(s)`);
     else pass('official links (sourced)', 'every site has record_url');
@@ -250,10 +277,34 @@ async function verifyZipPage(page, spec, cached) {
       }
     }
 
+    // LIFECYCLE. Four buckets, not three — see lifecycleValueRecognised for why `unknown`
+    // and an honest blank both pass, and why "does it resolve to a valid bucket" would be a
+    // vacuous question. The failure NAMES the offending values with counts: "4 out-of-map
+    // bucket(s)" told a reader nothing they could act on, which is why this check sat red
+    // across 8 ZIPs without anyone being able to see whether it was data or the instrument.
     const devRecs = rendered.filter((s) => s && s.relevance === 'development');
-    const badBucket = devRecs.filter((s) => !LIFECYCLE_BUCKETS.has(s.type));
-    if (badBucket.length) fail('lifecycle badges', `${badBucket.length} out-of-map bucket(s)`);
-    else pass('lifecycle badges', `${devRecs.length} dev record(s) bucketed`);
+    const badBucket = devRecs.filter((s) => !lifecycleValueRecognised(s));
+    if (badBucket.length) {
+      const census = {};
+      for (const s of badBucket) {
+        const k = JSON.stringify((s && s.type) == null ? null : String(s.type));
+        census[k] = (census[k] || 0) + 1;
+      }
+      const named = Object.entries(census).sort((a, b) => b[1] - a[1])
+        .slice(0, 5).map(([k, n]) => `${k}×${n}`).join(', ');
+      fail('lifecycle badges', `${badBucket.length} of ${devRecs.length} dev record(s) carry an `
+        + `unrecognised lifecycle value: ${named}`);
+    } else {
+      // The distribution is printed on the PASS too, so a bucket quietly going to zero — a
+      // source that stopped stating lifecycle at all — is visible without a failure first.
+      const seen = {};
+      for (const s of devRecs) {
+        const k = ((s && s.type) == null || String(s.type).trim() === '') ? '(absent)' : String(s.type).toLowerCase();
+        seen[k] = (seen[k] || 0) + 1;
+      }
+      const dist = Object.entries(seen).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · ');
+      pass('lifecycle badges', `${devRecs.length} dev record(s) bucketed${dist ? ` — ${dist}` : ''}`);
+    }
 
     if (expect.badges && st.countyBadges < 1) {
       // 84336 may not always show dt-badge if dev tracker block empty — warn not fail if dev present
@@ -286,22 +337,29 @@ async function verifyZipPage(page, spec, cached) {
           const paths = document.querySelectorAll('#map .leaflet-interactive').length;
           return Math.max(v.visibleMarkers || 0, paths);
         });
-        await page.click('#mapkey span[role="button"]:first-child');
+        // Clicking the LABEL toggles the checkbox it wraps — the same gesture a resident makes.
+        await page.click('#mapkey .stagechip:first-of-type');
         await page.waitForTimeout(500);
         const after = await page.evaluate(() => {
           const v = window.__HS_VERIFY || {};
           const paths = document.querySelectorAll('#map .leaflet-interactive').length;
           return Math.max(v.visibleMarkers || 0, paths);
         });
-        await page.click('#mapkey span[role="button"]:first-child');
+        await page.click('#mapkey .stagechip:first-of-type');   // restore, so later checks see a full map
         await page.waitForTimeout(300);
         if (after >= before) fail('legend filtering', `visible ${before}→${after} after toggle`);
         else pass('legend filtering', `visible ${before}→${after} after toggle`);
       } else {
-        pass('legend filtering', 'skipped — insufficient markers for toggle test');
+        // Honestly not applicable: one marker cannot demonstrate a filter. Recorded as a SKIP,
+        // never a pass — the two are only the same to a reader who does not look.
+        skip('legend filtering', `insufficient markers for a toggle test (${markerCount})`);
       }
     } else if (expect.filtering) {
-      pass('legend filtering', 'skipped — no legend');
+      // NOT a skip and NOT a pass. A ZIP asking for `filtering` must HAVE the control; the
+      // legend missing means the selector went stale or the panel stopped rendering, and that
+      // is precisely the condition that hid for four months behind `pass('… no legend')`.
+      fail('legend filtering', `expected the Status chips and found ${st.legendRows} — `
+        + 'the filter panel did not render, or this check\'s selector has gone stale');
     }
 
     if (expect.propertyPage) {
@@ -356,7 +414,7 @@ async function main() {
     const icon = row.pass ? '✓' : '✗';
     console.log(`${icon} ${spec.zip} — ${spec.label}`);
     for (const c of row.checks) {
-      console.log(`    ${c.pass ? '·' : '!'} ${c.name}${c.detail ? ': ' + c.detail : ''}`);
+      console.log(`    ${c.skipped ? '~' : c.pass ? '·' : '!'} ${c.name}${c.detail ? ': ' + c.detail : ''}`);
     }
     console.log('');
   }
@@ -383,7 +441,7 @@ async function main() {
       '',
       `### ${r.zip} — ${r.label}`,
       ...(r.cached ? [`- Cache: facilities=${r.cached.counts?.facilities} development=${r.cached.counts?.development} civic=${r.cached.counts?.civic}`] : []),
-      ...r.checks.map((c) => `- ${c.pass ? 'PASS' : '**FAIL**'}: ${c.name}${c.detail ? ` — ${c.detail}` : ''}`),
+      ...r.checks.map((c) => `- ${c.skipped ? '_SKIP_' : c.pass ? 'PASS' : '**FAIL**'}: ${c.name}${c.detail ? ` — ${c.detail}` : ''}`),
     ]),
   ].join('\n');
 
