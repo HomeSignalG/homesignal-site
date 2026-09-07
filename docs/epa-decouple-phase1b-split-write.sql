@@ -210,3 +210,64 @@ comment on function public.dev_epa_write_refused(boolean, jsonb, jsonb, timestam
 --   counts.facilities <> stored registry_id site count ......... 0 rows
 --   facilities_refreshed_at > refreshed_at (impossible) ........ 0 rows
 --   facilities_refreshed_at < refreshed_at (the split, visible) . 32 rows
+
+-- ============================================================================
+-- FOLLOW-UP 1 — a 67-SECOND MIGRATION WINDOW LEFT 6 ROWS WITH A STALE OVERLAY CLOCK
+-- migration `epa_decouple_phase1b_repair_migration_window_overlay_clock`, same day
+-- ============================================================================
+-- Part 1 (add the column + backfill) applied 14:25:50Z; part 2 (the split) applied
+-- 14:26:57Z. `dev-reports-rolling-refresh` runs */2, so its 14:26:00Z tick landed BETWEEN
+-- them and ran the OLD dev_refresh_collect — which advanced `refreshed_at` and knew nothing
+-- about the new column. 6 rows therefore read facilities_refreshed_at < refreshed_at while
+-- no EPA refusal had occurred.
+--
+-- ⚠️ HOW IT WAS FOUND, because the shape recurs: a table-wide invariant sweep flagged ONE row
+-- as "overlay held BUT facilities = 0" — a state the split makes structurally impossible
+-- (the refusal requires cached facilities > 0). Chasing that single row is what surfaced the
+-- window. A count of 1 against 12,722 is exactly the size of anomaly that gets rounded away;
+-- it was the only visible symptom of a 6-row inconsistency.
+--
+-- THE REPAIR IS THE HONEST VALUE. The old function was all-or-nothing — if it wrote the row it
+-- wrote BOTH planes from one payload — so for these rows the facility layer genuinely DID take
+-- a write at `refreshed_at`. The clock was under-reporting. Leaving it would have made 6 pages
+-- look like they had held a stale facility layer when they had not.
+--
+-- SCOPED BY TIME, NOT BY SYMPTOM, so it cannot touch a genuine refusal. Bounds are the two
+-- migration versions. Verified: 6 repaired, 0 remaining in-window, and the 42 genuine refusals
+-- outside the window were asserted UNCHANGED by the migration itself (it raises on collateral
+-- damage). Control: 0 rows with a behind clock BEFORE the window — which is what proves the
+-- backfill was correct in the first place.
+--
+-- 🔑 STANDING ANSWER: ADDING A COLUMN THAT A HOT-PATH FUNCTION MUST MAINTAIN IS ONE CHANGE,
+-- NOT TWO. On a */2 cron there is no safe gap between "the column exists" and "the writer
+-- maintains it". Either apply both in ONE migration, or expect to repair whatever the cron
+-- wrote in between — and measure it rather than assuming the window was empty.
+--
+-- Table-wide after the repair (control: 12,722 rows):
+--   facilities_refreshed_at > refreshed_at (impossible) ............ 0
+--   facilities_refreshed_at IS NULL ................................ 0
+--   overlay clock held ............................................. 43
+--     of those, carrying PRESERVED non-zero facilities ............. 43
+--     of those, zeroed (would be a defect) ......................... 0
+--   counts.facilities <> stored facility-site count ................ 0
+
+-- ============================================================================
+-- FOLLOW-UP 2 — the verification probe table was DROPPED
+-- migration `drop_epa_split_probe_20260907_diagnostic`
+-- ============================================================================
+-- public.epa_split_probe_20260907 froze the 80-ZIP pre-run cohort so the before/after could be
+-- proven. It is gone. Reasons, in order of weight:
+--   1. Nothing reads it and nothing can refresh it — it captured one instant that has passed.
+--   2. `create table as` in `public` inherited this project's default grants, so it landed with
+--      RLS DISABLED and `anon` holding arwdDxtm — readable AND WRITABLE through PostgREST with
+--      the public anon key. That is the page_cache posture CLAUDE.md flags as a defect, created
+--      for an artifact with no consumer.
+--   3. Its findings are committed above, where they are reviewable in a diff.
+-- Content at drop time, for the record: 80 rows, 26 EPA-refused, ZIP range 04015..99204,
+-- 2,635 project records protected and 405 stored facilities preserved across the refused rows.
+--
+-- 🔑 STANDING ANSWER: a verification cohort that will be summarised into a committed doc should
+-- be a TEMP table or doc-only. If a cohort must genuinely persist across sessions (as the
+-- gov-notices gn_*_cohort_* tables do), create it EXPLICITLY with RLS enabled and no anon
+-- grant, and name its owner and expiry in the same commit. `create table as` in `public` is
+-- never the right way to make one.

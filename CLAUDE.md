@@ -881,6 +881,25 @@ independently of EPA). 26+52+2 = 80; 26+52 = 78 = rows written. Exact. Table-wid
 `counts.facilities` ≠ stored facility-site count on **0 of 12,722**; overlay clock ahead of core on
 **0**; legitimately behind on **32** (the split, visible in the data).
 
+### Two standing answers this build paid for
+- 🔑 **ADDING A COLUMN A HOT-PATH FUNCTION MUST MAINTAIN IS ONE MIGRATION, NOT TWO.** Part 1
+  (column + backfill) landed 14:25:50Z and part 2 (the writer) 14:26:57Z; `dev-reports-rolling-
+  refresh` runs `*/2`, so its 14:26:00Z tick ran the OLD function in the 67-second gap and
+  advanced `refreshed_at` while leaving the new clock at its backfill value. 6 rows.
+  **It surfaced as ONE row** failing a table-wide invariant ("overlay held BUT facilities = 0",
+  which the split makes structurally impossible) — a count of 1 against 12,722 is exactly the
+  anomaly size that gets rounded away. Repaired scoped BY TIME (the two migration versions), so
+  the 42 genuine refusals could not be touched; the repair migration raises on collateral damage.
+  Control: **0** rows with a behind clock BEFORE the window, which is what proves the backfill
+  itself was right.
+- 🔑 **NEVER `create table as` A COHORT IN `public`.** `epa_split_probe_20260907` inherited the
+  project's default grants and landed **RLS-disabled with `anon` holding `arwdDxtm`** — anon-
+  readable AND WRITABLE through PostgREST, the `page_cache` posture this file flags as a defect,
+  for a diagnostic with no consumer. Dropped; its findings live in the parked SQL. A cohort that
+  will be summarised into a doc should be TEMP or doc-only; one that must persist (the
+  gov-notices `gn_*_cohort_*` tables) gets RLS, no anon grant, and a named owner and expiry in
+  the same commit.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
