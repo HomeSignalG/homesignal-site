@@ -1114,10 +1114,13 @@ HS.onReady(function(){
     var n = parseInt(h, 16);
     return isNaN(n) ? 0x706468 : n;
   }
-  // Lifecycle-only helper. Kept for any caller that has a bucket and no marker; the 3D
-  // aerial BUILDINGS no longer use it — they read the resolver's mk.color, which is the
-  // lifecycle hex for a project and the regulatory purple for an EPA-only facility.
-  // An unrecognised bucket falls back to the neutral, never to a stage colour.
+  // Lifecycle-only helper. IT HAS NO CALLER TODAY, and that is the point rather than an
+  // oversight: the 3D aerial BUILDINGS used to be its only caller, and painting by bucket
+  // alone is exactly what made every EPA facility a green "Operating now" block. They now
+  // read the resolver's mk.color — the lifecycle hex for a project, the regulatory purple
+  // for an EPA-only facility. Retained as the ONE named bucket→3D-integer converter, so a
+  // future caller that genuinely has a bucket and no marker cannot restate the palette as
+  // a literal. An unrecognised bucket falls back to the neutral, never to a stage colour.
   function lc3D(bkt){
     return hex3D((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468");
   }
@@ -3262,15 +3265,25 @@ HS.onReady(function(){
 
   function build3DFacilities(){
     if(!V3.inited)return;
-    // What this view actually painted — same resolver hex the 2D pin uses. A browser
-    // check reads this rather than sampling pixels (lighting and the canvas fallback
-    // both shift the on-screen colour). Empty until the first successful build.
+    // What this view actually painted. A browser check reads this rather than sampling
+    // pixels (lighting and the canvas fallback both shift the on-screen colour) — so it
+    // must record the value that REACHED THE RENDERER, read back off the object that was
+    // built, never the resolver's mk.color. Reporting the resolver's intent would make
+    // this hook agree with the contract even if the painter ignored it: reverting the
+    // paint line to lc3D(bkt) would still publish purple, and the browser assertions
+    // would pass on the very defect they exist to catch (measured — they did).
+    // Empty until the first successful build.
     var aerialPaint=[];
-    function notePaint(p, paint){
+    function noteHex(n){
+      var v = Number(n);
+      if(!isFinite(v) || v < 0) return null;
+      return "#" + ("000000" + (v >>> 0).toString(16)).slice(-6);
+    }
+    function notePaint(p, usedCol, drewBadge){
       aerialPaint.push({
         label: String(p.label || "").split(" ·")[0],
-        color: (paint.mk && paint.mk.color) || null,
-        signal: !!(paint.signal)
+        color: noteHex(usedCol),
+        signal: !!drewBadge
       });
     }
     function stampPaint(){
@@ -3293,8 +3306,10 @@ HS.onReady(function(){
         var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1];
         var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
         var paint=site3DPaint(p);
-        notePaint(p, paint);
-        V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:paint.col, wire:bkt==="proposed", site:p, signal:paint.signal});
+        var box={x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:paint.col, wire:bkt==="proposed", site:p, signal:paint.signal};
+        V3.softSites.push(box);
+        // Read back off the box the canvas path will actually draw, not off `paint`.
+        notePaint(p, box.col, box.signal);
       });
       set3DFrame(maxD);
       V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
@@ -3329,7 +3344,6 @@ HS.onReady(function(){
       var raw=String(p.label||"").split(" ·")[0];
       var name=raw.length>20?raw.slice(0,19).trim()+"…":raw;
       var paint=site3DPaint(p);
-      notePaint(p, paint);
       var col=paint.col;
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
@@ -3343,6 +3357,7 @@ HS.onReady(function(){
         grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.85})));
         grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.10})));
         grp.scale.y=Math.max(0.0001,V3.rise);G.add(grp);V3.proposed.push(grp);
+        notePaint(p, grp.children[0].material.color.getHex(), false);
       } else {
         // Operating, approved and lifecycle-UNKNOWN are precise, fewer, and the point of the
         // view — label these. Colour is paint.col from site3DPaint → mk.color, NOT a
@@ -3354,13 +3369,18 @@ HS.onReady(function(){
         // Friendly building-TYPE label — only when the scene is sparse enough to read;
         // in a dense cluster hover/click shows it instead (see showLabels above).
         if(showLabels){ var lb=lblSprite(facilityType(p),LBL_BG[bkt]||LBL_BG.unknown,"#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
+        var drewBadge=false;
         if(paint.signal){
           var rb=lblSprite(paint.signal.letter || "R", paint.signal.color, "#fff");
           rb.position.set(x+w*0.42, h+5, zc+w*0.42);
           rb.scale.set(4.2*(rb.userData.asp||1), 4.2, 1);
           rb.userData.regBadge=true;
           G.add(rb);
+          drewBadge=true;
         }
+        // Read back off the mesh that was added to the scene, and off whether the badge
+        // was really drawn — the hook reports the view, not the intent.
+        notePaint(p, bm.material.color.getHex(), drewBadge);
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });

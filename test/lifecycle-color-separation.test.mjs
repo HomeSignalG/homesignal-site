@@ -267,6 +267,17 @@ ok(epaOnly.color === FACILITY && parseInt(String(epaOnly.color).replace('#', '')
   epaOnly.color);
 ok(/__HS_AERIAL_PAINT/.test(aerial),
   '8j: the 3D aerial publishes the hex it painted, so a browser check can read colour without sampling pixels');
+// …and it publishes THE PAINT, not the intent. The first version of this hook recorded
+// `mk.color` — the resolver's answer — so the browser assertions in
+// test/map1-regulatory-toggle.browser.test.mjs passed even with the paint line reverted
+// to lc3D(bkt): measured, the mutation was invisible to them. The hook now reads the
+// value back off the object that was built (the mesh material, the soft box), which is
+// what makes those assertions load-bearing rather than decorative.
+ok(!/notepaint\(p,\s*paint\)/.test(aerialCode) && !/color:\s*\(paint\.mk/.test(aerialCode),
+  '8k: the aerial hook does not report the resolver colour — that made the browser check pass on the defect');
+ok(/notepaint\(p,\s*bm\.material\.color\.gethex\(\)/.test(aerialCode)
+   && /notepaint\(p,\s*box\.col,\s*box\.signal\)/.test(aerialCode),
+  '8l: both painters report the colour read back off the object they built — WebGL mesh and canvas box alike');
 
 
 // §9 — A COLOUR YOU CANNOT SEE IS NOT A COLOUR. §1-§8 prove the palette is separated;
