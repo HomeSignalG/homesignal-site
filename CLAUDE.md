@@ -933,8 +933,9 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 - `app_coverage_states`: `facilities_only` is a CORE coverage state and CI pins it to `⇒ pass`.
 - One `sites` jsonb still carries both planes (blocks "removable without a schema migration").
 - ~~`Promise.all([devSites, facilitySites])` keeps EPA's 6-step radius back-off on the critical
-  path.~~ **UNIT 4 IS BUILT IN SOURCE (see below); the DEPLOYED function still runs the old join
-  until it is deployed.**
+  path.~~ **UNIT 4 IS BUILT IN SOURCE (see below): the FRS ladder is CAPPED at 45s+grace, not
+  taken off the write.** The join still waits for both planes. The DEPLOYED function still runs
+  the old `Promise.all` until it is deployed.
 
 **Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
@@ -1094,10 +1095,11 @@ is still PARKED.** Full record: audit §15.
 ### 🅿️ PHASE 2 · UNIT 4 IS BUILT IN SOURCE AND NOT DEPLOYED (2026-09-07) — code, no SQL
 `Promise.all([devSites(...), facilitySites(...)])` at both call sites in
 `supabase/functions/get-address-report/index.ts` is replaced by `sources/planes.ts::resolvePlanes`,
-which runs the two planes concurrently under INDEPENDENT deadlines. Pinned by
-`test/epa-plane-deadlines.test.mjs` (39 assertions, proven load-bearing by seven mutations).
-**Units 1 and 3 are untouched; `data_quality`, `indexable`, `coverage_state`, the crons and N5 are
-untouched.**
+which runs the two planes concurrently under **separate, capped deadlines, then still waits for
+both** (`max(core, overlay+grace)` — a bound, not independence). Pinned by
+`test/epa-plane-deadlines.test.mjs` (43 assertions, including a composition grep of both call
+sites, proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
+`indexable`, `coverage_state`, the crons and N5 are untouched.**
 
 - 🔑 **UNIT 4 NEEDED NO SQL, AND THAT IS THE FINDING — NOT AN OMISSION.** A deadline miss is
   routed into the refusal path a 429 already takes: `epa.ok:false`, which is the **single**
@@ -1124,7 +1126,16 @@ untouched.**
   under one full attempt would cut off slow-but-SUCCESSFUL reads and manufacture
   `overlay_unknown` out of healthy ones — losing real facility records, which is the same harm as
   a false zero reached from the other side. Pinned: a 29 s successful read still succeeds.
-  `CORE_DEADLINE_MS` (60 s) is the longer of the two so the overlay can never outlive core.
+  `CORE_DEADLINE_MS` (60 s) is the longer *budget*. Overlay routinely outlives core *completion*
+  (core is hundreds of ms); the join duration is `max` of the two races, not their sum.
+- ⚠️ **THE JOIN IS A BOUND, NOT INDEPENDENCE.** Both planes start together and the caller still
+  waits for the overlay up to 45 s + 2 s grace. Until Unit 3 splits `sites`, the report cannot be
+  written without an overlay verdict. What Unit 4 removes is the unbounded 18×30 s FRS ladder and
+  an overlay throw failing the core report. A miss is the existing 429 refusal path.
+- ⚠️ **ECHO / CWA ENRICHMENT IS STILL ON THE PATH AFTER FRS, AND IS OUT OF SCOPE.**
+  `echoEnrich` + `cwaPermitEnrich` are two sequential 25 s pairs. On a deadline miss `fac` is
+  empty and both no-op. On a slow-but-successful FRS read they can still add EPA.gov I/O after
+  the 45 s budget. Do not fold them into this unit.
 - **The deadline is an ABSOLUTE instant, enforced twice from ONE value.** `resolvePlanes` computes
   it and hands it to the overlay, so the ladder's cooperative stop (which never STARTS an attempt
   it cannot finish, and CAPS that attempt's timeout to the budget left) and the outer hard stop
@@ -1138,6 +1149,9 @@ untouched.**
   run at §4 on Node's unhandled-rejection default, before printing anything. **Measure a mutation
   on the EXIT CODE.** The test now pre-attaches a catch so that regression prints four named
   failures instead of a stack trace — a crash hides every later section.
+- ⚠️ **A SUITE THAT NEVER READS `index.ts` CANNOT SEE A CALL-SITE REVERT.** Replacing both
+  `resolvePlanes` joins with `Promise.all([devSites, facilitySites])` left every helper assertion
+  green (measured). §0 now greps the two call sites. **The composition is the load-bearing pin.**
 
 
 ### Status

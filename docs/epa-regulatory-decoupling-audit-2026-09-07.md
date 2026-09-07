@@ -909,8 +909,11 @@ built later the same day — §17. Nothing in §16 depends on it.)*
 
 ## 17. PHASE 2 · UNIT 4 — BUILT IN SOURCE, NOT DEPLOYED (2026-09-07)
 
-**Scope: §6 only** — EPA off the report's critical path. Units 1 and 3 untouched;
-`data_quality`, `indexable`, `coverage_state`, the crons and N5 untouched. **No SQL.**
+**Scope: §6 only** — the FRS ladder on the report path is CAPPED (45s+grace), not removed.
+Units 1 and 3 untouched; `data_quality`, `indexable`, `coverage_state`, the crons and N5
+untouched. **No SQL.** The join still waits for both planes; that is a bound, not
+independence. Until Unit 3 splits `sites`, the report cannot be written without an overlay
+verdict. A miss is the existing 429 refusal path.
 
 ### 17.1 What §6 actually cost, bounded
 
@@ -931,6 +934,8 @@ counter. The test was corrected by the code, not the other way round.
 
 `supabase/functions/get-address-report/sources/planes.ts` — one `resolvePlanes()` used by BOTH
 call sites (ZIP mode ~line 662, address mode ~line 913), so the two joins cannot drift apart.
+The join still `Promise.all`s the two deadline *races*: duration is `max(core, overlay+grace)`.
+That is a bound, not independence.
 
 | plane | budget | a miss means |
 |---|---|---|
@@ -962,9 +967,11 @@ the other side. Pinned: a 29 s successful read still succeeds under the 45 s bud
 
 ### 17.5 Verification
 
-`test/epa-plane-deadlines.test.mjs` — **39 assertions**, driving the shipped modules with a mocked
-fetch and an injected clock, so no assertion waits on real time. Offline suite **163/163 files**,
-and the new file was confirmed present in that run rather than assumed.
+`test/epa-plane-deadlines.test.mjs` — **43 assertions**, driving the shipped modules with a mocked
+fetch and an injected clock, so no assertion waits on real time, plus a composition grep of both
+`index.ts` call sites (a `Promise.all` revert of the wiring left the helper assertions green).
+Offline suite **163/163 files**, and the new file was confirmed present in that run rather than
+assumed.
 
 | mutation | exit | named failures |
 |---|---|---|
@@ -975,6 +982,7 @@ and the new file was confirmed present in that run rather than assumed.
 | M5 drop the ladder deadline check | 1 | `7b`, `7d`, `8b`, `8c` |
 | M6 drop the timeout CAP, keep the stop (half-fix) | 1 | `8b`, `8c` |
 | M7 forget to clear the timers | 1 | `1d`, `3h` |
+| M8 revert both `index.ts` joins to `Promise.all([devSites, …])` | 1 | `0a`–`0d` |
 
 Baseline and restored: **exit 0, zero FAIL lines.**
 

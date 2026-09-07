@@ -1,4 +1,4 @@
-// TWO PLANES, TWO DEADLINES — the join that stops the CORE project plane waiting on EPA.
+// TWO PLANES, TWO DEADLINES — the join that stops the CORE project plane waiting minutes on EPA.
 //
 // UNIT 4 of the EPA/regulatory decoupling (founder decision 2026-09-07, CLAUDE.md §7.1). Map 1
 // has a REQUIRED core project plane and an OPTIONAL regulatory overlay plane. Until now both
@@ -7,12 +7,19 @@
 //     const [dev, facResult] = await Promise.all([devSites(...), facilitySites(...)]);
 //
 // `Promise.all` has exactly the two properties this workstream exists to remove:
-//   1. IT WAITS FOR THE SLOWEST. `facilitySites` → `frsFacilities` walks up to six radii x three
-//      attempts, each bounded only by its own 30s fetch timeout, so a slow-but-not-refusing FRS
-//      held the finished core result for MINUTES before the report could be written.
+//   1. IT WAITS FOR THE SLOWEST WITH NO CAP. `facilitySites` → `frsFacilities` walks up to six
+//      radii x three attempts, each bounded only by its own 30s fetch timeout, so a
+//      slow-but-not-refusing FRS held the finished core result for MINUTES before the report
+//      could be written.
 //   2. IT FAILS ON THE FIRST REJECTION. An overlay that threw would have failed the whole core
 //      report. (Today `facilitySites` cannot throw; this module makes that a guarantee rather
 //      than an accident of the current implementation.)
+//
+// WHAT THIS MODULE ACTUALLY DOES — A BOUND, NOT INDEPENDENCE. Both planes still start together
+// and the join still waits for both. Duration is max(core, overlay+grace), not their sum. Core
+// does not return the moment `devSites` finishes: until Unit 3 splits `sites`, the report cannot
+// be written without an overlay verdict. What this removes is the unbounded FRS ladder and the
+// overlay-throw failing the core report. A miss after 45s is the existing 429 refusal path.
 //
 // THE ASYMMETRY IS THE WHOLE POINT — the two planes get deadlines with OPPOSITE miss semantics:
 //
@@ -83,7 +90,11 @@ export type PlaneOutcome<C, O> = {
 };
 
 /**
- * Run both planes concurrently under independent deadlines.
+ * Run both planes concurrently under separate deadlines, then wait for both.
+ *
+ * Overlay is capped at `overlayDeadlineMs` (+ grace on the hard stop). A miss becomes
+ * `overlayUnavailable` — never a throw, never a zero. This is a bound, not independence:
+ * the caller still waits for the slower plane (Unit 3 is what would take EPA off the write).
  *
  * `overlay` receives the absolute epoch-ms instant it must finish by, so the plane's own
  * cooperative stop and this module's hard stop are derived from ONE value and cannot drift.
@@ -104,8 +115,8 @@ export async function resolvePlanes<C, O>(opts: {
   const overlayMs = opts.overlayDeadlineMs ?? OVERLAY_DEADLINE_MS;
   const overlayDeadlineAt = now() + overlayMs;
 
-  // Both start NOW, before either is awaited — that concurrency is what makes core independent
-  // of the overlay rather than merely bounded by it.
+  // Both start NOW, before either is awaited, so the wait is max(core, overlay) rather than
+  // their sum. The join below still awaits both races — that is the bound.
   const corePromise = opts.core();
   const overlayPromise = opts.overlay(overlayDeadlineAt);
 

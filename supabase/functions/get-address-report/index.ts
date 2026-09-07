@@ -657,10 +657,10 @@ async function handleRequest(req: Request): Promise<Response> {
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const communityIds = await resolveCommunityIds(supabase, zip);
-    // UNIT 4 — the two planes run concurrently under INDEPENDENT deadlines (sources/planes.ts).
-    // Core still throws on failure (the refresh layer keeps the previous cached row); the EPA
-    // overlay can only ever degrade to "unavailable", so a slow or refusing FRS no longer holds
-    // or fails the core project report.
+    // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
+    // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
+    // FRS ladder. Core still throws on failure (the refresh layer keeps the previous cached
+    // row); the EPA overlay can only ever degrade to "unavailable".
     const planes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
       core: () => devSites(supabase, clat, clng, communityIds),
       overlay: (deadlineAt) => facilitySites(clat, clng, zipRadius, deadlineAt),
@@ -911,7 +911,7 @@ async function handleRequest(req: Request): Promise<Response> {
   try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
-  // UNIT 4 — same independent-deadline join as ZIP mode above, same module, one implementation.
+  // UNIT 4 — same bounded-deadline join as ZIP mode above, same module, one implementation.
   const addrPlanes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
     core: () => devSites(supabase, lat, lng, communityIds),
     overlay: (deadlineAt) => facilitySites(lat, lng, radiusMi, deadlineAt),

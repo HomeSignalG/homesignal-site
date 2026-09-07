@@ -1,4 +1,4 @@
-// UNIT 4 — THE CORE PROJECT PLANE MUST NOT WAIT ON EPA, AND AN EPA MISS IS NEVER A ZERO.
+// UNIT 4 — THE CORE PROJECT PLANE MUST NOT WAIT MINUTES ON EPA, AND AN EPA MISS IS NEVER A ZERO.
 //
 // WHY THIS FILE EXISTS. Both call sites in `get-address-report/index.ts` joined the two Map 1
 // planes with `Promise.all([devSites(...), facilitySites(...)])`. `facilitySites` →
@@ -9,15 +9,23 @@
 //
 // These checks DRIVE THE SHIPPED MODULES (`sources/planes.ts`, `sources/epa-frs.ts`) with mocked
 // fetch and INJECTED timers/clock, so the deadline behaviour is proven without waiting for it.
+// §0 additionally GREPS `index.ts` so a revert of the call-site wiring cannot go green — this
+// suite does not execute the edge-function body.
+//
+// The join is a BOUND, not independence: both planes start together and the caller still waits
+// for max(core, overlay+grace). §3 proves the RESULT contains the core types when EPA hangs,
+// not that the HTTP response is sent the moment `devSites` finishes. Until Unit 3 splits
+// `sites`, the report cannot be written without an overlay verdict.
 //
 // The three facts the job asks to prove, asserted below as §3 and §5:
-//   (a) EPA timeout/refusal -> devSites still returns
+//   (a) EPA timeout/refusal -> the join still yields the core records
 //   (b) the core type records are present, in full
 //   (c) the facility count is UNKNOWN/unavailable (`ok:false`), NOT zero
 //
 // Run: node test/epa-plane-deadlines.test.mjs
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FN = join(root, 'supabase/functions/get-address-report');
@@ -77,6 +85,28 @@ const CORE_RECORDS = [
 ];
 const never = () => new Promise(() => {});   // a promise that never settles: EPA hung
 
+console.log('\n== 0. composition lock — both index.ts call sites use resolvePlanes ==');
+{
+  // A revert to Promise.all([devSites, facilitySites]) would leave every helper assertion
+  // below green. This section is the instrument that cannot be fooled by that.
+  const index = readFileSync(join(FN, 'index.ts'), 'utf8');
+  ok(!/Promise\.all\s*\(\s*\[\s*devSites/.test(index),
+    '0a. neither call site still joins with Promise.all([devSites, …])',
+    'the helpers would still pass; this grep is the composition lock');
+  const planeCalls = index.match(/resolvePlanes\s*</g) || [];
+  ok(planeCalls.length === 2,
+    '0b. BOTH call sites (ZIP and address) go through resolvePlanes',
+    `got ${planeCalls.length} typed resolvePlanes calls`);
+  const overlayWired = index.match(/overlay:\s*\(deadlineAt\)\s*=>\s*facilitySites\([^)]*deadlineAt\)/g) || [];
+  ok(overlayWired.length === 2,
+    '0c. both overlays pass the absolute deadline into facilitySites',
+    `got ${overlayWired.length}`);
+  const unavailable = index.match(/overlayUnavailable:\s*facilitiesUnavailable/g) || [];
+  ok(unavailable.length === 2,
+    '0d. both call sites share one facilitiesUnavailable (ok:false, never a zero)',
+    `got ${unavailable.length}`);
+}
+
 console.log('\n== 1. baseline: both planes answer, nothing is disturbed ==');
 {
   const c = fakeClock();
@@ -123,7 +153,7 @@ console.log('\n== 2. the planes run CONCURRENTLY, not one after the other ==');
     'the join serialised core behind the overlay');
 }
 
-console.log('\n== 3. THE HEADLINE — EPA HANGS FOREVER, CORE STILL RETURNS ==');
+console.log('\n== 3. THE HEADLINE — EPA HANGS FOREVER; AFTER THE OVERLAY BUDGET, CORE IS STILL IN THE RESULT ==');
 {
   const c = fakeClock();
   const p = resolvePlanes({
@@ -139,7 +169,7 @@ console.log('\n== 3. THE HEADLINE — EPA HANGS FOREVER, CORE STILL RETURNS ==')
   await c.advance(OVERLAY_GRACE_MS);
   const out = await p;
   // (a) devSites still returns:
-  ok(Array.isArray(out.core), '3b. (a) devSites STILL RETURNS while EPA is hung');
+  ok(Array.isArray(out.core), '3b. (a) the join still YIELDS the core records while EPA is hung');
   // (b) types records present:
   ok(out.core.length === 3 && out.core[0].label === 'Rezoning — 12 Elm St',
     '3c. (b) every core TYPE record is present and intact', JSON.stringify(out.core));
@@ -192,7 +222,7 @@ console.log('\n== 5. THE ASYMMETRY — a CORE miss FAILS the report (it must nev
     `got ${out ? 'a resolved value' : threw && threw.name}`);
   ok(out === null, '5b. it does NOT return an empty core — a partial core is fabrication by omission');
   ok(CORE_DEADLINE_MS > OVERLAY_DEADLINE_MS,
-    '5c. core is given the LONGER budget, so the overlay can never outlive it');
+    '5c. overlay budget is SHORTER than core budget — the join still waits for max(core, overlay+grace)');
 }
 
 console.log('\n== 6. a core rejection is passed through unwrapped, and is not blamed on EPA ==');
