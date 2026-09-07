@@ -228,6 +228,28 @@ ok(/function set3DFrame\(maxD\)\{[\s\S]{0,500}__HS_VERIFY\.aerialFrameExt = V3\.
 ok(/CUR_RADIUS = 1;?\s+\/\/ address-mode default; ZIP views do not use a radius/.test(page),
   'F25 ZIP mode does not leave a 3-mile radius that address mode would snap to 2 miles');
 
+// ── F(ground). ZIP MODE HAS NO GROUND UNTIL A REAL POLYGON EXISTS ────────────────────────────
+// A 7000x7000 slab under a ZIP is a rectangle standing in for an irregular ZCTA — an invented
+// shape, which the contract forbids as firmly as a house or a mile ring. Measured 2026-09-07:
+// no ZCTA polygon this page may read exists (geo.n5_zcta 0 rows; geo.zcta_boundary 56 of 12,722
+// and not 78617; 0 SELECT grants on geo.* to anon; 0 functions serving that geometry), so the
+// honest state is NO ground, not a substitute one. These guards are the fail-closed half: they
+// must keep failing if a rectangle, circle or platform is ever put back under a ZIP.
+ok(/grd\.receiveShadow=true;sc\.add\(grd\);V3\.ground=grd;syncGround3D\(\);/.test(page)
+   && /function syncGround3D\(\)\{[\s\S]{0,120}V3\.ground\.visible = !ZIP_MODE/.test(page),
+  'F26 the WebGL ground is a toggled reference, not drawn unconditionally at init');
+ok(/updateHome3D\(\);drawRings\(\);syncGround3D\(\);/.test(page),
+  'F27 the ground is rebuilt with the home mesh and the rings, so the three cannot drift apart');
+ok(/GATING ONLY THE WEBGL|different mechanism/i.test(page)
+   && /if\(!ZIP_MODE\)\{\s*\n\s*ctx\.fillStyle="#3c463f";/.test(page),
+  'F28 the Canvas-2D aerial draws the SAME slab and is gated too (no-WebGL machines included)');
+// Fail closed: nothing may be substituted for the absent polygon.
+ok(!/PlaneGeometry\(\s*ZIP_FRAME/.test(page)
+   && !/RingGeometry\([\s\S]{0,60}(spanMi|ZIP_RADIUS_MI)/.test(page)
+   && !/CircleGeometry\([\s\S]{0,60}(spanMi|CUR_RADIUS|ZIP_RADIUS_MI)/.test(page)
+   && !/ZIP_RADIUS_MI/.test(page),
+  'F29 no invented ZIP ground: ZIP_FRAME is never extruded, no circle from a radius');
+
 // ── G. THE HEADLINE NUMBER MUST DESCRIBE THE MAP ─────────────────────────────────────────────
 // Measured live on production 2026-09-04 BEFORE this guard: ZIP 78617's "New projects proposed
 // nearby" tile read 48 while 55 were actually drawn. The tile came from the cached report's

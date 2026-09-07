@@ -3080,11 +3080,16 @@ HS.onReady(function(){
     var g=ctx.createLinearGradient(0,0,0,V3.vh);
     g.addColorStop(0, top); g.addColorStop(1, bot);
     ctx.fillStyle=g; ctx.fillRect(0,0,V3.vw,V3.vh);
-    ctx.fillStyle="#3c463f";
-    var ground=[projectSoft(-3500,0,-3500), projectSoft(3500,0,-3500), projectSoft(3500,0,3500), projectSoft(-3500,0,3500)];
-    ctx.beginPath(); ctx.moveTo(ground[0].x,ground[0].y);
-    for(var i=1;i<4;i++) ctx.lineTo(ground[i].x,ground[i].y);
-    ctx.closePath(); ctx.fill();
+    // THE SAME 7000x7000 SLAB, DRAWN BY A DIFFERENT MECHANISM. Gating only the WebGL
+    // PlaneGeometry would leave the invented ground on every no-WebGL machine, which is
+    // exactly the population the Canvas-2D aerial exists for.
+    if(!ZIP_MODE){
+      ctx.fillStyle="#3c463f";
+      var ground=[projectSoft(-3500,0,-3500), projectSoft(3500,0,-3500), projectSoft(3500,0,3500), projectSoft(-3500,0,3500)];
+      ctx.beginPath(); ctx.moveTo(ground[0].x,ground[0].y);
+      for(var i=1;i<4;i++) ctx.lineTo(ground[i].x,ground[i].y);
+      ctx.closePath(); ctx.fill();
+    }
     if(V3.auto) V3.yaw+=0.0016;
     // ZIP mode is the whole ZIP, not a radius around a house. Mile rings and a home
     // mesh would invent an address-shaped geography the heading already rejects
@@ -3138,9 +3143,18 @@ HS.onReady(function(){
     sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
     var s0=sun.shadow.camera;s0.near=10;s0.far=900;s0.left=-340;s0.right=340;s0.top=340;s0.bottom=-340;
     sun.shadow.bias=-0.0006;sc.add(sun);V3.sun=sun;
-    // clean solid ground (no distracting grid) — everything above it is real data
+    // GROUND IS A GEOGRAPHY CLAIM, SO ZIP MODE HAS NONE UNTIL A REAL POLYGON EXISTS.
+    // A 7000x7000 slab under a ZIP asserts a shape the ZIP does not have: a rectangle
+    // standing in for an irregular ZCTA. Measured 2026-09-07, no ZCTA polygon this page
+    // may read exists anywhere — geo.n5_zcta 0 rows; geo.zcta_boundary 56 of 12,722 and
+    // not 78617; 0 SELECT grants on geo.* to anon; 0 functions serving that geometry. So
+    // ZIP mode draws no ground rather than an invented one: honest absence over invented
+    // coverage. Address mode keeps it — there the slab sits under a real HOME and rings.
+    // TOGGLED, never skipped at init: init3D runs once but ZIP_MODE flips at runtime
+    // (loadZip -> true, run -> false), so a build-time skip would strand an address
+    // search made from a ZIP page on a scene with no ground.
     var grd=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000),new THREE.MeshStandardMaterial({color:0x3c463f,roughness:1}));
-    grd.rotation.x=-Math.PI/2;grd.receiveShadow=true;sc.add(grd);
+    grd.rotation.x=-Math.PI/2;grd.receiveShadow=true;sc.add(grd);V3.ground=grd;syncGround3D();
     // distance "radius circles" — rebuilt by drawRings() in address mode; ZIP mode
     // leaves this group empty (no mile rings around a ZIP centroid).
     V3.ringGrp=new THREE.Group();sc.add(V3.ringGrp);
@@ -3217,6 +3231,11 @@ HS.onReady(function(){
 
   // Fixed reference rings: ½, 1, 2, 3, 5, 10, 20 mi — show each that fits inside the framed extent.
   function ringStops(R){ return [0.5,1,2,3,5,10,20].filter(function(r){ return r<=R+1e-9; }); }
+  // The ground is mode-dependent exactly like the home mesh and the mile rings, so it is
+  // rebuilt from the same place they are rather than set once at init.
+  function syncGround3D(){
+    if(V3.ground) V3.ground.visible = !ZIP_MODE;
+  }
   function drawRings(){
     if(!V3.inited)return;var G=V3.ringGrp;while(G.children.length)G.remove(G.children[0]);
     // Mile rings need an address-derived HOME. ZIP mode has none.
@@ -3262,7 +3281,7 @@ HS.onReady(function(){
     // above the threshold we drop them and let hover/click reveal each building instead.
     var showLabels = nLabelable <= 12;
     set3DFrame(maxD);
-    updateHome3D();drawRings();
+    updateHome3D();drawRings();syncGround3D();
     // scale fog to the framed extent so the rings + facilities stay crisp
     if(V3.sc&&V3.sc.fog){ V3.sc.fog.near=mi(V3.frameExt)*0.9; V3.sc.fog.far=mi(V3.frameExt)*5+300; }
     var G=V3.facil;while(G.children.length)G.remove(G.children[0]);V3.proposed=[];V3.pickable=[];
