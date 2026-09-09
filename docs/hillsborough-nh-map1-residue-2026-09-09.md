@@ -1,7 +1,15 @@
 # Hillsborough NH — Map 1 residue confirmation (2026-09-09)
 
-Re-run of the post-WRITE-2 confirmation. **Not 0.** This file is the measurement
-receipt; the apply script is `docs/hillsborough-nh-wrong-body-cache-purge.sql`.
+Re-run of the post-WRITE-2 confirmation.
+
+**2026-09-09 17:08Z: the confirmation query is 0.** 34/34 NH cache rows have
+0 `hillsboroughcounty.legistar.com` sites. 03101/03060 SSR is honest-empty
+("No government notices on file for this ZIP yet."). 33602 still shows the
+Florida titles (8 host refs). Do not re-apply the purge SQL.
+
+Earlier the same day (15:53Z) this was **238**. This file keeps that
+measurement below as the pre-clear record. The apply script is
+`docs/hillsborough-nh-wrong-body-cache-purge.sql`.
 
 ## Confirmation query (expect 0 — observed 238)
 

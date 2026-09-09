@@ -1,5 +1,10 @@
 -- hillsborough-nh-wrong-body-cache-purge.sql — ONE-TIME, provenance-scoped cache surgery.
 --
+-- DO NOT RE-APPLY. Re-measured 2026-09-09 17:08Z: Florida-host app_changes on the
+-- 34 NH ZIPs = 0; Florida-host sites in those 34 development_reports rows = 0;
+-- 33602 control still has the host. The fail-closed 884-site gate below will
+-- RAISE, which is the correct refusal now that the residue is gone.
+--
 -- WHAT THIS FINISHES. Ingest PR #482 (2026-09-07) + load-feeds-to-db deactivated
 -- gov-hillsborough-nh-commission (WRONG STATE: hillsboroughcounty.legistar.com is
 -- Hillsborough County FLORIDA). WRITE 1 on 2026-09-09 15:19:32Z archived-then-deleted
