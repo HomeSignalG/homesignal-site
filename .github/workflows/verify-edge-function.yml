@@ -117,6 +117,8 @@ jobs:
             echo "::error::no merge base with origin/main — the changed-line gate cannot run"; exit 1; }
           echo "merge base: ${base}"
           git diff --unified=0 "${base}" HEAD -- "${FN_DIR}" > "${RUNNER_TEMP}/pr.diff"
+          # An EMPTY pr.diff is legitimate (a workflow-only change, or a dispatch whose HEAD
+          # matches origin/main). The gate reports it and passes; it does not fail on it.
           echo "pr.diff: $(wc -l < "${RUNNER_TEMP}/pr.diff") line(s)"
           set +e
           deno check \
@@ -131,17 +133,29 @@ jobs:
           // Fail ONLY if `deno check` reports an error on a line THIS PR added/changed.
           // Pre-existing errors on untouched lines are tolerated (and logged). Robust to
           // dependency version drift: drift moves pre-existing errors, which stay tolerated.
-          // AN INSTRUMENT MUST PROVE IT RAN. This gate is only meaningful over a real diff:
-          // an empty pr.diff yields an empty `added` map, isNew() is false for every location,
-          // and the gate reports PASS while having compared nothing. That is exactly how it
-          // was green over a change that a working gate fails. So: fail closed on an empty
-          // diff. This workflow only triggers on supabase/functions paths, so a PR reaching
-          // this step MUST have changed lines under FN_DIR.
+          // AN EMPTY FN_DIR DIFF IS A NO-OP, NOT A FAILURE — and an earlier version of this
+          // gate got that wrong. It failed closed on an empty pr.diff, reasoning that "this
+          // workflow only triggers on supabase/functions paths, so a PR reaching this step
+          // MUST have changed lines under FN_DIR". That premise is FALSE twice over: the
+          // `paths:` list above also names this workflow file itself, and `workflow_dispatch`
+          // carries no path filter at all. Receipt: run 34267272206, a dispatch on a branch
+          // whose only change was this file, failed on that guard while `deno check` had
+          // already produced 16 perfectly readable errors.
+          //
+          // So: FN_DIR unchanged => there are no added lines this ref could have broken, and
+          // PASS is the honest answer. Emptiness is not failure. That includes a dispatch on
+          // `main` where HEAD == origin/main and the trees legitimately match.
+          //
+          // What still fails closed is a gate that CANNOT SEE: a merge base that cannot be
+          // computed or a `git diff` that exits non-zero (both handled in the shell above,
+          // with no `|| true`), and `deno check` output carrying errors from which NOT ONE
+          // location parsed (below) — that is a blind parser, which is how this gate was
+          // green over real errors for months.
           const rawDiff = Deno.readTextFileSync(Deno.env.get("PR_DIFF")!);
-          if (!rawDiff.trim()) {
-            console.error("::error::pr.diff is EMPTY — the changed-line gate has nothing to "
-              + "compare, so a PASS here would attest to nothing. Refusing to pass.");
-            Deno.exit(1);
+          const fnDirUnchanged = !rawDiff.trim();
+          if (fnDirUnchanged) {
+            console.log("FN_DIR unchanged by this ref — the changed-line gate has no added "
+              + "lines to judge. deno check output is still parsed and reported below.");
           }
           const added = new Map<string, Array<[number, number]>>();
           let cur: string | null = null;
@@ -169,7 +183,7 @@ jobs:
             (added.get(file) ?? []).some(([a, b]) => line >= a && line <= b);
           const news = locs.filter((l) => isNew(l.file, l.line));
           console.log(`pr.diff parsed: ${added.size} file(s), `
-            + `${[...added.values()].reduce((n, r) => n + r.length, 0)} changed hunk(s).`);
+            + `${[...added.values()].reduce((n, r) => n + r.length, 0)} changed hunk(s) under FN_DIR.`);
           // If deno check emitted errors but the regex matched none, the parse is blind and a
           // PASS would again attest to nothing. Distinguish "no errors" from "could not read".
           if (locs.length === 0 && /\berror\b/i.test(checkOut)) {
@@ -183,7 +197,9 @@ jobs:
             for (const l of news) console.error(`::error::  ${l.file}:${l.line}`);
             Deno.exit(1);
           }
-          console.log("PASS: no new type errors introduced by this PR.");
+          console.log(fnDirUnchanged
+            ? "PASS: FN_DIR unchanged by this ref, so nothing here could introduce a new type error."
+            : "PASS: no new type errors introduced by this PR.");
           TS
           PR_DIFF="${RUNNER_TEMP}/pr.diff" CHECK_ERR="${RUNNER_TEMP}/check.out" \
             deno run --allow-read --allow-env "${RUNNER_TEMP}/gate.ts"
