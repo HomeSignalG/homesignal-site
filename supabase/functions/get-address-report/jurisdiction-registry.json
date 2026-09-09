@@ -3257,6 +3257,49 @@
       "_receipts": "2026-07-16 AZ wire pass. FIRST consumer of the additive arcgis `spatial_latlng_cols` option (attribute-bbox: a geometry-less hosted TABLE whose rows carry per-record Latitude/Longitude COLUMNS - the Detroit-tables cousin; a geometry envelope param is meaningless on a table, so the envelope is AND'd into WHERE; offline unit-tested incl. envelope-mode regression). FRESH: newest IssueDate 2026-07-10 (#324234, live receipt; esriFieldTypeDate -> recency_days DATE literal valid). 7 PermitStatus values VERBATIM (REFUND/EXPIRED/ACTIVE/FINALLED/PENDING/WITHDRAWN/ON HOLD; nulls fail closed): ACTIVE->approved, FINALLED->operating, PENDING+ON HOLD->proposed, rest excluded. ~190 PermitType values enumerated live; kept 70 construction/development classes verbatim (SFR new/addition/remodel, multi-family, commercial new/shell/addition, hotels, churches/schools/care, demolition, foundation-only, guest houses); DROPPED at source: tenant improvements, signs, pools/spas, fences/walls, patio covers/carports, solar, water heaters, minimum-charge trade permits, special events, native-plant/NAOS paperwork. NOTE 'APARTMENTS GREEN' carries trailing whitespace at source (Bellevue-class variant) and is NOT in the keep list - rows of that class surface as excluded-by-extra_where, never guessed. Types /13 Cases + /15 COO same shape (not wired: COO=occupancy noise; Cases=queue). No per-row URL column -> dataset-precision record_url. || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'ON HOLD' moved proposed->exclude \u2014 pausing is not proposing; a held project supports neither resident claim."
     },
     {
+      "registry_id": "baltimore-city-housing-permits",
+      "platform": "arcgis",
+      "service_url": "https://baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3",
+      "dataset_url": "https://data.baltimorecity.gov/datasets/baltimore::housing-and-building-permits-2019-present",
+      "jurisdiction": "City of Baltimore",
+      "coverage": [
+        {
+          "state": "MD",
+          "county": "Baltimore"
+        },
+        {
+          "state": "MD",
+          "county": "Baltimore city"
+        }
+      ],
+      "column_map": {
+        "title": "Description",
+        "status_raw": null,
+        "file_date": "IssuedDate",
+        "address": "Address",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "CaseNumber"
+      },
+      "file_date_kind": "issued",
+      "spatial_zip_radius_mi": 3,
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Development",
+      "extra_where": "(CaseNumber LIKE 'BDEM%' OR CaseNumber LIKE 'DEM%' OR (UPPER(Description) LIKE '%---%NEW CONSTRUCTION%---%') OR (UPPER(Description) LIKE '%CONSTRUCT NEW SFD%') OR (UPPER(Description) LIKE '%CHILD APPLICATION%' AND (UPPER(Description) LIKE '%TOWNHOUSE%' OR UPPER(Description) LIKE '%TOWNHOME%' OR UPPER(Description) LIKE '%SFD%')))",
+      "incremental_field": "IssuedDate",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-09-09 founder: keep what you can prove (not include-all, not skip). Layer: City of Baltimore DHCD Housing/Building Permits 2019-Present, baltegis FeatureServer/3, esriGeometryPoint. FRESH: max IssuedDate 2026-09-08 (epoch 1788840000000). Trailing 365d = 31,730 issued rows. NO work-type column; ExistingUse/ProposedUse are land use (Rowhouse/Office), not job class; Cost does not split (sub-$5k repairs AND $2.4M HVAC replacement). City E-Permits prefixes ARE a closed class: BRCM One-and-Two-Family Combo 23,267 / BCCM Commercial-Multifamily Combo 4,133 / BUSE+USE Use-and-Occupancy 3,835 / BDEM+DEM Razing 145 / BTEMP Temporary Event 76 / COM legacy 274. Combo is mixed by design (new house AND roof share BRCM) so BRCM/BCCM are NOT kept wholesale. Occupancy and events dropped. KEEP at source, live-counted with the connector WHERE (1=1 AND extra_where AND IssuedDate >= DATE cutoff): 295 rows = BDEM/DEM 145 + dashed SCOPE NEW CONSTRUCTION header 41 + CONSTRUCT NEW SFD 31 + CHILD Application townhouse/townhome/SFD 78. 0 of 295 matched paint/roof/sprinkler/no-new-construction heuristics. Description LIKE '%NEW CONSTRUCTION%' alone is UNSAFE (includes 'no new construction, only paint'); CONSTRUCT NEW alone includes decks/patios; ADDITION includes 'additional branch circuits'. Issuance ledger, no status column -> status_const 'Issued' through approved (Detroit pattern). Type is a constant: Description is free prose, ExistingUse describes the parcel not the work (Sussex current_zoning trap) -> use_type_const Development. No ZIP column -> spatial_zip_radius_mi 3 on layer geometry (__lat/__lng). No per-row URL -> dataset_url hub page. Coverage MD/Baltimore is the communities.county value on both baltimore-city-md and baltimore-county-md ZIP rows (seed); MD/'Baltimore city' is the monitor label, included so a future FIPS rename still matches. DATE literal verified: connector-shaped where returned count 295. Envelope probe 21201 (39.2946,-76.6252) -> 258 of 295 in 3 mi."
+    },
+    {
       "registry_id": "baltimore-county-permits",
       "platform": "arcgis",
       "service_url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4",
