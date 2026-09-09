@@ -971,6 +971,41 @@ SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (exec
 load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
 robots and coverage states are untouched. Full record: audit §14.
 
+### 🅿️ EPA FEED-FIRST SESSION CLOSED (2026-09-09) — Baltimore city live; do not continue from here
+Founder call: **stop feeding this session.** Do not start Tampa. Do not apply Unit 1. Do not
+touch the keep-list filter. The only B-class that was “portal up, unwired” is done.
+
+- ✅ **`baltimore-city-housing-permits` IS LIVE** — squash `31fcab2` (#1131),
+  `get-address-report` **v250** (`ezbr_sha256` `76b9e726…`). Proven-keep `extra_where`
+  (md5 `da1e2815cd85a6f9a33a0943928ad706`): `BDEM%`/`DEM%` + dashed `NEW CONSTRUCTION`
+  header + `CONSTRUCT NEW SFD` + `CHILD APPLICATION` ∩ (`TOWNHOUSE`|`TOWNHOME`|`SFD`).
+  **Not** `BRCM%`/`BCCM%`/`BUSE%`/`BTEMP%` wholesale, **not** `%repair%`. BRCM/BCCM rows
+  that are present earned it on a wording template — Baltimore issues new townhouses
+  under those prefixes; a literal “0 BRCM” would drop the records this feed exists to keep.
+- The 12 city ZIPs (`21201 21202 21205 21211 21213 21217 21218 21223 21230 21231 21233
+  21287`) recached against that artifact: `baltegis` HTTP 200 (not Tampa 403), `_ndp`
+  populated, EPA-only cohort **967 → 955**, 0 BUSE/BTEMP, 0 roof/HVAC/rafter/paint.
+  One known false positive left in the filter: `BCCM-25-001722` (Level II tenant
+  improvement; `%---%NEW CONSTRUCTION%---` spans dashed headers), 1 of 290, not a
+  repair. Do not tighten unless asked. “Exactly 12 ZIP pages” is recache-scope, not a
+  jurisdiction gate — coverage is `MD/Baltimore`, which also matches county community
+  rows; daily `dev_refresh` may later place a 3-mile downtown pin on a county page.
+  That is not a failure.
+- ⛔ **Do not re-deploy or re-recache those 12** unless `extra_where` or the registry
+  entry changes. A second deploy of unchanged `main` mints no new version — v250
+  already **is** `31fcab2`. Sandbox `sleep` does not advance DB time here; wait on
+  pg_net with `pg_sleep` inside the SQL.
+- ⛔ **Unit 1 stays PARKED.** `_nfc >= 3` is still live in `app_refresh_zip`. Remaining
+  EPA-only B rows are blocked or stalled (Tampa 4 edge 403, Suffolk 4 GIS 403,
+  Oklahoma County 3 Incapsula 403, Howard 2 Nov 2025 stall). 184 C probed empty; 724
+  unknown never probed at own jurisdiction. Noindex is an A/C/unknown **policy** call,
+  not the next commit.
+- ⛔ **Do not wire `tampa-single-family-permits`.** Edge 403 HOLDS. Egress (pg_net /
+  DB-side fetch so the edge function is not the client Tampa blocks) is a separate
+  spike, own PR, only if asked. Do not treat Suffolk/OKC 403 as the same problem.
+- ⛔ **Do not recon the 724 unknown ZIPs in an EPA session. Do not start Unit 3 from
+  here. Do not merge #1118. Do not drop `_nf` from `data_quality`. Do not mass-recache.**
+
 - 🔑 **THE AUDIT'S OWN §10.2 RECOMMENDATION IS WRONG ON ITS `data_quality` HALF — do not
   implement it.** `data_quality` is not only a completeness claim, it is the **layout gate** in
   `lib/community-page.js` (`if (status !== 'pass')`), and the non-pass branch renders neither
@@ -1856,15 +1891,19 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
   first-party permit sources, 239 pages auto-indexable (no manual flip)** (DB-verified
   2026-07-16). Twelfth development state, state 4 of the four-state run — the CA/AZ/MD
   trio is CLOSED. **283 pass + 32 coverage_coming honest empties; 0 unsourced, 0 point
-  sites missing coords. 44 of 315 ZIPs dev-backed (14%), 6,755 dev records.** Sources:
+  sites missing coords. 44 of 315 ZIPs dev-backed (14%), 6,755 dev records.**   Sources:
   the **Montgomery County trio** (Socrata res m88u-pqki / com i26v-w6bd / demo b6ht-fw3x,
   fresh 07-15; FIRST consumer of the additive socrata **dot-path readCol** for the nested
   `location.latitude/longitude` columns; recency rides `addeddate` so Open applications
   stay visible pre-issuance) + **baltimore-county-permits** (the county's own ArcGIS
   Server, native ZIP + per-record lat/lng columns, ISSDATE fresh 07-15, 11-class verbatim
-  whitelist). **Baltimore city stays un-wired — the recon's DECISION NEEDED stands** (an
-  issuance ledger with no status and no work-type column: minor-repair noise like "Repair
-  one damaged rafter" cannot be dropped at source; founder call, logged, non-blocking).
+  whitelist) + **`baltimore-city-housing-permits` LIVE 2026-09-09** (squash `31fcab2`
+  #1131, `get-address-report` v250): DHCD Housing/Building Permits 2019–Present on
+  `baltegis` FeatureServer/3, proven-keep `extra_where` (not include-all, not skip) —
+  razing prefixes + dashed `NEW CONSTRUCTION` header + `CONSTRUCT NEW SFD` + CHILD
+  APPLICATION townhouse/SFD. The 12 city ZIPs now carry point-dev. **Do not widen to
+  `BRCM%`/`BCCM%`. Do not re-recache unless the filter changes.** The 2026-07 recon's
+  DECISION NEEDED (include-all vs skip) is closed: keep what you can prove.
   **Standing answer (found at go-live): a state seed's ZIP list must be generated FROM
   the live communities rows (level='zip' by state), never from the recon-pass county
   list** — the outage-night MD seed missed Prince George's (36) + Queen Anne's (16); the

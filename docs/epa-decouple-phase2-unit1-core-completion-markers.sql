@@ -20,6 +20,11 @@
 -- `apply_migration`), never in pieces — see "ONE MIGRATION, NOT TWO" in CLAUDE.md §7.1,
 -- the 67-second window that cost 6 rows during Phase 1B.
 --
+-- 2026-09-09 founder call: EPA feed-first session CLOSED. Baltimore city proven-keep
+-- is live (#1131 / v250); remaining EPA-only B rows are blocked or stalled. Do NOT
+-- apply this unit until A/C/unknown policy is explicit. Do not start from a leftover
+-- Tampa / recache / Unit 4 session.
+--
 -- Authored against live `public.app_refresh_zip`
 --   md5 6591d7f79f9a6cd0b476bbcfc2065b9a, length 19428.
 -- The script does NOT hard-fail on that md5 (another session may legitimately have
