@@ -125,17 +125,24 @@ ok(/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(dd
   '4e ...and anon is revoked EXPLICITLY, not merely left ungranted — default privileges '
   + 'hand it EXECUTE otherwise');
 
-// ── §5 PCM-4 is still not started ──────────────────────────────────────────────────────
-// §8 of test/place-context-map.test.mjs owns this too; these are the two that would move
-// first if this unit drifted into building the ZIP map.
-ok(!/lib\/map\.js/.test(read('scripts/gen_zip_pages.py')),
-  '5a the generator still loads no map code');
-ok(!/HS\.buildLive/.test(read('lib/community-page.js')),
-  '5b the shared ZIP runtime still draws no map');
-ok(!/app_zcta_boundary/.test(read('lib/community-page.js')),
-  '5c ...and does not call the new reader — PCM-4 is a separate unit');
-ok(!/server\.arcgisonline\.com/.test(read('community.html')),
-  '5d community.html CSP is still unwidened');
+// ── §5 PCM-4 CONSUMES THE READER, behind the authed gate ───────────────────────────────
+// INVERTED. These asserted the reader had no caller. They now assert it has exactly one,
+// and that the caller is gated — the reader has no EXECUTE for anon (proved live), so an
+// ungated call would be a guaranteed console error on the protected public document.
+const cpjs = read('lib/community-page.js').replace(/^\s*\/\/.*$/gm, '');
+ok(/lib\/map\.js\?v=/.test(read('scripts/gen_zip_pages.py')),
+  '5a the generator loads map code');
+ok(/HS\.buildLive\(el, \{/.test(cpjs) && /fitBoundary: true/.test(cpjs),
+  '5b the shared ZIP runtime draws the polygon and fits to it');
+ok(/HS\.sb\(\)\.rpc\('app_zcta_boundary', \{ p_zip: z \}\)/.test(cpjs),
+  '5c ...calling this reader by name, with a ZIP');
+ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cpjs)
+   && /if \(zipContextMap\) paintZipBoundary\(zip\);/.test(cpjs),
+  '5d ...ONLY behind the (sess && !sess.demo) gate — anon has no EXECUTE on it');
+ok(!/from geo\.zcta_boundary|geo\.zcta_boundary/.test(cpjs),
+  '5e the browser never reads geo.zcta_boundary directly — the function is the surface');
+ok(/server\.arcgisonline\.com/.test(read('community.html')),
+  '5f community.html CSP carries the tile host (the disclosed PS-001 public-byte change)');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
