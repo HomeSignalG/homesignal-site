@@ -122,14 +122,65 @@ ok(!/\bboundary:/.test(prop) && !/fitBoundary/.test(prop),
   '7h PCM-1 does NOT use the boundary options — the Address map is point-centered context',
   (prop.match(/.{0,50}(boundary|fitBoundary).{0,50}/) || [])[0]);
 
-// ── §8 PCM-1 did NOT start PCM-4. The public ZIP surface is untouched ───────────────────
+// ── §8 PCM-4 IS BUILT — the authenticated ZIP context map ──────────────────────────────
+// INVERTED. These said "the ZIP context map is PCM-4" and asserted its absence. They now
+// assert it exists AND that it is authenticated-only — which is the half that matters,
+// because the same file renders the protected public document.
+const cp8raw = read('lib/community-page.js');
+const cp8 = code(cp8raw);
 for (const f of ['community.html', 'scripts/gen_zip_pages.py']) {
   const z = read(f);
-  ok(!/lib\/map\.js/.test(z), '8a ' + f + ' still loads NO map code — the ZIP context map is PCM-4');
-  ok(!/server\.arcgisonline\.com/.test(z),
-    '8b ' + f + ' CSP is unwidened — the generated document\'s CSP is public bytes on the PS-001 surface');
+  ok(/lib\/map\.js\?v=/.test(z), '8a ' + f + ' loads lib/map.js');
+  ok(z.includes('lib/map.js?v=' + sha8('lib/map.js')),
+    '8b ' + f + ' ...at the SAME content hash the other hosts carry, not a fourth key');
+  ok(/server\.arcgisonline\.com/.test(z) && /style-src[^;]*cdn\.jsdelivr\.net/.test(z),
+    '8c ' + f + ' CSP carries the Esri tile host and jsDelivr for Leaflet\'s stylesheet — '
+    + 'a disclosed public-byte change on the PS-001 surface');
+  // Scoped to a real tag, not the bare word: both hosts' comments SAY maplibre-gl is not
+  // loaded, so a substring pin would fire on its own explanation.
+  ok(!/(src|href)=["'][^"']*maplibre-gl/.test(z),
+    '8d ' + f + ' does NOT load maplibre-gl — Leaflet is lazily injected by buildLive',
+    (z.match(/.{0,40}(src|href)=["'][^"']*maplibre-gl.{0,20}/) || [])[0]);
 }
-ok(!/HS\.buildLive/.test(read('lib/community-page.js')), '8c the shared ZIP runtime draws no map');
+ok(/HS\.buildLive\(el, \{/.test(cp8) && /boundary: geom/.test(cp8) && /fitBoundary: true/.test(cp8),
+  '8e the shared ZIP runtime draws the polygon and FITS to it');
+ok(/HS\.sb\(\)\.rpc\('app_zcta_boundary'/.test(cp8),
+  '8f ...reading it through the SECURITY DEFINER function, never geo.zcta_boundary directly');
+// THE GATE IS THE LOAD-BEARING PIN. Same shape as authedZipHealth: this file renders the
+// protected public document, and an ungated map would both change anonymous PS-001 output
+// and call an RPC that anon has no EXECUTE for — a guaranteed console error on the public page.
+ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cp8),
+  '8g the block is gated on (sess && !sess.demo) — the A-022 posture');
+ok(/if \(zipContextMap\) paintZipBoundary\(zip\);/.test(cp8),
+  '8h ...and the RPC is only ever called when that gate rendered the block');
+ok(/var authedZipHealth = \(sess && !sess\.demo\)/.test(cp8),
+  '8i ...the same gate ZIP health already uses, from one `var sess` (FM-081 unaffected)');
+// NOT an Address map, NOT a project map, NOT investigation.
+for (const [re, what] of [
+  [/radiusMi/, 'a radius ring'],
+  [/fitItems/, 'a bbox of project points (the #1141 shape)'],
+  [/n5_projects_within_radius/, 'the Address-mode radius RPC'],
+  [/ST_Buffer|ST_MakeEnvelope/, 'a substituted shape'],
+  [/items: projects|items: topProjects/, 'every project in the ZIP plotted as pins'],
+]) ok(!re.test(cp8), '8j the ZIP map has no ' + what, (cp8raw.match(re) || [])[0]);
+ok(/items: \[\]/.test(cp8), '8k ...it passes items: [] — the geography IS the subject');
+// A missing polygon is an honest state, never a drawn stand-in.
+ok(/payload\.status === 'not_measured'/.test(cp8) && /data-hs-map-refused/.test(cp8),
+  '8l not_measured is told apart from a failed read, and neither draws anything');
+ok(!/<a[^>]*homesignalmap/.test(cp8.slice(cp8.indexOf('zipContextMap'), cp8.indexOf('paintZipBoundary'))),
+  '8m the block adds NO second Development link — the header control is the handoff');
+// A CAPTION IS A CLAIM, AND ONLY THE PATH THAT DREW MAY MAKE IT. Measured in the sandbox
+// (jsDelivr unreachable, so buildLive refuses `boundary-needs-tiles`): a caption set straight
+// after the call left an EMPTY box reading "The whole of ZIP 84302, from the U.S. Census ZCTA
+// boundary." onReady fires on Leaflet and MapLibre only, never schematic — so routing the
+// success sentence through it makes the two outcomes mutually exclusive by construction.
+const cap = /from the U\.S\. Census ZCTA boundary/;
+ok(cap.test(cp8), '8n the drawn state has a caption naming the publisher');
+const onReadyBody = (cp8.match(/onReady: function \(\)[\s\S]{0,400}?\n      \}/) || [''])[0];
+ok(cap.test(onReadyBody),
+  '8o ...set INSIDE onReady, so a refused engine can never assert a drawn boundary');
+ok(/onRefuse: function/.test(cp8) && /but the map couldn/.test(cp8),
+  '8p ...and onRefuse says the boundary is on file while the map is not — not `not_measured`');
 
 // ── §9 My Places still has no map (G), and Dashboard is untouched (F) ───────────────────
 ok(!/HS\.buildLive/.test(read('properties.html')), '9a My Places has no map — portfolio management only');
