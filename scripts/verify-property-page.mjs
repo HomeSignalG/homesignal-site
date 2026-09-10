@@ -32,9 +32,13 @@ surfaceBanner('verify-property-page');
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 let fail = 0, pass = 0;
+// BOTH branches print on STDOUT. They used to split ✓/✗ across stdout/stderr, and GitHub
+// interleaves the two streams by arrival, so a failure surfaced under the WRONG section heading
+// in the job log — the 2026-09-10 §3 failure appeared beneath the "4)" header and was read as a
+// §4 problem. A verifier whose output misattributes its own failure costs more than it saves.
 const ok = (name, cond, detail) => {
   if (cond) { pass++; console.log(`  ✓ ${name}`); }
-  else { fail++; console.error(`  ✗ ${name}${detail ? `\n     ${detail}` : ''}`); }
+  else { fail++; console.log(`  ✗ ${name}${detail ? `\n     ${detail}` : ''}`); }
 };
 
 // The seeded demo persona, verbatim from seed/delvalle.js. If ANY of these reach a signed-out
@@ -85,8 +89,32 @@ const load = async (url) => {
 
 const live = await load(`${SITE_BASE}/property.html`);
 ok('page renders with no uncaught JS errors', live.errors.length === 0, live.errors.slice(0, 3).join(' | '));
-ok('signed-out visitor gets the honest empty state ("No Saved Place")',
-  /No Saved Place/i.test(live.text),
+// THE EXPECTED COPY IS DERIVED FROM THE SERVED PAGE, NOT PINNED HERE.
+//
+// This assertion used to hardcode /No Saved Place/i. #1140 (the four-container shell / My Places
+// consolidation) renamed that heading to "No Address" and renamed the back button to "← My
+// Places"; the literal here was not renamed with it, so the check went red on a COPY CHANGE while
+// the guard it exists to protect — the page refusing to render a dossier it has no property for —
+// was intact the whole time. A verifier that fails on a rename trains people to ignore it.
+//
+// Reading the SERVED property.html (not the checked-out one) is deliberate. This runs on push AND
+// on a daily schedule against the LIVE site, so a repo-local read would go red for the window
+// between a merge and its Pages deploy. That race is exactly why run #49 PASSED and run #50
+// FAILED on the SAME commit fbd85e4. Comparing the served page against its own rendered output
+// cannot drift that way.
+//
+// It still fails closed: if the `if (!p)` branch or its heading disappears, the first assertion
+// below fails and says so, rather than the check quietly having nothing to compare.
+const propSrc = await (await fetch(`${SITE_BASE}/property.html`)).text();
+const emptyBranch = (propSrc.match(/if\s*\(\s*!p\s*\)[\s\S]{0,400}?<\/h1>/) || [])[0] || '';
+const emptyHeading = (emptyBranch.match(/<h1>([^<]{2,60})<\/h1>/) || [])[1] || '';
+ok('the served property.html still declares an honest empty-state heading',
+  !!emptyHeading,
+  'no `if (!p)` empty-state <h1> found in the served page — the no-property guard may be gone, '
+  + 'or its shape changed. Read property.html before relaxing this; the guard is what stops a '
+  + 'dossier rendering for a visitor who has no saved place.');
+ok(`signed-out visitor gets that honest empty state ("${emptyHeading || '—'}")`,
+  !!emptyHeading && live.text.includes(emptyHeading),
   `body began: ${live.text.slice(0, 160).replace(/\s+/g, ' ')}`);
 for (const m of PERSONA_MARKERS) {
   ok(`the seeded demo persona (${m}) does NOT appear`, !live.html.includes(m),
