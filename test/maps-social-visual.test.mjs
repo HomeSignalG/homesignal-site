@@ -15,7 +15,11 @@ const WF = readFileSync(new URL('../.github/workflows/maps-social-image.yml', im
 // screenshot path"), so those checks run against the CODE with comments stripped — a doc
 // comment mentioning a forbidden concept is not the same as using it.
 const GEN_CODE = GEN
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
+// bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
+// reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
+  .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1 ')
   .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
 
 let n = 0, bad = 0;

@@ -22,6 +22,24 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
 <!-- Shared shell stylesheet FIRST, so the page's map-specific inline CSS below still wins where it overrides. -->
+<!-- EMBED MODE (?embed=1) — Place Context Maps. A Place page (property.html, the ZIP
+     runtime) iframes THIS document same-origin so the map a resident sees on a Place is
+     Map 1 itself: Map 1's pins, Map 1's type/status/regulatory rows, Map 1's writers.
+     There is no second widget and no extracted module.
+
+     THE CLASS IS SET HERE, IN THE HEAD, BEFORE shell.js RUNS AND BEFORE THE FIRST PAINT.
+     shell.js injects the sidebar and top bar; setting the class from the page runtime
+     (inside HS.onReady) would flash the full chrome inside the iframe first. This is the
+     only place in the document that can be earlier than the chrome it hides. -->
+<script>
+(function(){
+  try {
+    if (new URL(window.location.href).searchParams.get("embed") === "1") {
+      document.documentElement.classList.add("hs-embed");
+    }
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="app.css"/>
 <style>
   :root{
@@ -476,6 +494,54 @@
   .mapcaption{font-size:12px;color:var(--soft);margin-top:8px;line-height:1.5}
   .mapcaption .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;
     margin:0 3px 0 9px;border:1px solid rgba(0,0,0,.15)}
+
+  /* ===================== EMBED MODE — the hide list ===================== */
+  /* WHAT SURVIVES, and it is the whole point: the map canvas and the three FILTER ROWS,
+     with their existing map key. Those rows are the same DOM ids the full page builds
+     (#mapkey, #mapkeyShapes, #mapkeyReg) driven by the same writers (HS.setCategoryFilter,
+     the stage writer, HS.regulatoryVisible) — CSS hides chrome, it does not re-create a
+     control. Nothing here is a decorative chip.
+
+     CSS ALONE IS SUFFICIENT — shell.js is NOT forked. The one thing display:none cannot
+     do by itself is collapse the sidebar's grid COLUMN, because .app is
+     `grid-template-columns: var(--sidebar) 1fr`, so a hidden #hs-side would still reserve
+     its track and the map would sit in a narrow right-hand column. One extra rule fixes
+     that, which is why no shell change is needed. */
+  .hs-embed .app{grid-template-columns:1fr}
+  .hs-embed #hs-side,
+  .hs-embed #hs-top,
+  .hs-embed .sidebackdrop{display:none !important}
+  /* The page's own chrome: hero, the ADDRESS SEARCH FORM (an embed is anchored to the
+     Place that hosts it — a search box inside it would navigate the iframe away from the
+     Place), and the status line. */
+  .hs-embed .wrap>.head,
+  .hs-embed .wrap>.status{display:none !important}
+  /* Everything below the map: the counters card, the built/approved/proposed bands, the
+     civic band, the Development tracker and its notices, the footer, and the #property
+     dossier. The Place page carries its own copy of this material; the iframe is a MAP. */
+  .hs-embed .grid.stacked>.card.read,
+  .hs-embed .results>.grid.band,
+  .hs-embed .results>.card.read.band,
+  .hs-embed .results>.devtracker,
+  .hs-embed .results>.foot,
+  .hs-embed #property{display:none !important}
+  /* 3D is out of scope for a Place embed, so its controls AND its two canvases go: with
+     #viewSeg hidden there is no way to reach them, and hiding the canvases means a stale
+     one can never sit over the 2D map. */
+  .hs-embed #viewSeg,
+  .hs-embed #map3d,
+  .hs-embed #mapgl{display:none !important}
+  /* THE RADIUS PICKER IS HIDDEN BECAUSE THE EMBED'S RADIUS IS FIXED AT 2 BY THE HOST URL.
+     A visible picker would offer to change a geography the Place page has already stated
+     in its own copy. */
+  .hs-embed #radSel{display:none !important}
+  /* The iframe supplies the frame, so the page inside it drops its own page padding and
+     card chrome — otherwise a Place shows a card inside a card inside a card. */
+  .hs-embed .wrap{padding:0;max-width:none}
+  .hs-embed .card.mapcard{border:0;border-radius:0;box-shadow:none;margin:0}
+  .hs-embed .results{margin:0}
+  .hs-embed body{background:var(--panel)}
+
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
@@ -2317,6 +2383,23 @@ HS.onReady(function(){
       "Facility pins sit at their exact EPA-registered locations. County and city notices apply jurisdiction-wide (no fixed address) — their orange/blue dots are placed within the viewed area to show activity, not exact sites; open a dot for the official record. "+
       "Violations are a factual count linked to the official EPA record — not a verdict on any operator." +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
+    // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
+    // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
+    // overwritten by the next render, and a fit applied before the first render would find
+    // `map` still null. Called here, the boundary is drawn and fitted after the view is set,
+    // on every pass, and it is a no-op until both the polygon and the map exist.
+    applyEmbedBoundary();
+  }
+
+  // The polygon, once read, and the layer currently drawn from it.
+  var EMBED_BOUNDARY = null, EMBED_BOUNDARY_LAYER = null;
+  function applyEmbedBoundary(){
+    if(!EMBED_BOUNDARY || !map || !window.L) return;
+    if(EMBED_BOUNDARY_LAYER){ try { map.removeLayer(EMBED_BOUNDARY_LAYER); } catch(e){} }
+    EMBED_BOUNDARY_LAYER = L.geoJSON(EMBED_BOUNDARY.fc, { style: { color:"#157a49", weight:2,
+      opacity:0.9, fill:true, fillColor:"#157a49", fillOpacity:0.06 } }).addTo(map);
+    var b = EMBED_BOUNDARY.bounds;
+    map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
   }
 
   // Reflect the active radius in the #radSel button row (used both on manual clicks and when
@@ -4540,10 +4623,111 @@ HS.onReady(function(){
     });
   }
 
+  // ===================== EMBED MODE — Place Context Maps =====================
+  // A Place page iframes this document. Two shapes, and only two:
+  //   Address  homesignalmap.html?embed=1&lat=<saved>&lng=<saved>&radius=2
+  //   ZIP      homesignalmap.html?embed=1&zip=<zip>
+  //
+  // ?addr= IS NOT AN EMBED SHAPE. It routes to loadProperty(), the address DOSSIER, which is
+  // a different document with a different job; the Place page already carries that material.
+  //
+  // EMBED ADDRESS SKIPS THE GEOCODER ENTIRELY. property.html holds a SAVED home whose lat/lng
+  // were resolved once, when it was saved. Re-resolving them here would ask the geocoder the
+  // same question a second time and could answer it differently — a Place page whose pin
+  // moves between visits. The point arrives in the URL and is used verbatim as the RPC input,
+  // exactly as run() uses the geocoder's returned point verbatim.
+  function embedRadius(u){
+    var raw = parseFloat(u.searchParams.get("radius"));
+    // THE ALLOWLIST IS THE SERVER'S, NOT A LOCAL PREFERENCE. n5_projects_within_radius raises
+    // 22023 on an off-allowlist radius, and this page would then render an empty result — a
+    // refusal wearing the face of "nothing is near this home". Same guard syncRadiusStops()
+    // applies to the visible picker, applied here because in embed mode there is no picker.
+    if(!isFinite(raw) || !HS.N5_RADII || HS.N5_RADII.indexOf(raw) < 0) return null;
+    return raw;
+  }
+
+  function runEmbedPoint(home, radius){
+    // Address mode, minus the geocode and minus the report engine (see below).
+    ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
+    CUR_ADDRESS = "";
+    CUR_RADIUS = radius;                    // pinned; #radSel is hidden, so nothing can rewrite it
+    setRadiusButton(radius); syncRadiusStops();
+    document.body.classList.remove("zipmode");
+    var token = ++REQ_SEQ;
+    N5_NOTE = "";
+    var _cap = document.querySelector(".map-cap");
+    if(_cap){ _cap.textContent = "Development within " + radiusLabel(radius) + " of this home"; }
+    status("Pulling public records within " + radiusLabel(radius) + " of this home …");
+    // ⚠️ THE EPA FACILITY LAYER IS NOT IN THIS PIPELINE, AND THAT IS A CONSEQUENCE OF THE
+    // URL SHAPE RATHER THAN AN OMISSION. run() gets facilities from the get-address-report
+    // edge function, whose address mode requires an `address` STRING and geocodes it
+    // server-side (index.ts: `if (!address) return 400` then `geocode(address)`); it has no
+    // {lat,lng,radius_mi} shape. Calling it would mean both passing an address the embed
+    // contract does not carry and re-geocoding the saved home, which this mode exists to
+    // avoid. So an embed address map draws the N5 project corpus: real types, real statuses,
+    // real records. The regulatory row is still Map 1's own control over Map 1's own layer —
+    // it simply has no regulatory records to govern here. Stated, not hidden: hiding the row
+    // would be a second filter panel, which is the thing this whole unit refuses to build.
+    n5Radius(home, radius).then(function(rows){
+      if(!currentReq(token)) return;
+      return hydrateProjects(HS.n5SourceKeys(rows)).then(function(projects){
+        if(!currentReq(token)) return;
+        N5_NOTE = HS.n5CoverageNote(rows, radiusLabel(radius));
+        render({ home: home, address: "", sites: HS.n5SitesFrom(rows, projects, home), counts: {} });
+      });
+    }).catch(function(err){
+      if(!currentReq(token)) return;
+      status("Network error reaching the records service. (" + err.message + ")", true);
+    });
+  }
+
+  // EMBED ZIP ONLY: draw and fit this ZIP's real ZCTA outline over Map 1's own ZIP view.
+  // Read through public.app_zcta_boundary (SECURITY DEFINER); geo.zcta_boundary is not
+  // readable from a browser and must not be. The polygon is the AREA the Place page is
+  // about, which is why it belongs on a Place embed and not on the full Development page —
+  // ZIP_FRAME, computed from the records' own extent, is deliberately left as it is there.
+  //
+  // NOT MEASURED MEANS NOT DRAWN. Map 1's existing ZIP framing stays exactly as it is; no
+  // circle, no envelope, no bbox of project points stands in for a boundary we do not have.
+  function paintEmbedZipBoundary(zip){
+    if(!window.HS || !HS.sb || !HS.boundaryFC) return;
+    HS.sb().rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
+      if(r.error || !r.data) return;
+      var payload = r.data;
+      if(payload.status !== "boundary_complete") return;   // not_measured -> Map 1's own framing stands
+      var fc = HS.boundaryFC(payload.geometry);
+      var b = fc ? HS.boundaryBounds(fc) : null;
+      if(!fc || !b) return;                                // a non-area geometry is not a boundary
+      EMBED_BOUNDARY = { fc: fc, bounds: b };
+      applyEmbedBoundary();                                // in case render already ran
+    }).catch(function(){});
+  }
+
   // ===================== ZIP-mode boot (the crawlable landing surface) =====================
   // ?addr=<canonical> → property page; ?zip=<zip> or /development/<zip> → cached ZIP report.
   (function boot(){
     var u = new URL(window.location.href);
+    // EMBED FIRST. An embed URL never reaches ?addr=: the dossier is not a map.
+    if(u.searchParams.get("embed") === "1"){
+      var ez = u.searchParams.get("zip");
+      if(ez && /^\d{5}$/.test(ez)){
+        if(window.HS && HS.state) HS.state.zip = ez;
+        loadZip(ez);                       // Map 1's own ZIP mode, unchanged
+        paintEmbedZipBoundary(ez);         // plus the real ZCTA outline, embed only
+        return;                            // no loadDevTracker: the tracker is hidden here
+      }
+      var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));
+      var er = embedRadius(u);
+      if(isFinite(elat) && isFinite(elng) && er !== null){
+        runEmbedPoint({ lat: elat, lng: elng }, er);
+      } else {
+        // A malformed embed URL renders NOTHING rather than a default geography. The
+        // sample ZIP fallback below is for a resident who navigated here; an iframe that
+        // asked for a specific place must never be answered with a different one.
+        status("This map needs a location.", true);
+      }
+      return;
+    }
     var a = u.searchParams.get("addr");
     if(a && a.trim()){ loadProperty(a.trim()); return; }
     var z = u.searchParams.get("zip");

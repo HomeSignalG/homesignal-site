@@ -125,24 +125,36 @@ ok(/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(dd
   '4e ...and anon is revoked EXPLICITLY, not merely left ungranted — default privileges '
   + 'hand it EXECUTE otherwise');
 
-// ── §5 PCM-4 CONSUMES THE READER, behind the authed gate ───────────────────────────────
-// INVERTED. These asserted the reader had no caller. They now assert it has exactly one,
-// and that the caller is gated — the reader has no EXECUTE for anon (proved live), so an
+// ── §5 THE READER'S ONE CALLER IS MAP 1'S EMBED MODE ───────────────────────────────────
+// INVERTED TWICE, and the second inversion is the point. These first asserted the reader had
+// no caller (PCM-3). PCM-4 then made the caller lib/community-page.js, which drew the polygon
+// itself with HS.buildLive. That widget is deleted: Place maps are Map 1, so the reader is now
+// consumed inside homesignalmap.html's embed path — the document that already draws pins,
+// types, statuses and the regulatory layer.
+//
+// The GATE did not move, it relocated: the ZIP page still renders the block only for
+// (sess && !sess.demo), so an anonymous visitor never loads the frame and the frame is the
+// only thing that calls the reader. anon has no EXECUTE on it (proved live in PCM-3), so an
 // ungated call would be a guaranteed console error on the protected public document.
 const cpjs = read('lib/community-page.js').replace(/^\s*\/\/.*$/gm, '');
-ok(/lib\/map\.js\?v=/.test(read('scripts/gen_zip_pages.py')),
-  '5a the generator loads map code');
-ok(/HS\.buildLive\(el, \{/.test(cpjs) && /fitBoundary: true/.test(cpjs),
-  '5b the shared ZIP runtime draws the polygon and fits to it');
-ok(/HS\.sb\(\)\.rpc\('app_zcta_boundary', \{ p_zip: z \}\)/.test(cpjs),
-  '5c ...calling this reader by name, with a ZIP');
-ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cpjs)
-   && /if \(zipContextMap\) paintZipBoundary\(zip\);/.test(cpjs),
-  '5d ...ONLY behind the (sess && !sess.demo) gate — anon has no EXECUTE on it');
-ok(!/from geo\.zcta_boundary|geo\.zcta_boundary/.test(cpjs),
-  '5e the browser never reads geo.zcta_boundary directly — the function is the surface');
-ok(/server\.arcgisonline\.com/.test(read('community.html')),
-  '5f community.html CSP carries the tile host (the disclosed PS-001 public-byte change)');
+const m1js = read('homesignalmap.html').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+
+ok(!/lib\/map\.js\?v=/.test(read('scripts/gen_zip_pages.py')) && !/lib\/map\.js\?v=/.test(read('community.html')),
+  '5a NEITHER ZIP host loads map code any more — PCM-4\'s public-byte exception is reverted');
+ok(!/server\.arcgisonline\.com/.test(read('community.html'))
+   && !/server\.arcgisonline\.com/.test(read('scripts/gen_zip_pages.py')),
+  '5b ...including the Esri tile host, which left the public CSP with it');
+ok(/frame-src 'self'/.test(read('community.html')) && /frame-src \\'self\\'/.test(read('scripts/gen_zip_pages.py')),
+  '5c what replaces it is frame-src \'self\' on BOTH ZIP hosts — same-origin, and the only '
+  + 'public-byte change this work leaves behind');
+ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(m1js),
+  '5d the reader is called by name, with a ZIP, from homesignalmap.html');
+ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cpjs) && /embed=1/.test(cpjs),
+  '5e ...reached only through the embed the authed gate renders');
+ok(!/app_zcta_boundary/.test(cpjs) && !/HS\.buildLive/.test(cpjs),
+  '5f the ZIP runtime itself neither calls the reader nor draws a map — one implementation');
+ok(!/geo\.zcta_boundary/.test(cpjs) && !/geo\.zcta_boundary/.test(m1js),
+  '5g and no browser document reads geo.zcta_boundary directly — the function is the surface');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
