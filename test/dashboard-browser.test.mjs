@@ -87,12 +87,25 @@ try {
   await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForSelector('#dashStrip a.stat-link', { timeout: 30000 });
 
-  assertHref('Projects stat', await page.locator('#dashStrip a.stat-link').first().getAttribute('href'),
-    { zip: '78617', noPlace: true, has: { sort: 'distance' } });
-  assertHref('Action windows', await page.locator('#dashStrip a.stat-link.accent').getAttribute('href'),
+  // ⚠️ RETARGETED (A-001, Phase 3). The strip used to be Projects / Action windows / ZIP
+  // Score / Growth pressure, and these three assertions described exactly that. A-001
+  // replaced it with FOUR PORTFOLIO METRICS — Places Monitored · New Changes · Need
+  // Attention · Coming Up — so the old labels and destinations are false by design, not
+  // broken. What this block protects is unchanged and is still asserted below: every tile
+  // is a link, every href is well-formed, carries at most one zip, and lands where its
+  // label says. Only `Need Attention` kept its old destination (band=open), and it is
+  // deliberately left reading the same way so the diff shows what actually moved.
+  const stripLabels = await page.locator('#dashStrip a.stat-link .l').allTextContents();
+  ok(stripLabels.join(' · ') === 'Places Monitored · New Changes · Need Attention · Coming Up',
+    'A-001 strip is the four portfolio metrics');
+  assertHref('Places Monitored', await page.locator('#dashStrip a.stat-link').first().getAttribute('href'),
+    { noPlace: true });
+  ok((await page.locator('#dashStrip a.stat-link').first().getAttribute('href')) === 'properties.html',
+    'Places Monitored goes to My Places (account-wide, no ZIP)');
+  assertHref('Need Attention', await page.locator('#dashStrip a.stat-link.accent').getAttribute('href'),
     { zip: '78617', noPlace: true, has: { band: 'open' } });
-  assertHref('ZIP Score', await page.locator('#dashStrip a.stat-link.g').getAttribute('href'),
-    { zip: '78617', noPlace: true, has: { focus: 'score' } });
+  assertHref('Coming Up', await page.locator('#dashStrip a.stat-link.g').getAttribute('href'),
+    { zip: '78617', noPlace: true, has: { category: 'Government & civic' } });
   assertHref('Map link', await page.locator('#dashMapLink').getAttribute('href'),
     { zip: '78617', noPlace: true });
   assertHref('Manage Saved Places', await page.locator('a', { hasText: 'Manage →' }).getAttribute('href'),
@@ -130,12 +143,13 @@ try {
   assertHref('Meetings heading', await page.locator('#dashMeetingsHead').getAttribute('href'),
     { zip: '78617', has: { category: 'Government & civic' } });
 
-  // Projects near you navigation + back (context H)
+  // ⚠️ RETARGETED (A-001). The first tile used to be "Projects near you" and landed on
+  // development.html with sort=distance. It is now "Places Monitored" and lands on My
+  // Places. The navigation contract this exercises — a strip tile is a real link that
+  // navigates and can be backed out of — is unchanged.
   await page.locator('#dashStrip a.stat-link').first().click();
-  await page.waitForURL(/development\.html/, { timeout: 15000 });
-  await page.waitForSelector('#devSort button.on', { timeout: 15000 });
-  ok(page.url().includes('zip=78617') && page.url().includes('sort=distance'), 'Projects click lands on development with sort');
-  ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'distance', 'development shows Distance sort active');
+  await page.waitForURL(/properties\.html/, { timeout: 15000 });
+  ok(await page.locator('#plViews [data-view="all"]').count() === 1, 'Places Monitored click lands on My Places');
   await page.goBack();
   await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
 
@@ -157,15 +171,22 @@ try {
     await page.goBack();
   }
 
-  // ZIP Score → community focus=score
-  const zipScore = page.locator('#dashStrip a.stat-link.g');
-  if (await zipScore.count()) {
-    await zipScore.click();
-    await page.waitForURL(/community\.html.*focus=score/, { timeout: 15000 });
-    await page.waitForSelector('#zip-score-strip', { timeout: 15000 });
-    ok(await page.locator('#zip-score-strip').count() === 1, 'community page has zip-score-strip');
+  // ⚠️ RETARGETED (A-001). The `.g` tile was "ZIP Score" and opened community.html with
+  // focus=score; it is now "Coming Up" and opens the Alerts meetings category. The public
+  // ZIP score strip is not gone — it is still asserted, by navigating to it directly, so
+  // this file keeps covering it rather than losing it with the tile.
+  const comingUp = page.locator('#dashStrip a.stat-link.g');
+  if (await comingUp.count()) {
+    await comingUp.click();
+    await page.waitForURL(/alerts\.html.*category=/, { timeout: 15000 });
+    ok(await page.locator('#alFilter').count() === 1, 'Coming Up click lands on the Alerts feed');
     await page.goBack();
+    await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
   }
+  await page.goto(base + '/community.html?data=seed&zip=78617&focus=score', { waitUntil: 'networkidle' });
+  await page.waitForSelector('#zip-score-strip', { timeout: 15000 });
+  ok(await page.locator('#zip-score-strip').count() === 1, 'community page still has zip-score-strip');
+  await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle' });
 
   // Destination: alerts category + invalid id safe
   await page.goto(base + '/alerts.html?data=seed&zip=78617&category=Government%20%26%20civic', { waitUntil: 'networkidle' });
