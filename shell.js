@@ -102,7 +102,7 @@
       n = parseInt(n, 10);
       return (n >= 0 && n <= 2 && !isNaN(n)) ? n : 0;
     };
-    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
+    HS.ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};

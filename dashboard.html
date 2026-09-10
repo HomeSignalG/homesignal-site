@@ -54,7 +54,7 @@
           <div class="chips" id="dashWatch"></div>
         </div>
         <div class="block">
-          <div class="bt-row"><h2>Intelligence Reports</h2><a href="reports.html" id="dashReportsOpen" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">Open Reports →</a></div>
+          <div class="bt-row"><h2>Intelligence Reports</h2><a href="dashboard.html#dashReports" id="dashReportsOpen" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">Open Reports →</a></div>
           <div id="dashReports"></div>
         </div>
       </div>
@@ -70,7 +70,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/map.js?v=71e6cf06"></script>
-<script src="shell.js?v=7258b17c"></script>
+<script src="shell.js?v=13d6b1fc"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty, zip = S.zip;
@@ -298,11 +298,13 @@ HS.onReady(async function () {
   }
   document.getElementById('dashBrief').innerHTML = briefBits.join(' ');
 
-  // A-009 INTELLIGENCE REPORTS — surfaces the report capability reports.html ALREADY has:
-  // the same four report labels, generated from the same live data. Nothing is invented —
-  // no history, no CSV, no PDF, no persistence, no scheduling — and reports.html is NOT
-  // retired (A-019, Phase 8), so "Open Reports →" and property.html's "Generate property
-  // report" both keep working.
+  // A-009 INTELLIGENCE REPORTS — the report capability, generated from live data. Nothing
+  // is invented — no history, no CSV, no PDF, no persistence, no scheduling.
+  //
+  // A-019 (Phase 8) retired reports.html to a redirect stub once this module was proven to
+  // carry the capability. Every CTA that used to target reports.html now targets THIS
+  // module directly (dashboard.html#dashReports), so the designed path never hops through
+  // the stub and cannot loop back into it.
   //
   // The flagship pick is GUARDED here. reports.html:38 takes projects.sort(...)[0] with no
   // empty check and dereferences it, which throws on the 1,959 canonical ZIPs that carry no
@@ -313,7 +315,7 @@ HS.onReady(async function () {
   })[0] || null;
   var reportRows = [
     { icon: '⌂', t: (realHome ? realHome.address : 'Your home') + ' — Property Intelligence Report',
-      d: 'Score, nearby projects, risk & value outlook', href: 'reports.html' },
+      d: 'Score, nearby projects, risk & value outlook', href: 'dashboard.html#dashReports' },
     { icon: '◍', t: (c && c.zip ? c.zip : zip) + ' — Community Snapshot',
       d: 'What\'s changing across ' + ((c && c.name) || 'this area'), href: nav('community.html', mapCtx()) }
   ];
@@ -322,7 +324,7 @@ HS.onReady(async function () {
       d: 'Full project impact, timeline & recommended actions',
       href: nav('development.html', { zip: zip, id: flagship.id }) });
   }
-  reportRows.push({ icon: '✉', t: 'Your Weekly Briefing', d: 'The changes that mattered near you this week', href: 'reports.html' });
+  reportRows.push({ icon: '✉', t: 'Your Weekly Briefing', d: 'The changes that mattered near you this week', href: 'dashboard.html#dashReports' });
   document.getElementById('dashReports').innerHTML = reportRows.map(function (r) {
     return '<a class="swrow swrow-link" href="' + HS.esc(r.href) + '" style="text-decoration:none">'
       + '<div class="miniscore" style="font-size:15px">' + r.icon + '</div>'

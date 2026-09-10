@@ -34,7 +34,20 @@ const shellJs   = strip(read('shell.js'));
 for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
   ok(fs.existsSync(new URL('../' + f, import.meta.url)), 'A-008 ' + f + ' still exists');
 ok(/href="development\.html"\s+data-nav="dev"/.test(shellHtml), 'A-008 Development is in the nav');
-ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(shellHtml), 'A-008 Maps is STILL in the nav — not folded');
+// ⚠️ RETARGETED IN PHASE 8, ONE LINE, AND THE DEVELOPMENT CONTRACT IS UNCHANGED IN
+// SUBSTANCE. This line used to read `A-008 Maps is STILL in the nav — not folded`, which
+// was a true statement about the Phase 6 CHROME, not about Development's capability.
+// A-021 authorized folding Maps out of the sidebar, so that sentence is now false BY
+// DESIGN — and the thing it was really protecting (Map 1 continues to exist and stay
+// reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
+// Everything else in this file is byte-identical to Phase 6.
+ok(!/href="homesignalmap\.html"/.test(shellHtml),
+  'A-021 Maps is NO LONGER a sidebar item — folded under Development',
+  (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
+ok(/<body data-nav="dev"/.test(map),
+  'A-021 ...and Map 1 declares "dev", so visiting it lights Development');
+ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs),
+  'A-008 Map 1 is still in MAP_PAGES — the PAGE was not retired, only its sidebar entry');
 for (const p of ['development.html', 'homesignalmap.html'])
   ok(new RegExp("'" + p + "'").test(shellJs), 'A-008 ZIP_NAV_PAGES still carries ' + p);
 

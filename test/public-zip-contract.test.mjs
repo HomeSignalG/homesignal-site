@@ -69,13 +69,22 @@ for (const [f, body] of [['lib/community-page.js', cp], ['scripts/gen_zip_pages.
   ok(!/application\/ld\+json/.test(body), 'PS-001 no application/ld+json invented in ' + f,
     (body.match(/.{0,40}ld\+json.{0,40}/) || [])[0]);
 
-// ---- PS-001 CHROME: seven items, Maps and Today both present ----
+// ---- PS-001 CHROME: FOUR containers (A-021, Phase 8) ----
+// ⚠️ THIS IS THE ONLY SECTION OF THIS FILE PHASE 8 WAS AUTHORIZED TO RETARGET. The chrome
+// on the public ZIP changed because there is ONE shell and the retirement was authorized;
+// every other assertion here — robots, canonical, Rule F, ld+json, Follow copy, View
+// Development Map, Invite, FM-078, the Local News cap, the A-022 gate — is unchanged and
+// must stay that way. A public ZIP that kept Today/Maps/Comm while the logged-in pages
+// lost them would be a stealth shell split, so the four-item assertion below is measured
+// on the ONE partials/shell.html both surfaces load.
 {
   const nav = [...shellHtml.matchAll(/href="([^"]+)"\s+data-nav="([a-z]+)"/g)].map(m => m[2] + '->' + m[1]);
-  ok(nav.length === 7, 'PS-001 the shared chrome is SEVEN items', nav);
-  ok(nav.includes('today->today.html'), 'PS-001 Today is still in the chrome — not retired', nav);
-  ok(nav.includes('maps->homesignalmap.html'), 'PS-001 Maps is still in the chrome — not folded', nav);
-  ok(nav.includes('comm->community.html'), 'PS-001 the public ZIP is still a chrome destination', nav);
+  ok(nav.length === 4, 'PS-001 the shared chrome is FOUR containers', nav);
+  ok(nav.join('|') === 'dash->dashboard.html|alerts->alerts.html|dev->development.html|props->properties.html',
+    'PS-001 ...Dashboard, Alerts, Development, My Places — in that order', nav);
+  ok(!nav.some(n => /today/.test(n)), 'PS-001 Today is NOT in the chrome (A-020 retired it)', nav);
+  ok(!nav.some(n => /homesignalmap/.test(n)), 'PS-001 Maps is NOT in the chrome (A-021 folded it under Development)', nav);
+  ok(!nav.some(n => /community\.html/.test(n)), 'PS-001 Zip Code Activity is NOT in the chrome — the public ZIP is not a fifth container', nav);
 }
 
 // ---- PS-001 PRODUCT ENTRY: the public page's own copy and targets ----

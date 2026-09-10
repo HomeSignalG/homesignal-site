@@ -84,7 +84,17 @@ ok(!/dashWatch[\s\S]{0,400}?(toggleFollow|Notify me|Watch this)/.test(dash),
 // A-009 boundary: surface the existing capability, invent no new one.
 ok(!/text\/csv|\.pdf|localStorage\.setItem\('hs:reports/.test(dash),
   'A-009 no CSV, PDF or report persistence was invented');
-ok(/href="reports\.html"/.test(dash), 'A-009 reports.html is still reachable, not retired');
+// ⚠️ RETARGETED IN PHASE 8. This asserted `reports.html is still reachable, not retired`,
+// which was true when A-009 shipped and is false BY DESIGN now: A-019 retired reports.html
+// to a redirect stub once this module was proven to carry the capability. The real risk it
+// guarded — the Reports capability silently disappearing — is now guarded better, by
+// asserting the module is here AND that no designed CTA hops through the retired stub
+// (which would be a redirect loop waiting to happen).
+ok(/id="dashReports"/.test(dash) && /Intelligence Reports/.test(dash),
+  'A-009 the Intelligence Reports module is still the Reports capability');
+ok(!/reports\.html/.test(dash),
+  'A-019 ...and Dashboard no longer routes anyone through the retired reports.html stub',
+  (dash.match(/.{0,40}reports\.html.{0,40}/) || [])[0]);
 ok(/Add a ZIP Code/.test(dash) || /zipLabels:\s*true/.test(dash),
   'dashboard ZIP add flow uses ZIP Code terminology');
 ok(/statTileLink/.test(dash), 'dashboard stat tiles use statTileLink');

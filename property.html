@@ -18,7 +18,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/impact.js"></script>
-<script src="shell.js?v=7258b17c"></script>
+<script src="shell.js?v=13d6b1fc"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -75,7 +75,7 @@ HS.onReady(async function () {
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
     + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
     + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
-    + '<button class="btn" onclick="location.href=\'reports.html\'">Generate property report</button>'
+    + '<button class="btn" onclick="location.href=\'dashboard.html#dashReports\'">Generate property report</button>'
     + '</div></div>'
     + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
