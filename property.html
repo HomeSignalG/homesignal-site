@@ -155,9 +155,22 @@ HS.onReady(async function () {
           .filter(function (s) { return !!s.record_url; });
       }
     }
+    // The map CENTERS on the Address either way — that is the page's subject. The "Your home"
+    // MARKER is different: it is a claim that a real resident lives there, and the seed persona's
+    // three addresses are fiction (seed/delvalle.js carries demo:true, and HS.data.properties
+    // stamps sample:true when serving them under DEMO_SESSION). A fabricated persona must never
+    // be handed a pin that says "Your home" — the same rule HS.buildLive already states for a
+    // centroid stand-in, applied to the other way of getting a fake home onto a map.
+    //
+    // The predicate is EXACTLY the demo-exclusion half, and deliberately NOT HS.isRealHome:
+    // that also requires label === 'home' or tag 'home'/'Your home', which is the right test for
+    // "WHICH of my places is my residence" (what the dashboard and the where-line ask). This
+    // page is already about THIS Address, so that clause would suppress the pin on a genuine
+    // saved Address that simply carries a different label.
+    var realAddress = !home.sample && !home.demo;
     HS.buildLive(el, {
       center: { lat: home.lat, lng: home.lng },
-      home: home,                    // the Address IS the subject: a real, dominant home marker
+      home: realAddress ? home : null,   // real resident Address only; a demo persona gets no pin
       items: sites,
       radiusMi: PCM_RADIUS_MI,       // the ring drawn equals the geography actually queried
       zoom: 12.4,

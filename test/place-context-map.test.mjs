@@ -77,6 +77,18 @@ ok(/rows === null/.test(prop), '5c ...and the rendered note tells those two apar
 ok(/HS\.n5CoverageNote\(/.test(prop),
   '5d completeness uses the SHIPPED sentence, which already separates truncation from emptiness');
 
+// ── §5b the home PIN is a claim about a real resident, and a demo persona is not one ────
+ok(/var realAddress = !home\.sample && !home\.demo;/.test(prop),
+  '5e the home marker is gated on the demo-exclusion predicate');
+ok(/home:\s*realAddress \? home : null/.test(prop),
+  '5f ...and a sample/demo Address is handed NO home pin — buildLive draws one only for o.home');
+ok(!/HS\.isRealHome/.test(prop),
+  '5g ...and NOT via HS.isRealHome, whose label/tag clause would also suppress the pin on a '
+  + 'genuine saved Address carrying a different label',
+  (prop.match(/.{0,60}isRealHome.{0,60}/) || [])[0]);
+ok(/center: \{ lat: home\.lat, lng: home\.lng \}/.test(prop),
+  '5h ...while the map still CENTERS on the Address either way — the page\'s subject is unchanged');
+
 // ── §6 the handoff: the only Development deep link that exists today ────────────────────
 ok(/HS\.navHref\('homesignalmap\.html', p\.zip\)/.test(prop),
   '6a the handoff carries the ADDRESS\'s ZIP');
