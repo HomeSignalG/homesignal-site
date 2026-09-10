@@ -79,7 +79,17 @@ comment on schema geo is
   'function public.app_zcta_boundary(text), which transforms to 4326 at read time.';
 
 -- PRIVILEGES. anon is deliberately absent: the capability is authenticated-only.
+--
+-- REVOKING FROM `public` IS NOT ENOUGH, AND THE LIVE PROOF IS WHAT CAUGHT IT. This project
+-- carries default privileges that grant `anon` EXECUTE on new functions in schema public, so
+-- after the first deploy of this file — which revoked PUBLIC and granted only authenticated
+-- and service_role — has_function_privilege('anon', …, 'EXECUTE') was still TRUE.
+-- `PUBLIC` is the pseudo-role every role inherits; `anon` is a NAMED role holding its own
+-- grant, and revoking the first does not touch the second. The offline test asserted the
+-- FILE contained no `to anon` grant, which was true and irrelevant: nothing in this file
+-- granted it. Only asking the database found it.
 revoke all on function public.app_zcta_boundary(text) from public;
+revoke all on function public.app_zcta_boundary(text) from anon;
 grant execute on function public.app_zcta_boundary(text) to authenticated, service_role;
 
 -- NOTE, deliberately NOT executed here: `grant usage on schema geo` appears nowhere in this

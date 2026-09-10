@@ -413,8 +413,14 @@ select (select count(*) from geo.zcta_boundary)                                a
          where zcta5 = any (array[{canon}]))                                   as canonical_18_present,
        (select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
          where n.nspname='geo' and c.relname='zcta_boundary')                  as rls_enabled,
+       -- TABLES ONLY (relkind 'r'). The first version counted every pg_class row matching
+       -- the scratch name, which includes INDEXES: ALTER TABLE ... RENAME does not rename the
+       -- constraint, so the primary key stays 'zcta_boundary_load_pkey' and the field read 1
+       -- on a swap that had in fact left no table behind. A receipt that misreports its own
+       -- success condition is worse than no receipt.
        (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
-         where n.nspname='geo' and c.relname like 'zcta_boundary_load%')       as load_table_left_behind,
+         where n.nspname='geo' and c.relkind='r'
+           and c.relname like 'zcta_boundary_load%')                           as load_tables_left_behind,
        pg_size_pretty(pg_total_relation_size('geo.zcta_boundary'))             as total_size,
        pg_size_pretty(pg_database_size(current_database()))                    as db_size_after;
 """
