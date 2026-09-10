@@ -111,9 +111,19 @@ ok(/revoke all on function public\.app_zcta_boundary\(text\) from public;/.test(
   '4b EXECUTE is revoked from PUBLIC first');
 ok(/grant execute on function public\.app_zcta_boundary\(text\) to authenticated, service_role;/.test(ddl),
   '4c ...then granted to authenticated and service_role');
-ok(!/to\s+anon\b/.test(ddl) && !/anon,/.test(ddl),
-  '4d ...and NEVER to anon: ZIP context visualization is the authenticated A-022 posture, '
-  + 'and the public ZIP document is the protected acquisition surface');
+ok(!/grant[\s\S]{0,80}to\s+anon\b/.test(ddl) && !/to anon, authenticated/.test(ddl),
+  '4d ...and NEVER GRANTED to anon: ZIP context visualization is the authenticated A-022 '
+  + 'posture, and the public ZIP document is the protected acquisition surface');
+// 4e EXISTS BECAUSE 4d WAS TRUE AND NOT ENOUGH. This project's default privileges grant
+// `anon` EXECUTE on new functions in schema public, so after the first deploy — which
+// revoked PUBLIC and granted only authenticated/service_role — the live
+// has_function_privilege('anon', …) was STILL TRUE. `PUBLIC` is the pseudo-role every role
+// inherits; `anon` is a NAMED role holding its own grant, and revoking one does not touch
+// the other. A file that never grants anon is not a file that leaves anon without the
+// grant, and only the database can tell you which you have.
+ok(/revoke all on function public\.app_zcta_boundary\(text\) from anon;/.test(ddl),
+  '4e ...and anon is revoked EXPLICITLY, not merely left ungranted — default privileges '
+  + 'hand it EXECUTE otherwise');
 
 // ── §5 PCM-4 is still not started ──────────────────────────────────────────────────────
 // §8 of test/place-context-map.test.mjs owns this too; these are the two that would move
