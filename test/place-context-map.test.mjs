@@ -99,12 +99,28 @@ ok(!/[?&]addr=/.test(prop),
   '6c no ?addr= deep link was invented — that is the property_reports dossier, not address mode, '
   + 'and an address-mode parameter would mean touching Map 1');
 
-// ── §7 PCM-1 did NOT start PCM-2. The boundary primitive does not exist yet ─────────────
-ok(!/\bfitBoundary\b/.test(mapJs) && !/\bboundary:/.test(mapJs),
-  '7a lib/map.js still has NO boundary / fitBoundary option — PCM-2 is not started');
-ok(!/fitBounds/.test(mapJs), '7b ...and no bounds-fit in any engine');
+// ── §7 PCM-2 IS BUILT, and PCM-1 still does not use it ─────────────────────────────────
+// These pins were the inverse until PCM-2 landed ("the boundary primitive does not exist
+// yet"). They now assert the primitive EXISTS — and, just as load-bearing, that the ADDRESS
+// map does not reach for it. An Address is point-centered context; a polygon fit there would
+// be the wrong contract on the right page.
+ok(/HS\.boundaryFC = function/.test(mapJs) && /HS\.boundaryBounds = function/.test(mapJs),
+  '7a lib/map.js exposes the boundary helpers');
+ok(/o\.boundary \? HS\.boundaryFC\(o\.boundary\) : null/.test(mapJs) && /const fitB = !!o\.fitBoundary;/.test(mapJs),
+  '7b ...and buildLive reads both additive options');
+ok(/m\.fitBounds\(\[\[bBounds\.south, bBounds\.west\]/.test(mapJs),
+  '7c Leaflet fits as [[south,west],[north,east]]');
+ok(/map\.fitBounds\(\[\[bBounds\.west, bBounds\.south\]/.test(mapJs),
+  '7d ...and MapLibre as [[west,south],[east,north]] — the opposite order, in ONE place');
+ok(/if \(bFC \|\| fitB\) \{ refuse\('boundary-needs-tiles'\); return; \}/.test(mapJs),
+  '7e the schematic REFUSES a boundary view instead of degrading to point+radius');
+ok(/if \(fitB && !bBounds\) \{ refuse\('fitBoundary-without-boundary'\); return; \}/.test(mapJs),
+  '7f ...and fitBoundary with no usable polygon is refused in every engine');
 ok(!/fitItems/.test(prop) && !/fitItems/.test(mapJs),
-  '7c and no fitItems — a bbox of project points is not a polygon fit (the #1141 shape)');
+  '7g still no fitItems — a bbox of project points is not a polygon fit (the #1141 shape)');
+ok(!/\bboundary:/.test(prop) && !/fitBoundary/.test(prop),
+  '7h PCM-1 does NOT use the boundary options — the Address map is point-centered context',
+  (prop.match(/.{0,50}(boundary|fitBoundary).{0,50}/) || [])[0]);
 
 // ── §8 PCM-1 did NOT start PCM-4. The public ZIP surface is untouched ───────────────────
 for (const f of ['community.html', 'scripts/gen_zip_pages.py']) {
