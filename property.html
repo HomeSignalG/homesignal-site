@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Address</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 </head>
 <body data-nav="props">
 <template id="hs-content"><div class="page" id="propPage"></div></template>
@@ -14,10 +15,12 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/impact.js"></script>
+<script src="lib/map.js?v=f5cb9a37"></script>
 <script src="shell.js?v=13d6b1fc"></script>
 <script>
 HS.onReady(async function () {
@@ -47,10 +50,19 @@ HS.onReady(async function () {
 
   var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
 
+  var mapHref = 'homesignalmap.html?addr=' + encodeURIComponent(HS.homeAddressLine ? HS.homeAddressLine(p) : p.address);
+  var mapHome = (p && !p.sample && !p.demo && p.lat != null && p.lng != null) ? p : null;
+  var mapCaption = (mapHome && HS.isRealHome && HS.isRealHome(p)) ? 'Your home' : 'Address';
+  var mapItems = projects.concat(changes).filter(function (x) { return x.lat && x.lng; }).slice(0, 16);
+
   page.innerHTML =
     '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
     + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
     + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + '<div class="block" style="padding:16px 18px">'
+    + '<div class="bt-row"><h2>Map 1</h2><a href="' + HS.esc(mapHref) + '" id="placeMapLink">Open full map →</a></div>'
+    + '<div class="mapwrap" id="placeMap" role="region" aria-label="Map of this address — open the full map"></div>'
+    + '</div>'
     + '<div class="cols"><div>'
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
     + near.map(function (pr) {
@@ -82,6 +94,20 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
     + '</div></div>';
+
+  if (HS.placeMap) {
+    HS.placeMap(document.getElementById('placeMap'), {
+      mode: 'address',
+      home: mapHome,
+      homeCaption: mapCaption,
+      items: mapItems,
+      mapHref: mapHref,
+      itemClick: function (it) {
+        var href = HS.itemNavHref ? HS.itemNavHref(it, p.zip) : null;
+        if (href) location.href = href;
+      }
+    });
+  }
 });
 </script>
 </body>

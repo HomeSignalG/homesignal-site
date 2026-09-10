@@ -332,10 +332,13 @@ def render(p, built):
         f'<meta name="description" content="{esc(desc)}">\n'
         f'<link rel="canonical" href="{esc(canon)}">\n'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; base-uri \'self\'; '
-        "object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
-        'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
-        'form-action \'self\'">\n'
+        "object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org "
+        "https://server.arcgisonline.com; font-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; "
+        "connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co "
+        'wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com '
+        "https://*.tile.openstreetmap.org; form-action 'self'\">\n"
         '<link rel="stylesheet" href="/app.css">\n</head>\n'
         f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
@@ -343,6 +346,7 @@ def render(p, built):
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
         '<script src="/lib/templates.js?v=5f556744"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/map.js?v=f5cb9a37"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated

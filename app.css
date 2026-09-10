@@ -84,6 +84,9 @@
   a.section-link{text-decoration:none;color:inherit}
   a.section-link:hover,a.section-link:focus-visible{color:var(--green)}
   .dash-mapwrap:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:15px}
+  #placeMap{height:280px}
+  #placeMap .maplibregl-canvas{border-radius:15px}
+  #placeMap:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:15px}
 
   /* filter row */
   .toolbar{display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap}
