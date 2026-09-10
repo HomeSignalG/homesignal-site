@@ -221,8 +221,14 @@ await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeo
 c = await chrome();
 info('homesignalmap.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '2 Map 1 highlights exactly one sidebar item', c.activeLabels);
-ok(c.activeTokens[0] === 'maps', '2 ...and it is Maps', c.activeTokens);
-ok(c.activeTokens.indexOf('dev') < 0, '2 Development & Impact is NOT active on Map 1', c.activeTokens);
+// ⚠️ RETARGETED (A-021). This used to assert `activeTokens[0] === 'maps'`, and that was the
+// right assertion while a Maps sidebar entry existed — the 2026-09-04 defect this file was
+// written for was Map 1 claiming "dev" WHILE Maps was a container. A-021 folded Maps UNDER
+// Development, so there is no Maps entry to light and claiming "dev" IS the fold. The thing
+// this section protects is unchanged: Map 1 must light exactly one item, and it must be the
+// section it actually lives in.
+ok(c.activeTokens[0] === 'dev', '2 ...and it is Development — Map 1 lives under it (A-021)', c.activeTokens);
+ok(c.activeTokens.indexOf('maps') < 0, '2 there is no Maps item to light any more', c.activeTokens);
 
 // ═══ 6. ...while the proven ZIP contract is untouched ═══
 let z = await page.evaluate(() => ({
@@ -251,25 +257,44 @@ ok(z.devPoints > 0 && z.devPoints === z.authoritative,
   '6 every ZIP development point is authoritative whole-ZIP geometry', z);
 ok(z.distances === 0, '6 no radius distance is attached in ZIP mode', z.distances);
 
-// ═══ 3/4/5. Reaching Maps from other sections ═══
-for (const [origin, label] of [['alerts.html', '3 Alerts'], ['development.html', '4 Development & Impact'],
-                               ['dashboard.html', '5 Dashboard']]) {
+// ═══ 3/4/5. Reaching Map 1 from other sections ═══
+// ⚠️ RETARGETED (A-021), and the retarget is the point rather than a workaround. This loop
+// used to click `.nav a[data-nav="maps"]` from three origins. That entry no longer exists,
+// so the old loop did not merely fail — it TIMED OUT and crashed the whole file, taking
+// sections 6, 7 and 7b down with it. The journey it protects is still real: a resident must
+// be able to reach Map 1 from elsewhere in the product. What changed is the route. The
+// sidebar shortcut is gone BY DESIGN, so that absence is asserted here instead of crashed
+// on, and the two IN-PRODUCT paths A-021 kept are exercised in its place.
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
+  '3 there is no Maps sidebar entry — Maps was folded under Development (A-021)');
+ok(await page.locator('.nav a').count() === 4,
+  '3 ...and the sidebar is the four containers', await page.locator('.nav a').count());
+
+// The two routes chosen are ANCHORS that exist on a page's default view. development.html's
+// "See it on the map" is deliberately NOT one of them: it lives on the project DETAIL panel,
+// not the list, so reaching it would need a seed project id and would make this journey
+// depend on fixture contents rather than on navigation.
+for (const [origin, selector, label] of [
+  ['dashboard.html', '#dashMapLink',                        '4 Dashboard "Open full map"'],
+  ['community.html', 'a:has-text("View Development Map")',  '5 public ZIP "View Development Map"']
+]) {
   await page.goto(base + '/' + origin + '?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
   await waitShell();
-  const href = await page.getAttribute('.nav a[data-nav="maps"]', 'href');
+  const target = page.locator(selector).first();
+  ok(await target.count() > 0, label + ' -> the control exists');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-    page.click('.nav a[data-nav="maps"]')
+    target.click()
   ]);
   await waitShell();
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 }).catch(() => {});
   c = await chrome();
-  info(label + ' -> Maps', { href, landed: c.path + c.search, active: c.activeTokens });
-  ok(/^homesignalmap\.html/.test(href || ''), label + ' -> the Maps entry points at Map 1', href);
+  info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
   ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
-  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps',
-    label + ' -> Maps is the active item after the page settles', c.activeTokens);
-  ok(c.activeTokens.indexOf('dev') < 0, label + ' -> Development & Impact is NOT active', c.activeTokens);
+  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev',
+    label + ' -> Development is the active item after the page settles', c.activeTokens);
 }
 
 // ═══ 7. A saved home in Del Valle, a map of Denver ═══
@@ -290,7 +315,7 @@ ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '7 the saved home is still saved (unchanged, still the active property)', c.savedHome);
 ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps', '7 Maps is still the active item');
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
 
 // ═══ 7b. POSITIVE CONTROL — on the home's own ZIP it is still "Your home" ═══
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });

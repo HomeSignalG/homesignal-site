@@ -8,16 +8,26 @@
 <aside class="side" id="hs-side">
   <a class="logo" href="index.html"><span class="mk" style="background:var(--green)"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span> <span>Home<span style="color:var(--green-2)">Signal</span></span></a>
   <nav class="nav" id="hs-nav">
-    <a href="today.html"       data-nav="today"><span class="ic">◎</span> Today's Priorities</a>
     <a href="dashboard.html"   data-nav="dash"><span class="ic">▦</span> Dashboard</a>
     <a href="alerts.html"      data-nav="alerts"><span class="ic">◐</span> Alerts</a>
-    <a href="development.html" data-nav="dev"><span class="ic">◈</span> Development &amp; Impact</a>
-    <a href="homesignalmap.html" data-nav="maps"><span class="ic">◉</span> Maps</a>
-    <a href="properties.html"  data-nav="props"><span class="ic">⌂</span> Saved Places</a>
-    <a href="community.html"   data-nav="comm" id="hs-nav-comm"><span class="ic">◍</span> Zip Code Activity</a>
-    <!-- Reports is hidden for the public beta: its report list isn't interactive
-         yet and the preview makes claims ("impact model", "updated today") the
-         product doesn't back. Re-enable when the page is production-ready. -->
+    <a href="development.html" data-nav="dev"><span class="ic">◈</span> Development</a>
+    <a href="properties.html"  data-nav="props"><span class="ic">⌂</span> My Places</a>
+    <!-- FOUR CONTAINERS (A-021, Phase 8). Three entries left this list; none of the three
+         PAGES was retired, and that distinction is the whole point:
+           Today's Priorities - today.html is now a redirect stub to Dashboard (A-020),
+             after all four of its areas were proven to have live destinations.
+           Maps - homesignalmap.html IS STILL MAP 1 and is still in ZIP_NAV_PAGES and
+             MAP_PAGES. It lives UNDER Development now, so it declares data-nav="dev" and
+             visiting it lights Development. Five paths still reach it: Dashboard's "Open
+             full map -" and #dashMap, Worth Watching "See on map -", development.html's
+             "See it on the map", the public ZIP's "View Development Map -", and the
+             maps.html redirect. Do not re-add a Maps entry here to make an old test green.
+           Zip Code Activity - community.html is still in ZIP_NAV_PAGES and every generated
+             /community/<zip>/ document is untouched. It is the PUBLIC ZIP surface, not a
+             fifth logged-in container, so it keeps data-nav="comm" and highlights nothing.
+         Reports was already hidden here; reports.html is now a redirect stub too (A-019).
+         This is ONE shell: the public ZIP gets these same four items. There is no
+         public/logged-in split. -->
   </nav>
   <div class="grow"></div>
   <div class="upsell">
@@ -105,13 +115,13 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="switcherTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('switcherModal')" aria-label="Close">✕</button>
-      <span class="mbadge">⌂ Your Saved Places</span>
+      <span class="mbadge">⌂ My Places</span>
       <h3 id="switcherTitle">Switch zip code</h3>
       <p class="msub" id="switcherSub">Pick one to focus the app on it.</p>
     </div>
     <div class="mbody">
       <div id="switcherList"><!-- filled by shell.js --></div>
-      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add a Saved Place</button>
+      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add Address</button>
     </div>
   </div>
 </div>

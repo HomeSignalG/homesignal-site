@@ -102,7 +102,7 @@
       n = parseInt(n, 10);
       return (n >= 0 && n <= 2 && !isNaN(n)) ? n : 0;
     };
-    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
+    HS.ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};
@@ -1049,6 +1049,45 @@
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.remove('hidden');
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
+  };
+
+  // A-012 REMOVE ADDRESS — the one basic management function that did not exist.
+  //
+  // It removes ONLY the user's own saved/monitored Address relationship: a single
+  // app_properties row, matched on BOTH id and user_id. Everything else is deliberately
+  // untouched, because a "remove" that quietly took more than it named would be the exact
+  // collateral-deletion failure A-012 is written to prevent:
+  //   * alerts / app_changes / app_projects — public-record content, not the user's to delete
+  //   * app_follows and myCommunities — ZIP Code follows are a DIFFERENT Place type with
+  //     their own remove (HS.unfollowCommunity). Removing an Address never unfollows a ZIP,
+  //     even when saveHome originally followed that ZIP as a side effect.
+  //   * any other user's rows — the user_id match is defence in depth; RLS is the real gate.
+  //
+  // A DEMO session is refused. The seeded persona's sample homes are not a saved
+  // relationship anyone owns, so offering to "remove" one would be theatre.
+  //
+  // Returns true/false rather than throwing, so the caller can report an honest failure
+  // instead of optimistically removing the card from the DOM.
+  HS.removeAddress = async function (id) {
+    if (!id) return false;
+    if (!state.session || state.session.demo) return false;
+    if (CFG.DATA_SOURCE !== 'supabase' || !HS.sb) return false;
+    let r = null;
+    try {
+      r = await HS.sb().from('app_properties').delete()
+        .match({ id: id, user_id: state.session.user.id });
+    } catch (e) { r = { error: e }; }
+    if (r && r.error) return false;
+    state.properties = (state.properties || []).filter(p => String(p.id) !== String(id));
+    // If the removed Address was the active one, fall back to another saved Address; with
+    // none left, clear it and let the app's existing area default (myZip / DEFAULT_ZIP)
+    // take over. Never refuse to remove the last Address.
+    if (String(state.activePropId) === String(id)) {
+      state.activePropId = state.properties[0] ? state.properties[0].id : null;
+      LS.set('activeProp', state.activePropId);
+    }
+    paintTopbar();
+    return true;
   };
 
   // -------------------------------------------------- location / community ----

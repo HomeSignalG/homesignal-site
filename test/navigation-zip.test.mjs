@@ -123,8 +123,13 @@ ok(/data-znav="homesignalmap\.html"/.test(dash),
   'dashboard map links use data-znav');
 ok(/nav\('homesignalmap\.html',\s*mapCtx\(\)\)/.test(dash),
   'dashboard map click preserves ZIP via pageHref/navHref');
-ok(/data-znav="homesignalmap\.html"/.test(today),
-  'today.html Map link uses data-znav');
+// A-020 (Phase 8): today.html is now a redirect stub, pinned the way maps.html already is.
+// Its "Map -" link is gone WITH the page; Dashboard's "Open full map -" was already the
+// same path, which is why retiring it added no new map route.
+ok(/window\.location\.replace\('\/dashboard\.html'/.test(today) && !/<template id="hs-content">/.test(today),
+  'today.html is a redirect stub to the Dashboard, not a second one-pager');
+ok(/var q = window\.location\.search \|\| '';/.test(today),
+  'today.html carries the query string across the redirect');
 // No active runtime entry point may still send a resident to the retired map.
 [['development.html', devPage], ['dashboard.html', dash], ['today.html', today],
  ['partials/shell.html', fs.readFileSync(new URL('../partials/shell.html', import.meta.url), 'utf8')],

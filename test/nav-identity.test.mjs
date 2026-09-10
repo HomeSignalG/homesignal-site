@@ -31,8 +31,13 @@ const ok = (c, name, detail) => {
 // A section whose sidebar entry is deliberately not rendered today. A page may still
 // declare its token; anything NOT listed here must match a live nav entry, so a typo
 // ("mapz") can never pass as a valid identity.
+// PHASE 8 (A-019 / A-020 / A-021): the sidebar is now FOUR containers. Three tokens no
+// longer have a sidebar entry, and none of the three PAGES was deleted — that distinction
+// is what this map records.
 const HIDDEN_SECTIONS = {
-  reports: 'the Reports entry is commented out of partials/shell.html for the public beta'
+  reports: 'A-019: reports.html is a redirect stub to dashboard.html#dashReports; the capability is A-009',
+  today:   'A-020: today.html is a redirect stub to dashboard.html; its four areas live on A-003/A-004/A-005 and A-022',
+  comm:    'A-021: community.html is the PUBLIC ZIP surface, not a fifth logged-in container — it highlights nothing'
 };
 
 // ── the sidebar, as shipped ──────────────────────────────────────────────────────────────
@@ -44,7 +49,11 @@ const NAV = [];
 const linkRe = /<a\s+href="([^"]+)"[^>]*data-nav="([^"]*)"/g;
 let m;
 while ((m = linkRe.exec(navBlock))) NAV.push({ href: m[1], token: m[2] });
-ok(NAV.length >= 6, 'the sidebar exposes its entries as href + data-nav pairs', NAV.length);
+ok(NAV.length === 4, 'A-021 the sidebar is EXACTLY FOUR containers', NAV);
+ok(NAV.map((n) => n.token).join('|') === 'dash|alerts|dev|props',
+  'A-021 ...in order: Dashboard, Alerts, Development, My Places', NAV.map((n) => n.token));
+ok(NAV.map((n) => n.href).join('|') === 'dashboard.html|alerts.html|development.html|properties.html',
+  'A-021 ...pointing at the four container pages', NAV.map((n) => n.href));
 
 const tokenForHref = Object.create(null);
 NAV.forEach((n) => { tokenForHref[n.href] = n.token; });
@@ -63,7 +72,11 @@ const PAGE_RE = /<body[^>]*\sdata-nav="([^"]*)"/;
 const pages = [];
 for (const n of NAV) pages.push(n.href.split('?')[0]);
 // plus every other root page that declares an identity (detail pages, hidden sections)
-for (const f of ['property.html', 'reports.html', 'about.html', 'contact.html',
+// A-021 note: homesignalmap.html and community.html USED to be sidebar destinations and
+// are no longer, so they stopped arriving through NAV — they must be listed explicitly or
+// their identity goes unchecked, which is exactly the silence this file exists to end.
+for (const f of ['property.html', 'homesignalmap.html', 'community.html',
+                 'reports.html', 'today.html', 'about.html', 'contact.html',
                  'how-it-works.html', 'privacy.html']) {
   if (existsSync(join(root, f))) pages.push(f);
 }
@@ -72,7 +85,7 @@ for (const f of [...new Set(pages)]) {
   const mm = read(f).match(PAGE_RE);
   if (mm && mm[1]) declared.push({ file: f, token: mm[1] });
 }
-ok(declared.length >= 7, 'the app pages declare a navigation identity', declared.length);
+ok(declared.length >= 5, 'the app pages declare a navigation identity', declared.length);
 
 // THE ASSERTION THAT WOULD HAVE CAUGHT THE DEFECT: a page that IS a sidebar destination
 // must claim that entry's own token. homesignalmap.html claiming "dev" fails right here.
@@ -93,19 +106,59 @@ ok(orphanTokens.length === 0,
 
 // Named pins, so a rename is loud rather than quietly re-shuffling what lights up.
 const tokenOf = (f) => (declared.find((d) => d.file === f) || {}).token;
-ok(tokenOf('homesignalmap.html') === 'maps',
-  'MAP 1 (homesignalmap.html) IS the Maps section', tokenOf('homesignalmap.html'));
+// ⚠️ THE PIN BELOW IS THE EXACT INVERSE OF THE 2026-09-04 DEFECT, AND THAT IS DELIBERATE.
+// That defect was homesignalmap.html declaring "dev" WHILE a Maps sidebar entry existed:
+// the token pointed at a section the page was not, and Maps could never light up. A-021
+// removed the Maps entry, so Map 1 now genuinely LIVES UNDER Development — claiming "dev"
+// IS the fold, and visiting Map 1 correctly lights Development. The defect and the fix
+// look identical in one line of HTML and are opposites in context; the rest of this file
+// is what supplies the context. Do NOT re-add a Maps sidebar entry to make this green.
+ok(tokenOf('homesignalmap.html') === 'dev',
+  'A-021 MAP 1 (homesignalmap.html) now lives UNDER Development', tokenOf('homesignalmap.html'));
 ok(tokenOf('development.html') === 'dev',
-  'development.html IS the Development & Impact section', tokenOf('development.html'));
+  'A-021 ...alongside development.html, which is the same section', tokenOf('development.html'));
 ok(tokenOf('alerts.html') === 'alerts', 'alerts.html IS the Alerts section', tokenOf('alerts.html'));
-ok(tokenForHref['homesignalmap.html'] === 'maps',
-  'the sidebar\'s Maps entry points at the primary map', tokenForHref['homesignalmap.html']);
+ok(tokenForHref['homesignalmap.html'] === undefined,
+  'A-021 there is NO Maps sidebar entry any more', tokenForHref['homesignalmap.html']);
 
-// Map 2 stays retired: the sidebar must offer exactly one map, and it must be Map 1.
+// The fold is about the SIDEBAR, never about the page. Map 1 must still exist and must
+// still be a ZIP-scoped nav target, or the wrong thing was folded.
+ok(existsSync(join(root, 'homesignalmap.html')), 'A-021 Map 1 STILL EXISTS as a page');
+const shellJsSrc = read('shell.js');
+ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJsSrc),
+  'A-021 Map 1 is still in MAP_PAGES');
+ok(/HS\.ZIP_NAV_PAGES = \['dashboard\.html', 'alerts\.html', 'development\.html', 'homesignalmap\.html', 'community\.html'\];/.test(shellJsSrc),
+  'A-021 ZIP_NAV_PAGES dropped ONLY today.html — homesignalmap.html and community.html stay');
+ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];"),
+  'A-021 ...and lib/view-zip.js carries the byte-identical literal');
+
+// Zero map entries in the sidebar now, and the retired second map is still not there.
 const mapEntries = NAV.filter((n) => /map/i.test(n.href));
-ok(mapEntries.length === 1 && mapEntries[0].href === 'homesignalmap.html',
-  'exactly one map entry in the sidebar, and it is Map 1', mapEntries);
+ok(mapEntries.length === 0, 'A-021 no map entry in the sidebar — Maps was folded', mapEntries);
 ok(!/href="maps\.html"/.test(navBlock), 'the retired second map is not in the sidebar');
+ok(!/href="today\.html"/.test(navBlock), 'A-020 Today is not in the sidebar');
+ok(!/href="community\.html"/.test(navBlock), 'A-021 Zip Code Activity is not in the sidebar');
+
+// The retired pages are redirect stubs, not deletions.
+for (const [f, target] of [['today.html', '/dashboard.html'], ['reports.html', '/dashboard.html']]) {
+  const src = read(f);
+  ok(/window\.location\.replace\('\/dashboard\.html'/.test(src),
+    'A-019/A-020 ' + f + ' is a redirect stub to ' + target, src.slice(0, 80));
+  ok(!/<template id="hs-content">/.test(src),
+    'A-019/A-020 ...with no #hs-content — it is not a second page', f);
+  ok(/var q = window\.location\.search \|\| '';/.test(src),
+    'A-019/A-020 ...carrying the query string, same convention as maps.html', f);
+}
+// community.html keeps its own identity and is NOT a fifth container.
+ok(tokenOf('community.html') === 'comm',
+  'A-021 community.html still declares "comm" — the public ZIP highlights nothing', tokenOf('community.html'));
+ok(/data-nav="comm"/.test(read('scripts/gen_zip_pages.py')),
+  'A-021 ...and the generator SOURCE still stamps data-nav="comm" on every generated document');
+// No designed CTA may still route through the retired Reports stub.
+for (const f of ['dashboard.html', 'property.html'])
+  ok(!/['"]reports\.html['"]/.test(read(f)) && !/href="reports\.html"/.test(read(f)),
+    'A-019 ' + f + ' no longer uses reports.html as a designed CTA target',
+    (read(f).match(/.{0,40}reports\.html.{0,40}/) || [])[0]);
 
 // ── the consumer must still exist, or this whole contract is decoration ──────────────────
 const shellJs = read('shell.js');
