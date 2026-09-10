@@ -40,11 +40,51 @@ const mtgBare = { id: 'mtg-x' };
 ok(meetingNavHref(mtgBare, '78617') === 'alerts.html?zip=78617&category=Government+%26+civic',
   'meetingNavHref without related id uses civic category only');
 
-const dash = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
-ok(/ZIP Score/.test(dash) && !/Community score/.test(dash),
-  'dashboard uses ZIP Score label, not Community score');
-ok(/Your ZIP Codes/.test(dash) && !/Your communities/.test(dash),
-  'dashboard uses Your ZIP Codes heading');
+const dashRaw = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
+// ASSERT ON A COMMENT-STRIPPED COPY. These two checks name the very strings they forbid,
+// so a `//` line that mentions "ZIP Score" in order to explain its removal would satisfy
+// them from prose alone — which is exactly what happened when A-001 first landed: the
+// tile was gone and the assertion still went green off a code comment. Same technique the
+// generator gates already use.
+const dash = dashRaw.replace(/^\s*\/\/.*$/gm, '');
+
+// ---- A-001: the Portfolio Strip is EXACTLY the four locked portfolio metrics ----------
+// ZIP-health is excluded by name: the score ring, component bars, value outlook and growth
+// pressure live on authenticated /community/<zip>/ under A-022, and on today.html until
+// A-020. Nothing may reintroduce them to this strip.
+for (const label of ['Places Monitored', 'New Changes', 'Need Attention', 'Coming Up']) {
+  ok(dash.includes("'" + label + "'"), 'A-001 Portfolio Strip carries ' + label);
+}
+ok(!/ZIP Score/.test(dash) && !/'Growth pressure'/.test(dash),
+  'A-001 ZIP Score and Growth pressure are OUT of the Dashboard strip');
+ok(!/scoreRing|scoreBars/.test(dash),
+  'A-001 no ZIP-health visualization anywhere on Dashboard (A-022 owns it)');
+
+// ---- A-002 (Dashboard half): one unified "Your Places" summary, two distinct TYPES -----
+ok(/>Your Places</.test(dash), 'A-002 Dashboard shows one "Your Places" summary');
+ok(!/Your Saved Places/.test(dash) && !/>Your ZIP Codes</.test(dash),
+  'A-002 the separate Saved Places and ZIP Codes headings are merged away');
+ok(/>Addresses</.test(dash) && />ZIP Codes</.test(dash),
+  'A-002 Address and ZIP Code remain distinct types inside Your Places');
+ok(/href="properties\.html"/.test(dash) && /id="dashZipOpen"/.test(dash),
+  'A-002 both drill-downs survive: Manage -> properties.html, ZIP -> community.html');
+
+// ---- A-003 .. A-009: the module names the frozen actions lock -------------------------
+for (const [name, action] of [['Needs Your Attention', 'A-004'], ['Your Briefing', 'A-005'],
+                              ['Recent Changes', 'A-006'], ['Worth Watching', 'A-007'],
+                              ['Development Overview', 'A-008'], ['Intelligence Reports', 'A-009'],
+                              ['Coming Up', 'A-003']]) {
+  ok(dash.includes('>' + name + '<'), action + ' Dashboard module named exactly "' + name + '"');
+}
+ok(!/What's changing around you|Recent activity near you|Worth watching nearby|>Upcoming meetings</.test(dash),
+  'A-006/A-007/A-008/A-003 the superseded module names are gone');
+// A-007 boundary: discovery chips are links, never monitoring controls.
+ok(!/dashWatch[\s\S]{0,400}?(toggleFollow|Notify me|Watch this)/.test(dash),
+  'A-007 Worth Watching chips carry no follow/watch/notify control');
+// A-009 boundary: surface the existing capability, invent no new one.
+ok(!/text\/csv|\.pdf|localStorage\.setItem\('hs:reports/.test(dash),
+  'A-009 no CSV, PDF or report persistence was invented');
+ok(/href="reports\.html"/.test(dash), 'A-009 reports.html is still reachable, not retired');
 ok(/Add a ZIP Code/.test(dash) || /zipLabels:\s*true/.test(dash),
   'dashboard ZIP add flow uses ZIP Code terminology');
 ok(/statTileLink/.test(dash), 'dashboard stat tiles use statTileLink');
