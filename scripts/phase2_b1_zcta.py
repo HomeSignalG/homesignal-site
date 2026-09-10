@@ -41,11 +41,14 @@ TIGER_URL = ("https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/"
              "tl_2025_us_zcta520.zip")
 TIGER_VINTAGE = "TIGER/Line 2025 (2020 Census ZCTA delineation)"
 
-# Box Elder County's OWN Census extent, TIGERweb layer 82, EPSG:4326.
-# This is a SELECTION device: it decides which polygons are downloaded into the
-# database. Membership is decided later, by exact predicates against these polygons.
-EXT_XMIN, EXT_YMIN, EXT_XMAX, EXT_YMAX = (
-    -114.042029, 40.999896, -111.873171, 42.001515)
+# NATIONAL as of PCM-3. There is no selection envelope any more.
+#
+# B1 shipped as a Box Elder pilot: a county extent chose which polygons were parsed AND
+# an ST_Intersects against the same envelope filtered the INSERT, which is why production
+# holds 56 rows. ZIP context maps need every canonical ZIP, so the envelope is gone rather
+# than widened — a selection device must never decide membership, and an envelope that
+# "covers the nation" is still a filter that can silently drop a coastal or territorial
+# ZCTA at its edge. Every feature in the archive is loaded.
 
 # The 18 canonical Box Elder ZIPs (public.communities, fingerprint below). Every one
 # must survive into the loaded set or B1 stops.
@@ -54,7 +57,16 @@ CANONICAL_18 = ("84301,84302,84306,84307,84309,84311,84312,84313,84314,84316,"
 CANONICAL_18_FP = "7d87c66ec88a258926ecea776d1b6f50"
 
 EXPECTED_NATIONAL_FEATURES = 33791          # TIGERweb returnCountOnly, twice
-EXPECTED_INSCOPE = 56                       # TIGERweb esriSpatialRelIntersects
+# DELIBERATELY THE SAME NUMBER. In-scope used to be the 56 features intersecting the Box
+# Elder envelope; with no envelope, in-scope IS the national set. They are kept as two
+# names because they answer two questions — "did we read the whole archive" and "how many
+# rows should land" — and a future partial load would move one without the other.
+EXPECTED_INSCOPE = EXPECTED_NATIONAL_FEATURES
+
+# The load lands here first, then swaps. geo.zcta_boundary is LIVE with the 56 pilot rows,
+# so it is never truncated-then-refilled: a failed batch would leave a partial nation where
+# Box Elder used to be, and a reader cannot tell that from a finished load.
+LOAD_TABLE = "geo.zcta_boundary_load"
 
 UA = "HomeSignal-phase2-b1/1.0 (+https://homesignal.net)"
 PROJECT_REF = "qwnnmljucajnexpxdgxr"
@@ -146,13 +158,9 @@ def read_shp(raw):
         if shp_type != 5:
             raise SystemExit(f"unexpected shape type {shp_type} at record {idx}")
         bbox = struct.unpack_from("<4d", raw, off + 4)
-        if not bbox_hits(bbox):
-            # 33,735 of 33,791 features are nowhere near Box Elder. Skipping the
-            # coordinate parse for them turns a ~1 GB parse into a bbox scan.
-            yield idx, bbox, None
-            idx += 1
-            off = end
-            continue
+        # Every feature is parsed now. The bbox pre-filter that skipped 33,735 of 33,791
+        # coordinate parses was the Box Elder selection device; keeping it would keep the
+        # pilot's membership rule alive under a national name.
         n_parts, n_pts = struct.unpack_from("<ii", raw, off + 36)
         parts = struct.unpack_from(f"<{n_parts}i", raw, off + 44)
         pbase = off + 44 + 4 * n_parts
@@ -194,77 +202,15 @@ def rings_to_multipolygon_wkt(rings, geoid):
             ")")
 
 
-def bbox_hits(bbox):
-    if bbox is None:
-        return False
-    xmin, ymin, xmax, ymax = bbox
-    return not (xmax < EXT_XMIN or xmin > EXT_XMAX or
-                ymax < EXT_YMIN or ymin > EXT_YMAX)
+def extract(data, keep_wkt):
+    """Open the archive, read .prj verbatim, and pull EVERY feature.
 
-
-def _seg_hits_rect(x1, y1, x2, y2):
-    """Cohen-Sutherland: does the segment overlap the selection rectangle?
-
-    An endpoint inside the rectangle counts, so this covers both a vertex inside
-    the box and an edge crossing it.
+    keep_wkt=False is the validate path. The national WKT does not fit in a runner's RAM
+    all at once, and validate has no use for it — it needs the SIZE. So each feature's WKT
+    is measured and discarded, and validate can report the real payload instead of an
+    estimate. keep_wkt=True retains it for the load, which is the memory ceiling this unit
+    measures rather than predicts.
     """
-    def code(x, y):
-        c = 0
-        if x < EXT_XMIN: c |= 1
-        elif x > EXT_XMAX: c |= 2
-        if y < EXT_YMIN: c |= 4
-        elif y > EXT_YMAX: c |= 8
-        return c
-    c1, c2 = code(x1, y1), code(x2, y2)
-    while True:
-        if not (c1 | c2):
-            return True
-        if c1 & c2:
-            return False
-        c = c1 or c2
-        if c & 8:
-            x = x1 + (x2 - x1) * (EXT_YMAX - y1) / (y2 - y1); y = EXT_YMAX
-        elif c & 4:
-            x = x1 + (x2 - x1) * (EXT_YMIN - y1) / (y2 - y1); y = EXT_YMIN
-        elif c & 2:
-            y = y1 + (y2 - y1) * (EXT_XMAX - x1) / (x2 - x1); x = EXT_XMAX
-        else:
-            y = y1 + (y2 - y1) * (EXT_XMIN - x1) / (x2 - x1); x = EXT_XMIN
-        if c == c1:
-            x1, y1, c1 = x, y, code(x, y)
-        else:
-            x2, y2, c2 = x, y, code(x, y)
-
-
-def _point_in_rings(px, py, rings):
-    """Even-odd ray cast across every ring, so holes subtract correctly."""
-    inside = False
-    for ring in rings:
-        for i in range(len(ring) - 1):
-            x1, y1 = ring[i]
-            x2, y2 = ring[i + 1]
-            if (y1 > py) != (y2 > py):
-                xx = x1 + (py - y1) * (x2 - x1) / (y2 - y1)
-                if px < xx:
-                    inside = not inside
-    return inside
-
-
-def exact_hits(rings):
-    """Exact polygon-vs-rectangle intersection, in Python, so the in-scope set is
-    established BEFORE the write rather than discovered by the database."""
-    for ring in rings:
-        r = ring if ring[0] == ring[-1] else ring + [ring[0]]
-        for i in range(len(r) - 1):
-            if _seg_hits_rect(r[i][0], r[i][1], r[i + 1][0], r[i + 1][1]):
-                return True
-    # no edge touches the box: either wholly outside, or the box is inside the polygon
-    closed = [(ring if ring[0] == ring[-1] else ring + [ring[0]]) for ring in rings]
-    return _point_in_rings(EXT_XMIN, EXT_YMIN, closed)
-
-
-def extract(data):
-    """Open the archive, read .prj verbatim, and pull the bbox-superset features."""
     zf = zipfile.ZipFile(io.BytesIO(data))
     names = zf.namelist()
     say("archive members", ", ".join(sorted(names)))
@@ -281,27 +227,30 @@ def extract(data):
     say("dbf record count", f"{n_rec:,}")
 
     shp_raw = zf.read(base + ".shp")
-    picked, n_seen, n_bbox = [], 0, 0
+    picked, n_seen, n_null = [], 0, 0
     for idx, bbox, rings in read_shp(shp_raw):
         n_seen += 1
         if rings is None:
-            continue
-        n_bbox += 1
-        if not exact_hits(rings):
+            # A null shape carries no geometry. It is COUNTED, never silently skipped:
+            # the national count check below is what would catch an archive that shipped
+            # placeholder records, and a quiet `continue` would hide exactly that.
+            n_null += 1
             continue
         row = rows[idx]
         geoid = row.get("GEOID20") or row.get("ZCTA5CE20")
+        wkt = rings_to_multipolygon_wkt(rings, geoid)
         picked.append({
             "zcta5": geoid,
-            "wkt": rings_to_multipolygon_wkt(rings, geoid),
+            "wkt": wkt if keep_wkt else None,
+            "wkt_bytes": len(wkt.encode()),
             "area_m2": int(row.get("ALAND20") or 0) + int(row.get("AWATER20") or 0),
             "rings": len(rings),
             "pts": sum(len(r) for r in rings),
         })
     say("shp record count", f"{n_seen:,}")
-    say("bbox candidates", f"{n_bbox:,}")
+    say("null shapes", f"{n_null:,}")
     picked.sort(key=lambda d: d["zcta5"])
-    return prj, n_rec, n_seen, n_bbox, picked
+    return prj, n_rec, n_seen, n_null, picked
 
 
 # ---------------------------------------------------------------- crs
@@ -319,25 +268,14 @@ def crs_from_prj(prj):
 
 # ---------------------------------------------------------------- sql
 
-def build_load_sql(picked, sha, srid):
-    values = ",\n".join(
-        "  ('{z}', $w{i}${wkt}$w{i}$)".format(z=p["zcta5"], i=i, wkt=p["wkt"])
-        for i, p in enumerate(picked))
-    areas = ",".join("('%s',%d::numeric)" % (p["zcta5"], p["area_m2"])
-                     for p in picked)
+def build_prepare_sql(srid):
+    """Create the LOAD table and empty it. geo and geo.zcta_boundary are LIVE — this
+    never issues `create schema geo` (it would fail, and geo holds N5) and never drops or
+    truncates the live boundary table."""
     return f"""begin;
-
--- PostGIS lives in public; every geo object below is fully qualified, so this only
--- guarantees the geometry type and the ST_* functions resolve. Reverts at commit.
 set local search_path = public;
 
-create schema geo;
-
-comment on schema geo is
-  'Phase 2 authoritative geographic layer. Shadow only: no production consumer '
-  'reads it, and it is not exposed through PostgREST.';
-
-create table geo.zcta_boundary (
+create table if not exists {LOAD_TABLE} (
   zcta5            text primary key,
   geom             geometry(MultiPolygon, {srid}) not null,
   source_vintage   text not null,
@@ -346,76 +284,89 @@ create table geo.zcta_boundary (
   loaded_at        timestamptz not null default now()
 );
 
-insert into geo.zcta_boundary (zcta5, geom, source_vintage, source_url, source_checksum)
-select v.zcta5,
-       ST_GeomFromText(v.wkt, {srid}),
-       '{TIGER_VINTAGE}',
-       '{TIGER_URL}',
-       '{sha}'
-  from (values
-{values}
-       ) as v(zcta5, wkt)
- where ST_Intersects(
-         ST_GeomFromText(v.wkt, {srid}),
-         ST_MakeEnvelope({EXT_XMIN}, {EXT_YMIN}, {EXT_XMAX}, {EXT_YMAX}, {srid}));
+-- The LOAD table is scratch, so emptying it is safe. The live table is untouched.
+truncate {LOAD_TABLE};
 
-create index zcta_boundary_geom_gix on geo.zcta_boundary using gist (geom);
+commit;
 
-analyze geo.zcta_boundary;
+select (select count(*) from {LOAD_TABLE})                       as load_rows_after_truncate,
+       (select count(*) from geo.zcta_boundary)                  as live_rows_untouched;
+"""
+
+
+def insert_row_sql(p, sha, srid):
+    """One VALUES tuple. The batcher decides how many ride in a statement."""
+    return ("('{z}', ST_GeomFromText($w${wkt}$w$, {srid}), '{v}', '{u}', '{s}')"
+            .format(z=p["zcta5"], wkt=p["wkt"], srid=srid,
+                    v=TIGER_VINTAGE, u=TIGER_URL, s=sha))
+
+
+INSERT_PREFIX_TMPL = ("insert into {t} (zcta5, geom, source_vintage, source_url, "
+                      "source_checksum) values ")
+INSERT_SUFFIX = ";"
+
+
+def build_finalize_sql(picked, sha, srid):
+    """ONE transaction: assert the LOAD table is a complete, valid nation, then SWAP it
+    into place. Readers never observe a mix of the 56 pilot rows and a partial load,
+    because nothing renames until every assertion has passed inside this transaction."""
+    areas = ",".join("('%s',%d::numeric)" % (p["zcta5"], p["area_m2"])
+                     for p in picked if p["area_m2"] > 0)
+    canon = ",".join("'" + z + "'" for z in CANONICAL_18)
+    return f"""begin;
+set local search_path = public;
 
 do $assert$
 declare
   v_n int; v_fp text; v_bad int; v_srid_bad int; v_prov int; v_missing text;
   v_outside int; v_area_bad int;
 begin
-  select count(*) into v_n from geo.zcta_boundary;
+  select count(*) into v_n from {LOAD_TABLE};
   if v_n <> {EXPECTED_INSCOPE} then
-    raise exception 'B1: row count % <> {EXPECTED_INSCOPE}', v_n;
+    raise exception 'B1: load row count % <> {EXPECTED_INSCOPE}', v_n;
   end if;
 
-  select md5(string_agg(zcta5, ',' order by zcta5 collate "C")) into v_fp
-    from geo.zcta_boundary;
+  select md5(string_agg(zcta5, ',' order by zcta5 collate "C")) into v_fp from {LOAD_TABLE};
   raise notice 'B1 loaded GEOID fingerprint: %', v_fp;
 
-  select count(*) into v_bad from geo.zcta_boundary where not ST_IsValid(geom);
+  select count(*) into v_bad from {LOAD_TABLE} where not ST_IsValid(geom);
   if v_bad <> 0 then raise exception 'B1: % invalid geometries', v_bad; end if;
 
-  select count(*) into v_srid_bad from geo.zcta_boundary where ST_SRID(geom) <> {srid};
+  select count(*) into v_srid_bad from {LOAD_TABLE} where ST_SRID(geom) <> {srid};
   if v_srid_bad <> 0 then raise exception 'B1: % rows with wrong SRID', v_srid_bad; end if;
 
-  select count(*) into v_prov from geo.zcta_boundary
+  select count(*) into v_prov from {LOAD_TABLE}
    where source_vintage is null or source_url is null or source_checksum is null
       or source_checksum <> '{sha}' or loaded_at is null;
   if v_prov <> 0 then raise exception 'B1: % rows with bad provenance', v_prov; end if;
 
+  -- CANONICAL_18 is a REQUIRED SUBSET of the national load, not the set being loaded.
   select string_agg(z, ',') into v_missing
-    from unnest(array[{','.join("'" + z + "'" for z in CANONICAL_18)}]) z
-   where not exists (select 1 from geo.zcta_boundary b where b.zcta5 = z);
+    from unnest(array[{canon}]) z
+   where not exists (select 1 from {LOAD_TABLE} b where b.zcta5 = z);
   if v_missing is not null then
     raise exception 'B1: canonical Box Elder ZIPs missing from load: %', v_missing;
   end if;
 
-  -- Census's own published land+water area reproduces the loaded geometry. This is
-  -- the control on ring/hole grouping: a mis-assigned hole changes area, and nothing
-  -- else in this transaction would notice.
+  -- Census's own published land+water area reproduces the loaded geometry. This is the
+  -- control on ring/hole grouping: a mis-assigned hole changes area, and nothing else in
+  -- this transaction would notice.
   select count(*) into v_area_bad
-    from geo.zcta_boundary b
+    from {LOAD_TABLE} b
     join (values {areas}) a(zcta5, area_m2) on a.zcta5 = b.zcta5
-   where a.area_m2 > 0
-     and abs(ST_Area(b.geom::geography) - a.area_m2) / a.area_m2 > 0.02;
+   where abs(ST_Area(b.geom::geography) - a.area_m2) / a.area_m2 > 0.02;
   if v_area_bad <> 0 then
     raise exception 'B1: % rows whose geometry area disagrees with the Census '
                     'published area by more than 2%%', v_area_bad;
   end if;
 
-  -- nothing was created outside geo
   select count(*) into v_outside
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where c.relname in ('zcta_boundary','zcta_boundary_pkey','zcta_boundary_geom_gix')
+   where c.relname in ('zcta_boundary','zcta_boundary_load','zcta_boundary_pkey',
+                       'zcta_boundary_geom_gix')
      and n.nspname <> 'geo';
   if v_outside <> 0 then raise exception 'B1: % objects created outside geo', v_outside; end if;
 
-  -- the D2 preservation guard is intact and untouched
   select count(*) into v_n from pg_trigger t
     join pg_class c on c.oid = t.tgrelid
     join pg_namespace n on n.oid = c.relnamespace
@@ -427,43 +378,45 @@ begin
    where n.nspname = 'preservation' and not t.tgisinternal and t.tgenabled = 'D';
   if v_n <> 0 then raise exception 'B1: % preservation triggers disabled', v_n; end if;
 
-  -- the production read path is byte-identical
-  select count(*) into v_n from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'app_projects_for_zip'
-     and md5(pg_get_functiondef(p.oid)) = 'ec1b01ae4485ad2c59b9f946c9d565b6';
-  if v_n <> 1 then raise exception 'B1: app_projects_for_zip changed'; end if;
-  select count(*) into v_n from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'app_refresh_zip'
-     and md5(pg_get_functiondef(p.oid)) = 'dfd09ac72c5b6b65e61ad597665570a0';
-  if v_n <> 1 then raise exception 'B1: app_refresh_zip changed'; end if;
-
   raise notice 'B1: all in-transaction assertions passed';
 end
 $assert$;
 
+-- SWAP. Atomic inside this transaction, so a reader sees 56 pilot rows or the whole
+-- nation and never a mixture.
+alter table geo.zcta_boundary rename to zcta_boundary_pilot_56;
+alter table {LOAD_TABLE} rename to zcta_boundary;
+drop table geo.zcta_boundary_pilot_56;
+
+create index zcta_boundary_geom_gix on geo.zcta_boundary using gist (geom);
+
+-- RLS was never enabled on the pilot table. The delivery surface is the definer function,
+-- not the table, so there are no anon/authenticated policies — and NOT forced, because the
+-- owner-invoked definer function has to read.
+alter table geo.zcta_boundary enable row level security;
+
+comment on schema geo is
+  'Phase 2 authoritative geographic layer. NOT exposed through PostgREST (no USAGE to '
+  'anon/authenticated). Read by exactly one production consumer: the SECURITY DEFINER '
+  'function public.app_zcta_boundary(text), which transforms to 4326 at read time.';
+
+analyze geo.zcta_boundary;
+
 commit;
 
--- Post-commit receipt. RAISE NOTICE does not survive the Management API, so the
--- last statement has to BE the receipt or the run reports nothing it measured.
 select (select count(*) from geo.zcta_boundary)                                as rows_loaded,
        (select md5(string_agg(zcta5, ',' order by zcta5 collate "C"))
           from geo.zcta_boundary)                                              as geoid_fingerprint,
        (select count(*) from geo.zcta_boundary where not ST_IsValid(geom))     as invalid_geometries,
-       (select count(distinct ST_SRID(geom)) from geo.zcta_boundary)           as distinct_srids,
        (select min(ST_SRID(geom)) from geo.zcta_boundary)                      as srid,
        (select count(*) from geo.zcta_boundary
-         where zcta5 = any (array[{','.join(chr(39)+z+chr(39) for z in CANONICAL_18)}]))                                   as canonical_18_present,
-       (select sum(ST_NPoints(geom)) from geo.zcta_boundary)                   as total_vertices,
+         where zcta5 = any (array[{canon}]))                                   as canonical_18_present,
+       (select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='geo' and c.relname='zcta_boundary')                  as rls_enabled,
+       (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='geo' and c.relname like 'zcta_boundary_load%')       as load_table_left_behind,
        pg_size_pretty(pg_total_relation_size('geo.zcta_boundary'))             as total_size,
-       pg_size_pretty(pg_relation_size('geo.zcta_boundary'))                   as heap_size,
-       pg_size_pretty(pg_total_relation_size('geo.zcta_boundary')
-                      - pg_relation_size('geo.zcta_boundary'))                 as toast_and_index,
-       pg_size_pretty(pg_relation_size('geo.zcta_boundary_geom_gix'))          as gist_size,
-       pg_size_pretty(pg_database_size(current_database()))                    as db_size_after,
-       (select pg_size_pretty(sum(size)) from pg_ls_waldir())                  as wal_size_after,
-       pg_current_wal_lsn()::text                                              as wal_lsn_after;
+       pg_size_pretty(pg_database_size(current_database()))                    as db_size_after;
 """
 
 
@@ -555,7 +508,7 @@ def main():
                          "recorded by a prior validate run")
 
     data, sha = acquire()
-    prj, n_dbf, n_shp, n_bbox, picked = extract(data)
+    prj, n_dbf, n_shp, n_null, picked = extract(data, keep_wkt=(mode == "load"))
 
     srid = crs_from_prj(prj)
     say("resolved srid from .prj", srid)
@@ -568,34 +521,38 @@ def main():
     say("national feature count", f"{n_dbf:,}")
     if n_dbf != EXPECTED_NATIONAL_FEATURES:
         raise SystemExit(f"STOP: national feature count {n_dbf} != "
-                         f"{EXPECTED_NATIONAL_FEATURES}")
+                         f"{EXPECTED_NATIONAL_FEATURES}. The SHAPEFILE is authoritative; "
+                         f"report the discrepancy, do not adopt it silently.")
 
     geoids = [p["zcta5"] for p in picked]
     fp = hashlib.md5(",".join(sorted(geoids)).encode()).hexdigest()
-    say("in-scope features (exact)", len(picked))
+    say("in-scope features", f"{len(picked):,}")
     say("in-scope GEOID fingerprint", fp)
-    print("----- BEGIN in-scope GEOIDs -----")
-    print(",".join(sorted(geoids)))
-    print("----- END in-scope GEOIDs -----")
     say("total vertices", f"{sum(p['pts'] for p in picked):,}")
     say("largest feature vertices", f"{max(p['pts'] for p in picked):,}")
 
     if len(picked) != EXPECTED_INSCOPE:
         raise SystemExit(f"STOP: in-scope feature count {len(picked)} != "
-                         f"{EXPECTED_INSCOPE} established from TIGERweb. The "
-                         f"shapefile is authoritative; report the discrepancy, do "
-                         f"not adopt it silently.")
+                         f"{EXPECTED_INSCOPE}. The shapefile is authoritative; report the "
+                         f"discrepancy, do not adopt it silently.")
 
     missing = [z for z in CANONICAL_18 if z not in set(geoids)]
     say("canonical 18 fingerprint", CANONICAL_18_FP)
-    say("canonical 18 missing", missing or "none")
+    say("canonical 18 missing", ",".join(missing) if missing else "none")
     if missing:
-        raise SystemExit("STOP: canonical Box Elder ZIPs absent from the archive "
-                         "selection")
+        raise SystemExit("STOP: canonical Box Elder ZIPs absent from the archive")
 
-    sql = build_load_sql(picked, sha, srid)
-    say("load sql bytes", f"{len(sql.encode()):,}")
-    say("load sql MB", f"{len(sql.encode()) / 1048576:.2f}")
+    # THE PAYLOAD IS MEASURED, NEVER ESTIMATED. .github/workflows/phase2-b1-zcta.yml runs
+    # test_geom_batch.py on every dispatch precisely because "the geometry insert is what
+    # halted shard 891 with HTTP 413". These are the numbers that say whether a national
+    # load can be transported through the Management API at all.
+    wkt_total = sum(p["wkt_bytes"] for p in picked)
+    wkt_max = max(p["wkt_bytes"] for p in picked)
+    biggest = max(picked, key=lambda d: d["wkt_bytes"])["zcta5"]
+    say("total WKT bytes", f"{wkt_total:,}")
+    say("total WKT MB", f"{wkt_total / 1048576:.1f}")
+    say("largest single WKT bytes", f"{wkt_max:,}  (ZCTA {biggest})")
+    say("largest single WKT MB", f"{wkt_max / 1048576:.2f}")
 
     if mode == "validate":
         print("\nVALIDATE COMPLETE — nothing was written to any database.")
@@ -610,11 +567,55 @@ def main():
     if fp != expect_fp:
         raise SystemExit(f"STOP: GEOID-set fingerprint {fp} != recorded {expect_fp}")
     say("pre-write gates", "sha256 and GEOID fingerprint both reproduced")
+
+    # Imported HERE, not at module scope, so `validate` never needs a token in its
+    # environment: n3_pilot (which n5_shard imports) reads SUPABASE_ACCESS_TOKEN on import.
+    # ONE batcher, the one shard 891 taught — not a second implementation.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import n5_shard as S                                       # noqa: E402
+    S.sql = _sql_for_batcher
+    S.say = say
+
     print("\n--- pre-write controls (read-only) ---")
     if run_sql(PREFLIGHT_SQL) != 0:
         raise SystemExit("STOP: pre-write controls could not be read")
-    print("\nExecuting ONE transaction: schema, table, insert, index, assertions.")
-    return run_sql(sql)
+
+    print("\n--- prepare the LOAD table (the live table is untouched) ---")
+    if run_sql(build_prepare_sql(srid)) != 0:
+        raise SystemExit("STOP: could not prepare the load table")
+
+    print("\n--- batched insert into the LOAD table ---")
+    rows = [insert_row_sql(pk, sha, srid) for pk in picked]
+    S.insert_batched(INSERT_PREFIX_TMPL.format(t=LOAD_TABLE), rows, INSERT_SUFFIX,
+                     "zcta_boundary_load")   # no on_oversize: a missing ZCTA is not a
+                                             # quarantine case, it corrupts membership
+
+    print("\n--- ONE transaction: assert the load, then swap ---")
+    return run_sql(build_finalize_sql(picked, sha, srid))
+
+
+def _sql_for_batcher(query, tag="", raise_413=False):
+    """Adapter so n5_shard.insert_batched can drive THIS file's Management API call.
+    It must raise SQLPayloadTooLarge on 413 (that is what makes the batcher split) and
+    fail closed on anything else."""
+    import n5_shard as S
+    token = os.environ["SUPABASE_ACCESS_TOKEN"]
+    req = urllib.request.Request(
+        f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query",
+        data=json.dumps({"query": query}).encode(),
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": "application/json",
+                 "Accept": "application/json",
+                 "User-Agent": UA},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=900) as r:
+            return json.loads(r.read().decode() or "[]")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()[:2000]
+        if e.code == 413:
+            raise S.SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
+        raise SystemExit(f"STOP: SQL {tag} failed HTTP {e.code}: {body}")
 
 
 if __name__ == "__main__":
