@@ -107,3 +107,35 @@ identity, so the CTA opens the ZIP page in both cases.
 
 Applying the migration arms **future transitions only**. The 6 identities already
 eligible at apply time are never mailed retroactively.
+
+## Status — APPLIED 2026-09-10
+
+Live in production on founder instruction. Function deployed **first**, then the
+trigger — arming the trigger before the endpoint existed would have queued POSTs at
+a 404.
+
+- Edge Function `confirm-alerts` v1 ACTIVE, `verify_jwt=false` (shared-secret auth).
+- Migration ledger row `20260910193858 alert_confirmation_hook`.
+- Ledger table `public.alert_confirmations`: RLS on, **0 anon/authenticated grants**,
+  `UNIQUE (user_id, epoch)`, **0 rows** — no backfill, as designed.
+- `email_deliveries_item_type_check` unchanged: digest dedup untouched.
+
+Verified in one transaction that rolled itself back, so nothing persisted and no mail
+could escape (pg_net's worker reads committed rows only, so a rolled-back enqueue is
+undeliverable by construction):
+
+| step | ledger rows |
+|---|---|
+| follow-only INSERT (consent false) | **0** |
+| consent false → true | **1** (epoch 1) |
+| reconcile of an already-eligible row | still **1** |
+| unsubscribe → re-subscribe | **2** (epochs 1, 2) |
+
+Rollback confirmed: 0 probe users, 0 ledger rows, users still 6 / eligible 6.
+
+Live endpoint probes, no mail sent: no secret → `401 {"error":"unauthorized"}`;
+correct secret + unknown id → `502 {"ok":false,"outcome":"unknown_confirmation"}`,
+which exercises secret → service-role → claim RPC → decision flow end to end.
+
+**No confirmation email has been sent to anyone yet.** The first will go to the next
+resident who genuinely opts in.
