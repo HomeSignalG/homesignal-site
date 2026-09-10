@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Address</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<style>#placeContextMap{height:220px}</style>
 </head>
 <body data-nav="props">
 <template id="hs-content"><div class="page" id="propPage"></div></template>
@@ -17,9 +18,108 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/map.js?v=bcaa366a"></script>
+<script src="lib/residential-qualify.js?v=20260905"></script>
+<script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/impact.js"></script>
 <script src="shell.js?v=13d6b1fc"></script>
 <script>
+// PCM-1 — Address context map. Orientation only: this Place's pin + nearby
+// canonical projects inside Map 1's 1-mile address default. Nearby comes from
+// n5_projects_within_radius at THIS Address's lat/lng, never from the ZIP-scoped
+// HS.data.projects list (that list still feeds "What's changing" below).
+function paintPlaceContextMap(p) {
+  var mapEl = document.getElementById('placeContextMap');
+  var noteEl = document.getElementById('placeContextMapNote');
+  var linkEl = document.getElementById('placeContextMapLink');
+  if (!mapEl) return;
+  var zip = p && p.zip;
+  var mapHref = HS.navHref('homesignalmap.html', zip);
+  if (linkEl) linkEl.setAttribute('href', mapHref);
+
+  var canPin = !!(p && !p.sample && !p.demo && p.lat != null && p.lng != null);
+  var RADIUS_MI = 1;
+  if (!HS.N5_RADII || HS.N5_RADII.indexOf(RADIUS_MI) < 0) RADIUS_MI = null;
+  var home = canPin ? { lat: p.lat, lng: p.lng, address: p.address } : null;
+  var homeTitle = HS.isRealHome(p) ? 'Your home' : ((p && p.address) || 'This address');
+  var isSeed = ((window.HS_CONFIG && HS_CONFIG.DATA_SOURCE) || 'seed') === 'seed';
+
+  function setNote(text) { if (noteEl) noteEl.textContent = text || ''; }
+  function paint(items) {
+    if (!HS.buildLive) return;
+    HS.buildLive(mapEl, {
+      center: home ? { lat: home.lat, lng: home.lng } : null,
+      home: home,
+      homeTitle: homeTitle,
+      items: items || [],
+      radiusMi: (home && RADIUS_MI != null) ? RADIUS_MI : null,
+      interactive: true, zoom: 13, w: 640, h: 220,
+      itemClick: function (it) {
+        if (it && it.record_url) window.open(it.record_url, '_blank', 'noopener');
+      }
+    });
+  }
+  mapEl.style.cursor = 'pointer';
+  if (!mapEl._hsPlaceCtxBound) {
+    mapEl._hsPlaceCtxBound = true;
+    mapEl.addEventListener('click', function (e) {
+      if (mapEl._hsDragged || (e.target.closest && e.target.closest('[data-hs-map-item]'))) return;
+      location.href = mapHref;
+    });
+    mapEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !(e.target.closest && e.target.closest('[data-hs-map-item]'))) location.href = mapHref;
+    });
+  }
+
+  if (!canPin) {
+    setNote('This map pins a saved address with coordinates. Open Development to explore the ZIP.');
+    paint([]);
+    return;
+  }
+  if (isSeed || !HS.sb || RADIUS_MI == null) {
+    setNote(isSeed ? 'Nearby projects load from live public records.' : '');
+    paint([]);
+    return;
+  }
+
+  function hydrateProjects(keys) {
+    if (!keys.length) return Promise.resolve([]);
+    var chunks = [], size = 40, i;
+    for (i = 0; i < keys.length; i += size) chunks.push(keys.slice(i, i + size));
+    return Promise.all(chunks.map(function (ch) {
+      return HS.sb().from('app_projects')
+        .select('source_key,name,type,status,source_ref,registry_id,submitted_at,date_kind,impact_score,impact_dimensions')
+        .eq('record_kind', 'development')
+        .in('source_key', ch);
+    })).then(function (parts) {
+      var out = [];
+      parts.forEach(function (r) { if (r && Array.isArray(r.data)) out = out.concat(r.data); });
+      return out;
+    });
+  }
+
+  HS.sb().rpc('n5_projects_within_radius', {
+    p_lat: p.lat, p_lng: p.lng, p_radius_mi: RADIUS_MI, p_limit: 500
+  }).then(function (res) {
+    if (res && res.error) {
+      setNote('Nearby projects could not be loaded. Open Development to explore.');
+      paint([]);
+      return;
+    }
+    var rows = (res && Array.isArray(res.data)) ? res.data : [];
+    return hydrateProjects(HS.n5SourceKeys(rows)).then(function (projects) {
+      var sites = HS.n5SitesFrom(rows, projects, home).filter(function (s) {
+        return s && s.lat != null && s.lng != null && s.record_url;
+      }).slice(0, 12);
+      setNote(HS.n5CoverageNote(rows, '1 mile'));
+      paint(sites);
+    });
+  }).catch(function () {
+    setNote('Nearby projects could not be loaded. Open Development to explore.');
+    paint([]);
+  });
+}
+
 HS.onReady(async function () {
   var S = HS.state;
   var id = new URLSearchParams(location.search).get('id');
@@ -51,6 +151,11 @@ HS.onReady(async function () {
     '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
     + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
     + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + '<div class="block" style="padding:16px 18px">'
+    + '<div class="bt-row"><h2>Around this address</h2><a id="placeContextMapLink" href="homesignalmap.html">Open in Development →</a></div>'
+    + '<div class="mapwrap" id="placeContextMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map of this address and nearby development"></div>'
+    + '<p id="placeContextMapNote" style="font-size:11px;color:var(--ink-3);margin:10px 0 0"></p>'
+    + '</div>'
     + '<div class="cols"><div>'
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
     + near.map(function (pr) {
@@ -82,6 +187,7 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
     + '</div></div>';
+  paintPlaceContextMap(p);
 });
 </script>
 </body>
