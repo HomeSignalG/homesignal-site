@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Saved Places</title>
+<title>HomeSignal — My Places</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
 </head>
@@ -12,12 +12,21 @@
 <template id="hs-content">
   <div class="page">
     <div class="ph">
-      <div class="eyebrow">Saved Places</div>
-      <h1>Your Saved Places</h1>
-      <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
+      <div class="eyebrow">My Places</div>
+      <h1>My Places</h1>
+      <p>Everything HomeSignal watches for you. An <b>Address</b> is one home; a <b>ZIP&nbsp;Code</b> is a whole community. Each is watched independently, and you're alerted when something changes.</p>
     </div>
     <div class="strip" id="propStrip"></div>
-    <div class="bt-row"><h2 style="font-size:15px;margin:0">Places you follow</h2><button class="addbtn" onclick="HS.addHome()">+ Add a Saved Place</button></div>
+    <div class="toolbar toolbar--lead">
+      <div class="seg" id="plViews">
+        <button class="on" type="button" data-view="all">All</button>
+        <button type="button" data-view="addresses">Addresses</button>
+        <button type="button" data-view="zips">ZIP Codes</button>
+      </div>
+      <div class="sp"></div>
+      <button class="addbtn" type="button" id="plAddAddress">+ Add Address</button>
+      <button class="addbtn" type="button" id="plAddZip">+ Add ZIP Code</button>
+    </div>
     <div class="propgrid" id="propGrid"></div>
   </div>
 </template>
@@ -28,7 +37,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<script src="shell.js?v=7258b17c"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -38,37 +47,154 @@ HS.onReady(async function () {
     changes = await HS.data.changes(S.zip, null);
     projects = await HS.data.projects(S.zip, null);
   } catch (e) {
-    console.warn('[properties] data load failed', e);
-    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your Saved Places</h1>'
+    console.warn('[my places] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load My Places</h1>'
       + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
       + '<button class="btn primary" onclick="location.reload()">Try again</button>';
     return;
   }
-  var avg = S.properties.length
-    ? Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / S.properties.length) : null;
 
-  document.getElementById('propStrip').innerHTML =
-    HS.tpl.statTile(S.properties.length, 'Saved Places', '')
-    + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all places', 'accent')
-    + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
-    + (avg != null ? HS.tpl.statTile(avg, 'Avg property score', 'g') : '');
+  // A-002 / A-010 — TWO PLACE TYPES, TWO EXISTING STORES, KEPT DISTINCT.
+  // Address  -> app_properties, via HS.state.properties (the Census-confirmed home writer)
+  // ZIP Code -> app_follows / myCommunities, via HS.followedCommunities()
+  // They are NOT merged into one collection and a ZIP Code is never written into
+  // app_properties. My Places is the one management CONTAINER; the underlying types,
+  // workflows and destinations stay exactly as they already were.
+  function addresses() { return S.properties || []; }
+  function zips() { return HS.followedCommunities ? HS.followedCommunities() : []; }
 
-  var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };
-  document.getElementById('propGrid').innerHTML = S.properties.map(function (p) {
-    // per-property computed: nearest N projects, open windows
-    var near = HS.withDistance(projects, p).filter(function(x){return (x.distance_mi||9e9) <= 5;});
-    var needs = HS.withDistance(changes, p).filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
-    return '<div class="propcard" onclick="HS.selectProperty(\'' + p.id + '\');location.href=\'property.html?id=' + p.id + '\'">'
-      + '<div class="miniscore">' + (p.score||'') + '</div>'
-      + '<div class="pinfo"><div class="ptag" style="color:' + (tone[p.tag]||'var(--green)') + '">' + HS.esc(p.tag||p.label) + '</div>'
+  var view = 'all';
+
+  function strip() {
+    var a = addresses(), z = zips();
+    var avg = a.length ? Math.round(a.reduce(function (s, p) { return s + (p.score || 0); }, 0) / a.length) : null;
+    document.getElementById('propStrip').innerHTML =
+      HS.tpl.statTile(a.length + z.length, 'Places', '')
+      + HS.tpl.statTile(changes.filter(function (x) { return HS.daysUntil(x.window_closes_at) >= 0; }).length, 'Need you across all Places', 'accent')
+      + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
+      + (avg != null ? HS.tpl.statTile(avg, 'Avg Address score', 'g') : '');
+  }
+
+  var tone = { 'Your home': 'var(--green)', 'Rental': 'var(--amber)', 'Family': 'var(--blue)' };
+
+  // Every card states its TYPE. "All" is not a blended card type — an Address and a ZIP
+  // Code are visibly different things that happen to share one container.
+  function typeChip(label) {
+    return '<span class="ptype" style="font-size:10px;font-weight:700;letter-spacing:.04em;'
+      + 'text-transform:uppercase;color:var(--ink-2)">' + HS.esc(label) + '</span>';
+  }
+
+  function addressCard(p) {
+    // per-Address computed: nearest projects, open windows
+    var near = HS.withDistance(projects, p).filter(function (x) { return (x.distance_mi || 9e9) <= 5; });
+    var needs = HS.withDistance(changes, p).filter(function (x) { return HS.daysUntil(x.window_closes_at) >= 0 && (x.distance_mi || 9e9) <= 5; }).length;
+    return '<div class="propcard" data-kind="address" data-id="' + HS.esc(p.id) + '">'
+      + '<div class="miniscore">' + (p.score || '') + '</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(p.tag || p.label || 'Address') + '</div>'
       + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
-      + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs===1?'s':'') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
-      + '<span>' + near.length + ' nearby projects</span><span style="color:var(--green);font-weight:600">+' + p.value_outlook + '%</span></div></div></div>';
-  }).join('')
-  + '<div class="propcard" onclick="HS.addHome()" style="border-style:dashed;justify-content:center">'
-  + '<div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div>'
-  + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another Saved Place</div>'
-  + '<div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div></div>';
+      + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs === 1 ? 's' : '') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
+      + '<span>' + near.length + ' nearby projects</span>'
+      + (p.value_outlook != null ? '<span style="color:var(--green);font-weight:600">+' + HS.esc(p.value_outlook) + '%</span>' : '')
+      + '</div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="remove-address" data-id="' + HS.esc(p.id) + '">Remove Address</button>'
+      + '</div></div></div>';
+  }
+
+  function zipCard(z) {
+    // The ZIP Code's destination is UNCHANGED — the same page the follow flow has always
+    // opened. My Places lists it; it does not re-route it.
+    var href = HS.pageHref ? HS.pageHref('community.html', { zip: z.zip }) : ('community.html?zip=' + encodeURIComponent(z.zip));
+    return '<div class="propcard" data-kind="zip" data-zip="' + HS.esc(z.zip) + '" data-href="' + HS.esc(href) + '">'
+      + '<div class="miniscore">◍</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:var(--blue)">' + typeChip('ZIP Code') + '</div>'
+      + '<h3>' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</h3>'
+      + '<div class="paddr">' + HS.esc(z.zip) + (z.state ? ', ' + HS.esc(z.state) : '') + '</div>'
+      + '<div class="pmeta"><span style="color:var(--ink-3)">Whole-community coverage</span></div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="unfollow-zip" data-zip="' + HS.esc(z.zip) + '">Unfollow</button>'
+      + '</div></div></div>';
+  }
+
+  // Empty states are PER VIEW. An empty ZIP Codes view while Addresses exist is a true
+  // statement about that type, not a defect — so each view says what is actually missing.
+  function emptyCard(kind) {
+    var copy = kind === 'zips'
+      ? { t: 'No ZIP Codes yet', d: 'Follow a ZIP Code to watch a whole community.', btn: '+ Add ZIP Code', act: 'add-zip' }
+      : { t: 'No Addresses yet', d: 'Add a home and we\'ll watch official records around it.', btn: '+ Add Address', act: 'add-address' };
+    return '<div class="propcard" style="border-style:dashed;justify-content:center">'
+      + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">' + copy.t + '</div>'
+      + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">' + copy.d + '</div>'
+      + '<button class="btn primary" type="button" data-act="' + copy.act + '">' + copy.btn + '</button></div></div>';
+  }
+
+  function render() {
+    strip();
+    var a = addresses(), z = zips(), html = '';
+    var vb = document.getElementById('plViews');
+    if (vb) [].forEach.call(vb.querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-view') === view);
+      var k = b.getAttribute('data-view');
+      var n = k === 'addresses' ? a.length : k === 'zips' ? z.length : a.length + z.length;
+      b.textContent = (k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : 'ZIP Codes') + ' (' + n + ')';
+    });
+    if (view === 'all' || view === 'addresses') {
+      html += a.length ? a.map(addressCard).join('') : emptyCard('addresses');
+    }
+    if (view === 'all' || view === 'zips') {
+      html += z.length ? z.map(zipCard).join('') : emptyCard('zips');
+    }
+    document.getElementById('propGrid').innerHTML = html;
+  }
+
+  document.getElementById('plViews').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-view]'); if (!b) return;
+    view = b.getAttribute('data-view'); render();
+  });
+  // A-010: two DISTINCT primary actions on the two EXISTING workflows. No generic
+  // "+ Add a Place", and no second writer for either type.
+  document.getElementById('plAddAddress').addEventListener('click', function () { HS.addHome(); });
+  document.getElementById('plAddZip').addEventListener('click', function () { HS.openLoc(); });
+
+  document.getElementById('propGrid').addEventListener('click', async function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (btn) {
+      e.stopPropagation();
+      var act = btn.getAttribute('data-act');
+      if (act === 'add-address') { HS.addHome(); return; }
+      if (act === 'add-zip') { HS.openLoc(); return; }
+      if (act === 'remove-address') {
+        var id = btn.getAttribute('data-id');
+        var card = btn.closest('[data-kind="address"]');
+        var label = card ? (card.querySelector('h3') || {}).textContent : 'this Address';
+        // A-012 requires a confirmation. It names what is removed AND what is not, because
+        // the honest worry is that "remove" silently takes the alerts or the ZIP with it.
+        if (!window.confirm('Remove ' + label + ' from My Places?\n\nThis removes only this saved Address. Your ZIP Code follows and alert history are not affected.')) return;
+        btn.disabled = true; btn.textContent = 'Removing…';
+        var okDel = await HS.removeAddress(id);
+        if (!okDel) { btn.disabled = false; btn.textContent = 'Remove Address';
+          window.alert("Couldn't remove that Address — please try again."); return; }
+        render(); return;
+      }
+      if (act === 'unfollow-zip') {
+        var zip = btn.getAttribute('data-zip');
+        if (!window.confirm('Unfollow ZIP Code ' + zip + '?\n\nThis removes only this ZIP Code follow. Your Addresses are not affected.')) return;
+        HS.unfollowCommunity(zip);
+        render(); return;
+      }
+      return;
+    }
+    // Card body click -> the type's EXISTING destination, unchanged.
+    var acard = e.target.closest('[data-kind="address"]');
+    if (acard) { HS.selectProperty(acard.getAttribute('data-id'));
+      location.href = 'property.html?id=' + encodeURIComponent(acard.getAttribute('data-id')); return; }
+    var zcard = e.target.closest('[data-kind="zip"]');
+    if (zcard) { location.href = zcard.getAttribute('data-href'); }
+  });
+
+  render();
 });
 </script>
 </body>
