@@ -205,20 +205,46 @@ r = rec(); el = run(Object.assign({}, DASH, { fitBoundary: true, boundary: { typ
 ok(el.getAttribute('data-hs-map-refused') === 'fitBoundary-without-boundary',
   '5d ...and a non-area "boundary" counts as no polygon, rather than being drawn as one');
 
-// --- §6 PRE-EXISTING, NOT FIXED HERE: the Leaflet marker loop throws ----------------------
-// `const m = HS.resolveMarker(it)` at lib/map.js:1886 SHADOWS the outer `const m = L.map(...)`,
-// so `mk.addTo(m)` at :1894 adds the marker to a plain object with no addTo. It throws, the
-// enclosing catch calls schematic(), and the whole Leaflet map is discarded. MapLibre's loop
-// says `.addTo(map)` and is unaffected. Pinned so the boundary path's own coverage cannot be
-// mistaken for coverage of this: with items, the Leaflet fit is executed and then thrown away.
-r = rec(); el = run(Object.assign({}, DASH, { items: [{ id: 'x', lat: 30.18, lng: -97.62, status: 'Proposed' }] }), 'leaflet', r);
-ok(/<svg/.test(el.innerHTML),
-  '6a MEASURED DEFECT (pre-existing, out of PCM-2 scope): one item makes the Leaflet path fall '
-  + 'all the way back to the schematic — the map is built, then discarded by a throw');
-r = rec(); el = run(Object.assign({}, FIT, { items: [{ id: 'x', lat: 41.5, lng: -112.05, status: 'Proposed' }] }), 'leaflet', r);
-ok(r.fitBounds.length === 1 && el.getAttribute('data-hs-map-refused') === 'boundary-needs-tiles',
-  '6b ...so a boundary view WITH markers fits correctly and is then refused by the fallback. '
-  + 'PCM-2\'s Leaflet fit is therefore proven for items:[] and BLOCKED by this defect otherwise.');
+// --- §6 THE LEAFLET MAP SURVIVES ITS OWN MARKERS -----------------------------------------
+// INVERTED. Until 5fa3f90 these pins recorded a defect: `const m = HS.resolveMarker(it)` in
+// the marker loop SHADOWED the outer `const m = L.map(el, …)`, so `mk.addTo(m)` handed the
+// marker to a plain object with no addLayer. Leaflet threw, the branch's own catch called
+// schematic(), and the entire tiled map was discarded — on every call carrying at least one
+// item. property.html is the page that felt it: it deliberately does not load maplibre-gl, so
+// Leaflet IS its engine, and any nearby record turned its map into the schematic.
+// The inner binding is now `spec`. These assert the map is KEPT.
+//
+// The fake's addTo is faithful on purpose — `addTo(t) { t.addLayer(this); }` — so a
+// reintroduced shadow throws here exactly as Leaflet would. An `addTo(){}` no-op would
+// accept any argument and let the defect back in unnoticed.
+const ITEM = { id: 'x', lat: 41.55, lng: -112.05, status: 'Proposed' };
+r = rec(); let readyWith = 0;
+el = run(Object.assign({}, DASH, { items: [ITEM], onReady: () => { readyWith++; } }), 'leaflet', r);
+ok(!/<svg/.test(el.innerHTML),
+  '6a Leaflet KEEPS the map when items.length > 0 — no schematic dump', el.innerHTML.slice(0, 60));
+ok(el.getAttribute('data-hs-map-refused') === null, '6b ...and nothing is refused by that path');
+ok(r.marker.length === 1 && r.added.length === 3,
+  '6c ...and the marker actually reached the map, alongside the tile layer and the radius ring',
+  { markers: r.marker.length, added: r.added.length });
+ok(r.setView.length === 1, '6d ...and the view was still set');
+ok(readyWith === 1,
+  '6e ...and onReady FIRES — it sits after the loop, so the throw used to skip it silently');
+
+// The same, with the PCM-2 options on: a boundary view with markers is the PCM-4 shape.
+r = rec(); el = run(Object.assign({}, FIT, { items: [ITEM] }), 'leaflet', r);
+ok(r.fitBounds.length === 1 && el.getAttribute('data-hs-map-refused') === null && !/<svg/.test(el.innerHTML),
+  '6f a boundary view WITH markers fits AND survives — the PCM-4 shape is no longer blocked');
+ok(r.geoJSON.length === 1 && r.marker.length === 1 && r.added.length === 4,
+  '6g ...with the boundary layer, the ring and the marker all on the map',
+  { added: r.added.length });
+
+// Control: the harness can still SEE a reintroduced shadow. Handing a marker to a
+// non-map object must throw through the same faithful contract the fix relies on.
+let threw = false;
+try { leafletFake(rec()).marker([0, 0]).addTo({ notAMap: true }); } catch (e) { threw = true; }
+ok(threw,
+  '6h CONTROL: the fake still throws when a layer is added to a non-map, so 6a-6g are a '
+  + 'measurement of the fix and not of a permissive stub');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
