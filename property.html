@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Address</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<style>#propMap{height:clamp(200px,42vw,300px)}</style>
 </head>
 <body data-nav="props">
 <template id="hs-content"><div class="page" id="propPage"></div></template>
@@ -18,6 +19,16 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/impact.js"></script>
+<!-- PCM-1 · the Address context map. lib/map.js is HS.buildLive (the guarded
+     MapLibre -> Leaflet -> schematic chain); residential-qualify is Rule 5, which
+     lib/n5-radius.js calls through HS.residentialGateDrops - omitting it would let
+     routine residential work onto a NEW surface, the exact defect the 2026-09-06
+     total-qualification build closed. maplibre-gl is deliberately NOT loaded: it is
+     ~200 KB gzipped and eager on dashboard.html, and buildLive falls straight through
+     to lazily-injected Leaflet when window.maplibregl is absent. -->
+<script src="lib/map.js?v=71e6cf06"></script>
+<script src="lib/residential-qualify.js?v=20260905"></script>
+<script src="lib/n5-radius.js?v=20260904"></script>
 <script src="shell.js?v=13d6b1fc"></script>
 <script>
 HS.onReady(async function () {
@@ -47,10 +58,137 @@ HS.onReady(async function () {
 
   var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
 
+  // ── PCM-1 · ADDRESS CONTEXT MAP ───────────────────────────────────────────────────────
+  // An ORIENTATION layer: "where is this Address, and what is changing around it?" It is not
+  // a second investigation product. Development owns investigation, and the single
+  // "Open in Development" handoff below is how a resident gets there. No type/status/
+  // regulatory filters, no search, no radius control, no 2D/3D switch, no table, no export.
+  //
+  // GEOGRAPHY IS POINT-CENTERED on the Address's OWN coordinates (app_properties.lat/lng).
+  // Those are written only from a Census-confirmed match by the two writers that exist -
+  // HS.saveHome and saveOnboardingAddress - and BOTH refuse to save an address the geocoder
+  // could not pin, so a saved Address always carries a real point. No point therefore means
+  // NO MAP, never a substituted one: not the ZIP centroid, not the first nearby record.
+  // The zoom is deliberately not building-level either - the coordinate is Census address-RANGE
+  // interpolation, so a rooftop-tight view would assert precision the data does not have.
+  var PCM_RADIUS_MI  = 2;     // founder, 2026-09-10
+  var PCM_ROW_LIMIT  = 500;   // the RPC's own default; it REFUSES over 2000 rather than clamping
+  var PCM_MARKER_CAP = 25;    // orientation, not investigation: density must not bury the home
+
+  function pcmHasPoint(x) {
+    return !!x && typeof x.lat === 'number' && typeof x.lng === 'number'
+        && isFinite(x.lat) && isFinite(x.lng);
+  }
+
+  // NEARBY DATA IS n5_projects_within_radius, AND IT IS NOT HS.data.projects().
+  // HS.data.projects(zip, home) reads app_projects_for_zip and then stamps a distance on
+  // each row, so its SET is every development record in the ZIP. Plotting that on an
+  // address-centered map draws ZIP MEMBERSHIP wearing address labels. lib/n5-radius.js says
+  // it outright: the two geographic modes must never share retrieval semantics. This RPC
+  // measures membership and distance server-side against true canonical geometry.
+  //
+  // The radius is ASSERTED against the allowlist rather than trusted. HS.N5_RADII mirrors the
+  // RPC's own `array[0.5, 1, 2, 5]`, and an off-allowlist value raises 22023 server-side -
+  // which this page would otherwise render as "nothing near this home", a refusal wearing the
+  // face of an empty result. It is also deliberately NOT the Dashboard's 1.5: that is a
+  // decorative ring on a preview canvas, is not in the allowlist, and is what HS.buildLive's
+  // schematic path falls back to as `o.radiusMi || 1.5`. Passing a real allowlist radius is
+  // what stops that default from ever reading as a data radius.
+  async function pcmRows(home) {
+    if (!HS.N5_RADII || HS.N5_RADII.indexOf(PCM_RADIUS_MI) < 0) return null;
+    var r = await HS.sb().rpc('n5_projects_within_radius', {
+      p_lat: home.lat, p_lng: home.lng, p_radius_mi: PCM_RADIUS_MI, p_limit: PCM_ROW_LIMIT
+    });
+    // A FAILED READ IS NEVER AN EMPTY ONE. null and [] mean different things all the way
+    // through the note below, exactly as lib/zip-authoritative.js keeps them apart.
+    if (r.error || !Array.isArray(r.data)) return null;
+    return r.data;
+  }
+
+  // Content for the capped set only. The RPC is spatial truth; app_projects is content.
+  // Chunked because one URL should not carry hundreds of quoted keys.
+  async function pcmHydrate(keys) {
+    var out = [];
+    for (var i = 0; i < keys.length; i += 40) {
+      var r = await HS.sb().from('app_projects')
+        .select('source_key,name,type,status,source_ref,registry_id,submitted_at,date_kind,impact_score,impact_dimensions')
+        .eq('record_kind', 'development')
+        .in('source_key', keys.slice(i, i + 40));
+      if (r.error || !r.data) return null;
+      out = out.concat(r.data);
+    }
+    return out;
+  }
+
+  // ONE honest sentence. HS.n5CoverageNote is the SHIPPED wording - it already separates
+  // "nothing came back" from "we truncated" - so it is reused verbatim rather than reworded.
+  // The drawn-count clause is appended only when fewer pins reached the map than records
+  // came back, which happens for the marker cap AND for records Rule 5 or the record_url
+  // gate dropped. It reports what was actually drawn, so it cannot overstate either way.
+  function pcmNote(rows, drawn) {
+    if (rows === null) {
+      return HS_CONFIG.DATA_SOURCE === 'supabase'
+        ? 'Nearby development records could not be read just now — this map shows the address only.'
+        : 'Nearby development records need the live site — this map shows the address only.';
+    }
+    var s = HS.n5CoverageNote(rows, PCM_RADIUS_MI + ' miles');
+    if (drawn < rows.length) s += ' — ' + drawn + ' drawn on the map';
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+  }
+
+  async function pcmPaint(home) {
+    var el = document.getElementById('propMap');
+    if (!el) return;
+    var rows = null, sites = [];
+    if (HS_CONFIG.DATA_SOURCE === 'supabase') {
+      try { rows = await pcmRows(home); } catch (e) { rows = null; }
+      if (rows && rows.length) {
+        var nearest = rows.slice().sort(function (a, b) {
+          return (a.distance_mi == null ? 9e9 : a.distance_mi) - (b.distance_mi == null ? 9e9 : b.distance_mi);
+        }).slice(0, PCM_MARKER_CAP);
+        var projects = null;
+        try { projects = await pcmHydrate(HS.n5SourceKeys(nearest)); } catch (e) { projects = null; }
+        // ANTI-FABRICATION GATE. Every drawn marker traces to an official public record.
+        // Map 1 applies this inside its own render(); HS.buildLive has no such gate, so on
+        // this page it is mine to apply — a pin with no record_url is dropped, not drawn.
+        if (projects) sites = HS.n5SitesFrom(nearest, projects, home)
+          .filter(function (s) { return !!s.record_url; });
+      }
+    }
+    HS.buildLive(el, {
+      center: { lat: home.lat, lng: home.lng },
+      home: home,                    // the Address IS the subject: a real, dominant home marker
+      items: sites,
+      radiusMi: PCM_RADIUS_MI,       // the ring drawn equals the geography actually queried
+      zoom: 12.4,
+      interactive: true,             // basic pan/zoom only (E); no marker click-through wired
+      w: 640, h: 300
+    });
+    var note = document.getElementById('propMapNote');
+    if (note) note.textContent = pcmNote(rows, sites.length);
+  }
+
+  // The handoff. homesignalmap.html?zip=<the ADDRESS's ZIP> is the only Development deep link
+  // that exists today: Map 1's address mode is entered by form submit and never changes the
+  // URL, and ?addr= is the property_reports dossier (1 cached row), not address mode.
+  // Inventing an address-mode parameter would mean touching Map 1 and is not authorized.
+  // NO data-znav ON PURPOSE: that attribute lets the shell re-stamp the href with the app's
+  // ACTIVE zip, which is not necessarily this Address's zip.
+  var contextMap = pcmHasPoint(p)
+    ? '<div class="block" id="propContext">'
+      + '<div class="bt-row"><h2>Where this address is</h2>'
+      + '<a href="' + HS.esc(HS.navHref('homesignalmap.html', p.zip)) + '" id="propMapOpen">Open in Development →</a></div>'
+      + '<div class="mapwrap" id="propMap"></div>'
+      + '<div class="quiet" id="propMapNote" style="margin-top:10px">Checking nearby development records…</div>'
+      + '</div>'
+    : '';
+
+
   page.innerHTML =
     '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
     + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
     + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + contextMap
     + '<div class="cols"><div>'
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
     + near.map(function (pr) {
@@ -82,6 +220,8 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
     + '</div></div>';
+
+  if (contextMap) pcmPaint(p);
 });
 </script>
 </body>
