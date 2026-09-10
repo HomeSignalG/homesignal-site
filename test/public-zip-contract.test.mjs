@@ -26,7 +26,11 @@ let fails = 0;
 const ok = (c, name, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name
   + (!c && d !== undefined ? '  detail: ' + JSON.stringify(d).slice(0, 220) : '')); if (!c) fails++; };
 const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-const strip = (x) => x.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
+// bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
+// reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
+const strip = (x) => x.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1');
 
 const cpRaw = read('lib/community-page.js');
 const cp    = strip(cpRaw);

@@ -332,9 +332,14 @@ def render(p, built):
         f'<meta name="description" content="{esc(desc)}">\n'
         f'<link rel="canonical" href="{esc(canon)}">\n'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; base-uri \'self\'; '
-        "object-src 'none'; img-src 'self' data: https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
         'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
+        # frame-src/child-src 'self': the AUTHENTICATED ZIP context map is a same-origin
+        # iframe of homesignalmap.html. An anonymous visitor never renders it, so these
+        # two directives are the ONLY public-byte change the Place-maps work leaves on this
+        # document - lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
+        'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
         '<link rel="stylesheet" href="/app.css">\n</head>\n'
         f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
@@ -343,13 +348,6 @@ def render(p, built):
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
         '<script src="/lib/templates.js?v=5f556744"></script>\n<script src="/lib/impact.js"></script>\n'
-        # PCM-4: the authenticated ZIP context map. Parity with community.html is not
-        # optional - test/zip-page-shared-runtime.test.mjs compares the two lists, and
-        # adding a shared dependency to one host only is the gov-notice-copy defect.
-        # The CSP above gains the Esri tile host and jsDelivr for Leaflet's stylesheet;
-        # those are PUBLIC BYTES on the PS-001 surface even though the map itself is
-        # authenticated-only, which is the disclosed exception this unit carries.
-        '<script src="/lib/map.js?v=969ce603"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
