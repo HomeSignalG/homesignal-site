@@ -359,7 +359,7 @@ def render(p, built):
         '<script src="/lib/premium-waitlist.js?v=ae8a117e"></script>\n'
         '<script src="/shell.js?v=a54d65f4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=1944943b"></script>\n'
+        '<script src="/lib/community-page.js?v=8d4d63d1"></script>\n'
         "</body>\n</html>\n")
 
 
