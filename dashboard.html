@@ -301,15 +301,20 @@ HS.onReady(async function () {
   // A-009 INTELLIGENCE REPORTS — the report capability, generated from live data. Nothing
   // is invented — no history, no CSV, no PDF, no persistence, no scheduling.
   //
-  // A-019 (Phase 8) retired reports.html to a redirect stub once this module was proven to
-  // carry the capability. Every CTA that used to target reports.html now targets THIS
-  // module directly (dashboard.html#dashReports), so the designed path never hops through
-  // the stub and cannot loop back into it.
+  // A-019 (Phase 8) retired the reports.html PROTOTYPE once this module was proven to carry
+  // the capability, and pointed the Dashboard's own CTAs at this module. That still holds:
+  // nothing here routes through reports.html, which is pinned.
   //
-  // The flagship pick is GUARDED here. reports.html:38 takes projects.sort(...)[0] with no
-  // empty check and dereferences it, which throws on the 1,959 canonical ZIPs that carry no
-  // development records (measured 2026-09-10). That defect is recorded and deliberately not
-  // fixed in its own file this phase; this module simply must not reproduce it.
+  // ⚠️ WHAT CHANGED ON 2026-09-11: reports.html is no longer a redirect stub. It is the
+  // public-beta Property Reports IN-PROGRESS page, opened by property.html's "Generate
+  // property report" — because this module's "Property Intelligence Report" row links to
+  // dashboard.html#dashReports, i.e. to itself, which answered that click with nothing. The
+  // retired prototype did NOT come back; only the URL was reused. This module is unchanged.
+  //
+  // The flagship pick is GUARDED here. The retired prototype took projects.sort(...)[0] with
+  // no empty check and dereferenced it, which threw on the 1,959 canonical ZIPs that carry no
+  // development records (measured 2026-09-10). That code is gone for good and the in-progress
+  // page reads no project data at all; this module simply must not reproduce it.
   var flagship = projects.slice().sort(function (a, b) {
     return (b.impact_score || 0) - (a.impact_score || 0);
   })[0] || null;
