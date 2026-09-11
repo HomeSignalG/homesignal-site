@@ -6,15 +6,30 @@
 // driving the REAL site with a headless browser.
 //
 // The site was switched to the new layout (community.html reads the app_* tables via the
-// public anon key + RLS and the data-quality gate). The NATIONWIDE SUBSTANCE GATE is the
-// current policy (PLAN.md §11, founder-approved threshold c): the materializer stamps
-// app_community_meta.indexable = pass AND (dev-backed OR >=3 facilities), and this
-// asserts, live, for EVERY materialized page in any state:
-//   1. indexable=true  ⇒ the page renders REAL, sourced content (stat strip + record
-//      cards) AND <meta name=robots> = index — that's the advertised set.
-//   2. indexable=false ⇒ robots = noindex (pass-but-thin AND coverage-coming both), and
+// public anon key + RLS and the data-quality gate). This walks community.html?zip= — the
+// LEGACY DYNAMIC surface — and asserts, live, for EVERY materialized page in any state:
+//   1. data_quality=pass          ⇒ the page renders REAL, sourced content (stat strip +
+//      record cards); coverage_coming ⇒ the honest coverage state, never a PASS layout.
+//   2. the page is NEVER indexable ⇒ robots stays noindex whatever the database says, and
 //      a sample of never-materialized ZIPs renders without error, noindexed.
 //   3. Anti-fabrication: every "View public record" link is a real http URL.
+//   4. Phase 0: the cross-state ZIP modeling guard (browser-free).
+//
+// ⚖️ WHAT THIS FILE DOES *NOT* ASSERT, AND WHY — corrected 2026-09-11 after 12 consecutive
+// red runs. It used to require `app_community_meta.indexable=true ⇒ robots=index` HERE. Two
+// separate things made that wrong the moment #1023 landed (2026-09-04; last green run
+// 2026-09-03):
+//   * WRONG DOCUMENT. The canonical crawlable community page is /community/<zip>/, whose
+//     robots is written into the INITIAL HTML at build time from RULE F by
+//     scripts/gen_zip_pages.py. community.html hardcodes `noindex, nofollow` and
+//     lib/community-page.js has zero robots writes — #1023 deleted the inline
+//     setIndexable() that used to promote this page client-side, deliberately: "a crawler
+//     that does not execute JS must see the same decision as one that does."
+//   * WRONG FLAG. app_community_meta.indexable is the DEVELOPMENT / Map 1 gate, not this
+//     page's. gen_zip_pages.py reads it into `dev_indexable` and never uses it.
+// The canonical page's robots IS verified, by scripts/prove-zip-pages-live.mjs
+// (verify-zip-pages-live.yml): index,follow on a Rule F pass, noindex,follow on a fail,
+// UA-invariant, and /community/00000/ never indexable. It is not duplicated here.
 //
 // Config via env: SITE_BASE (default https://homesignal.net), SAMPLE (cap walked ZIPs for
 // a quick smoke run), CONCURRENCY (default 8).
@@ -256,12 +271,13 @@ async function main() {
     `# Community page verification (nationwide substance gate)`,
     ``,
     `- Site: ${SITE_BASE}`,
-    `- Materialized pages checked: **${walked.length}** (${nIdx} substance-flagged ⇒ must be indexable; rest ⇒ noindex)`,
+    `- Materialized pages checked: **${walked.length}** (all must render their stamped state and stay noindex; `
+      + `${nIdx} carry the development gate, which is /community/<zip>/'s business, not this page's)`,
     `- Rows re-read after a mid-walk materializer change: **${reReads}**`,
     `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Cross-state ZIP model violations: **${modelFails.length}** (every ZIP page vs the authoritative USPS state)`,
     `- Failed: **${fails.length}**`,
-    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `Every substance-flagged page renders real records and is indexable; every thin/empty/unmaterialized page is noindexed. ✓`]),
+    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `Every page renders the state its row stamps, links only to real public records, and stays noindex — the dynamic page never promotes itself. ✓`]),
   ].join('\n');
   console.log('\n' + summary);
   if (process.env.GITHUB_STEP_SUMMARY) {

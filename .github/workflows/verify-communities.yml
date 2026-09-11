@@ -2,10 +2,13 @@ name: verify-communities
 
 # Automated, live end-to-end check of the new-layout community page on the real site.
 # Runs where network egress works (GitHub-hosted runner) — the piece the build sandbox
-# cannot do. INDEX-ONLY-UTAH policy: asserts every Utah page renders real sourced records
-# and is indexable, and that non-Utah pages are noindexed. Zero-touch: it reads the live
-# app_community_meta table (anon key from config.js), so new Utah ZIPs are covered with no
-# code change.
+# cannot do. Asserts that every materialized page renders the state its app_community_meta
+# row stamps (pass => real sourced records; coverage_coming => the honest coverage state),
+# links only to real public records, and NEVER advertises itself: community.html?zip= is
+# the legacy dynamic surface and is noindex by design. The CANONICAL /community/<zip>/
+# document's robots comes from Rule F at build time and is verified by
+# verify-zip-pages-live.yml, not here. Zero-touch: it reads the live app_community_meta
+# table (anon key from config.js), so new ZIPs are covered with no code change.
 #
 # It also runs a data-only PHASE 0 first: the cross-state ZIP modeling guard, which
 # asserts every modeled ZIP page against the authoritative USPS state crosswalk
