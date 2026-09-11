@@ -35,7 +35,9 @@ const ok = (c, name, detail) => {
 // longer have a sidebar entry, and none of the three PAGES was deleted — that distinction
 // is what this map records.
 const HIDDEN_SECTIONS = {
-  reports: 'A-019: reports.html is a redirect stub to dashboard.html#dashReports; the capability is A-009',
+  reports: 'reports.html is the public-beta Property Reports in-progress page (2026-09-11), opened by '
+         + 'property.html\'s "Generate property report"; it has no sidebar entry. The report CAPABILITY '
+         + 'list is still A-009 on the Dashboard, which this page does not replace',
   today:   'A-020: today.html is a redirect stub to dashboard.html; its four areas live on A-003/A-004/A-005 and A-022',
   comm:    'A-021: community.html is the PUBLIC ZIP surface, not a fifth logged-in container — it highlights nothing'
 };
@@ -140,7 +142,10 @@ ok(!/href="today\.html"/.test(navBlock), 'A-020 Today is not in the sidebar');
 ok(!/href="community\.html"/.test(navBlock), 'A-021 Zip Code Activity is not in the sidebar');
 
 // The retired pages are redirect stubs, not deletions.
-for (const [f, target] of [['today.html', '/dashboard.html'], ['reports.html', '/dashboard.html']]) {
+// ⚠️ reports.html LEFT THIS LIST on 2026-09-11, by explicit authorization naming A-019. It
+// is a real page again — see the Property Reports block below, which pins the contract it
+// left this one for. today.html is untouched and still a stub.
+for (const [f, target] of [['today.html', '/dashboard.html']]) {
   const src = read(f);
   ok(/window\.location\.replace\('\/dashboard\.html'/.test(src),
     'A-019/A-020 ' + f + ' is a redirect stub to ' + target, src.slice(0, 80));
@@ -154,11 +159,83 @@ ok(tokenOf('community.html') === 'comm',
   'A-021 community.html still declares "comm" — the public ZIP highlights nothing', tokenOf('community.html'));
 ok(/data-nav="comm"/.test(read('scripts/gen_zip_pages.py')),
   'A-021 ...and the generator SOURCE still stamps data-nav="comm" on every generated document');
-// No designed CTA may still route through the retired Reports stub.
-for (const f of ['dashboard.html', 'property.html'])
-  ok(!/['"]reports\.html['"]/.test(read(f)) && !/href="reports\.html"/.test(read(f)),
-    'A-019 ' + f + ' no longer uses reports.html as a designed CTA target',
-    (read(f).match(/.{0,40}reports\.html.{0,40}/) || [])[0]);
+// ── PUBLIC-BETA PROPERTY REPORTS ─────────────────────────────────────────────────────────
+// The Address dossier's "Generate property report" opens an honest in-progress page that
+// can return the resident to the EXACT Address they came from. Pinned here because this
+// file already owns the reports.html contract; what changed is which contract.
+//
+// A-009 IS UNCHANGED AND STAYS PINNED: the Dashboard carries the report capability list and
+// routes NOBODY through this page. That half of A-019 was not reversed, so the assertion
+// that protected it stays — now matching reports.html ANYWHERE in dashboard.html, not only
+// as a bare quoted literal. The old regex required a quote immediately after ".html", so
+// `location.href='reports.html?id='+…` slipped straight past it: a guard with a hole is how
+// the thing it guards comes back wearing a query string.
+//
+// ⚠️ AND SCOPED TO CODE, NOT PROSE. Widening the match without stripping comments made this
+// pin fail on dashboard.html's own sentence ABOUT reports.html, and three pins below fail on
+// the comments that explain what they forbid — a pin that names the string it forbids cannot
+// also search the whole file for it. Same stripper as test/final-matrix.test.mjs, byte for
+// byte, and the block-comment arm still must not fire inside a URL's "//".
+const strip = (x) => x.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1');
+
+ok(!/reports\.html/.test(strip(read('dashboard.html'))),
+  'A-009/A-019 dashboard.html still routes nobody through reports.html',
+  (strip(read('dashboard.html')).match(/.{0,40}reports\.html.{0,40}/) || [])[0]);
+
+const reportsSrc = read('reports.html');
+const propSrc    = read('property.html');
+const reportsCode = strip(reportsSrc);   // the pins about what the page DOES read this one
+
+// It is a real page on the shared shell, not a stub and not a bespoke error screen.
+ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="reports">/.test(reportsSrc),
+  'reports.html is a real page on the shared shell (#hs-content + its nav identity)');
+ok(!/location\.replace/.test(reportsSrc),
+  'reports.html no longer redirects — a resident who clicks the CTA lands here');
+
+// The honest state itself. Both sentences, verbatim: this copy IS the deliverable, so a
+// silent reword is a product change and must fail here.
+ok(/<h1>Property reports are in progress<\/h1>/.test(reportsSrc),
+  'reports.html says "Property reports are in progress"');
+ok(/We're working on this feature now\. Check back soon\./.test(reportsSrc),
+  'reports.html says "We\'re working on this feature now. Check back soon."');
+
+// The CTA reaches it, keeps its label, and carries the ORIGINATING Address.
+ok(/Generate property report/.test(propSrc),
+  'property.html still offers "Generate property report" — the label did not change');
+ok(/location\.href=\\'reports\.html\?id=' \+ encodeURIComponent\(p\.id\)/.test(propSrc),
+  'property.html routes that CTA to reports.html carrying THIS Address\'s id',
+  (propSrc.match(/.{0,60}reports\.html.{0,40}/) || [])[0]);
+
+// And the return path lands on that same Address, by the app's existing ?id= route.
+ok(/'property\.html\?id=' \+ encodeURIComponent\(from\.id\)/.test(reportsSrc),
+  'reports.html returns to property.html?id=<the id it was handed>');
+ok(/Back to property/.test(reportsSrc),
+  'reports.html offers a "Back to property" action');
+// THE ASSERTION THAT MAKES THE RETURN TRUSTWORTHY. property.html resolves its Address with
+// `find(...) || S.activeProperty`; inheriting that fallback here would send a resident with
+// a stale id back to SOME OTHER Address and call it theirs. The action must be gated on the
+// id resolving, and must not fall back.
+ok(/HS\.state && HS\.state\.properties/.test(reportsCode)
+   && /if \(from && slot\)/.test(reportsCode)
+   && !/activeProperty/.test(reportsCode),
+  'reports.html shows that action only when the id resolves to a real saved Address — and never falls back to another one');
+
+// The flag the browser suite waits on before asserting the ABSENCE of that action. If it
+// stops being set on both outcomes, that suite silently starts measuring nothing.
+ok(/window\.__HS_REPORTS_READY = true;/.test(reportsCode),
+  'reports.html signals when it has DECIDED, so an absent back action is measurable');
+
+// THE RETIRED PROTOTYPE MUST NOT COME BACK WITH IT. This page is the in-progress state; it
+// is not an opening to restore the four report rows, the flagship preview document or the
+// share affordance for a report that was never generated. (test/final-matrix.test.mjs
+// LEFTOVER 8 pins the preview document's own strings; these are the CTAs.)
+for (const gone of ['Share this report', 'Community Snapshot', 'Impact Analysis', 'Weekly Briefing'])
+  ok(!reportsCode.includes(gone),
+    'the retired Reports prototype stays retired — reports.html has no "' + gone + '"');
+
+// Nothing is generated here: the page must not grow an export, a write or a paywall.
+ok(!/text\/csv|\.pdf|jsPDF|download|supabase\.from\(|\.insert\(|paywall|premium/i.test(reportsCode),
+  'reports.html generates nothing — no PDF, CSV, download, write or gate was invented');
 
 // ── the consumer must still exist, or this whole contract is decoration ──────────────────
 const shellJs = read('shell.js');

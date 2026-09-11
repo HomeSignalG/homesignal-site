@@ -3,35 +3,104 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; form-action 'self'">
 <meta name="robots" content="noindex, nofollow">
-<link rel="canonical" href="https://homesignal.net/dashboard.html">
-<title>HomeSignal — Reports has moved</title>
-<script>
-// RETIRED 2026-09-10 (A-019). This page was already hidden from the sidebar; what it
-// carried - four static report labels over live data, plus Share - is the Dashboard's
-// "Intelligence Reports" module (A-009), which was proven live before this redirect was
-// written. Its flagship-project PREVIEW DOCUMENT was deliberately NOT ported: it makes
-// claims the product does not back, and A-009 is a capability list, not a document
-// renderer. Nothing was invented in its place - no history, no CSV, no PDF, no
-// persistence, no scheduling.
-//
-// Its unguarded projects.sort(...)[0] - which threw on every ZIP carrying no development
-// records - is retired with it and is deliberately NOT reproduced; A-009 already guards
-// that pick.
-//
-// Every in-product CTA now targets dashboard.html#dashReports directly, so the designed
-// path never hops through this file and there is no redirect loop. The file stays as a
-// REDIRECT because the URL is reachable from bookmarks. Query string carried across;
-// location.replace, so it does not sit in the back-button history. Same convention as
-// maps.html.
-(function () {
-  var q = window.location.search || '';
-  window.location.replace('/dashboard.html' + q + '#dashReports');
-})();
-</script>
+<title>HomeSignal — Property reports</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
 </head>
-<body>
-<p>Reports is now <a href="/dashboard.html#dashReports">Intelligence Reports on your Dashboard &rarr;</a></p>
+<body data-nav="reports">
+<!-- PUBLIC-BETA PROPERTY REPORTS — THE HONEST IN-PROGRESS STATE (founder, 2026-09-11).
+     This page is what "Generate property report" on the Address dossier opens. It states
+     plainly that the feature is not built yet, and it returns the resident to the exact
+     Address they came from.
+
+     ⚖️ THIS REVERSES THE reports.html HALF OF A-019 (fbd85e4, #1140, 2026-09-10), UNDER
+     EXPLICIT AUTHORIZATION NAMING IT. A-019 retired this file to a redirect stub once the
+     Dashboard's Intelligence Reports module (A-009) was proven to carry the report
+     CAPABILITY LIST, and retargeted every CTA at that module. What it did NOT do — and
+     what this unit is — is answer the resident who clicks "Generate property report" and
+     gets no report: the module's own "<address> — Property Intelligence Report" row links
+     to dashboard.html#dashReports, i.e. to itself, so the click still generated nothing
+     and said nothing about why.
+
+     WHAT IS AND IS NOT REVERSED, so the next session does not over-read this:
+       REVERSED — reports.html is a real page again, and property.html targets it.
+       KEPT     — A-009 stands untouched: the Intelligence Reports module is still the
+                  Reports capability, and dashboard.html still routes NOBODY through this
+                  file (pinned in test/nav-identity.test.mjs and test/dashboard-nav.test.mjs).
+       KEPT     — the retired PROTOTYPE stays retired. The four report rows, the flagship
+                  nearby-project preview document and "Share this report" made claims the
+                  product does not back; none of it is reproduced here, and the pin that
+                  forbids it (test/final-matrix.test.mjs LEFTOVER 8) is unchanged.
+                  Its unguarded projects.sort(...)[0] is likewise gone for good.
+
+     NOTHING IS GENERATED HERE. No PDF, no report API, no database write, no new dossier,
+     no report-generation engine, no download, no premium gate, no pricing. The page reads
+     ONE value — the ?id= it was handed — and renders static copy. It is deliberately not
+     an error page: it uses the shared shell, so the sidebar, header and styling are the
+     product's own and a resident is never stranded, with or without that id. -->
+<template id="hs-content">
+  <div class="page">
+    <div id="repBack"></div>
+    <div class="ph">
+      <div class="eyebrow">Reports</div>
+      <h1>Property reports are in progress</h1>
+      <p>We're working on this feature now. Check back soon.</p>
+    </div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
+<script src="lib/templates.js?v=5f556744"></script>
+<script src="shell.js?v=13d6b1fc"></script>
+<script>
+HS.onReady(function () {
+  // ORIGINATING ADDRESS — the MINIMUM context, on the route the app already uses.
+  // properties.html opens an Address with `property.html?id=<id>` and property.html reads
+  // exactly that param, so ?id= is this app's property route; carrying it here and handing
+  // it back is reusing that route, not inventing a second one. The id travels in the query
+  // string only — it is never printed into the page.
+  var id = new URLSearchParams(location.search).get('id');
+
+  // The back action is gated on the id RESOLVING to a real saved Address, not merely on the
+  // param being present. property.html finds its Address with the same lookup, so this
+  // button appears exactly when the page it points at can actually show that Address — a
+  // stale, foreign or hand-typed id resolves to nothing and gets no action rather than a
+  // link that lands on "No Address". DELIBERATELY NOT `|| HS.state.activeProperty`, which
+  // property.html falls back to: silently returning someone to a DIFFERENT Address than
+  // they came from is the misdirection this unit exists to remove, not an acceptable
+  // default.
+  var props = (HS.state && HS.state.properties) || [];
+  var from = id ? props.filter(function (x) { return x && x.id === id; })[0] : null;
+  var slot = document.getElementById('repBack');
+
+  // Built in JS rather than revealed from the template on purpose: .backbtn sets
+  // display:inline-flex, and an author display rule beats the UA's [hidden]{display:none},
+  // so a hidden-by-default button would render anyway on every direct visit.
+  if (from && slot) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'backbtn';
+    btn.id = 'repBackBtn';
+    btn.textContent = '← Back to property';
+    btn.addEventListener('click', function () {
+      if (HS.selectProperty) HS.selectProperty(from.id);
+      location.href = 'property.html?id=' + encodeURIComponent(from.id);
+    });
+    slot.appendChild(btn);
+  }
+
+  // DECIDED — set on BOTH outcomes, and last. The interesting assertion about this page is
+  // an ABSENCE (no back action on a direct visit), and "the button is not there" and "the
+  // handler has not run yet" are the same DOM. Without this flag a browser check of that
+  // absence passes while measuring nothing, which is the failure this repo has already paid
+  // for elsewhere. Same convention as homesignalmap.html's window.__HS_SITES.
+  window.__HS_REPORTS_READY = true;
+});
+</script>
 </body>
 </html>

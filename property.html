@@ -131,7 +131,12 @@ HS.onReady(async function () {
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
     + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
     + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
-    + '<button class="btn" onclick="location.href=\'dashboard.html#dashReports\'">Generate property report</button>'
+    // A-019 sent this at dashboard.html#dashReports, whose "Property Intelligence Report"
+    // row links to itself — so the click generated nothing and explained nothing. It now
+    // opens the public-beta in-progress state, carrying THIS Address's id on the app's own
+    // ?id= property route so "Back to property" returns here and not to some other Address.
+    // The label is unchanged, deliberately: what is wrong is the answer, not the offer.
+    + '<button class="btn" onclick="location.href=\'reports.html?id=' + encodeURIComponent(p.id) + '\'">Generate property report</button>'
     + '</div></div>'
     + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
