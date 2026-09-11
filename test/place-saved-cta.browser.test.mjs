@@ -39,7 +39,28 @@ await page.route('**/*', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   }
   if (url.includes('cdn.jsdelivr.net')) {
-    return route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.supabase={createClient:function(){return {from:function(){return {select:function(){return {eq:function(){return {limit:function(){return Promise.resolve({data:[],error:null});};};};};},insert:function(){return {select:function(){return {single:function(){return Promise.resolve({data:null,error:null});};};};},then:function(r){return Promise.resolve({data:null,error:null}).then(r);}};},rpc:function(){return Promise.resolve({data:null,error:null});},auth:{getSession:function(){return Promise.resolve({data:{session:null}});},onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};}}};}};' });
+    return route.fulfill({
+      status: 200,
+      contentType: 'text/javascript',
+      body: `window.supabase={createClient:function(){
+        function q(){
+          var o={};
+          ['select','eq','in','order','limit','contains','gte','lte','not','or','filter','range','match','maybeSingle','single','insert','update','delete']
+            .forEach(function(m){ o[m]=function(){ return o; }; });
+          o.then=function(r){ return Promise.resolve({data:[],error:null}).then(r); };
+          return o;
+        }
+        return {
+          from:function(){ return q(); },
+          rpc:function(){ return Promise.resolve({data:null,error:null}); },
+          functions:{invoke:function(){ return Promise.resolve({data:null,error:null}); }},
+          auth:{
+            getSession:function(){ return Promise.resolve({data:{session:null}}); },
+            onAuthStateChange:function(){ return {data:{subscription:{unsubscribe:function(){}}}}; }
+          }
+        };
+      }};`
+    });
   }
   return route.abort();
 });
@@ -65,6 +86,9 @@ ok(/Follow this zip code/.test(followLabel), 'ZIP follow control is present befo
 
 await page.click('#commFollowBtn');
 await page.waitForSelector('#hsOptin', { timeout: 5000 });
+if (process.env.HS_SCREENSHOT_DIR) {
+  await page.locator('#hsOptin').screenshot({ path: join(process.env.HS_SCREENSHOT_DIR, 'zip-save-card-closeup.png') });
+}
 const zipCard = await page.locator('#hsOptin').innerText();
 ok(/saved to My Places/.test(zipCard), 'ZIP save card states My Places', zipCard);
 ok(/Want email alerts\?/.test(zipCard), 'ZIP save card invites email alerts separately', zipCard);
@@ -90,6 +114,9 @@ const prefsBefore = await page.evaluate(() => JSON.stringify(window.HS.state.top
 
 await page.click('#optinAlertsCta');
 await page.waitForURL(/alerts\.html\?zip=78617/, { timeout: 10000 });
+if (process.env.HS_SCREENSHOT_DIR) {
+  await page.screenshot({ path: join(process.env.HS_SCREENSHOT_DIR, 'zip-cta-alerts.png'), fullPage: false });
+}
 ok(true, 'ZIP CTA opened Alerts with ?zip=78617');
 
 const alertsState = await page.evaluate(() => {
@@ -147,6 +174,9 @@ await page.evaluate(() => {
   }, false);
 });
 await page.waitForSelector('#hsOptin', { timeout: 5000 });
+if (process.env.HS_SCREENSHOT_DIR) {
+  await page.locator('#hsOptin').screenshot({ path: join(process.env.HS_SCREENSHOT_DIR, 'address-save-card-closeup.png') });
+}
 const addrCard = await page.locator('#hsOptin').innerText();
 ok(/2200 CALDWELL LN, DEL VALLE, TX 78617/.test(addrCard),
   'address card uses the confirmed address identity', addrCard);
@@ -162,6 +192,9 @@ ok(addrEnable === 0, 'address card did not call enableAreaEmail');
 
 await page.click('#optinAlertsCta');
 await page.waitForURL(/alerts\.html\?zip=78617/, { timeout: 10000 });
+if (process.env.HS_SCREENSHOT_DIR) {
+  await page.screenshot({ path: join(process.env.HS_SCREENSHOT_DIR, 'address-cta-alerts.png'), fullPage: false });
+}
 const addrAlerts = await page.evaluate(() => new URLSearchParams(location.search).get('zip'));
 ok(addrAlerts === '78617', 'address CTA opened Alerts with the saved ZIP');
 
