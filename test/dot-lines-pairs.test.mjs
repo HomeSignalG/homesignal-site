@@ -133,8 +133,17 @@ console.log('\n── live-measured specifics ───────────�
     'VT: COMPLETE → operating (occurs only on the lines layer; was unmapped)');
   ok(VT.status_to_bucket.exclude.includes('ON HOLD') && VT.status_to_bucket.exclude.includes('CANCELLED'),
     'VT: ON HOLD + CANCELLED stay excluded — a stalled value must never claim motion');
-  ok(!byId('vtrans-project-locations').status_to_bucket.operating.includes('COMPLETE'),
-    'VT: the POINTS entry is left alone — COMPLETE does not occur there, and adding it would be an unmeasured edit');
+  // ⚠️ THE POINTS ENTRY NOW MAPS IT TOO, 2026-09-11 — and the 2026-08-05 receipt above is
+  // PRESERVED rather than rewritten, because it was true on its date. What changed is the
+  // data: scripts/source-monitor.mjs probed `vtrans-project-locations` (FeatureServer/10,
+  // the POINTS layer, 1,037 rows) in that entry's OWN scope — extra_where ProjectStatus IS
+  // NOT NULL AND ExpectedConstructionStart IS NOT NULL, no recency window — and found
+  // COMPLETE in-window and unmapped, so the connector was DROPPING it. The two entries are
+  // separate layers (points /10, lines /9), so this is not the lines value leaking across.
+  // The earlier "adding it would be an unmeasured edit" was right about the principle and is
+  // now satisfied: the edit IS measured, by the monitor, in the connector's own scope.
+  ok(byId('vtrans-project-locations').status_to_bucket.operating.includes('COMPLETE'),
+    'VT: the POINTS entry maps COMPLETE too — the monitor measured it in-window on layer 10');
 }
 
 console.log();
