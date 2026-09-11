@@ -356,7 +356,7 @@ def render(p, built):
         # (run 33929420398, ZIPs 01001 and 01002). Parity with community.html is asserted by
         # test/zip-page-shared-runtime.test.mjs so the next shared dependency cannot ship to
         # one host only.
-        '<script src="/shell.js?v=13d6b1fc"></script>\n'
+        '<script src="/shell.js?v=74f55f23"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js"></script>\n'
         "</body>\n</html>\n")
