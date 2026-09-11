@@ -120,8 +120,14 @@ ok(/id="devDataBtn"/.test(dev) && /Table view/.test(dev),
   'A-016 "Table view" is an in-page toggle');
 
 // ---- A-023: Follow is live, Watch is a stub, and they are different things ----
-ok(dev.includes("HS.toggleFollow(this,\\'project\\'") && /Follow this project/.test(dev),
-  'A-023 "Follow this project" is LIVE on development.html');
+ok(dev.includes("HS.toggleFollow(this,\\'project\\'"),
+  'A-023 project follow is LIVE on development.html via toggleFollow');
+ok(/Add to My Places to follow/.test(dev) && /Following in My Places/.test(dev),
+  'A-023 project-follow copy is the My Places contract');
+ok(/HS\.isFollowing && HS\.isFollowing\('project'/.test(dev),
+  'A-023 the button reads persisted follow state before paint');
+ok(!/Follow this project/.test(dev),
+  'A-023 the misleading "Follow this project" label is gone from development.html');
 ok(/id='propWatch'>Watch this address</.test(map),
   'A-023 the map Watch control still reads "Watch this address"');
 ok(/wb\.textContent = "Watch requests aren't live yet";/.test(map),
