@@ -132,7 +132,8 @@
           "Waiting on Fiscal",
           "Waiting on Legal",
           "Intake Accepted - Fees Due",
-          "Awaiting Update"
+          "Awaiting Update",
+          "Intake Accepted"
         ],
         "approved": [
           "Approved",
@@ -478,7 +479,8 @@
           "Corrections Submitted",
           "Pending",
           "Published",
-          "Ready for Publication"
+          "Ready for Publication",
+          "Final Reviews Completed"
         ],
         "approved": [
           "Issued",
@@ -1264,6 +1266,12 @@
           "first_seen": "2026-07-30",
           "records_at_first_seen": 0,
           "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment \u2014 not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) \u2014 the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "SUBPERM",
+          "first_seen": "2026-09-11",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED by this pass. The value was measured live by scripts/source-monitor.mjs in this entry's own connector scope (Rule 13) and reported in docs/source-monitor-report.md run 2026-09-11T12:02:15.555Z, but NO publisher lookup was performed: this build sandbox has no egress to the publisher, and guessing a bucket for an opaque code is exactly what this field exists to prevent. OPEN QUESTION for the publisher. `SUBPERM` reads as an abbreviation (sub-permit?) but this entry already carries other opaque codes (APP_EXP, W/REFUND, XCLOSED) whose bucketing was decided elsewhere, so the abbreviation cannot be resolved by analogy either."
         }
       ],
       "observed_types_unreviewed": [
@@ -2578,7 +2586,9 @@
           "Waiting for Information",
           "Recording Revisions Routed",
           "Recording Revisions Required",
-          "Application Accepted"
+          "Application Accepted",
+          "Review in Process - Cycle 2",
+          "Review in Process - Cycle 3"
         ],
         "approved": [
           "Approved",
@@ -3489,13 +3499,15 @@
         "Building Permits",
         "Commercial",
         "Install Permits",
-        "Residential"
+        "Residential",
+        "Fire Permits"
       ],
       "type_map": {
         "Building Permits": "Development",
         "Commercial": "Commercial",
         "Install Permits": "Development",
-        "Residential": "Residential"
+        "Residential": "Residential",
+        "Fire Permits": "Development"
       },
       "status_const": "Issued",
       "extra_where": "PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL",
@@ -4052,7 +4064,8 @@
       "status_to_bucket": {
         "approved": [
           "APPROVED",
-          "UNDER CONSTRUCTION"
+          "UNDER CONSTRUCTION",
+          "ISSUED"
         ],
         "operating": [
           "FINALED"
@@ -4063,7 +4076,8 @@
         "exclude": [
           "CANCELLED",
           "EXPIRED",
-          "SEE 2024-12-9925"
+          "SEE 2024-12-9925",
+          "EXPIRED/CHANGED DESIGN"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -4819,7 +4833,8 @@
           "Denied",
           "Withdrawn",
           "Never Completed Application",
-          "Expired"
+          "Expired",
+          "Saved Application"
         ]
       },
       "record_url_precision": "dataset",
@@ -5503,7 +5518,8 @@
         ],
         "operating": [],
         "exclude": [
-          "Denied"
+          "Denied",
+          "Withdrawn"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -8390,7 +8406,9 @@
           "B-Complete, E-4. Complete, M-4. Complete",
           "B-4. Complete, E-Complete",
           "E-Complete, P-4. Complete",
-          "E-Complete, M-4. Complete"
+          "E-Complete, M-4. Complete",
+          "E-Complete, P-4. Complete, M-4. Complete",
+          "P-Complete, M-Complete"
         ],
         "exclude": []
       },
@@ -11168,7 +11186,8 @@
           "Continued off-Docket",
           "Proposed",
           "Pending",
-          "Accepted"
+          "Accepted",
+          "Submitted"
         ],
         "approved": [
           "Approved",
@@ -11194,7 +11213,15 @@
       "recency_days": 1825,
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 MISSOURI PASS. The Kansas City metro seam: Jackson 25 dark, Cass 14, Clay 10, Platte 10. Config only. This is the best-formed source found anywhere in Missouri -- the City of Kansas City's full planning-case docket, 23,166 rows, 100% dated (count(APPLICATIONDATE) = 23,166 of 23,166), APPLICATIONDATE spanning 1985-05-03 to 2026-07-31, i.e. FRESH TO WITHIN FOUR DAYS of wiring. Schema carries PLANNUMBER, PLANTYPE, STATUS, APPLICATIONDATE, COMPLETEDATE, PLANNER, DESCRIPTION, LAND_USE, DWELL_UNITS, NON_RES_AREA, LOTS, PROJECTNAME, WORKCLASS and NEXTHEARINGDATE. THE 1825-DAY WINDOW IS LOAD-BEARING AND IT SOLVES THE ONE REAL PROBLEM. Unwindowed, STATUS is 26 values summing exactly to 23,166 but dominated by 'Closed' at 16,370 (71%) -- a terminal state whose OUTCOME is not recorded, so it can support neither an approved nor an operating claim. Inside 1825 days the layer is 2,675 rows and 'Closed' DISAPPEARS ENTIRELY: the windowed vocabulary is 17 values summing exactly to 2,675 (Approved Subject to Conditions 1007 / Approved 836 / Under Review 141 / Voided 113 / Dismissed 106 / Denied 105 / Recorded 93 / Review on Hold 62 / Cancelled - Customer 55 / Inactive 44 / Expired 38 / To Council 35 / Continued off-Docket 25 / To CPC 10 / To BZA 3 / Revoked 1 / '4' 1). Every one of those is self-describing except the single opaque numeric '4', which is left UNMAPPED and fails closed. The window is the standing 1825 default and is independently the correct choice here. 'Closed' IS NEVERTHELESS MAPPED -- TO exclude, DELIBERATELY. It cannot appear in today's window, but the window MOVES: a case filed in 2024 and closed in 2027 will be both in-window and Closed. Rather than leave that to fail closed silently later, it is mapped to exclude now, because 'Closed' alone asserts neither that a project was approved nor that it was built, and asserting either would be a guess about outcome. The other terminal states (Voided, Dismissed, Denied, Cancelled/Canceled - Customer, Inactive, Expired, Revoked) are excluded for the same reason. Statuses that can only appear outside the current window (Proposed, Pending, Accepted, Released) are mapped anyway so the entry stays correct as the window advances. use_type_const 'Development' because PLANTYPE IS UNUSABLE AS A VOCABULARY: 17,447 of 23,166 are NULL (75%), and the non-null tail is contaminated with individual case identifiers and free text -- 'CLD-FnPlat-2022-00046', 'CD-CPC-2023-00051', 'Jones Iron & Metal - Alley Vacation', 'Rezoning from R-0.5 to R-0.75', 'Somerbrook 7th Plat, Final Plat', 'Final Plat - The Preserve, 8th Plat'. Never guess a decode; the generic member asserts nothing. GEOMETRY is polygon and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set -- this is a classic ArcGIS Server MapServer, which silently ignores it. Scoping is spatial at 3 mi: there is no ZIP and no address column. COVERAGE IS FOUR COUNTIES because Kansas City itself straddles them, and the measured dark-page lift is Jackson +9, Clay +2, Platte +2, Cass +1 = 14. It is the CITY's docket, not the counties' -- Independence, Lee's Summit, Blue Springs, Liberty and the rest run their own planning departments and are not in this layer. Not a claim of four-county coverage. NEW HOST -- mapd.kcmo.org has never been fetched by the engine, so per governance section 0 the first post-deploy re-cache is a DEPLOY VERIFICATION read from arcgis_reports[].fetched/emitted, not from counts. The wire-and-see is legitimate here because there IS a positive control: pg_net returns 200 on the exact connector query shape. ALSO REJECTED IN KANSAS CITY: (a) the data.kcmo.org BLDS permit ledger (ntw8-aacc) was RE-PROBED this session and is STILL STALLED at max(:updated_at) = 2025-05-09T20:22:20.907Z over 681,036 rows -- byte-identical to the value recorded on 2026-07-17, so three further months produced no movement. It stays on the reprobe list. (b) BW_NewCommercial_Permits (797 rows, hosted on services.arcgis.com) is real and per-record but max(USER_Issue_Date) is 2025-06-17 and its 797 rows carry only 5 distinct ZIPs, so the measured lift is ONE dark page; combined with the BW_ prefix and 100+ USER_bldg_type_* analysis columns marking it as a one-off study extract rather than a maintained ledger, it is not worth an entry. Recorded, not wired. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Review on Hold' moved proposed->exclude \u2014 pausing is not proposing; a held project supports neither resident claim."
+      "_receipts": "2026-08-05 MISSOURI PASS. The Kansas City metro seam: Jackson 25 dark, Cass 14, Clay 10, Platte 10. Config only. This is the best-formed source found anywhere in Missouri -- the City of Kansas City's full planning-case docket, 23,166 rows, 100% dated (count(APPLICATIONDATE) = 23,166 of 23,166), APPLICATIONDATE spanning 1985-05-03 to 2026-07-31, i.e. FRESH TO WITHIN FOUR DAYS of wiring. Schema carries PLANNUMBER, PLANTYPE, STATUS, APPLICATIONDATE, COMPLETEDATE, PLANNER, DESCRIPTION, LAND_USE, DWELL_UNITS, NON_RES_AREA, LOTS, PROJECTNAME, WORKCLASS and NEXTHEARINGDATE. THE 1825-DAY WINDOW IS LOAD-BEARING AND IT SOLVES THE ONE REAL PROBLEM. Unwindowed, STATUS is 26 values summing exactly to 23,166 but dominated by 'Closed' at 16,370 (71%) -- a terminal state whose OUTCOME is not recorded, so it can support neither an approved nor an operating claim. Inside 1825 days the layer is 2,675 rows and 'Closed' DISAPPEARS ENTIRELY: the windowed vocabulary is 17 values summing exactly to 2,675 (Approved Subject to Conditions 1007 / Approved 836 / Under Review 141 / Voided 113 / Dismissed 106 / Denied 105 / Recorded 93 / Review on Hold 62 / Cancelled - Customer 55 / Inactive 44 / Expired 38 / To Council 35 / Continued off-Docket 25 / To CPC 10 / To BZA 3 / Revoked 1 / '4' 1). Every one of those is self-describing except the single opaque numeric '4', which is left UNMAPPED and fails closed. The window is the standing 1825 default and is independently the correct choice here. 'Closed' IS NEVERTHELESS MAPPED -- TO exclude, DELIBERATELY. It cannot appear in today's window, but the window MOVES: a case filed in 2024 and closed in 2027 will be both in-window and Closed. Rather than leave that to fail closed silently later, it is mapped to exclude now, because 'Closed' alone asserts neither that a project was approved nor that it was built, and asserting either would be a guess about outcome. The other terminal states (Voided, Dismissed, Denied, Cancelled/Canceled - Customer, Inactive, Expired, Revoked) are excluded for the same reason. Statuses that can only appear outside the current window (Proposed, Pending, Accepted, Released) are mapped anyway so the entry stays correct as the window advances. use_type_const 'Development' because PLANTYPE IS UNUSABLE AS A VOCABULARY: 17,447 of 23,166 are NULL (75%), and the non-null tail is contaminated with individual case identifiers and free text -- 'CLD-FnPlat-2022-00046', 'CD-CPC-2023-00051', 'Jones Iron & Metal - Alley Vacation', 'Rezoning from R-0.5 to R-0.75', 'Somerbrook 7th Plat, Final Plat', 'Final Plat - The Preserve, 8th Plat'. Never guess a decode; the generic member asserts nothing. GEOMETRY is polygon and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set -- this is a classic ArcGIS Server MapServer, which silently ignores it. Scoping is spatial at 3 mi: there is no ZIP and no address column. COVERAGE IS FOUR COUNTIES because Kansas City itself straddles them, and the measured dark-page lift is Jackson +9, Clay +2, Platte +2, Cass +1 = 14. It is the CITY's docket, not the counties' -- Independence, Lee's Summit, Blue Springs, Liberty and the rest run their own planning departments and are not in this layer. Not a claim of four-county coverage. NEW HOST -- mapd.kcmo.org has never been fetched by the engine, so per governance section 0 the first post-deploy re-cache is a DEPLOY VERIFICATION read from arcgis_reports[].fetched/emitted, not from counts. The wire-and-see is legitimate here because there IS a positive control: pg_net returns 200 on the exact connector query shape. ALSO REJECTED IN KANSAS CITY: (a) the data.kcmo.org BLDS permit ledger (ntw8-aacc) was RE-PROBED this session and is STILL STALLED at max(:updated_at) = 2025-05-09T20:22:20.907Z over 681,036 rows -- byte-identical to the value recorded on 2026-07-17, so three further months produced no movement. It stays on the reprobe list. (b) BW_NewCommercial_Permits (797 rows, hosted on services.arcgis.com) is real and per-record but max(USER_Issue_Date) is 2025-06-17 and its 797 rows carry only 5 distinct ZIPs, so the measured lift is ONE dark page; combined with the BW_ prefix and 100+ USER_bldg_type_* analysis columns marking it as a one-off study extract rather than a maintained ledger, it is not worth an entry. Recorded, not wired. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Review on Hold' moved proposed->exclude \u2014 pausing is not proposing; a held project supports neither resident claim.",
+      "status_unresolved": [
+        {
+          "value": "4",
+          "first_seen": "2026-09-11",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED by this pass. The value was measured live by scripts/source-monitor.mjs in this entry's own connector scope (Rule 13) and reported in docs/source-monitor-report.md run 2026-09-11T12:02:15.555Z, but NO publisher lookup was performed: this build sandbox has no egress to the publisher, and guessing a bucket for an opaque code is exactly what this field exists to prevent. OPEN QUESTION for the publisher. `4` is a bare integer in a STATUS column whose other values are words (\"Under Review\", \"Approved\", \"Voided\") \u2014 no in-entry sibling and no self-evident meaning."
+        }
+      ]
     },
     {
       "registry_id": "columbia-mo-capital-projects",
@@ -11687,7 +11714,9 @@
         "approved": [
           "ACTIVE"
         ],
-        "operating": [],
+        "operating": [
+          "COMPLETE"
+        ],
         "exclude": [
           "ON HOLD",
           "CANCELLED"
@@ -16163,7 +16192,8 @@
         "exclude": [
           "Expired",
           "Revoked",
-          "Stop Work"
+          "Stop Work",
+          "Reviews Paused"
         ]
       },
       "recency_days": 365,
@@ -16284,7 +16314,8 @@
           "Inspection Followup"
         ],
         "operating": [
-          "Closed"
+          "Closed",
+          "Final Closed"
         ],
         "exclude": [
           "Cancelled"

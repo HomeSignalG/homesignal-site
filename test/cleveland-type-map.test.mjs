@@ -52,9 +52,20 @@ const HS = global.window.HS;
 // ── 1. the shipped config ────────────────────────────────────────────────────────────────
 {
   ok(!!ENTRY, '1a the entry is in the registry');
+  // ⚠️ FOUR -> FIVE, 2026-09-11, and the ADDITION is the point rather than a loosened pin.
+  // The four-value enumeration below was correct when written and was overtaken by a fresher
+  // in-scope probe: scripts/source-monitor.mjs measured `Fire Permits` IN-WINDOW on this
+  // entry's own scope (extra_where PERMIT_TYPE IN ('Building Permit','Construction Project')
+  // AND ISSUE_DATE IS NOT NULL, recency ISSUE_DATE >= 2025-09-11) and gated the run, because
+  // include_types is pushed into the query and an unlisted value is NEVER FETCHED. That is
+  // the same mechanism that dropped this entry's `Install Permits` for five months.
+  // The list stays EXACT — a set, verbatim, asserted whole — so a future value still gates.
   const inc = ENTRY.include_types.slice().sort();
-  ok(JSON.stringify(inc) === JSON.stringify(['Building Permits', 'Commercial', 'Install Permits', 'Residential']),
-    '1b include_types is the LIVE in-window vocabulary — all four values, verbatim', JSON.stringify(inc));
+  ok(JSON.stringify(inc) === JSON.stringify(['Building Permits', 'Commercial', 'Fire Permits', 'Install Permits', 'Residential']),
+    '1b include_types is the LIVE in-window vocabulary — all five values, verbatim', JSON.stringify(inc));
+  ok(ENTRY.type_map['Fire Permits'] === 'Development',
+    '1b2 ...and Fire Permits carries a type_map line — a whitelisted value with no mapping is '
+    + 'fetched only to render `unclassified`');
   ok(!ENTRY.include_types.includes('Building') && !('Building' in ENTRY.type_map),
     '1c `Building` is GONE from both lists — it matched 0 rows all-time');
   ok(ENTRY.include_types.includes('Install Permits'),
