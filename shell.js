@@ -873,6 +873,15 @@
     LS.set('myZip', zip);
     state.zip = zip;
   }
+  // Drop the active-Address POINTER when that Address is not in the place being
+  // switched to. Never deletes the row — removal is HS.removeAddress alone (A-012).
+  function clearActivePropIfForeign(zip) {
+    const cur = (state.properties || []).find(x => String(x.id) === String(state.activePropId));
+    if (cur && String(cur.zip) !== String(zip)) {
+      state.activePropId = null;
+      LS.set('activeProp', null);
+    }
+  }
   HS.switchProperty = function (id) {
     const p = (state.properties || []).find(x => String(x.id) === String(id));
     const zip = p && /^\d{5}$/.test(String(p.zip)) ? String(p.zip) : null;
@@ -904,6 +913,15 @@
     const changed = zip !== String(state.zip);
     HS.closeModal('switcherModal');
     if (!changed) return;
+    // A ZIP-only Place has no Address, so the previously active one must stop being the
+    // active CONTEXT — otherwise a resident who moves from their Celina Address to
+    // Bear River City (84301) is still carrying Celina as the app's home identity.
+    // This clears the POINTER only: the app_properties row stays saved, still lists in
+    // My Places and in this very menu, and is one tap away. It does not unfollow a ZIP,
+    // does not write an Address, and never invents one for a ZIP-only Place.
+    // (The distance/home anchor is separately protected at the data layer by
+    // lib/data.js::homeFor, which anchors only on a home IN the fetched ZIP.)
+    clearActivePropIfForeign(zip);
     focusZip(zip);
     location.href = focusHref(zip);
   };
