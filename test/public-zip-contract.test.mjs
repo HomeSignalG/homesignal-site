@@ -108,14 +108,39 @@ ok(/View Development Map →/.test(cp) && /HS\.navHref\('homesignalmap\.html', z
 ok(/◍ Invite your neighbors/.test(cp) && cp.includes("HS.openModal(\\'shareModal\\')"),
   'PS-001 "Invite your neighbors" still opens the share modal');
 
-// ---- FM-078: placeholders stay PLACEHOLDERS ----
-ok(/🔒 Demographics<\/span><span class="d">Phase 1\.5 · \+ Census \(free\)/.test(cp),
-  'FM-078 the Demographics placeholder is present and still locked');
-ok(/🔒 Economy &amp; Market<\/span><span class="d">Phase 2 · \+ market data/.test(cp),
-  'FM-078 the Economy & Market placeholder is present and still locked');
-ok(/🔒<\/span> Community profile — Phase 1\.5 \/ 2/.test(cp),
-  'FM-078 the Community profile placeholder is present and still locked');
-ok(/opacity:\.55/.test(cp), 'FM-078 ...and still rendered in the locked/dimmed state');
+// ---- FM-078: Premium / Coming soon placeholders stay UNAVAILABLE ----
+// These lenses are future Premium capabilities, not live data products. The customer-
+// facing contract is PREMIUM + COMING SOON. Internal roadmap language (Phase 1.5 / 2,
+// lock, feed activation, Census/market implementation badges) must not ship.
+ok(/<button class="lenscard on"><span class="q">What\\'s changing<\/span><span class="d">Live · built on existing feeds<\/span><\/button>/.test(cp),
+  'FM-078 What\'s changing stays Live and does not carry a Premium label');
+ok(/<span class="q">Demographics<\/span><span class="d">Premium · Coming soon<\/span>/.test(cp),
+  'FM-078 Demographics is Premium · Coming soon — not a live data product');
+ok(/<span class="q">Economy &amp; Market<\/span><span class="d">Premium · Coming soon<\/span>/.test(cp),
+  'FM-078 Economy & Market is Premium · Coming soon — not a live data product');
+ok(/Community Profile · Premium/.test(cp),
+  'FM-078 Community Profile stays named Community Profile and is labelled Premium');
+ok(/<div class="p2sub">Coming soon<\/div>/.test(cp),
+  'FM-078 Community Profile visibly says Coming soon');
+ok(/Get Premium access →/.test(cp),
+  'FM-078 the frozen CTA is exactly "Get Premium access →"');
+{
+  const premiumOpens = cp.match(/HS\.openModal\(\\?'premiumModal\\?'\)/g) || [];
+  ok(premiumOpens.length === 3,
+    'FM-078 Demographics, Economy & Market, and the Community Profile CTA all open the existing Premium modal',
+    premiumOpens);
+}
+ok(cp.includes("HS.openModal(\\'premiumModal\\')") && !/premiumEmail|premiumForm|submitWaitlist|persistEmail/.test(cp),
+  'FM-078 Community Profile reuses HS.openModal(\'premiumModal\') — no second waitlist or form');
+ok(!/Phase 1\.5|PHASE 1\.5|Phase 2 ·|activates with new feeds|\+ Census \(free\)|\+ market data/.test(cp),
+  'FM-078 internal roadmap / feed-implementation language is gone from the customer-facing markup');
+ok(!/ZIP Profile|Zip Profile/.test(cp),
+  'FM-078 Community Profile was not renamed to ZIP Profile');
+ok(/opacity:\.55/.test(cp), 'FM-078 Demographics and Economy & Market stay visually unavailable (dimmed)');
+ok(/Community DNA radar, household mix/.test(cp) && /Prices, growth outlook/.test(cp),
+  'FM-078 the future-capability descriptions are retained');
+ok(!/id="premiumModal"|id="premiumEmail"/.test(cp),
+  'FM-078 the shared renderer does not invent a second Premium modal');
 
 // ---- LOCAL NEWS CAP: display-only, and the same number on both renderers ----
 ok(/var LOCAL_NEWS_CAP = 20;/.test(cp), 'PS-001 LOCAL_NEWS_CAP is 20 in the runtime renderer');
