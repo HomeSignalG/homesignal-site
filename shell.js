@@ -1097,7 +1097,7 @@
     $('locDone').classList.add('hidden');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
     // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
-    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your community" : 'Change your community';
+    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your zip code" : 'Change your zip code';
     const sub = document.querySelector('#locModal .msub');
     if (sub) sub.textContent = onboarding
       ? "Enter your ZIP code to save your area and open what's changing around your home."
@@ -1111,7 +1111,7 @@
     el.style.borderColor = '';
     const covered = await HS.data.isCovered(z);
     if (covered) {
-      // Looking up a covered ZIP follows it: saves it to Your communities and makes
+      // Looking up a covered ZIP follows it: saves it to Your zip codes and makes
       // it the primary area, so the Del Valle sample stops showing everywhere.
       let meta = null; try { meta = await HS.data.community(z); } catch (e) {}
       HS.followCommunity({ zip: z, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
@@ -1179,7 +1179,7 @@
     const zip = btn.dataset.zip;
     if (HS.isFollowingCommunity(zip)) {
       HS.unfollowCommunity(zip);
-      btn.textContent = '＋ Follow this community'; btn.classList.remove('following');
+      btn.textContent = '＋ Follow this zip code'; btn.classList.remove('following');
     } else {
       HS.followCommunity({ zip: zip, name: btn.dataset.name, state: btn.dataset.state });
       btn.textContent = '✓ Following'; btn.classList.add('following');
@@ -1293,7 +1293,7 @@
       HS.esc(c.name || ('ZIP ' + c.zip)) + '</a>').join('');
     const emptyLabel = opts.zipLabels
       ? 'No ZIP codes yet.'
-      : 'No communities yet.';
+      : 'No zip codes yet.';
     const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
     return '<div class="chips">' + empty + chips +

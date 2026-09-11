@@ -32,11 +32,18 @@ ok(/>My Places</.test(props) && /HomeSignal — My Places/.test(props),
 for (const [f, body] of [['properties.html', props], ['property.html', prop],
                          ['dashboard.html', dash], ['partials/shell.html', shellHtml]])
   ok(!/Saved Place/.test(body), 'A-002 "Saved Place(s)" is gone from ' + f, (body.match(/.{0,40}Saved Place.{0,40}/) || [])[0]);
-// The PUBLIC acquisition surface keeps its own words — this is the A-002 exception.
-ok(cpage.includes('＋ Follow this community') && /Your communities/.test(cpage),
-  'A-002 EXCEPTION: public ZIP Follow copy and "Your communities" are UNCHANGED');
-ok(/Your community/.test(shellHtml) && /Change your community/.test(shellHtml),
-  'A-002 EXCEPTION: the loc-modal acquisition copy still says community');
+// Residents follow ZIP codes, not communities — the public ZIP page and the loc-modal
+// use the same ZIP-code vocabulary as Dashboard / My Places.
+ok(cpage.includes('＋ Follow this zip code') && /Your zip codes/.test(cpage),
+  'A-002 public ZIP Follow copy and followed-list heading say zip code');
+ok(/Your zip code/.test(shellHtml) && /Change your zip code/.test(shellHtml),
+  'A-002 the loc-modal acquisition copy says zip code');
+ok(!/Follow this community/.test(cpage) && !/Your communities/.test(cpage),
+  'A-002 the public ZIP page no longer calls a ZIP a community');
+ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHtml),
+  'A-002 the loc-modal no longer calls a ZIP a community');
+ok(/No zip codes yet\./.test(shell) && !/No communities yet\./.test(shell),
+  'A-002 the ZIP follow-strip empty state says zip codes');
 
 // ---- A-010: three views, two distinct primary actions, no generic add -------------------
 for (const v of ['data-view="all"', 'data-view="addresses"', 'data-view="zips"'])
