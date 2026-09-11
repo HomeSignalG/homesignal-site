@@ -25,7 +25,7 @@
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=4441d37e"></script>
+<script src="shell.js?v=cd1015f9"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
@@ -171,17 +171,28 @@ HS.onReady(async function () {
     paint();
   }
 
-  function renderDetail(pid) {
-    var p = projects.find(function(x){return x.id===pid;});
+  function missingRecord() {
+    page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>';
+  }
+  async function renderDetail(pid) {
+    var p = projects.find(function(x){return String(x.id)===String(pid);});
     // Facilities share this route/page but branch to their own dossier template —
     // a regulated facility is an EXISTING CONDITION, not development activity, so the
     // header/labels read "Regulated facility" throughout (spec §7).
     if (!p) {
-      var f = facilities.find(function(x){return x.id===pid;});
+      var f = facilities.find(function(x){return String(x.id)===String(pid);});
       if (f) { renderFacility(f); return; }
     }
-    if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>'; return; }
-    HS.data.meetings(S.zip, home).then(function (meetings) {
+    // My Places can open a followed project from another ZIP. The list above is
+    // the viewed ZIP only — fetch by id rather than claiming the record is gone.
+    if (!p && HS.data && HS.data.projectsByIds) {
+      try {
+        var fetched = await HS.data.projectsByIds([pid]);
+        p = fetched && fetched[0];
+      } catch (e) { p = null; }
+    }
+    if (!p) { missingRecord(); return; }
+    HS.data.meetings(p.zip || S.zip, home).then(function (meetings) {
       var mtg = HS.bestMeeting(meetings, p.id);   // soonest UPCOMING first, else latest held
       // Timeline: only sourced milestones — filing date, record stage/status, or a
       // linked meeting. Never invent a future vote or expected date from status alone.
@@ -255,7 +266,7 @@ HS.onReady(async function () {
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
         + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the official record</button>'
         + '<button class="btn" onclick="location.href=\'' + HS.esc(HS.navHref('homesignalmap.html', S.zip)) + '\'">See it on the map</button>'
-        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
+        + projectFollowButton(p) + '</div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
         + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
@@ -320,6 +331,13 @@ HS.onReady(async function () {
       + '</div>'
       + '<div class="divider"></div><div class="kicker">Source — official records</div><div class="doact">' + linksHtml + '</div>'
       + '</div></div>';
+  }
+  function projectFollowButton(p) {
+    var following = !!(HS.isFollowing && HS.isFollowing('project', p.id));
+    var label = following
+      ? (HS.PROJECT_FOLLOW_ON || '✓ Following in My Places')
+      : (HS.PROJECT_FOLLOW_ADD || 'Add to My Places to follow');
+    return '<button class="btn ghost' + (following ? ' following' : '') + '" type="button" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">' + HS.esc(label) + '</button>';
   }
   function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
 });
