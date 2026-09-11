@@ -857,6 +857,14 @@
     HS.selectProperty(id);
     HS.closeModal('switcherModal');
     if (!changed) return;
+    // On the Address dossier, reload keeps the OLD ?id= and a cross-ZIP pick used
+    // to dump the resident on My Places. The click is "open THIS Address".
+    const page = currentShellPage();
+    if (page === 'property.html' && p) {
+      if (zip && zip !== String(state.zip)) focusZip(zip);
+      location.href = 'property.html?id=' + encodeURIComponent(p.id);
+      return;
+    }
     if (zip && zip !== String(state.zip)) {
       focusZip(zip);
       location.href = focusHref(zip);

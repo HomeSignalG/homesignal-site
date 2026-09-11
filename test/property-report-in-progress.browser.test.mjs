@@ -168,6 +168,26 @@ await waitShell(); await waitDecided();
 ok(/Property reports are in progress/.test(await bodyText()), '7 an unresolvable id still renders the page');
 ok(!(await backBtn()), '7 ...and offers no action, rather than one pointing at another property');
 
+// ═══ 7b. The Address dossier itself must not inherit that fallback either ═══
+// The production blank page was property.html?id=<a real uuid> with an empty
+// #propPage. An unresolvable id is the other half of the same contract: named
+// empty state, never another Address, never a blank slot.
+await page.goto(base + '/property.html?id=not-a-real-property', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => {
+  const el = document.querySelector('#propPage h1, .ph h1');
+  return !!(el && el.textContent);
+}, null, { timeout: 30000 });
+const unknownDossier = await page.evaluate(() => ({
+  h1: (document.querySelector('.ph h1') || {}).textContent,
+  html: (document.getElementById('propPage') || {}).innerHTML || '',
+  text: ((document.getElementById('propPage') || {}).innerText || '').replace(/\s+/g, ' ').trim()
+}));
+ok(/No Address/.test(unknownDossier.h1 || ''), '7b an unresolvable property id renders "No Address"', unknownDossier);
+ok(unknownDossier.html.trim().length > 0, '7b ...and #propPage is not an empty slot');
+ok(unknownDossier.h1 !== target.address && unknownDossier.text.indexOf(target.address) < 0,
+  '7b ...and it does not render a different saved Address', unknownDossier);
+
 // ═══ 8. The shell is intact, and so is the small screen ═══
 await page.goto(base + '/reports.html?id=' + encodeURIComponent(target.id), { waitUntil: 'domcontentloaded' });
 await waitShell(); await waitDecided();

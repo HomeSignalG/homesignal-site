@@ -211,7 +211,7 @@ ok(/'property\.html\?id=' \+ encodeURIComponent\(from\.id\)/.test(reportsSrc),
   'reports.html returns to property.html?id=<the id it was handed>');
 ok(/Back to property/.test(reportsSrc),
   'reports.html offers a "Back to property" action');
-// THE ASSERTION THAT MAKES THE RETURN TRUSTWORTHY. property.html resolves its Address with
+// THE ASSERTION THAT MAKES THE RETURN TRUSTWORTHY. property.html used to resolve with
 // `find(...) || S.activeProperty`; inheriting that fallback here would send a resident with
 // a stale id back to SOME OTHER Address and call it theirs. The action must be gated on the
 // id resolving, and must not fall back.

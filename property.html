@@ -24,24 +24,82 @@
      because it drew the map itself; nothing on this page draws a map any more, and
      carrying them would be a second copy of a runtime that lives one frame away. -->
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=e47c81a7"></script>
+<script src="shell.js?v=df2559e4"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
   var id = new URLSearchParams(location.search).get('id');
-  var p = S.properties.find(function(x){return x.id===id;}) || S.activeProperty;
-  if (p) HS.selectProperty(p.id);
   var page = document.getElementById('propPage');
+  // ?id= is an identity, not a suggestion. reports.html already refuses the
+  // `|| activeProperty` fallback; inheriting it here showed a DIFFERENT Address
+  // (or, when render then threw, a blank slot) for a typed or stale id.
+  var p = id
+    ? (S.properties || []).find(function (x) { return String(x.id) === String(id); })
+    : S.activeProperty;
+  if (p) HS.selectProperty(p.id);
   if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button><div class="ph"><h1>No Address</h1></div>'; return; }
+  if (typeof HS.setViewLabel === 'function') HS.setViewLabel(p.address, { precise: true });
 
-  var projects = HS.withDistance(await HS.data.projects(S.zip, p), p)
+  function numCoord(v) {
+    if (v == null || v === '') return null;
+    var n = Number(v);
+    return (typeof n === 'number' && isFinite(n)) ? n : null;
+  }
+  var latN = numCoord(p.lat), lngN = numCoord(p.lng);
+  if (latN != null && lngN != null) p = Object.assign({}, p, { lat: latN, lng: lngN });
+
+  function dataZipFor(home) {
+    var z = String((home && home.zip) || '').replace(/\D/g, '').slice(0, 5);
+    return /^\d{5}$/.test(z) ? z : (S.zip || '');
+  }
+  function identityHtml(home) {
+    return '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
+      + '<div class="ph"><div class="eyebrow">' + HS.esc(home.tag||home.label) + '</div><h1>' + HS.esc(home.address) + '</h1>'
+      + '<p>' + HS.esc(home.city) + ', ' + HS.esc(home.state) + ' ' + HS.esc(home.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>';
+  }
+  function failHtml(msg) {
+    return identityHtml(p)
+      + '<p style="padding:16px 22px;color:var(--ink-3)">' + HS.esc(msg) + '</p>'
+      + '<button class="btn" style="margin:0 22px 24px" onclick="location.reload()">Try again</button>';
+  }
+
+  // Paint the Address FIRST. Nearby records used to run before any innerHTML, so a
+  // throw or a hang in projects()/changes()/envRisk left #propPage empty — the
+  // production "click 96 Island Drive and nothing comes up" failure. The header
+  // is this page's identity; the records can fail honestly underneath it.
+  page.innerHTML = identityHtml(p)
+    + '<p style="padding:16px 22px;color:var(--ink-3)" id="propLoading">Loading nearby records…</p>';
+
+  var zip = dataZipFor(p);
+  var projects = [], changes = [], env = null;
+  try {
+    var loaded = await Promise.all([
+      HS.data.projects(zip, p),
+      HS.data.changes(zip, p),
+      HS.data.envRisk(zip)
+    ]);
+    projects = loaded[0] || [];
+    changes = loaded[1] || [];
+    env = loaded[2];
+  } catch (e) {
+    console.warn('[property] data load failed', e);
+    page.innerHTML = failHtml('Could not load nearby records. Try again.');
+    return;
+  }
+
+  try {
+  projects = HS.withDistance(projects, p)
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  var changes = HS.withDistance(await HS.data.changes(S.zip, p), p);
-  var env = await HS.data.envRisk(S.zip);
-  var near = projects.slice(0, 3);
+  changes = HS.withDistance(changes, p);
+  var near = projects.slice(0, 3).map(function (pr) {
+    return Array.isArray(pr.impact_dimensions) ? pr
+      : Object.assign({}, pr, { impact_dimensions: [] });
+  });
 
   var risk = env ? ['flood','wildfire','heat'].map(function (k) {
-    var r = env[k]; var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
+    var r = env[k];
+    if (!r) return '';
+    var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
     var label = k==='heat'?'Extreme heat':k.charAt(0).toUpperCase()+k.slice(1);
     return '<div class="rk"><div class="rkl">' + label + '</div><div class="rkv" style="color:' + color + '">' + HS.esc(r.label) + '</div>'
       + '<div class="track" style="margin-top:7px"><div class="fill" style="width:' + r.pct + '%;background:' + color + '"></div></div></div>';
@@ -104,15 +162,13 @@ HS.onReady(async function () {
 
 
   page.innerHTML =
-    '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
-    + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
-    + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    identityHtml(p)
     + contextMap
     + '<div class="cols"><div>'
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
     + near.map(function (pr) {
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
-          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(pr.status.toLowerCase()) + '</span>'
+          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
           + '<h3>' + HS.esc(pr.name) + '</h3>'
           + HS.tpl.devImpactBlock(pr)
           + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
@@ -144,6 +200,10 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
     + '</div></div>';
+  } catch (e) {
+    console.warn('[property] render failed', e);
+    page.innerHTML = failHtml('Could not display this Address. Try again.');
+  }
 
 });
 </script>
