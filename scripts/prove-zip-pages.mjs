@@ -13,6 +13,8 @@
 //   D fail_dev_fail  Alerts FAIL + development FAIL
 //   E local_news     Rule F carried by local news only
 //   F weather_thin   weather present, still under Rule F  <- weather never counts
+//                    (01002 -> 01005 and 04401 -> 02532 on 2026-09-11; both crossed Rule F
+//                     by normal ingestion. See the CONTROLS comment in pages.yml.)
 //   G honest_empty   no qualifying records at all
 //   H fanout         one jurisdiction's notices across many ZIPs
 //   I               anonymous render (every request here is anonymous, no address, no home)
@@ -171,6 +173,58 @@ const main = async () => {
   await browser.close();
   server.close();
   console.log(`\n${pass} passed, ${fail} failed`);
+
+  // ── WHEN A FROZEN CONTROL DRIFTS, NAME ITS REPLACEMENT ────────────────────────────────
+  // The controls are pinned on purpose: a control derived from the same build it tests
+  // cannot catch a build-wide misclassification, because the class it samples would simply
+  // come back empty and the assertion would pass over nothing. So freezing stays — what
+  // was missing is the other half. A ZIP leaves its class by NORMAL INGESTION (content
+  // arrives and it crosses Rule F), and the pinned comment already calls that "a visible
+  // one-line replacement" — but the replacement had to be found by hand-querying
+  // production, which is why 01002 and 04401 sat red on main instead.
+  //
+  // 2026-09-11: rule_f_pass moved 8,291 -> 8,380 between two builds of the SAME commit.
+  // 01002 Amherst MA (class C, Alerts FAIL) and 04401 Bangor ME (class F, weather-thin)
+  // both crossed. Four assertions failed; none of them was a defect in the site.
+  //
+  // This prints current members of the affected classes so the next drift is a copy-paste.
+  // It runs ONLY on failure and asserts NOTHING — a suggestion that could fail the build
+  // would be a second, unreviewed gate.
+  if (fail) {
+    try {
+      const idx = new Set(man.indexable_zips);            // Rule F pass
+      const dev = new Set(man.dev_indexable_zips || []);  // development gate
+      const lines = [];
+
+      // Class C — Alerts FAIL + development PASS. Pure set math; no file reads.
+      lines.push(dev.size
+        ? `  fail_dev_pass (C, Alerts FAIL + development PASS): `
+          + ([...dev].filter((z) => !idx.has(z)).sort().slice(0, 8).join(' ') || '(none — the class is EMPTY)')
+        : '  fail_dev_pass (C): this manifest predates dev_indexable_zips — rebuild with the current generator');
+
+      // Class F — weather DISPLAYED and still under Rule F. The manifest lists only the PASS
+      // set, and weather is a property of the rendered document, so this walks the tree.
+      const { readdir } = await import('node:fs/promises');
+      const dirs = (await readdir(join(SITE, 'community'), { withFileTypes: true }))
+        .filter((d) => d.isDirectory() && /^\d{5}$/.test(d.name)).map((d) => d.name).sort();
+      const wx = [];
+      for (const z of dirs) {
+        if (idx.has(z)) continue;                          // must be under Rule F
+        let h; try { h = await readFile(join(SITE, 'community', z, 'index.html'), 'utf8'); } catch { continue; }
+        if (/<h2>Weather alerts<\/h2>/.test(h) && h.includes('content="noindex, follow"')) wx.push(z);
+        if (wx.length >= 8) break;
+      }
+      lines.push(`  weather_thin (F, weather DISPLAYED + still under Rule F): ${wx.join(' ') || '(none found)'}`);
+      console.log('\n----- CURRENT MEMBERS OF THE DRIFT-PRONE CONTROL CLASSES -----');
+      console.log('  (suggestions only — nothing here asserts. Replace the drifted ZIP in');
+      console.log('   .github/workflows/pages.yml CONTROLS and in this file\'s header.)');
+      for (const l of lines) console.log(l);
+      console.log('--------------------------------------------------------------');
+    } catch (e) {
+      console.log(`\n(control-class suggestions unavailable: ${e.message})`);
+    }
+  }
+
   if (fail) process.exit(1);
 };
 main().catch((e) => { console.error(e); process.exit(1); });

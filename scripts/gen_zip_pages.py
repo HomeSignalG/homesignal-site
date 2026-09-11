@@ -479,9 +479,17 @@ def main():
         sys.exit("ERROR: document count != canonical ZIP count")
     if stats["bytes"] > 900 * 1024 * 1024:
         sys.exit("ERROR: artifact exceeds the safe GitHub Pages budget")
+    # dev_indexable_zips is ADDITIVE and exists so the crawler proof can NAME the current
+    # members of a control class when a frozen control drifts out of it. The build already
+    # computes p["dev_indexable"] per ZIP and threw it away; without it, "Alerts FAIL +
+    # development PASS" is underivable from the artifact, so a drifted class-C control can
+    # only be replaced by hand-querying production. It changes no document, no robots
+    # directive and no sitemap entry — it is a fact about the build, written down.
+    dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
                "rule_f_fail": len(pages) - npass,
-               "indexable_zips": indexable, "sitemap_community_urls": sm["added"]},
+               "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
+               "sitemap_community_urls": sm["added"]},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

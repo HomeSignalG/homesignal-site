@@ -162,18 +162,32 @@ jobs:
           # replacement. 07010 was the prior unit's "Alerts PASS + development FAIL" control
           # and has since become development PASS (its map page qualified); 01034 Granville
           # MA replaces it in that class. See docs/alerts-seo-build-2026-09-04.md.
+          #
+          # 2026-09-11 — TWO MORE DRIFTED, and this is the normal way they leave. 01002
+          # Amherst MA (C) and 04401 Bangor ME (F) both crossed Rule F as content arrived:
+          # rule_f_pass read 8,291 / 8,380 / 8,372 across three builds, TWO OF THEM ON THE
+          # SAME COMMIT, which is what proves the cause is ingestion and not code. Four
+          # assertions failed and nothing on the site was wrong — but `pages` went red, and
+          # a red pages build means the site does not update.
+          # 01005 Barre MA and 02532 Sagamore Beach MA replace them, chosen from the
+          # candidates the proof itself printed (run 34609174282).
+          #
+          # WHEN THIS HAPPENS AGAIN — and near-threshold ZIPs mean it will — the proof now
+          # prints the current members of the drift-prone classes on failure, so the swap is
+          # a copy-paste instead of a hand-query against production. The goal was never
+          # "never drifts"; it is "drift costs one line".
           #   A 01001 Agawam MA        Alerts PASS + development PASS
           #   B 01034 Granville MA     Alerts PASS + development FAIL (Alerts alone qualifies)
-          #   C 01002 Amherst MA       Alerts FAIL + development PASS (development cannot)
+          #   C 01005 Barre MA         Alerts FAIL + development PASS (development cannot)
           #   D 02543 Woods Hole MA    Alerts FAIL + development FAIL
           #   E 01001                  Rule F carried by local news only
-          #   F 04401 Bangor ME        weather present, still under Rule F
+          #   F 02532 Sagamore Beach MA weather present, still under Rule F
           #   G 02543                  honest-empty
           #   H 22030 Fairfax VA       60 notices fanned out from one jurisdiction
           #   J 28468 Sunset Beach NC  19,536 development records - no point may leak
           CONTROLS: >-
-            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01002",
-             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"04401",
+            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01005",
+             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"02532",
              "honest_empty":"02543","fanout":"22030","point_dense":"28468"}
         run: |
           set -euo pipefail
