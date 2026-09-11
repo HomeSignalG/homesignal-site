@@ -50,7 +50,8 @@ for (const v of ['data-view="all"', 'data-view="addresses"', 'data-view="zips"']
   ok(props.includes(v), 'A-010 My Places has view ' + v);
 ok(/id="plAddAddress"[^>]*>\+ Add Address</.test(props), 'A-010 primary action "+ Add Address"');
 ok(/id="plAddZip"[^>]*>\+ Add ZIP Code</.test(props), 'A-010 primary action "+ Add ZIP Code"');
-ok(!/\+ Add a Place\b/.test(props) && !/\+ Add a Place\b/.test(dash), 'A-010 no generic "+ Add a Place"');
+ok(!/\+ Add a Place\b/.test(props) && !/\+ Add a Place\b/.test(dash) && !/\+ Add a Place\b/.test(shellHtml),
+  'A-010 no generic "+ Add a Place"');
 // the two adds must reuse the EXISTING workflows, not introduce second writers
 ok(/plAddAddress'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(props),
   'A-010 "+ Add Address" reuses the existing HS.addHome Census flow');
@@ -61,6 +62,31 @@ ok(/S\.properties/.test(props) && /HS\.followedCommunities/.test(props),
   'A-010 Addresses come from app_properties and ZIP Codes from followedCommunities');
 ok(!/from\('app_properties'\)[\s\S]{0,200}?target_type/.test(shell),
   'A-010 a ZIP Code is never written into app_properties');
+
+// ---- Viewing chip: the same two types, the same two adds, on every page --------
+// The chip used to open an Address-only list titled "Switch zip code", so a
+// resident with 3 ZIP Codes and 0 Addresses was told they follow 0 places.
+ok(/id="switcherTitle">Switch place</.test(shellHtml),
+  'A-010 Viewing chip title is Switch place');
+ok(!/Switch zip code/.test(shellHtml) && !/Switch property/.test(shellHtml),
+  'A-010 switcher title is not zip-only or property-only');
+ok(/id="switcherAddAddress"[\s\S]{0,160}HS\.addHome\(\)/.test(shellHtml),
+  'A-010 switcher "+ Add Address" reuses HS.addHome');
+ok(/id="switcherAddZip"[\s\S]{0,160}HS\.openLoc\(\)/.test(shellHtml),
+  'A-010 switcher "+ Add ZIP Code" reuses HS.openLoc');
+ok(!/\+ Add a Place\b/.test(shellHtml) && !/\+ Add a Place\b/.test(shell),
+  'A-010 switcher has no generic "+ Add a Place"');
+const switcherFn = (shell.match(/HS\.openSwitcher = function \(\) \{[\s\S]*?\n  \};/) || [''])[0];
+ok(switcherFn.length > 200, 'A-010 openSwitcher body was found for contract pins');
+ok(/followedCommunities/.test(switcherFn) && /state\.properties/.test(switcherFn),
+  'A-010 openSwitcher reads Addresses AND followed ZIP Codes');
+ok(/Addresses \(/.test(switcherFn) && /ZIP Codes \(/.test(switcherFn),
+  'A-010 switcher lists the two types in labeled sections');
+ok(!/You're following/.test(switcherFn),
+  'A-010 switcher does not count Addresses as "followed" places');
+ok(/HS\.switchZip = function/.test(shell), 'A-010 HS.switchZip focuses a followed ZIP');
+ok(!/from\('app_properties'\)/.test((shell.match(/HS\.switchZip = function[\s\S]*?\n  \};/) || ['x'])[0]),
+  'A-010 switchZip never writes an Address row');
 
 // ---- A-012: Remove Address exists, is scoped, and takes nothing else --------------------
 ok(/HS\.removeAddress = async function/.test(shell), 'A-012 HS.removeAddress exists');

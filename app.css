@@ -448,6 +448,13 @@
   .swrow .pt{font-size:14px;font-weight:600}
   .swrow .pa{font-size:12px;color:var(--ink-3)}
   .swrow .chk{color:var(--green);font-weight:700}
+  #switcherList{max-height:min(52vh,420px);overflow-y:auto}
+  .swsec{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin:14px 10px 6px}
+  .swsec:first-child{margin-top:0}
+  .swempty{padding:8px 10px 12px;font-size:12.5px;color:var(--ink-3);line-height:1.45}
+  .swtype{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+  .swacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .swacts .addbtn{flex:1;justify-content:center}
 
   .hidden{display:none}
   .menubtn{display:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;align-items:center;justify-content:center;font-size:17px;color:var(--ink-2);cursor:pointer;flex:none}
