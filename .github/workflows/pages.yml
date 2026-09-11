@@ -157,38 +157,26 @@ jobs:
       - name: Candidate crawler proof (initial HTML + JS + Googlebot UAs)
         env:
           SITE_DIR: _site
-          # FROZEN CONTROLS — classes A-J, re-derived from live data 2026-09-04 14:26-14:35Z
-          # and pinned here so a reclassification by normal ingestion is a visible one-line
-          # replacement. 07010 was the prior unit's "Alerts PASS + development FAIL" control
-          # and has since become development PASS (its map page qualified); 01034 Granville
-          # MA replaces it in that class. See docs/alerts-seo-build-2026-09-04.md.
+          # CONTROLS — classes A-J. Only point_dense is still PINNED, and only because
+          # "the densest development ZIP leaks no point/radius string" is a strictly stronger
+          # claim than "some page leaks none": deriving it would replace the worst case with
+          # an average one. Everything else is DERIVED from the build each run and asserted
+          # NON-EMPTY, so drift substitutes and reports instead of reddening the build.
           #
-          # 2026-09-11 — TWO MORE DRIFTED, and this is the normal way they leave. 01002
-          # Amherst MA (C) and 04401 Bangor ME (F) both crossed Rule F as content arrived:
-          # rule_f_pass read 8,291 / 8,380 / 8,372 across three builds, TWO OF THEM ON THE
-          # SAME COMMIT, which is what proves the cause is ingestion and not code. Four
-          # assertions failed and nothing on the site was wrong — but `pages` went red, and
-          # a red pages build means the site does not update.
-          # 01005 Barre MA and 02532 Sagamore Beach MA replace them, chosen from the
-          # candidates the proof itself printed (run 34609174282).
+          # WHY THIS STOPPED BEING FROZEN. Pinned controls rotted three times — 07010, then
+          # 01002 Amherst MA and 04401 Bangor ME on 2026-09-11 — every time by NORMAL
+          # INGESTION, as real content pushed a ZIP across Rule F. rule_f_pass read 8,291 /
+          # 8,380 / 8,372 across three builds, TWO OF THEM ON THE SAME COMMIT. Each rot went
+          # red, and a red pages build means the site does not update.
           #
-          # WHEN THIS HAPPENS AGAIN — and near-threshold ZIPs mean it will — the proof now
-          # prints the current members of the drift-prone classes on failure, so the swap is
-          # a copy-paste instead of a hand-query against production. The goal was never
-          # "never drifts"; it is "drift costs one line".
-          #   A 01001 Agawam MA        Alerts PASS + development PASS
-          #   B 01034 Granville MA     Alerts PASS + development FAIL (Alerts alone qualifies)
-          #   C 01005 Barre MA         Alerts FAIL + development PASS (development cannot)
-          #   D 02543 Woods Hole MA    Alerts FAIL + development FAIL
-          #   E 01001                  Rule F carried by local news only
-          #   F 02532 Sagamore Beach MA weather present, still under Rule F
-          #   G 02543                  honest-empty
-          #   H 22030 Fairfax VA       60 notices fanned out from one jurisdiction
-          #   J 28468 Sunset Beach NC  19,536 development records - no point may leak
+          # The argument for freezing was that a control derived from the build it tests
+          # cannot catch a build-wide misclassification, because the class comes back empty
+          # and its assertion passes over nothing. That premise is true; the conclusion is
+          # not. Asserting the class is NON-EMPTY covers exactly that case, and is now done.
+          # Pinned selection was never the only way to get the property — only the way that
+          # also turned ordinary ingestion into an outage.
           CONTROLS: >-
-            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01005",
-             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"02532",
-             "honest_empty":"02543","fanout":"22030","point_dense":"28468"}
+            {"point_dense":"28468"}
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
