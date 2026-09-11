@@ -1452,13 +1452,54 @@
   }
 
   // -------------------------------------------------- premium waitlist --------
+  // The success state is shown ONLY after the canonical store confirms the write.
+  // This used to insert into 'premium_waitlist' — a table that does not exist in
+  // production (PostgREST answers PGRST205) — swallow the rejection, and show
+  // "You're on the list" regardless. Every Premium lead ever offered was lost.
   HS.submitWaitlist = async function () {
-    const el = $('premiumEmail'), e = el.value.trim();
-    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
-    await persistEmail('premium_waitlist', { email: e });
+    const el = $('premiumEmail'), btn = $('premiumSubmit');
+    const W = window.HSPremiumWaitlist;
+    // A missing module is an outage, not a bad address — say the right thing.
+    if (!W) { waitlistError("We could not save your email just now. Please try again in a moment."); return; }
+    const email = W.normalizeEmail(el ? el.value : '');
+    if (!email) { waitlistError('Enter a valid email address so we can reach you.'); if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    if (el) el.style.borderColor = '';
+    waitlistError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    // Seed/preview mode has no database by construction, and every other persistence
+    // in that mode is the same local queue. Production is DATA_SOURCE='supabase'.
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('app_premium_waitlist', { email: email })
+      : await W.submit({
+          client: HS.sb(),
+          email: email,
+          source: location.pathname + (location.search || ''),
+          zip: W.zipFromLocation(location)
+        });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Notify me'; }
+    if (!res.ok) {
+      // The entered address is deliberately left in the field so a retry costs nothing.
+      waitlistError(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : "We could not save your email just now. Please try again in a moment.");
+      if (el) el.focus();
+      return;
+    }
+    // Conversion is recorded only after confirmed persistence, and is measurement
+    // only — app_premium_waitlist remains the record of the lead itself.
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('premium_waitlist_joined'); } catch (err) {}
     $('premiumForm').classList.add('hidden');
     $('premiumDone').classList.remove('hidden');
   };
+
+  function waitlistError(msg) {
+    const box = $('premiumError');
+    if (!box) return;
+    box.textContent = msg || '';
+    box.classList.toggle('hidden', !msg);
+  }
 
   // -------------------------------------------------- follows / watch ---------
   HS.toggleFollow = function (btn, type, id) {
@@ -1530,9 +1571,18 @@
   }
 
   // -------------------------------------------------- persistence seam --------
+  // Returns { ok } — and callers MUST branch on it. A Supabase insert reports a
+  // PostgREST rejection by RESOLVING with { error }, not by throwing, so the old
+  // bare try/catch treated a permission denial, a missing table and a constraint
+  // violation as success. Every failure mode is now collapsed into ok:false.
   async function persistEmail(table, row) {
-    if (CFG.DATA_SOURCE !== 'supabase') { LS.set('pending:' + table, [...(LS.get('pending:' + table, [])), row]); return; }
-    try { await HS.sb().from(table).insert(row); } catch (e) { console.warn('persist', table, e); }
+    if (CFG.DATA_SOURCE !== 'supabase') { LS.set('pending:' + table, [...(LS.get('pending:' + table, [])), row]); return { ok: true, queued: true }; }
+    try {
+      const res = await HS.sb().from(table).insert(row);
+      if (!res || typeof res !== 'object') { console.warn('persist', table, 'no result'); return { ok: false }; }
+      if (res.error) { console.warn('persist', table, res.error.message || res.error); return { ok: false, error: res.error }; }
+      return { ok: true };
+    } catch (e) { console.warn('persist', table, e); return { ok: false, error: e }; }
   }
   async function persistFollow(type, id, on) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
