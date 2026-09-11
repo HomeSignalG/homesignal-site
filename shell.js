@@ -814,17 +814,59 @@
     document.dispatchEvent(new CustomEvent('hs:property', { detail: { id } }));
   };
   // Switcher-modal path: pages compute their home-anchored data (pin, header
-  // address, distances) once at load, so switching focus reloads the current
-  // page to rebuild everything for the newly active home (same pattern as
-  // saveHome). Only on an actual change — re-picking the active home just
-  // closes the modal. Other selectProperty callers must NOT reload: property
-  // cards navigate right after selecting, and property.html syncs the active
-  // home during page load (a reload there would loop).
+  // address, distances) once at load, so switching focus rebuilds the current
+  // page for the newly active home (same pattern as saveHome). Only on an
+  // actual change — re-picking the active home just closes the modal. Other
+  // selectProperty callers must NOT reload: property cards navigate right after
+  // selecting, and property.html syncs the active home during page load (a
+  // reload there would loop).
+  //
+  // Focusing an Address also focuses its ZIP: the Viewing chip is a Place
+  // switcher, and an Address in 78617 is not a way to keep browsing 75009.
+  // That write to myZip is an explicit pick, not a browse — NAV-01's
+  // "viewing must not overwrite myZip" still holds for URL/session navigation.
+  function currentShellPage() {
+    const parts = (location.pathname || '').split('/').filter(Boolean);
+    const file = parts[parts.length - 1] || '';
+    if (/\.html$/i.test(file)) return file;
+    if (parts[0] === 'community') return 'community.html';
+    return 'dashboard.html';
+  }
+  function focusHref(zip) {
+    const page = currentShellPage();
+    if (page === 'property.html') return HS.navHref('properties.html', zip);
+    return HS.navHref(page, zip);
+  }
+  function focusZip(zip) {
+    zip = String(zip);
+    LS.set('myZip', zip);
+    state.zip = zip;
+  }
   HS.switchProperty = function (id) {
-    const changed = id !== state.activePropId;
+    const p = (state.properties || []).find(x => String(x.id) === String(id));
+    const zip = p && /^\d{5}$/.test(String(p.zip)) ? String(p.zip) : null;
+    const changed = id !== state.activePropId || (zip && zip !== String(state.zip));
     HS.selectProperty(id);
     HS.closeModal('switcherModal');
-    if (changed) location.reload();
+    if (!changed) return;
+    if (zip && zip !== String(state.zip)) {
+      focusZip(zip);
+      location.href = focusHref(zip);
+      return;
+    }
+    location.reload();
+  };
+  // ZIP Codes are a DIFFERENT Place type (app_follows / myCommunities). This
+  // focuses the app on an already-followed ZIP — it does not write an Address,
+  // does not unfollow the others, and does not open the Census home flow.
+  HS.switchZip = function (zip) {
+    zip = String(zip || '');
+    if (!/^\d{5}$/.test(zip)) return;
+    const changed = zip !== String(state.zip);
+    HS.closeModal('switcherModal');
+    if (!changed) return;
+    focusZip(zip);
+    location.href = focusHref(zip);
   };
   function paintNavHrefs() {
     if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
@@ -943,17 +985,48 @@
     } catch (e) { /* a missing context line must never break the page */ }
   };
 
+  // A-002 / A-010 — the Viewing chip lists BOTH Place types from their EXISTING
+  // stores, kept visually distinct. It never merges them, never writes a ZIP
+  // into app_properties, and never offers a generic "+ Add a Place".
   HS.openSwitcher = function () {
     const list = $('switcherList'); if (!list) return;
-    $('switcherSub').textContent = "You're following " + state.properties.length + " saved place" +
-      (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
-    list.innerHTML = state.properties.map(p => `
-      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
-        <div class="miniscore">${p.score || ''}</div>
-        <div class="pinfo"><div class="pt">${HS.esc(p.address)}</div>
-          <div class="pa">${HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label))} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
-        ${p.id === state.activePropId ? '<span class="chk">✓</span>' : ''}
-      </div>`).join('');
+    const addresses = state.properties || [];
+    const zips = HS.followedCommunities ? HS.followedCommunities() : [];
+    const n = addresses.length + zips.length;
+    if ($('switcherTitle')) $('switcherTitle').textContent = 'Switch place';
+    if ($('switcherSub')) {
+      $('switcherSub').textContent = n
+        ? ('You have ' + n + ' place' + (n === 1 ? '' : 's') + '. Pick one to focus the app on it.')
+        : 'Add an Address or a ZIP Code to focus the app on it.';
+    }
+    const home = state.activeProperty;
+    const homeIsCurrent = !!(home && String(home.zip) === String(state.zip) && !state.viewLabelPrecise);
+    const typeChip = function (label) {
+      return '<span class="swtype">' + HS.esc(label) + '</span>';
+    };
+    const addrRows = addresses.length ? addresses.map(p => {
+      const on = p.id === state.activePropId && homeIsCurrent;
+      return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchProperty(\'' + p.id + '\')">'
+        + '<div class="miniscore">' + (p.score || '') + '</div>'
+        + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + '</div>'
+        + '<div class="pa">' + typeChip('Address') + ' · '
+        + HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Address'))
+        + ' · ' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div></div>'
+        + (on ? '<span class="chk">✓</span>' : '')
+        + '</div>';
+    }).join('') : '<div class="swempty">No Addresses yet. Add a home and we\'ll watch official records around it.</div>';
+    const zipRows = zips.length ? zips.map(z => {
+      const on = String(z.zip) === String(state.zip) && !homeIsCurrent;
+      return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchZip(\'' + HS.esc(String(z.zip)) + '\')">'
+        + '<div class="miniscore">◍</div>'
+        + '<div class="pinfo"><div class="pt">' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</div>'
+        + '<div class="pa">' + typeChip('ZIP Code') + ' · ' + HS.esc(z.zip)
+        + (z.state ? (', ' + HS.esc(z.state)) : '') + '</div></div>'
+        + (on ? '<span class="chk">✓</span>' : '')
+        + '</div>';
+    }).join('') : '<div class="swempty">No ZIP Codes yet. Follow a ZIP Code to watch a whole community.</div>';
+    list.innerHTML = '<div class="swsec">Addresses (' + addresses.length + ')</div>' + addrRows
+      + '<div class="swsec">ZIP Codes (' + zips.length + ')</div>' + zipRows;
     HS.openModal('switcherModal');
   };
 

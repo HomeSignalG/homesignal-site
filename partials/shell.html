@@ -112,18 +112,24 @@
   </div>
 </div>
 
-<!-- ======= PROPERTY SWITCHER MODAL ======= -->
+<!-- ======= PLACE SWITCHER MODAL =======
+     The Viewing chip is the global focus control for BOTH Place types.
+     Addresses (app_properties) and ZIP Codes (app_follows) stay distinct —
+     two labeled lists, two existing add workflows, no generic "+ Add a Place". -->
 <div class="overlay" id="switcherModal" onclick="if(event.target===this)HS.closeModal('switcherModal')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="switcherTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('switcherModal')" aria-label="Close">✕</button>
       <span class="mbadge">⌂ My Places</span>
-      <h3 id="switcherTitle">Switch zip code</h3>
+      <h3 id="switcherTitle">Switch place</h3>
       <p class="msub" id="switcherSub">Pick one to focus the app on it.</p>
     </div>
     <div class="mbody">
       <div id="switcherList"><!-- filled by shell.js --></div>
-      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add Address</button>
+      <div class="swacts">
+        <button class="addbtn" type="button" id="switcherAddAddress" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add Address</button>
+        <button class="addbtn" type="button" id="switcherAddZip" onclick="HS.closeModal('switcherModal');HS.openLoc()">+ Add ZIP Code</button>
+      </div>
     </div>
   </div>
 </div>
