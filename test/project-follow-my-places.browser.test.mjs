@@ -38,7 +38,7 @@ const ADD = 'Add to My Places to follow';
 const ON = '✓ Following in My Places';
 const PID = 'proj-datacenter';
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ channel: 'chrome' });
 const context = await browser.newContext();
 const page = await context.newPage();
 
@@ -112,7 +112,7 @@ ok(/SH-130 Data Center Campus/.test(projHtml) && /data-kind="project"/.test(proj
   'Projects view lists the followed project');
 ok(/Location not listed on this project record/.test(projHtml),
   'seed project without a street address says location is not listed');
-ok(!/\+ Add Project/.test(await page.content()),
+ok((await page.locator('button', { hasText: '+ Add Project' }).count()) === 0,
   'My Places has no + Add Project writer');
 const placesTile = await page.locator('#propStrip').innerText();
 ok(!/SH-130/.test(placesTile),
