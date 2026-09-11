@@ -907,6 +907,42 @@
     focusZip(zip);
     location.href = focusHref(zip);
   };
+  // ------------------------------------------- viewed place, re-asserted ------
+  // THE ONE re-assertion of the viewed place, called by every ZIP-scoped page before
+  // it fetches. Gate 1 stops account hydration from stealing state.zip; this is the
+  // defence in depth that makes the page's own URL authoritative at the MOMENT OF THE
+  // FETCH, so any future async step between boot and render cannot quietly redefine
+  // the page's geography. It is a shared helper on purpose — the alternative was
+  // copying lib/community-page.js's URL reset into four pages, i.e. four per-page
+  // geography rules that drift.
+  //
+  // Resolution is the DOCUMENTED one and nothing else:
+  //   explicit page ZIP (?zip=, or a path-based ZIP the page declares) -> the
+  //   established viewed ZIP (resolveViewedZip: myZip -> session viewZip) -> DEFAULT_ZIP.
+  //
+  // pageZip is for a canonical document whose ZIP is in its PATH, not its query string
+  // (/community/<zip>/ declares it as <body data-zip>). It ranks WITH ?zip= because it
+  // is that document's URL identity — ranking it below myZip would render a resident's
+  // saved area on a page that is about a different ZIP.
+  HS.ensureViewedZip = function (pageZip) {
+    const explicit = HS.parseZipParam(location.search)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    const z = HS.resolveViewedZip({
+      urlZip: explicit,
+      myZip: LS.get('myZip', null),
+      sessionViewZip: SS.get('viewZip'),
+      defaultZip: CFG.DEFAULT_ZIP
+    });
+    if (z && z !== String(state.zip)) state.zip = z;   // setter re-paints + re-stamps nav
+    return String(state.zip);
+  };
+
+  // Click-time navigator for shell chrome that is NOT an <a> (the bell). Resolving
+  // through HS.navHref at the moment of the click means it can never carry a stale ZIP
+  // the way a string baked into partials/shell.html at inject time would — and it keeps
+  // the ban on hand-built '?zip=' concatenation intact.
+  HS.navTo = function (page) { location.href = HS.navHref(page, state.zip); };
+
   function paintNavHrefs() {
     if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
     const zip = state.zip;

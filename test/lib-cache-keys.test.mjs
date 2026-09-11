@@ -112,5 +112,25 @@ const stale = createHash('sha256').update(readFileSync(join(root, 'lib/map.js'))
 ok(stale !== key('lib/map.js'),
   '4b: a one-byte change produces a different key, which is what makes §1b unforgettable');
 
+// §5 — THE GENERATOR'S KEYS ARE LITERALS, AND NOTHING WAS CHECKING THEM.
+// scripts/gen_zip_pages.py writes the <script> tags for every canonical
+// /community/<zip>/ document as hardcoded strings. §1 scans committed *.html only, and
+// the generated documents are never committed (they exist only inside the Pages
+// artifact), so a shell.js edit left the generator pinning the PREVIOUS key with nothing
+// failing — measured: a Fix 6 edit staled it and the suite stayed green. Returning
+// visitors would then keep the cached old runtime on the ZIP pages while every other
+// page got the new one. The file comment above already claimed §1 "matches both"; this
+// is the assertion that makes that true.
+const gen = readFileSync(join(root, 'scripts/gen_zip_pages.py'), 'utf8');
+const genRe = /src="\/([a-z0-9/-]+\.js)\?v=([0-9a-f]{8})"/g;
+let g, seen = 0;
+while ((g = genRe.exec(gen))) {
+  seen++;
+  ok(g[2] === key(g[1]),
+    `5a: generator tag /${g[1]} carries its current content hash (?v=${key(g[1])}, found ${g[2]})`);
+}
+ok(seen >= CONTENT_KEYED.length - 1,
+  `5b: the generator scan actually matched tags (${seen}) — a regex that stops matching must not read as clean`);
+
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
