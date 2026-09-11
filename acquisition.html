@@ -209,7 +209,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button></nav>
   <main>
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -223,6 +223,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-acquisition"></div>
     <div class="tab" id="tab-videoproducer"></div>
     <div class="tab" id="tab-bluesky"></div>
+    <div class="tab" id="tab-premium"></div>
   </main>
   <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -458,6 +459,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireZipBehavior();
     wireAcqMetrics();
     wireBluesky();
+    wirePremiumWaitlist();
     stalenessBanner(p.meta);
   }
 
@@ -516,6 +518,57 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Community</th><th style="text-align:right">Requests</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'):'<div class="muted">No coverage requests yet.</div>')+
     '</div>';
   }
+  // ---- PREMIUM WAITLIST (gated RPC hs_premium_waitlist). The canonical store is
+  //      public.app_premium_waitlist; anon holds NO privilege on it, so this read is
+  //      SECURITY DEFINER + dashboard_admins, exactly like the other live tabs.
+  //      Gate 5: the overview KPI and the lead log come from ONE call over ONE table,
+  //      so the headline number and the rows below it cannot drift apart. ----
+  function premiumKpis(w){
+    return '<div class="grid" style="margin-bottom:14px">'+
+      liveTile('Premium prospects', w.total||0, 'canonical app_premium_waitlist')+
+      liveTile('Last 7 days', w.last_7d||0, (w.last_30d||0)+' in last 30 days')+
+      liveTile('With ZIP context', w.with_zip||0, 'captured only where the URL stated a ZIP')+
+    '</div>';
+  }
+  function premiumWaitlistCard(w){
+    w=w||{};
+    var rows=(w.rows||[]).map(function(r){
+      var when=r.created_at?esc(String(r.created_at).replace('T',' ').slice(0,16)):'—';
+      return '<tr><td>'+esc(r.email||'—')+'</td>'+
+        '<td class="muted" style="font-variant-numeric:tabular-nums">'+when+'</td>'+
+        '<td class="muted">'+(r.source?esc(r.source):'—')+'</td>'+
+        '<td style="font-variant-numeric:tabular-nums">'+(r.zip?esc(r.zip):'—')+'</td></tr>';
+    }).join('');
+    var capped=(w.rows||[]).length>=(w.row_limit||500);
+    return '<div class="card"><h3>Premium waitlist <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Everyone who asked to be told when Premium launches, newest first. Source is the page the signup came from; ZIP appears only where the URL itself stated one — it is never inferred.</p>'+
+      premiumKpis(w)+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Email</th><th>Joined</th><th>Source</th><th>ZIP</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        (capped?'<p class="sub" style="margin-top:8px">Showing the newest '+(w.row_limit||500)+'. The count above is unfiltered.</p>':''))
+        :'<div class="muted">No Premium prospects yet.</div>')+
+    '</div>';
+  }
+  async function wirePremiumWaitlist(){
+    var tab=$('tab-premium'); if(!tab) return;
+    try{
+      var r=await window.hsClient.rpc('hs_premium_waitlist');
+      if(r.error || !r.data){
+        tab.innerHTML='<div class="card"><h3>Premium waitlist</h3><p class="sub">Could not load the waitlist just now.</p></div>';
+        return;
+      }
+      tab.innerHTML=premiumWaitlistCard(r.data);
+      // Gate 5 — the same payload also supplies the overview tile on tab 1.
+      var exec=$('tab-exec');
+      if(exec && !document.getElementById('acq-premium-kpi')){
+        var box=document.createElement('div'); box.id='acq-premium-kpi';
+        box.innerHTML='<div class="card"><h3>Premium demand <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+          '<p class="sub">Interest in paid Premium, from the same canonical record as the Premium Waitlist tab.</p>'+
+          premiumKpis(r.data)+'</div>';
+        exec.appendChild(box);
+      }
+    }catch(e){}
+  }
+
   async function wireAcqLive(){
     var host=$('tab-exec'); if(!host) return;
     try{

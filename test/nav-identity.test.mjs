@@ -234,8 +234,16 @@ for (const gone of ['Share this report', 'Community Snapshot', 'Impact Analysis'
     'the retired Reports prototype stays retired — reports.html has no "' + gone + '"');
 
 // Nothing is generated here: the page must not grow an export, a write or a paywall.
-ok(!/text\/csv|\.pdf|jsPDF|download|supabase\.from\(|\.insert\(|paywall|premium/i.test(reportsCode),
-  'reports.html generates nothing — no PDF, CSV, download, write or gate was invented');
+// Scoped to the page's OWN markup and logic: a <script src> to a shared-shell module is
+// not something this page does, and matching one would make the pin fire on a filename.
+// (lib/premium-waitlist.js loads on all 13 shell pages because the Premium modal lives in
+// partials/shell.html; dropping it here would silently break capture on this page alone.)
+// The repo has paid for this shape before — a pin that names the string it forbids must be
+// scoped to the statement it is about, or it stops guarding by becoming noise.
+const reportsLogic = reportsCode.replace(/<script\s+src="[^"]*"\s*><\/script>/g, '');
+ok(!/text\/csv|\.pdf|jsPDF|download|supabase\.from\(|\.insert\(|paywall|premium/i.test(reportsLogic),
+  'reports.html generates nothing — no PDF, CSV, download, write or gate was invented',
+  (reportsLogic.match(/.{0,40}(text\/csv|\.pdf|jsPDF|download|paywall|premium).{0,40}/i) || [])[0]);
 
 // ── the consumer must still exist, or this whole contract is decoration ──────────────────
 const shellJs = read('shell.js');
