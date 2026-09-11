@@ -31,7 +31,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // the same class of silent failure, and #1089's search fix was the first to ship behind
 // exactly that risk. Its tags are written as src="shell.js" on the 14 pages and as
 // src="/shell.js" by the generator (which carries <base href="/">), so §1 matches both.
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js'];
+const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-page.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -54,14 +54,14 @@ CONTENT_KEYED.forEach((rel) => {
     + (wrong.length ? ` — stale: ${wrong.map((w) => w.page + ' (' + w.key + ')').join(', ')}` : ''));
 });
 
-// §2 — the KEYLESS set may not grow. Nine other libs carry no ?v= at all, which is the
+// §2 — the KEYLESS set may not grow. Other libs carry no ?v= at all, which is the
 // same latent defect: a fix in one of them would ship, deploy green, and never reach a
 // browser that already has the file. They are NOT keyed here — that is a product-wide
 // change nobody asked for, in a session that has already produced several surprises, and
 // each one needs the same check for hard-coded URL references that caught
 // scripts/verify-map-markers.mjs. So the set is PINNED at its measured membership: a NEW
-// keyless lib fails immediately, and closing the existing nine stays a deliberate act.
-// ⚠️ MEASURED, NOT FIXED — the nine are listed so this is a record, not a silence.
+// keyless lib fails immediately, and closing a remaining keyless lib stays a deliberate act.
+// ⚠️ MEASURED, NOT FIXED — the remaining keyless scripts are listed so this is a record, not a silence.
 // ⚠️ WIDENED from `lib/*.js` to EVERY same-origin script. The original sweep could only
 // ever see lib/, so a keyless script anywhere else was not "known" — it was invisible.
 // shell.js was keyless on all 14 pages for the life of the repo and this pin reported
@@ -69,7 +69,7 @@ CONTENT_KEYED.forEach((rel) => {
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
   'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
-  'lib/community-page.js', 'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
+  'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
   'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
 // A leading "/" is the generator's absolute form, not a different file (same rule as
