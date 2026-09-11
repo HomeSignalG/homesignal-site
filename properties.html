@@ -14,7 +14,7 @@
     <div class="ph">
       <div class="eyebrow">My Places</div>
       <h1>My Places</h1>
-      <p>Everything HomeSignal watches for you. An <b>Address</b> is one home; a <b>ZIP&nbsp;Code</b> is a whole community. Each is watched independently, and you're alerted when something changes.</p>
+      <p>Everything HomeSignal watches for you. An <b>Address</b> is one home; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>projects</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a project does not turn on email alerts.</p>
     </div>
     <div class="strip" id="propStrip"></div>
     <div class="toolbar toolbar--lead">
@@ -22,6 +22,7 @@
         <button class="on" type="button" data-view="all">All</button>
         <button type="button" data-view="addresses">Addresses</button>
         <button type="button" data-view="zips">ZIP Codes</button>
+        <button type="button" data-view="projects">Projects</button>
       </div>
       <div class="sp"></div>
       <button class="addbtn" type="button" id="plAddAddress">+ Add Address</button>
@@ -38,15 +39,16 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=ed1c97fb"></script>
+<script src="shell.js?v=e47c81a7"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
   // Never hang silently: a failed read renders an honest retry state.
-  var changes, projects;
+  var changes, projects, followedProjects;
   try {
     changes = await HS.data.changes(S.zip, null);
     projects = await HS.data.projects(S.zip, null);
+    followedProjects = await loadFollowedProjects();
   } catch (e) {
     console.warn('[my places] data load failed', e);
     document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load My Places</h1>'
@@ -61,8 +63,24 @@ HS.onReady(async function () {
   // They are NOT merged into one collection and a ZIP Code is never written into
   // app_properties. My Places is the one management CONTAINER; the underlying types,
   // workflows and destinations stay exactly as they already were.
+  // Followed projects are listed here too (app_follows target_type=project) so
+  // "Add to My Places to follow" is truthful. They are not a Place type: they do
+  // not count in Places Monitored and have no "+ Add Project" writer.
   function addresses() { return S.properties || []; }
   function zips() { return HS.followedCommunities ? HS.followedCommunities() : []; }
+  async function loadFollowedProjects() {
+    var ids = HS.followedProjectIds ? HS.followedProjectIds() : [];
+    if (!ids.length) return [];
+    var rows = [];
+    try {
+      rows = HS.data.projectsByIds ? await HS.data.projectsByIds(ids) : [];
+    } catch (e) { rows = []; }
+    var byId = {};
+    (rows || []).forEach(function (p) { if (p && p.id != null) byId[String(p.id)] = p; });
+    return ids.map(function (id) {
+      return byId[String(id)] || { id: id, name: 'Followed project', _unresolved: true };
+    });
+  }
 
   var view = 'all';
 
@@ -119,9 +137,43 @@ HS.onReady(async function () {
       + '</div></div></div>';
   }
 
+  function projectLocationLine(p) {
+    if (!p || p._unresolved) return 'Location not listed on this project record';
+    var bits = [];
+    if (p.address) bits.push(String(p.address));
+    if (p.zip) bits.push('ZIP ' + String(p.zip));
+    if (bits.length) return bits.join(' · ');
+    return 'Location not listed on this project record';
+  }
+
+  function projectCard(p) {
+    var loc = projectLocationLine(p);
+    var sub = p.status || p.type || 'Followed project';
+    var hrefOpts = { id: p.id };
+    if (p.zip && /^\d{5}$/.test(String(p.zip))) hrefOpts.zip = String(p.zip);
+    var href = HS.pageHref ? HS.pageHref('development.html', hrefOpts)
+      : ('development.html?id=' + encodeURIComponent(p.id) + (hrefOpts.zip ? '&zip=' + encodeURIComponent(hrefOpts.zip) : ''));
+    return '<div class="propcard" data-kind="project" data-id="' + HS.esc(p.id) + '" data-href="' + HS.esc(href) + '">'
+      + '<div class="miniscore">◎</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:var(--ink-2)">' + typeChip('Project') + (sub ? ' · ' + HS.esc(sub) : '') + '</div>'
+      + '<h3>' + HS.esc(p.name || 'Followed project') + '</h3>'
+      + '<div class="paddr">' + HS.esc(loc) + '</div>'
+      + '<div class="pmeta"><span style="color:var(--ink-3)">Followed in My Places. Does not turn on email alerts.</span></div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="unfollow-project" data-id="' + HS.esc(p.id) + '">Unfollow</button>'
+      + '</div></div></div>';
+  }
+
   // Empty states are PER VIEW. An empty ZIP Codes view while Addresses exist is a true
   // statement about that type, not a defect — so each view says what is actually missing.
   function emptyCard(kind) {
+    if (kind === 'projects') {
+      return '<div class="propcard" style="border-style:dashed;justify-content:center">'
+        + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">No projects followed yet</div>'
+        + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">Open a project and tap Add to My Places to follow. Followed projects appear here so you can reopen them. This does not turn on email alerts.</div>'
+        + '</div></div>';
+    }
     var copy = kind === 'zips'
       ? { t: 'No ZIP Codes yet', d: 'Follow a ZIP Code to watch a whole community.', btn: '+ Add ZIP Code', act: 'add-zip' }
       : { t: 'No Addresses yet', d: 'Add a home and we\'ll watch official records around it.', btn: '+ Add Address', act: 'add-address' };
@@ -133,19 +185,29 @@ HS.onReady(async function () {
 
   function render() {
     strip();
-    var a = addresses(), z = zips(), html = '';
+    var a = addresses(), z = zips(), p = followedProjects || [];
+    var html = '';
     var vb = document.getElementById('plViews');
     if (vb) [].forEach.call(vb.querySelectorAll('button'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-view') === view);
       var k = b.getAttribute('data-view');
-      var n = k === 'addresses' ? a.length : k === 'zips' ? z.length : a.length + z.length;
-      b.textContent = (k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : 'ZIP Codes') + ' (' + n + ')';
+      var n = k === 'addresses' ? a.length
+        : k === 'zips' ? z.length
+        : k === 'projects' ? p.length
+        : a.length + z.length + p.length;
+      var label = k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : k === 'zips' ? 'ZIP Codes' : 'Projects';
+      b.textContent = label + ' (' + n + ')';
     });
     if (view === 'all' || view === 'addresses') {
       html += a.length ? a.map(addressCard).join('') : emptyCard('addresses');
     }
     if (view === 'all' || view === 'zips') {
       html += z.length ? z.map(zipCard).join('') : emptyCard('zips');
+    }
+    if (view === 'projects') {
+      html += p.length ? p.map(projectCard).join('') : emptyCard('projects');
+    } else if (view === 'all' && p.length) {
+      html += p.map(projectCard).join('');
     }
     document.getElementById('propGrid').innerHTML = html;
   }
@@ -185,6 +247,14 @@ HS.onReady(async function () {
         HS.unfollowCommunity(zip);
         render(); return;
       }
+      if (act === 'unfollow-project') {
+        var pid = btn.getAttribute('data-id');
+        if (!pid) return;
+        if (!window.confirm('Stop following this project?\n\nIt will leave My Places. This does not change email alerts. Your Addresses and ZIP Codes are not affected.')) return;
+        if (HS.unfollowProject) await HS.unfollowProject(pid);
+        followedProjects = (followedProjects || []).filter(function (row) { return String(row.id) !== String(pid); });
+        render(); return;
+      }
       return;
     }
     // Card body click -> the type's EXISTING destination, unchanged.
@@ -192,7 +262,9 @@ HS.onReady(async function () {
     if (acard) { HS.selectProperty(acard.getAttribute('data-id'));
       location.href = 'property.html?id=' + encodeURIComponent(acard.getAttribute('data-id')); return; }
     var zcard = e.target.closest('[data-kind="zip"]');
-    if (zcard) { location.href = zcard.getAttribute('data-href'); }
+    if (zcard) { location.href = zcard.getAttribute('data-href'); return; }
+    var pcard = e.target.closest('[data-kind="project"]');
+    if (pcard) { location.href = pcard.getAttribute('data-href'); }
   });
 
   render();

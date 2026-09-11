@@ -88,7 +88,9 @@ ok(!/from\('app_watches'\)|toggleFollow\([^)]*'watch'/.test(map),
   'DEFERRED DF-005 ...and no watch data model was wired');
 // A-023's three controls must stay three DIFFERENT things.
 ok(read('property.html').includes("HS.toggleFollow(this,\\'property\\'"), 'SHIPPED A-023 "Watch this property" is LIVE');
-ok(dev.includes("HS.toggleFollow(this,\\'project\\'"), 'SHIPPED A-023 "Follow this project" is LIVE');
+ok(dev.includes("HS.toggleFollow(this,\\'project\\'"), 'SHIPPED A-023 project follow is LIVE');
+ok(/Add to My Places to follow/.test(dev) && /Following in My Places/.test(dev),
+  'SHIPPED A-023 project follow copy names My Places');
 ok(/id='propWatch'>Watch this address</.test(map), 'SHIPPED A-023 ...and the map Watch is a third, still-stubbed control');
 
 // ── LEFTOVERS: measured, recorded, and deliberately NOT closed ───────────────────────────
