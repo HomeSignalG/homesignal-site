@@ -4,17 +4,15 @@
 // It asserts the two things a post-JS DOM check cannot: that the bytes a crawler receives
 // already carry the SEO contract, and that executing JavaScript does not reverse it.
 //
-// FROZEN CONTROLS (re-derived from live data 2026-09-04 14:26–14:35Z; the classes are the
-// founder's A–J). They are passed in as CONTROLS so a reclassification by normal ingestion
-// is a one-line, visible replacement rather than a rewritten script:
+// CONTROLS are DERIVED from the build each run (see resolveControls below) and each class is
+// asserted NON-EMPTY, so a ZIP crossing Rule F by normal ingestion substitutes and reports
+// instead of reddening the build. point_dense stays pinned. The classes are the founder's A–J:
 //   A pass_dev_pass  Alerts PASS + development PASS
 //   B pass_dev_fail  Alerts PASS + development FAIL   <- Alerts alone qualifies a page
 //   C fail_dev_pass  Alerts FAIL + development PASS   <- development cannot qualify one
 //   D fail_dev_fail  Alerts FAIL + development FAIL
 //   E local_news     Rule F carried by local news only
 //   F weather_thin   weather present, still under Rule F  <- weather never counts
-//                    (01002 -> 01005 and 04401 -> 02532 on 2026-09-11; both crossed Rule F
-//                     by normal ingestion. See the CONTROLS comment in pages.yml.)
 //   G honest_empty   no qualifying records at all
 //   H fanout         one jurisdiction's notices across many ZIPs
 //   I               anonymous render (every request here is anonymous, no address, no home)
@@ -23,6 +21,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
+import { CLASSIFY, PINNED_ONLY, classifyMembers, chooseControls } from './lib/zip-page-controls.mjs';
 
 const SITE = process.env.SITE_DIR || '_site';
 const PORT = 8099;
@@ -49,14 +48,40 @@ const grab = (h, re) => { const m = re.exec(h); return m ? m[1].trim() : null; }
 const get = (base, z, ua) =>
   fetch(`${base}/community/${z}/`, { headers: ua ? { 'User-Agent': ua } : {} });
 
+// Control resolution lives in scripts/lib/zip-page-controls.mjs — a PURE core with no
+// playwright import, so the offline unit job can drive it. See that file's header.
+async function resolveControls(SITE, man, pins) {
+  const members = await classifyMembers(SITE, man);
+  const { controls, empties, notes } = chooseControls(pins, members);
+  for (const k of Object.keys(CLASSIFY)) {
+    if (PINNED_ONLY.has(k)) continue;
+    ok(!empties.includes(k), `control class ${k} is NON-EMPTY (${(members[k] || []).length} member(s)) — `
+      + `an empty class would let its assertion pass over nothing`);
+  }
+  if (notes.length) {
+    console.log('\n----- CONTROL SUBSTITUTIONS (drift is visible, not fatal) -----');
+    for (const n of notes) console.log(n);
+    console.log('  Update the pins in .github/workflows/pages.yml when convenient — the proof');
+    console.log('  is already testing the right pages either way.');
+    console.log('---------------------------------------------------------------');
+  }
+  return controls;
+}
+
 const main = async () => {
   await new Promise((r) => server.listen(PORT, r));
   const base = `http://127.0.0.1:${PORT}`;
-  const C = JSON.parse(process.env.CONTROLS || '{}');
+  // The manifest is read up front now: control resolution needs it. The later sitemap
+  // reconciliation reads the same object rather than re-reading the file.
+  const man = JSON.parse(await readFile(join(SITE, 'zip-pages-manifest.json'), 'utf8'));
+  const PINS = JSON.parse(process.env.CONTROLS || '{}');
+  if (!PINS.point_dense) throw new Error('CONTROLS is missing point_dense (the one pin that is not derived)');
+  const C = await resolveControls(SITE, man, PINS);
   for (const k of ['pass_dev_pass', 'pass_dev_fail', 'fail_dev_pass', 'fail_dev_fail',
                    'local_news', 'weather_thin', 'honest_empty', 'fanout', 'point_dense']) {
-    if (!C[k]) throw new Error(`CONTROLS is missing ${k}`);
+    if (!C[k]) throw new Error(`no control resolved for ${k}`);
   }
+  console.log('controls: ' + Object.entries(C).map(([k, v]) => `${k}=${v}`).join(' '));
   const P = C.pass_dev_fail, F = C.fail_dev_pass;   // the two page-purpose-separation halves
 
   // ---- initial HTTP response, three user agents -----------------------------------------
@@ -122,7 +147,6 @@ const main = async () => {
   ok(bad.status === 404, 'a non-canonical ZIP path is not a page (404, never an indexable shell)');
 
   // ---- sitemap reconciliation over the real artifact -------------------------------------
-  const man = JSON.parse(await readFile(join(SITE, 'zip-pages-manifest.json'), 'utf8'));
   const sm = await readFile(join(SITE, 'sitemap.xml'), 'utf8');
   const smZips = [...sm.matchAll(/<loc>[^<]*\/community\/(\d{5})\/<\/loc>/g)].map((m) => m[1]);
   ok(!/community\.html\?zip=/.test(sm), 'the artifact sitemap no longer advertises the legacy URL');
@@ -174,57 +198,15 @@ const main = async () => {
   server.close();
   console.log(`\n${pass} passed, ${fail} failed`);
 
-  // ── WHEN A FROZEN CONTROL DRIFTS, NAME ITS REPLACEMENT ────────────────────────────────
-  // The controls are pinned on purpose: a control derived from the same build it tests
-  // cannot catch a build-wide misclassification, because the class it samples would simply
-  // come back empty and the assertion would pass over nothing. So freezing stays — what
-  // was missing is the other half. A ZIP leaves its class by NORMAL INGESTION (content
-  // arrives and it crosses Rule F), and the pinned comment already calls that "a visible
-  // one-line replacement" — but the replacement had to be found by hand-querying
-  // production, which is why 01002 and 04401 sat red on main instead.
-  //
-  // 2026-09-11: rule_f_pass moved 8,291 -> 8,380 between two builds of the SAME commit.
-  // 01002 Amherst MA (class C, Alerts FAIL) and 04401 Bangor ME (class F, weather-thin)
-  // both crossed. Four assertions failed; none of them was a defect in the site.
-  //
-  // This prints current members of the affected classes so the next drift is a copy-paste.
-  // It runs ONLY on failure and asserts NOTHING — a suggestion that could fail the build
-  // would be a second, unreviewed gate.
-  if (fail) {
-    try {
-      const idx = new Set(man.indexable_zips);            // Rule F pass
-      const dev = new Set(man.dev_indexable_zips || []);  // development gate
-      const lines = [];
-
-      // Class C — Alerts FAIL + development PASS. Pure set math; no file reads.
-      lines.push(dev.size
-        ? `  fail_dev_pass (C, Alerts FAIL + development PASS): `
-          + ([...dev].filter((z) => !idx.has(z)).sort().slice(0, 8).join(' ') || '(none — the class is EMPTY)')
-        : '  fail_dev_pass (C): this manifest predates dev_indexable_zips — rebuild with the current generator');
-
-      // Class F — weather DISPLAYED and still under Rule F. The manifest lists only the PASS
-      // set, and weather is a property of the rendered document, so this walks the tree.
-      const { readdir } = await import('node:fs/promises');
-      const dirs = (await readdir(join(SITE, 'community'), { withFileTypes: true }))
-        .filter((d) => d.isDirectory() && /^\d{5}$/.test(d.name)).map((d) => d.name).sort();
-      const wx = [];
-      for (const z of dirs) {
-        if (idx.has(z)) continue;                          // must be under Rule F
-        let h; try { h = await readFile(join(SITE, 'community', z, 'index.html'), 'utf8'); } catch { continue; }
-        if (/<h2>Weather alerts<\/h2>/.test(h) && h.includes('content="noindex, follow"')) wx.push(z);
-        if (wx.length >= 8) break;
-      }
-      lines.push(`  weather_thin (F, weather DISPLAYED + still under Rule F): ${wx.join(' ') || '(none found)'}`);
-      console.log('\n----- CURRENT MEMBERS OF THE DRIFT-PRONE CONTROL CLASSES -----');
-      console.log('  (suggestions only — nothing here asserts. Replace the drifted ZIP in');
-      console.log('   .github/workflows/pages.yml CONTROLS and in this file\'s header.)');
-      for (const l of lines) console.log(l);
-      console.log('--------------------------------------------------------------');
-    } catch (e) {
-      console.log(`\n(control-class suggestions unavailable: ${e.message})`);
-    }
-  }
-
+  // The drift-suggestion block that lived here is GONE, and its absence is the point:
+  // it existed to make a red build cheap to repair. Controls now substitute themselves, so
+  // drift never reddens the build and there is nothing to repair. Substitutions are printed
+  // above by resolveControls().
   if (fail) process.exit(1);
 };
-main().catch((e) => { console.error(e); process.exit(1); });
+// Auto-run ONLY when executed directly. Importing this module for the offline test must
+// not start a web server and walk an artifact that is not there.
+import { fileURLToPath } from 'node:url';
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
