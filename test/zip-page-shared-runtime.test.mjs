@@ -31,7 +31,7 @@ const ok = (c, name, detail) => {
 
 // A leading "/" is the only legitimate difference: the generated document sits two levels
 // deep and carries <base href="/">, so it names its scripts absolutely.
-const norm = (u) => String(u).replace(/^\//, '');
+const norm = (u) => String(u).replace(/^\//, '').replace(/\?.*$/, '');
 
 const htmlScripts = (html) =>
   [...html.matchAll(/<script\s+src="([^"]+)"/g)].map((m) => norm(m[1]));

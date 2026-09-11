@@ -19,7 +19,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fail++; console.error('FAIL —', m); } };
 
 // ---- ONE shared implementation (CLAUDE.md §0) -------------------------------------------
-ok(/<script src="lib\/community-page\.js"><\/script>/.test(legacy),
+ok(/<script src="lib\/community-page\.js(?:\?v=[a-f0-9]+)?">\s*<\/script>/.test(legacy),
    'community.html loads the ONE shared runtime rather than carrying its own copy');
 ok(!/HS\.onReady\(async function/.test(legacy),
    'community.html no longer inlines a second implementation of the page');
