@@ -200,7 +200,7 @@ ok(/We're working on this feature now\. Check back soon\./.test(reportsSrc),
   'reports.html says "We\'re working on this feature now. Check back soon."');
 
 // The CTA reaches it, keeps its label, and carries the ORIGINATING Address.
-ok(/Generate property report/.test(propSrc),
+ok(/id="propReportBtn"/.test(propSrc) && /Generate property report/.test(propSrc),
   'property.html still offers "Generate property report" — the label did not change');
 ok(/location\.href=\\'reports\.html\?id=' \+ encodeURIComponent\(p\.id\)/.test(propSrc),
   'property.html routes that CTA to reports.html carrying THIS Address\'s id',

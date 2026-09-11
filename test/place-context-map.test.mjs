@@ -235,5 +235,32 @@ for (const [label, src, raw] of [['property.html', prop, propRaw], ['lib/communi
     + 'chrome and all, inside a Place', (raw.match(/<iframe[^>]*>/) || [])[0]);
 }
 
+// ── §14 the map must not bury "Generate property report" ────────────────────────────────
+// PCM-1's position is still "between the header and What's changing". That means the FIRST
+// CELL of the left column of .cols, not a full-width sibling above the grid. A 320–520px
+// iframe above .cols pushed the actions rail below the fold on a 1280×720 laptop. Demo/seed
+// Addresses skip the map, so a seed-only browser pass cannot see this — the pin is on the
+// concatenation order, which is what production saved homes actually render.
+const colsOpen = prop.indexOf("'<div class=\"cols\" id=\"propCols\"><div>'");
+const mapUse   = prop.indexOf('+ contextMap');
+const changing = prop.indexOf("What\\'s changing near this property");
+ok(colsOpen >= 0, '14a the Address grid is #propCols — the stacked-order rule is scoped to this page');
+ok(mapUse > colsOpen,
+  '14b the Address map is concatenated INSIDE .cols, after the grid opens — not as a full-width sibling above it',
+  'colsOpen=' + colsOpen + ' mapUse=' + mapUse);
+ok(changing > mapUse,
+  '14c ...and still BEFORE "What\'s changing" — PCM-1\'s position, not a relocation',
+  'mapUse=' + mapUse + ' changing=' + changing);
+ok(/id="propReportBtn"/.test(prop),
+  '14d Generate property report has a stable id, so a buried CTA is measurable');
+ok(prop.indexOf("What you can do") < prop.indexOf("Property vitals"),
+  '14d2 the actions block leads the right rail — vitals under it still left the CTA 4px below a 720px laptop viewport');
+const cssSrc = read('app.css');
+const mq900 = cssSrc.slice(cssSrc.indexOf('@media (max-width: 900px)'), cssSrc.indexOf('@media (max-width: 620px)'));
+ok(/#propCols\s*>\s*:last-child\s*\{[^}]*order:\s*-1/.test(mq900),
+  '14e stacked, the actions column paints FIRST — otherwise the map still buries the CTA on a phone');
+ok(!/#propCols/.test(code(read('dashboard.html'))) && !/#propCols/.test(code(read('development.html'))),
+  '14f ...and no other container page reused that id, so the order rule cannot leak');
+
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);

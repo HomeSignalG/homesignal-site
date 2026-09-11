@@ -86,6 +86,14 @@ HS.onReady(async function () {
   // test for "WHICH of my places is my residence" and the wrong one here — this page is
   // already about THIS Address, so that clause would suppress the map on a genuine saved
   // Address that simply carries a different label.
+  //
+  // THE MAP LIVES IN THE LEFT COLUMN OF .cols, NOT AS A FULL-WIDTH SIBLING ABOVE IT.
+  // PCM-1's position is still "between the address identity header and What's changing" —
+  // that is the first cell of the left column. A full-width iframe (clamp 320–520px) above
+  // .cols pushed "Generate property report" below the fold on a 1280×720 laptop. Demo/seed
+  // Addresses skip the map, so a seed-only browser pass cannot see this; production saved
+  // homes always have a real point and always get the map. Reports stays out of the sidebar
+  // (A-021); the CTA stays where it is, just findable again.
   var realAddress = pcmHasPoint(p) && !p.sample && !p.demo;
   var contextMap = realAddress
     ? '<div class="block" id="propContext">'
@@ -106,8 +114,8 @@ HS.onReady(async function () {
     '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
     + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
     + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + '<div class="cols" id="propCols"><div>'
     + contextMap
-    + '<div class="cols"><div>'
     + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
     + near.map(function (pr) {
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
@@ -122,13 +130,6 @@ HS.onReady(async function () {
     + '<p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">From the flood-zone, wildfire and climate data we track for this area.</p></div>'
     + '<div class="block"><h2 class="bt">This property\'s timeline</h2><div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
     + '</div><div>'
-    + '<div class="block"><h2 class="bt">Property vitals</h2>'
-    + '<div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">' + HS.tpl.scoreRing(p.score)
-    + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
-    + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
-    + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
-    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
-    + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
     + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
     + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
     // A-019 sent this at dashboard.html#dashReports, whose "Property Intelligence Report"
@@ -136,8 +137,18 @@ HS.onReady(async function () {
     // opens the public-beta in-progress state, carrying THIS Address's id on the app's own
     // ?id= property route so "Back to property" returns here and not to some other Address.
     // The label is unchanged, deliberately: what is wrong is the answer, not the offer.
-    + '<button class="btn" onclick="location.href=\'reports.html?id=' + encodeURIComponent(p.id) + '\'">Generate property report</button>'
+    // This block leads the right rail on purpose: Property vitals used to sit above it, and
+    // with the context map in the left column that still left the CTA 4px below a 1280×720
+    // laptop viewport (measured). Actions first, vitals second.
+    + '<button class="btn" id="propReportBtn" onclick="location.href=\'reports.html?id=' + encodeURIComponent(p.id) + '\'">Generate property report</button>'
     + '</div></div>'
+    + '<div class="block"><h2 class="bt">Property vitals</h2>'
+    + '<div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">' + HS.tpl.scoreRing(p.score)
+    + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
+    + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
+    + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
+    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
+    + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
     + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
