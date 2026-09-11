@@ -203,8 +203,11 @@
       <div id="premiumForm">
         <div class="field">
           <input id="premiumEmail" type="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')HS.submitWaitlist()">
-          <button class="mbtn" type="button" onclick="HS.submitWaitlist()">Notify me</button>
+          <button class="mbtn" type="button" id="premiumSubmit" onclick="HS.submitWaitlist()">Notify me</button>
         </div>
+        <!-- Shown ONLY when the canonical store refused the write. The entered address
+             stays in the field above so the retry costs the visitor nothing. -->
+        <div id="premiumError" class="mnote hidden" role="alert" aria-live="polite" style="color:#c23b34"></div>
         <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
       </div>
       <div id="premiumDone" class="success hidden">
