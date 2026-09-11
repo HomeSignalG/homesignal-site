@@ -1293,7 +1293,7 @@
       HS.esc(c.name || ('ZIP ' + c.zip)) + '</a>').join('');
     const emptyLabel = opts.zipLabels
       ? 'No ZIP codes yet.'
-      : 'No communities yet.';
+      : 'No zip codes yet.';
     const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
     return '<div class="chips">' + empty + chips +

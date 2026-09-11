@@ -42,6 +42,8 @@ ok(!/Follow this community/.test(cpage) && !/Your communities/.test(cpage),
   'A-002 the public ZIP page no longer calls a ZIP a community');
 ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHtml),
   'A-002 the loc-modal no longer calls a ZIP a community');
+ok(/No zip codes yet\./.test(shell) && !/No communities yet\./.test(shell),
+  'A-002 the ZIP follow-strip empty state says zip codes');
 
 // ---- A-010: three views, two distinct primary actions, no generic add -------------------
 for (const v of ['data-view="all"', 'data-view="addresses"', 'data-view="zips"'])
