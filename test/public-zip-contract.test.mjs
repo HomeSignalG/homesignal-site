@@ -4,10 +4,10 @@
 // search crawler see, and every phase of this rebuild has touched the shared shell that
 // renders it. The contract is entirely "change nothing", which is the kind that erodes in
 // silence: nothing fails when JSON-LD is added because it "helps SEO", when a locked
-// placeholder is switched on, when the public Follow copy is renamed to match the logged-in
-// vocabulary, when View Development Map is retargeted at the list, when the Local News cap
-// moves, or — worst — when JavaScript starts writing #robots-meta and a page can promote
-// itself client-side. This file is the thing that fails.
+// placeholder is switched on, when the ZIP-page Follow copy is renamed away from
+// zip-code language, when View Development Map is retargeted at the list, when the Local
+// News cap moves, or — worst — when JavaScript starts writing #robots-meta and a page can
+// promote itself client-side. This file is the thing that fails.
 //
 // TWO SCOPE RULES, both deliberate and both load-bearing:
 //   1. It does NOT assert that #zip-health-authed is absent from lib/community-page.js.
@@ -92,8 +92,14 @@ for (const [f, body] of [['lib/community-page.js', cp], ['scripts/gen_zip_pages.
 }
 
 // ---- PS-001 PRODUCT ENTRY: the public page's own copy and targets ----
-ok(cp.includes('＋ Follow this community') && cp.includes('✓ Following'),
-  'PS-001 the public Follow copy is unchanged (U+FF0B), including its followed state');
+ok(cp.includes('＋ Follow this zip code') && cp.includes('✓ Following'),
+  'PS-001 the public Follow copy is ZIP-code language (U+FF0B), including its followed state');
+ok(cp.includes("What\\'s changing across your zip code"),
+  'PS-001 the standfirst names the zip code, not a community');
+ok(cp.includes('eyebrow">ZIP Codes<') && cp.includes('Your zip codes'),
+  'PS-001 the page eyebrow and followed-list heading say ZIP Codes');
+ok(/class="eyebrow">ZIP Codes<\/p>/.test(gen),
+  'PS-001 the generated document\'s SSR eyebrow is ZIP Codes too');
 ok(/id="commFollowBtn"/.test(cp), 'PS-001 ...on the same control id');
 ok(/View Development Map →/.test(cp) && /HS\.navHref\('homesignalmap\.html', zip\)/.test(cp),
   'PS-001 "View Development Map →" still targets Map 1, not the development list');

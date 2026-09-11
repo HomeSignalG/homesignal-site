@@ -297,7 +297,7 @@ def render(p, built):
              f'<a href="/">HomeSignal home</a> · '
              f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
     body = (
-        f'<main id="hs-ssr"><header><p class="eyebrow">Communities</p>'
+        f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
         f'<p>Government notices, public meetings and local news that apply to the whole of '
         f'ZIP {esc(z)}{county_bit}.</p></header>'

@@ -57,27 +57,27 @@
   </div><!-- /.main -->
 </div><!-- /.app -->
 
-<!-- ======= LOCATION / REQUEST COMMUNITY MODAL ======= -->
+<!-- ======= LOCATION / REQUEST ZIP CODE MODAL ======= -->
 <div class="overlay" id="locModal" onclick="if(event.target===this)HS.closeModal('locModal')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="locModalTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('locModal')" aria-label="Close">✕</button>
-      <span class="mbadge">◉ Your community</span>
-      <h3 id="locModalTitle">Change your community</h3>
+      <span class="mbadge">◉ Your zip code</span>
+      <h3 id="locModalTitle">Change your zip code</h3>
       <p class="msub">Enter a ZIP code to open what's changing around that area.</p>
     </div>
     <div class="mbody">
       <div id="locForm">
         <div class="field">
           <input id="locZip" inputmode="numeric" maxlength="5" placeholder="Enter ZIP (e.g., 78617)" onkeydown="if(event.key==='Enter')HS.findCommunity()">
-          <button class="mbtn" type="button" onclick="HS.findCommunity()">Find my community</button>
+          <button class="mbtn" type="button" onclick="HS.findCommunity()">Find my zip code</button>
         </div>
       </div>
       <div id="locRequest" class="hidden">
         <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">—</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
         <div class="field" style="flex-direction:column;gap:10px">
           <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')HS.submitRequest()">
-          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my community</button>
+          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my zip code</button>
         </div>
         <div class="mnote">We'll only email you when your area goes live. No spam.</div>
       </div>
@@ -263,7 +263,7 @@
             <b>We're not in <span id="onbUncoveredZip">—</span> yet</b> — add your email and we'll notify you when your area goes live.
           </div>
           <input id="onbReqEmail" type="email" placeholder="Your email" class="onb-input">
-          <button type="button" class="onb-btn onb-btn-secondary" id="onbReqBtn">Request my community</button>
+          <button type="button" class="onb-btn onb-btn-secondary" id="onbReqBtn">Request my zip code</button>
         </div>
       </section>
 
