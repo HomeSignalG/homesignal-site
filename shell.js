@@ -1268,7 +1268,11 @@
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
-    if (strip) strip.innerHTML = HS.communitiesStripHTML();
+    if (strip) {
+      // Dashboard has its own "+ Add ZIP Code" addbtn; do not also restore the dashed chip.
+      const hideAdd = strip.id === 'dashCommunities';
+      strip.innerHTML = HS.communitiesStripHTML(hideAdd ? { zipLabels: true, hideAdd: true } : {});
+    }
   };
 
   // Bridge the app -> digest system. Following an area (save-home, ZIP lookup, or the
@@ -1377,8 +1381,9 @@
       : 'No zip codes yet.';
     const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
-    return '<div class="chips">' + empty + chips +
-      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button></div>';
+    const add = opts.hideAdd ? ''
+      : '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button>';
+    return '<div class="chips">' + empty + chips + add + '</div>';
   };
 
   // -------------------------------------------------- topic prefs (hydrate) -----
