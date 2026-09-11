@@ -15,7 +15,12 @@
 //   2. a pin that has drifted SUBSTITUTES        (drift is visible, never an outage)
 //   3. a class with no members is EMPTY          (the build-wide misclassification, loud)
 // Run: node scripts/run-unit-tests.mjs   (or: node test/zip-pages-controls.test.mjs)
-import { classifyMembers, chooseControls } from '../scripts/prove-zip-pages.mjs';
+// Imports the PURE LIB, never scripts/prove-zip-pages.mjs — that module imports playwright,
+// which the offline unit job does not install. Importing it here passed locally (this sandbox
+// has playwright globally) and failed in CI, and the runner could not warn because it detects
+// browser suites by text-matching the TEST FILE for a playwright import, which cannot see a
+// transitive one.
+import { classifyMembers, chooseControls } from '../scripts/lib/zip-page-controls.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -113,6 +118,39 @@ const main = async () => {
     catch (e) { threw = e.message; }
     ok('a manifest without dev_indexable_zips FAILS CLOSED rather than classifying every ZIP as dev-fail',
       /dev_indexable_zips/.test(threw || ''), String(threw));
+  }
+
+  console.log('\n5) NO OFFLINE SUITE MAY REACH PLAYWRIGHT THROUGH A TRANSITIVE IMPORT');
+  {
+    // THE RUNNER CANNOT CATCH THIS AND THAT IS WHY THE CHECK LIVES HERE.
+    // scripts/run-unit-tests.mjs classifies a suite by text-matching
+    // /(?:from|import\(|require\()\s*['"]playwright['"]/ against the TEST FILE ITSELF. A file
+    // that imports a module that imports playwright reads as offline, is run in the job that
+    // installs no playwright, and dies there — while passing on any machine that happens to
+    // have playwright installed, which is how this shipped to CI once already.
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const { dirname, resolve, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const testDir = dirname(fileURLToPath(import.meta.url));
+    const PW = /(?:from|import\(|require\()\s*['"]playwright['"]/;
+    const reaches = (entry) => {
+      const seen = new Set(); const stack = [entry];
+      while (stack.length) {
+        const f = stack.pop(); if (seen.has(f)) continue; seen.add(f);
+        let src; try { src = readFileSync(f, 'utf8'); } catch { continue; }
+        if (f !== entry && PW.test(src)) return f;      // a DEPENDENCY pulls it in
+        for (const m of src.matchAll(/(?:from|import\(|require\()\s*['"](\.[^'"]+)['"]/g)) {
+          stack.push(resolve(dirname(f), m[1]));
+        }
+      }
+      return null;
+    };
+    const offline = readdirSync(testDir).filter((f) => f.endsWith('.test.mjs'))
+      .filter((f) => !PW.test(readFileSync(join(testDir, f), 'utf8')));  // the runner's own rule
+    ok(`the runner sees offline suites to check (${offline.length})`, offline.length > 0);
+    const bad = offline.map((f) => [f, reaches(join(testDir, f))]).filter(([, v]) => v);
+    ok('no offline suite reaches playwright transitively', bad.length === 0,
+      bad.map(([f, v]) => `${f} -> ${v}`).join(', '));
   }
 
   console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} control-resolution checks passed.`);
