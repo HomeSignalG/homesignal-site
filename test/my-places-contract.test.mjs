@@ -45,13 +45,15 @@ ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHt
 ok(/No zip codes yet\./.test(shell) && !/No communities yet\./.test(shell),
   'A-002 the ZIP follow-strip empty state says zip codes');
 
-// ---- A-010: three views, two distinct primary actions, no generic add -------------------
-for (const v of ['data-view="all"', 'data-view="addresses"', 'data-view="zips"'])
+// ---- A-010: views, two distinct primary Place actions, no generic add -------------------
+for (const v of ['data-view="all"', 'data-view="addresses"', 'data-view="zips"', 'data-view="projects"'])
   ok(props.includes(v), 'A-010 My Places has view ' + v);
 ok(/id="plAddAddress"[^>]*>\+ Add Address</.test(props), 'A-010 primary action "+ Add Address"');
 ok(/id="plAddZip"[^>]*>\+ Add ZIP Code</.test(props), 'A-010 primary action "+ Add ZIP Code"');
 ok(!/\+ Add a Place\b/.test(props) && !/\+ Add a Place\b/.test(dash) && !/\+ Add a Place\b/.test(shellHtml),
   'A-010 no generic "+ Add a Place"');
+ok(!/\+ Add Project\b/.test(props),
+  'A-010 no "+ Add Project" writer — projects enter My Places from the project page');
 // the two adds must reuse the EXISTING workflows, not introduce second writers
 ok(/plAddAddress'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(props),
   'A-010 "+ Add Address" reuses the existing HS.addHome Census flow');
@@ -60,6 +62,12 @@ ok(/plAddZip'\)\.addEventListener\('click', function \(\) \{ HS\.openLoc\(\); \}
 // the two TYPES must come from their two EXISTING stores
 ok(/S\.properties/.test(props) && /HS\.followedCommunities/.test(props),
   'A-010 Addresses come from app_properties and ZIP Codes from followedCommunities');
+ok(/HS\.followedProjectIds/.test(props) && /HS\.data\.projectsByIds/.test(props),
+  'Fix 1 My Places lists followed projects from followedProjectIds + projectsByIds');
+ok(/data-kind="project"/.test(props) && /data-act="unfollow-project"/.test(props),
+  'Fix 1 followed projects render as a distinct Project card with Unfollow');
+ok(/statTile\(a\.length \+ z\.length, 'Places'/.test(props),
+  'Places strip still counts Addresses + ZIP Codes only');
 ok(!/from\('app_properties'\)[\s\S]{0,200}?target_type/.test(shell),
   'A-010 a ZIP Code is never written into app_properties');
 
@@ -82,6 +90,8 @@ ok(/followedCommunities/.test(switcherFn) && /state\.properties/.test(switcherFn
   'A-010 openSwitcher reads Addresses AND followed ZIP Codes');
 ok(/Addresses \(/.test(switcherFn) && /ZIP Codes \(/.test(switcherFn),
   'A-010 switcher lists the two types in labeled sections');
+ok(!/followedProjectIds/.test(switcherFn) && !/data-kind="project"/.test(switcherFn),
+  'A-010 Viewing chip switcher does not list followed projects');
 ok(!/You're following/.test(switcherFn),
   'A-010 switcher does not count Addresses as "followed" places');
 ok(/HS\.switchZip = function/.test(shell), 'A-010 HS.switchZip focuses a followed ZIP');
@@ -116,8 +126,18 @@ for (const [f, body] of [['properties.html', props], ['dashboard.html', dash], [
 }
 ok(!/type="search"|id="[^"]*[Ss]earch"|placeholder="[^"]*[Ss]earch/.test(props),
   'A-010 no search was invented on My Places');
-ok(!/data-act="remove-address"|data-view="zips"|Add ZIP Code/.test(dash),
-  'Dashboard stays a SUMMARY — no My Places management controls were added to it');
+ok(!/data-act="remove-address"|data-view="zips"/.test(dash),
+  'Dashboard stays a SUMMARY — no My Places views or Remove Address were added to it');
+ok(/id="dashAddPlace"[^>]*>\+ Add Address</.test(dash),
+  'Dashboard summary add for Addresses is "+ Add Address"');
+ok(/id="dashAddZip"[^>]*>\+ Add ZIP Code</.test(dash),
+  'Dashboard summary add for ZIP Codes is "+ Add ZIP Code"');
+ok(/dashAddPlace'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(dash),
+  'Dashboard "+ Add Address" reuses HS.addHome');
+ok(/dashAddZip'\)\.addEventListener\('click', function \(\) \{ HS\.openLoc\(\); \}\)/.test(dash),
+  'Dashboard "+ Add ZIP Code" reuses HS.openLoc');
+ok(/hideAdd:\s*true/.test(dash),
+  'Dashboard does not also render the dashed ZIP add chip');
 
 // ---- routes and identifiers are NOT renamed for terminology -----------------------------
 ok(fs.existsSync(new URL('../properties.html', import.meta.url)), 'properties.html IS My Places — no my-places.html was created');

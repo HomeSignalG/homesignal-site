@@ -98,6 +98,10 @@ ok(!/reports\.html/.test(dash),
 ok(/Add a ZIP Code/.test(dash) || /zipLabels:\s*true/.test(dash),
   'dashboard ZIP add flow uses ZIP Code terminology');
 ok(/statTileLink/.test(dash), 'dashboard stat tiles use statTileLink');
+ok(/var placesMonitored = S\.properties\.length \+ followedZips\.length;/.test(dash),
+  'Places Monitored is Addresses + ZIP Codes only — not followed projects');
+ok(!/followedProjectIds/.test(dash) && !/followedProjects/.test(dash),
+  'Dashboard does not count followed projects as Places Monitored');
 ok(/miniCardLink/.test(dash), 'dashboard recent cards use miniCardLink');
 ok(/meetingRowLink/.test(dash), 'dashboard meetings use meetingRowLink');
 ok(/itemClick:\s*onMarkerClick/.test(dash), 'dashboard map markers are clickable');

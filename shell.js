@@ -316,6 +316,13 @@
     LS.set('accountUid', null);
     state.activePropId = null;
     _serverFollowZips = [];
+    // Project follows are account-scoped (app_follows target_type=project).
+    // Drop only those keys so a later sign-in cannot inherit — or PUSH — another
+    // account's project follows. Property watches and change-notify keys stay
+    // in localStorage (their restore contract is unchanged).
+    const keptFollows = [...state.follows].filter(k => String(k).indexOf('project:') !== 0);
+    state.follows = new Set(keptFollows);
+    LS.set('follows', keptFollows);
   }
 
   function ensureAccountScope() {
@@ -345,6 +352,7 @@
     }
     ensureAccountScope();
     await syncFollowsFromAccount();
+    await syncProjectFollowsFromAccount();
     state.properties = await HS.data.properties();
     const validIds = new Set(state.properties.map(p => p.id));
     if (state.activePropId && !validIds.has(state.activePropId)) {
@@ -1268,7 +1276,11 @@
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
-    if (strip) strip.innerHTML = HS.communitiesStripHTML();
+    if (strip) {
+      // Dashboard has its own "+ Add ZIP Code" addbtn; do not also restore the dashed chip.
+      const hideAdd = strip.id === 'dashCommunities';
+      strip.innerHTML = HS.communitiesStripHTML(hideAdd ? { zipLabels: true, hideAdd: true } : {});
+    }
   };
 
   // Bridge the app -> digest system. Following an area (save-home, ZIP lookup, or the
@@ -1377,8 +1389,9 @@
       : 'No zip codes yet.';
     const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
-    return '<div class="chips">' + empty + chips +
-      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button></div>';
+    const add = opts.hideAdd ? ''
+      : '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button>';
+    return '<div class="chips">' + empty + chips + add + '</div>';
   };
 
   // -------------------------------------------------- topic prefs (hydrate) -----
@@ -1583,14 +1596,40 @@
   }
 
   // -------------------------------------------------- follows / watch ---------
+  // Project-follow copy is the Fix 1 contract. Do not reuse these strings for
+  // ZIP follows (toggleFollowCommunityBtn), property watches, or Notify.
+  HS.PROJECT_FOLLOW_ADD = 'Add to My Places to follow';
+  HS.PROJECT_FOLLOW_ON = '✓ Following in My Places';
+  HS.isFollowing = function (type, id) {
+    if (type == null || id == null || id === '') return false;
+    return state.follows.has(type + ':' + id);
+  };
+  HS.followedProjectIds = function () {
+    const ids = [];
+    state.follows.forEach(function (k) {
+      const s = String(k);
+      if (s.indexOf('project:') === 0) ids.push(s.slice('project:'.length));
+    });
+    return ids;
+  };
+  HS.unfollowProject = function (id) {
+    if (id == null || id === '') return Promise.resolve();
+    state.follows.delete('project:' + id);
+    LS.set('follows', [...state.follows]);
+    return persistFollow('project', id, false);
+  };
   HS.toggleFollow = function (btn, type, id) {
     if (!HS.requireAuth('follow')) return;
     const key = type + ':' + id;
-    if (state.follows.has(key)) { state.follows.delete(key); btn.textContent = btn.dataset.follow || 'Follow'; }
-    else {
+    if (state.follows.has(key)) {
+      state.follows.delete(key);
+      btn.textContent = btn.dataset.follow || (type === 'project' ? HS.PROJECT_FOLLOW_ADD : 'Follow');
+    } else {
       state.follows.add(key);
       btn.dataset.follow = btn.textContent;
-      btn.textContent = (type === 'property') ? 'Watching ✓' : 'Following ✓';
+      btn.textContent = (type === 'property') ? 'Watching ✓'
+        : (type === 'project') ? HS.PROJECT_FOLLOW_ON
+        : 'Following ✓';
     }
     LS.set('follows', [...state.follows]);
     persistFollow(type, id, state.follows.has(key));
@@ -1741,6 +1780,45 @@
       }
     }
     await refreshServerFollowZips();
+  }
+
+  // Project follows share app_follows with ZIP follows, but they are a different
+  // target_type and a different in-memory key (`project:<id>` on state.follows).
+  // ZIP sync above never reads that type — which is why a persisted project follow
+  // did not restore after reload/sign-in. Same bidirectional merge as communities:
+  // pull account rows this device hasn't seen, push local-only rows up. Server and
+  // localStorage stay one contract, not a second source of truth. Property watches
+  // and change-notify keys are untouched.
+  async function syncProjectFollowsFromAccount() {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+    let rows;
+    try {
+      const res = await HS.sb().from('app_follows').select('target_id').eq('target_type', 'project');
+      if (res.error) return;
+      rows = res.data || [];
+    } catch (e) { return; }
+    const local = new Set();
+    state.follows.forEach(function (k) {
+      const s = String(k);
+      if (s.indexOf('project:') === 0) local.add(s.slice('project:'.length));
+    });
+    const acct = new Set();
+    (rows || []).forEach(function (r) {
+      const id = r && r.target_id != null ? String(r.target_id) : '';
+      if (!id) return;
+      acct.add(id);
+      if (!local.has(id)) state.follows.add('project:' + id);
+    });
+    LS.set('follows', [...state.follows]);
+    for (const id of local) {
+      if (!acct.has(id)) {
+        try {
+          await HS.sb().from('app_follows').insert({
+            user_id: state.session.user.id, target_type: 'project', target_id: id
+          });
+        } catch (e) {}
+      }
+    }
   }
 
   async function boot() {
