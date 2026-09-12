@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Address</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
-<link rel="stylesheet" href="app.css?v=02a9a715">
+<link rel="stylesheet" href="app.css?v=20814d85">
 </head>
 <body data-nav="props">
 <template id="hs-content"><div class="page" id="propPage"></div></template>
@@ -23,9 +23,9 @@
      load inside THAT document, which already loads all three. PCM-1 needed them here
      because it drew the map itself; nothing on this page draws a map any more, and
      carrying them would be a second copy of a runtime that lives one frame away. -->
-<script src="lib/premium-waitlist.js?v=ae8a117e"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=63ab9d1e"></script>
+<script src="shell.js?v=d58ee55b"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -231,11 +231,42 @@ HS.onReady(async function () {
     + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
     + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
-    + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
+    // ── PREMIUM (Fix 15) ──────────────────────────────────────────────────────────────
+    // WAS: "Phase 2 — unlocked by new feeds" / "Layout ready; activates with these
+    // sources", with a "+ assessor / tax"-style feed chip on each row. That is the
+    // engineering roadmap talking to itself on a page a resident reads — it names our
+    // ingestion plan, not a product they can want. Nothing is implemented here: total
+    // cost of ownership, insurance comparison and the document vault remain FUTURE
+    // Premium capabilities, and "Coming soon" keeps the card from implying otherwise.
+    //
+    // The CTA is the SHARED Premium waitlist — the same modal and the same
+    // hs_premium_waitlist_join write path the ZIP Community Profile card uses. There is
+    // no second modal, no second form and no second table. What is new is the CONTEXT:
+    // this CTA states its own source, ZIP and street line, so Acquisition can tell a
+    // property lead from a ZIP one and say WHICH property. Values come from THIS
+    // dossier's own `p` — the Address the page is about — never from viewing state.
+    + '<div class="p2" id="propPremium"><div class="p2h"><span>🔒</span> Premium</div>'
+    + '<div class="p2sub">Coming soon</div>'
+    + '<div class="p2t">Get deeper property insights</div>'
+    + '<div class="p2sub">Unlock total cost of ownership, insurance comparisons, document vault and more.</div>'
+    + '<button type="button" class="inlinebtn" id="propPremiumBtn" style="margin-top:12px">Get Premium access →</button></div>'
     + '</div></div>';
+
+  // THE CONTEXT IS HANDED OVER IN A CLOSURE, NOT INTERPOLATED INTO AN ATTRIBUTE.
+  // The first version of this built `onclick="HS.openPremiumModal({…,address:' +
+  // JSON.stringify(p.address) + '})"`. JSON.stringify emits DOUBLE quotes, and the
+  // onclick attribute is double-quoted, so the browser read the handler only as far as
+  // `…{source:'Property Insights',zip:` and the button did nothing. Source-grep tests
+  // passed the whole time — rendering the fragment and reading the attribute back is
+  // what caught it. A closure also means an address containing an apostrophe (O'BRIEN)
+  // or any other quote needs no escaping at all, and no property value is ever parsed
+  // as code. Values are THIS dossier's own `p` — the Address this page is about.
+  var premiumBtn = document.getElementById('propPremiumBtn');
+  if (premiumBtn) {
+    premiumBtn.addEventListener('click', function () {
+      HS.openPremiumModal({ source: 'Property Insights', zip: p.zip, address: p.address });
+    });
+  }
   } catch (e) {
     console.warn('[property] render failed', e);
     page.innerHTML = failHtml('Could not display this Address. Try again.');

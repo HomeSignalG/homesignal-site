@@ -124,14 +124,21 @@ ok(/<div class="p2sub">Coming soon<\/div>/.test(cp),
   'FM-078 Community Profile visibly says Coming soon');
 ok(/Get Premium access →/.test(cp),
   'FM-078 the frozen CTA is exactly "Get Premium access →"');
+// Fix 15 routed these three through HS.openPremiumModal, which calls
+// HS.openModal('premiumModal') itself (shell.js) and then binds the SOURCE label so a ZIP
+// lead is distinguishable from a property lead in Acquisition. It is the same one modal
+// and the same one write path — what the count pins is that there are still exactly three
+// callers and that none of them grew a form of its own.
 {
-  const premiumOpens = cp.match(/HS\.openModal\(\\?'premiumModal\\?'\)/g) || [];
+  const premiumOpens = cp.match(/HS\.openPremiumModal\(\{source:\\?'ZIP Community Profile\\?'\}\)/g) || [];
   ok(premiumOpens.length === 3,
     'FM-078 Demographics, Economy & Market, and the Community Profile CTA all open the existing Premium modal',
     premiumOpens);
 }
-ok(cp.includes("HS.openModal(\\'premiumModal\\')") && !/premiumEmail|premiumForm|submitWaitlist|persistEmail/.test(cp),
-  'FM-078 Community Profile reuses HS.openModal(\'premiumModal\') — no second waitlist or form');
+ok(!/HS\.openModal\(\\?'premiumModal/.test(cp),
+  'FM-078 no CTA here opens the modal WITHOUT stating its acquisition context');
+ok(!/premiumEmail|premiumForm|submitWaitlist|persistEmail|hs_premium_waitlist/.test(cp),
+  'FM-078 Community Profile reuses the shared Premium modal — no second waitlist or form');
 ok(!/Phase 1\.5|PHASE 1\.5|Phase 2 ·|activates with new feeds|\+ Census \(free\)|\+ market data/.test(cp),
   'FM-078 internal roadmap / feed-implementation language is gone from the customer-facing markup');
 ok(!/ZIP Profile|Zip Profile/.test(cp),

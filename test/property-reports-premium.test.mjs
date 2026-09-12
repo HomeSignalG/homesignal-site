@@ -39,8 +39,12 @@ ok(/repBackBtn/.test(reports) && /Back to property/.test(reports),
 
 ok(/onclick="HS\.openModal\('premiumModal'\)"/.test(reports),
   '2a Property Reports CTA is HS.openModal(\'premiumModal\')');
-ok((community.match(/HS\.openModal\(\\?'premiumModal\\?'\)/g) || []).length === 3,
+// Fix 15: Community Profile's three CTAs now go through HS.openPremiumModal, which opens
+// THIS SAME modal (shell.js) and binds a source label. Still three callers, still one modal.
+ok((community.match(/HS\.openPremiumModal\(\{source:\\?'ZIP Community Profile\\?'\}\)/g) || []).length === 3,
   '2b Community Profile still opens that same modal (three callers, unchanged)');
+ok(/HS\.openPremiumModal = function/.test(shell) && /HS\.openModal\('premiumModal'\)/.test(shell),
+  '2b2 …and HS.openPremiumModal is a thin binder over the one shared modal, not a second one');
 ok(/Get Premium access →/.test(community) && /Community Profile · Premium/.test(community),
   '2c Community Profile copy is untouched');
 
@@ -51,10 +55,13 @@ ok(!/hs_premium_waitlist_join|submitWaitlist|premiumEmail/.test(reportsCode),
 ok(/rpc\('hs_premium_waitlist'\)/.test(acq) && /canonical app_premium_waitlist/.test(acq),
   '3c Acquisition Dashboard still reads the one canonical table');
 
-ok(/source:\s*location\.pathname \+ \(location\.search \|\| ''\)/.test(shell),
-  '4a production source convention is still the page URL (path + query)');
-ok(/zip:\s*W\.zipFromLocation\(location\)/.test(shell),
-  '4b production ZIP convention is still zipFromLocation, not a second field');
+// Fix 15 made the CTA able to STATE its context; the unbound fallback is unchanged, and
+// that is what these two pin — reports.html binds nothing, so it still lands here.
+ok(/const fallbackSource = location\.pathname \+ \(location\.search \|\| ''\);/.test(shell)
+   && /source: ctx\.source \|\| fallbackSource/.test(shell),
+  '4a unbound source convention is still the page URL (path + query)');
+ok(/zip: ctx\.zip \|\| W\.zipFromLocation\(location\)/.test(shell),
+  '4b unbound ZIP convention is still zipFromLocation, not a second field');
 ok(/W\.normalizeZip\(from\.zip\)/.test(reportsCode) && /origZip\(loc\) \|\| z/.test(reportsCode),
   '4c Property Reports supplies the resolved Address ZIP as zipFromLocation fallback');
 ok(!/myZip|viewZip|DEFAULT_ZIP|activeProperty/.test(reportsCode),

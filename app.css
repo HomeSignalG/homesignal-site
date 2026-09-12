@@ -272,6 +272,7 @@
   .p2{border:1px dashed #cdd6cf;border-radius:15px;padding:17px 18px;background:repeating-linear-gradient(135deg,#fafbfa,#fafbfa 10px,#f3f5f3 10px,#f3f5f3 20px)}
   .p2 .p2h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:6px}
   .p2 .p2sub{font-size:11.5px;color:var(--ink-3);margin-bottom:12px}
+  .p2 .p2t{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:5px}
   .p2 .p2i{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2)}
   .p2 .p2i:last-child{border-bottom:none}
   .p2 .p2i .t{font-size:13.5px;font-weight:600;color:var(--ink-2)}
