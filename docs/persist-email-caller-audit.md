@@ -11,8 +11,8 @@ each caller does with that, and — where it is still ignored — the measured r
 | caller | table | status |
 |---|---|---|
 | `HS.submitWaitlist` (premium modal) | `app_premium_waitlist` | **FIXED** — moved to `lib/premium-waitlist.js` + the `hs_premium_waitlist_join` RPC; success is shown only on confirmed persistence |
-| `HS.submitRequest` (coverage modal) | `community_requests` | **BROKEN, documented, deliberately unchanged** |
-| `HS.submitOnboardingRequest` (onboarding) | `community_requests` | **BROKEN, documented, deliberately unchanged** |
+| `HS.submitRequest` (coverage modal) | `community_requests` | **FIXED (Fix 13)** — `lib/community-request.js` + `hs_community_request_join` RPC; success is shown only on confirmed persistence. Admin read: `hs_community_requests` on Acquisition Dashboard tab 14 · Area requests. |
+| `HS.submitOnboardingRequest` (onboarding) | `community_requests` | **FIXED (Fix 13)** — same write path as the coverage modal |
 
 ## The two `community_requests` callers
 
@@ -54,6 +54,13 @@ does fail. Surfacing that is a product decision, not a mechanical one.
 **Recommended next unit:** give `community_requests` the same treatment this unit gave the
 waitlist — one `SECURITY DEFINER` join RPC, correct column mapping, no public table grant —
 then branch both callers on `ok`. Small, and it reuses everything built here.
+
+**Done — Fix 13 (2026-09-12).** SQL of record: `docs/community-requests-capture.sql`.
+Client: `lib/community-request.js`. Admin lookup: Acquisition Dashboard → tab
+**14 · Area requests** (`hs_community_requests`). Filter to a ZIP to get the email
+list to notify when that ZIP goes live. Apply the parked SQL before the site
+deploy that calls the RPC, or every request honestly fails instead of silently
+succeeding.
 
 ## Not in scope, noted
 
