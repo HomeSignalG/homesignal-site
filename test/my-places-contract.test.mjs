@@ -42,10 +42,14 @@ ok(!/Change your zip code/.test(shellHtml) && !/Change your zip code/.test(shell
   'Fix 11 the loc-modal title is Add, not Change — Change is the Switch-place verb');
 ok(/: 'Add a zip code'/.test(shell),
   'Fix 11 openLoc (non-onboarding) sets Add a zip code, matching the chip that opens it');
-ok(/id="hsAddZip"[\s\S]{0,120}HS\.openLoc\(\)/.test(shellHtml) && /topadd-rest/.test(shellHtml),
+ok(/id="hsAddAddress"[\s\S]{0,160}HS\.addHome\(\)/.test(shellHtml),
+  'A-010 + Add an address sits in the shared top bar next to Viewing, on every page');
+ok(/id="hsAddZip"[\s\S]{0,120}HS\.openLoc\(\)/.test(shellHtml),
   'Fix 11 + Add a zip code sits in the shared top bar next to Viewing, on every page');
-ok(/topadd-rest\{display:none\}/.test(strip(read('app.css'))),
-  'Fix 11 phone top bar shortens the Add chip so 390px does not scroll sideways');
+ok(/id="hsAddAddress"[\s\S]{0,400}id="hsAddZip"/.test(shellHtml),
+  'A-010 top-bar Place adds are Address then ZIP — the same order as My Places');
+ok(/topadd-short\{display:inline\}/.test(strip(read('app.css'))),
+  'phone top bar shortens Address/ZIP chips so 390px does not scroll sideways');
 ok(/Add this zip code/.test(shellHtml) && !/Find my zip code/.test(shellHtml),
   'Fix 11 the loc-modal CTA is Add this zip code, not Find');
 ok(/function afterAddZipHref/.test(shell) && /focusHref\(zip\)/.test(shell),
