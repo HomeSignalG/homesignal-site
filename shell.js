@@ -1775,6 +1775,7 @@
   // This used to insert into 'premium_waitlist' — a table that does not exist in
   // production (PostgREST answers PGRST205) — swallow the rejection, and show
   // "You're on the list" regardless. Every Premium lead ever offered was lost.
+
   // THE ACQUISITION CONTEXT OF A PREMIUM SIGNUP IS OWNED BY THE CTA THAT OPENED THE
   // MODAL — never by viewing state. Deliberately NOT read anywhere below: state.zip
   // (which falls back to HS_CONFIG.DEFAULT_ZIP, a sample), state.activeProperty, the
