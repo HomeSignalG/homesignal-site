@@ -135,8 +135,8 @@ await waitZip(); await page.waitForTimeout(600);
 const z = await hero(page);
 ok(/Development overview/i.test(z.kicker || ''), '1a ZIP mode kicker names the overview', z.kicker);
 ok(/78617/.test(z.h1 || ''), '1b ZIP mode H1 names the ZIP', z.h1);
-ok(/See what is changing in your zip code/i.test(z.sub || ''),
-  '1c ZIP mode standfirst is the ZIP-mode line', z.sub);
+ok(z.sub === 'See what is changing in 78617',
+  '1c ZIP mode standfirst names THIS ZIP via the shared heading helper', z.sub);
 ok(/All development across/i.test(z.heading || ''), '1d ...and the results heading agrees', z.heading);
 
 // ══════════════ 2. ADDRESS MODE — the hero must stop making the whole-ZIP claim ══════════════
@@ -156,8 +156,10 @@ ok(/Address view/i.test(a.kicker || ''), '2f ...it names the address mode', a.ki
 // on both modes and discriminate nothing. What the mode switch owes the resident is that the
 // address hero is not the ZIP hero, so that is what is asserted — with the old claim kept beside it.
 ok(!/across ZIP/i.test(a.sub || ''), '2g the standfirst drops the whole-ZIP claim', a.sub);
-ok(!/See what is changing in your zip code/i.test(a.sub || ''),
+ok(!/See what is changing in 78617/i.test(a.sub || ''),
   '2g2 ...and is no longer the ZIP-mode standfirst at all', a.sub);
+ok(/^See what is changing at /i.test(a.sub || '') && /CALDWELL/i.test(a.sub || ''),
+  '2g3 ...it names THIS address via the shared heading helper', a.sub);
 ok(!/ZIP 78617/.test(a.title || ''), '2h the document title follows the mode too', a.title);
 // The hero must not claim a RADIUS either — the radius is stated once, where it is true, and a
 // second copy in the hero would go stale the moment the resident changes it.
@@ -180,7 +182,7 @@ await waitZip(); await page.waitForTimeout(600);
 const b = await hero(page);
 ok(/Development overview/i.test(b.kicker || ''), '4a returning restores the ZIP kicker', b.kicker);
 ok(/78617/.test(b.h1 || ''), '4b ...the ZIP H1', b.h1);
-ok(/See what is changing in your zip code/i.test(b.sub || ''), '4c ...and the ZIP standfirst', b.sub);
+ok(b.sub === 'See what is changing in 78617', '4c ...and the ZIP standfirst names THIS ZIP', b.sub);
 ok(/All development across/i.test(b.heading || ''), '4d ...over whole-ZIP results', b.heading);
 
 // ══════════════ 5. A DIRECT ADDRESS VISIT ALSO GETS ADDRESS-MODE IDENTITY ══════════════
@@ -201,6 +203,8 @@ await waitAddr(p2); await p2.waitForTimeout(600);
 const d = await hero(p2);
 ok(/around this address/i.test(d.h1 || '') && /Address view/i.test(d.kicker || ''),
   '5b a direct address search gets the same address-mode identity', { h1: d.h1, kicker: d.kicker });
+ok(/^See what is changing at /i.test(d.sub || '') && /CALDWELL/i.test(d.sub || ''),
+  '5c ...and the standfirst names THIS address', d.sub);
 
 ok(pageErrors.length === 0, '6 the whole journey ran with no fatal client error', pageErrors);
 

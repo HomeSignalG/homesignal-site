@@ -31,6 +31,7 @@ const prop = code(propRaw);
 const cpRaw = read('lib/community-page.js');
 const cp = code(cpRaw);
 const m1Raw = read('homesignalmap.html');
+const m1 = code(m1Raw);
 
 console.log('='.repeat(78));
 console.log('PLACE CHANGING HEADING — copy, kind, sources, stale-state');
@@ -113,18 +114,32 @@ ok(/zip=' \+ encodeURIComponent\(zip\)/.test(cp)
 ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cp),
   '5h the heading rides inside the existing A-022 session gate');
 
-// ── §6 no second geography mechanism, no Map 1 hero rewrite ─────────────────
-ok(/See what is changing in your zip code/.test(m1Raw),
-  '6a Map 1\'s own ZIP standfirst is untouched');
-ok(!/placeChangingHeading/.test(m1Raw),
-  '6b homesignalmap.html does not call the Place heading helper');
-ok(!/placeChangingHeading\('address',\s*p\.zip\)/.test(prop + cp)
+// ── §6 Map 1 is a third host of the SAME helper ─────────────────────────────
+// #1178 left Map 1's standfirst as "See what is changing in your zip code" on
+// purpose. That exclusion is no longer acceptable: ZIP mode must name THIS ZIP
+// and address mode must name THIS address, via the shared helper, not a second
+// copy of the sentence.
+ok(/function paintMap1PlaceHeading/.test(m1),
+  '6a Map 1 has a named painter that is the only writer of .sub in ZIP/address boot');
+ok(/HS\.placeChangingHeading\(kind,\s*value\)/.test(m1),
+  '6b ...and that painter calls the shared helper (kind + value, nothing else)');
+ok(/paintMap1PlaceHeading\('zip',\s*zip\)/.test(m1),
+  '6c ZIP mode binds heading to the same `zip` loadZip received');
+ok(/paintMap1PlaceHeading\('address',\s*address\)/.test(m1),
+  '6d address mode binds heading to the same `address` run() received');
+ok(/paintMap1PlaceHeading\('address',\s*m\.matchedAddress\s*\|\|\s*address\)/.test(m1),
+  '6e ...and upgrades to the geocoder match once it exists, never a leftover ZIP');
+ok(!/See what is changing in your zip code/.test(m1Raw),
+  '6f the generic "your zip code" standfirst is gone');
+ok(!/placeChangingHeading\('address',\s*p\.zip\)/.test(prop + cp + m1)
   && !/geocode/i.test(prop.slice(prop.indexOf('var contextMap = realAddress'))),
-  '6c neither host geocodes or substitutes ZIP for the address heading');
+  '6g neither Place host geocodes or substitutes ZIP for the address heading');
 
 // ── §7 callers escape; the helper does not ──────────────────────────────────
 ok(/HS\.esc\(placeHeading\)/.test(prop) && /HS\.esc\(placeHeading\)/.test(cp),
-  '7a both hosts run HS.esc on the heading before inserting it');
+  '7a Place iframe hosts run HS.esc on the heading before inserting it into HTML');
+ok(/el\.textContent = heading/.test(m1),
+  '7c Map 1 assigns via textContent — no HTML insertion, so it must not HTML-escape');
 ok(!/HS\.esc/.test(helperSrc.slice(helperSrc.indexOf('placeChangingHeading'),
   helperSrc.indexOf('placeChangingHeading') + 600)),
   '7b the helper itself does not HTML-escape (avoids double-escaping)');
