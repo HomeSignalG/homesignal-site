@@ -66,8 +66,8 @@ A ZIP-only Place has no Address: `switchZip` clears a conflicting `activePropId`
 **Sidebar = which tool. Viewing = which place.** `community.html` is the public ZIP hub
 (`data-nav="comm"`) and highlights no tool, so the Viewing control names the place from the
 community's own metadata (`Bear River City · 84301`), falling back to the bare ZIP when
-metadata is absent. That is an AREA label, so a real saved home in the viewed ZIP still
-reads `Your home · <street>`.
+metadata is absent. That is an AREA label, so a saved address in the viewed ZIP still
+reads `Viewing · <street>`.
 
 ## How to link
 

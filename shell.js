@@ -1095,11 +1095,14 @@
   // -------------------------------------------- page-header context line ------
   // Say up front WHICH address (or area) the page is about, on every app page
   // with a .ph header — ONE shared injector (a new page gets it for free; a
-  // page that must not carry it sets data-no-where on <body>). A real saved
-  // property IN the viewed ZIP shows its full logged address; otherwise the
-  // viewed area — never a demo/sample address presented as the visitor's own
-  // (the same never-faked gate the maps use). Idempotent: pages that rebuild
-  // their .ph dynamically (development.html) just call it again after painting.
+  // page that must not carry it sets data-no-where on <body>). Dashboard sets
+  // that opt-out: the Viewing chip already names the geography, so a second
+  // #phWhere line would duplicate it. Other .ph pages keep the context line.
+  // A real saved property IN the viewed ZIP shows its full logged address;
+  // otherwise the viewed area — never a demo/sample address presented as the
+  // visitor's own (the same never-faked gate the maps use). Idempotent: pages
+  // that rebuild their .ph dynamically (development.html) just call it again
+  // after painting.
   HS.paintWhereLine = async function () {
     try {
       const ph = document.querySelector('#hs-slot .ph');
