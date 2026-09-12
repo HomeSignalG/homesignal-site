@@ -15708,7 +15708,8 @@
           "Payment Due",
           "Pre-Issue/Payment Due",
           "Plan Check Comments Sent",
-          "Resubmittal Requested"
+          "Resubmittal Requested",
+          "Resubmittal Received"
         ],
         "approved": [
           "Issued",
