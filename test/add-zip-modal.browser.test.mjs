@@ -1,8 +1,8 @@
-// Fix 11 — clicking "+ Add a zip code" must open ADD, not Change.
+// Fix 11 — clicking "+ Add a zip code" must open ADD, not Change — on every
+// app container that shows the chip (ZIP page, Alerts, Address, Development).
 //
-// The dashed chip on the ZIP page used to open a dialog titled "Change your zip
-// code", so a resident could not tell whether they were saving a new ZIP or
-// toggling among ones they already had. Switching already-saved ZIPs is the
+// The dashed chip used to live only on the ZIP page, and that chip opened a
+// dialog titled "Change your zip code". Switching already-saved ZIPs is the
 // solid chips / Switch place. This modal follows/saves.
 //
 // Run: node test/add-zip-modal.browser.test.mjs
@@ -77,22 +77,40 @@ await page.addInitScript(() => {
   localStorage.setItem('hs:myZip', JSON.stringify('78617'));
 });
 
-await page.goto(base + '/community.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+async function assertAddChip(label, path) {
+  await page.goto(base + path, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
+  const chip = await page.locator('#commStrip button.wchip').textContent();
+  ok(/Add a zip code/i.test(chip || ''), label + ': the dashed chip says Add a zip code', chip);
+  await page.locator('#commStrip button.wchip').click();
+  await page.waitForSelector('#locModal.show', { timeout: 5000 });
+  const title = (await page.locator('#locModalTitle').textContent() || '').trim();
+  const sub = (await page.locator('#locModal .msub').textContent() || '').trim();
+  ok(title === 'Add a zip code', label + ': modal title is Add a zip code', title);
+  ok(!/change/i.test(title), label + ': modal title does not say Change', title);
+  ok(/save it/i.test(sub), label + ': subtitle says the ZIP is saved', sub);
+  await page.locator('#locModal .mclose').click();
+}
+
+await assertAddChip('ZIP page', '/community.html?data=seed&zip=78617');
+await assertAddChip('Alerts', '/alerts.html?data=seed&zip=78617');
+await assertAddChip('Address', '/property.html?data=seed');
+await assertAddChip('Development', '/development.html?data=seed&zip=78617');
+
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
-
-const chip = await page.locator('#commStrip button.wchip').textContent();
-ok(/Add a zip code/i.test(chip || ''), 'the dashed chip says Add a zip code', chip);
-
+await page.screenshot({ path: join(ART, 'add_zip_chip_on_alerts.png'), fullPage: false });
 await page.locator('#commStrip button.wchip').click();
 await page.waitForSelector('#locModal.show', { timeout: 5000 });
+await page.screenshot({ path: join(ART, 'add_zip_modal_on_alerts.png'), fullPage: false });
+await page.locator('#locModal .mclose').click();
 
-const title = (await page.locator('#locModalTitle').textContent() || '').trim();
-const sub = (await page.locator('#locModal .msub').textContent() || '').trim();
-ok(title === 'Add a zip code', 'modal title is Add a zip code', title);
-ok(!/change/i.test(title), 'modal title does not say Change', title);
-ok(/save it/i.test(sub), 'subtitle says the ZIP is saved', sub);
-
-await page.screenshot({ path: join(ART, 'add-zip-modal-after.png'), fullPage: false });
+await page.goto(base + '/property.html?data=seed', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
+await page.screenshot({ path: join(ART, 'add_zip_chip_on_address.png'), fullPage: false });
+await page.locator('#commStrip button.wchip').click();
+await page.waitForSelector('#locModal.show', { timeout: 5000 });
+await page.screenshot({ path: join(ART, 'add_zip_modal_on_address.png'), fullPage: false });
 
 await browser.close();
 server.close();
