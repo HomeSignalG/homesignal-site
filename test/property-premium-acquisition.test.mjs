@@ -70,7 +70,7 @@ ok(/class="p2 " ?|class="p2"/.test(propertyCode) && /\.p2 \.p2t/.test(read('app.
   '1j it uses the shared .p2 Premium treatment the ZIP card uses');
 
 // ── 2. ONE MODAL, ONE WRITE PATH, ONE ACQUISITION AREA ───────────────────────────────
-ok(/HS\.openPremiumModal\(\{ source: 'Property Insights'/.test(property),
+ok(/HS\.openPremiumModal\(\{\s*\n?\s*source: 'Property Insights'/.test(property),
   '2a the property CTA enters the EXISTING Premium flow via HS.openPremiumModal');
 ok(/HS\.openPremiumModal = function/.test(shell) && /HS\.openModal\('premiumModal'\)/.test(shell),
   '2b HS.openPremiumModal opens the one shared premiumModal — it is a binder, not a modal');
@@ -133,14 +133,30 @@ function harnessForQuoting() {
     };
   };
   out.click = (p) => HS.openPremiumModal({ source: 'Property Insights', zip: p.zip, address: p.address });
+  out.clickDemo = (p) => {
+    const demo = !!(p.sample || p.demo);
+    HS.openPremiumModal({ source: 'Property Insights', zip: demo ? null : p.zip, address: demo ? null : p.address });
+  };
   return out;
 }
 
 // ── 3. THE CONTEXT THE ACQUISITION RECORD CARRIES ────────────────────────────────────
 ok(/source: 'Property Insights'/.test(property),
   '3a a property lead states its interest as "Property Insights"');
-ok(/zip: p\.zip, address: p\.address/.test(property),
+ok(/zip: demo \? null : p\.zip/.test(property) && /address: demo \? null : p\.address/.test(property),
   '3b ZIP and the street line come from THIS dossier\'s own property object `p`');
+{
+  // A SAMPLE ADDRESS IS NOT A PROPERTY. Under ?demo=1 the dossier shows a seeded home
+  // the visitor does not own; recording it as the property that generated the lead
+  // would be a fabricated context. The interest is still captured — only the place is
+  // withheld — so this is the "absent stays absent" rule, not a dropped signup.
+  const demoBind = /var demo = !!\(p\.sample \|\| p\.demo\);/.test(property);
+  ok(demoBind, '3b2 a sample/demo Address is detected before the context is bound');
+  const h = harnessForQuoting();
+  h.clickDemo({ zip: '78617', address: '4400 Wildhorse Trail', sample: true });
+  ok(h.ctx.source === 'Property Insights' && h.ctx.zip === null && h.ctx.address === null,
+    '3b3 …the lead is still captured, with NO fabricated property context', h.ctx);
+}
 // THE DEFECT THAT GOT THROUGH THE FIRST TIME, now pinned. The context was interpolated
 // into onclick="…" with JSON.stringify, which emits DOUBLE quotes and TERMINATED the
 // double-quoted attribute: a browser ran only `HS.openPremiumModal({source:'Property

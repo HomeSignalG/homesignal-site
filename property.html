@@ -261,10 +261,22 @@ HS.onReady(async function () {
   // what caught it. A closure also means an address containing an apostrophe (O'BRIEN)
   // or any other quote needs no escaping at all, and no property value is ever parsed
   // as code. Values are THIS dossier's own `p` — the Address this page is about.
+  //
+  // A SAMPLE ADDRESS IS NOT A PROPERTY. Under ?demo=1 preview (HS.data.properties stamps
+  // `sample: true` on the seeded persona) this dossier shows 4400 Wildhorse Trail — a
+  // demo home the visitor does not own. Their Premium interest is real and is still
+  // captured under "Property Insights"; the place context is not, so it stays ABSENT
+  // rather than recording a seeded address as the property that generated the lead.
+  // Same predicate the context map already uses to decide a real Address.
   var premiumBtn = document.getElementById('propPremiumBtn');
   if (premiumBtn) {
     premiumBtn.addEventListener('click', function () {
-      HS.openPremiumModal({ source: 'Property Insights', zip: p.zip, address: p.address });
+      var demo = !!(p.sample || p.demo);
+      HS.openPremiumModal({
+        source: 'Property Insights',
+        zip: demo ? null : p.zip,
+        address: demo ? null : p.address
+      });
     });
   }
   } catch (e) {
