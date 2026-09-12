@@ -11,7 +11,9 @@ const {
   pageHref,
   hasViewedZipContext,
   ZIP_NAV_PAGES,
-  MAP_PAGES
+  MAP_PAGES,
+  placeSavedLabel,
+  alertsHrefForSavedPlace
 } = require('../lib/view-zip.js');
 
 let fails = 0;
@@ -52,6 +54,10 @@ ok(navHref('homesignalmap.html', '84101').indexOf('78617') === -1,
   'navHref does not substitute the sample ZIP when a different ZIP is passed');
 ok(navHref('homesignalmap.html', DEF) === 'homesignalmap.html?zip=78617',
   'navHref encodes an explicitly passed default ZIP');
+ok(alertsHrefForSavedPlace({ zip: '84101' }) === navHref('alerts.html', '84101'),
+  'saved-place Alerts CTA reuses navHref (ZIP context)');
+ok(placeSavedLabel({ zip: '84101', name: 'Salt Lake City' }) === 'Salt Lake City (84101)',
+  'saved-place ZIP label is name + ZIP');
 ok(pageHref('alerts.html', { zip: '84101', band: 'open' }) === 'alerts.html?zip=84101&band=open',
   'pageHref preserves zip + deep-link params');
 
