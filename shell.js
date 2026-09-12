@@ -1319,11 +1319,13 @@
     $('locDone').classList.add('hidden');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
     // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
-    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your zip code" : 'Change your zip code';
+    // Every other opener is an ADD (the dashed chip, Dashboard / My Places / Viewing
+    // "+ Add ZIP Code"). Switching among already-saved ZIPs is Switch place, not this modal.
+    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your zip code" : 'Add a zip code';
     const sub = document.querySelector('#locModal .msub');
     if (sub) sub.textContent = onboarding
       ? "Enter your ZIP code to save your area and open what's changing around it."
-      : "Enter a ZIP code to open what's changing around that area.";
+      : "Enter a ZIP code to save it and open what's changing around that area.";
     HS.openModal('locModal');
     setTimeout(() => { if (z) z.focus(); }, 50);
   };
