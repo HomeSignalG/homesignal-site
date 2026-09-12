@@ -105,7 +105,10 @@ const waitShell = () => page.waitForFunction(() => !!document.querySelector('.na
 async function shot(name) {
   if (!existsSync(ART)) return;
   try { mkdirSync(ART, { recursive: true }); } catch { /* exists */ }
-  await page.screenshot({ path: join(ART, name), fullPage: false });
+  // PNG, not webp: Playwright's screenshot encoder here rejects image/webp.
+  const file = name.replace(/\.webp$/i, '.png');
+  try { await page.screenshot({ path: join(ART, file), type: 'png', fullPage: false }); }
+  catch (e) { info('screenshot skipped', String(e).slice(0, 120)); }
 }
 
 async function readAddress() {
@@ -173,7 +176,7 @@ ok(!zA.lat && !zA.lng, '1 ZIP A iframe is area-mode (no lat/lng)', zA);
 ok(zA.embed === '1', '1 ZIP A iframe is embed mode');
 ok(!zA.stale, '1 ZIP A heading is not undefined/null');
 ok(!/78744|78725|78719/.test(zA.heading), '1 ZIP A heading ignored poisoned myZip/viewZip/followed ZIP', zA.heading);
-await shot('place-heading-zip-a.webp');
+await shot('place-heading-zip-a.png');
 
 // ═══ 2. Browser refresh keeps ZIP A ═════════════════════════════════════════
 await page.reload({ waitUntil: 'domcontentloaded' });
@@ -194,7 +197,7 @@ ok(a1.embed === '1' && a1.radius === '2', '3 Address 1 iframe keeps embed + radi
 ok(!a1.stale, '3 Address 1 heading is not undefined/null');
 ok(!a1.heading.includes(ZIP_A) && !a1.heading.includes('78744'),
   '3 Address 1 heading is not a ZIP and not the poisoned myZip', a1.heading);
-await shot('place-heading-address-1.webp');
+await shot('place-heading-address-1.png');
 
 // ═══ 4. Address → Address (no refresh) ══════════════════════════════════════
 await page.goto(base + '/property.html?id=' + P2.id, { waitUntil: 'domcontentloaded' });
@@ -204,7 +207,7 @@ info('Address 2', a2);
 ok(a2.heading === 'See what is changing at ' + P2.address, '4 Address 2 heading is "at" + the OTHER address', a2.heading);
 ok(!a2.heading.includes(P1.address), '4 previous Address 1 did not survive', a2.heading);
 ok(near(a2.lat, P2.lat) && near(a2.lng, P2.lng), '4 Address 2 iframe is p2\'s saved point, not p1\'s', a2);
-await shot('place-heading-address-2.webp');
+await shot('place-heading-address-2.png');
 
 // ═══ 5. Address → ZIP C (no refresh) ════════════════════════════════════════
 await page.goto(base + '/community.html?zip=' + ZIP_C, { waitUntil: 'domcontentloaded' });
@@ -238,7 +241,7 @@ ok(!seqB.heading.includes(ZIP_A) && !seqB.heading.includes('in ' + ZIP_A),
   '7b previous ZIP A did not survive', seqB.heading);
 ok(near(seqB.lat, P2.lat) && near(seqB.lng, P2.lng) && !seqB.zipParam,
   '7b iframe is Address B\'s point, not ZIP geography', seqB);
-await shot('place-heading-seq-address-b.webp');
+await shot('place-heading-seq-address-b.png');
 
 await page.goto(base + '/community.html?zip=' + ZIP_C, { waitUntil: 'domcontentloaded' });
 await waitShell();
@@ -248,7 +251,7 @@ ok(!seqC.heading.includes(P2.address) && !seqC.heading.includes(ZIP_A),
   '7c neither Address B nor ZIP A survived', seqC.heading);
 ok(seqC.zipParam === ZIP_C && !seqC.lat, '7c iframe is ZIP C area', seqC);
 ok(!/78744|78725|78719/.test(seqC.heading), '7c poisoned account geography still unused', seqC.heading);
-await shot('place-heading-seq-zip-c.webp');
+await shot('place-heading-seq-zip-c.png');
 
 // ═══ 8. Narrow viewport: Address heading wraps without overflowing ══════════
 await page.setViewportSize({ width: 390, height: 844 });
@@ -270,7 +273,7 @@ const layout = await page.evaluate(() => {
 });
 info('mobile wrap', layout);
 ok(!layout.overflowsViewport, '8 heading does not overflow the 390px viewport', layout);
-await shot('place-heading-mobile-wrap.webp');
+await shot('place-heading-mobile-wrap.png');
 
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base + '/community.html?zip=' + ZIP_A, { waitUntil: 'domcontentloaded' });
