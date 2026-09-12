@@ -127,7 +127,8 @@ HS.onReady(async function () {
   //
   // THE POINT IS HANDED OVER, NOT RE-RESOLVED. It was geocoded once, when the Address was
   // saved; asking the geocoder again could answer differently and move a Place's pin
-  // between visits. ?embed=1&lat=&lng=&radius=2 carries it verbatim.
+  // between visits. ?embed=1&lat=&lng=&radius=2&zip=<hint> carries the point verbatim;
+  // zip is only so Map Full View inside the frame can hand off to this Address's ZIP.
   var PCM_RADIUS_MI = 2;      // founder, 2026-09-10; also in HS.N5_RADII, which the RPC mirrors
 
   function pcmHasPoint(x) {
@@ -156,7 +157,8 @@ HS.onReady(async function () {
         + 'border-radius:12px;display:block" '
         + 'src="homesignalmap.html?embed=1&amp;lat=' + encodeURIComponent(p.lat)
         + '&amp;lng=' + encodeURIComponent(p.lng)
-        + '&amp;radius=' + PCM_RADIUS_MI + '"></iframe>'
+        + '&amp;radius=' + PCM_RADIUS_MI
+        + '&amp;zip=' + encodeURIComponent(p.zip) + '"></iframe>'
       + '</div>'
     : '';
 

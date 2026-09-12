@@ -541,6 +541,20 @@
   .hs-embed .card.mapcard{border:0;border-radius:0;box-shadow:none;margin:0}
   .hs-embed .results{margin:0}
   .hs-embed body{background:var(--panel)}
+  /* MAP FULL VIEW — embed only. A click inside an iframe navigates the iframe unless the
+     link targets the top window, so the markup carries target=_top. Hidden on the full
+     Development page (you are already there). Sits top-right of the canvas; Leaflet zoom
+     is top-left. Must NOT be added to the embed hide list. */
+  #mapFullView{display:none}
+  .hs-embed #mapFullView{
+    display:inline-flex;align-items:center;
+    position:absolute;top:10px;right:10px;z-index:1100;
+    padding:7px 12px;border-radius:9px;
+    background:#fff;border:1px solid var(--line);
+    box-shadow:0 1px 4px rgba(8,30,28,.18);
+    color:var(--ink);font:600 12.5px var(--font);text-decoration:none;line-height:1.2
+  }
+  .hs-embed #mapFullView:hover{background:#f4f6f5;border-color:#9aa8a3}
 
 </style>
 </head>
@@ -690,6 +704,7 @@
             <div class="mk3tip" id="mk3tip"></div>
             <div class="mk3info" id="mk3info"></div>
             <div id="map"><div id="mapInner"></div></div>
+            <a id="mapFullView" href="homesignalmap.html" target="_top" rel="noopener">Map Full View</a>
             <div class="mapgl" id="mapgl"></div>
             <div class="map3d" id="map3d">
               <div class="hud3d">
@@ -4626,8 +4641,13 @@ HS.onReady(function(){
 
   // ===================== EMBED MODE — Place Context Maps =====================
   // A Place page iframes this document. Two shapes, and only two:
-  //   Address  homesignalmap.html?embed=1&lat=<saved>&lng=<saved>&radius=2
+  //   Address  homesignalmap.html?embed=1&lat=<saved>&lng=<saved>&radius=2&zip=<hint>
   //   ZIP      homesignalmap.html?embed=1&zip=<zip>
+  //
+  // The Address ?zip= is a HANDOFF HINT for Map Full View, not the geography. Full Map 1
+  // cannot boot from lat/lng except in embed mode, so the link is homesignalmap.html?zip=<the
+  // Address's ZIP> — the same handoff property.html already uses. Boot must prefer lat+lng
+  // over zip, or that hint would loadZip a saved home.
   //
   // ?addr= IS NOT AN EMBED SHAPE. It routes to loadProperty(), the address DOSSIER, which is
   // a different document with a different job; the Place page already carries that material.
@@ -4682,6 +4702,17 @@ HS.onReady(function(){
     });
   }
 
+  // MAP FULL VIEW. The parent Place already has a Development CTA; this one sits on the
+  // canvas because that is where the founder asked for it. href is HS.navHref — never a
+  // hand-built ?zip= and never embed=1 / ?addr=. No data-znav: the shell would re-stamp
+  // the href with the app's ACTIVE zip, which on an Address Place can be a different ZIP.
+  function wireMapFullView(zip){
+    var a = document.getElementById("mapFullView");
+    if(!a) return;
+    var z = (zip && /^\d{5}$/.test(String(zip))) ? String(zip) : null;
+    a.setAttribute("href", (window.HS && HS.navHref) ? HS.navHref("homesignalmap.html", z) : "homesignalmap.html");
+  }
+
   // EMBED ZIP ONLY: draw and fit this ZIP's real ZCTA outline over Map 1's own ZIP view.
   // Read through public.app_zcta_boundary (SECURITY DEFINER); geo.zcta_boundary is not
   // readable from a browser and must not be. The polygon is the AREA the Place page is
@@ -4711,22 +4742,27 @@ HS.onReady(function(){
     // EMBED FIRST. An embed URL never reaches ?addr=: the dossier is not a map.
     if(u.searchParams.get("embed") === "1"){
       var ez = u.searchParams.get("zip");
+      var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));
+      var er = embedRadius(u);
+      // ADDRESS FIRST. An Address embed may also carry ?zip= so Map Full View can hand off
+      // to the full page. That ZIP is a hint, not the geography: checking it first would
+      // loadZip a saved home instead of pinning at the saved point.
+      if(isFinite(elat) && isFinite(elng) && er !== null){
+        wireMapFullView(ez);
+        runEmbedPoint({ lat: elat, lng: elng }, er);
+        return;
+      }
       if(ez && /^\d{5}$/.test(ez)){
         if(window.HS && HS.state) HS.state.zip = ez;
+        wireMapFullView(ez);
         loadZip(ez);                       // Map 1's own ZIP mode, unchanged
         paintEmbedZipBoundary(ez);         // plus the real ZCTA outline, embed only
         return;                            // no loadDevTracker: the tracker is hidden here
       }
-      var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));
-      var er = embedRadius(u);
-      if(isFinite(elat) && isFinite(elng) && er !== null){
-        runEmbedPoint({ lat: elat, lng: elng }, er);
-      } else {
-        // A malformed embed URL renders NOTHING rather than a default geography. The
-        // sample ZIP fallback below is for a resident who navigated here; an iframe that
-        // asked for a specific place must never be answered with a different one.
-        status("This map needs a location.", true);
-      }
+      // A malformed embed URL renders NOTHING rather than a default geography. The
+      // sample ZIP fallback below is for a resident who navigated here; an iframe that
+      // asked for a specific place must never be answered with a different one.
+      status("This map needs a location.", true);
       return;
     }
     var a = u.searchParams.get("addr");

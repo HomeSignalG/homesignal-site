@@ -69,6 +69,8 @@ ok(/lat=' \+ encodeURIComponent\(p\.lat\)/.test(propFrame) && /lng=' \+ encodeUR
   '2c ...carrying the SAVED point verbatim — never re-geocoded, so a Place\'s pin cannot move between visits');
 ok(/radius=' \+ PCM_RADIUS_MI/.test(propFrame) && /var PCM_RADIUS_MI = 2;/.test(prop),
   '2d ...at the founder-set radius 2, from one constant');
+ok(/zip=' \+ encodeURIComponent\(p\.zip\)/.test(propFrame),
+  '2g ...and the Address ZIP, as a Map Full View handoff hint — not as the boot geography');
 // ⚠️ `&amp;` IS THE SEPARATOR AN IFRAME src ACTUALLY USES, and the first version of this pin
 // could not see it: /[?&]addr=/ requires ? or & immediately before, and in `&amp;addr=` the
 // preceding character is `;`. The mutation that adds ?addr= to the embed URL therefore passed.
@@ -133,9 +135,9 @@ for (const [sel, what] of [
 ok(/\.hs-embed \.app\{grid-template-columns:1fr\}/.test(hide),
   '6c ...and collapses the sidebar GRID COLUMN — display:none alone leaves its track reserved');
 // What must NOT be hidden is the point of the unit.
-for (const keep of ['#mapkey', '#mapkeyShapes', '#mapkeyReg', '#map', '.maplegend-wrap']) {
+for (const keep of ['#mapkey', '#mapkeyShapes', '#mapkeyReg', '#map', '.maplegend-wrap', '#mapFullView']) {
   ok(!new RegExp('\\.hs-embed [^{]*\\' + keep.replace(/[.#]/g, '\\$&') + '[^{]*\\{[^}]*display:none').test(hide),
-    '6d the embed does NOT hide ' + keep + ' — the filter rows and the canvas are what it is for');
+    '6d the embed does NOT hide ' + keep + ' — the filter rows, the canvas and Map Full View stay');
 }
 
 // ── §7 the three rows are Map 1's OWN controls, not decorative chips ────────────────────
@@ -234,6 +236,32 @@ for (const [label, src, raw] of [['property.html', prop, propRaw], ['lib/communi
     '13b ' + label + '\'s iframe carries embed=1 — a frame without it is the full Development page, '
     + 'chrome and all, inside a Place', (raw.match(/<iframe[^>]*>/) || [])[0]);
 }
+
+// ── §14 Map Full View: on the canvas, out of the iframe, onto the real Development page ─
+// A link inside an iframe navigates the iframe. target=_top is the whole point of this
+// control. The href is the full page (no embed=1) scoped to the Place's ZIP (no ?addr=).
+const fv = (m1Raw.match(/<a id="mapFullView"[^>]*>[\s\S]*?<\/a>/) || [''])[0];
+ok(fv.length > 0, '14a Map 1 carries a Map Full View control');
+ok(/>Map Full View</.test(fv), '14b ...labelled Map Full View');
+ok(/target="_top"/.test(fv), '14c ...with target=_top so a click leaves the iframe');
+ok(!/data-znav/.test(fv),
+  '14d ...and NO data-znav, which would let the shell re-stamp it with the app\'s ACTIVE zip',
+  (fv.match(/data-znav/) || [])[0]);
+ok(/href="homesignalmap\.html"/.test(fv),
+  '14e ...default href is the full page with no query — zip is stamped at embed boot');
+const fvFn = m1.slice(m1.indexOf('function wireMapFullView'), m1.indexOf('function paintEmbedZipBoundary'));
+ok(/HS\.navHref\("homesignalmap.html", z\)/.test(fvFn),
+  '14f the href is HS.navHref — never a hand-built ?zip= URL');
+ok(!/embed/.test(fvFn) && !/addr/.test(fvFn),
+  '14g ...and that href carries neither embed=1 nor ?addr=');
+ok((embedBranch.match(/wireMapFullView\(ez\)/g) || []).length === 2,
+  '14h both embed shapes stamp the control from the URL\'s zip');
+ok(embedBranch.indexOf('runEmbedPoint') < embedBranch.indexOf('loadZip'),
+  '14i Address lat/lng is tried BEFORE loadZip — a zip hint on an Address embed must not switch it to ZIP mode');
+ok(/#mapFullView\{display:none\}/.test(m1),
+  '14j the control is hidden on the full Development page');
+ok(/\.hs-embed #mapFullView\{/.test(hide) && /display:inline-flex/.test(hide.slice(hide.indexOf('.hs-embed #mapFullView'))),
+  '14k ...and shown only in embed mode, overlaid on the canvas');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
