@@ -42,6 +42,14 @@ ok(!/Change your zip code/.test(shellHtml) && !/Change your zip code/.test(shell
   'Fix 11 the loc-modal title is Add, not Change — Change is the Switch-place verb');
 ok(/: 'Add a zip code'/.test(shell),
   'Fix 11 openLoc (non-onboarding) sets Add a zip code, matching the chip that opens it');
+ok(/HS\.paintFollowedZipStrip = function/.test(shell),
+  'Fix 11 the Add-zip strip is a shared shell painter, not ZIP-page-only markup');
+ok(/alerts\|property\|development\|community/.test(shell),
+  'Fix 11 the shared painter mounts on Alerts, Address, Development, and ZIP pages');
+ok(/paintFollowedZipStrip/.test(prop),
+  'Fix 11 the Address dossier re-paints the Add-zip strip after it rebuilds .ph');
+ok(!/paintFollowedZipStrip/.test(dash),
+  'Dashboard does not mount the dashed ZIP strip (it has + Add ZIP Code)');
 ok(!/Follow this community/.test(cpage) && !/Your communities/.test(cpage),
   'A-002 the public ZIP page no longer calls a ZIP a community');
 ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHtml),
