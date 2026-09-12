@@ -196,6 +196,13 @@ HS.onReady(async function () {
       } catch (e) { p = null; }
     }
     if (!p) { missingRecord(); return; }
+    // THIS RECORD OWNS THE VIEWING CHIP. Opening a project dossier is looking at ONE
+    // listed location. ensureViewedZip above only names the ZIP, so the chip stayed
+    // "ZIP 78617" on Pearce Lane even though My Places already showed 11921 PEARCE LN
+    // from the same p.address field. precise:true so a saved Address in this ZIP cannot
+    // steal the chip (Gate 4). Does not write myZip, does not insert app_properties,
+    // does not selectProperty — a project is not a saved home.
+    applyRecordView(p);
     HS.data.meetings(p.zip || S.zip, home).then(function (meetings) {
       var mtg = HS.bestMeeting(meetings, p.id);   // soonest UPCOMING first, else latest held
       // Timeline: only sourced milestones — filing date, record stage/status, or a
@@ -237,6 +244,8 @@ HS.onReady(async function () {
         : '';
 
       var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
+      var listedAddr = listedAddress(p);
+      var backHref = HS.navHref('development.html', S.zip);
       // "Why this matters" (Sprint-3): four evidence-based answers + what the
       // record does and doesn't establish — shared backbone lib/why.js.
       var wd = HS.whyDerive(p, {
@@ -252,7 +261,7 @@ HS.onReady(async function () {
         ? '<div class="impacts">' + HS.tpl.impactChips(dims) + '</div>'
         : '';
       page.innerHTML =
-        '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+        '<button class="backbtn" onclick="location.href=\'' + HS.esc(backHref) + '\'">← Back to development</button>'
         + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
         + '<div class="detail"><div class="panel">'
         + '<div class="kicker">The bottom line</div>'
@@ -272,6 +281,7 @@ HS.onReady(async function () {
         + '<button class="btn" onclick="location.href=\'' + HS.esc(HS.navHref('homesignalmap.html', S.zip)) + '\'">See it on the map</button>'
         + projectFollowButton(p) + '</div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
+        + (listedAddr ? specRow('Address', listedAddr) : '')
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
         + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
         + '</div>' + (p.approx ? '<p style="font-size:11.5px;color:var(--ink-2);margin:12px 0 0">Some details are still preliminary while county records sync — the official record is the source of truth.</p>' : '') + '</div></div>';
@@ -283,6 +293,7 @@ HS.onReady(async function () {
   // is SAID to be absent, never guessed. Enforcement zeros render as a positive signal
   // ONLY while compliance tracking is on (§5) — otherwise the tracking-off caveat shows.
   function renderFacility(f) {
+    applyRecordView(f);
     var fenv = f.facility_env || null;
     var interp = HS.fac.interpret(fenv);
     var sigs = HS.fac.signals(fenv);
@@ -314,8 +325,10 @@ HS.onReady(async function () {
       return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
     }).join('');
 
+    var listedAddr = listedAddress(f);
+    var backHref = HS.navHref('development.html', S.zip);
     page.innerHTML =
-      '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+      '<button class="backbtn" onclick="location.href=\'' + HS.esc(backHref) + '\'">← Back to development</button>'
       + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status active">Operating</span></div>'
       + '<h1 style="margin-bottom:2px">' + HS.esc(f.name) + '</h1>'
       + '<p style="margin:6px 0 0">An existing regulated facility on the public record — environmental context, not development activity.</p></div>'
@@ -328,6 +341,7 @@ HS.onReady(async function () {
       + '</div>'
       + '<div class="panel side"><div class="kicker">Identity</div><div class="specs">'
       + specRow('Facility', f.name) + specRow('Type', f.type)
+      + (listedAddr ? specRow('Address', listedAddr) : '')
       + specRow('FRS Registry ID', f.registry_id)
       + specRow('Statutes', statutes.join(', '))
       + specRow('TCEQ RN', fenv && fenv.tceq_rn)
@@ -335,6 +349,16 @@ HS.onReady(async function () {
       + '</div>'
       + '<div class="divider"></div><div class="kicker">Source — official records</div><div class="doact">' + linksHtml + '</div>'
       + '</div></div>';
+  }
+  function listedAddress(rec) {
+    if (!rec || rec.address == null) return '';
+    return String(rec.address).trim();
+  }
+  function applyRecordView(rec) {
+    if (!rec) return;
+    if (rec.zip && /^\d{5}$/.test(String(rec.zip))) HS.state.zip = String(rec.zip);
+    var addr = listedAddress(rec);
+    if (addr && typeof HS.setViewLabel === 'function') HS.setViewLabel(addr, { precise: true });
   }
   function projectFollowButton(p) {
     var following = !!(HS.isFollowing && HS.isFollowing('project', p.id));
