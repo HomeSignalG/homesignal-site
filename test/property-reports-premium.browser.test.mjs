@@ -214,10 +214,15 @@ const CFG = String(await readFile(join(root, 'config.js'), 'utf8'));
 const SUPA_URL = (CFG.match(/SUPABASE_URL:\s*'([^']+)'/) || [])[1];
 const SUPA_KEY = (CFG.match(/SUPABASE_ANON_KEY:\s*'([^']+)'/) || [])[1];
 const rpcProbe = async (fn, body) => {
+  // BOUNDED ON PURPOSE. Node's fetch has NO default timeout, so an endpoint that
+  // accepts the connection and then stalls would hang the whole browser job rather
+  // than reporting DID NOT RUN. A probe that can block CI forever is a bad instrument
+  // even when it is passing today.
   const r = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000)
   });
   return { status: r.status, json: await r.json().catch(() => ({})) };
 };

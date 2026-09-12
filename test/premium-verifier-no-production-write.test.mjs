@@ -95,11 +95,29 @@ const interceptedAt = (src, at) => {
   return timeline.length ? timeline[timeline.length - 1].on : false;
 };
 
-const browserSuites = readdirSync(testDir)
-  .filter((f) => f.endsWith('.browser.test.mjs'))
-  .sort();
+// ⚠️ THE SET IS THE RUNNER'S, NOT THE FILENAME'S — and that distinction is the
+// whole gate. scripts/run-unit-tests.mjs decides what a browser suite is by whether
+// the file IMPORTS PLAYWRIGHT, deliberately, "because a list drifts". Measured:
+// 27 suites import playwright and only 18 are named *.browser.test.mjs, so a
+// filename scan silently skipped NINE playwright suites — among them
+// dashboard-browser.test.mjs and the five acquisition-video-producer files, which
+// drive the Acquisition surface. None touches the Premium modal today; the point is
+// that the gate could not have seen it if one did.
+const PLAYWRIGHT = /(?:from|import\(|require\()\s*['"]playwright['"]/;
+const runnerSrc = readFileSync(join(root, 'scripts/run-unit-tests.mjs'), 'utf8');
+ok(runnerSrc.indexOf(String(PLAYWRIGHT)) >= 0,
+  '0a the suite set is derived with the RUNNER\'s own predicate, so the two cannot drift apart',
+  String(PLAYWRIGHT));
 
-ok(browserSuites.length > 0, '0 browser suites were found (the scan is not vacuous)', browserSuites.length);
+const allTests = readdirSync(testDir)
+  .filter((f) => f.endsWith('.test.mjs') || f.endsWith('.test.ts'))
+  .sort();
+const browserSuites = allTests.filter((f) => PLAYWRIGHT.test(readFileSync(join(testDir, f), 'utf8')));
+
+ok(browserSuites.length > 0, '0b browser suites were found (the scan is not vacuous)', browserSuites.length);
+ok(browserSuites.length >= allTests.filter((f) => f.endsWith('.browser.test.mjs')).length,
+  '0c the scanned set is a SUPERSET of the .browser.test.mjs names (the 9 unnamed suites are covered)',
+  { byImport: browserSuites.length, byName: allTests.filter((f) => f.endsWith('.browser.test.mjs')).length });
 
 // ── 1. THE INVARIANT, over every browser suite ────────────────────────────────
 let submittingSuites = 0;
