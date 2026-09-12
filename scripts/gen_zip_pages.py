@@ -341,7 +341,7 @@ def render(p, built):
         # document - lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
-        '<link rel="stylesheet" href="/app.css">\n</head>\n'
+        '<link rel="stylesheet" href="/app.css?v=02a9a715">\n</head>\n'
         f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
