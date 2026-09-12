@@ -357,9 +357,9 @@ def render(p, built):
         # test/zip-page-shared-runtime.test.mjs so the next shared dependency cannot ship to
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=ae8a117e"></script>\n'
-        '<script src="/shell.js?v=c2256cac"></script>\n'
+        '<script src="/shell.js?v=12df1b2e"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=c9fe338d"></script>\n'
+        '<script src="/lib/community-page.js?v=32da0257"></script>\n'
         "</body>\n</html>\n")
 
 

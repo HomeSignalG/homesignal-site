@@ -26,6 +26,12 @@ function render(opts) {
     followedCommunities: () => opts.zips || [],
     esc: (s) => String(s == null ? '' : s),
     isRealHome: (p) => !!(p && p.tag === 'Your home'),
+    placeDisplayTag: (p, fallback) => {
+      var raw = p && (p.tag || p.label);
+      if (!raw) return fallback || 'Address';
+      if (/^(your home|my home|home)$/i.test(String(raw).trim())) return fallback || 'Address';
+      return String(raw);
+    },
     openModal: () => { captured.opened = true; }
   };
   const state = {
@@ -88,6 +94,8 @@ ok(/class="swrow active" onclick="HS\.switchProperty\('h1'\)"/.test(mixed.html),
   'when the saved home is the current view, the Address row is checked');
 ok(!/class="swrow active" onclick="HS\.switchZip\('78617'\)"/.test(mixed.html),
   '...and the ZIP Code in that same area is not also checked');
+ok(!/Your home/i.test(mixed.html),
+  'Fix 9: mixed HTML never labels a saved address as the user\'s home', mixed.html.slice(0, 240));
 
 console.log(fails ? '\n' + fails + ' failed' : '\nAll place-switcher render assertions passed.');
 process.exit(fails ? 1 : 0);

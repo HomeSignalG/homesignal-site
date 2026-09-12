@@ -320,12 +320,12 @@
   /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
      offered there - showing it would invite a circle around a ZIP centre. */
   body.zipmode .radsel{display:none}
-  /* "From home" re-frames the 3D view around the resident's HOME. In ZIP mode there IS no
-     home - a ZIP centroid is a page anchor, not somebody's house - so the control promises a
-     place the page cannot show. Written fail-closed (hidden unless `hashome` is set by a real
-     address search) rather than "hidden in zipmode", so any future no-HOME state inherits the
-     correct behaviour instead of leaking the control. Same standard the radius control already
-     applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED HOME CENTRE." */
+  /* "From this place" re-frames the 3D view around the searched ADDRESS. In ZIP mode there
+     is no address pin - a ZIP centroid is a page anchor, not a saved place - so the control
+     promises a place the page cannot show. Written fail-closed (hidden unless `hashome` is
+     set by a real address search) rather than "hidden in zipmode", so any future no-address
+     state inherits the correct behaviour instead of leaking the control. Same standard the
+     radius control already applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED CENTRE." */
   body:not(.hashome) #homeViewBtn{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
@@ -602,7 +602,7 @@
       <div class="grid stacked">
         <div class="card mapcard">
           <div class="map-bar">
-            <div class="map-cap">Development around this home</div>
+            <div class="map-cap">Development around this address</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div class="viewseg" id="viewSeg">
               <button data-v="2d" class="on">2D map</button>
@@ -700,7 +700,7 @@
                     <button class="c3-btn c3-z" id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button>
                   </span>
                   <span class="c3-time" title="Time of day">☀<input type="range" id="todSlider" min="0" max="100" value="64"></span>
-                  <button class="c3-btn" id="homeViewBtn">👁 From home</button>
+                  <button class="c3-btn" id="homeViewBtn">👁 From this place</button>
                 </div>
               </div>
             </div>
@@ -819,13 +819,13 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/map.js?v=969ce603"></script>
+<script src="lib/map.js?v=ea30843b"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260907b"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=c2256cac"></script>
+<script src="shell.js?v=12df1b2e"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1158,7 +1158,7 @@ HS.onReady(function(){
     var m = document.getElementById("robots-meta");
     if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
   }
-  // HomeSignal house logo, reused as the "your home" marker across all three maps.
+  // HomeSignal house logo, reused as the saved-place marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
   // ONE lifecycle authority. Delegates to the shared resolver (lib/map.js
@@ -1589,7 +1589,7 @@ HS.onReady(function(){
     // so "N mi from home" would be distance from a ZIP centroid. Area items' raw e/n
     // come from the engine's untrusted jurisdiction coordinate anyway.
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
+    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var h = envHeadline(s);
     var tyStyle = h ? " style='color:"+envColor(h.tone,true)+"'" : "";
     return "<div class='n'>"+esc(s.label||"")+"</div>"+
@@ -1606,7 +1606,7 @@ HS.onReady(function(){
   // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
   function infoCard3(s){
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
+    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var link = s.url || s.record_url || "";
     // Type line: bare facility type for points (env shows in its own block below, not duplicated);
     // jurisdiction framing for area notices.
@@ -1932,7 +1932,7 @@ HS.onReady(function(){
     // a radius change re-enters (radSel -> run(CUR_ADDRESS)), and after snapRadiusForAddress()
     // above, so it can never state a radius the search did not use.
     var _cap2 = document.querySelector(".map-cap");
-    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this home"; }
+    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this address"; }
     // THE PAGE'S LARGEST TYPE HAS TO CHANGE MODE TOO — authorized change B.
     // The heading pair, the map caption, the counters and the way back all moved to
     // address-mode wording in #1070. The HERO did not: arriving here from a ZIP view left
@@ -1943,7 +1943,7 @@ HS.onReady(function(){
     // rendered kicker "Development overview" / H1 "ZIP 78617".
     // loadZip() already restores all four for the ZIP view, so this is the missing half of
     // a switch that was only ever written in one direction.
-    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Near-home view";
+    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Address view";
     var _h1A = document.querySelector(".head h1");
     if(_h1A) _h1A.textContent = "Development around this address";
     var _subA = document.querySelector(".sub");
@@ -2449,7 +2449,7 @@ HS.onReady(function(){
     if(!HOME_ANCHOR){
       var homeIcon = L.divIcon({ className:"homepin", html:HOME_SVG, iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-16] });
       L.marker([home.lat, home.lng], { icon:homeIcon, zIndexOffset:1000 })
-        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")
+        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Address</div>")
         .bindTooltip(esc(LAST_ADDR), { direction:"top" }).addTo(layerGroup);
     }
 
@@ -2948,7 +2948,7 @@ HS.onReady(function(){
     // Real straight-line distance from the home (e/n are miles East/North of the home).
     var dist = siteDistMi(s);
     var distStr = (s.scope==="point" && dist!=null && !ZIP_MODE)
-      ? (dist<0.1 ? " · at this address" : " · "+(Math.round(dist*10)/10)+" mi from home") : "";
+      ? (dist<0.1 ? " · at this address" : " · "+(Math.round(dist*10)/10)+" mi from this address") : "";
     // Honesty note on area dots: their spot on the map is representative, not a site address.
     var approxNote = s.scope==="area"
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>County/city-wide notice — dot placed within the "
@@ -3356,7 +3356,7 @@ HS.onReady(function(){
     var pad=new THREE.Mesh(new THREE.CircleGeometry(13,40),new THREE.MeshBasicMaterial({color:0x13b89a,transparent:true,opacity:.40}));pad.rotation.x=-Math.PI/2;pad.position.y=.4;G.add(pad);
     var base=new THREE.Mesh(new THREE.BoxGeometry(11,9,11),new THREE.MeshStandardMaterial({color:0x1f5130,roughness:.6}));base.position.y=4.5;base.castShadow=true;base.receiveShadow=true;G.add(base);
     var roof=new THREE.Mesh(new THREE.ConeGeometry(9.2,6,4),new THREE.MeshStandardMaterial({color:0x2f7d4f,roughness:.6}));roof.position.y=12;roof.rotation.y=Math.PI/4;roof.castShadow=true;G.add(roof);
-    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Your home","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
+    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Saved place","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
   }
 
   // Fixed reference rings: ½, 1, 2, 3, 5, 10, 20 mi — show each that fits inside the framed extent.
@@ -3687,7 +3687,7 @@ HS.onReady(function(){
     // Home marker only after an address search — never for a bare ZIP centroid.
     if(!HOME_ANCHOR){
       GL.homeMarker=new maplibregl.Marker({element:homePinEl()}).setLngLat([GL.home.lng,GL.home.lat])
-        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")).addTo(GL.map);
+        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Address</div>")).addTo(GL.map);
     }
     MAP_SITES.forEach(function(s){
       var ll=siteLL(s);
@@ -4657,8 +4657,8 @@ HS.onReady(function(){
     var token = ++REQ_SEQ;
     N5_NOTE = "";
     var _cap = document.querySelector(".map-cap");
-    if(_cap){ _cap.textContent = "Development within " + radiusLabel(radius) + " of this home"; }
-    status("Pulling public records within " + radiusLabel(radius) + " of this home …");
+    if(_cap){ _cap.textContent = "Development within " + radiusLabel(radius) + " of this address"; }
+    status("Pulling public records within " + radiusLabel(radius) + " of this address …");
     // ⚠️ THE EPA FACILITY LAYER IS NOT IN THIS PIPELINE, AND THAT IS A CONSEQUENCE OF THE
     // URL SHAPE RATHER THAN AN OMISSION. run() gets facilities from the get-address-report
     // edge function, whose address mode requires an `address` STRING and geocodes it

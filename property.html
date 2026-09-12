@@ -24,7 +24,7 @@
      because it drew the map itself; nothing on this page draws a map any more, and
      carrying them would be a second copy of a runtime that lives one frame away. -->
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=c2256cac"></script>
+<script src="shell.js?v=12df1b2e"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -54,7 +54,7 @@ HS.onReady(async function () {
   }
   function identityHtml(home) {
     return '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
-      + '<div class="ph"><div class="eyebrow">' + HS.esc(home.tag||home.label) + '</div><h1>' + HS.esc(home.address) + '</h1>'
+      + '<div class="ph"><div class="eyebrow">' + HS.esc(HS.placeDisplayTag(home, 'Address')) + '</div><h1>' + HS.esc(home.address) + '</h1>'
       + '<p>' + HS.esc(home.city) + ', ' + HS.esc(home.state) + ' ' + HS.esc(home.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>';
   }
   function failHtml(msg) {
@@ -177,7 +177,7 @@ HS.onReady(async function () {
           + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
           + '<h3>' + HS.esc(pr.name) + '</h3>'
           + HS.tpl.devImpactBlock(pr)
-          + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<p class="sowhat"><b>Effect at this address:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
           + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
       }).join('')
     + '</div>'

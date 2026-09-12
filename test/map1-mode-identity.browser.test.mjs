@@ -151,7 +151,7 @@ ok(/CALDWELL/i.test(a.scopeLine || ''), '2b ...centred on the matched address', 
 ok(!/ZIP 78617/.test(a.h1 || ''), '2c the H1 no longer makes the whole-ZIP claim', a.h1);
 ok(/around this address/i.test(a.h1 || ''), '2d ...it names the address view', a.h1);
 ok(!/Development overview/i.test(a.kicker || ''), '2e the kicker is no longer the ZIP overview', a.kicker);
-ok(/Near-home view/i.test(a.kicker || ''), '2f ...it names the near-home mode', a.kicker);
+ok(/Address view/i.test(a.kicker || ''), '2f ...it names the address mode', a.kicker);
 // The ZIP standfirst no longer carries the ZIP NUMBER, so "does it say 'across ZIP'" would pass
 // on both modes and discriminate nothing. What the mode switch owes the resident is that the
 // address hero is not the ZIP hero, so that is what is asserted — with the old claim kept beside it.
@@ -169,7 +169,7 @@ await page.click('#radSel button[data-r="5"]');
 await waitAddr(page); await page.waitForTimeout(900);
 const r5 = await hero(page);
 ok(/within 5 miles of$/.test(r5.heading || ''), '3a the radius change took effect', r5.heading);
-ok(/around this address/i.test(r5.h1 || '') && /Near-home view/i.test(r5.kicker || ''),
+ok(/around this address/i.test(r5.h1 || '') && /Address view/i.test(r5.kicker || ''),
   '3b the hero still names the address view after it', { h1: r5.h1, kicker: r5.kicker });
 
 // ══════════════ 4. THE SWITCH RUNS BOTH WAYS ══════════════
@@ -199,7 +199,7 @@ await p2.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
 await p2.click('#go');
 await waitAddr(p2); await p2.waitForTimeout(600);
 const d = await hero(p2);
-ok(/around this address/i.test(d.h1 || '') && /Near-home view/i.test(d.kicker || ''),
+ok(/around this address/i.test(d.h1 || '') && /Address view/i.test(d.kicker || ''),
   '5b a direct address search gets the same address-mode identity', { h1: d.h1, kicker: d.kicker });
 
 ok(pageErrors.length === 0, '6 the whole journey ran with no fatal client error', pageErrors);

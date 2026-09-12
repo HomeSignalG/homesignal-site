@@ -14,7 +14,7 @@
     <div class="ph">
       <div class="eyebrow">My Places</div>
       <h1>My Places</h1>
-      <p>Everything HomeSignal watches for you. An <b>Address</b> is one home; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>projects</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a project does not turn on email alerts.</p>
+      <p>Everything HomeSignal watches for you. An <b>Address</b> is one location; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>projects</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a project does not turn on email alerts.</p>
     </div>
     <div class="strip" id="propStrip"></div>
     <div class="toolbar toolbar--lead">
@@ -39,7 +39,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=c2256cac"></script>
+<script src="shell.js?v=12df1b2e"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -110,7 +110,7 @@ HS.onReady(async function () {
     return '<div class="propcard" data-kind="address" data-id="' + HS.esc(p.id) + '">'
       + '<div class="miniscore">' + (p.score || '') + '</div>'
       + '<div class="pinfo">'
-      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(p.tag || p.label || 'Address') + '</div>'
+      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(HS.placeDisplayTag(p, 'Address')) + '</div>'
       + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
       + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs === 1 ? 's' : '') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
       + '<span>' + near.length + ' nearby projects</span>'

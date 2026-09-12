@@ -317,16 +317,19 @@ ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
 
-// ═══ 7b. POSITIVE CONTROL — on the home's own ZIP it is still "Your home" ═══
+// ═══ 7b. POSITIVE CONTROL — on the saved place's own ZIP it is still that address ═══
+// Fix 9: the chip names the geography as Viewing, never as "Your home".
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
 await page.waitForTimeout(300);
 c = await chrome();
-info('ZIP 78617 with the same saved home', c.locLabel);
-ok(/^Your home · 13313 COOMES DR/.test(c.locLabel || ''),
-  '7b on the home\'s OWN ZIP the control still says "Your home"', c.locLabel);
+info('ZIP 78617 with the same saved place', c.locLabel);
+ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
+  '7b on the saved place\'s OWN ZIP the control says "Viewing · <street>"', c.locLabel);
+ok(!/your home/i.test(c.locLabel || ''),
+  '7b the chip does not call the saved address "Your home"', c.locLabel);
 
 // ═══ 8. Address mode still reaches the established experience ═══
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
@@ -450,8 +453,8 @@ ok(c.totalTileShown === true,
 ok(!/across this ZIP/i.test(c.kDev || ''), '12d no ZIP-mode scope copy leaks into address mode', c.kDev);
 // The caption sits ON the map canvas, so it names the radius too - a resident reading the pins
 // should not have to look back up at the heading to know what circle they are inside.
-ok(/^Development within .+ of this home$/.test((c.mapCap || '').trim()),
-  '12e the address map caption names the radius, not just "around this home"', c.mapCap);
+ok(/^Development within .+ of this address$/.test((c.mapCap || '').trim()),
+  '12e the address map caption names the radius, not just "around this address"', c.mapCap);
 
 // ── 13. THE TWO MODES ARE NOT A ONE-WAY DOOR ───────────────────────────────────────────
 // run() flips ZIP_MODE in JS and never touches the URL, so before the back control existed a
@@ -509,7 +512,7 @@ ok(bzZip.scopeNoteShown === true,
 // A ZIP centroid is a page anchor, not somebody's house. A control offering to re-frame the
 // view "from home" promises a place the page does not have.
 ok(bzZip.homeBtnShown === false,
-  '13h ZIP mode hides the HOME-specific "From home" control - there is no home here', bzZip);
+  '13h ZIP mode hides the address-specific "From this place" control - there is no saved address here', bzZip);
 
 // ── 14. THE NOT-MEASURED STATE IS SAYABLE OUT LOUD ─────────────────────────────────────
 // Launch-gate task 6: a resident must be able to explain what "not measured" means. The
@@ -573,7 +576,7 @@ const after15 = await page.evaluate(() => ({
 info('radius change', { before: before15, after: after15 });
 ok(/Showing development within 2 miles of/.test(after15.within),
   '15a the heading restates the NEW radius', after15.within);
-ok(/^Development within 2 miles of this home$/.test(after15.cap.trim()),
+ok(/^Development within 2 miles of this address$/.test(after15.cap.trim()),
   '15b the map caption restates the NEW radius too', after15.cap);
 ok(before15.cap.trim() !== after15.cap.trim(),
   '15c ...and it actually CHANGED (not a caption that happens to match)',

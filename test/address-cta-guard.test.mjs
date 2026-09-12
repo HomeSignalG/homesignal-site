@@ -57,6 +57,7 @@ const MUST_MATCH = {
   // Shipped until the helper sentence was removed; kept because every string in this list is
   // REAL, and a wording the page once carried must not start failing the guard.
   'the former helper text (#1090)': 'Choose an address from the suggestions, press Enter, or click search.',
+  'the CURRENT not-measured note (Fix 9)': 'Development coverage for ZIP 08005 is not measured yet — we will not estimate it from a circle around the ZIP centre. Enter an address for the live view around that address.',
   'the shipped not-measured note': 'Development coverage for ZIP 08005 is not measured yet — we will not estimate it from a circle around the ZIP centre. Enter an address for the live view around your home.',
   "#1086's ZIP-mode hint": 'Enter a street address to switch from ZIP-wide results to development nearby.',
   "#1079's ZIP-mode hint": 'Enter an address to see development nearby.',
