@@ -40,6 +40,38 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-12 — OPEN ITEM: the Premium waitlist is ~88% CI traffic, so its KPI reads mostly robot
+
+**Found while auditing Fix 15. Explicitly OUT OF SCOPE of Fix 15 by founder instruction, and
+deliberately NOT fixed there — recorded here for founder review, per Rule 16.**
+
+`public.app_premium_waitlist` held **42 rows**, of which **37 match
+`^agent\.pr\.reports\.[0-9]+@homesignal\.net$`** — rows written by another session's live
+browser verification of `reports.html`, all carrying `source = '/reports.html?id=p2'`, arriving
+between 14:18 and 22:41 on 2026-09-12. A 38th is a different `@homesignal.net` address. So
+**only ~4 of 42 rows are genuine prospects**, and the Acquisition dashboard's "Premium
+prospects" tile is counting CI runs.
+
+- **This is not caused by Fix 15 and is not made worse by it.** Fix 15 changed the KPI's
+  *definition* (`count(distinct email)` rather than `count(*)`), which is correct either way;
+  it does not change *which rows exist*. Under the new multi-interest key these rows stay one
+  signal each, exactly as before.
+- **Nothing was deleted.** The Fix 15 migration preserved all 42 rows (0 deleted, 0
+  relabelled), and the founder instruction was explicit that this cleanup must not ride along
+  with a schema migration.
+- **The verifier is a live-write test against production.** Every green run of the
+  `reports.html` Premium browser check appends a permanent row, so the pollution GROWS with CI
+  frequency — it is not a one-off backlog.
+- **Two candidate directions, neither chosen here:** (a) point the verifier at a disposable
+  identity the dashboard excludes, or give it a teardown; (b) leave the writes and exclude the
+  pattern at the read (`hs_premium_waitlist`), which keeps the audit trail but bakes a regex
+  into a KPI. (a) is cleaner; (b) is smaller. **Founder call.**
+- ⚠️ **Do not "fix" this by deleting the rows alone** — the verifier would refill them by the
+  next CI run, and the deletion would look like it worked.
+
+Receipts are in the Fix 15 session audit; re-measure before acting, since the count moves with
+every CI run (39 → 41 → 42 observed within one session).
+
 ### 2026-09-06 — MAP 1 MODE IDENTITY: the hero was the last surface still claiming the ZIP
 
 **Re-scoped after a concurrency check, and the re-scope is the finding.** The founder's
