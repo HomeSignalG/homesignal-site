@@ -36,8 +36,12 @@ for (const [f, body] of [['properties.html', props], ['property.html', prop],
 // use the same ZIP-code vocabulary as Dashboard / My Places.
 ok(cpage.includes('＋ Follow this zip code') && /Your zip codes/.test(cpage),
   'A-002 public ZIP Follow copy and followed-list heading say zip code');
-ok(/Your zip code/.test(shellHtml) && /Change your zip code/.test(shellHtml),
+ok(/Your zip code/.test(shellHtml) && /Add a zip code/.test(shellHtml),
   'A-002 the loc-modal acquisition copy says zip code');
+ok(!/Change your zip code/.test(shellHtml) && !/Change your zip code/.test(shell),
+  'Fix 11 the loc-modal title is Add, not Change — Change is the Switch-place verb');
+ok(/: 'Add a zip code'/.test(shell),
+  'Fix 11 openLoc (non-onboarding) sets Add a zip code, matching the chip that opens it');
 ok(!/Follow this community/.test(cpage) && !/Your communities/.test(cpage),
   'A-002 the public ZIP page no longer calls a ZIP a community');
 ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHtml),
