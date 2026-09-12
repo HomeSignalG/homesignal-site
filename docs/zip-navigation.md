@@ -42,7 +42,21 @@ likewise no longer elects `properties[0]` as the active Address; any election is
 the property being in the viewed ZIP.
 
 Only these may change the viewed place, and each is an **explicit** resident action:
-`followCommunity` · `switchProperty` · `switchZip` · a `?zip=` navigation.
+`followCommunity` · `switchProperty` · `switchZip` · a `?zip=` navigation ·
+**opening an Address dossier**.
+
+**The Address dossier is a place-selection.** `property.html?id=` is about ONE Address, so
+once it resolves a real `p` with a 5-digit `p.zip` it writes the viewed ZIP from it
+(`HS.state.zip = p.zip`) and the setter re-stamps all tool chrome. Without that write the
+sidebar, the bell and in-page links stamped whatever leftover session geography the tab
+held: from the Coomes dossier (78617) Alerts opened **78657**, a different place.
+`selectProperty` writes `activePropId` only — it has never set geography.
+
+- The ADDRESS's ZIP wins here, deliberately **not** `ensureViewedZip(p.zip)`: this page's
+  identity is `?id=`, so a stray `?zip=` must not outrank the Address on screen.
+- It writes the **viewed** ZIP only, never `myZip` — opening a dossier is not a re-homing.
+- `property.html` is **not** in `ZIP_NAV_PAGES` (it is addressed by `?id=`), and Alerts stays
+  area-scoped: this routes geography, it does not create per-address Alerts.
 
 ### The helpers
 
@@ -123,6 +137,7 @@ Run via `node scripts/run-unit-tests.mjs`.
 - `test/navigation-viewing-switch.test.mjs` — the Viewing control switches place (Gate 3)
 - `test/navigation-place-identity.test.mjs` — tool vs place in the UI (Gate 4)
 - `test/navigation-history.test.mjs` — Back/Forward restore a coherent place
+- `test/navigation-address-dossier-zip.test.mjs` — the Address dossier owns tool-nav geography
 - `test/nav-identity.test.mjs` — A-021 four-container sidebar (owns that pin)
 
 ## Related
