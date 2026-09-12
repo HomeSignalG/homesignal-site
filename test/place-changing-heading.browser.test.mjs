@@ -77,6 +77,16 @@ const base = 'http://127.0.0.1:' + server.address().port;
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext();
+// Poison account/default geography BEFORE any Place page, without visiting
+// index.html first. CI aborted the follow-up community.html navigation
+// (net::ERR_ABORTED) when a previous document was still hydrating.
+await ctx.addInitScript(() => {
+  try {
+    localStorage.setItem('myZip', '78744');
+    sessionStorage.setItem('viewZip', '78725');
+    localStorage.setItem('myCommunities', JSON.stringify([{ zip: '78719', name: 'Austin (ABIA)', state: 'TX' }]));
+  } catch (e) { /* about:blank / opaque origins */ }
+});
 const page = await ctx.newPage();
 const pageErrors = [];
 page.on('pageerror', e => {
@@ -101,6 +111,16 @@ await page.route('**/*', async (route) => {
 });
 
 const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+
+async function go(path) {
+  const url = path.startsWith('http') ? path : base + path;
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+  } catch (e) {
+    if (!/ERR_ABORTED|interrupted/i.test(String(e))) throw e;
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+  }
+}
 
 async function shot(name) {
   if (!existsSync(ART)) return;
@@ -155,18 +175,8 @@ console.log('='.repeat(78));
 console.log('PLACE CHANGING HEADING — browser, Address + ZIP, transitions');
 console.log('='.repeat(78));
 
-// Poison account/default geography BEFORE any Place page. If the heading reads
-// these, the binding is wrong even when the URL is explicit.
-await page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
-await waitShell();
-await page.evaluate(() => {
-  localStorage.setItem('myZip', '78744');
-  sessionStorage.setItem('viewZip', '78725');
-  localStorage.setItem('myCommunities', JSON.stringify([{ zip: '78719', name: 'Austin (ABIA)', state: 'TX' }]));
-});
-
 // ═══ 1. Direct URL load — ZIP A ═════════════════════════════════════════════
-await page.goto(base + '/community.html?zip=' + ZIP_A, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_A);
 await waitShell();
 const zA = await readZip();
 info('ZIP A', zA);
@@ -179,14 +189,19 @@ ok(!/78744|78725|78719/.test(zA.heading), '1 ZIP A heading ignored poisoned myZi
 await shot('place-heading-zip-a.png');
 
 // ═══ 2. Browser refresh keeps ZIP A ═════════════════════════════════════════
-await page.reload({ waitUntil: 'domcontentloaded' });
+try {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+} catch (e) {
+  if (!/ERR_ABORTED|interrupted/i.test(String(e))) throw e;
+  await go('/community.html?zip=' + ZIP_A);
+}
 await waitShell();
 const zA2 = await readZip();
 ok(zA2.heading === 'See what is changing in ' + ZIP_A && zA2.zipParam === ZIP_A,
   '2 refresh keeps ZIP A heading and iframe zip=', zA2);
 
 // ═══ 3. Direct URL load — Address 1 ═════════════════════════════════════════
-await page.goto(base + '/property.html?id=' + P1.id, { waitUntil: 'domcontentloaded' });
+await go('/property.html?id=' + P1.id);
 await waitShell();
 const a1 = await readAddress();
 info('Address 1', a1);
@@ -200,7 +215,7 @@ ok(!a1.heading.includes(ZIP_A) && !a1.heading.includes('78744'),
 await shot('place-heading-address-1.png');
 
 // ═══ 4. Address → Address (no refresh) ══════════════════════════════════════
-await page.goto(base + '/property.html?id=' + P2.id, { waitUntil: 'domcontentloaded' });
+await go('/property.html?id=' + P2.id);
 await waitShell();
 const a2 = await readAddress();
 info('Address 2', a2);
@@ -210,7 +225,7 @@ ok(near(a2.lat, P2.lat) && near(a2.lng, P2.lng), '4 Address 2 iframe is p2\'s sa
 await shot('place-heading-address-2.png');
 
 // ═══ 5. Address → ZIP C (no refresh) ════════════════════════════════════════
-await page.goto(base + '/community.html?zip=' + ZIP_C, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_C);
 await waitShell();
 const zCfromAddr = await readZip();
 ok(zCfromAddr.heading === 'See what is changing in ' + ZIP_C, '5 Address → ZIP C heading is "in" + 78612', zCfromAddr.heading);
@@ -219,7 +234,7 @@ ok(!zCfromAddr.heading.includes(P2.address) && !zCfromAddr.heading.includes(P1.a
 ok(zCfromAddr.zipParam === ZIP_C && !zCfromAddr.lat, '5 ZIP C iframe is 78612 area, not an address point', zCfromAddr);
 
 // ═══ 6. ZIP → ZIP (no refresh) ══════════════════════════════════════════════
-await page.goto(base + '/community.html?zip=' + ZIP_A, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_A);
 await waitShell();
 const zA3 = await readZip();
 ok(zA3.heading === 'See what is changing in ' + ZIP_A, '6 ZIP C → ZIP A heading flips to 78617', zA3.heading);
@@ -227,13 +242,13 @@ ok(!zA3.heading.includes(ZIP_C), '6 previous ZIP C did not survive', zA3.heading
 ok(zA3.zipParam === ZIP_A, '6 ZIP A iframe zip= matches');
 
 // ═══ 7. THE REQUIRED SEQUENCE: ZIP A → Address B → ZIP C without refresh ════
-await page.goto(base + '/community.html?zip=' + ZIP_A, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_A);
 await waitShell();
 const seqA = await readZip();
 ok(seqA.heading === 'See what is changing in ' + ZIP_A && seqA.zipParam === ZIP_A,
   '7a ZIP A: in 78617, iframe zip=78617', seqA);
 
-await page.goto(base + '/property.html?id=' + P2.id, { waitUntil: 'domcontentloaded' });
+await go('/property.html?id=' + P2.id);
 await waitShell();
 const seqB = await readAddress();
 ok(seqB.heading === 'See what is changing at ' + P2.address, '7b Address B: at 13100 Elroy Rd', seqB.heading);
@@ -243,7 +258,7 @@ ok(near(seqB.lat, P2.lat) && near(seqB.lng, P2.lng) && !seqB.zipParam,
   '7b iframe is Address B\'s point, not ZIP geography', seqB);
 await shot('place-heading-seq-address-b.png');
 
-await page.goto(base + '/community.html?zip=' + ZIP_C, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_C);
 await waitShell();
 const seqC = await readZip();
 ok(seqC.heading === 'See what is changing in ' + ZIP_C, '7c ZIP C: in 78612', seqC.heading);
@@ -255,7 +270,7 @@ await shot('place-heading-seq-zip-c.png');
 
 // ═══ 8. Narrow viewport: Address heading wraps without overflowing ══════════
 await page.setViewportSize({ width: 390, height: 844 });
-await page.goto(base + '/property.html?id=' + P1.id, { waitUntil: 'domcontentloaded' });
+await go('/property.html?id=' + P1.id);
 await waitShell();
 const wrap = await readAddress();
 ok(wrap.heading === 'See what is changing at ' + P1.address, '8 mobile still shows Address 1 heading', wrap.heading);
@@ -276,7 +291,7 @@ ok(!layout.overflowsViewport, '8 heading does not overflow the 390px viewport', 
 await shot('place-heading-mobile-wrap.png');
 
 await page.setViewportSize({ width: 390, height: 844 });
-await page.goto(base + '/community.html?zip=' + ZIP_A, { waitUntil: 'domcontentloaded' });
+await go('/community.html?zip=' + ZIP_A);
 await waitShell();
 const zipWrap = await readZip();
 ok(zipWrap.heading === 'See what is changing in ' + ZIP_A, '8b mobile ZIP heading still "in" 78617', zipWrap.heading);
