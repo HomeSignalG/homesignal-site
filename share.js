@@ -87,7 +87,7 @@
   // Place/topic-specific share text — never generic.
   function shareText() {
     return metaContent('hs:share-text') || metaContent('og:description') ||
-      "See what's being planned around your home — HomeSignal civic alerts.";
+      "See what's being planned around a place you follow — HomeSignal civic alerts.";
   }
 
   function isTouch() {

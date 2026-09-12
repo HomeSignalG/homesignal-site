@@ -70,9 +70,9 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=969ce603"></script>
+<script src="lib/map.js?v=36ef304f"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=a54d65f4"></script>
+<script src="shell.js?v=e4126072"></script>
 <script>
 HS.onReady(async function () {
   // Gate 2: the URL is authoritative at the moment of the fetch (shared helper —
@@ -110,10 +110,10 @@ HS.onReady(async function () {
   var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
   document.getElementById('dashHi').textContent = S.session
     ? (name ? 'Welcome back, ' + name : 'Welcome back')
-    : 'See what\'s changing around your home';
+    : 'See what\'s changing around this place';
   document.getElementById('dashSub').textContent = S.properties.length
-    ? S.properties.length + ' saved place' + (S.properties.length === 1 ? '' : 's') + ' — here\'s what needs you across them.'
-    : 'Add your home and we\'ll watch official county and permit records around it'
+    ? S.properties.length + ' saved place' + (S.properties.length === 1 ? '' : 's') + ' — here\'s what needs your attention across them.'
+    : 'Add an address and we\'ll watch official county and permit records around it'
       + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample ZIP code, Del Valle, TX.' : '.');
 
   // ---------------------------------------------------------------- module pools ----
@@ -232,7 +232,7 @@ HS.onReady(async function () {
   document.getElementById('dashProps').innerHTML = S.properties.map(function (p) {
     return '<a class="swrow swrow-link" href="property.html?id=' + encodeURIComponent(p.id) + '" data-place-id="' + HS.esc(p.id) + '">'
       + '<div class="miniscore">' + (p.score || '') + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(p.tag || p.label || 'home').toUpperCase()) + '</span></div>'
+      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(HS.placeDisplayTag(p, 'Address')).toUpperCase()) + '</span></div>'
       + '<div class="pa">' + HS.esc(p.city) + '</div></div></a>';
   }).join('');
   document.getElementById('dashProps').addEventListener('click', function (e) {
@@ -327,7 +327,7 @@ HS.onReady(async function () {
     return (b.impact_score || 0) - (a.impact_score || 0);
   })[0] || null;
   var reportRows = [
-    { icon: '⌂', t: (realHome ? realHome.address : 'Your home') + ' — Property Intelligence Report',
+    { icon: '⌂', t: (realHome ? realHome.address : 'This place') + ' — Property Intelligence Report',
       d: 'Score, nearby projects, risk & value outlook', href: 'dashboard.html#dashReports' },
     { icon: '◍', t: (c && c.zip ? c.zip : zip) + ' — Community Snapshot',
       d: 'What\'s changing across ' + ((c && c.name) || 'this area'), href: nav('community.html', mapCtx()) }

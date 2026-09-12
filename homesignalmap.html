@@ -6,16 +6,16 @@
 <!-- CSP: self + jsDelivr (leaflet / three.js / maplibre-gl), Supabase (edge fn + REST),
      and the map imagery hosts the three views need. MapLibre spins workers from blob:. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; font-src 'self'; form-action 'self'"/>
-<title>HomeSignal — Development around your home</title>
+<title>HomeSignal — Development around a place you follow</title>
 <!-- Default noindex; the page init flips this to index only for a Utah ZIP that has real, sourced content. -->
 <meta name="robots" content="noindex, nofollow" id="robots-meta"/>
-<meta name="description" content="See what's built and what's proposed near your home — EPA-registered facilities, planning hearings and open comment windows — every item linked to its official public record."/>
+<meta name="description" content="See what's built and what's proposed near a place you follow — EPA-registered facilities, planning hearings and open comment windows — every item linked to its official public record."/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
 <link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>
-<meta property="og:title" content="Development around your home — HomeSignal"/>
-<meta property="og:description" content="What's built and what's proposed near your home, every item linked to its official public record."/>
+<meta property="og:title" content="Development around a place you follow — HomeSignal"/>
+<meta property="og:description" content="What's built and what's proposed near a place you follow, every item linked to its official public record."/>
 <meta property="og:image" content="https://homesignal.net/og-default.png"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="https://homesignal.net/og-default.png"/>
@@ -559,7 +559,7 @@
   <div class="wrap">
     <div class="head">
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
-      <h1>Development around your home</h1>
+      <h1>Development around this place</h1>
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
         industrial facilities, data-center activity, planning hearings and open comment windows —
         every item linked to its official public record.</div>
@@ -819,13 +819,13 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=969ce603"></script>
+<script src="lib/map.js?v=36ef304f"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=20260904"></script>
 <script src="lib/zip-authoritative.js?v=20260907b"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=a54d65f4"></script>
+<script src="shell.js?v=e4126072"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1158,7 +1158,7 @@ HS.onReady(function(){
     var m = document.getElementById("robots-meta");
     if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
   }
-  // HomeSignal house logo, reused as the "your home" marker across all three maps.
+  // HomeSignal house logo, reused as the saved-place marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
   // ONE lifecycle authority. Delegates to the shared resolver (lib/map.js
@@ -2449,7 +2449,7 @@ HS.onReady(function(){
     if(!HOME_ANCHOR){
       var homeIcon = L.divIcon({ className:"homepin", html:HOME_SVG, iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-16] });
       L.marker([home.lat, home.lng], { icon:homeIcon, zIndexOffset:1000 })
-        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")
+        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Saved place</div>")
         .bindTooltip(esc(LAST_ADDR), { direction:"top" }).addTo(layerGroup);
     }
 
@@ -3356,7 +3356,7 @@ HS.onReady(function(){
     var pad=new THREE.Mesh(new THREE.CircleGeometry(13,40),new THREE.MeshBasicMaterial({color:0x13b89a,transparent:true,opacity:.40}));pad.rotation.x=-Math.PI/2;pad.position.y=.4;G.add(pad);
     var base=new THREE.Mesh(new THREE.BoxGeometry(11,9,11),new THREE.MeshStandardMaterial({color:0x1f5130,roughness:.6}));base.position.y=4.5;base.castShadow=true;base.receiveShadow=true;G.add(base);
     var roof=new THREE.Mesh(new THREE.ConeGeometry(9.2,6,4),new THREE.MeshStandardMaterial({color:0x2f7d4f,roughness:.6}));roof.position.y=12;roof.rotation.y=Math.PI/4;roof.castShadow=true;G.add(roof);
-    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Your home","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
+    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Saved place","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
   }
 
   // Fixed reference rings: ½, 1, 2, 3, 5, 10, 20 mi — show each that fits inside the framed extent.
@@ -3687,7 +3687,7 @@ HS.onReady(function(){
     // Home marker only after an address search — never for a bare ZIP centroid.
     if(!HOME_ANCHOR){
       GL.homeMarker=new maplibregl.Marker({element:homePinEl()}).setLngLat([GL.home.lng,GL.home.lat])
-        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")).addTo(GL.map);
+        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Saved place</div>")).addTo(GL.map);
     }
     MAP_SITES.forEach(function(s){
       var ll=siteLL(s);

@@ -39,7 +39,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=5f556744"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
-<script src="shell.js?v=a54d65f4"></script>
+<script src="shell.js?v=e4126072"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -110,7 +110,7 @@ HS.onReady(async function () {
     return '<div class="propcard" data-kind="address" data-id="' + HS.esc(p.id) + '">'
       + '<div class="miniscore">' + (p.score || '') + '</div>'
       + '<div class="pinfo">'
-      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(p.tag || p.label || 'Address') + '</div>'
+      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(HS.placeDisplayTag(p, 'Address')) + '</div>'
       + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
       + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs === 1 ? 's' : '') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
       + '<span>' + near.length + ' nearby projects</span>'

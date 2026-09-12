@@ -42,16 +42,19 @@ ok(at > 0 && branch > 0 && at < branch,
   'the place is named BEFORE the coverage branches, so honest-empty pages are named too',
   { at, branch });
 
-console.log('--- an AREA label must not overwrite a real saved home ---');
+console.log('--- an AREA label must not overwrite a real saved address ---');
 // setViewLabel(label) with no opts is a NON-precise (area) label. paintTopbar keeps
-// "Your home · <street>" for a real home in the viewed ZIP unless the label is `precise`
-// (a searched street address). So naming the area never steals the home affordance.
+// "Viewing · <street>" for a saved address in the viewed ZIP unless the label is `precise`
+// (a searched street address). So naming the area never steals the current-place affordance.
+// Fix 9: the chip never calls that address "Your home".
 ok(!/setViewLabel\(meta\.name[^)]*\{\s*precise/.test(cpage),
   'the ZIP-hub label is an AREA label, never flagged precise');
 ok(/const homeIsCurrent = !!\(p && String\(p\.zip\) === String\(state\.zip\) && !state\.viewLabelPrecise\);/.test(shell),
-  'paintTopbar still gates the home label on the home being IN the viewed ZIP');
-ok(/\(p && homeIsCurrent\)\s*\?\s*\(\(HS\.isRealHome\(p\) \? 'Your home · ' : ''\) \+ p\.address\)/.test(shell),
-  'a real home in the viewed ZIP still reads "Your home · <street>"');
+  'paintTopbar still gates the address label on the saved place being IN the viewed ZIP');
+ok(/\(p && homeIsCurrent\)\s*\?\s*\('Viewing · ' \+ p\.address\)/.test(shell),
+  'a saved address in the viewed ZIP reads "Viewing · <street>"');
+ok(!/'Your home · '/.test(shell),
+  'paintTopbar never prefixes the chip with "Your home · "');
 
 console.log('--- the label lives in the shared shell, not a page-local string ---');
 ok(/HS\.setViewLabel = function/.test(shell) && /function viewedLabel\(\)/.test(shell),

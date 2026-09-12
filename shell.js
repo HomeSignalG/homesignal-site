@@ -211,19 +211,29 @@
     const tail = [p.city, [p.state, p.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     return [p.address, tail].filter(Boolean).join(', ');
   };
-  // Is this row the resident's OWN home (never a demo/sample property)?
-  // app_properties rows are written with label:'home'; the seed's designated
-  // home is tagged 'Your home' (pure-seed preview only). Live-demo rows carry
-  // sample:true and are never presented as the visitor's own home.
+  // Is this row the account's designated saved address (never a demo/sample property)?
+  // INTERNAL: app_properties rows are written with label:'home'; the seed's designated
+  // address is tagged 'Your home' (pure-seed preview only). Those stored values are
+  // identifiers, not user-facing copy (Fix 9). Live-demo rows carry sample:true and
+  // are never presented as the visitor's own place.
   HS.isRealHome = function (p) {
     return !!(p && !p.sample && !p.demo
       && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
   };
-  // The active property IFF it's a real (non-sample) home located in the ZIP being
-  // viewed — the ONE test for "may I anchor the map / pin 'Your home' here". Returns
-  // null for a sample home, a home in a different ZIP, or none. Single source: maps /
-  // dashboard + the shared where-line all call this (no per-page copies — guarded by
-  // test/realhome.test.mjs).
+  // User-facing tag for a saved address. Stored 'Your home' / 'home' / 'my home'
+  // values are NOT shown — they assume residency. Type vocabulary stays Address
+  // (A-002); Rental/Family and other non-ownership tags pass through.
+  HS.placeDisplayTag = function (p, fallback) {
+    var raw = p && (p.tag || p.label);
+    if (!raw) return fallback || 'Address';
+    if (/^(your home|my home|home)$/i.test(String(raw).trim())) return fallback || 'Address';
+    return String(raw);
+  };
+  // The active property IFF it's a real (non-sample) saved address located in the ZIP
+  // being viewed — the ONE test for "may I anchor the map / pin this place here".
+  // Returns null for a sample row, an address in a different ZIP, or none. Single
+  // source: maps / dashboard + the shared where-line all call this (no per-page
+  // copies — guarded by test/realhome.test.mjs). Geography contract unchanged (Fix 6).
   HS.realHome = function () {
     var p = state.activeProperty;
     return (p && HS.isRealHome(p) && p.zip === state.zip) ? p : null;
@@ -547,18 +557,18 @@
     if (existing) {
       const upd = await HS.sb().from('app_properties').update(row)
         .eq('id', existing.id).eq('user_id', state.session.user.id).select().single();
-      if (upd.error || !upd.data) throw new Error("Couldn't save your home — please try again.");
+      if (upd.error || !upd.data) throw new Error("Couldn't save this place — please try again.");
       saved = upd.data;
     } else {
       const ins = await HS.sb().from('app_properties').insert(row).select().single();
-      if (ins.error || !ins.data) throw new Error("Couldn't save your home — please try again.");
+      if (ins.error || !ins.data) throw new Error("Couldn't save this place — please try again.");
       saved = ins.data;
     }
     LS.set('activeProp', saved.id);
     state.activePropId = saved.id;
     state.properties = await HS.data.properties();
     if (!state.properties.find(p => p.id === saved.id)) {
-      throw new Error("Your home saved but could not be verified — please try again.");
+      throw new Error("Place saved but could not be verified — please try again.");
     }
     if (await HS.data.isCovered(m.zip)) {
       await persistCommunityFollow(m.zip);
@@ -988,8 +998,8 @@
   // searched street address) rather than the area they are browsing. A precise view
   // outranks the saved home even inside the home's own ZIP: someone who searches
   // 2200 Caldwell Ln must not be told they are looking at 13313 Coomes Dr just because
-  // both sit in 78617. An AREA label does not outrank it — on your home's own ZIP the
-  // control still says "Your home", which is the affordance residents rely on.
+  // both sit in 78617. An AREA label does not outrank it — on a saved address's own ZIP
+  // the control still names that address as what is being viewed.
   HS.setViewLabel = function (label, opts) {
     const t = label == null ? '' : String(label).trim();
     const precise = !!(opts && opts.precise);
@@ -1003,24 +1013,22 @@
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
-      // A saved home is labeled AS the home ("Your home · <street>") — a bare
-      // street line never said which address the app had on file. The full
+      // CURRENT GEOGRAPHY is always "Viewing · …" (Fix 9). A saved address in the
+      // viewed ZIP is named as the thing in view — never as "your home". The full
       // logged address (street, city, state ZIP) rides in the hover tooltip.
       //
-      // SAVED HOME IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
-      // print the saved home on every page regardless of what the page was showing,
-      // so a resident with a Del Valle home browsing ?zip=80210 read
-      // "Your home · 13313 COOMES DR" beside a Denver map — two locations side by
-      // side with nothing saying which one the page was about (founder-observed on
-      // production, 2026-09-04). The home is named as the current context only when
-      // the page is actually showing its ZIP — the same gate HS.realHome() already
-      // applies to the page-level context line. Otherwise the control names the
-      // CURRENT VIEW. Nothing about the saved home changes: it stays saved, stays
-      // active, and stays one tap away in the switcher (and the tooltip still names it).
+      // SAVED ADDRESS IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
+      // print the saved address on every page regardless of what the page was showing,
+      // so a Del Valle address browsing ?zip=80210 read as the Denver page's location
+      // (founder-observed on production, 2026-09-04). The address is named as the
+      // current context only when the page is actually showing its ZIP — the same
+      // gate HS.realHome() already applies to the page-level context line. Otherwise
+      // the control names the CURRENT VIEW. Nothing about the saved place changes:
+      // it stays saved, stays active, and stays one tap away in the switcher.
       const myZip = LS.get('myZip', null);
       const homeIsCurrent = !!(p && String(p.zip) === String(state.zip) && !state.viewLabelPrecise);
       $('locLabel').textContent = (p && homeIsCurrent)
-        ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
+        ? ('Viewing · ' + p.address)
         : ((p || myZip)
           ? ('Viewing · ' + viewedLabel())
           : (HS.isSample()
@@ -1029,8 +1037,8 @@
       const locWrap = $('locLabel').closest('.loc');
       if (locWrap) locWrap.title = p
         ? (homeIsCurrent
-          ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
-          : ('Viewing ' + viewedLabel() + ' — your saved home is still '
+          ? ('Viewing ' + HS.homeAddressLine(p) + ' — tap to switch')
+          : ('Viewing ' + viewedLabel() + ' — a saved place is still '
              + HS.homeAddressLine(p) + '. Tap to switch.'))
         : 'Tap to set your area';
     }
@@ -1066,12 +1074,12 @@
       }
       const p = HS.realHome();
       if (p) {
-        const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Saved place');
-        el.textContent = '⌂ ' + tag + ' · ' + HS.homeAddressLine(p);
+        el.textContent = 'Viewing · ' + HS.homeAddressLine(p);
       } else {
         let c = null;
         try { c = HS.data ? await HS.data.community(state.zip) : null; } catch (e) {}
-        el.textContent = c ? ('◍ ' + c.name + (c.state ? ', ' + c.state : '')
+        el.textContent = c ? ('Viewing · ' + c.name + (c.state ? ', ' + c.state : '')
+          + (c.zip ? ' ' + c.zip : '')
           + (HS.isSample() ? ' — (Sample Zip Code)' : '')) : '';
       }
       el.style.display = el.textContent ? '' : 'none';
@@ -1103,11 +1111,11 @@
         + '<div class="miniscore">' + (p.score || '') + '</div>'
         + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + '</div>'
         + '<div class="pa">' + typeChip('Address') + ' · '
-        + HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Address'))
+        + HS.esc(HS.placeDisplayTag(p, 'Address'))
         + ' · ' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div></div>'
         + (on ? '<span class="chk">✓</span>' : '')
         + '</div>';
-    }).join('') : '<div class="swempty">No Addresses yet. Add a home and we\'ll watch official records around it.</div>';
+    }).join('') : '<div class="swempty">No Addresses yet. Add an address and we\'ll watch official records around it.</div>';
     const zipRows = zips.length ? zips.map(z => {
       const on = String(z.zip) === String(state.zip) && !homeIsCurrent;
       return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchZip(\'' + HS.esc(String(z.zip)) + '\')">'
@@ -1123,7 +1131,7 @@
     HS.openModal('switcherModal');
   };
 
-  // -------------------------------------------------- your home ---------------
+  // -------------------------------------------------- saved address -----------
   // The ONE writer of app_properties (nothing else in the app writes it).
   // Geocoder: the U.S. Census one-line locator — free, keyless, the same source
   // the engine uses server-side. HONESTY RULES:
@@ -1134,11 +1142,11 @@
   //     get the sign-in modal — the nudge doubles as the signup prompt.
   let _homeMatch = null;
   HS.openHome = function () {
-    if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding a home needs the live site.'); return; }
+    if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding an address needs the live site.'); return; }
     if (!state.session || state.session.demo) {
       HS.openAuth();
       const sub = $('authSub');
-      if (sub) sub.textContent = 'Sign in first — then add your home address to see what’s changing around it.';
+      if (sub) sub.textContent = 'Sign in first — then add an address to see what’s changing around it.';
       return;
     }
     _homeMatch = null;
@@ -1200,7 +1208,7 @@
     let r = null;
     try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
     if (!r || r.error || !r.data) {
-      $('homeConfirmMsg').textContent = "Couldn't save your home — please try again.";
+      $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
       return;
     }
     LS.set('activeProp', r.data.id);
@@ -1266,7 +1274,7 @@
     if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your zip code" : 'Change your zip code';
     const sub = document.querySelector('#locModal .msub');
     if (sub) sub.textContent = onboarding
-      ? "Enter your ZIP code to save your area and open what's changing around your home."
+      ? "Enter your ZIP code to save your area and open what's changing around it."
       : "Enter a ZIP code to open what's changing around that area.";
     HS.openModal('locModal');
     setTimeout(() => { if (z) z.focus(); }, 50);
@@ -1734,7 +1742,7 @@
   function buildShare() {
     const grid = $('shareGrid'); if (!grid) return;
     $('shareUrl').textContent = shareUrl().replace(/^https?:\/\//, '');
-    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around your home on HomeSignal');
+    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around a place you follow on HomeSignal');
     grid.innerHTML = SHARE.map((s, i) => {
       const href = s.u ? s.u(u, x) : '#';
       const tag = s.u ? 'a' : 'button';

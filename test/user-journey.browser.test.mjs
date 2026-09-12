@@ -317,16 +317,19 @@ ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
 
-// ═══ 7b. POSITIVE CONTROL — on the home's own ZIP it is still "Your home" ═══
+// ═══ 7b. POSITIVE CONTROL — on the saved place's own ZIP it is still that address ═══
+// Fix 9: the chip names the geography as Viewing, never as "Your home".
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
 await page.waitForTimeout(300);
 c = await chrome();
-info('ZIP 78617 with the same saved home', c.locLabel);
-ok(/^Your home · 13313 COOMES DR/.test(c.locLabel || ''),
-  '7b on the home\'s OWN ZIP the control still says "Your home"', c.locLabel);
+info('ZIP 78617 with the same saved place', c.locLabel);
+ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
+  '7b on the saved place\'s OWN ZIP the control says "Viewing · <street>"', c.locLabel);
+ok(!/your home/i.test(c.locLabel || ''),
+  '7b the chip does not call the saved address "Your home"', c.locLabel);
 
 // ═══ 8. Address mode still reaches the established experience ═══
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');

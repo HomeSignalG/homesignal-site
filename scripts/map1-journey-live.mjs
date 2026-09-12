@@ -147,16 +147,18 @@ ok(new RegExp(OTHER_ZIP).test(c.locLabel || ''), 'F ...and names the ZIP on scre
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   'F the saved home is preserved, unchanged', c.savedHome);
 
-// positive control: on the home's OWN ZIP it still reads "Your home"
+// positive control: on the saved place's OWN ZIP it still names that address as Viewing
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await installSavedHome();
 await page.waitForTimeout(500);
 c = await chrome();
-info('ZIP ' + ZIP + ' with the same saved home', c.locLabel);
-ok(/^Your home · 13313 COOMES DR/.test(c.locLabel || ''),
-  'F POSITIVE CONTROL — on the home\'s own ZIP the control still says "Your home"', c.locLabel);
+info('ZIP ' + ZIP + ' with the same saved place', c.locLabel);
+ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
+  'F POSITIVE CONTROL — on the saved place\'s own ZIP the control says "Viewing · <street>"', c.locLabel);
+ok(!/your home/i.test(c.locLabel || ''),
+  'F the chip does not call the saved address "Your home"', c.locLabel);
 
 // ── G. Address mode still reaches the established experience ────────────────────────────
 await page.fill('#addr', ADDRESS);

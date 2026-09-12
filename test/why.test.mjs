@@ -33,13 +33,13 @@ test('why-this-matters derivation is evidence-gated', () => {
   // ── no saved home -> NO distance sentence, ever (never fabricated) ──
   const noHome = HS.whyDerive({ ...fullProject, distance_mi: null, dist: '' }, { hasHome: false, place: 'Del Valle' });
   assert.doesNotMatch(noHome.close, /mi from/, 'no home -> no distance claim');
-  assert.match(noHome.close, /Save your home address/, 'no home -> says why, offers the fix');
+  assert.match(noHome.close, /Save an address/, 'no saved place -> says why, offers the fix');
   assert.match(noHome.seeing, /Del Valle/, 'no home -> Q1 anchors on the viewed place instead');
 
   // ── beyond the radius -> the radius claim is NOT made ──
   const far = HS.whyDerive({ ...fullProject, distance_mi: 3.2, dist: '3.2 mi' }, homeCtx);
   assert.doesNotMatch(far.seeing, /map view/, 'distance > radius -> no "inside your view" claim');
-  assert.match(far.seeing, /near your saved home/);
+  assert.match(far.seeing, /near your saved place/);
 
   // ── area-wide record (no point) -> whole-area sentence, no distance ──
   const areaRec = HS.whyDerive({ id: 'n1', category: 'Notice', occurred_at: past, source_ref: 'https://x' }, homeCtx);
