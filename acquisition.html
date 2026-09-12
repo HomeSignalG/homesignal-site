@@ -525,12 +525,35 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   //      SECURITY DEFINER + dashboard_admins, exactly like the other live tabs.
   //      Gate 5: the overview KPI and the lead log come from ONE call over ONE table,
   //      so the headline number and the rows below it cannot drift apart. ----
+  // TWO AXES, BECAUSE ONE PERSON CAN NOW HOLD SEVERAL PREMIUM INTERESTS.
+  // "Premium prospects" KEEPS ITS BUSINESS MEANING — it is people, and it now reads the
+  // RPC's `prospects` (count(distinct email)) rather than `total` (count(*)). Those two
+  // were necessarily EQUAL while UNIQUE(email) stood, so the tile was accidentally right;
+  // once one email can carry a ZIP interest AND a property interest, `total` silently
+  // becomes a count of signals. Pointing the tile at `prospects` is what stops the label
+  // drifting away from the number. `total` is surfaced beside it, named for what it is.
+  // Both come from ONE call over ONE table, so headline and rows cannot disagree.
   function premiumKpis(w){
     return '<div class="grid" style="margin-bottom:14px">'+
-      liveTile('Premium prospects', w.total||0, 'canonical app_premium_waitlist')+
+      liveTile('Premium prospects', w.prospects||0, 'distinct people — canonical app_premium_waitlist')+
+      liveTile('Interest signals', w.total||0, 'one per person per ZIP / property / feature')+
       liveTile('Last 7 days', w.last_7d||0, (w.last_30d||0)+' in last 30 days')+
-      liveTile('With ZIP context', w.with_zip||0, 'captured only where the URL stated a ZIP')+
+      liveTile('With ZIP context', w.with_zip||0, 'captured only where the URL or the viewed Address stated a ZIP')+
+      liveTile('Property leads', w.with_address||0, 'signed up while viewing a specific address')+
     '</div>';
+  }
+  // ONE Premium-interest area, TWO contexts (Fix 15). A ZIP Community Profile lead and a
+  // property/address lead are the same intent — "tell me when Premium launches" — arriving
+  // from different places, so they share this tab and this canonical table. What tells them
+  // apart is the pair of context columns the lead itself carries: Source (the interest, e.g.
+  // "ZIP Community Profile" / "Property Insights") and Place (the address when the CTA was on
+  // a property dossier, otherwise the ZIP). Neither is inferred here — a row that states
+  // nothing renders an em dash rather than a guess, and older rows predating the labels still
+  // carry the page URL as their Source.
+  function premiumPlace(r){
+    if (r && r.address) return esc(r.address);
+    if (r && r.zip) return 'ZIP '+esc(r.zip);
+    return '<span class="muted">—</span>';
   }
   function premiumWaitlistCard(w){
     w=w||{};
@@ -539,13 +562,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       return '<tr><td>'+esc(r.email||'—')+'</td>'+
         '<td class="muted" style="font-variant-numeric:tabular-nums">'+when+'</td>'+
         '<td class="muted">'+(r.source?esc(r.source):'—')+'</td>'+
-        '<td style="font-variant-numeric:tabular-nums">'+(r.zip?esc(r.zip):'—')+'</td></tr>';
+        '<td style="font-variant-numeric:tabular-nums">'+(r.zip?esc(r.zip):'—')+'</td>'+
+        '<td>'+premiumPlace(r)+'</td></tr>';
     }).join('');
     var capped=(w.rows||[]).length>=(w.row_limit||500);
     return '<div class="card"><h3>Premium waitlist <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
-      '<p class="sub">Everyone who asked to be told when Premium launches, newest first. Source is the page the signup came from; ZIP appears only where the URL itself stated one — it is never inferred.</p>'+
+      '<p class="sub">Every Premium interest, newest first — <b>one row per person per interest</b>, so the same email can appear more than once with different places. Repeat submissions of the SAME interest do not add a row. Source says which Premium surface they came from — "ZIP Community Profile" or "Property Insights"; rows from before those labels show the page URL instead. Place names the specific address for a property lead, or the ZIP otherwise. ZIP appears only where the URL or the viewed Address itself stated one — it is never inferred.</p>'+
       premiumKpis(w)+
-      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Email</th><th>Joined</th><th>Source</th><th>ZIP</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Email</th><th>Joined</th><th>Source</th><th>ZIP</th><th>Place / Interest</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
         (capped?'<p class="sub" style="margin-top:8px">Showing the newest '+(w.row_limit||500)+'. The count above is unfiltered.</p>':''))
         :'<div class="muted">No Premium prospects yet.</div>')+
     '</div>';

@@ -341,7 +341,7 @@ def render(p, built):
         # document - lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
-        '<link rel="stylesheet" href="/app.css?v=02a9a715">\n</head>\n'
+        '<link rel="stylesheet" href="/app.css?v=20814d85">\n</head>\n'
         f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
@@ -356,11 +356,11 @@ def render(p, built):
         # (run 33929420398, ZIPs 01001 and 01002). Parity with community.html is asserted by
         # test/zip-page-shared-runtime.test.mjs so the next shared dependency cannot ship to
         # one host only.
-        '<script src="/lib/premium-waitlist.js?v=ae8a117e"></script>\n'
+        '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=63ab9d1e"></script>\n'
+        '<script src="/shell.js?v=a718e977"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=32da0257"></script>\n'
+        '<script src="/lib/community-page.js?v=ffa11682"></script>\n'
         "</body>\n</html>\n")
 
 

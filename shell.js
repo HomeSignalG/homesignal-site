@@ -319,6 +319,12 @@
   let _lastFocus = null;
   HS.openModal = function (id) {
     const el = $(id); if (!el) return;
+    // CONTEXT ISOLATION (Fix 15). The Premium modal is ONE shared modal reached from
+    // several CTAs, so a context bound by an earlier click must never survive into a
+    // later one. Clearing on the GENERIC entry means the only way a signup carries a
+    // property or a ZIP label is HS.openPremiumModal, below, which re-binds AFTER this
+    // runs. An unbound open falls back to the page URL, exactly as it always has.
+    if (id === 'premiumModal') HS.premiumContext = null;
     _lastFocus = document.activeElement;
     el.classList.add('show');
     const f = el.querySelector('input,button,[tabindex]'); if (f) f.focus();
@@ -1769,6 +1775,32 @@
   // This used to insert into 'premium_waitlist' — a table that does not exist in
   // production (PostgREST answers PGRST205) — swallow the rejection, and show
   // "You're on the list" regardless. Every Premium lead ever offered was lost.
+
+  // THE ACQUISITION CONTEXT OF A PREMIUM SIGNUP IS OWNED BY THE CTA THAT OPENED THE
+  // MODAL — never by viewing state. Deliberately NOT read anywhere below: state.zip
+  // (which falls back to HS_CONFIG.DEFAULT_ZIP, a sample), state.activeProperty, the
+  // first My Places follow, or a previously-viewed property. A resident who looks at
+  // 96 ISLAND DR, navigates to ZIP 78617 and then clicks the ZIP Premium CTA must be
+  // recorded against the ZIP, and the reverse must be recorded against the address.
+  //
+  //   HS.openPremiumModal({ source: 'Property Insights', zip: p.zip, address: p.address })
+  //
+  // Any field left out stays absent and falls back to the page URL / zipFromLocation —
+  // it is never filled in from somewhere else.
+  HS.premiumContext = null;
+  HS.openPremiumModal = function (ctx) {
+    // openModal clears the context first, so the bind has to follow it. That ordering
+    // is what makes a stale context structurally impossible rather than merely unlikely.
+    HS.openModal('premiumModal');
+    const W = window.HSPremiumWaitlist;
+    if (!ctx || !W) return;
+    HS.premiumContext = {
+      source: W.normalizeSource(ctx.source),
+      zip: W.normalizeZip(ctx.zip),
+      address: W.normalizeAddress(ctx.address)
+    };
+  };
+
   HS.submitWaitlist = async function () {
     const el = $('premiumEmail'), btn = $('premiumSubmit');
     const W = window.HSPremiumWaitlist;
@@ -1780,16 +1812,22 @@
     waitlistError('');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
+    // The CTA's own context wins; each field falls back independently to the page URL
+    // convention that every unbound surface still uses.
+    const ctx = HS.premiumContext || {};
+    const fallbackSource = location.pathname + (location.search || '');
+    const lead = {
+      email: email,
+      source: ctx.source || fallbackSource,
+      zip: ctx.zip || W.zipFromLocation(location),
+      address: ctx.address || null
+    };
+
     // Seed/preview mode has no database by construction, and every other persistence
     // in that mode is the same local queue. Production is DATA_SOURCE='supabase'.
     const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
-      ? await persistEmail('app_premium_waitlist', { email: email })
-      : await W.submit({
-          client: HS.sb(),
-          email: email,
-          source: location.pathname + (location.search || ''),
-          zip: W.zipFromLocation(location)
-        });
+      ? await persistEmail('app_premium_waitlist', lead)
+      : await W.submit(Object.assign({ client: HS.sb() }, lead));
 
     if (btn) { btn.disabled = false; btn.textContent = 'Notify me'; }
     if (!res.ok) {
