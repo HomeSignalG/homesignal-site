@@ -1947,11 +1947,10 @@ HS.onReady(function(){
     var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Address view";
     var _h1A = document.querySelector(".head h1");
     if(_h1A) _h1A.textContent = "Development around this address";
-    var _subA = document.querySelector(".sub");
-    if(_subA){ _subA.textContent = "What's built and what's proposed within the distance you "
-      + "choose around one address — data-center activity, planning hearings and open comment "
-      + "windows, plus nearby regulated facilities for context — every item linked to its "
-      + "official public record."; }
+    // Fix 7: the standfirst names THIS address, same helper the Address dossier uses.
+    // Kind is address-mode (this host), never inferred from the string. H1 still names
+    // the MODE; the radius stays on the map caption so it cannot go stale in the hero.
+    paintMap1PlaceHeading('address', address);
     document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
@@ -1977,6 +1976,7 @@ HS.onReady(function(){
       }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
+      paintMap1PlaceHeading('address', m.matchedAddress || address);
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -2037,6 +2037,20 @@ HS.onReady(function(){
     var base = String(best.name).replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
     if(/\(\d{5}\)\s*$/.test(base)) return base;
     return base + " (" + zip + ")";
+  }
+
+  // Fix 7: Map 1's standfirst names the geography currently in view, via the same
+  // helper Address and ZIP pages already use. Kind is THIS mode (ZIP-area vs
+  // address-radius), never inferred from the string. An unresolved value withholds
+  // the heading rather than printing "your zip code" or "at undefined".
+  // textContent — the helper does not HTML-escape; callers that inject HTML must.
+  function paintMap1PlaceHeading(kind, value){
+    var el = document.querySelector(".sub");
+    if(!el) return;
+    var heading = (window.HS && typeof HS.placeChangingHeading === 'function')
+      ? HS.placeChangingHeading(kind, value)
+      : '';
+    el.textContent = heading || '';
   }
 
   function loadZip(zip){
@@ -2123,11 +2137,10 @@ HS.onReady(function(){
     // Elder, which is wrong on every other ZIP page). The radius selector is hidden; ZIP views
     // frame the records' own extent, not a circle the resident widens.
     document.body.classList.add("zipmode");
-    var _sub = document.querySelector(".sub");
-    // Founder copy: one plain line. The long inventory clause it replaced named the record types
-    // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
-    // seen any of them — the page below already labels each of those, so the hero just says why to read it.
-    if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
+    // Fix 7: one plain line naming THIS ZIP — the same helper the ZIP page uses.
+    // Kind is zip-mode (this host). The H1 still names the place ("Del Valle (78617)");
+    // the standfirst names the ZIP the map is rendering.
+    paintMap1PlaceHeading('zip', zip);
     // NO helper text under the field in either mode, so ZIP mode has nothing to override.
     // The field carries its own instruction in the placeholder, which reads correctly in both.
     var _cap = document.querySelector(".map-cap");
