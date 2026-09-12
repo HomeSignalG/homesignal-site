@@ -320,16 +320,19 @@ ok(/if \(!res\.ok\)/.test(shell)
   "if (id === 'premiumModal') HS.premiumContext = null;"
 ].forEach((line, i) => ok(shell.includes(line), '5c' + (i + 1) + ' shipped: ' + line));
 
-// ── 6. THE UNIQUENESS CONTRACT IS UNCHANGED — the reported, deliberately-untaken gate ──
-// §9 of the brief: representing more than one interest context per email needs a new
-// uniqueness key, which is a database-contract change and is gated. This pin makes the
-// limit visible rather than letting a later session silently "improve" it either way.
-ok(/on conflict \(email\) do nothing/.test(waitlistSql),
-  '6a first-touch dedupe on email is unchanged (a repeat is accepted and not overwritten)');
-ok(!/on conflict \(email\) do update/.test(waitlistSql),
-  '6b it was NOT changed to DO UPDATE, which would overwrite the first context');
-ok(/unique \(email\)/.test(waitlistSql),
-  '6c UNIQUE(email) is unchanged');
+// ── 6. ONE PROSPECT, SEVERAL INTERESTS — the approved uniqueness contract ────────────
+// This section USED to pin the opposite ("UNIQUE(email) is unchanged"), which was right
+// while the widening was a gated, reported blocker. The founder approved it on
+// 2026-09-12, so the pin moves with the contract rather than being deleted. The full
+// semantics live in test/premium-multi-interest.test.mjs; what is kept here is the part
+// this file is about — a property lead and a ZIP lead from ONE email must both survive.
+ok(/unique \(email, interest_key\)/.test(waitlistSql),
+  '6a the key is the pair, so a property interest cannot evict a ZIP interest');
+ok(!/add constraint app_premium_waitlist_email_key unique \(email\)/.test(waitlistSql),
+  '6b UNIQUE(email) is not re-added — that IS the discard defect');
+ok(/on conflict \(email, interest_key\) do nothing/.test(waitlistSql)
+   && !/on conflict[^;]*do update/i.test(waitlistSql.replace(/^\s*--.*$/gm, '')),
+  '6c a repeat of the SAME interest is still ignored, never overwritten with the newest');
 
 // ── 7. SECURITY POSTURE UNCHANGED ────────────────────────────────────────────────────
 ok(/revoke all on table public\.app_premium_waitlist from anon, authenticated;/.test(waitlistSql),
