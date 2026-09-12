@@ -8,9 +8,11 @@ name: db-sql
 # from a committed file so every statement is code-reviewed and auditable. Results print
 # into the job log (the receipt channel — the sandbox cannot reach the artifact store).
 #
-# Manual dispatch remains the primary operator path. A push trigger on docs/candidates/
-# exists so merges that land candidate INSERT SQL can execute without workflow_dispatch
-# (cloud agents lack actions:write for manual dispatch).
+# Manual dispatch remains the primary operator path. A push trigger exists so merges
+# that land apply-on-merge SQL can execute without workflow_dispatch (cloud agents
+# lack actions:write for manual dispatch). Two path families:
+#   docs/candidates/**/*.sql  — gov-feed candidate INSERTs
+#   docs/*-capture.sql        — parked capture-contract DDL (waitlist, ZIP requests)
 
 on:
   workflow_dispatch:
@@ -22,6 +24,7 @@ on:
     branches: [main]
     paths:
       - 'docs/candidates/**/*.sql'
+      - 'docs/*-capture.sql'
 
 permissions:
   contents: read
@@ -86,7 +89,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             run_file "${{ github.event.inputs.sql_file }}"
           else
-            mapfile -t CHANGED < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^docs/candidates/.+\.sql$' || true)
+            mapfile -t CHANGED < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^(docs/candidates/.+\.sql|docs/[^/]+-capture\.sql)$' || true)
             if [ "${#CHANGED[@]}" -eq 0 ]; then
               echo "No candidate SQL files changed"
               exit 1

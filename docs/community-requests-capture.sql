@@ -1,9 +1,9 @@
 -- HomeSignal — ZIP coverage-request capture contract (DDL of record)
 --
 -- Fix 13. Parked here so the schema stays reproducible (CLAUDE.md §1, source #3).
--- Apply in the Supabase SQL editor on project qwnnmljucajnexpxdgxr BEFORE the
--- matching site deploy: the client only reports "Request received" after
--- hs_community_request_join returns { ok: true }.
+-- Apply path: db-sql.yml on merge to main (docs/*-capture.sql). Also valid in the
+-- Supabase SQL editor on project qwnnmljucajnexpxdgxr. The client only reports
+-- "Request received" after hs_community_request_join returns { ok: true }.
 --
 -- ============================================================================
 -- WHAT WAS BROKEN
