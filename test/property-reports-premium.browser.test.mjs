@@ -11,9 +11,15 @@
 // so seed Addresses resolve on reports.html?id=p2 AND the query string stays the
 // production route, so source attribution is /reports.html?id=p2.
 //
-// The failure path never reaches the network: Playwright fulfills the RPC with the
-// historical PGRST205 payload. The success path is allowed to call production so
-// the captured request is the real write path. Run:
+// NEITHER PATH REACHES PRODUCTION (Fix 16). Playwright fulfills the RPC on both:
+// §F with the historical PGRST205 payload, §D with the deployed function's own success
+// shape. This journey used to let §D call production, and every green run appended a
+// permanent Premium lead — 40 of the table's 44 rows on 2026-09-12, each carrying the
+// Date.now() it was created at. The row was never read back by any assertion: it was a
+// side effect bought to obtain an {ok:true} the UI needs, so intercepting costs nothing
+// the file was actually proving. What production DOES still prove is §D2, a zero-write
+// reachability probe that uses the RPC's own pre-INSERT email guard.
+// Run:
 //   node test/property-reports-premium.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -119,7 +125,7 @@ ok(modal.shown && modal.title === 'Premium is being built',
 ok(modal.doneHidden && !modal.formHidden, 'C notify-me form, not a granted-access or generated-report state', modal);
 
 // ═══ F. Failed write → no false success ═══
-const failEmail = 'agent.pr.reports.fail.' + Date.now() + '@homesignal.net';
+const failEmail = 'waitlist.ui.refused@example.com';
 await page.route('**/rest/v1/rpc/hs_premium_waitlist_join', async (route) => {
   await route.fulfill({
     status: 404,
@@ -139,14 +145,31 @@ ok(!modal.formHidden, 'F the form stays up so the visitor can retry', modal);
 ok(modal.error.length > 0, 'F an error is shown instead', modal);
 await page.unroute('**/rest/v1/rpc/hs_premium_waitlist_join');
 
-// ═══ D. Successful persistence through the shared RPC ═══
+// ═══ D. Success through the shared RPC — fulfilled, never committed ═══
+// The success payload is not invented: it is the DDL of record's own return expression,
+// asserted against docs/premium-waitlist-capture.sql below, so the fixture cannot drift
+// away from what production actually answers.
+const RPC_SUCCESS_SHAPE = "jsonb_build_object('ok', true, 'email', e)";
+const captureSql = await readFile(join(root, 'docs/premium-waitlist-capture.sql'), 'utf8');
+ok(captureSql.indexOf(RPC_SUCCESS_SHAPE) >= 0,
+  'D0 the fulfilled success shape is still the one hs_premium_waitlist_join returns',
+  RPC_SUCCESS_SHAPE);
+
 const joinCalls = [];
 page.on('request', (r) => {
   if (/hs_premium_waitlist_join/.test(r.url())) {
     joinCalls.push({ url: r.url(), method: r.method(), post: r.postData() });
   }
 });
-const okEmail = 'agent.pr.reports.' + Date.now() + '@homesignal.net';
+const okEmail = 'waitlist.ui.fixture@example.com';
+await page.route('**/rest/v1/rpc/hs_premium_waitlist_join', async (route) => {
+  const sent = JSON.parse(route.request().postData() || '{}');
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, email: String(sent.p_email || '').toLowerCase() })
+  });
+});
 await page.fill('#premiumEmail', okEmail);
 await page.click('#premiumSubmit');
 await page.waitForFunction(() => {
@@ -166,6 +189,58 @@ ok(typeof payload.p_source === 'string' && /reports\.html/.test(payload.p_source
   'D source is the Property Reports URL (existing path+query convention)', payload);
 ok(payload.p_zip === fromProperty.zip && /^\d{5}$/.test(payload.p_zip || ''),
   'D ZIP is the resolved Address ZIP, not a guessed sample', { zip: payload.p_zip, expected: fromProperty.zip });
+ok(joinCalls.length === 1, 'D the shared RPC was invoked exactly once', joinCalls.length);
+// The client half of the signature check. §D2 proves the deployed function accepts
+// exactly these four names; this proves the shipped client sends exactly them.
+ok(JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(['p_address', 'p_email', 'p_source', 'p_zip']),
+  'D the wire payload carries the deployed 4-argument context, no more and no less', Object.keys(payload).sort());
+ok('p_address' in payload, 'D address context is present on the wire (absent stays null, never omitted)', payload.p_address);
+await page.unroute('**/rest/v1/rpc/hs_premium_waitlist_join');
+
+// ═══ D2. PRODUCTION REACHABILITY — a real call to the deployed RPC that writes NOTHING ═══
+// §D no longer touches production, so this is what stops that from becoming a coverage
+// hole. It is NOT a new self-test RPC: it calls the shipped hs_premium_waitlist_join with
+// the four deployed argument names and an email the function's OWN guard rejects. That
+// guard raises 22023 BEFORE the insert, so the call proves reachability and signature and
+// leaves no row. Verified against production 2026-09-12 (pg_net 31384/31385/31386):
+//   correct 4 names + invalid email -> HTTP 400 {"code":"22023","message":"invalid email"}
+//   a wrong argument name           -> HTTP 404 PGRST202 "no matches ... in the schema cache"
+//   a function that does not exist  -> HTTP 404 PGRST202
+//   rows before 44 -> rows after 44, written_in_last_10min = 0
+// 22023 is therefore only reachable when PostgREST has the function in its schema cache,
+// anon may execute it, the four names match, and the body RAN. The PGRST202 control is
+// what makes that discriminating rather than merely green.
+const CFG = String(await readFile(join(root, 'config.js'), 'utf8'));
+const SUPA_URL = (CFG.match(/SUPABASE_URL:\s*'([^']+)'/) || [])[1];
+const SUPA_KEY = (CFG.match(/SUPABASE_ANON_KEY:\s*'([^']+)'/) || [])[1];
+const rpcProbe = async (fn, body) => {
+  const r = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
+    body: JSON.stringify(body)
+  });
+  return { status: r.status, json: await r.json().catch(() => ({})) };
+};
+ok(!!SUPA_URL && !!SUPA_KEY, 'D2 the shipped config supplies the production endpoint', { url: SUPA_URL });
+let liveProbe = null;
+try {
+  liveProbe = await rpcProbe('hs_premium_waitlist_join',
+    { p_email: '', p_source: '/reports.html?id=p2', p_zip: '78617', p_address: null });
+} catch (e) {
+  // An instrument must prove it ran before its silence counts as evidence. A blocked
+  // egress is reported as an UNRUN probe, never as a pass — the build sandbox cannot
+  // reach Supabase, the CI runner can.
+  console.log('SKIP — D2 production probe DID NOT RUN (no egress to ' + SUPA_URL + '): ' + (e && e.message));
+}
+if (liveProbe) {
+  info('D2 live', liveProbe);
+  ok(liveProbe.status === 400 && liveProbe.json && liveProbe.json.code === '22023',
+    'D2 the deployed RPC is reachable and its pre-INSERT guard ran', liveProbe);
+  const control = await rpcProbe('hs_premium_waitlist_join', { p_email: '', p_bogus: 'x' });
+  info('D2 control', control);
+  ok(control.status === 404 && control.json && control.json.code === 'PGRST202',
+    'D2 CONTROL a wrong argument name is refused, so 22023 really does discriminate', control);
+}
 
 // ═══ E. Acquisition Dashboard still has ONE waitlist read ═══
 const acq = await page.goto(base + '/acquisition.html', { waitUntil: 'domcontentloaded' });
