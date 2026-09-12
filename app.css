@@ -505,10 +505,14 @@
   .sharegrid{grid-template-columns:repeat(3,1fr)}
   .strip .stat{min-width:calc(50% - 7px)}
   .page{padding:20px 16px 48px}
-  /* top bar: the utility cluster is compact buttons now, so it just tightens up */
-  .top{gap:8px;padding:11px 14px}
-  .top .loc{max-width:44vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-  .top .topadd{padding:7px 10px}
+  /* top bar: Add sits next to Viewing. Hide the spacer so Share/Sign in wrap
+     instead of stretching the row past the viewport (390px reports page). */
+  .top{gap:6px;padding:11px 10px;min-width:0;flex-wrap:wrap}
+  .top .sp{display:none}
+  .top .loc{max-width:36vw;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .top .topadd{padding:6px 8px;font-size:12px}
+  .top .topadd .topadd-rest{display:none}
+  .top .sharebtn{padding:0 10px}
   .hero h1{font-size:30px}
 }
 

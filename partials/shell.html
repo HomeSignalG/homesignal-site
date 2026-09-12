@@ -48,7 +48,7 @@
 <div class="top" id="hs-top">
   <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
   <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
-  <button class="wchip topadd" type="button" id="hsAddZip" onclick="HS.openLoc()">＋ Add a zip code</button>
+  <button class="wchip topadd" type="button" id="hsAddZip" aria-label="Add a zip code" onclick="HS.openLoc()">＋ Add<span class="topadd-rest"> a zip code</span></button>
   <div class="sp"></div>
   <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
   <button class="ib" type="button" aria-label="Notifications" onclick="HS.navTo('alerts.html')">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>

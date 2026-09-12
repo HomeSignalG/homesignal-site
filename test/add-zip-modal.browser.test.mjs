@@ -98,6 +98,18 @@ await assertAddChip('Alerts', '/alerts.html?data=seed&zip=78617');
 await assertAddChip('Address', '/property.html?data=seed');
 await assertAddChip('Development', '/development.html?data=seed&zip=78617');
 
+await page.setViewportSize({ width: 390, height: 844 });
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#hsAddZip', { timeout: 15000 });
+const mobile = await page.evaluate(() => ({
+  overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+  chip: (document.getElementById('hsAddZip') || {}).innerText || ''
+}));
+ok(!mobile.overflow, 'at 390px the top bar does not scroll sideways', mobile);
+ok(/Add/i.test(mobile.chip), 'at 390px the Add chip is still visible', mobile);
+await page.screenshot({ path: join(ART, 'add_zip_topbar_on_alerts_390.png'), fullPage: false });
+
+await page.setViewportSize({ width: 1280, height: 900 });
 await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('#hsAddZip', { timeout: 15000 });
 await page.screenshot({ path: join(ART, 'add_zip_topbar_on_alerts.png'), fullPage: false });
