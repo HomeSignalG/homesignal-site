@@ -102,6 +102,19 @@
       n = parseInt(n, 10);
       return (n >= 0 && n <= 2 && !isNaN(n)) ? n : 0;
     };
+    // Mirrors lib/view-zip.js (canonical). Follow sync may INITIALIZE an absent myZip
+    // and may never replace an established one; it returns no viewed ZIP by design.
+    HS.myZipAfterFollowSync = function (opts) {
+      opts = opts || {};
+      const cur = opts.myZip;
+      if (cur && /^\d{5}$/.test(String(cur))) return null;
+      const list = (opts.serverFollowZips || []).concat(opts.localFollowZips || []);
+      for (let i = 0; i < list.length; i++) {
+        const z = list[i] == null ? '' : String(list[i]);
+        if (/^\d{5}$/.test(z)) return z;
+      }
+      return null;
+    };
     HS.ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
@@ -359,9 +372,19 @@
       state.activePropId = null;
       LS.set('activeProp', null);
     }
-    if (!state.activePropId && state.properties[0]) {
-      state.activePropId = state.properties[0].id;
-      LS.set('activeProp', state.activePropId);
+    // Hydrate may refresh the saved-address COLLECTION; it must not elect an active
+    // address that silently redefines the viewed place. Electing properties[0] made a
+    // Celina home the active context while the URL said 84301 — the same ownership
+    // defect as the follow-order assignment above, reached through the other store.
+    // Elect only a property ALREADY in the viewed ZIP, which is the condition
+    // HS.realHome() applies anyway, so an out-of-ZIP election never bought anything
+    // it is now losing.
+    if (!state.activePropId) {
+      const inView = state.properties.find(p => p && String(p.zip) === String(state.zip));
+      if (inView) {
+        state.activePropId = inView.id;
+        LS.set('activeProp', inView.id);
+      }
     }
     await refreshServerFollowZips();
     _accountHydrated = true;
@@ -850,6 +873,15 @@
     LS.set('myZip', zip);
     state.zip = zip;
   }
+  // Drop the active-Address POINTER when that Address is not in the place being
+  // switched to. Never deletes the row — removal is HS.removeAddress alone (A-012).
+  function clearActivePropIfForeign(zip) {
+    const cur = (state.properties || []).find(x => String(x.id) === String(state.activePropId));
+    if (cur && String(cur.zip) !== String(zip)) {
+      state.activePropId = null;
+      LS.set('activeProp', null);
+    }
+  }
   HS.switchProperty = function (id) {
     const p = (state.properties || []).find(x => String(x.id) === String(id));
     const zip = p && /^\d{5}$/.test(String(p.zip)) ? String(p.zip) : null;
@@ -881,9 +913,54 @@
     const changed = zip !== String(state.zip);
     HS.closeModal('switcherModal');
     if (!changed) return;
+    // A ZIP-only Place has no Address, so the previously active one must stop being the
+    // active CONTEXT — otherwise a resident who moves from their Celina Address to
+    // Bear River City (84301) is still carrying Celina as the app's home identity.
+    // This clears the POINTER only: the app_properties row stays saved, still lists in
+    // My Places and in this very menu, and is one tap away. It does not unfollow a ZIP,
+    // does not write an Address, and never invents one for a ZIP-only Place.
+    // (The distance/home anchor is separately protected at the data layer by
+    // lib/data.js::homeFor, which anchors only on a home IN the fetched ZIP.)
+    clearActivePropIfForeign(zip);
     focusZip(zip);
     location.href = focusHref(zip);
   };
+  // ------------------------------------------- viewed place, re-asserted ------
+  // THE ONE re-assertion of the viewed place, called by every ZIP-scoped page before
+  // it fetches. Gate 1 stops account hydration from stealing state.zip; this is the
+  // defence in depth that makes the page's own URL authoritative at the MOMENT OF THE
+  // FETCH, so any future async step between boot and render cannot quietly redefine
+  // the page's geography. It is a shared helper on purpose — the alternative was
+  // copying lib/community-page.js's URL reset into four pages, i.e. four per-page
+  // geography rules that drift.
+  //
+  // Resolution is the DOCUMENTED one and nothing else:
+  //   explicit page ZIP (?zip=, or a path-based ZIP the page declares) -> the
+  //   established viewed ZIP (resolveViewedZip: myZip -> session viewZip) -> DEFAULT_ZIP.
+  //
+  // pageZip is for a canonical document whose ZIP is in its PATH, not its query string
+  // (/community/<zip>/ declares it as <body data-zip>). It ranks WITH ?zip= because it
+  // is that document's URL identity — ranking it below myZip would render a resident's
+  // saved area on a page that is about a different ZIP.
+  HS.ensureViewedZip = function (pageZip) {
+    const explicit = HS.parseZipParam(location.search)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    const z = HS.resolveViewedZip({
+      urlZip: explicit,
+      myZip: LS.get('myZip', null),
+      sessionViewZip: SS.get('viewZip'),
+      defaultZip: CFG.DEFAULT_ZIP
+    });
+    if (z && z !== String(state.zip)) state.zip = z;   // setter re-paints + re-stamps nav
+    return String(state.zip);
+  };
+
+  // Click-time navigator for shell chrome that is NOT an <a> (the bell). Resolving
+  // through HS.navHref at the moment of the click means it can never carry a stale ZIP
+  // the way a string baked into partials/shell.html at inject time would — and it keeps
+  // the ban on hand-built '?zip=' concatenation intact.
+  HS.navTo = function (page) { location.href = HS.navHref(page, state.zip); };
+
   function paintNavHrefs() {
     if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
     const zip = state.zip;
@@ -1766,13 +1843,23 @@
       }
     }
     LS.set('myCommunities', local);
-    if (_serverFollowZips.length) {
-      LS.set('myZip', _serverFollowZips[0]);
-      state.zip = _serverFollowZips[0];
-    } else if (!LS.get('myZip', null) && local[0]) {
-      LS.set('myZip', String(local[0].zip));
-      state.zip = String(local[0].zip);
-    }
+    // SAVED PLACES ONLY — follow sync must NEVER decide the VIEWED place.
+    // It used to assign the viewed ZIP from account-follow ROW ORDER on every
+    // signed-in boot, so a resident who opened alerts.html?zip=84301 hydrated and
+    // then rendered whichever ZIP happened to sort first in app_follows.
+    // community.html survived only because lib/community-page.js re-reads the URL
+    // after hydrate; Dashboard / Alerts / Development had no such reset.
+    // The viewed place is resolved ONCE at boot by resolveViewedZip
+    // (?zip= -> myZip -> session viewZip -> DEFAULT_ZIP) and afterwards changes only
+    // on an explicit place-selection (followCommunity / switchProperty / switchZip).
+    // The decision lives in lib/view-zip.js::myZipAfterFollowSync, which has no
+    // viewed-ZIP return value at all. See docs/zip-navigation.md.
+    const initZip = HS.myZipAfterFollowSync({
+      myZip: LS.get('myZip', null),
+      serverFollowZips: _serverFollowZips,
+      localFollowZips: local.map(c => c && c.zip)
+    });
+    if (initZip) LS.set('myZip', initZip);
     // push: local-only follows -> account
     for (const c of local) {
       if (!acctZips.has(String(c.zip))) {
