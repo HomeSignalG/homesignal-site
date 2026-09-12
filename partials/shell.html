@@ -79,8 +79,9 @@
         <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">—</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
         <div class="field" style="flex-direction:column;gap:10px">
           <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')HS.submitRequest()">
-          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my zip code</button>
+          <button class="mbtn" type="button" id="reqSubmit" onclick="HS.submitRequest()">Request my zip code</button>
         </div>
+        <div id="locRequestError" class="mnote hidden" role="alert" aria-live="polite" style="color:#c23b34"></div>
         <div class="mnote">We'll only email you when your area goes live. No spam.</div>
       </div>
       <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>

@@ -731,12 +731,32 @@
   };
 
   HS.submitOnboardingRequest = async function () {
-    const el = onbEl('onbReqEmail'), e = el && el.value.trim();
-    if (!e || e.indexOf('@') < 1) { if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    const el = onbEl('onbReqEmail'), btn = onbEl('onbReqBtn');
+    const R = window.HSCommunityRequest;
+    if (!R) { onbMsg('We could not save your email just now. Please try again in a moment.', true); return; }
+    const email = R.normalizeEmail(el && el.value);
+    if (!email) {
+      if (el) { el.style.borderColor = '#c23b34'; el.focus(); }
+      onbMsg('Enter a valid email address so we can reach you.', true);
+      return;
+    }
+    const zip = R.normalizeZip(onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent);
+    if (!zip) { onbMsg('That ZIP code does not look right — check it and try again.', true); return; }
     if (el) el.style.borderColor = '';
-    const row = { email: e, zip: (onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent) || '' };
-    const ref = HS.referralToken(); if (ref) row.source = ref;
-    await persistEmail('community_requests', row);
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    const source = (typeof HS.referralToken === 'function' && HS.referralToken()) || 'onboarding';
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('community_requests', { email: email, requested_zip: zip, source: source })
+      : await R.submit({ client: HS.sb(), email: email, zip: zip, source: source });
+    if (btn) { btn.disabled = false; btn.textContent = 'Request my zip code'; }
+    if (!res.ok) {
+      onbMsg(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : 'We could not save your email just now. Please try again in a moment.', true);
+      if (el) el.focus();
+      return;
+    }
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
     onbMsg('Request received — we will email you when your area goes live.');
     if (onbEl('onbUncovered')) onbEl('onbUncovered').classList.add('hidden');
   };
@@ -1317,6 +1337,7 @@
     $('locForm').classList.remove('hidden');
     $('locRequest').classList.add('hidden');
     $('locDone').classList.add('hidden');
+    locRequestError('');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
     // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
     // Every other opener is an ADD (the dashed chip, Dashboard / My Places / Viewing
@@ -1349,19 +1370,54 @@
     }
   };
   HS.submitRequest = async function () {
-    const el = $('reqEmail'), e = el.value.trim();
-    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    const el = $('reqEmail'), btn = $('reqSubmit');
+    const R = window.HSCommunityRequest;
+    // A missing module is an outage, not a bad address — say the right thing.
+    if (!R) { locRequestError('We could not save your email just now. Please try again in a moment.'); return; }
+    const email = R.normalizeEmail(el ? el.value : '');
+    if (!email) { locRequestError('Enter a valid email address so we can reach you.'); if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    const zip = R.normalizeZip($('reqZipLabel') && $('reqZipLabel').textContent);
+    if (!zip) { locRequestError('That ZIP code does not look right — check it and try again.'); return; }
+    if (el) el.style.borderColor = '';
+    locRequestError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
     // Referral stamp: carry the first-touch source onto the area-request row
     // (community_requests.source — same column submit-public-form stamps with
-    // 'homepage_zip'). Only set when a first touch exists; absent stays absent.
-    const row = { email: e, zip: $('reqZipLabel').textContent };
-    const ref = HS.referralToken(); if (ref) row.source = ref;
-    await persistEmail('community_requests', row);
+    // 'homepage_zip'). Coverage-modal provenance when no first touch exists.
+    const source = (typeof HS.referralToken === 'function' && HS.referralToken()) || 'coverage_modal';
+    // Seed/preview mode has no database by construction. Production is DATA_SOURCE='supabase'.
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('community_requests', { email: email, requested_zip: zip, source: source })
+      : await R.submit({
+          client: HS.sb(),
+          email: email,
+          zip: zip,
+          source: source
+        });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Request my zip code'; }
+    if (!res.ok) {
+      locRequestError(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : res.reason === 'invalid_zip'
+          ? 'That ZIP code does not look right — check it and try again.'
+          : 'We could not save your email just now. Please try again in a moment.');
+      if (el) el.focus();
+      return;
+    }
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
     $('locRequest').classList.add('hidden');
     $('locDoneH').textContent = 'Request received';
-    $('locDoneP').textContent = "We'll email you the moment " + $('reqZipLabel').textContent + ' is live on HomeSignal.';
+    $('locDoneP').textContent = "We'll email you the moment " + zip + ' is live on HomeSignal.';
     $('locDone').classList.remove('hidden');
   };
+  function locRequestError(msg) {
+    const box = $('locRequestError');
+    if (!box) return;
+    box.textContent = msg || '';
+    box.classList.toggle('hidden', !msg);
+  }
 
   // -------------------------------------------------- followed communities ----
   // The visitor's saved communities (shown on Dashboard + Communities). The primary

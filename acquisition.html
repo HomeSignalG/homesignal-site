@@ -209,7 +209,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button></nav>
   <main>
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -224,6 +224,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-videoproducer"></div>
     <div class="tab" id="tab-bluesky"></div>
     <div class="tab" id="tab-premium"></div>
+    <div class="tab" id="tab-arearequests"></div>
   </main>
   <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -460,6 +461,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireAcqMetrics();
     wireBluesky();
     wirePremiumWaitlist();
+    wireAreaRequests();
     stalenessBanner(p.meta);
   }
 
@@ -567,6 +569,81 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         exec.appendChild(box);
       }
     }catch(e){}
+  }
+
+  // ---- AREA REQUESTS (gated RPC hs_community_requests). Canonical store is
+  //      public.community_requests; anon holds NO privilege on it, so this read
+  //      is SECURITY DEFINER + dashboard_admins, exactly like Premium Waitlist.
+  //      THIS is where to look when a ZIP goes live: filter to that ZIP and
+  //      email everyone on the list. Gate 5: KPI + lead log are ONE call. ----
+  function areaRequestKpis(w){
+    var filter=w.filter_zip;
+    return '<div class="grid" style="margin-bottom:14px">'+
+      liveTile('Area requests', w.total||0, 'canonical community_requests')+
+      liveTile('Last 7 days', w.last_7d||0, (w.last_30d||0)+' in last 30 days')+
+      liveTile('Distinct ZIPs', w.distinct_zips||0, filter?('showing '+filter):'uncovered-ZIP asks')+
+    '</div>';
+  }
+  function areaRequestsCard(w){
+    w=w||{};
+    var rows=(w.rows||[]).map(function(r){
+      var when=r.created_at?esc(String(r.created_at).replace('T',' ').slice(0,16)):'—';
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+(r.requested_zip?esc(r.requested_zip):'—')+'</td>'+
+        '<td>'+esc(r.email||'—')+'</td>'+
+        '<td class="muted" style="font-variant-numeric:tabular-nums">'+when+'</td>'+
+        '<td class="muted">'+(r.source?esc(r.source):'—')+'</td></tr>';
+    }).join('');
+    var capped=(w.rows||[]).length>=(w.row_limit||500);
+    var emails=(w.rows||[]).map(function(r){ return r.email; }).filter(Boolean);
+    var copyBox=emails.length
+      ? '<p class="sub" style="margin-top:10px">When this ZIP goes live, email these '+emails.length+' people. Copy-ready list:</p>'+
+        '<textarea id="areaReqEmails" readonly rows="4" style="width:100%;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'+esc(emails.join('\n'))+'</textarea>'
+      : '';
+    var zipCounts=(w.by_zip||[]).slice(0,12).map(function(a){
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+esc(a.zip||'?')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(a.count||0)+'</td></tr>';
+    }).join('');
+    return '<div class="card"><h3>Area requests <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Everyone who asked to be told when an uncovered ZIP goes live. Filter to a ZIP to get the email list for that launch. Source is the page the request came from (coverage_modal, onboarding, homepage_zip, or a referral stamp).</p>'+
+      areaRequestKpis(w)+
+      '<div class="field" style="display:flex;gap:8px;align-items:center;margin:0 0 14px;flex-wrap:wrap">'+
+        '<label for="areaReqZip" class="sub" style="margin:0">ZIP to notify</label>'+
+        '<input id="areaReqZip" inputmode="numeric" maxlength="5" placeholder="e.g. 90025" value="'+(w.filter_zip?esc(w.filter_zip):'')+'" style="width:8em;padding:6px 10px;border:1px solid var(--line);border-radius:8px">'+
+        '<button type="button" class="winbtn" id="areaReqFilter">Show this ZIP</button>'+
+        '<button type="button" class="winbtn" id="areaReqAll">Show all</button>'+
+      '</div>'+
+      (zipCounts && !w.filter_zip?('<div style="overflow-x:auto;margin-bottom:14px"><table class="tbl"><thead><tr><th>ZIP</th><th style="text-align:right">Requests</th></tr></thead><tbody>'+zipCounts+'</tbody></table></div>'):'')+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Email</th><th>Requested</th><th>Source</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        (capped?'<p class="sub" style="margin-top:8px">Showing the newest '+(w.row_limit||500)+'. The count above is unfiltered.</p>':'')+
+        copyBox)
+        :'<div class="muted">No coverage requests yet.</div>')+
+    '</div>';
+  }
+  function paintAreaRequests(data){
+    var tab=$('tab-arearequests'); if(!tab) return;
+    tab.innerHTML=areaRequestsCard(data);
+    var zipEl=$('areaReqZip');
+    var go=function(z){ wireAreaRequests(z); };
+    if($('areaReqFilter')) $('areaReqFilter').onclick=function(){ go(zipEl && zipEl.value); };
+    if($('areaReqAll')) $('areaReqAll').onclick=function(){ go(''); };
+    if(zipEl) zipEl.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(zipEl.value); } };
+  }
+  async function wireAreaRequests(zip){
+    var tab=$('tab-arearequests'); if(!tab) return;
+    var z=(zip==null)?'':String(zip).trim();
+    if(z && !/^\d{5}$/.test(z)) z='';
+    try{
+      var args={ p_limit: 500 };
+      if(z) args.p_zip=z;
+      var r=await window.hsClient.rpc('hs_community_requests', args);
+      if(r.error || !r.data){
+        tab.innerHTML='<div class="card"><h3>Area requests</h3><p class="sub">Could not load area requests just now. If this is a new deploy, apply docs/community-requests-capture.sql in the SQL editor first.</p></div>';
+        return;
+      }
+      paintAreaRequests(r.data);
+    }catch(e){
+      tab.innerHTML='<div class="card"><h3>Area requests</h3><p class="sub">Could not load area requests just now.</p></div>';
+    }
   }
 
   async function wireAcqLive(){

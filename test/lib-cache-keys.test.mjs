@@ -31,7 +31,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // the same class of silent failure, and #1089's search fix was the first to ship behind
 // exactly that risk. Its tags are written as src="shell.js" on the 14 pages and as
 // src="/shell.js" by the generator (which carries <base href="/">), so §1 matches both.
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-page.js'];
+const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
