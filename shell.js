@@ -1041,8 +1041,25 @@
   function paintNavHrefs() {
     if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
     const zip = state.zip;
+    // On a project/facility dossier the Development sidebar used to stamp
+    // development.html?zip= only, dropping ?id=. Clicking the already-lit
+    // Development item then opened the ZIP list (or, with no zip, leftover
+    // myZip) and Viewing fell off Pearce Lane back to a ZIP code.
+    // Keep the record id on THAT one link so the click stays on the dossier.
+    // Alerts/Dashboard stay zip-only. "Back to development" is still the list.
+    let dossierId = null;
+    if (currentShellPage() === 'development.html') {
+      try {
+        const id = new URLSearchParams(location.search).get('id');
+        if (id) dossierId = String(id);
+      } catch (e) { dossierId = null; }
+    }
     const stamp = (a, base) => {
       if (!base || HS.ZIP_NAV_PAGES.indexOf(base) < 0) return;
+      if (base === 'development.html' && dossierId && HS.pageHref) {
+        a.setAttribute('href', HS.pageHref('development.html', { zip: zip, id: dossierId }));
+        return;
+      }
       a.setAttribute('href', HS.navHref(base, zip));
     };
     const nav = document.getElementById('hs-nav');

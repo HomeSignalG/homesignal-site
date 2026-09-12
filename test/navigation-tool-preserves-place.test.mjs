@@ -103,6 +103,11 @@ ok(!/_serverFollowZips/.test(paint) && !/myZip/.test(paint),
   'paintNavHrefs never stamps a follow-list or saved-area ZIP over the viewed one');
 ok(/HS\.ZIP_NAV_PAGES\.indexOf\(base\) < 0/.test(paint),
   'only ZIP-scoped pages are stamped (My Places keeps its account-wide link)');
+ok(/currentShellPage\(\) === 'development.html'/.test(paint)
+  && /HS\.pageHref\('development.html', \{ zip: zip, id: dossierId \}\)/.test(paint),
+  'a Development dossier keeps ?id= on the Development sidebar link');
+ok(/get\('id'\)/.test(paint),
+  'the kept id is read from the current URL, not a second store');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll Gate 2 tool-navigation assertions passed.');
