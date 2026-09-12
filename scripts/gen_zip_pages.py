@@ -347,7 +347,7 @@ def render(p, built):
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
-        '<script src="/lib/templates.js?v=5f556744"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=848593cf"></script>\n<script src="/lib/impact.js"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
@@ -359,7 +359,7 @@ def render(p, built):
         '<script src="/lib/premium-waitlist.js?v=ae8a117e"></script>\n'
         '<script src="/shell.js?v=a54d65f4"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=8d4d63d1"></script>\n'
+        '<script src="/lib/community-page.js?v=c9fe338d"></script>\n'
         "</body>\n</html>\n")
 
 
