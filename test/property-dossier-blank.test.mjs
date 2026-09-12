@@ -86,8 +86,23 @@ ok(/HS\.data\.projects\(zip, p\)/.test(prop) && /HS\.data\.changes\(zip, p\)/.te
   '5b projects/changes/envRisk are called with that ZIP, not a hardcoded S.zip');
 ok(!/HS\.data\.projects\(S\.zip/.test(prop) && !/HS\.data\.changes\(S\.zip/.test(prop),
   '5c S.zip is not the fetch key — that mixed 75009 TxDOT rows onto a 78657 home');
-ok(!/LS\.set\('myZip'/.test(prop) && !/state\.zip\s*=/.test(prop),
+// 5d WAS TWO CLAIMS IN ONE ASSERTION, AND ONLY ONE OF THEM IS STILL TRUE.
+// Its NAME is the myZip half, and that half is UNCHANGED and still asserted below:
+// loading a dossier must never rewrite the resident's saved area (NAV-01).
+// Its IMPLEMENTATION also banned every `state.zip =`, and that half is deliberately
+// reversed by the P0 address-dossier fix (2026-09-12): the dossier is a PLACE-SELECTION,
+// so it writes the VIEWED zip from the Address's own p.zip. Without that write the sidebar
+// and the bell stamped whatever leftover session geography the tab held — from the Coomes
+// dossier (78617) Alerts opened 78657, a different place.
+// The blanket ban is NARROWED rather than dropped, so the protection it was really giving
+// (no foreign geography written on this page) survives: the ONLY permitted geography write
+// is from p.zip. 5a-5c above — the fetch key — are untouched and unaffected.
+ok(!/LS\.set\('myZip'/.test(prop),
   '5d loading a dossier does not write myZip (NAV-01)');
+const zipWrites = prop.match(/state\.zip\s*=\s*[^;]+/g) || [];
+ok(zipWrites.length === 1 && /state\.zip = String\(p\.zip\)/.test(zipWrites[0]),
+  '5d2 the dossier writes geography exactly once, and only from the ADDRESS\'s p.zip',
+  zipWrites);
 
 // ── 6. The Viewing chip names the Address this page is showing ───────────────
 ok(/HS\.setViewLabel\(p\.address, \{ precise: true \}\)/.test(prop),

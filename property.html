@@ -42,6 +42,22 @@ HS.onReady(async function () {
     : S.activeProperty;
   if (p) HS.selectProperty(p.id);
   if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button><div class="ph"><h1>No Address</h1></div>'; paintZipStrip(); return; }
+  // THIS DOSSIER OWNS THE VIEWED GEOGRAPHY. Opening an Address is a PLACE-SELECTION,
+  // not a browse: the page is about THIS Address, so the app's viewed ZIP must be its ZIP.
+  // Without this write, state.zip kept whatever leftover session geography the tab carried
+  // and paintNavHrefs / HS.navTo stamped the sidebar and the bell with it — so Alerts from
+  // the Coomes dossier (78617) opened 78657 / Horseshoe Bay, a different geography.
+  // selectProperty above only writes activePropId; it has never set geography.
+  //
+  // Same writer the Viewing switcher already uses for an Address (shell.js::focusZip), and
+  // the setter itself re-paints the top bar and re-stamps every ZIP-scoped link, so no href
+  // is hand-built here.
+  //
+  // The ADDRESS's ZIP wins — deliberately NOT HS.ensureViewedZip(p.zip). This page's identity
+  // is ?id=, so a stray ?zip= in the URL must never outrank the Address on screen.
+  // It writes the VIEWED zip ONLY, never myZip: opening a dossier is not a re-homing, and
+  // NAV-01's "browsing never overwrites the resident's saved area" still holds.
+  if (p.zip && /^\d{5}$/.test(String(p.zip))) HS.state.zip = String(p.zip);
   if (typeof HS.setViewLabel === 'function') HS.setViewLabel(p.address, { precise: true });
 
   function numCoord(v) {
@@ -177,7 +193,7 @@ HS.onReady(async function () {
     identityHtml(p)
     + contextMap
     + '<div class="cols"><div>'
-    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
+    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="' + HS.esc(HS.navHref('development.html', p.zip)) + '">All projects →</a></div>'
     + near.map(function (pr) {
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
           + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
