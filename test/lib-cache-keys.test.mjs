@@ -132,5 +132,78 @@ while ((g = genRe.exec(gen))) {
 ok(seen >= CONTENT_KEYED.length - 1,
   `5b: the generator scan actually matched tags (${seen}) — a regex that stops matching must not read as clean`);
 
+// §6 — THE STYLESHEET WAS OUTSIDE EVERY SECTION ABOVE, AND THAT IS HOW THE CHIPS SHIPPED
+// HALF-DRESSED. §1/§2/§3/§5 all match `.js` only — §2's sweep is literally
+// /<script\s+src="…\.js"/ — so a `<link rel="stylesheet">` could never appear in `keyless`
+// no matter how stale it was. app.css carried NO key on all 13 committed hosts and in the
+// generator for the life of the repo, and this suite reported nothing: the same
+// "absence that reads as a pass" §2 was widened to prevent, one tag type over.
+//
+// WHAT IT COST, and why CSS is worse than JS here rather than better. #1189 put the
+// top-bar Place chips' markup in partials/shell.html and their rules in app.css. shell.js
+// fetches that partial with `cache: 'no-store'`, so the MARKUP always arrives fresh while
+// the STYLESHEET could come from cache — the one combination that cannot self-correct. A
+// returning visitor then got the new spans with no rules to hide them, because
+// `.top .topadd .topadd-short{display:none}` lives only in app.css, and the chips read
+// "＋ Add an addressAddress" / "＋ Add a zip codeZIP" with no chip styling at all.
+// A hard refresh hid it, which is exactly why it could be shipped and reviewed as green.
+const STYLE_KEYED = ['app.css'];
+// Pinned at its measured membership, like §2: app.css is the ONLY same-origin stylesheet in
+// the repo, so this set is EMPTY and a new unkeyed one fails immediately. The three
+// jsDelivr sheets (leaflet, maplibre-gl) are versioned in their own URL and are not ours
+// to key — the same carve-out §2 makes for absolute script sources.
+const KNOWN_KEYLESS_STYLE = new Set();
+
+STYLE_KEYED.forEach((rel) => {
+  const want = key(rel);
+  const found = [];
+  pages.forEach((p) => {
+    const src = readFileSync(join(root, p), 'utf8');
+    const re = new RegExp('href="/?' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\?v=([^"]*))?"', 'g');
+    let m;
+    while ((m = re.exec(src))) found.push({ page: p, key: m[2] || null });
+  });
+  ok(found.length > 0, `6a: ${rel} is actually linked by at least one page (${found.length} tags)`);
+  const wrong = found.filter((f) => f.key !== want);
+  ok(wrong.length === 0,
+    `6b: all ${found.length} ${rel} tags carry its content hash ?v=${want}`
+    + (wrong.length ? ` — stale: ${wrong.map((w) => w.page + ' (' + w.key + ')').join(', ')}` : ''));
+});
+
+// 6c — no NEW keyless same-origin stylesheet, by the same logic as §2a.
+const keylessStyle = new Set();
+pages.forEach((p) => {
+  const src = readFileSync(join(root, p), 'utf8');
+  const re = /<link[^>]*rel="stylesheet"[^>]*href="(?!https?:)([^"?]+\.css)"/g;
+  let m;
+  while ((m = re.exec(src))) keylessStyle.add(localSrc(m[1]));
+});
+const unexpectedStyle = [...keylessStyle].filter((f) => !KNOWN_KEYLESS_STYLE.has(f));
+ok(unexpectedStyle.length === 0,
+  '6c: no keyless same-origin stylesheet has appeared'
+  + (unexpectedStyle.length ? ' — ' + unexpectedStyle.join(', ') : ` (${KNOWN_KEYLESS_STYLE.size} known, pinned)`));
+
+// 6d — the generator writes its stylesheet tag as a hardcoded string too, and the
+// generated /community/<zip>/ documents are never committed, so §6b cannot see them.
+// This is §5's lesson applied to the sheet: a ZIP page kept the cached old CSS while
+// every other page got the new one.
+const genStyleRe = /href="\/([a-z0-9/-]+\.css)\?v=([0-9a-f]{8})"/g;
+let gs, seenStyle = 0;
+while ((gs = genStyleRe.exec(gen))) {
+  seenStyle++;
+  ok(gs[2] === key(gs[1]),
+    `6d: generator tag /${gs[1]} carries its current content hash (?v=${key(gs[1])}, found ${gs[2]})`);
+}
+ok(seenStyle === STYLE_KEYED.length,
+  `6e: the generator stylesheet scan matched every keyed sheet (${seenStyle}/${STYLE_KEYED.length}) — a regex that stops matching must not read as clean`);
+
+// 6f — control, so §6b is derived from THIS file rather than any file: the sheet and the
+// runtime hash differently, and a one-byte change moves the sheet's key.
+ok(key('app.css') !== key('shell.js'),
+  '6f: app.css and shell.js hash differently — the key really is this file\'s content');
+const staleCss = createHash('sha256').update(readFileSync(join(root, 'app.css')) + 'x').digest('hex').slice(0, 8);
+ok(staleCss !== key('app.css'),
+  '6g: a one-byte CSS change produces a different key, which is what makes 6b unforgettable');
+
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
