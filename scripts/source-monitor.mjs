@@ -47,6 +47,7 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs
 import {
   firstColOf, windowClause, andWhere, windowLabel, renderBytes, differenceCategory,
   unresolvedIndex, UNRESOLVED_VOLUME_BOUND, unreachableRows,
+  fieldList, joinFieldValues, describeFailure,
 } from './lib/status-drift.mjs';
 import {
   soleTypeCol, typeDriftApplies, hasBaseline, classifyTypeValues, whitelistMappingGaps,
@@ -137,23 +138,38 @@ const seenBefore = (key) => probedUrls.has(key) ? true : (probedUrls.add(key), f
 
 // ---------------------------------------------------------------- ArcGIS probing
 
-async function arcgisGroupBy(layerUrl, field, extraWhere) {
+// `diag` is an optional out-parameter: callers that want the reason pass an object and read
+// `diag.reason`. Added as an out-param rather than a changed return type so the recon call
+// sites (arcgisRecon) keep their existing rows|null contract untouched.
+async function arcgisGroupBy(layerUrl, field, extraWhere, diag) {
+  const fields = fieldList(field);
   const where = encodeURIComponent(extraWhere || '1=1');
-  const stats = encodeURIComponent(JSON.stringify([{ statisticType: 'count', onStatisticField: field, outStatisticFieldName: 'n' }]));
-  const r = await jget(`${layerUrl}/query?where=${where}&groupByFieldsForStatistics=${encodeURIComponent(field)}&outStatistics=${stats}&f=json`);
-  if (!r.ok || r.json.error) return null;
-  return (r.json.features || []).map((f) => ({ value: f.attributes[field], n: f.attributes.n ?? f.attributes.N ?? 0 }));
+  const stats = encodeURIComponent(JSON.stringify([{ statisticType: 'count', onStatisticField: fields[0], outStatisticFieldName: 'n' }]));
+  const r = await jget(`${layerUrl}/query?where=${where}&groupByFieldsForStatistics=${encodeURIComponent(fields.join(','))}&outStatistics=${stats}&f=json`);
+  if (!r.ok || r.json.error) { if (diag) diag.reason = describeFailure(r); return null; }
+  // Two different field combinations can join to the SAME string (a blank second part joins
+  // to the first part alone), so counts are summed per joined value rather than emitted twice.
+  const merged = new Map();
+  for (const f of (r.json.features || [])) {
+    const value = joinFieldValues(f.attributes, fields);
+    const n = f.attributes.n ?? f.attributes.N ?? 0;
+    const key = value == null ? '\u0000null' : String(value);
+    const cur = merged.get(key);
+    if (cur) cur.n += n; else merged.set(key, { value, n });
+  }
+  return [...merged.values()];
 }
 
 // Distinct values, VERBATIM. Needed because ArcGIS groupBy statistics can CASE-FOLD the
 // returned value (the Denver standing answer: groupBy said UPPERCASE, the layer stores mixed
 // case), which would make an exact-match drift check report false positives every night.
 // groupBy is still used for the counts; anything it flags is confirmed against this first.
-async function arcgisDistinct(layerUrl, field, extraWhere) {
+async function arcgisDistinct(layerUrl, field, extraWhere, diag) {
+  const fields = fieldList(field);
   const where = encodeURIComponent(extraWhere || '1=1');
-  const r = await jget(`${layerUrl}/query?where=${where}&outFields=${encodeURIComponent(field)}&returnDistinctValues=true&returnGeometry=false&f=json`);
-  if (!r.ok || r.json.error) return null;
-  return (r.json.features || []).map((f) => f.attributes[field]);
+  const r = await jget(`${layerUrl}/query?where=${where}&outFields=${encodeURIComponent(fields.join(','))}&returnDistinctValues=true&returnGeometry=false&f=json`);
+  if (!r.ok || r.json.error) { if (diag) diag.reason = describeFailure(r); return null; }
+  return (r.json.features || []).map((f) => joinFieldValues(f.attributes, fields));
 }
 
 // ── live status-domain readers for the non-arcgis/socrata families ──────────────
@@ -671,21 +687,24 @@ async function statusDomainDrift() {
       if (!mapped.size) continue;                       // nothing declared → not a drift signal
 
       // Read the SAME domain twice: once inside the connector's window, once outside it.
-      const readDomain = async (invert) => {
+      const readDomain = async (invert, diag = {}) => {
         const win = windowClause(family, e, invert);
         // An entry with no window has no out-of-window half — say so rather than re-reading
         // the same rows and reporting them twice under two different tiers.
         if (invert && !win && family !== 'csv') return e.recency_days > 0 ? null : [];
         const where = andWhere(e.extra_where, win);
         if (family === 'arcgis') {
-          const rows = await arcgisGroupBy(e.service_url, field, where);
+          const rows = await arcgisGroupBy(e.service_url, field, where, diag);
           return rows ? rows.map((r) => ({ value: r.value, n: r.n })) : null;
         }
         if (family === 'socrata') {
+          const cols = fieldList(field);
+          const sel = cols.map((c) => encodeURIComponent(c)).join(',');
           const w = where ? `&$where=${encodeURIComponent(where)}` : '';
           const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
-            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${w}`);
-          return (r.ok && Array.isArray(r.json)) ? r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 })) : null;
+            `?$select=${sel},count(*) as n&$group=${sel}&$limit=2000${w}`);
+          if (!(r.ok && Array.isArray(r.json))) { diag.reason = describeFailure(r); return null; }
+          return r.json.map((x) => ({ value: joinFieldValues(x, cols), n: parseInt(x.n, 10) || 0 }));
         }
         if (family === 'ckan')   return ckanStatusCounts({ ...e, extra_where: where }, field);
         if (family === 'carto')  return cartoStatusCounts({ ...e, extra_where: where }, field);
@@ -699,15 +718,20 @@ async function statusDomainDrift() {
       // An unreachable entry is NOT a clean entry. Capture WHY, and which read failed, so the
       // report can name it — a count alone makes "could not be read" indistinguishable from
       // "read and found nothing wrong", which is the exact failure this check exists to catch.
+      // `inDiag` is an OUT-PARAMETER, not a return value, so the recon call sites keep their
+      // existing `rows|null` contract. Without it every reader collapses a 404, a 429, an
+      // ArcGIS in-band error and an unsupported field to the SAME bare null, and the report
+      // can only ever say "returned null" — undiagnosable from the committed artifact.
+      const inDiag = {};
       let inLive = null, outLive = null, readErr = null;
-      try { inLive = await readDomain(false); } catch (err) { inLive = null; readErr = err?.message || String(err); }
+      try { inLive = await readDomain(false, inDiag); } catch (err) { inLive = null; readErr = err?.message || String(err); }
       try { outLive = await readDomain(true); } catch { outLive = null; }
       if (!inLive) {
         out.push({
           registry_id: e.registry_id, family, field, unreachable: true,
           unreachableReason: readErr
             ? `in-window status read threw: ${readErr}`
-            : `in-window status read returned null (${family} reader could not resolve a status domain)`,
+            : `in-window status read failed (${family}): ${inDiag.reason || 'reader returned null without recording a reason'}`,
           inWindow: [], outWindow: [], notes: [], unresolved: [],
         });
         continue;
@@ -722,13 +746,15 @@ async function statusDomainDrift() {
       // different question than the probe — the exact Rule 13 trap this pass exists to fix.
       let presentIn = null;
       if (family === 'arcgis') {
-        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)));
+        const vDiag = {};
+        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)), vDiag);
         if (!verbatim) {
           out.push({
             registry_id: e.registry_id, family, field, unreachable: true,
-            unreachableReason: 'arcgis returnDistinctValues confirmation returned null — groupBy '
-              + 'counts cannot be trusted verbatim without it, so the entry is reported unreachable '
-              + 'rather than reported from case-folded values',
+            unreachableReason: 'arcgis returnDistinctValues confirmation failed — groupBy counts '
+              + 'cannot be trusted verbatim without it, so the entry is reported unreachable rather '
+              + 'than reported from case-folded values: '
+              + (vDiag.reason || 'reader returned null without recording a reason'),
             inWindow: [], outWindow: [], notes: [], unresolved: [],
           });
           continue;
@@ -835,19 +861,22 @@ async function typeDomainDrift() {
         continue;
       }
 
-      const readDomain = async (invert) => {
+      const readDomain = async (invert, diag = {}) => {
         const win = windowClause(family, e, invert);
         if (invert && !win && family !== 'csv') return e.recency_days > 0 ? null : [];
         const where = andWhere(e.extra_where, win);
         if (family === 'arcgis') {
-          const rows = await arcgisGroupBy(e.service_url, field, where);
+          const rows = await arcgisGroupBy(e.service_url, field, where, diag);
           return rows ? rows.map((r) => ({ value: r.value, n: r.n })) : null;
         }
         if (family === 'socrata') {
+          const cols = fieldList(field);
+          const sel = cols.map((c) => encodeURIComponent(c)).join(',');
           const w = where ? `&$where=${encodeURIComponent(where)}` : '';
           const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
-            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${w}`);
-          return (r.ok && Array.isArray(r.json)) ? r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 })) : null;
+            `?$select=${sel},count(*) as n&$group=${sel}&$limit=2000${w}`);
+          if (!(r.ok && Array.isArray(r.json))) { diag.reason = describeFailure(r); return null; }
+          return r.json.map((x) => ({ value: joinFieldValues(x, cols), n: parseInt(x.n, 10) || 0 }));
         }
         if (family === 'ckan')  return ckanStatusCounts({ ...e, extra_where: where }, field);
         if (family === 'carto') return cartoStatusCounts({ ...e, extra_where: where }, field);
@@ -855,15 +884,20 @@ async function typeDomainDrift() {
         return null;
       };
 
+      // `inDiag` is an OUT-PARAMETER, not a return value, so the recon call sites keep their
+      // existing `rows|null` contract. Without it every reader collapses a 404, a 429, an
+      // ArcGIS in-band error and an unsupported field to the SAME bare null, and the report
+      // can only ever say "returned null" — undiagnosable from the committed artifact.
+      const inDiag = {};
       let inLive = null, outLive = null, readErr = null;
-      try { inLive = await readDomain(false); } catch (err) { inLive = null; readErr = err?.message || String(err); }
+      try { inLive = await readDomain(false, inDiag); } catch (err) { inLive = null; readErr = err?.message || String(err); }
       try { outLive = await readDomain(true); } catch { outLive = null; }
       if (!inLive) {
         out.push({
           registry_id: e.registry_id, family, field, unreachable: true, baselineMissing: false,
           unreachableReason: readErr
             ? `in-window type read threw: ${readErr}`
-            : `in-window type read returned null (${family} reader could not resolve a type domain)`,
+            : `in-window type read failed (${family}): ${inDiag.reason || 'reader returned null without recording a reason'}`,
           gating: [], latent: [], listedNotLive: [], baselineHits: [],
         });
         continue;
@@ -873,12 +907,14 @@ async function typeDomainDrift() {
       // window before reporting, or every night invents drift on identical data.
       let presentIn = null;
       if (family === 'arcgis') {
-        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)));
+        const vDiag = {};
+        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)), vDiag);
         if (!verbatim) {
           out.push({
             registry_id: e.registry_id, family, field, unreachable: true, baselineMissing: false,
-            unreachableReason: 'arcgis returnDistinctValues confirmation returned null — groupBy '
-              + 'values cannot be trusted verbatim without it',
+            unreachableReason: 'arcgis returnDistinctValues confirmation failed — groupBy values '
+              + 'cannot be trusted verbatim without it: '
+              + (vDiag.reason || 'reader returned null without recording a reason'),
             gating: [], latent: [], listedNotLive: [], baselineHits: [],
           });
           continue;
