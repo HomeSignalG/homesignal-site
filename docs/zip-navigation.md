@@ -58,6 +58,16 @@ held: from the Coomes dossier (78617) Alerts opened **78657**, a different place
 - `property.html` is **not** in `ZIP_NAV_PAGES` (it is addressed by `?id=`), and Alerts stays
   area-scoped: this routes geography, it does not create per-address Alerts.
 
+**A project (or facility) dossier names its listed street in Viewing.** `development.html?id=`
+is ZIP-scoped for the list, but a specific record is one location. Once that record resolves,
+the page writes the viewed ZIP from `p.zip` when it is a 5-digit ZIP and, when `p.address` is
+present, calls `HS.setViewLabel(address, { precise: true })` — the same chip path the Address
+dossier uses. Without the precise label the chip stays `ZIP #####` (or a saved home in that
+ZIP via Gate 4) even when My Places already shows the street from the same field. Missing
+address stays absent: no reverse-geocode, no `note`, no lat/lng promoted to a street. This
+does not write `myZip`, does not insert `app_properties`, and does not add projects to the
+Viewing switcher (Addresses + ZIP Codes stay the two Place types).
+
 ### The helpers
 
 - **`HS.ensureViewedZip(pageZip)`** — THE ONE re-assertion, called by every ZIP-scoped page
@@ -138,6 +148,7 @@ Run via `node scripts/run-unit-tests.mjs`.
 - `test/navigation-place-identity.test.mjs` — tool vs place in the UI (Gate 4)
 - `test/navigation-history.test.mjs` — Back/Forward restore a coherent place
 - `test/navigation-address-dossier-zip.test.mjs` — the Address dossier owns tool-nav geography
+- `test/navigation-project-dossier-view.test.mjs` — a project dossier names its listed street in Viewing
 - `test/nav-identity.test.mjs` — A-021 four-container sidebar (owns that pin)
 
 ## Related
