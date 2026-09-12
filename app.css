@@ -45,7 +45,9 @@
   .search{flex:1;max-width:520px}
   .search input{width:100%;border:1px solid var(--line);background:#f7f9f7;border-radius:9px;padding:9px 13px;font-size:13px;color:var(--ink)}
   .top .sp{flex:1}
+  .topadds{display:flex;align-items:center;gap:8px;flex:none;min-width:0;flex-wrap:wrap}
   .top .topadd{border-style:dashed;cursor:pointer;background:#fff;flex:none;white-space:nowrap}
+  .top .topadd .topadd-short{display:none}
   .ib{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:var(--ink-2);position:relative}
   .ib .badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px}
   .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-2),var(--green-deep));color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
@@ -509,13 +511,15 @@
   .sharegrid{grid-template-columns:repeat(3,1fr)}
   .strip .stat{min-width:calc(50% - 7px)}
   .page{padding:20px 16px 48px}
-  /* top bar: Add sits next to Viewing. Hide the spacer so Share/Sign in wrap
-     instead of stretching the row past the viewport (390px reports page). */
+  /* top bar: Address + ZIP adds sit next to Viewing. Short labels and wrap so
+     a 390px phone does not scroll sideways. */
   .top{gap:6px;padding:11px 10px;min-width:0;flex-wrap:wrap}
   .top .sp{display:none}
-  .top .loc{max-width:36vw;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .top .loc{max-width:32vw;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .topadds{gap:6px}
   .top .topadd{padding:6px 8px;font-size:12px}
-  .top .topadd .topadd-rest{display:none}
+  .top .topadd .topadd-full{display:none}
+  .top .topadd .topadd-short{display:inline}
   .top .sharebtn{padding:0 10px}
   .hero h1{font-size:30px}
 }
