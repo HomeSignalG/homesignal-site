@@ -183,6 +183,10 @@ ok(!/property_reports_waitlist|premium_waitlist_reports/.test(dash.src),
 // ═══ G. Community Profile CTA still opens the same modal ═══
 await page.goto(base + '/community.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
+await page.waitForFunction(() => {
+  const buttons = Array.from(document.querySelectorAll('button'));
+  return buttons.some((b) => (b.textContent || '').trim() === 'Get Premium access →');
+}, null, { timeout: 30000 });
 const profileCta = page.locator('button', { hasText: 'Get Premium access →' }).first();
 ok(await profileCta.count() > 0, 'G Community Profile still offers Get Premium access →');
 await profileCta.click();
