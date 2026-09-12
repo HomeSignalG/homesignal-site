@@ -1,9 +1,8 @@
-// Fix 11 — clicking "+ Add a zip code" must open ADD, not Change — on every
-// app container that shows the chip (ZIP page, Alerts, Address, Development).
+// Fix 11 — the top-bar "+ Add a zip code" chip must open ADD, not Change, on
+// every shell page (ZIP, Alerts, Address, Development).
 //
-// The dashed chip used to live only on the ZIP page, and that chip opened a
-// dialog titled "Change your zip code". Switching already-saved ZIPs is the
-// solid chips / Switch place. This modal follows/saves.
+// Viewing is Switch place (toggle among saved places). Add is a sibling in the
+// top bar so Address and Alerts do not bury it behind Switch. The modal follows/saves.
 //
 // Run: node test/add-zip-modal.browser.test.mjs
 import { chromium } from 'playwright';
@@ -79,16 +78,18 @@ await page.addInitScript(() => {
 
 async function assertAddChip(label, path) {
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
-  const chip = await page.locator('#commStrip button.wchip').textContent();
-  ok(/Add a zip code/i.test(chip || ''), label + ': the dashed chip says Add a zip code', chip);
-  await page.locator('#commStrip button.wchip').click();
+  await page.waitForSelector('#hsAddZip', { timeout: 15000 });
+  const chip = await page.locator('#hsAddZip').textContent();
+  ok(/Add a zip code/i.test(chip || ''), label + ': the top-bar chip says Add a zip code', chip);
+  await page.locator('#hsAddZip').click();
   await page.waitForSelector('#locModal.show', { timeout: 5000 });
   const title = (await page.locator('#locModalTitle').textContent() || '').trim();
   const sub = (await page.locator('#locModal .msub').textContent() || '').trim();
+  const cta = (await page.locator('#locForm .mbtn').textContent() || '').trim();
   ok(title === 'Add a zip code', label + ': modal title is Add a zip code', title);
   ok(!/change/i.test(title), label + ': modal title does not say Change', title);
   ok(/save it/i.test(sub), label + ': subtitle says the ZIP is saved', sub);
+  ok(cta === 'Add this zip code', label + ': modal CTA is Add this zip code', cta);
   await page.locator('#locModal .mclose').click();
 }
 
@@ -97,20 +98,32 @@ await assertAddChip('Alerts', '/alerts.html?data=seed&zip=78617');
 await assertAddChip('Address', '/property.html?data=seed');
 await assertAddChip('Development', '/development.html?data=seed&zip=78617');
 
+await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
-await page.screenshot({ path: join(ART, 'add_zip_chip_on_alerts.png'), fullPage: false });
-await page.locator('#commStrip button.wchip').click();
+await page.waitForSelector('#hsAddZip', { timeout: 15000 });
+const mobile = await page.evaluate(() => ({
+  overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+  chip: (document.getElementById('hsAddZip') || {}).innerText || ''
+}));
+ok(!mobile.overflow, 'at 390px the top bar does not scroll sideways', mobile);
+ok(/Add/i.test(mobile.chip), 'at 390px the Add chip is still visible', mobile);
+await page.screenshot({ path: join(ART, 'add_zip_topbar_on_alerts_390.png'), fullPage: false });
+
+await page.setViewportSize({ width: 1280, height: 900 });
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#hsAddZip', { timeout: 15000 });
+await page.screenshot({ path: join(ART, 'add_zip_topbar_on_alerts.png'), fullPage: false });
+await page.locator('#hsAddZip').click();
 await page.waitForSelector('#locModal.show', { timeout: 5000 });
-await page.screenshot({ path: join(ART, 'add_zip_modal_on_alerts.png'), fullPage: false });
+await page.locator('#locModal .modal').screenshot({ path: join(ART, 'add_zip_topbar_modal_alerts.png') });
 await page.locator('#locModal .mclose').click();
 
 await page.goto(base + '/property.html?data=seed', { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('#commStrip button.wchip', { timeout: 15000 });
-await page.screenshot({ path: join(ART, 'add_zip_chip_on_address.png'), fullPage: false });
-await page.locator('#commStrip button.wchip').click();
+await page.waitForSelector('#hsAddZip', { timeout: 15000 });
+await page.screenshot({ path: join(ART, 'add_zip_topbar_on_address.png'), fullPage: false });
+await page.locator('#hsAddZip').click();
 await page.waitForSelector('#locModal.show', { timeout: 5000 });
-await page.screenshot({ path: join(ART, 'add_zip_modal_on_address.png'), fullPage: false });
+await page.locator('#locModal .modal').screenshot({ path: join(ART, 'add_zip_topbar_modal_address.png') });
 
 await browser.close();
 server.close();

@@ -42,14 +42,17 @@ ok(!/Change your zip code/.test(shellHtml) && !/Change your zip code/.test(shell
   'Fix 11 the loc-modal title is Add, not Change — Change is the Switch-place verb');
 ok(/: 'Add a zip code'/.test(shell),
   'Fix 11 openLoc (non-onboarding) sets Add a zip code, matching the chip that opens it');
-ok(/HS\.paintFollowedZipStrip = function/.test(shell),
-  'Fix 11 the Add-zip strip is a shared shell painter, not ZIP-page-only markup');
-ok(/alerts\|property\|development\|community/.test(shell),
-  'Fix 11 the shared painter mounts on Alerts, Address, Development, and ZIP pages');
-ok(/paintFollowedZipStrip/.test(prop),
-  'Fix 11 the Address dossier re-paints the Add-zip strip after it rebuilds .ph');
-ok(!/paintFollowedZipStrip/.test(dash),
-  'Dashboard does not mount the dashed ZIP strip (it has + Add ZIP Code)');
+ok(/id="hsAddZip"[\s\S]{0,120}HS\.openLoc\(\)/.test(shellHtml) && /topadd-rest/.test(shellHtml),
+  'Fix 11 + Add a zip code sits in the shared top bar next to Viewing, on every page');
+ok(/topadd-rest\{display:none\}/.test(strip(read('app.css'))),
+  'Fix 11 phone top bar shortens the Add chip so 390px does not scroll sideways');
+ok(/Add this zip code/.test(shellHtml) && !/Find my zip code/.test(shellHtml),
+  'Fix 11 the loc-modal CTA is Add this zip code, not Find');
+ok(/function afterAddZipHref/.test(shell) && /focusHref\(zip\)/.test(shell),
+  'Fix 11 adding a ZIP from an app container stays on that tool via focusHref');
+ok(!/paintFollowedZipStrip/.test(shell) && !/paintFollowedZipStrip/.test(prop)
+  && !/paintFollowedZipStrip/.test(dash),
+  'Fix 11 does not transplant the ZIP-page chip strip onto Address / Dashboard');
 ok(!/Follow this community/.test(cpage) && !/Your communities/.test(cpage),
   'A-002 the public ZIP page no longer calls a ZIP a community');
 ok(!/Change your community/.test(shellHtml) && !/Find my community/.test(shellHtml),
