@@ -132,6 +132,37 @@
     };
   }
 
+  // Post-save confirmation helpers (canonical copy: lib/view-zip.js — keep in sync).
+  // SAVE/FOLLOW adds the place to My Places. Email alerts are configured on Alerts.
+  if (!HS.placeSavedLabel) {
+    HS.placeSavedLabel = function (info) {
+      info = info || {};
+      var zip = String(info.zip || '').trim();
+      var address = String(info.address || '').trim();
+      if (address) return address;
+      var name = String(info.name || '').trim();
+      if (name && zip && name.indexOf(zip) !== -1) return name;
+      if (name && zip) return name + ' (' + zip + ')';
+      return name || zip || '';
+    };
+  }
+  if (!HS.alertsHrefForSavedPlace) {
+    HS.alertsHrefForSavedPlace = function (info) {
+      info = info || {};
+      var zip = String(info.zip || '').trim();
+      return HS.navHref('alerts.html', /^\d{5}$/.test(zip) ? zip : null);
+    };
+  }
+  HS.announcePlaceSaved = function (info, willNavigate) {
+    if (!info) return;
+    if (!info.zip && !info.address && !info.name) return;
+    if (willNavigate) {
+      try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {}
+    } else {
+      HS.showAreaOptin(info);
+    }
+  };
+
   // ------------------------------------------------------------------ state --
   const LS = {
     get(k, d) { try { return JSON.parse(localStorage.getItem('hs:' + k)) ?? d; } catch (e) { return d; } },
@@ -570,9 +601,15 @@
     if (!state.properties.find(p => p.id === saved.id)) {
       throw new Error("Place saved but could not be verified — please try again.");
     }
+    _onbOptin = {
+      zip: m.zip,
+      kind: 'address',
+      address: String(m.matchedAddress || row.address || '').trim(),
+      placeId: saved.id
+    };
     if (await HS.data.isCovered(m.zip)) {
       await persistCommunityFollow(m.zip);
-      _onbOptin = await HS.ensureAreaSubscribed(m.zip, false, true, true);
+      await HS.ensureAreaSubscribed(m.zip, false, true, true);
     }
     state.zip = m.zip;
     paintTopbar();
@@ -583,7 +620,9 @@
     const covered = await HS.data.isCovered(zip);
     if (!covered) return { covered: false, zip: zip };
     await persistCommunityFollow(zip);
-    _onbOptin = await HS.ensureAreaSubscribed(zip, false, true, true);
+    const followed = HS.followedCommunities().find(c => String(c.zip) === String(zip));
+    _onbOptin = { zip: zip, kind: 'zip', name: (followed && followed.name) || '' };
+    await HS.ensureAreaSubscribed(zip, false, true, true);
     paintTopbar();
     return { covered: true, zip: zip };
   }
@@ -1212,12 +1251,18 @@
       return;
     }
     LS.set('activeProp', r.data.id);
+    HS.announcePlaceSaved({
+      zip: m.zip,
+      kind: 'address',
+      address: String(m.matchedAddress || row.address || '').trim(),
+      placeId: r.data.id
+    }, true);
     // Focus the app on the home's area when it's covered (same follow the ZIP flow does).
     try {
       if (await HS.data.isCovered(m.zip)) {
         let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
         HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
-        await HS.ensureAreaSubscribed(m.zip, true);   // register the digest floor (page reloads below)
+        await HS.ensureAreaSubscribed(m.zip, true, true);   // digest floor only; card already announced
       }
     } catch (e) {}
     $('homeConfirm').classList.add('hidden');
@@ -1289,7 +1334,8 @@
       // it the primary area, so the Del Valle sample stops showing everywhere.
       let meta = null; try { meta = await HS.data.community(z); } catch (e) {}
       HS.followCommunity({ zip: z, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
-      await HS.ensureAreaSubscribed(z, true);   // register the digest floor (redirect below)
+      HS.announcePlaceSaved({ zip: z, kind: 'zip', name: (meta && meta.name) || '' }, true);
+      await HS.ensureAreaSubscribed(z, true, true);   // digest floor only; card already announced
       location.href = 'community.html?zip=' + z;
     } else {
       $('reqZipLabel').textContent = z;
@@ -1357,7 +1403,8 @@
     } else {
       HS.followCommunity({ zip: zip, name: btn.dataset.name, state: btn.dataset.state });
       btn.textContent = '✓ Following'; btn.classList.add('following');
-      HS.ensureAreaSubscribed(zip, false);   // follow (no consent) + show the inline email opt-in card
+      HS.announcePlaceSaved({ zip: zip, kind: 'zip', name: btn.dataset.name || '' }, false);
+      HS.ensureAreaSubscribed(zip, false, true);   // digest floor only; card already announced
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
@@ -1370,17 +1417,15 @@
 
   // Bridge the app -> digest system. Following an area (save-home, ZIP lookup, or the
   // community Follow button) registers the resident in public.users/user_subscriptions
-  // — the tables digest.py actually emails from — so "following your community" delivers
-  // alerts instead of only updating app state (the CH-class gap: app rows but 0 digest
-  // rows -> no email). The NARROW floor: development/land-use + hearings, but ONLY the
-  // labels this community really carries (word-for-word from its cascaded
-  // government_topics), so we never subscribe to a topic with no feed. Purely ADDITIVE
-  // (subscribe_area_defaults, ON CONFLICT DO NOTHING) — it can never delete a topic the
-  // user already chose (unlike signup_complete, which reconciles-to-exact). No silent
-  // subscription: on success the resident sees a confirmation naming what they'll get.
+  // so a LATER Alerts-page consent can deliver. The NARROW floor: development/land-use
+  // + hearings, but ONLY the labels this community really carries (word-for-word from
+  // its cascaded government_topics). Purely ADDITIVE (subscribe_area_defaults, ON
+  // CONFLICT DO NOTHING) — it can never delete a topic the user already chose (unlike
+  // signup_complete, which reconciles-to-exact). marketing_consent stays false.
+  // SAVE/FOLLOW ≠ EMAIL: the post-save card never claims this floor enabled alerts.
   const AREA_DEFAULT_TOPICS = ['Planning, zoning & development', 'County Commission & county business'];
-  // The exact wording the resident affirms when they tap "Email me these alerts" — stored
-  // on the users row (marketing_consent_copy) as the audit trail of what they agreed to.
+  // Consent copy for enable_area_email_alerts if that RPC is invoked elsewhere.
+  // The post-save card does not display or affirm this copy.
   const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
   HS.ensureAreaSubscribed = async function (zip, willNavigate, suppressUi, throwOnError) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return null;
@@ -1412,8 +1457,8 @@
       console.warn('area-subscribe', e);
       return null;
     }
-    // Surface the inline email opt-in card. Reload/redirect callers stash a one-shot flag
-    // boot() renders on the destination page; in-place callers render immediately.
+    // Callers that already announced via announcePlaceSaved pass suppressUi so this
+    // floor write cannot present follow as "emailing you".
     const info = { zip: zip, communityId: ct.rootId, topics: labels };
     if (!suppressUi) {
       if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
@@ -1421,24 +1466,25 @@
     }
     return info;
   };
-  // The inline EMAIL OPT-IN card — a persistent, deliberately-tapped affirmative (never a
-  // disappearing toast, per the founder consent decision). Shown after a covered follow.
-  // Tapping "Email me these alerts" is the ONLY action that sets marketing_consent.
+  // Post-save card: the place is in My Places. Email alerts are configured on Alerts.
+  // Navigation only — never calls enableAreaEmail / enable_area_email_alerts.
   HS.showAreaOptin = function (info) {
-    if (!info || !info.zip) return;
+    if (!info) return;
+    const label = HS.placeSavedLabel(info);
+    if (!label) return;
     let box = $('hsOptin');
     if (!box) { box = document.createElement('div'); box.id = 'hsOptin'; document.body.appendChild(box); }
     box.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;'
       + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
+    const href = HS.alertsHrefForSavedPlace(info);
     box.innerHTML =
-      '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Now following development &amp; hearings in ' + HS.esc(info.zip) + '</div>'
-      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">' + HS.esc(AREA_CONSENT_COPY) + '</div>'
+      '<div id="optinTitle" style="font-weight:700;color:var(--ink,#12261d)">✓ ' + HS.esc(label) + ' saved to My Places</div>'
+      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">Want email alerts? '
+      + '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="color:var(--green,#157a49);font-weight:700;text-decoration:underline">Choose your alert topics →</a></div>'
       + '<div style="display:flex;gap:10px;align-items:center">'
-      +   '<button type="button" id="optinYes" style="background:var(--green,#157a49);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer">✉ Email me these alerts</button>'
       +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
       + '</div>';
-    $('optinYes').onclick = function () { HS.enableAreaEmail(info); };
     $('optinNo').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; };
   };
   // The affirmative: the ONLY caller of enable_area_email_alerts, the ONLY writer of
@@ -1929,8 +1975,8 @@
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
-    // One-shot: a covered save-home / ZIP lookup that navigated here left the email
-    // opt-in card to render once the new page settled (follow ≠ consent — explicit tap).
+    // One-shot: a save-home / ZIP lookup that navigated here left the
+    // "saved to My Places" card to render once the new page settled.
     try {
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
