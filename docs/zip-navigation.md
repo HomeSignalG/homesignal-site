@@ -110,6 +110,10 @@ location.href = HS.navHref('maps.html', HS.state.zip);
 
 - Sidebar links listed in `ZIP_NAV_PAGES`
 - Any `#hs-slot a[data-znav]` in-page link
+- Exception: when the current page is a Development dossier (`development.html?id=`),
+  the Development sidebar link keeps that `id` so clicking the already-lit tool does
+  not dump the resident onto the ZIP list (and an old `myZip`). Other tools stay zip-only.
+  **Back to development** is still the list.
 
 `ZIP_NAV_PAGES` and helpers live in **`lib/view-zip.js`** (canonical); `shell.js` mirrors
 them when the module is not loaded directly.
