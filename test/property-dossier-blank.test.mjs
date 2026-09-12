@@ -120,8 +120,11 @@ ok(/var realAddress = pcmHasPoint\(p\) && !p\.sample && !p\.demo;/.test(prop),
 ok(/<iframe id="propMapFrame"/.test(prop) && /homesignalmap\.html\?embed=1/.test(prop),
   '8b the context map is still an iframe of Map 1');
 ok(/Generate property report/.test(propRaw)
+  && /id="propReportBtn"/.test(propRaw)
   && /location\.href=\\'reports\.html\?id=' \+ encodeURIComponent\(p\.id\)/.test(propRaw),
   '8c the Generate-report CTA stays on this page, same label, same ?id= route');
+ok(/id="propCols"/.test(propRaw) && prop.indexOf("'<div class=\"cols\" id=\"propCols\"><div>'") < prop.indexOf('+ contextMap'),
+  '8d the Address map sits inside #propCols — not a full-width sibling that buries the CTA');
 
 // ── 9. switchProperty on this page opens the Address URL, it does not reload
 ok(/page === 'property.html' && p/.test(shell)

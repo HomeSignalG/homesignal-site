@@ -44,6 +44,10 @@ const server = createServer(async (req, res) => {
     // HS.state.properties is populated on EVERY page load the way a signed-in resident's
     // app_properties rows are. Nothing else in config.js is touched.
     if (p.endsWith('config.js')) body = Buffer.from(String(body).replace("DATA_SOURCE: 'supabase'", "DATA_SOURCE: 'seed'"));
+    // Seed Addresses carry demo:true, which withholds the context map. Production saved
+    // homes do not, and the map is what buried the CTA. Flip the flag so this journey
+    // exercises the layout a real Address actually renders.
+    if (p.endsWith('delvalle.js')) body = Buffer.from(String(body).replace(/demo:\s*true/g, 'demo:false'));
     res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body);
   } catch { res.writeHead(404).end('not found'); }
 });
@@ -102,9 +106,49 @@ await Promise.all([
 ok(new URL(page.url()).searchParams.get('id') === target.id,
   '1 My Places opens the Address on the app\'s own ?id= route', page.url());
 await waitShell();
-await page.waitForSelector('.doact .btn', { timeout: 30000 });
+await page.setViewportSize({ width: 1280, height: 720 });
+await page.waitForSelector('#propReportBtn', { timeout: 30000 });
+await page.waitForSelector('#propContext', { timeout: 30000 });
 const shownAddress = await page.evaluate(() => (document.querySelector('.ph h1') || {}).textContent);
 ok(shownAddress === target.address, '1 the Address dossier is open on the property under test', { shownAddress, expected: target.address });
+const fold = await page.evaluate(() => {
+  const btn = document.getElementById('propReportBtn');
+  const map = document.getElementById('propContext');
+  const watch = document.querySelector('.doact .btn.primary');
+  const r = btn ? btn.getBoundingClientRect() : null;
+  return {
+    hasMap: !!map,
+    hasBtn: !!btn,
+    watch: watch ? watch.textContent.trim() : null,
+    top: r ? Math.round(r.top) : null,
+    bottom: r ? Math.round(r.bottom) : null,
+    vh: window.innerHeight,
+    inView: !!(r && r.top >= 0 && r.bottom <= window.innerHeight && r.height > 0)
+  };
+});
+ok(fold.hasMap && fold.hasBtn,
+  '1 the Address map AND the Generate CTA are both on the page — otherwise a fold check is vacuous', fold);
+ok(fold.inView,
+  '1 Generate property report is in the 1280×720 viewport without scrolling', fold);
+ok(fold.watch === 'Watch this property',
+  '1 Watch this property is still the primary action next to the report CTA', fold);
+await page.setViewportSize({ width: 390, height: 844 });
+const mobileFold = await page.evaluate(() => {
+  const btn = document.getElementById('propReportBtn');
+  const r = btn ? btn.getBoundingClientRect() : null;
+  const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
+  return {
+    top: r ? Math.round(r.top) : null,
+    bottom: r ? Math.round(r.bottom) : null,
+    vh: window.innerHeight,
+    overflow,
+    inView: !!(r && r.top >= 0 && r.bottom <= window.innerHeight && r.height > 0)
+  };
+});
+ok(mobileFold.inView,
+  '1 ...and at 390px too, because the actions column stacks first', mobileFold);
+ok(!mobileFold.overflow, '1 ...and the 390px dossier does not scroll sideways', mobileFold);
+await page.setViewportSize({ width: 1280, height: 720 });
 const activeIsOther = await page.evaluate((id) => {
   const a = HS.state.activeProperty;
   return { activeId: a ? a.id : null, differs: !!a && a.id !== id };
@@ -112,9 +156,10 @@ const activeIsOther = await page.evaluate((id) => {
 info('active property while on this page', activeIsOther);
 
 // ═══ 2. Click the CTA — the journey is the click, never a scripted goto ═══
-const cta = await page.$('.doact .btn:not(.primary)');
+const cta = await page.$('#propReportBtn');
 ok(!!cta, '2 the "Generate property report" CTA is on the page');
 ok((await cta.textContent()).trim() === 'Generate property report', '2 ...with its label unchanged', (await cta.textContent()).trim());
+const requestsBeforeClick = requests.length;
 await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), cta.click()]);
 const landed = new URL(page.url());
 ok(landed.pathname.endsWith('/reports.html'), '2 clicking it opens reports.html', page.url());
@@ -163,9 +208,17 @@ ok(modal.reportsForms === 0, '3b ...and reports.html did not invent a second for
 await page.keyboard.press('Escape');
 
 // ═══ 4. Nothing was generated ═══
-const writes = requests.filter(r => r.method !== 'GET');
+// Scoped to requests the CLICK itself issued. The Address map iframe POSTs to
+// n5_projects_within_radius while the dossier is open; that call can land AFTER
+// the click timestamp because the iframe is still in-flight when we navigate away.
+// It is Map 1 loading, not a report being generated, so it is excluded by URL —
+// counting it made the assertion red the moment the map (the layout this suite
+// now requires) was present.
+const afterClick = requests.slice(requestsBeforeClick)
+  .filter(r => !/n5_projects_within_radius/.test(r.url));
+const writes = afterClick.filter(r => r.method !== 'GET');
 ok(writes.length === 0, '4 the click issued no write of any kind', writes.slice(0, 5));
-const generated = requests.filter(r => /get-address-report|generate|report_pdf|property_reports|\.pdf/i.test(r.url));
+const generated = afterClick.filter(r => /get-address-report|generate|report_pdf|property_reports|\.pdf/i.test(r.url));
 ok(generated.length === 0, '4 ...and called no report generator, report API or dossier', generated.slice(0, 5));
 
 // ═══ 5. Back to the EXACT property ═══

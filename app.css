@@ -498,6 +498,10 @@
   .mapcols .mapwrap{order:1}
   .mapcols .pinlist{order:2}
   .tcats{grid-template-columns:1fr 1fr}
+  /* Address dossier only. Source order is map then actions; stacked, that buries
+     Generate property report under a 320–520px iframe. Scoped to #propCols so
+     every other .cols page keeps source order. */
+  #propCols > :last-child{order:-1}
 }
 @media (max-width: 620px){
   .tcats{grid-template-columns:1fr}
