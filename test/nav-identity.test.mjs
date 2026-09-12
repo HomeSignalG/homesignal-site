@@ -35,7 +35,7 @@ const ok = (c, name, detail) => {
 // longer have a sidebar entry, and none of the three PAGES was deleted — that distinction
 // is what this map records.
 const HIDDEN_SECTIONS = {
-  reports: 'reports.html is the public-beta Property Reports in-progress page (2026-09-11), opened by '
+  reports: 'reports.html is the public-beta Property Reports Premium acquisition page, opened by '
          + 'property.html\'s "Generate property report"; it has no sidebar entry. The report CAPABILITY '
          + 'list is still A-009 on the Dashboard, which this page does not replace',
   today:   'A-020: today.html is a redirect stub to dashboard.html; its four areas live on A-003/A-004/A-005 and A-022',
@@ -192,12 +192,19 @@ ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="reports">/.
 ok(!/location\.replace/.test(reportsSrc),
   'reports.html no longer redirects — a resident who clicks the CTA lands here');
 
-// The honest state itself. Both sentences, verbatim: this copy IS the deliverable, so a
-// silent reword is a product change and must fail here.
-ok(/<h1>Property reports are in progress<\/h1>/.test(reportsSrc),
-  'reports.html says "Property reports are in progress"');
-ok(/We're working on this feature now\. Check back soon\./.test(reportsSrc),
-  'reports.html says "We\'re working on this feature now. Check back soon."');
+// The frozen Premium Property Reports treatment. Silent reword is a product change.
+ok(/PROPERTY REPORTS · PREMIUM/.test(reportsSrc),
+  'reports.html is labelled PROPERTY REPORTS · PREMIUM');
+ok(/<h1>Property reports are coming soon<\/h1>/.test(reportsSrc),
+  'reports.html says "Property reports are coming soon"');
+ok(/Get a detailed report for this property, including property intelligence and nearby changes that may affect the property\./.test(reportsSrc),
+  'reports.html carries the frozen Premium explainer, verbatim');
+ok(/Get Premium access →/.test(reportsSrc),
+  'reports.html CTA is exactly "Get Premium access →"');
+ok(/HS\.openModal\('premiumModal'\)/.test(reportsSrc),
+  'reports.html reuses HS.openModal(\'premiumModal\') — the Community Profile entry point');
+ok(!/premiumEmail|premiumForm|submitWaitlist|persistEmail|hs_premium_waitlist_join/.test(reportsCode),
+  'reports.html does not duplicate the waitlist form or persistence path');
 
 // The CTA reaches it, keeps its label, and carries the ORIGINATING Address.
 ok(/Generate property report/.test(propSrc),
@@ -241,9 +248,11 @@ for (const gone of ['Share this report', 'Community Snapshot', 'Impact Analysis'
 // The repo has paid for this shape before — a pin that names the string it forbids must be
 // scoped to the statement it is about, or it stops guarding by becoming noise.
 const reportsLogic = reportsCode.replace(/<script\s+src="[^"]*"\s*><\/script>/g, '');
-ok(!/text\/csv|\.pdf|jsPDF|download|supabase\.from\(|\.insert\(|paywall|premium/i.test(reportsLogic),
-  'reports.html generates nothing — no PDF, CSV, download, write or gate was invented',
-  (reportsLogic.match(/.{0,40}(text\/csv|\.pdf|jsPDF|download|paywall|premium).{0,40}/i) || [])[0]);
+ok(!/text\/csv|\.pdf|jsPDF|download|supabase\.from\(|\.insert\(|paywall/i.test(reportsLogic),
+  'reports.html generates nothing — no PDF, CSV, download, write or paywall was invented',
+  (reportsLogic.match(/.{0,40}(text\/csv|\.pdf|jsPDF|download|paywall).{0,40}/i) || [])[0]);
+ok(!/myZip|viewZip|DEFAULT_ZIP|activeProperty/.test(reportsLogic),
+  'reports.html does not pull identity or ZIP from unrelated account/viewed/default state');
 
 // ── the consumer must still exist, or this whole contract is decoration ──────────────────
 const shellJs = read('shell.js');

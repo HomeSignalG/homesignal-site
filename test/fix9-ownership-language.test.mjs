@@ -90,6 +90,49 @@ ok(/You have ' \+ n \+ ' place/.test(shell),
 ok(/typeChip\('Address'\)/.test(shell) && /typeChip\('ZIP Code'\)/.test(shell),
   'switcher still distinguishes Address vs ZIP Code types');
 
+console.log('--- remaining class-A phrases cannot return in shipped copy ---');
+const EXTRA = [
+  [/\bnear home\b/i, 'near home'],
+  [/\bfrom home\b/i, 'from home'],
+  [/\bthis home\b/i, 'this home'],
+  [/Near-home/i, 'Near-home'],
+];
+const shippedJs = [
+  'shell.js', 'share.js',
+  'lib/map.js', 'lib/why.js', 'lib/impact.js', 'lib/zip-authoritative.js',
+  'lib/community-page.js', 'lib/templates.js',
+];
+for (const f of htmlPages.concat(shippedJs)) {
+  let body = strip(read(f));
+  if (f === 'shell.js') {
+    body = body.replace(/\/\^\(your home\|my home\|home\)\$\/i/g, '');
+  }
+  for (const [re, label] of EXTRA) {
+    const hit = body.match(re);
+    ok(!hit, f + ' has no user-facing "' + label + '"', hit && hit[0]);
+  }
+}
+
+const alerts = stripScripts(read('alerts.html'));
+ok(/What needs your attention in this area/.test(alerts),
+  'alerts H1 is "in this area", not "near home"');
+const mapPage = strip(read('homesignalmap.html'));
+ok(/>👁 From this place</.test(mapPage),
+  '3D re-frame control is "From this place"');
+ok(/mi from this address/.test(mapPage),
+  'distance copy is "mi from this address"');
+ok(/Address view/.test(mapPage),
+  'address-mode eyebrow is "Address view"');
+ok(/of this address/.test(mapPage),
+  'map caption radius line uses "of this address"');
+const prop = strip(read('property.html'));
+ok(/Effect at this address/.test(prop),
+  'property impact line is "Effect at this address"');
+ok(!/Effect on this home/.test(prop),
+  'property.html no longer says "Effect on this home"');
+ok(!/your property/.test(prop + dash + shellHtml),
+  'fix did not substitute "your property" for ownership language');
+
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll Fix 9 ownership-language assertions passed.');
 process.exit(0);

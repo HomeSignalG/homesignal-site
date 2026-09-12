@@ -453,8 +453,8 @@ ok(c.totalTileShown === true,
 ok(!/across this ZIP/i.test(c.kDev || ''), '12d no ZIP-mode scope copy leaks into address mode', c.kDev);
 // The caption sits ON the map canvas, so it names the radius too - a resident reading the pins
 // should not have to look back up at the heading to know what circle they are inside.
-ok(/^Development within .+ of this home$/.test((c.mapCap || '').trim()),
-  '12e the address map caption names the radius, not just "around this home"', c.mapCap);
+ok(/^Development within .+ of this address$/.test((c.mapCap || '').trim()),
+  '12e the address map caption names the radius, not just "around this address"', c.mapCap);
 
 // ── 13. THE TWO MODES ARE NOT A ONE-WAY DOOR ───────────────────────────────────────────
 // run() flips ZIP_MODE in JS and never touches the URL, so before the back control existed a
@@ -512,7 +512,7 @@ ok(bzZip.scopeNoteShown === true,
 // A ZIP centroid is a page anchor, not somebody's house. A control offering to re-frame the
 // view "from home" promises a place the page does not have.
 ok(bzZip.homeBtnShown === false,
-  '13h ZIP mode hides the HOME-specific "From home" control - there is no home here', bzZip);
+  '13h ZIP mode hides the address-specific "From this place" control - there is no saved address here', bzZip);
 
 // ── 14. THE NOT-MEASURED STATE IS SAYABLE OUT LOUD ─────────────────────────────────────
 // Launch-gate task 6: a resident must be able to explain what "not measured" means. The
@@ -576,7 +576,7 @@ const after15 = await page.evaluate(() => ({
 info('radius change', { before: before15, after: after15 });
 ok(/Showing development within 2 miles of/.test(after15.within),
   '15a the heading restates the NEW radius', after15.within);
-ok(/^Development within 2 miles of this home$/.test(after15.cap.trim()),
+ok(/^Development within 2 miles of this address$/.test(after15.cap.trim()),
   '15b the map caption restates the NEW radius too', after15.cap);
 ok(before15.cap.trim() !== after15.cap.trim(),
   '15c ...and it actually CHANGED (not a caption that happens to match)',

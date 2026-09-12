@@ -9,10 +9,11 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body data-nav="reports">
-<!-- PUBLIC-BETA PROPERTY REPORTS — THE HONEST IN-PROGRESS STATE (founder, 2026-09-11).
-     This page is what "Generate property report" on the Address dossier opens. It states
-     plainly that the feature is not built yet, and it returns the resident to the exact
-     Address they came from.
+<!-- PUBLIC-BETA PROPERTY REPORTS — PREMIUM ACQUISITION SURFACE (founder, 2026-09-12).
+     This page is what "Generate property report" on the Address dossier opens. It still
+     states plainly that the report is not built yet (nothing is generated, previewed or
+     sold). What changed is the dead-end: the visitor is offered the EXISTING Premium
+     waitlist, not a second one.
 
      ⚖️ THIS REVERSES THE reports.html HALF OF A-019 (fbd85e4, #1140, 2026-09-10), UNDER
      EXPLICIT AUTHORIZATION NAMING IT. A-019 retired this file to a redirect stub once the
@@ -34,18 +35,26 @@
                   forbids it (test/final-matrix.test.mjs LEFTOVER 8) is unchanged.
                   Its unguarded projects.sort(...)[0] is likewise gone for good.
 
-     NOTHING IS GENERATED HERE. No PDF, no report API, no database write, no new dossier,
-     no report-generation engine, no download, no premium gate, no pricing. The page reads
-     ONE value — the ?id= it was handed — and renders static copy. It is deliberately not
-     an error page: it uses the shared shell, so the sidebar, header and styling are the
-     product's own and a resident is never stranded, with or without that id. -->
+     NOTHING IS GENERATED HERE. No PDF, no report API, no new dossier, no report-generation
+     engine, no download, no pricing, no second waitlist. The page reads ONE value — the
+     ?id= it was handed — renders the frozen Premium Property Reports treatment, and the
+     CTA calls HS.openModal('premiumModal'), the same shared entry Community Profile uses.
+     Persistence stays HS.submitWaitlist → hs_premium_waitlist_join. Source attribution is
+     the existing convention: location.pathname + location.search, which on this page is
+     /reports.html?id=<the originating id>. ZIP is supplied only when the resolved Address
+     already carries a 5-digit zip, via the waitlist helper's own normalizeZip — never
+     myZip, viewZip, DEFAULT_ZIP or another Address. -->
 <template id="hs-content">
   <div class="page">
     <div id="repBack"></div>
     <div class="ph">
-      <div class="eyebrow">Reports</div>
-      <h1>Property reports are in progress</h1>
-      <p>We're working on this feature now. Check back soon.</p>
+      <div class="eyebrow">PROPERTY REPORTS · PREMIUM</div>
+      <h1>Property reports are coming soon</h1>
+      <p class="ph-where" id="repIdentity" hidden></p>
+      <p>Get a detailed report for this property, including property intelligence and nearby changes that may affect the property.</p>
+    </div>
+    <div class="p2">
+      <button type="button" class="inlinebtn" id="repPremiumBtn" style="margin-top:12px" onclick="HS.openModal('premiumModal')">Get Premium access →</button>
     </div>
   </div>
 </template>
@@ -55,7 +64,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/templates.js?v=848593cf"></script>
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
 <script src="shell.js?v=e4126072"></script>
 <script>
@@ -74,10 +83,12 @@ HS.onReady(function () {
   // link that lands on "No Address". DELIBERATELY NOT `|| HS.state.activeProperty`, which
   // property.html falls back to: silently returning someone to a DIFFERENT Address than
   // they came from is the misdirection this unit exists to remove, not an acceptable
-  // default.
+  // default. The same gate owns the on-page identity and the waitlist ZIP: neither may
+  // come from another Address, myZip, viewZip or HS_CONFIG.DEFAULT_ZIP.
   var props = (HS.state && HS.state.properties) || [];
   var from = id ? props.filter(function (x) { return x && x.id === id; })[0] : null;
   var slot = document.getElementById('repBack');
+  var ident = document.getElementById('repIdentity');
 
   // Built in JS rather than revealed from the template on purpose: .backbtn sets
   // display:inline-flex, and an author display rule beats the UA's [hidden]{display:none},
@@ -93,6 +104,34 @@ HS.onReady(function () {
       location.href = 'property.html?id=' + encodeURIComponent(from.id);
     });
     slot.appendChild(btn);
+  }
+
+  if (from && ident) {
+    var line = from.address || '';
+    if (from.city || from.state || from.zip) {
+      line += (line ? ' — ' : '')
+        + (from.city || '')
+        + (from.city && from.state ? ', ' : '')
+        + (from.state || '')
+        + (from.zip ? ' ' + from.zip : '');
+    }
+    ident.textContent = line;
+    ident.hidden = !line;
+  }
+
+  // ZIP for the EXISTING waitlist write path. HS.submitWaitlist already sends
+  // zipFromLocation(location), which only reads ?zip= or /community/NNNNN/ — this page
+  // is reports.html?id=, so the URL itself does not state a ZIP. When the resolved
+  // Address carries a real 5-digit zip, hand it to that helper as a fallback. URL ZIP
+  // still wins. Unparseable values become absent (normalizeZip). Never myZip / viewZip
+  // / DEFAULT_ZIP, and never a ZIP from a different Address.
+  var W = window.HSPremiumWaitlist;
+  var z = (from && W && W.normalizeZip) ? W.normalizeZip(from.zip) : null;
+  if (z && W && typeof W.zipFromLocation === 'function') {
+    var origZip = W.zipFromLocation;
+    W.zipFromLocation = function (loc) {
+      return origZip(loc) || z;
+    };
   }
 
   // DECIDED — set on BOTH outcomes, and last. The interesting assertion about this page is

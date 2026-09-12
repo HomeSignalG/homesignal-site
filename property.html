@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/templates.js?v=848593cf"></script>
 <script src="lib/impact.js"></script>
 <!-- NO MAP LIBRARIES ON THIS PAGE. The Address context map is an IFRAME of
      homesignalmap.html, so lib/map.js, lib/residential-qualify.js and lib/n5-radius.js
@@ -146,9 +146,15 @@ HS.onReady(async function () {
   // already about THIS Address, so that clause would suppress the map on a genuine saved
   // Address that simply carries a different label.
   var realAddress = pcmHasPoint(p) && !p.sample && !p.demo;
+  // Heading binds to THIS Address — the same `p` whose saved lat/lng the iframe
+  // carries. Kind is 'address' because this host is always address-radius, never
+  // inferred from the string. p.address is the saved display line; do not substitute
+  // p.zip / city / a followed place.
+  var placeHeading = HS.placeChangingHeading('address', p.address);
   var contextMap = realAddress
     ? '<div class="block" id="propContext">'
-      + '<div class="bt-row"><h2>Where this address is</h2>'
+      + '<div class="bt-row place-changing">'
+      + (placeHeading ? '<h2 id="propPlaceHeading">' + HS.esc(placeHeading) + '</h2>' : '')
       + '<a href="' + HS.esc(HS.navHref('homesignalmap.html', p.zip)) + '" id="propMapOpen">Open in Development →</a></div>'
       + '<iframe id="propMapFrame" title="Development within ' + PCM_RADIUS_MI + ' miles of this address" '
         + 'loading="lazy" '
@@ -171,7 +177,7 @@ HS.onReady(async function () {
           + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
           + '<h3>' + HS.esc(pr.name) + '</h3>'
           + HS.tpl.devImpactBlock(pr)
-          + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<p class="sowhat"><b>Effect at this address:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
           + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
       }).join('')
     + '</div>'

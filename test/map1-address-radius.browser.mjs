@@ -271,7 +271,7 @@ await page.waitForSelector('.leaflet-popup-content', { timeout: 5000 }).catch(()
 const popup = (await page.textContent('.leaflet-popup-content').catch(() => '')) || '';
 ok(/Caldwell Lane|Riverside Resort/.test(popup),
   'clicking a canonical marker opens the existing Map 1 dossier popup', popup.slice(0, 120));
-ok(/mi from home|at this address/.test(popup), 'the popup carries a distance: ' + popup.slice(0, 100));
+ok(/mi from this address|at this address/.test(popup), 'the popup carries a distance: ' + popup.slice(0, 100));
 ok(!/Facility · operating now/.test(popup),
   'Q — a canonical project is NOT labelled as an EPA facility: ' + popup.slice(0, 100));
 

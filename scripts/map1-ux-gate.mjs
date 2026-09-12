@@ -203,7 +203,7 @@ info('after switching to 2 miles', { before: before, after: a2.sites_total, with
 ok(/2 miles/i.test(a2.withinLbl || ''), 'B9 the page states the NEW radius', a2.withinLbl);
 // The caption is ON the map canvas, so it must track the radius too - a caption still
 // naming the OLD radius beside re-scoped pins is worse than no caption.
-ok(/^Development within 2 miles of this home$/.test((a2.mapCap || '').trim()),
+ok(/^Development within 2 miles of this address$/.test((a2.mapCap || '').trim()),
   'B9b ...and the map caption states the NEW radius too', a2.mapCap);
 ok(a2.tile_proposed === a2.rail_proposed,
   'B10 the tile still equals the drawn set after a radius change',

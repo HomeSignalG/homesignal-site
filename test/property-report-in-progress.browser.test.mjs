@@ -121,16 +121,46 @@ ok(landed.pathname.endsWith('/reports.html'), '2 clicking it opens reports.html'
 ok(landed.searchParams.get('id') === target.id, '2 ...carrying the ORIGINATING property, not a default', landed.search);
 await waitShell(); await waitDecided();
 
-// ═══ 3. What the resident is told ═══
+// ═══ 3. What the resident is told — frozen Premium Property Reports treatment ═══
 const txt = await bodyText();
-ok(/Property reports are in progress/.test(txt), '3 the page says "Property reports are in progress"', txt.slice(0, 140));
-ok(/We're working on this feature now\. Check back soon\./.test(txt), '3 ...and "We\'re working on this feature now. Check back soon."');
+ok(/PROPERTY REPORTS\s*·\s*PREMIUM/i.test(txt), '3 the page is labelled PROPERTY REPORTS · PREMIUM', txt.slice(0, 180));
+ok(/Property reports are coming soon/.test(txt), '3 the page says "Property reports are coming soon"', txt.slice(0, 180));
+ok(/Get a detailed report for this property, including property intelligence and nearby changes that may affect the property\./.test(txt),
+  '3 ...and the frozen explainer');
+ok(txt.includes(target.address), '3 the originating Address is visible on the page', { address: target.address, txt: txt.slice(0, 220) });
+ok(/Get Premium access →/.test(txt), '3 the CTA is exactly "Get Premium access →"');
+ok(!/We're working on this feature now\. Check back soon\./.test(txt), '3 the dead-end "check back soon" copy is gone');
 // The retired prototype, by what a resident would actually see.
 for (const gone of ['Share this report', 'Community Snapshot', 'Impact Analysis', 'Weekly Briefing', 'Bottom line', 'Recommended actions'])
   ok(!txt.includes(gone), '3 no trace of the retired prototype: "' + gone + '"');
 const projectish = await page.evaluate(() => document.querySelectorAll('.card, .doc, .rrow, .rlist, .dsec').length);
 ok(projectish === 0, '3 no report rows and no nearby-project preview document are rendered', projectish);
 ok(!txt.includes(target.id), '3 the internal id is carried in the URL, never printed into the page');
+
+// ═══ 3b. Get Premium access opens the SHARED waitlist modal ═══
+const premiumCta = await page.$('#repPremiumBtn');
+ok(!!premiumCta, '3b the Premium CTA is present');
+ok((await premiumCta.textContent()).trim() === 'Get Premium access →', '3b ...with the frozen label');
+await premiumCta.click();
+const modal = await page.evaluate(() => {
+  const overlay = document.getElementById('premiumModal');
+  const title = document.getElementById('premiumTitle');
+  const form = document.getElementById('premiumForm');
+  const done = document.getElementById('premiumDone');
+  const shown = overlay && overlay.classList.contains('show');
+  return {
+    shown: !!shown,
+    title: title ? title.textContent.trim() : '',
+    formVisible: !!(form && !form.classList.contains('hidden')),
+    doneHidden: !!(done && done.classList.contains('hidden')),
+    reportsForms: document.querySelectorAll('#hs-slot #premiumEmail, #repPremiumForm').length
+  };
+});
+ok(modal.shown, '3b clicking it opens the existing Premium modal', modal);
+ok(modal.title === 'Premium is being built', '3b ...the shared "Premium is being built" waitlist, not a report', modal);
+ok(modal.formVisible && modal.doneHidden, '3b ...on the notify-me form, not a success state', modal);
+ok(modal.reportsForms === 0, '3b ...and reports.html did not invent a second form', modal);
+await page.keyboard.press('Escape');
 
 // ═══ 4. Nothing was generated ═══
 const writes = requests.filter(r => r.method !== 'GET');
@@ -155,7 +185,7 @@ ok((await page.evaluate(() => (document.querySelector('.ph h1') || {}).textConte
 await page.goto(base + '/reports.html', { waitUntil: 'domcontentloaded' });
 await waitShell(); await waitDecided();
 const direct = await bodyText();
-ok(/Property reports are in progress/.test(direct), '6 a direct visit with no context still renders the in-progress state');
+ok(/Property reports are coming soon/.test(direct), '6 a direct visit with no context still renders the coming-soon Premium surface');
 ok(!(await backBtn()), '6 ...and offers NO "Back to property" action');
 ok(!/Back to property/.test(direct), '6 ...not even as dead text', direct.slice(0, 140));
 
@@ -165,7 +195,7 @@ ok(!/Back to property/.test(direct), '6 ...not even as dead text', direct.slice(
 // passes every check above and fails this one.
 await page.goto(base + '/reports.html?id=not-a-real-property', { waitUntil: 'domcontentloaded' });
 await waitShell(); await waitDecided();
-ok(/Property reports are in progress/.test(await bodyText()), '7 an unresolvable id still renders the page');
+ok(/Property reports are coming soon/.test(await bodyText()), '7 an unresolvable id still renders the page');
 ok(!(await backBtn()), '7 ...and offers no action, rather than one pointing at another property');
 
 // ═══ 7b. The Address dossier itself must not inherit that fallback either ═══
@@ -207,7 +237,7 @@ const mobile = await page.evaluate(() => ({
   back: !!document.getElementById('repBackBtn')
 }));
 ok(!mobile.overflow, '8 at 390px the page does not scroll sideways', mobile);
-ok(mobile.h1 === 'Property reports are in progress' && mobile.back, '8 ...and still carries the message and the way back', mobile);
+ok(mobile.h1 === 'Property reports are coming soon' && mobile.back, '8 ...and still carries the message and the way back', mobile);
 
 ok(pageErrors.length === 0, 'no uncaught page errors during the journey', pageErrors);
 
