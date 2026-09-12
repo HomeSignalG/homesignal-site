@@ -937,6 +937,14 @@
     if (page === 'property.html') return HS.navHref('properties.html', zip);
     return HS.navHref(page, zip);
   }
+  function afterAddZipHref(zip) {
+    const page = currentShellPage();
+    if (page === 'index.html' || page === 'contact.html' || page === 'about.html'
+        || page === 'how-it-works.html' || page === 'privacy.html') {
+      return HS.navHref('community.html', zip);
+    }
+    return focusHref(zip);
+  }
   function focusZip(zip) {
     zip = String(zip);
     LS.set('myZip', zip);
@@ -1145,7 +1153,6 @@
           + (HS.isSample() ? ' — (Sample Zip Code)' : '')) : '';
       }
       el.style.display = el.textContent ? '' : 'none';
-      if (HS.paintFollowedZipStrip) HS.paintFollowedZipStrip();
     } catch (e) { /* a missing context line must never break the page */ }
   };
 
@@ -1363,7 +1370,9 @@
       HS.followCommunity({ zip: z, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
       HS.announcePlaceSaved({ zip: z, kind: 'zip', name: (meta && meta.name) || '' }, true);
       await HS.ensureAreaSubscribed(z, true, true);   // digest floor only; card already announced
-      location.href = 'community.html?zip=' + z;
+      // Stay on the tool that opened Add (Alerts stays Alerts, Address → My Places).
+      // Homepage / contact "find my community" still opens the ZIP page.
+      location.href = afterAddZipHref(z);
     } else {
       $('reqZipLabel').textContent = z;
       $('locForm').classList.add('hidden');
@@ -1585,36 +1594,6 @@
     const add = opts.hideAdd ? ''
       : '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button>';
     return '<div class="chips">' + empty + chips + add + '</div>';
-  };
-  // Fix 11 was ZIP-page-only in practice: the dashed "+ Add a zip code" chip that
-  // opens the Add modal lived in lib/community-page.js, so Address / Alerts /
-  // Development had no in-page Add control (only Viewing → Switch place → + Add
-  // ZIP Code). Dashboard and My Places already have their own "+ Add ZIP Code"
-  // buttons and are skipped. Idempotent: pages that rebuild .ph call this again.
-  HS.paintFollowedZipStrip = function () {
-    try {
-      if (document.getElementById('plAddZip') || document.getElementById('dashAddZip')) return;
-      if (document.body.dataset.noWhere != null) return;
-      const file = decodeURIComponent((location.pathname.split('/').pop() || ''));
-      const onGeneratedZip = /\/community\/\d{5}\/?$/.test(location.pathname);
-      if (!/^(alerts|property|development|community)\.html$/.test(file) && !onGeneratedZip) return;
-      const ph = document.querySelector('#hs-slot .page > .ph, #hs-slot .ph');
-      if (!ph) return;
-      const strip = document.getElementById('commStrip');
-      if (strip && strip.isConnected) {
-        strip.innerHTML = HS.communitiesStripHTML();
-        return;
-      }
-      let wrap = document.getElementById('hsZipStrip');
-      if (!wrap || !wrap.isConnected) {
-        wrap = document.createElement('div');
-        wrap.id = 'hsZipStrip';
-        wrap.style.marginTop = '14px';
-        ph.appendChild(wrap);
-      }
-      wrap.innerHTML = '<div class="bt" style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Your zip codes</div>'
-        + '<div id="commStrip">' + HS.communitiesStripHTML() + '</div>';
-    } catch (e) { /* a missing strip must never break the page */ }
   };
 
   // -------------------------------------------------- topic prefs (hydrate) -----
@@ -1949,7 +1928,7 @@
   async function injectShell() {
     const root = document.createElement('div');
     root.id = 'hs-app-root';
-    const html = await fetch('partials/shell.html').then(r => r.text());
+    const html = await fetch('partials/shell.html', { cache: 'no-store' }).then(r => r.text());
     root.innerHTML = html;
     // move page content (from <template id="hs-content">) into the slot
     const tpl = $('hs-content');
@@ -2063,7 +2042,6 @@
     await hydrateAccountLocation();
     paintTopbar();
     HS.paintWhereLine();   // shared header context line (async, never blocks boot)
-    if (HS.paintFollowedZipStrip) HS.paintFollowedZipStrip();
     buildShare();
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal

@@ -25,15 +25,12 @@
      carrying them would be a second copy of a runtime that lives one frame away. -->
 <script src="lib/premium-waitlist.js?v=ae8a117e"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=2891932a"></script>
+<script src="shell.js?v=60456218"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
   var id = new URLSearchParams(location.search).get('id');
   var page = document.getElementById('propPage');
-  function paintZipStrip() {
-    if (HS.paintFollowedZipStrip) HS.paintFollowedZipStrip();
-  }
   // ?id= is an identity, not a suggestion. reports.html already refuses the
   // `|| activeProperty` fallback; inheriting it here showed a DIFFERENT Address
   // (or, when render then threw, a blank slot) for a typed or stale id.
@@ -41,7 +38,7 @@ HS.onReady(async function () {
     ? (S.properties || []).find(function (x) { return String(x.id) === String(id); })
     : S.activeProperty;
   if (p) HS.selectProperty(p.id);
-  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button><div class="ph"><h1>No Address</h1></div>'; paintZipStrip(); return; }
+  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button><div class="ph"><h1>No Address</h1></div>'; return; }
   if (typeof HS.setViewLabel === 'function') HS.setViewLabel(p.address, { precise: true });
 
   function numCoord(v) {
@@ -73,7 +70,6 @@ HS.onReady(async function () {
   // is this page's identity; the records can fail honestly underneath it.
   page.innerHTML = identityHtml(p)
     + '<p style="padding:16px 22px;color:var(--ink-3)" id="propLoading">Loading nearby records…</p>';
-  paintZipStrip();
 
   var zip = dataZipFor(p);
   var projects = [], changes = [], env = null;
@@ -89,7 +85,6 @@ HS.onReady(async function () {
   } catch (e) {
     console.warn('[property] data load failed', e);
     page.innerHTML = failHtml('Could not load nearby records. Try again.');
-    paintZipStrip();
     return;
   }
 
@@ -212,11 +207,9 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
     + '</div></div>';
-  paintZipStrip();
   } catch (e) {
     console.warn('[property] render failed', e);
     page.innerHTML = failHtml('Could not display this Address. Try again.');
-    paintZipStrip();
   }
 
 });

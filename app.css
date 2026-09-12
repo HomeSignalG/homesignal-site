@@ -45,6 +45,7 @@
   .search{flex:1;max-width:520px}
   .search input{width:100%;border:1px solid var(--line);background:#f7f9f7;border-radius:9px;padding:9px 13px;font-size:13px;color:var(--ink)}
   .top .sp{flex:1}
+  .top .topadd{border-style:dashed;cursor:pointer;background:#fff;flex:none;white-space:nowrap}
   .ib{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:var(--ink-2);position:relative}
   .ib .badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px}
   .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-2),var(--green-deep));color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
@@ -507,6 +508,7 @@
   /* top bar: the utility cluster is compact buttons now, so it just tightens up */
   .top{gap:8px;padding:11px 14px}
   .top .loc{max-width:44vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .top .topadd{padding:7px 10px}
   .hero h1{font-size:30px}
 }
 
