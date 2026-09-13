@@ -109,6 +109,33 @@ The seven Fix 18 found were a floor, not the list — three more families nobody
   correct. Minting a permanent public URL contract for an internal repo file would be worse than
   the 404.
 
+**CLOSED. Merged `9a4222b` (#1201); `unit` · `build` (pages) · `browser` all green on that commit.**
+Pages run **235** built and **deployed at 14:13:04Z**. CI receipts from the merge build:
+`staged 61 files into _site under the Fix 19 artifact contract` · `ALL CHECKS PASSED (artifact:
+61 files)` · **`artifact files: 12784  contract: 61  generated: 12723  unexpected: 0`** ·
+`ARTIFACT AUDIT OK`. 12,722 documents, Rule F pass 8,423, sitemap reconciled 8,423 == 8,423.
+
+**PRODUCTION PROOF, measured after deploy — a merge is not production proof.** Controls in the
+same call: `index.html` **200 / 7,174** and `NOSUCHFILE-fix19-control.md` **404**.
+- **INTERNAL SURFACE — all 14 now 404**, byte-identical to the 404 control (11,125 B), i.e.
+  normal not-found with no redirect: `/CLAUDE.md` · `/QUEUE.md` · `/PLAN.md` · `/DECISIONS.md` ·
+  `/PROGRESS.md` · `/verify/alerts-topic-name-audit.md` · `/scripts/gen_sitemap.py` ·
+  `/.claude/settings.json` · `/supabase/functions/get-address-report/index.ts` ·
+  `…/jurisdiction-registry.json` · `/fixtures/tabs/…` · `/data/n2a_classes.json` ·
+  `/lib/generated/transitions.sql` · `/.gitignore`.
+- **PUBLIC PRODUCT — all 200:** homepage 7,174 · Maps 299,119 · Alerts 19,348 · development
+  24,174 · property 18,586 · properties 15,347 · dashboard 21,403 · how-it-works 4,559 ·
+  **`/community/78617/` 6,833** · robots 1,373 · sitemap 2,880,571 · app.css 45,020 · shell.js
+  111,118 · config.js 1,998 · partials/shell.html 20,423 · seed/delvalle.js 18,397 ·
+  lib/community-page.js 28,885 · lib/map.js 126,335 · lib/generated/county-sources.json 54,682 ·
+  favicon 401 · assets/acquisition-video-producer.js 82,847. `/community/00000/` still **404**.
+- ⚠️ **`og-default.png` READS AS 8 BYTES THROUGH `pg_net` AND IS NOT TRUNCATED — do not
+  re-investigate.** Its `content-length` header is **272,163**, exactly the repo file. `pg_net`
+  stores bodies in a **text** column, so a PNG stops at its 8-byte signature. The control is what
+  settles it: every TEXT asset stores exactly its content-length (app.css 45,020/45,020,
+  favicon 401/401) and only the binary diverges. **Read the header, not `octet_length(content)`,
+  for any binary asset.**
+
 
 ### 2026-09-13 — ✅ FIX 18: the Phase 1 mockup was a PRODUCTION PAGE, and nobody deployed it
 
