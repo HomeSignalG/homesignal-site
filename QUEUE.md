@@ -40,7 +40,7 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-12 — OPEN ITEM: the Premium waitlist is ~88% CI traffic, so its KPI reads mostly robot
+### 2026-09-12 — ✅ CLOSED (Fix 16, #1192 / squash 2fcc560): the Premium waitlist was ~91% CI traffic
 
 **Found while auditing Fix 15. Explicitly OUT OF SCOPE of Fix 15 by founder instruction, and
 deliberately NOT fixed there — recorded here for founder review, per Rule 16.**
@@ -71,6 +71,44 @@ prospects" tile is counting CI runs.
 
 Receipts are in the Fix 15 session audit; re-measure before acting, since the count moves with
 every CI run (39 → 41 → 42 observed within one session).
+
+**RESOLVED 2026-09-13. Producer fixed FIRST, then the rows removed — in that order, deliberately.**
+
+- **Producer:** `test/property-reports-premium.browser.test.mjs` §D submitted the shared Premium
+  modal with `hs_premium_waitlist_join` **un-intercepted**. It never read the row back — its
+  assertions read the captured REQUEST payload, and the response only flipped the UI to "You're on
+  the list". The durable lead was a side effect bought for an `{ok:true}`. §D now fulfils the RPC
+  with the deployed function's own success shape.
+- **Provenance, proven not inferred:** the generator interpolated `Date.now()` into the address, so
+  each row carried its own creation time. The 13-digit epoch matched `created_at` within **0.336 s
+  on all 40**. Control: the 4 non-matching rows fall inside **no** CI run window.
+- **No new self-test RPC, and the audit is why.** `docs/premium-waitlist-capture.sql` already
+  proves the persistence contract (CI-applied by `db-sql.yml`, fail-closed on 8 post-apply
+  invariants + 2 prechecks). The only uncovered property — PostgREST reachability, the Fix 15
+  PGRST205 class — is now §D2: a real call to the **existing** RPC with the four deployed argument
+  names and an email its own guard rejects at `22023`, raised BEFORE the insert. Zero writes,
+  bounded by `AbortSignal`, and an unreachable endpoint prints `DID NOT RUN` rather than passing.
+- **The pin prohibits the BEHAVIOUR** (`test/premium-verifier-no-production-write.test.mjs`): over
+  every playwright suite, each Premium submit must have an active route interception at that point.
+  Proven load-bearing by four mutations.
+- ⚠️ **Two defects in the fix's own first commit, both caught by reconciling a number rather than
+  accepting it.** CI reported `223 files` against a local `196`; 196 + 18 `.browser.test.mjs` = 214,
+  not 223. The runner defines a browser suite by **importing playwright** (27 files), so **nine
+  playwright suites sat outside the gate** — including `dashboard-browser.test.mjs` and the five
+  `acquisition-video-producer` files. No live violation, but the gate could not have seen one. Also
+  the §D2 `fetch` was unbounded and could have hung CI. Both fixed before merge.
+- ⚠️ **A page/source/domain filter would have destroyed a real lead.** `uclambact@gmail.com` sits on
+  `/reports.html` — the verifier's own page — differing only in a real report UUID instead of `p2`.
+- **Producer-dead: three consecutive green CI runs, delta 0/0 each** (`34726113687`, `34726405074`,
+  `34726623963`), corroborated by `edge_logs` showing only §D2's `400`+`404` and **zero** `200`/`201`
+  on the join path.
+- **Cleanup:** 40 rows archived whole into `public.fix16_verifier_rows_archive` (RLS ON, no
+  `anon`/`authenticated` grant) and deleted, computed in-DB and fail-closed on cohort count, cohort
+  md5 `2980b275641b3fad36d07bd1b82ca78e`, archive md5, deleted-set md5, and the 4 survivors.
+  **Prospects 44 → 4, signals 44 → 4, ambiguous 0.**
+- **Post-cleanup rerun** (`34726834324`) held it at **4 / 4**, 0 written.
+- **Unchanged:** Fix 15 semantics, schema, RLS, grants, the write boundary, the admin read. No
+  `synthetic` column, no email/domain filter, no cleanup RPC, no new privileged surface.
 
 ### 2026-09-06 — MAP 1 MODE IDENTITY: the hero was the last surface still claiming the ZIP
 
