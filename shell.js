@@ -587,20 +587,22 @@
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
       city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home'
+      lat: m.lat, lng: m.lng, label: 'home',
+      input_address: String(addr || '').trim() || null
     };
-    const existing = (state.properties || []).find(p => HS.isRealHome(p));
-    let saved = null;
-    if (existing) {
-      const upd = await HS.sb().from('app_properties').update(row)
-        .eq('id', existing.id).eq('user_id', state.session.user.id).select().single();
-      if (upd.error || !upd.data) throw new Error("Couldn't save this place — please try again.");
-      saved = upd.data;
-    } else {
-      const ins = await HS.sb().from('app_properties').insert(row).select().single();
-      if (ins.error || !ins.data) throw new Error("Couldn't save this place — please try again.");
-      saved = ins.data;
-    }
+    // FIX 17 — onboarding uses the SAME saved-place contract as HS.saveHome.
+    //
+    // It used to find whichever row was isRealHome and UPDATE it, which encoded a
+    // one-home-per-user identity that saveHome's unconditional INSERT contradicted.
+    // Two writers, two contracts, neither enforced — the condition Fix 17 removes.
+    //
+    // The UPDATE branch is not merely redundant, it was destructive: a resident who
+    // already had a saved Address and typed a DIFFERENT one here had the first place
+    // silently overwritten. My Places holds many Addresses, so the honest outcome is a
+    // second place, and a repeat of the SAME place is now idempotent at the database.
+    const saveRes = await savePlaceRow(row);
+    if (!saveRes.data) throw new Error("Couldn't save this place — please try again.");
+    const saved = saveRes.data;
     LS.set('activeProp', saved.id);
     state.activePropId = saved.id;
     state.properties = await HS.data.properties();
@@ -1234,6 +1236,7 @@
   //   * signed-in only (app_properties is RLS'd to the owner). Signed-out users
   //     get the sign-in modal — the nudge doubles as the signup prompt.
   let _homeMatch = null;
+  let _homeInput = null;   // FIX 17 — the resident's TYPED line; the only unit-bearing value (Census drops APT/UNIT/STE/#)
   HS.openHome = function () {
     if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding an address needs the live site.'); return; }
     if (!state.session || state.session.demo) {
@@ -1243,6 +1246,9 @@
       return;
     }
     _homeMatch = null;
+    _homeInput = null;
+    _savingHome = false;
+    const sb0 = $('homeSaveBtn'); if (sb0) { sb0.disabled = false; sb0.removeAttribute('aria-busy'); }
     $('homeForm').classList.remove('hidden');
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.add('hidden');
@@ -1285,25 +1291,90 @@
       return;
     }
     _homeMatch = m;
+    _homeInput = q;
     $('homeMatched').textContent = m.matchedAddress || q;
     $('homeForm').classList.add('hidden');
     $('homeConfirm').classList.remove('hidden');
   };
+  // FIX 17 — THE ONE SAVED-PLACE WRITE, IDEMPOTENT BY IDENTITY.
+  //
+  // Both writers (this and saveOnboardingAddress) go through here, so the saved-place
+  // contract has ONE definition. Before Fix 17 they disagreed: saveHome INSERTed
+  // unconditionally while onboarding UPDATEd whichever row was isRealHome — many-places
+  // versus one-home-per-user, neither enforced. Measured cost: one resident held two
+  // byte-identical rows for 96 ISLAND DR, written 0.991 s apart.
+  //
+  // THE INTEGRITY MECHANISM IS THE DATABASE, NOT THIS FUNCTION. The unique index
+  // app_properties_user_place_key (docs/saved-place-identity.sql) is what makes two
+  // simultaneous saves produce one row; a select-then-insert here would lose that race
+  // and is deliberately NOT what this does. This function's job is to turn the conflict
+  // into an honest success — a repeat save returns the place the resident already has,
+  // rather than an error for a thing that did work.
+  //
+  // input_address is the string the resident TYPED. The Census locator drops secondary
+  // unit designators (measured: APT 101, APT 102, UNIT 101 and #101 all return the same
+  // matchedAddress), so the typed line is the only unit-bearing value in the flow and it
+  // is part of the identity. It is stored for identity/provenance and NEVER rendered —
+  // the address shown back is still the confirmed match, per openHome's honesty contract.
+  // 23505 is Postgres unique_violation, which PostgREST passes through as error.code.
+  // Declared INSIDE the function, not as a module const: savePlaceRow is reached by
+  // saveOnboardingAddress, which appears EARLIER in this file and therefore relies on
+  // function hoisting — a hoisted function that closed over a `const` declared below it
+  // would be a temporal-dead-zone hazard the day anything calls it during module setup.
+  function isDuplicateRowError(e) {
+    if (!e) return false;
+    const DUP_CODE = '23505';
+    return String(e.code || '') === DUP_CODE
+      || /duplicate key value|app_properties_user_place_key/i.test(String(e.message || ''));
+  }
+  async function savePlaceRow(row) {
+    let r = null;
+    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
+    if (r && r.data && !r.error) return { data: r.data, existed: false };
+    if (!r || !isDuplicateRowError(r.error)) return { data: null, existed: false, error: (r && r.error) || new Error('save failed') };
+    // The row is already ours. Re-read it under RLS — never another account's.
+    let q = null;
+    try {
+      q = await HS.sb().from('app_properties').select('*')
+        .eq('user_id', row.user_id).eq('address', row.address)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    } catch (e) { q = { error: e }; }
+    if (q && q.data && !q.error) return { data: q.data, existed: true };
+    return { data: null, existed: false, error: (q && q.error) || new Error('save failed') };
+  }
+
+  let _savingHome = false;
   HS.saveHome = async function () {
     const m = _homeMatch; if (!m || !state.session) return;
+    // In-flight guard. UX only — it stops the second click from ever leaving the browser,
+    // but it is not what guarantees one row (two tabs never see this flag).
+    if (_savingHome) return;
+    _savingHome = true;
+    const btn = $('homeSaveBtn'); if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    // Released on EVERY exit path, success included. An earlier draft released it only on
+    // failure — the success path ends in location.reload(), so in production the stuck flag
+    // was invisible; the browser suite caught it immediately, and a blocked or slow reload
+    // would have left the resident unable to save anything else for the life of the page.
+    // A guard that can latch ON is a worse defect than the one it was added to prevent.
+    const release = function () {
+      _savingHome = false;
+      const b = $('homeSaveBtn'); if (b) { b.disabled = false; b.removeAttribute('aria-busy'); }
+    };
     $('homeConfirmMsg').textContent = 'Saving…';
     const row = {
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
       city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home'
+      lat: m.lat, lng: m.lng, label: 'home',
+      input_address: _homeInput || null
     };
-    let r = null;
-    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
-    if (!r || r.error || !r.data) {
+    const r = await savePlaceRow(row);
+    if (!r.data) {
       $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
+      release();
       return;
     }
+    if (r.existed) $('homeConfirmMsg').textContent = 'This address is already in My Places.';
     LS.set('activeProp', r.data.id);
     HS.announcePlaceSaved({
       zip: m.zip,
@@ -1321,6 +1392,7 @@
     } catch (e) {}
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.remove('hidden');
+    release();
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
   };
 
@@ -1351,6 +1423,22 @@
         .match({ id: id, user_id: state.session.user.id });
     } catch (e) { r = { error: e }; }
     if (r && r.error) return false;
+    // FIX 17 — the property WATCH is part of this Address's lifecycle, so it goes with it.
+    // app_follows.target_id is TEXT with no foreign key, so nothing cascades: before this,
+    // removing a watched Address left a dangling app_follows(target_type='property') row
+    // pointing at an id that no longer exists. Scoped to target_type='property' and this
+    // id alone — a ZIP Code follow is a DIFFERENT Place type with its own remove
+    // (HS.unfollowCommunity) and a followed PROJECT is not a Place at all; neither is
+    // touched. Failure here is logged, never fatal: the Address really was removed, and
+    // reporting that as a failure would be the dishonest half of A-012.
+    try {
+      await HS.sb().from('app_follows').delete()
+        .match({ user_id: state.session.user.id, target_type: 'property', target_id: String(id) });
+    } catch (e) { console.warn('remove-address follow cleanup', e); }
+    if (state.follows && state.follows.delete) {
+      state.follows.delete('property:' + id);
+      LS.set('follows', [...state.follows]);
+    }
     state.properties = (state.properties || []).filter(p => String(p.id) !== String(id));
     // If the removed Address was the active one, fall back to another saved Address; with
     // none left, clear it and let the app's existing area default (myZip / DEFAULT_ZIP)

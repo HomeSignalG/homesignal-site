@@ -121,10 +121,24 @@ ok(!/from\('app_properties'\)/.test((shell.match(/HS\.switchZip = function[\s\S]
 ok(/HS\.removeAddress = async function/.test(shell), 'A-012 HS.removeAddress exists');
 ok(/from\('app_properties'\)\s*\n?\s*\.delete\(\)\s*\n?\s*\.match\(\{ id: id, user_id: state\.session\.user\.id \}\)/.test(shell),
   'A-012 the delete is scoped to BOTH the row id and the owning user_id');
-for (const t of ['alerts', 'app_changes', 'app_projects', 'app_follows']) {
-  const re = new RegExp("removeAddress[\\s\\S]{0,1200}?from\\('" + t + "'\\)[\\s\\S]{0,80}?delete");
+// PUBLIC-RECORD CONTENT IS NEVER THE USER'S TO DELETE — unchanged.
+for (const t of ['alerts', 'app_changes', 'app_projects']) {
+  const re = new RegExp("removeAddress[\\s\\S]{0,2400}?from\\('" + t + "'\\)[\\s\\S]{0,80}?delete");
   ok(!re.test(shell), 'A-012 removeAddress never deletes ' + t);
 }
+// app_follows NARROWED BY FIX 17 (founder ruling, 2026-09-13), not relaxed. A property
+// WATCH is this Address's own relationship and there is no foreign key, so leaving it
+// behind dangles a row pointing at an id that no longer exists. A ZIP Code follow and a
+// followed project are still off limits: they are a different Place type and a non-Place,
+// each with its own remove. The pin now states WHICH follow may go, so a future edit that
+// widened the delete to sweep them would still fail.
+const rmFn = (shell.match(/HS\.removeAddress = async function[\s\S]*?\n  \};/) || [''])[0];
+ok(/from\('app_follows'\)[\s\S]{0,200}target_type: 'property'/.test(rmFn),
+  'A-012 removeAddress deletes the property WATCH that belongs to this Address');
+ok(!/target_type: 'community'/.test(rmFn),
+  'A-012 removeAddress never unfollows a ZIP Code');
+ok(!/target_type: 'project'/.test(rmFn),
+  'A-012 removeAddress never unfollows a project');
 ok(/state\.session\.demo\) return false/.test(shell), 'A-012 a DEMO session is refused — sample homes are nobody\'s saved relationship');
 ok(/data-act="remove-address"/.test(props) && /window\.confirm\(/.test(props),
   'A-012 Remove Address is a real control on My Places and requires confirmation');

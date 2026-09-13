@@ -40,6 +40,77 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-13 — ✅ FIX 17: a saved place has ONE identity, and the unit question was MEASURED
+
+**The defect.** `public.app_properties` was the ONLY per-user table in this schema with no
+natural-key uniqueness (`app_follows UNIQUE (user_id, target_type, target_id)`,
+`app_topic_prefs PK (user_id, category)`, `user_subscriptions UNIQUE (user_id, community_id,
+pipeline_type, topic)`, `public.users UNIQUE (email, community_id)` — every sibling has one),
+and `HS.saveHome` was a bare INSERT with no in-flight guard. Measured: 9 rows / 8 distinct
+(user, address, zip); one resident held two byte-identical rows for `96 ISLAND DR / 78657`
+written **0.991 s apart** — a double-submit by a real signed-in human, NOT a CI verifier
+(all 5 owning accounts are external domains; 0 match `^agent\.pr\.`, so this is not Fix 16's class).
+
+- 🔑 **SAVED-PLACE IDENTITY AND ALERT-SUBSCRIPTION IDENTITY ARE FULLY SEPARATE — checked
+  before anything was deduped, because collapsing a place that carried its own alert
+  config would have been the worse bug.** Zero columns named `*propert*` exist anywhere in
+  the database, zero FKs point at `app_properties`, and none of `subscribe_area_defaults` /
+  `enable_area_email_alerts` / `signup_complete` accepts a place — they key on
+  `(email, community_id, pipeline_type, topic)`. Control: `user_subscriptions` holds 100
+  rows across 10 users, newest 2026-09-12, so the zeros are real. **A duplicate place could
+  not have been a distinct alert configuration; deduping cannot remove a topic.**
+- 🔑 **THE CENSUS GEOCODER DROPS THE UNIT, AND THAT IS MEASURED, NOT ASSUMED.** Ten live
+  probes via `pg_net`, two independent buildings, four designator syntaxes, all HTTP 200:
+  `350 5TH AVE APT 101` / `APT 102` / `UNIT 101` / `#101` / bare **all** return
+  `350 5TH AVE, NEW YORK, NY, 10118`, and `addressComponents` carries **no** unit-like key
+  on any of the ten. Our own `.split(',')[0]` is NOT the discarder. So a key over the
+  Census line alone would assert APT 101 and APT 102 are one physical property.
+- ⚖️ **DECISION B — the resident's TYPED line is now part of the identity.** New nullable
+  `app_properties.input_address` stores it verbatim; it is identity/provenance only and is
+  **never rendered** (the displayed address stays the confirmed match — `openHome`'s honesty
+  contract, pinned across four pages). Final key:
+  `UNIQUE (user_id, hs_premium_fold_address(address), coalesce(zip,''),
+  hs_premium_fold_address(coalesce(input_address, address)))`.
+- 🔑 **THE TWO CANDIDATE KEYS FAIL ASYMMETRICALLY, WHICH IS WHY THIS ONE WON.** A
+  presence-test regex over the USPS secondary designators keys more tightly, but a FALSE
+  NEGATIVE there **merges two real homes** — silent and unrecoverable. Folding the raw input
+  uses no regex and has one failure mode: a resident who retypes the same house differently
+  keeps an extra row. **It fails SAFE. A tighter key that can fail unsafe is not narrower.**
+  Known limit stated, not buried; capturing a unit COMPONENT is a separate product change.
+- **No second normalizer.** Fix 15's `hs_premium_fold_address` is reused verbatim and
+  **pinned by body md5** (`2a4b632220…`) inside the migration, so a silent edit to it fails
+  the apply instead of quietly changing what the key means.
+- ⚠️ **`docs/premium-waitlist-capture.sql:84` says HS.saveHome is "the only writer of
+  app_properties". It never was** — `saveOnboardingAddress` is a second one, and its
+  find-isRealHome-then-UPDATE encoded a rival one-home-per-user contract that also
+  **silently overwrote** a resident's existing place when they entered a different address.
+  Both writers now go through one `savePlaceRow`. That file's stated revisit trigger had
+  already fired.
+- 🔑 **THE INTEGRITY MECHANISM IS THE DATABASE. The client guard is UX and is pinned as
+  such** — `savePlaceRow` deliberately does NOT select-then-insert, and a test asserts the
+  re-read happens only AFTER a 23505 refusal. Two parallel saves is the case no client
+  check can win, and it is a test.
+- ⚠️ **THE BROWSER SUITE CAUGHT A DEFECT IN THE FIX'S OWN FIRST DRAFT: the in-flight guard
+  LATCHED ON.** It was released only on failure; the success path ends in
+  `location.reload()`, so in production the stuck flag would have been invisible until a
+  slow or blocked reload left the resident unable to save anything for the life of the
+  page. **A guard that can latch on is worse than the duplicate it prevents.** Released on
+  every path now, `openHome` re-arms the button, and both halves are pinned.
+- **`HS.removeAddress` now deletes the matching `app_follows(target_type='property')`.**
+  There is no FK, so nothing cascaded and a removed Address left a watch pointing at a
+  dead id. The A-012 pin was **narrowed, not relaxed**: ZIP follows and followed projects
+  are still asserted untouched, and public-record content still is.
+- **Cleanup:** computed in-DB, partitioned **by user_id** (never by address — three
+  addresses are legitimately held by more than one account), oldest row survives, archived
+  whole into `public.fix17_duplicate_rows_archive` (RLS on, no anon/authenticated grant),
+  cohort/archive/deleted-set fingerprints agreeing, and the migration raises unless the
+  shape is still exactly 9 rows / 1 group / 1 excess.
+- SQL of record: `docs/saved-place-identity.sql`. Tests:
+  `test/saved-place-identity.test.mjs` (46 pins, 5 mutations proven load-bearing) +
+  `test/saved-place-identity.browser.test.mjs` (20 assertions incl. rapid triple-click,
+  two parallel clients, two users on one house, and two units in one building).
+
+
 ### 2026-09-12 — ✅ CLOSED (Fix 16, #1192 / squash 2fcc560): the Premium waitlist was ~91% CI traffic
 
 **Found while auditing Fix 15. Explicitly OUT OF SCOPE of Fix 15 by founder instruction, and

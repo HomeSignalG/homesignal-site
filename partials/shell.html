@@ -163,7 +163,7 @@
       <div id="homeConfirm" class="hidden">
         <div style="background:#eaf4ee;border:1px solid #cfe5d7;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px"><b>Confirmed:</b> <span id="homeMatched">—</span></div>
         <div class="field" style="flex-direction:column;gap:10px">
-          <button class="mbtn" type="button" onclick="HS.saveHome()">Save this place</button>
+          <button class="mbtn" type="button" id="homeSaveBtn" onclick="HS.saveHome()">Save this place</button>
           <button class="mbtn" type="button" style="background:transparent;color:var(--ink);border:1px solid var(--line)" onclick="document.getElementById('homeConfirm').classList.add('hidden');document.getElementById('homeForm').classList.remove('hidden')">Edit address</button>
         </div>
         <div class="mnote" id="homeConfirmMsg"></div>

@@ -61,7 +61,13 @@ ok(/toggleFollowCommunityBtn[\s\S]{0,500}announcePlaceSaved/.test(shell),
   'ZIP follow button announces independently of the digest-floor RPC');
 ok(/findCommunity[\s\S]{0,700}announcePlaceSaved/.test(shell),
   'ZIP lookup announces independently of the digest-floor RPC');
-ok(/saveHome[\s\S]{0,1200}announcePlaceSaved/.test(shell),
+// Scoped to the FUNCTION BODY, not a character window. The window read {0,1200} and broke
+// on Fix 17 purely because saveHome gained a guard and a comment — a proximity assertion
+// measures formatting, not behaviour, and a pin that fails on an unrelated edit is a pin
+// that gets deleted rather than read.
+const saveHomeBody = (shell.match(/HS\.saveHome = async function[\s\S]*?\n  \};/) || [''])[0];
+ok(saveHomeBody.length > 0, 'HS.saveHome is locatable in shell.js');
+ok(/announcePlaceSaved/.test(saveHomeBody),
   'address save announces independently of the digest-floor RPC');
 ok(/announcePlaceSaved\(\{[\s\S]{0,200}kind: 'address'/.test(shell),
   'address save carries kind:address + the confirmed address string');
