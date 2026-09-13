@@ -8,21 +8,25 @@
 // "your home" ownership language Fix 9 removed from the product.
 //
 // It nevertheless reached production for the life of the repo, because
-// .github/workflows/pages.yml stages the artifact with
-//     rsync -a --exclude '.git' --exclude '.github' --exclude '_site' \
-//              --exclude 'test' --exclude 'docs' --exclude 'node_modules' ./ _site/
-// i.e. it ships EVERY repo file that is not in that exclude list. The mockup was not
-// deployed on purpose — it survived because it existed at the repo root.
+// .github/workflows/pages.yml staged the artifact with an rsync that shipped EVERY repo
+// file not named in six --exclude flags. The mockup was not deployed on purpose — it
+// survived because it existed at the repo root.
 //
 // Fix 18 moved it to docs/, the one tree proven excluded from the artifact. This guard
 // pins BOTH halves, because either one alone is a silent regression:
 //   - the file is not in the shipped set (it cannot come back to the root), and
-//   - `docs` is still excluded by the real producer (its hiding place still hides it).
+//   - docs/ is still absent from the real producer's output (its hiding place still hides it).
+//
+// FIX 19 (2026-09-13) replaced that rsync with an ALLOWLIST — scripts/stage_site.py — so
+// this guard now executes that producer instead of parsing exclude flags. The invariant is
+// unchanged and the evidence for it is strictly stronger: docs/ used to be absent because
+// a flag named it, and is now absent because nothing names it.
 //
 // Run: node test/no-phase1-mockup-in-artifact.test.mjs
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { join, dirname, relative, sep } from 'node:path';
+import { join, dirname } from 'node:path';
 
 let fails = 0;
 const ok = (c, name, d) => {
@@ -36,35 +40,29 @@ const MOCKUP = 'homesignalphase1_13.html';
 const KEPT_AT = join('docs', MOCKUP);
 
 // ---- 1. THE PRODUCER -------------------------------------------------------------------
-// Read the exclude list out of pages.yml rather than restating it, so this guard tracks the
-// real staging rule. A copy would keep passing after the producer changed, which is the
-// failure mode the whole test exists to prevent.
+// Execute the real producer rather than restating or modelling it. A copy would keep
+// passing after the producer changed, which is the failure mode the whole test exists to
+// prevent — so this runs scripts/stage_site.py, exactly as pages.yml does.
 const pagesYml = readFileSync(join(root, '.github/workflows/pages.yml'), 'utf8');
-const rsyncLine = pagesYml.slice(pagesYml.indexOf('rsync -a'));
-const excludes = [...rsyncLine.slice(0, rsyncLine.indexOf('./ _site/')).matchAll(/--exclude '([^']+)'/g)]
-  .map((m) => m[1]);
+ok(pagesYml.includes('scripts/stage_site.py'),
+  '1a: pages.yml stages the artifact with scripts/stage_site.py — the producer this guard executes');
 
-ok(excludes.length > 0, `1a: pages.yml rsync exclude list was parsed (${excludes.length} entries) — a regex that stops matching must not read as clean`, excludes);
-ok(excludes.includes('docs'),
-  "1b: pages.yml still excludes 'docs' — the mockup's hiding place still hides it", excludes);
+const staged = execFileSync('python3',
+  [join(root, 'scripts/stage_site.py'), '--src', root, '--list-only'],
+  { encoding: 'utf8' }).split('\n').map((l) => l.trim()).filter(Boolean);
+
+ok(staged.length > 0,
+  `1b: the producer emitted a non-empty artifact (${staged.length} files) — a producer that stops emitting must not read as clean`);
 
 // ---- 2. THE SHIPPED SET ----------------------------------------------------------------
-// Model the rsync: every repo file except the excluded top-level trees.
-const skip = new Set(excludes.concat(['.git']));
-const shipped = [];
-(function walk(dir) {
-  for (const name of readdirSync(dir)) {
-    const abs = join(dir, name);
-    const rel = relative(root, abs);
-    if (skip.has(rel.split(sep)[0])) continue;
-    if (statSync(abs).isDirectory()) walk(abs);
-    else shipped.push(rel);
-  }
-})(root);
+const shipped = staged;
 
 ok(shipped.length > 0, `2a: the shipped set is non-empty (${shipped.length} files) — an empty set would pass every check below over nothing`);
 ok(shipped.includes('index.html'),
   '2b: control — index.html IS in the shipped set, so membership is really being measured');
+ok(!shipped.some((p) => p.startsWith('docs/')),
+  "2c: no docs/ file is in the artifact — the mockup's hiding place still hides it",
+  shipped.filter((p) => p.startsWith('docs/')).slice(0, 5));
 
 // ---- 3. THE INVARIANT ------------------------------------------------------------------
 const shippedMockups = shipped.filter((p) => /(^|[\\/])homesignalphase1_[^\\/]*\.html$/.test(p));

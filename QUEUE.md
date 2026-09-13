@@ -40,6 +40,76 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-13 — ✅ FIX 19: the artifact producer SELECTED NOTHING, and now it fails closed
+
+**Closes the "LEGACY ARTIFACT FAMILY" open item #1200 opened.** That item asked which way the
+producer should default. **Answer: ALLOWLIST.**
+
+🔑 **THE ROOT CAUSE IS ONE LINE, AND IT IS THE SAME ONE FIX 18 FOUND.** `pages.yml` staged the
+artifact with `rsync -a --exclude .git .github _site test docs node_modules ./ _site/` — it
+shipped **every repo file not named in six flags**, so a file shipped BECAUSE IT EXISTED. Fix 18
+removed one symptom (the Phase 1 mockup); the mechanism was untouched.
+
+**MEASURED EXPOSURE, `pg_net` with BOTH controls passing** (`index.html` → 200/7,174 ·
+`NOSUCHFILE-fix19-control.md` → 404). **347 files shipped; 287 of them were internal.**
+The seven Fix 18 found were a floor, not the list — three more families nobody had looked at:
+
+| URL | status | bytes |
+|---|---|---|
+| `/CLAUDE.md` · `/QUEUE.md` | **200** | 170,828 · 704,852 |
+| `/PLAN.md` · `/DECISIONS.md` · `/PROGRESS.md` | 200 | 30,067 · 16,233 · 5,682 |
+| `/verify/**` · `/scripts/**` (207 files) · `/fixtures/**` | 200 | — |
+| **`/.claude/settings.json`** 🆕 | **200** | 1,920 |
+| **`/supabase/functions/get-address-report/index.ts`** 🆕 | **200** | 69,200 |
+| **`…/jurisdiction-registry.json`** 🆕 | **200** | **1,184,018** |
+
+- ⚖️ **SENSITIVE-CONTENT AUDIT: NO SECRETS, NO ESCALATION — and that was PROVEN, not assumed.**
+  All 8 JWT-shaped values decode to `role='anon'`; `homesignalmap.html` carries an
+  `sb_publishable_…` key, not `sb_secret_`. Both are browser-intended and RLS-gated per
+  CLAUDE.md §4. Payloads were decoded and **no token value was ever reproduced**.
+- 🔑 **THE FIX IS THE PRODUCER, NOT A LONGER DENYLIST.** `scripts/stage_site.py` holds the
+  artifact contract: **38 named root files + four trees** (`lib` `.js/.json`, `partials` `.html`,
+  `assets`, `seed` `.js`). A path ships only if it is named, so a future `internal-notes.md`, a
+  future developer script and a future `.sql` dump are all excluded **with no edit and nobody
+  having to remember**. Adding `--exclude` flags would have left the next artifact failing open.
+- **ARTIFACT DIFF: 347 → 61 files, −287, −5.59 MB, ZERO additions, ZERO unexplained removals.**
+  By family: scripts 208 · fixtures 36 · supabase 23 · verify 8 · root `.md` 5 · lib build
+  artifacts 3 · data 2 · `.gitignore` 1 · `.claude` 1. **Every removal was traced first**: the
+  only occurrences of `scripts/` and `supabase/` in runtime files are a provenance string inside
+  two JSONs and the jsDelivr path `@supabase/supabase-js`. `data/*.json` is read by
+  `scripts/n2a_classify.py` **from the checkout**, never over HTTP.
+- ⚠️ **NOTHING WAS DELETED.** All 287 files stay in the repo and stay useful there. The defect
+  was that they were SERVED.
+- 🔒 **TWO GATES, because a repo-side test cannot see a later step copying something in.**
+  `test/site-artifact-contract.test.mjs` **executes the real producer** (never a transcribed
+  copy) — and `pages.yml` **audits the real `_site` after every build step**, asserting it equals
+  the contract plus generated ZIP documents. Proven: planting `CLAUDE.md` into a built `_site`
+  → exit 1 naming it.
+- **Mutation-proved on EXIT CODE, not printed text:** CLAUDE.md re-added → 1 fail · lib tree
+  widened to `.md/.sql/.mjs` → 4 · root allowlist → ship-everything → **12 (the 6 internal files
+  AND all 6 root canaries, exactly)** · `shell.js` dropped → **2, §4 and §5c independently** ·
+  workflow reverted to rsync → 1. Restore green each time.
+- 🔑 **§5 IS WHAT MAKES AN ALLOWLIST SAFE TO ADOPT.** It fails when any shipped page references a
+  local asset the artifact lacks, so forgetting a future page is a RED BUILD, not a silent 404.
+  That is the stated cost of fail-closed, paid for up front.
+- ⚠️ **MY OWN TEST FAILED THE REPO'S OWN LESSON TWICE, AND BOTH ARE FIXED.** (a) §6b forbade the
+  string `rsync` while my header comment legitimately contains it — *a pin that names the string
+  it forbids cannot also search the whole file for it*; scoped to executable lines, with a
+  control that the rationale comment still exists so §6b cannot pass vacuously. (b) A producer
+  that REFUSES made the suite **crash with 0 FAIL lines** — indistinguishable from a pass; it now
+  reports 37 named failures. **A mutation harness that counts FAIL lines cannot see a crash.**
+- **Fix 18's guard was RE-POINTED, not weakened** (§18: respect its invariant). It parsed the
+  rsync exclude flags, which no longer exist; it now executes the same producer. Its evidence is
+  strictly stronger — `docs/` used to be absent because a flag named it, and is now absent
+  because **nothing** names it. Re-proved load-bearing: mockup back at root → 2 fails.
+- **Tests:** offline **199/199** (baseline on pristine `main` was 198/198 — exactly +1, my
+  suite). Browser: **9 failures, byte-identical on pristine `main` and on this branch — 0
+  introduced, 0 fixed**; they are sandbox-egress failures, and CI runs them with network.
+- 📌 **NO REDIRECTS.** `/CLAUDE.md` and friends were never customer-facing URLs; normal 404 is
+  correct. Minting a permanent public URL contract for an internal repo file would be worse than
+  the 404.
+
+
 ### 2026-09-13 — ✅ FIX 18: the Phase 1 mockup was a PRODUCTION PAGE, and nobody deployed it
 
 **CLOSED. Merged `6493c81` (#1195); `unit` and `browser` both green on that commit** — 197/197
