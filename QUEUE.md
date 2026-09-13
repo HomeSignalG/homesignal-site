@@ -219,7 +219,16 @@ pass over nothing.
 `PLAN.md` path, and the new test. No redirect, no deployment machinery, no sibling files touched,
 no Fort Bend, no ingest.
 
-### 📌 OPEN ITEM (Rule 16) — LEGACY ARTIFACT FAMILY: the same producer ships the internal record
+### ✅ RESOLVED BY FIX 19 (2026-09-13) — LEGACY ARTIFACT FAMILY: the producer shipped the internal record
+
+⛔ **CLOSED. Do not re-open or re-derive this.** Fix 19 (`9a4222b`, #1201) answered the producer-policy
+question it asks — **ALLOWLIST** — and every URL in the table below is now **404 in production**,
+measured after deploy against a passing 200/404 control pair. The artifact went 347 → 61 files.
+See the Fix 19 entry at the top of this file for the full receipts.
+
+**Retained below as the DATED RECORD of what was measured on 2026-09-13 while it was still open** —
+the exposure table was TRUE on its date and is not rewritten (a receipt edited to match a later
+state is falsified). It is history, not a work item.
 
 **Found during Fix 18, deliberately NOT fixed there — the fix is a producer-policy decision, not a
 file move, and Fix 18's scope was fixed at authorization.**
