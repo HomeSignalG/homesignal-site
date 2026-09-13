@@ -40,6 +40,124 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-13 — ✅ FIX 18: the Phase 1 mockup was a PRODUCTION PAGE, and nobody deployed it
+
+**CLOSED. Merged `6493c81` (#1195); `unit` and `browser` both green on that commit** — 197/197
+offline, 224/224 mode=all. Pages build 226 deployed it. Production proven, not inferred.
+
+`homesignalphase1_13.html` — its own `<title>` is *"HomeSignal — Alerts & Development mockups"* —
+had been served from `homesignal.net` for the life of the repo. Measured before the change
+(`pg_net`, with controls): **HTTP 200, 116,339 bytes**, byte-identical to the repo file, 20 dead
+`href="#"` links, 20+ instances of the "your home" ownership language **Fix 9 removed from the
+product**, and no robots meta, canonical or OG tags. Controls in the same call: `index.html`
+200/7,174 and a never-existing sibling **404**, so the 200 was real.
+
+🔑 **THE ROOT CAUSE IS THE PRODUCER, AND IT SELECTS NOTHING.** `pages.yml` stages the artifact
+with `rsync -a --exclude '.git' '.github' '_site' 'test' 'docs' 'node_modules' ./ _site/` — it
+ships **every repo file that is not in that list**. The mockup shipped *because it existed at the
+repo root*. Nothing chose to publish it, and nothing would ever have stopped.
+
+- ⚠️ **THE REPO HAD ALREADY SAID IT WAS NOT PRODUCTION, THREE TIMES, AND IT SHIPPED ANYWAY.**
+  `test/fix9-ownership-language.test.mjs:6` excludes it by name as *"the frozen mock"*;
+  `verify/alerts-topic-name-audit.md:39` records *"Frozen prototype … not production"*;
+  `PLAN.md:27` describes a 13-view SPA mock. **A file being known-obsolete in prose is not a
+  deployment control** — only the producer's exclude list is.
+- 🔑 **MOVED TO `docs/`, NOT DELETED, AND THE REASON IS A LIVE CONTRACT.** `app.css:2` states its
+  tokens were *"lifted VERBATIM from the approved mockup … Do not restyle"* and
+  `lib/templates.js:3` that its markup *"mirrors homesignalphase1_13.html verbatim"* — both in
+  SHIPPED runtime files. `docs/` is the one tree the producer provably excludes, so the move
+  removes the public surface and keeps the reference, with no new deployment machinery.
+  The clone CI and sessions get is **shallow** (53 commits, two artificial roots), so "git
+  preserves a deleted file" is weaker here than it sounds — local history could not even
+  establish this file's own provenance.
+- 🔑 **BOTH PROVENANCE COMMENTS NAME THE FILE WITHOUT A PATH, WHICH IS WHY NOTHING WAS RE-KEYED.**
+  `app.css` and `lib/templates.js` are CONTENT-KEYED (`test/lib-cache-keys.test.mjs` §1b pins all
+  13 `?v=` tags to the file hash). Editing either comment would have changed its hash and forced
+  a 13-page tag update — churning a shipped asset for a comment. They stayed accurate untouched.
+- **URL decision: A — normal not-found. NO REDIRECT.** The URL was never advertised (absent from
+  `sitemap.xml`, `Disallow`ed in `robots.txt`) and 13 client-switched mockup views have no
+  semantically correct successor. Redirecting an accidental mockup to the homepage would mint a
+  **permanent obsolete URL contract** to avoid a 404 nobody is entitled to. `404.html` forwards
+  only `/development/<zip>/` and `/community/<zip>/`, so it is unaffected.
+  The `robots.txt` `Disallow` went with it — a rule for a page that does not exist is a dangling
+  deployment reference **that also publishes the URL**.
+- **Dependency audit: nothing.** The file is fully self-contained (1 inline `<script>`, 1 inline
+  `<style>`, **zero** external `src`/`href`), so there are no orphaned assets.
+  `test/lib-cache-keys.test.mjs` DID read it (it globs root `*.html`) but it carries zero script
+  or stylesheet tags, so it contributed nothing to `found.length` and could not starve the
+  "loaded by at least one page" assertion. Verified green before and after.
+
+**PRODUCTION PROOF, measured after deploy — repository deletion is not production proof:**
+target **404** / 11,125 bytes / `HomeSignal — Page not found`, byte-identical to the 404 control
+measured before the change · `robots.txt` **1,409 → 1,373 bytes = −36**, exactly the length of
+`Disallow: /homesignalphase1_13.html\n` · **`/docs/homesignalphase1_13.html` → 404**, which is
+what proves the move did not merely relocate the public surface · `index.html` 200 (7,174,
+unchanged) · `/community/78617/` 200 · `how-it-works.html` 200 · `homesignalmap.html` 200 ·
+`sitemap.xml` 200 · `app.css` 200 and still containing the string `homesignalphase1_13` — the
+**design-provenance comment, deliberately kept**, not a live reference.
+
+**Regression: `test/no-phase1-mockup-in-artifact.test.mjs`.** It parses the exclude list **out of
+`pages.yml`** rather than restating it, so the guard tracks the real producer — a transcribed copy
+would keep passing after the producer changed, which is the exact failure it exists to prevent.
+It pins both halves, because either alone is a silent regression: the mockup is not in the shipped
+set, AND `docs` is still excluded. Proven load-bearing on the **exit code** by six mutations:
+mockup back at root → 3a,3b · deleted outright → 4a,4b · **producer stops excluding `docs` → 1b
+AND 3a** · dangling robots rule restored → 5a · a shipped page links to it → 6a; restore green
+each time. §2a/§2b assert the shipped set is non-empty and contains `index.html`, so no check can
+pass over nothing.
+
+- ⚠️ **TWO INSTRUMENT FAILURES, BOTH THE SAME SHAPE — A STALE READING THAT LOOKS LIKE A STATE.**
+  (a) The GitHub checks API reported the PR's `browser` job `in_progress` for **~25 minutes after
+  it had already succeeded**, and later reported the `pages` and post-merge `unit-tests` runs
+  frozen with `updated_at` stuck at the same minute. Acting on the first would have meant
+  re-running a green job; acting on the second would have meant re-dispatching a deploy that was
+  already working. **What cut through both was production itself** (`pg_net`), which is the only
+  instrument in this loop with no cache between it and the truth.
+  (b) Sandbox egress to `homesignal.net` is **policy-blocked for `curl` AND `WebFetch`** (proxy
+  403). The first curl returned `000` on the target *and on both controls* — all three dead, so
+  that is an instrument failure, never evidence of absence. **`pg_net` from Postgres is the
+  working production instrument from this sandbox**, per CLAUDE.md's own workaround.
+
+**Scope held.** 4 files, +108/−2: the move (R100, 0 content change), one `robots.txt` line, a
+`PLAN.md` path, and the new test. No redirect, no deployment machinery, no sibling files touched,
+no Fort Bend, no ingest.
+
+### 📌 OPEN ITEM (Rule 16) — LEGACY ARTIFACT FAMILY: the same producer ships the internal record
+
+**Found during Fix 18, deliberately NOT fixed there — the fix is a producer-policy decision, not a
+file move, and Fix 18's scope was fixed at authorization.**
+
+The `homesignalphase1_*` family is a **family of one** (verified: no sibling exists). But the
+*accidental-shipping* class is broader. **MEASURED 2026-09-13 via `pg_net`, not inferred from the
+exclude list** — every one of these answers HTTP 200 on `homesignal.net` with its real content,
+against a `/NOSUCHFILE.md` control that correctly returns 404:
+
+| URL | status | bytes |
+|---|---|---|
+| `/CLAUDE.md` | **200** | **170,828** |
+| `/QUEUE.md` | **200** | **696,108** |
+| `/PLAN.md` | 200 | 30,067 |
+| `/DECISIONS.md` | 200 | 16,233 |
+| `/PROGRESS.md` | 200 | 5,682 |
+| `/verify/alerts-topic-name-audit.md` | 200 | 23,789 |
+| `/scripts/gen_sitemap.py` | 200 | 7,401 |
+| `/NOSUCHFILE.md` (control) | **404** | 11,125 |
+
+**`CLAUDE.md` and this file ARE the internal engineering record** — architecture, the Supabase
+project id, coverage numbers, known blockers, and every founder ruling — and they are publicly
+readable right now, 170 KB and 680 KB of it. They are not secrets, but they were never a
+deliberate publication either, and the same "nobody selected it" mechanism that shipped the mockup
+is what put them there. The mockup was the visible symptom; this is the same defect, larger.
+
+- **The decision is which way the producer should default**, and it is a founder call: an
+  allow-list of what ships (safe, but every new asset needs adding) versus extending the
+  exclude-list (cheap, but keeps failing open for the next artifact nobody selected).
+- **Fix 18's regression does not cover this** — it pins the mockup and the `docs` exclusion only.
+- ⚠️ **Do NOT fold this into a "delete the files" cleanup.** Every one of them is a working
+  in-repo document; the defect is that they are SERVED, not that they exist.
+- 📌 Also recorded, unrelated to the above: **`CLAUDE.md` §7 describes
+  `development-map-desktop*.html` as a frozen mock in this repo — no such file exists on `main`.**
+
 ### 2026-09-13 — ✅ FIX 17: a saved place has ONE identity, and the unit question was MEASURED
 
 **CLOSED. Merged `d7ea6c4` (#1196); all CI on that commit green** — pages · unit-tests ·
