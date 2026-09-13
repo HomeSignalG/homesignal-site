@@ -272,12 +272,57 @@ ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
 ok(await page.locator('.nav a').count() === 4,
   '3 ...and the sidebar is the four containers', await page.locator('.nav a').count());
 
-// The two routes chosen are ANCHORS that exist on a page's default view. development.html's
+// ═══ 4. The Dashboard is the ALL MY PLACES briefing — it has no map to open ═══
+// RETARGETED (Fix 8). This section used to click a Dashboard "Open full map" control
+// (#dashMapLink) and assert it landed on Map 1. Fix 8 made the Dashboard an account-wide
+// briefing across every monitored place and REMOVED the default map with it, so that
+// control is gone BY DESIGN — exactly like the Maps sidebar entry §3 above asserts the
+// absence of, rather than crashing on. Asserting the removal positively is what keeps this
+// file honest: a deleted assertion would leave the Dashboard's map contract untested, and a
+// restored #dashMapLink would put back UI the approved contract removed.
+//
+// Map 1 itself is NOT untested here — §5 below still drives the public ZIP route to it, so
+// the in-product path this section was protecting survives with one origin instead of two.
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+const dash = await page.evaluate(() => {
+  const main = document.querySelector('.cols > div:first-child');
+  const rail = document.querySelector('.cols > div:last-child');
+  const heads = (r) => r ? [...r.querySelectorAll('h2, .p2h')].map((h) => h.innerText.trim()) : [];
+  return {
+    mapLink: document.querySelectorAll('#dashMapLink').length,
+    map: document.querySelectorAll('#dashMap, .leaflet-container, .maplibregl-canvas').length,
+    strip: document.querySelectorAll('#dashStrip').length,
+    main: heads(main), rail: heads(rail),
+    text: document.body.innerText,
+    viewing: (document.getElementById('locLabel') || {}).textContent || ''
+  };
+});
+info('4 Dashboard structure', { main: dash.main, rail: dash.rail, viewing: dash.viewing });
+ok(dash.mapLink === 0, '4 Dashboard has no #dashMapLink — the map control was removed (Fix 8)', dash.mapLink);
+ok(dash.map === 0, '4 ...and renders no map at all', dash.map);
+ok(dash.text.indexOf('Open full map') < 0, '4 ...and no "Open full map" copy survives');
+ok(dash.strip === 0, '4 ...and no #dashStrip KPI row', dash.strip);
+ok(dash.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
+  '4 Dashboard main column is the approved briefing hierarchy', dash.main);
+ok(dash.rail.join(' | ') === 'Your Places | Stay Informed',
+  '4 ...and the right rail is Your Places then Stay Informed', dash.rail);
+ok(/Coming soon/.test(dash.text) && /Get deeper local insights/.test(dash.text),
+  '4 ...with the Premium coming-soon card, not a live Quality-of-Life claim');
+ok(/ALL MY PLACES/.test(dash.viewing) && !/\b\d{5}\b/.test(dash.viewing),
+  '4 Dashboard scope reads ALL MY PLACES and names no ZIP', dash.viewing);
+for (const gone of ['Places Monitored', 'New Changes', 'Need Attention', 'Coming Up',
+                    'Welcome back', 'Good morning', 'High Quality-of-Life Impact',
+                    'High Impact', 'Medium Impact', 'Low Impact', 'Action Needed Soon',
+                    'How to participate', 'Submit a comment', 'Take action'])
+  ok(dash.text.indexOf(gone) < 0, '4 Dashboard no longer renders "' + gone + '"');
+
+// The route chosen is an ANCHOR that exists on a page's default view. development.html's
 // "See it on the map" is deliberately NOT one of them: it lives on the project DETAIL panel,
 // not the list, so reaching it would need a seed project id and would make this journey
 // depend on fixture contents rather than on navigation.
 for (const [origin, selector, label] of [
-  ['dashboard.html', '#dashMapLink',                        '4 Dashboard "Open full map"'],
   ['community.html', 'a:has-text("View Development Map")',  '5 public ZIP "View Development Map"']
 ]) {
   await page.goto(base + '/' + origin + '?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });

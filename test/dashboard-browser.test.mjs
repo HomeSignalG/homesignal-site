@@ -80,109 +80,153 @@ const { srv, port } = await startServer();
 const base = 'http://127.0.0.1:' + port;
 const browser = await chromium.launch({ headless: true });
 const ctx = await browser.newContext();
+// Fix 8 SCOPE FIXTURE. The Dashboard is now an ALL MY PLACES briefing: its content and its
+// Your Places rows come from CANONICAL MY PLACES membership, not from the viewed ZIP. With no
+// membership the page correctly renders its zero-places state, so every Dashboard assertion
+// below would be measuring the empty case. Two followed ZIPs are seeded through the same
+// store My Places itself writes (`hs:myCommunities`) — this is fixture setup, not a product
+// behaviour, and the pre-Fix-8 suite needed none of it only because the old Dashboard read
+// the URL's ZIP.
+await ctx.addInitScript(() => {
+  try {
+    localStorage.setItem('hs:myCommunities', JSON.stringify([
+      { zip: '78617', name: 'Del Valle', state: 'TX' },
+      { zip: '78701', name: 'Austin', state: 'TX' }
+    ]));
+  } catch (e) { /* a blocked storage write must not abort the run */ }
+});
 const page = await ctx.newPage();
 
 try {
   // Context I — signed-out sample ZIP (seed mode, no demo place in URLs)
   await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
-  await page.waitForSelector('#dashStrip a.stat-link', { timeout: 30000 });
+  await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
 
-  // ⚠️ RETARGETED (A-001, Phase 3). The strip used to be Projects / Action windows / ZIP
-  // Score / Growth pressure, and these three assertions described exactly that. A-001
-  // replaced it with FOUR PORTFOLIO METRICS — Places Monitored · New Changes · Need
-  // Attention · Coming Up — so the old labels and destinations are false by design, not
-  // broken. What this block protects is unchanged and is still asserted below: every tile
-  // is a link, every href is well-formed, carries at most one zip, and lands where its
-  // label says. Only `Need Attention` kept its old destination (band=open), and it is
-  // deliberately left reading the same way so the diff shows what actually moved.
-  const stripLabels = await page.locator('#dashStrip a.stat-link .l').allTextContents();
-  ok(stripLabels.join(' · ') === 'Places Monitored · New Changes · Need Attention · Coming Up',
-    'A-001 strip is the four portfolio metrics');
-  assertHref('Places Monitored', await page.locator('#dashStrip a.stat-link').first().getAttribute('href'),
-    { noPlace: true });
-  ok((await page.locator('#dashStrip a.stat-link').first().getAttribute('href')) === 'properties.html',
-    'Places Monitored goes to My Places (account-wide, no ZIP)');
-  assertHref('Need Attention', await page.locator('#dashStrip a.stat-link.accent').getAttribute('href'),
-    { zip: '78617', noPlace: true, has: { band: 'open' } });
-  assertHref('Coming Up', await page.locator('#dashStrip a.stat-link.g').getAttribute('href'),
-    { zip: '78617', noPlace: true, has: { category: 'Government & civic' } });
-  assertHref('Map link', await page.locator('#dashMapLink').getAttribute('href'),
-    { zip: '78617', noPlace: true });
-  assertHref('Manage Saved Places', await page.locator('a', { hasText: 'Manage →' }).getAttribute('href'),
+  // ⚠️ RETARGETED (Fix 8). This block used to assert a four-tile KPI strip
+  // (#dashStrip — Places Monitored · New Changes · Need Attention · Coming Up), a
+  // Dashboard map link (#dashMapLink), and the old per-module ids #dashProps / #dashWatch /
+  // #dashRecent / #dashMeetings. Fix 8 replaced the single-place Dashboard with the ALL MY
+  // PLACES briefing and removed every one of them, so those assertions were false BY DESIGN,
+  // not broken. What this file protects is unchanged and is still asserted below: every
+  // Dashboard destination is a real link, every href is well-formed, carries at most one
+  // zip, and lands where its label says. The removals are asserted POSITIVELY rather than
+  // deleted, so a restored strip or map link fails here instead of passing silently.
+  const gone = await page.evaluate(() => ({
+    strip: document.querySelectorAll('#dashStrip').length,
+    mapLink: document.querySelectorAll('#dashMapLink').length,
+    map: document.querySelectorAll('#dashMap, .leaflet-container, .maplibregl-canvas').length,
+    legacyModules: ['#dashProps', '#dashWatch', '#dashRecent', '#dashMeetings', '#dashMeetingsHead']
+      .filter((sel) => document.querySelector(sel)),
+    text: document.body.innerText
+  }));
+  ok(gone.strip === 0, 'Fix 8 no #dashStrip KPI row', gone.strip);
+  ok(gone.mapLink === 0, 'Fix 8 no #dashMapLink', gone.mapLink);
+  ok(gone.map === 0, 'Fix 8 the Dashboard renders no map', gone.map);
+  ok(gone.legacyModules.length === 0, 'Fix 8 the superseded module containers are gone', gone.legacyModules);
+  for (const label of ['Places Monitored', 'New Changes', 'Need Attention', 'Coming Up',
+                       'Open full map', 'Welcome back', 'Good morning',
+                       'High Quality-of-Life Impact', 'High Impact', 'Medium Impact', 'Low Impact',
+                       'Action Needed Soon', 'How to participate', 'Submit a comment', 'Take action'])
+    ok(gone.text.indexOf(label) < 0, 'Fix 8 Dashboard no longer renders "' + label + '"');
+
+  // The approved briefing hierarchy, in order, on both columns.
+  const shape = await page.evaluate(() => {
+    const heads = (sel) => [...document.querySelectorAll(sel + ' h2, ' + sel + ' .p2h')]
+      .map((h) => h.innerText.trim());
+    return {
+      main: heads('.cols > div:first-child'),
+      rail: heads('.cols > div:last-child'),
+      viewing: (document.getElementById('locLabel') || {}).textContent || '',
+      sub: (document.getElementById('dashSub') || {}).textContent || ''
+    };
+  });
+  ok(shape.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
+    'Fix 8 main column is What\u2019s Changing → Quality-of-Life Premium → Official Dates');
+  ok(shape.rail.join(' | ') === 'Your Places | Stay Informed',
+    'Fix 8 right rail is Your Places → Stay Informed');
+  ok(/ALL MY PLACES/.test(shape.viewing) && !/\b\d{5}\b/.test(shape.viewing),
+    'Fix 8 Dashboard scope reads ALL MY PLACES and names no ZIP', shape.viewing);
+  ok(/monitored place/.test(shape.sub), 'Fix 8 the header counts monitored places', shape.sub);
+
+  // Every Dashboard destination is still a real, well-formed link. These are the SAME
+  // href guarantees the strip tiles used to carry, moved onto the controls that replaced
+  // them — no new routing surface is introduced here.
+  assertHref('Manage Saved Places', await page.locator('#dashManagePlaces').getAttribute('href'),
     { zip: undefined });
-  ok((await page.locator('a', { hasText: 'Manage →' }).getAttribute('href')) === 'properties.html',
+  ok((await page.locator('#dashManagePlaces').getAttribute('href')) === 'properties.html',
     'Manage link is account-wide properties.html');
+  assertHref('Manage your alerts', await page.locator('#dashManageAlerts').getAttribute('href'),
+    { zip: undefined });
+  ok((await page.locator('#dashManageAlerts').getAttribute('href')) === 'alerts.html',
+    'Stay Informed reaches the existing Alerts management page');
 
-  // Context B — multiple saved places in seed (rows present)
-  const propRows = await page.locator('#dashProps a.swrow-link').count();
-  ok(propRows >= 2, 'seed shows multiple saved-place rows (context C/D)');
+  // Context B — the resident's places are rows, each to its own destination.
+  const placeRows = page.locator('#dashPlaces a.placerow');
+  ok(await placeRows.count() >= 1, 'Your Places lists the monitored places');
+  for (const href of await placeRows.evaluateAll((els) => els.map((e) => e.getAttribute('href'))))
+    assertHref('Your Places row', href, { noPlace: true });
 
-  // Worth-watching chips
-  const chips = page.locator('#dashWatch a.wchip-link');
-  if (await chips.count()) {
-    const ch = await chips.first().getAttribute('href');
-    assertHref('Worth-watching chip', ch, { zip: '78617' });
-    ok(ch.indexOf('id=') > 0, 'worth-watching chip carries project id');
+  // What's Changing rows carry their OWN place's zip and the record id — never a
+  // page-level zip, which is the whole point of an account-wide briefing.
+  const changeRows = page.locator('#dashChanging .crow a.cgo');
+  if (await changeRows.count()) {
+    const ch = await changeRows.first().getAttribute('href');
+    assertHref('What\u2019s Changing row', ch, { noPlace: true });
+    ok(ch.indexOf('id=') > 0, 'a What\u2019s Changing row carries its record id', ch);
   }
 
-  // Recent activity cards are anchors with valid hrefs
-  const recent = page.locator('#dashRecent a.card-link');
-  if (await recent.count()) {
-    assertHref('Recent activity', await recent.first().getAttribute('href'), { zip: '78617' });
-  }
-
-  // Meeting row — DVISD change id routes to alerts
-  const mtg = page.locator('#dashMeetings a.aw-link').filter({ hasText: 'Board of Trustees' });
-  if (await mtg.count()) {
-    const mh = await mtg.getAttribute('href');
-    ok(mh && mh.indexOf('chg-dvisd') > 0 && mh.indexOf('development') < 0,
-      'DVISD meeting routes to alerts change id');
-  }
-
-  // Upcoming meetings heading link
-  assertHref('Meetings heading', await page.locator('#dashMeetingsHead').getAttribute('href'),
-    { zip: '78617', has: { category: 'Government & civic' } });
-
-  // ⚠️ RETARGETED (A-001). The first tile used to be "Projects near you" and landed on
-  // development.html with sort=distance. It is now "Places Monitored" and lands on My
-  // Places. The navigation contract this exercises — a strip tile is a real link that
-  // navigates and can be backed out of — is unchanged.
-  await page.locator('#dashStrip a.stat-link').first().click();
+  // ⚠️ RETARGETED (Fix 8). These three navigations used to start from KPI strip tiles
+  // (Places Monitored → My Places, Need Attention → alerts band=open, Coming Up → the
+  // Alerts feed). The strip is gone, so they now start from the controls that replaced it.
+  // The contract being exercised is identical and is why they were kept rather than
+  // deleted: a Dashboard destination is a real link that NAVIGATES and can be backed out
+  // of, leaving the briefing intact. Nothing here restores a strip or invents a route.
+  // ⚠️ These two assert the NAVIGATION, not the destination's rendered content. Both
+  // links are account-wide and carry no query string BY DESIGN, so following one drops
+  // `?data=seed` and the destination falls back to its live data source. Asserting a
+  // rendered element there would make this browser test depend on network reachability,
+  // which is exactly the hidden dependency the offline suites exist to avoid — and the
+  // contract in question is that the control navigates and can be backed out of.
+  // properties.html's and alerts.html's own rendering is covered by their own suites.
+  await page.locator('#dashManagePlaces').click();
   await page.waitForURL(/properties\.html/, { timeout: 15000 });
-  ok(await page.locator('#plViews [data-view="all"]').count() === 1, 'Places Monitored click lands on My Places');
+  ok(/properties\.html$/.test(new URL(page.url()).pathname + ''), 'Your Places Manage click lands on My Places',
+    page.url());
   await page.goBack();
   await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
+  await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+  ok(await page.locator('#dashChanging').count() === 1, '...and the briefing is intact on return');
 
-  // Action windows deep link
-  await page.locator('#dashStrip a.stat-link.accent').click();
-  await page.waitForURL(/alerts\.html.*band=open/, { timeout: 15000 });
-  ok(await page.locator('#alBand').count() >= 0, 'alerts page loaded with band=open');
+  await page.locator('#dashManageAlerts').click();
+  await page.waitForURL(/alerts\.html/, { timeout: 15000 });
+  ok(/alerts\.html$/.test(new URL(page.url()).pathname + ''), 'Stay Informed click lands on Alerts', page.url());
   await page.goBack();
+  await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
+  await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
 
-  // Growth pressure → lens=2 (distance sort via deep link)
-  const growth = page.locator('#dashStrip a.stat-link').filter({ hasText: 'Growth pressure' });
-  if (await growth.count()) {
-    await growth.click();
-    await page.waitForURL(/development\.html.*lens=2/, { timeout: 15000 });
-    await page.waitForSelector('#devSort button.on[data-sort="distance"]', { timeout: 15000 });
-    ok(await page.locator('#devSort button.on').count() === 1, 'lens=2 shows exactly one active sort button');
-    ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'distance',
-      'lens=2 highlights Distance sort only');
-    await page.goBack();
-  }
-
-  // ⚠️ RETARGETED (A-001). The `.g` tile was "ZIP Score" and opened community.html with
-  // focus=score; it is now "Coming Up" and opens the Alerts meetings category. The public
-  // ZIP score strip is not gone — it is still asserted, by navigating to it directly, so
-  // this file keeps covering it rather than losing it with the tile.
-  const comingUp = page.locator('#dashStrip a.stat-link.g');
-  if (await comingUp.count()) {
-    await comingUp.click();
-    await page.waitForURL(/alerts\.html.*category=/, { timeout: 15000 });
-    ok(await page.locator('#alFilter').count() === 1, 'Coming Up click lands on the Alerts feed');
+  // A place row opens THAT place's own page, and the briefing is unchanged on return —
+  // navigation never edits membership.
+  const firstPlace = page.locator('#dashPlaces a.placerow').first();
+  if (await firstPlace.count()) {
+    const beforeCount = await page.locator('#dashPlaces a.placerow').count();
+    await firstPlace.click();
+    await page.waitForURL(/community\.html|property\.html/, { timeout: 15000 });
+    ok(/(community|property)\.html$/.test(new URL(page.url()).pathname + ''),
+      'a Your Places row opens its own place page', page.url());
     await page.goBack();
     await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
+    await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+    ok(await page.locator('#dashPlaces a.placerow').count() === beforeCount,
+      'returning to the Dashboard restores the same All My Places membership');
   }
+
+  // The band=open deep link the old Need Attention tile pointed at is still a real
+  // destination; it is asserted directly now that no tile carries it.
+  await page.goto(base + '/alerts.html?data=seed&zip=78617&band=open', { waitUntil: 'networkidle' });
+  ok(await page.locator('#alBand').count() >= 0, 'alerts page loaded with band=open');
+
+  // The public ZIP score strip is not gone — it is still asserted by navigating to it
+  // directly, so this file keeps covering it rather than losing it with the retired tile.
   await page.goto(base + '/community.html?data=seed&zip=78617&focus=score', { waitUntil: 'networkidle' });
   await page.waitForSelector('#zip-score-strip', { timeout: 15000 });
   ok(await page.locator('#zip-score-strip').count() === 1, 'community page still has zip-score-strip');
@@ -237,36 +281,27 @@ try {
   const inj2 = await page.evaluate(() => window.__HS_TEST2);
   ok(inj2.placeRental === true, 'rental active property is not realHome (no place for rental)');
 
-  // Map marker vs background
+  // ⚠️ REMOVED AND ASSERTED (Fix 8). This block drove the Dashboard's embedded map:
+  // marker click, keyboard Enter on the map region, and a background click that opened
+  // Map 1. Fix 8 removed the default Dashboard map, so there is no map surface to drive
+  // and no map route to leave from. The three interactions cannot be retargeted onto
+  // anything — the feature is gone — so what remains is the assertion that it is gone,
+  // re-checked here on a FRESH load so a map that appears only after hydration would still
+  // be caught. Map 1's own interactions are covered by the map1-*.browser suites, and
+  // reaching Map 1 in-product is covered by user-journey.browser.test.mjs §5.
   await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle' });
-  await page.waitForSelector('#dashMap', { timeout: 30000 });
-  const marker = page.locator('#dashMap [data-hs-map-item]').first();
-  if (await marker.count()) {
-    const before = page.url();
-    await marker.click({ force: true });
-    await page.waitForTimeout(400);
-    const after = page.url();
-    ok(after !== before && after.indexOf('dashboard') < 0, 'marker click navigates away from dashboard');
-    ok(after.indexOf('homesignalmap.html') < 0 || after.indexOf('id=') > 0 || after.indexOf('development') > 0 || after.indexOf('alerts') > 0,
-      'marker click does not open the bare map background');
-    await page.goBack();
-    await page.waitForURL(/dashboard\.html/);
-
-    // Keyboard Enter on map region opens full map
-    await page.locator('#dashMap').focus();
-    await page.keyboard.press('Enter');
-    await page.waitForURL(/homesignalmap\.html/, { timeout: 15000 });
-    ok(page.url().includes('zip=78617') && !page.url().includes('place='), 'Enter on map opens the map with zip only');
-    await page.goBack();
-    await page.waitForURL(/dashboard\.html/);
-
-    // Background click opens maps (not after drag — simulated by direct click corner)
-    await page.locator('#dashMap').click({ position: { x: 12, y: 12 }, force: true });
-    await page.waitForURL(/homesignalmap\.html/, { timeout: 15000 });
-    assertHref('map background click', 'homesignalmap.html' + page.url().substring(page.url().indexOf('?')), { zip: '78617', noPlace: true });
-  } else {
-    console.log('SKIP — no map markers rendered in this environment');
-  }
+  await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+  await page.waitForTimeout(600);
+  const mapAfterHydration = await page.evaluate(() => ({
+    surfaces: document.querySelectorAll('#dashMap, .leaflet-container, .maplibregl-canvas, canvas').length,
+    markers: document.querySelectorAll('[data-hs-map-item]').length,
+    link: document.querySelectorAll('#dashMapLink').length
+  }));
+  ok(mapAfterHydration.surfaces === 0, 'Fix 8 no map surface on the Dashboard, even after hydration',
+    mapAfterHydration.surfaces);
+  ok(mapAfterHydration.markers === 0, 'Fix 8 ...and no map markers', mapAfterHydration.markers);
+  ok(mapAfterHydration.link === 0, 'Fix 8 ...and no route out of a map that no longer exists',
+    mapAfterHydration.link);
 
 // The retired map's URL must not be a dead end: it forwards to the primary map and CARRIES
 // ITS QUERY STRING, so an old bookmark lands on the same ZIP. `place`/`id` were that page's
