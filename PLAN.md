@@ -2,7 +2,9 @@
 
 > Status: **DRAFT — awaiting founder review before scaffolding** (per build prompt v4:
 > "write PLAN.md and pause for my review before scaffolding").
-> Source of truth for layout/design: `./homesignalphase1_13.html` (the approved mockup, now in-repo).
+> Source of truth for layout/design: `./docs/homesignalphase1_13.html` (the approved mockup,
+> kept in-repo as a design reference; moved out of the shipped site root by Fix 18 — `docs/`
+> is excluded from the Pages artifact, so it is no longer served as a public page).
 > Companion: `DECISIONS.md` (assumptions), `PROGRESS.md` (running log, created at scaffold time).
 
 ---
