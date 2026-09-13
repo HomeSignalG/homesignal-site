@@ -216,11 +216,17 @@ ok(/HS\.boundaryFC\(payload\.geometry\)/.test(zboot),
 ok(!/\bboundary:/.test(prop) && !/fitBoundary/.test(prop) && !/\bboundary:/.test(cp) && !/fitBoundary/.test(cp),
   '11c neither Place host passes boundary/fitBoundary — neither draws anything');
 
-// ── §12 My Places still has no map (G), and Dashboard is untouched (F) ─────────────────
+// ── §12 Neither ACCOUNT-WIDE surface carries a map ────────────────────────────────────
+// My Places never had one (G). Fix 8 removed the Dashboard's preview (§4 "no default
+// Dashboard map"; §17 authorises the removal): an ALL MY PLACES briefing spans every saved
+// place, so there is no single centre a map could honestly be drawn around — the old preview
+// anchored on the VIEWED ZIP, which is exactly the scope Fix 8 removed from that page.
 ok(!/HS\.buildLive/.test(read('properties.html')) && !/<iframe/.test(read('properties.html')),
   '12a My Places has no map — portfolio management only');
-ok(/radiusMi: 1\.5/.test(code(read('dashboard.html'))),
-  '12b the Dashboard preview is byte-unchanged, decorative ring and all');
+ok(!/HS\.buildLive/.test(code(read('dashboard.html'))) && !/<iframe/.test(read('dashboard.html')),
+  '12b Fix 8 the Dashboard has no map either — All My Places has no single centre');
+ok(!/radiusMi:/.test(code(read('dashboard.html'))) && !/id="dashMap"/.test(read('dashboard.html')),
+  '12c ...and no radius/decorative-ring preview config survives on it');
 
 // ── §13 the Place hosts iframe the EMBED, never the full Development page ──────────────
 // INVERTED. §10 of this file used to forbid type/status/regulatory controls near the Place

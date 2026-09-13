@@ -31,7 +31,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // the same class of silent failure, and #1089's search fix was the first to ship behind
 // exactly that risk. Its tags are written as src="shell.js" on the 14 pages and as
 // src="/shell.js" by the generator (which carries <base href="/">), so §1 matches both.
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js'];
+// lib/dashboard-aggregate.js joined the set with Fix 8. It is the Dashboard's whole
+// view-model — membership, dedup identity, meeting-time safety, Premium state — so a fix
+// in it that a browser never fetches is exactly the silent class this file exists to stop.
+const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -129,8 +132,18 @@ while ((g = genRe.exec(gen))) {
   ok(g[2] === key(g[1]),
     `5a: generator tag /${g[1]} carries its current content hash (?v=${key(g[1])}, found ${g[2]})`);
 }
-ok(seen >= CONTENT_KEYED.length - 1,
-  `5b: the generator scan actually matched tags (${seen}) — a regex that stops matching must not read as clean`);
+// The floor is the set the GENERATED ZIP DOCUMENT actually loads, named explicitly rather
+// than derived from CONTENT_KEYED.length. Those are different sets and always were: the ZIP
+// document does not load lib/map.js, and Fix 8 added lib/dashboard-aggregate.js, which is the
+// Dashboard's view-model and has no business on a public ZIP page. Deriving the floor from the
+// whole keyed set made adding ANY page-specific keyed lib fail this check for the wrong reason —
+// it would read as "the generator went stale" when the generator is correct.
+const GENERATOR_KEYED = ['lib/templates.js', 'lib/premium-waitlist.js', 'lib/community-request.js',
+                         'shell.js', 'lib/community-page.js'];
+ok(seen >= GENERATOR_KEYED.length,
+  `5b: the generator scan actually matched tags (${seen} >= ${GENERATOR_KEYED.length}) — a regex that stops matching must not read as clean`);
+GENERATOR_KEYED.forEach((rel) => ok(new RegExp('src="/' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\?v=' + key(rel) + '"').test(gen),
+  `5c: the generated ZIP document loads ${rel} at its current hash`));
 
 // §6 — THE STYLESHEET WAS OUTSIDE EVERY SECTION ABOVE, AND THAT IS HOW THE CHIPS SHIPPED
 // HALF-DRESSED. §1/§2/§3/§5 all match `.js` only — §2's sweep is literally

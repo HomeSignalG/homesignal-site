@@ -61,13 +61,23 @@ ok(/window\.location\.replace\('\/homesignalmap\.html' \+ q\)/.test(legacy),
 ok(/var q = window\.location\.search \|\| '';/.test(legacy),
   'A-008 ...carrying the query string, so ?zip= survives the forward');
 
-// ---- A-008: Dashboard keeps the compact snapshot, NOT Map 1 ----
-ok(/>Development Overview</.test(dash), 'A-008 the Dashboard heading is exactly "Development Overview"');
-ok(!/What's Changing Around You/.test(dash), 'A-008 "What\'s Changing Around You" is gone as a module name');
-ok(/id="dashMap"/.test(dash), 'A-008 the compact #dashMap preview is present');
-ok(/Open full map/.test(dash) && /homesignalmap\.html/.test(dash), 'A-008 "Open full map →" routes into Map 1');
+// ---- FIX 8 (founder): Dashboard has NO map snapshot at all ----
+// A-008 gave the Dashboard a compact #dashMap preview of Map 1, anchored on the VIEWED ZIP.
+// Fix 8 §4 states "There is no default Dashboard map" and §17 authorises removing it: the
+// page is now an ALL MY PLACES briefing spanning every saved place, so there is no single
+// centre a preview could honestly be drawn around. The A-008 boundary that MATTERED — Map 1's
+// own controls never leaking onto the Dashboard — is asserted below and is now trivially
+// true, so it is kept rather than dropped.
+ok(!/>Development Overview</.test(dash), 'Fix 8 the "Development Overview" module is gone from Dashboard');
+ok(!/id="dashMap"/.test(dash), 'Fix 8 the #dashMap preview is REMOVED — no default Dashboard map');
+ok(!/HS\.buildLive/.test(dash) && !/maplibre|leaflet/i.test(dash),
+  'Fix 8 Dashboard builds no live map and loads no map library');
+ok(!/Open full map/.test(dash), 'Fix 8 the "Open full map →" preview CTA went with the preview');
 for (const ctl of ['id="viewSeg"', 'id="radSel"', 'stagechip', 'typechip', 'regchip'])
   ok(!dash.includes(ctl), 'A-008 Map 1 control ' + ctl + ' is NOT on Dashboard');
+// Map 1 itself is untouched by Fix 8 — it is still the one place these live.
+ok(/id="radSel"/.test(read('homesignalmap.html')),
+  'Fix 8 Map 1 still owns the radius control — only the Dashboard preview was removed');
 
 // ---- A-008: the radius contract — THREE facts that must all stay true together ----
 {

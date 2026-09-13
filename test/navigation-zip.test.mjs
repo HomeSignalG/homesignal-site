@@ -125,10 +125,14 @@ ok(/hasViewedZipContext/.test(devMapHtml),
   'homesignalmap boot reuses shell ZIP context (no sample auto-load)');
 ok(/HS\.navHref\('homesignalmap\.html',\s*S\.zip\)/.test(devPage),
   'development.html "See it on the map" uses HS.navHref with active ZIP');
-ok(/data-znav="homesignalmap\.html"/.test(dash),
-  'dashboard map links use data-znav');
-ok(/nav\('homesignalmap\.html',\s*mapCtx\(\)\)/.test(dash),
-  'dashboard map click preserves ZIP via pageHref/navHref');
+// FIX 8: the Dashboard map preview is REMOVED (§4 "no default Dashboard map"; §17 authorises
+// its removal). There is no Dashboard map link left to preserve a ZIP through, so the old
+// pins are replaced by the positive fact that no map is rendered there at all. Every OTHER
+// page's map links are still pinned above and below this line.
+ok(!/data-znav="homesignalmap\.html"/.test(dash) && !/id="dashMap"/.test(dash),
+  'Fix 8 dashboard.html renders no map and no map link — All My Places has no single centre');
+ok(!/maplibre|leaflet/i.test(dash),
+  'Fix 8 dashboard.html loads no map library at all');
 // A-020 (Phase 8): today.html is now a redirect stub, pinned the way maps.html already is.
 // Its "Map -" link is gone WITH the page; Dashboard's "Open full map -" was already the
 // same path, which is why retiring it added no new map route.

@@ -51,9 +51,10 @@ for (const f of ['today.html', 'reports.html', 'maps.html', 'homesignalmap.html'
                  'community.html', 'development.html', 'properties.html', 'alerts.html',
                  'dashboard.html', 'property.html'])
   ok(has(f), 'SHIPPED the ' + f + ' page still exists — retired means redirected, never deleted');
-ok(/HS\.ZIP_NAV_PAGES = \['dashboard\.html', 'alerts\.html', 'development\.html', 'homesignalmap\.html', 'community\.html'\];/.test(shellJs),
-  'SHIPPED A-020/A-021 ZIP_NAV_PAGES dropped ONLY today.html');
-ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];"),
+// Fix 8 D1: dashboard.html is OUT (account-wide All My Places surface, like properties.html).
+ok(shellJs.includes("HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
+  'SHIPPED Fix 8 D1 ZIP_NAV_PAGES is the four ZIP-scoped tools — dashboard.html is OUT');
+ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
   'SHIPPED ...and lib/view-zip.js carries the byte-identical literal');
 ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs), 'SHIPPED A-021 Map 1 is still in MAP_PAGES');
 ok(/var authedZipHealth = \(sess && !sess\.demo\)/.test(cp), 'SHIPPED A-022 the ZIP-health gate is on a real non-demo session');

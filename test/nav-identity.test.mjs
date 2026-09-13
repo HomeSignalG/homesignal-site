@@ -129,10 +129,18 @@ ok(existsSync(join(root, 'homesignalmap.html')), 'A-021 Map 1 STILL EXISTS as a 
 const shellJsSrc = read('shell.js');
 ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJsSrc),
   'A-021 Map 1 is still in MAP_PAGES');
-ok(/HS\.ZIP_NAV_PAGES = \['dashboard\.html', 'alerts\.html', 'development\.html', 'homesignalmap\.html', 'community\.html'\];/.test(shellJsSrc),
-  'A-021 ZIP_NAV_PAGES dropped ONLY today.html — homesignalmap.html and community.html stay');
-ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];"),
-  'A-021 ...and lib/view-zip.js carries the byte-identical literal');
+// FIX 8 D1 (founder): dashboard.html LEFT ZIP_NAV_PAGES. The Dashboard is an account-wide
+// ALL MY PLACES briefing, so sidebar nav must not stamp one currently-viewed ZIP on it —
+// the same reason properties.html has always been excluded. today.html stays out (A-021),
+// and homesignalmap.html + community.html stay in.
+ok(new RegExp('HS\\.ZIP_NAV_PAGES = ' + "['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'.replace('X','')).test(shellJsSrc) ||
+   shellJsSrc.includes("HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
+  'Fix 8 D1 ZIP_NAV_PAGES is the four ZIP-scoped tools — dashboard.html is OUT');
+ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html']" + ';'),
+  'Fix 8 D1 ...and lib/view-zip.js carries the byte-identical literal');
+ok(!/HS\.ZIP_NAV_PAGES = \[[^\]]*'dashboard\.html'/.test(shellJsSrc)
+   && !/var ZIP_NAV_PAGES = \[[^\]]*'dashboard\.html'/.test(read('lib/view-zip.js')),
+  'Fix 8 D1 dashboard.html cannot creep back into either ZIP_NAV_PAGES literal');
 
 // Zero map entries in the sidebar now, and the retired second map is still not there.
 const mapEntries = NAV.filter((n) => /map/i.test(n.href));
