@@ -161,16 +161,24 @@ ok(!/type="search"|id="[^"]*[Ss]earch"|placeholder="[^"]*[Ss]earch/.test(props),
   'A-010 no search was invented on My Places');
 ok(!/data-act="remove-address"|data-view="zips"/.test(dash),
   'Dashboard stays a SUMMARY — no My Places views or Remove Address were added to it');
-ok(/id="dashAddPlace"[^>]*>\+ Add Address</.test(dash),
-  'Dashboard summary add for Addresses is "+ Add Address"');
-ok(/id="dashAddZip"[^>]*>\+ Add ZIP Code</.test(dash),
-  'Dashboard summary add for ZIP Codes is "+ Add ZIP Code"');
-ok(/dashAddPlace'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(dash),
-  'Dashboard "+ Add Address" reuses HS.addHome');
+// FIX 8 §9: Your Places on the Dashboard is a READ-ONLY rail — label, type and drill-down,
+// with "Manage →" as the one route into the real manager. The always-present add buttons moved
+// off it. They still appear in the ZERO-PLACE state, because a resident with nothing saved has
+// no briefing to read and needs a way in; §11 names that copy exactly ("Add an address" /
+// "Add a ZIP code"). The invariant this file protects is unchanged and asserted below: both
+// add paths REUSE the existing writers and no second writer was invented.
+ok(/>Add an address</.test(dash) && /id="dashAddAddress"/.test(dash),
+  'Fix 8 the zero-place state offers "Add an address"');
+ok(/>Add a ZIP code</.test(dash) && /id="dashAddZip"/.test(dash),
+  'Fix 8 the zero-place state offers "Add a ZIP code"');
+ok(/dashAddAddress'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(dash),
+  'Fix 8 Dashboard "Add an address" reuses HS.addHome — no second app_properties writer');
 ok(/dashAddZip'\)\.addEventListener\('click', function \(\) \{ HS\.openLoc\(\); \}\)/.test(dash),
-  'Dashboard "+ Add ZIP Code" reuses HS.openLoc');
-ok(/hideAdd:\s*true/.test(dash),
-  'Dashboard does not also render the dashed ZIP add chip');
+  'Fix 8 Dashboard "Add a ZIP code" reuses HS.openLoc — no second follow writer');
+ok(/href="properties\.html"/.test(dash) && /Manage &rarr;/.test(dash),
+  'Fix 8 Your Places rail routes management to the existing My Places page');
+ok(!/communitiesStripHTML/.test(dash),
+  'Fix 8 Dashboard renders its own place rows, not the shared ZIP chip strip');
 
 // ---- routes and identifiers are NOT renamed for terminology -----------------------------
 ok(fs.existsSync(new URL('../properties.html', import.meta.url)), 'properties.html IS My Places — no my-places.html was created');

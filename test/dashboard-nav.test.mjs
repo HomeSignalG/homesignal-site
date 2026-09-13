@@ -46,65 +46,82 @@ const dashRaw = fs.readFileSync(new URL('../dashboard.html', import.meta.url), '
 // them from prose alone — which is exactly what happened when A-001 first landed: the
 // tile was gone and the assertion still went green off a code comment. Same technique the
 // generator gates already use.
-const dash = dashRaw.replace(/^\s*\/\/.*$/gm, '');
+// HTML comments are stripped as well as `//` lines: the Fix 8 page explains in an HTML
+// comment WHY no Quality-of-Life claim renders, and that prose must not be able to satisfy
+// a presence check for the very section it is describing.
+const dash = dashRaw.replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
 
-// ---- A-001: the Portfolio Strip is EXACTLY the four locked portfolio metrics ----------
-// ZIP-health is excluded by name: the score ring, component bars, value outlook and growth
-// pressure live on authenticated /community/<zip>/ under A-022, and on today.html until
-// A-020. Nothing may reintroduce them to this strip.
-for (const label of ['Places Monitored', 'New Changes', 'Need Attention', 'Coming Up']) {
-  ok(dash.includes("'" + label + "'"), 'A-001 Portfolio Strip carries ' + label);
-}
-ok(!/ZIP Score/.test(dash) && !/'Growth pressure'/.test(dash),
-  'A-001 ZIP Score and Growth pressure are OUT of the Dashboard strip');
-ok(!/scoreRing|scoreBars/.test(dash),
-  'A-001 no ZIP-health visualization anywhere on Dashboard (A-022 owns it)');
+// ============================================================================
+// FIX 8 — the ALL MY PLACES contract replaces A-001 .. A-009.
+//
+// WHY THESE ASSERTIONS CHANGED. A-001's Portfolio Strip, A-004 "Needs Your Attention",
+// A-005 "Your Briefing", A-006 "Recent Changes", A-007 "Worth Watching", A-008
+// "Development Overview" (and its #dashMap preview) and A-009 "Intelligence Reports" were
+// the module set of the SINGLE-ZIP Dashboard. Fix 8 (founder-approved) replaced that page
+// with an account-wide briefing whose §4 main/rail order is fixed and whose map is removed
+// by name. Every pin below is a POSITIVE assertion of the new contract — coverage is
+// replaced, not dropped.
+// ============================================================================
 
-// ---- A-002 (Dashboard half): one unified "Your Places" summary, two distinct TYPES -----
-ok(/>Your Places</.test(dash), 'A-002 Dashboard shows one "Your Places" summary');
-ok(!/Your Saved Places/.test(dash) && !/>Your ZIP Codes</.test(dash),
-  'A-002 the separate Saved Places and ZIP Codes headings are merged away');
-ok(/>Addresses</.test(dash) && />ZIP Codes</.test(dash),
-  'A-002 Address and ZIP Code remain distinct types inside Your Places');
-ok(/href="properties\.html"/.test(dash) && /id="dashZipOpen"/.test(dash),
-  'A-002 both drill-downs survive: Manage -> properties.html, ZIP -> community.html');
+// ---- the page no longer reads the VIEWED place at all --------------------------------
+// This is the whole point of Fix 8 and the one thing that would be silent if it regressed:
+// membership comes from canonical My Places, so a viewed-ZIP read is a defect, not a detail.
+ok(!/HS\.ensureViewedZip\(/.test(dash),
+  'Fix 8 dashboard.html does not call ensureViewedZip — it is not a ZIP-scoped page');
+ok(!/S\.zip|HS\.state\.zip|myZip|sessionViewZip/.test(dash),
+  'Fix 8 dashboard.html reads no viewed-place state',
+  (dash.match(/.{0,50}(S\.zip|HS\.state\.zip|myZip).{0,50}/) || [])[0]);
+ok(/HS\.dashAgg/.test(dash) && /canonicalPlaces\(/.test(dash),
+  'Fix 8 scope comes from the dashboard-aggregate view-model');
+ok(/HS\.followedCommunities/.test(dash) && /S\.properties/.test(dash),
+  'Fix 8 membership is the two canonical My Places stores');
+ok(!/app_follows/.test(dash),
+  'Fix 8 Dashboard never reaches into app_follows rows directly — membership is the hydrated list');
 
-// ---- A-003 .. A-009: the module names the frozen actions lock -------------------------
-for (const [name, action] of [['Needs Your Attention', 'A-004'], ['Your Briefing', 'A-005'],
-                              ['Recent Changes', 'A-006'], ['Worth Watching', 'A-007'],
-                              ['Development Overview', 'A-008'], ['Intelligence Reports', 'A-009'],
-                              ['Coming Up', 'A-003']]) {
-  ok(dash.includes('>' + name + '<'), action + ' Dashboard module named exactly "' + name + '"');
-}
-ok(!/What's changing around you|Recent activity near you|Worth watching nearby|>Upcoming meetings</.test(dash),
-  'A-006/A-007/A-008/A-003 the superseded module names are gone');
-// A-007 boundary: discovery chips are links, never monitoring controls.
-ok(!/dashWatch[\s\S]{0,400}?(toggleFollow|Notify me|Watch this)/.test(dash),
-  'A-007 Worth Watching chips carry no follow/watch/notify control');
-// A-009 boundary: surface the existing capability, invent no new one.
-ok(!/text\/csv|\.pdf|localStorage\.setItem\('hs:reports/.test(dash),
-  'A-009 no CSV, PDF or report persistence was invented');
-// ⚠️ RETARGETED IN PHASE 8. This asserted `reports.html is still reachable, not retired`,
-// which was true when A-009 shipped and is false BY DESIGN now: A-019 retired reports.html
-// to a redirect stub once this module was proven to carry the capability. The real risk it
-// guarded — the Reports capability silently disappearing — is now guarded better, by
-// asserting the module is here AND that no designed CTA hops through the retired stub
-// (which would be a redirect loop waiting to happen).
-ok(/id="dashReports"/.test(dash) && /Intelligence Reports/.test(dash),
-  'A-009 the Intelligence Reports module is still the Reports capability');
+// ---- §4 main-column and rail sections, in the approved order -------------------------
+for (const h of ['What&rsquo;s Changing?', 'Official Dates to Know', 'Your Places', 'Stay Informed'])
+  ok(dash.includes('>' + h + '<'), 'Fix 8 Dashboard renders the "' + h.replace('&rsquo;', "'") + '" section');
+const iChanging = dash.indexOf('What&rsquo;s Changing?');
+const iQol = dash.indexOf('Quality-of-Life Impact');
+const iDates = dash.indexOf('Official Dates to Know');
+ok(iChanging > 0 && iQol > iChanging && iDates > iQol,
+  'Fix 8 main column order is What’s Changing -> Quality-of-Life Premium -> Official Dates',
+  { iChanging, iQol, iDates });
+ok(dash.indexOf('>Your Places<') < dash.indexOf('>Stay Informed<'),
+  'Fix 8 right rail order is Your Places -> Stay Informed');
+
+// ---- the superseded single-ZIP module set is gone ------------------------------------
+for (const gone of ['Needs Your Attention', 'Your Briefing', 'Recent Changes', 'Worth Watching',
+                    'Development Overview', 'Intelligence Reports'])
+  ok(!dash.includes('>' + gone + '<'), 'Fix 8 the single-ZIP module "' + gone + '" is gone');
+ok(!/id="dashStrip"|statTileLink/.test(dash), 'Fix 8 the Portfolio Strip is gone (no KPI tile row)');
+ok(!/id="dashMap"|HS\.buildLive/.test(dash), 'Fix 8 no default Dashboard map');
 ok(!/reports\.html/.test(dash),
-  'A-019 ...and Dashboard no longer routes anyone through the retired reports.html stub',
-  (dash.match(/.{0,40}reports\.html.{0,40}/) || [])[0]);
-ok(/Add a ZIP Code/.test(dash) || /zipLabels:\s*true/.test(dash),
-  'dashboard ZIP add flow uses ZIP Code terminology');
-ok(/statTileLink/.test(dash), 'dashboard stat tiles use statTileLink');
-ok(/var placesMonitored = S\.properties\.length \+ followedZips\.length;/.test(dash),
-  'Places Monitored is Addresses + ZIP Codes only — not followed projects');
-ok(!/followedProjectIds/.test(dash) && !/followedProjects/.test(dash),
-  'Dashboard does not count followed projects as Places Monitored');
-ok(/miniCardLink/.test(dash), 'dashboard recent cards use miniCardLink');
-ok(/meetingRowLink/.test(dash), 'dashboard meetings use meetingRowLink');
-ok(/itemClick:\s*onMarkerClick/.test(dash), 'dashboard map markers are clickable');
+  'Fix 8 Dashboard still routes nobody through the retired reports.html stub');
+
+// ---- §4 forbids greeting copy BY NAME ------------------------------------------------
+for (const greet of ['Welcome back', 'Good morning', 'Good afternoon', 'Hello '])
+  ok(!dash.includes(greet), 'Fix 8 Dashboard renders no "' + greet.trim() + '" greeting');
+
+// ---- no Quality-of-Life CLAIM may render (Phase 1: no authoritative impact plane) -----
+ok(!/High Impact|Medium Impact|Low Impact|impactRating|impact_score|impact_dimensions/.test(dash),
+  'Fix 8 no QoL/impact label, rating or score anywhere on Dashboard',
+  (dash.match(/.{0,40}(High Impact|impactRating|impact_score).{0,40}/) || [])[0]);
+
+// ---- no AGGREGATE "View all" — there is no All My Places destination to send them to --
+ok(!/View all/.test(dash),
+  'Fix 8 no aggregate "View all" CTA renders in this release',
+  (dash.match(/.{0,50}View all.{0,50}/) || [])[0]);
+
+// ---- the two rail CTAs route to the EXISTING surfaces ---------------------------------
+ok(/href="properties\.html"/.test(dash) && /Manage &rarr;/.test(dash),
+  'Fix 8 Your Places "Manage" routes to the existing My Places page');
+ok(/href="alerts\.html"/.test(dash) && /Manage your alerts &rarr;/.test(dash),
+  'Fix 8 Stay Informed routes to the existing Alerts management');
+
+// ---- Places are Addresses + ZIP Codes; followed projects are NOT a Place -------------
+ok(!/followedProjectIds|followedProjects/.test(dash),
+  'Fix 8 Dashboard does not count followed projects as monitored places');
 ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener not inline onclick');
 
 const shell = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');

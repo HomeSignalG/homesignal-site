@@ -104,10 +104,18 @@ ok(/Notify me/.test(templates) && /Following ✓/.test(shell),
 ok(/id='propWatch'>Watch this address</.test(map)
   && /Watch requests aren't live yet/.test(map),
   'map Watch stub is unchanged');
-ok(/var placesMonitored = S\.properties\.length \+ followedZips\.length;/.test(dash),
-  'Places Monitored is still Addresses + ZIP Codes');
-ok(!/followedProjectIds/.test(dash),
-  'Dashboard does not fold followed projects into Places Monitored');
+// FIX 8: the monitored-place count moved into the dashboard-aggregate view-model
+// (canonicalPlaces), which builds from app_properties + the followed-ZIP list and from
+// NOTHING else. The rule this asserts is unchanged — a followed PROJECT is not a Place —
+// and it is now structural: canonicalPlaces has no project branch to fold one into.
+const agg = read('lib/dashboard-aggregate.js');
+ok(/function canonicalPlaces/.test(agg) && /kind: 'address'/.test(agg) && /kind: 'zip'/.test(agg),
+  'Fix 8 canonicalPlaces builds monitored places from Addresses + ZIP Codes only');
+ok(!/project/i.test(agg.slice(agg.indexOf('function canonicalPlaces'), agg.indexOf('function queryZips'))
+     .replace(/^\s*\/\/.*$/gm, '')),
+  'Fix 8 canonicalPlaces has no followed-project branch at all');
+ok(/placeCount = places\.length/.test(dash) && !/followedProjectIds/.test(dash),
+  'Fix 8 Dashboard does not fold followed projects into the monitored-place count');
 ok(!/digest\.py|user_subscriptions|pipeline_type/.test(dev + props)
   && !/from\('alerts'\)/.test(shell.match(/HS\.toggleFollow = function[\s\S]*?\n  \};/) || [''])[0],
   'Fix 1 does not enroll email alerts or touch digest');

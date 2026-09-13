@@ -28,17 +28,23 @@ const shellHtml = strip(read('partials/shell.html'));
 const VIEWED = '84301';
 
 console.log('--- the ZIP-scoped page set ---');
-for (const p of ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'])
+for (const p of ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'])
   ok(ZIP_NAV_PAGES.indexOf(p) >= 0, 'ZIP_NAV_PAGES includes ' + p);
-// My Places is the ACCOUNT-WIDE manager of every Address and ZIP. Scoping it to one ZIP
-// would hide the rest of the resident's places behind the place they happen to be viewing.
+// ACCOUNT-WIDE SURFACES ARE NOT ZIP NAVIGATION TARGETS. My Places manages every Address and
+// ZIP; scoping it to one ZIP would hide the rest of the resident's places behind whichever
+// place they happen to be viewing. Fix 8 D1 (founder) put the DASHBOARD in the same category:
+// it is the ALL MY PLACES briefing, so stamping ?zip= on its own sidebar link would put one
+// currently-viewed ZIP on a surface about every saved place — and HS.submitWaitlist's
+// zipFromLocation fallback would then attribute a FEATURE-level Premium lead to that ZIP.
 ok(ZIP_NAV_PAGES.indexOf('properties.html') < 0,
   'properties.html (My Places) stays account-wide — NOT silently added to ZIP_NAV_PAGES');
-ok(ZIP_NAV_PAGES.length === 5, 'ZIP_NAV_PAGES is exactly those five', ZIP_NAV_PAGES);
+ok(ZIP_NAV_PAGES.indexOf('dashboard.html') < 0,
+  'Fix 8 D1 dashboard.html (All My Places) is account-wide — NOT in ZIP_NAV_PAGES', ZIP_NAV_PAGES);
+ok(ZIP_NAV_PAGES.length === 4, 'ZIP_NAV_PAGES is exactly those four', ZIP_NAV_PAGES);
 
 console.log('--- moving between tools keeps 84301 ---');
 // 84301 Dashboard -> Alerts -> Development -> Map 1 : the tool changes, the place does not.
-for (const dest of ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html'])
+for (const dest of ['alerts.html', 'development.html', 'homesignalmap.html'])
   ok(navHref(dest, VIEWED) === dest + '?zip=' + VIEWED,
     'tool nav to ' + dest + ' carries the viewed ZIP');
 ok(navHref('development.html', VIEWED).indexOf('78617') < 0,
@@ -62,7 +68,9 @@ ok(!/_serverFollowZips/.test(ensure) && !/followedCommunities/.test(ensure),
 
 // Every ZIP-scoped tool page must call it BEFORE it reads S.zip, or the re-assertion
 // lands after the fetch it was meant to protect.
-for (const f of ['alerts.html', 'dashboard.html', 'development.html']) {
+// Dashboard is intentionally account-wide and does not call ensureViewedZip.
+// Positive coverage lives in dashboard-nav.test.mjs and dashboard-all-places.test.mjs.
+for (const f of ['alerts.html', 'development.html']) {
   const src = strip(read(f));
   const call = src.indexOf('HS.ensureViewedZip(');
   const firstRead = src.search(/HS\.data\.[a-z]+\(S\.zip/);

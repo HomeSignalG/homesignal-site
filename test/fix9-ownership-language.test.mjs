@@ -103,14 +103,18 @@ ok(/document\.body\.dataset\.noWhere != null/.test(shell),
   'paintWhereLine honors data-no-where (shared helper stays for other .ph pages)');
 ok(!/id="phWhere"/.test(dashRaw),
   'dashboard.html does not itself render a #phWhere duplicate');
-ok(/saved place/.test(dash) && /here\\'s what needs your attention across them/.test(dash),
-  'dashboard subline uses "saved place(s)", not homes followed');
+// FIX 8 (founder) §4: the Dashboard header is "Dashboard" plus a question about the whole
+// portfolio, and greeting copy is forbidden BY NAME. The ownership rule this file exists to
+// protect is unchanged and still asserted — the page must never call a saved Address "your
+// home" — it is simply now enforced on a header that greets nobody.
+ok(/monitored place/.test(dash),
+  'Fix 8 dashboard subline counts MONITORED PLACES across the portfolio');
 ok(!/Your home/.test(dash),
   'dashboard.html has no "Your home" after comment strip');
-ok(/id="dashHi">Welcome back</.test(dash),
-  'dashboard still greets with Welcome back (hierarchy unchanged)');
-ok(/placeDisplayTag\(p, 'Address'\)/.test(dashRaw),
-  'dashboard place rows use placeDisplayTag → Address, not stored Your home');
+for (const greet of ['Welcome back', 'Good morning', 'Good afternoon'])
+  ok(!dash.includes(greet), 'Fix 8 dashboard renders no "' + greet + '" greeting (§4 forbids it by name)');
+ok(/ptag-kind/.test(dashRaw) && /'Address' : 'ZIP Code'/.test(dashRaw),
+  'Fix 8 dashboard place rows still state the TYPE — Address vs ZIP Code — never "your home"');
 
 console.log('--- place type labels ---');
 ok(/typeChip\('Address'\)/.test(read('properties.html')),

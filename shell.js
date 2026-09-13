@@ -115,7 +115,8 @@
       }
       return null;
     };
-    HS.ZIP_NAV_PAGES = ['dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
+    // Mirrors lib/view-zip.js::ZIP_NAV_PAGES — dashboard.html excluded (Fix 8 D1); see there.
+    HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};

@@ -5,58 +5,149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Dashboard</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css?v=20814d85">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<style>#dashMap{height:300px}#dashMap .maplibregl-canvas{border-radius:15px}</style>
+<style>
+  /* Dashboard-scoped only — app.css is untouched (Fix 8 §1). */
+  /* §4: main ~70-75%, rail ~25-30%. app.css ships 1.55fr/.95fr (62/38) for the older pages. */
+  .dashpage .cols{grid-template-columns:2.6fr 1fr}
+  /* A grid item defaults to min-width:auto, so a column cannot shrink below the min-content
+     width of its widest row — and the compact rows below deliberately use white-space:nowrap
+     on the type pill and the CTA. Without this the whole page scrolled sideways at 390px
+     (measured), which §4 forbids. min-width:0 lets the column shrink; the rows then wrap. */
+  .dashpage .cols > *{min-width:0}
+  @media(max-width:900px){.dashpage .cols{grid-template-columns:1fr}}
+  @media(max-width:560px){
+    /* Stack each row's CTA under its content rather than squeezing the title to nothing. */
+    .dashpage .crow,.dashpage .drow{flex-wrap:wrap}
+    .dashpage .crow .ck{flex:0 0 100%;margin-bottom:2px}
+    .dashpage .crow .cmain,.dashpage .drow .dmain{flex:1 1 100%}
+    .dashpage .crow .cgo,.dashpage .drow .cgo{margin-top:6px}
+    /* The count block is a number and a 250px note side by side, and it is flex:0 0 auto in
+       the header — so at 390px it refuses to shrink and pushes the page sideways. Here it
+       takes a full row of its own and becomes shrinkable; the note drops its fixed width and
+       its left rule, which only reads as a divider when the two sit side by side. */
+    .dashpage .dashcount{padding-top:14px;flex:1 1 100%;min-width:0}
+    .dashpage .dashcount .note{max-width:none;min-width:0;border-left:0;padding-left:0}
+  }
+  .dashhead{display:flex;gap:26px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .dashhead .dhl{min-width:0;flex:1 1 380px}
+  .dashcount{display:flex;gap:18px;align-items:center;flex:0 0 auto;padding-top:4px}
+  .dashcount .n{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em}
+  .dashcount .lbl{font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:5px}
+  .dashcount .note{max-width:250px;font-size:12px;color:var(--ink-2);line-height:1.45;
+                   border-left:1px solid var(--line);padding-left:18px}
+  @media(max-width:640px){.dashcount .note{border-left:0;padding-left:0}}
+  /* Compact list rows — §5 "not large feature cards". */
+  .crow{display:flex;gap:14px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line-2)}
+  .crow:last-child{border-bottom:none}
+  /* A FIXED type column, so every title starts at the same x. Without it the pill sizes
+     the column per row ("GOVERNMENT NOTICE" is wider than "DEVELOPMENT") and the titles
+     step in and out — the approved visual reads as aligned columns. */
+  /* 140px, not 132: the widest label ("GOVERNMENT NOTICE") measures 137px, and a pill that
+     overflows its basis pushes its own title out of the column — measured as titles at two
+     x positions, 454 and 449. The column must fit the widest pill for the column to exist. */
+  .crow .ck{flex:0 0 140px}
+  .crow .cv{flex:0 0 auto;color:var(--ink-3);font-size:15px;line-height:1;align-self:center}
+  .ctype{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+         padding:3px 8px;border-radius:5px;white-space:nowrap}
+  .ctype.gov{background:var(--blue-tint);color:var(--blue)}
+  .ctype.dev{background:var(--green-tint);color:var(--green-deep)}
+  .ctype.news{background:var(--amber-tint);color:var(--amber)}
+  .crow .cmain{flex:1 1 auto;min-width:0}
+  .crow .ct{font-size:13.8px;font-weight:600;line-height:1.4}
+  .crow .cmeta{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .crow .cgo{flex:0 0 auto;font-size:12px;font-weight:600;color:var(--green);text-decoration:none;
+             white-space:nowrap;display:inline-block;padding:4px 0;margin:-4px 0}
+  .crow .cgo:hover{text-decoration:underline}
+  .crow .cgo:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  /* Official dates — date block + detail. */
+  .drow{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line-2)}
+  .drow:last-child{border-bottom:none}
+  .dblock{flex:0 0 46px;text-align:center;border:1px solid var(--line);border-radius:9px;padding:6px 0;background:#fff}
+  .dblock .m{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+  .dblock .d{font-size:17px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+  .drow .dmain{flex:1 1 auto;min-width:0}
+  .drow .dt{font-size:13.8px;font-weight:600;line-height:1.4}
+  .drow .dmeta{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:9px;flex-wrap:wrap}
+  .dwin{color:var(--amber);font-weight:600}
+  .placerow{display:flex;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line-2);
+            text-decoration:none;color:inherit}
+  .placerow:last-of-type{border-bottom:none}
+  .placerow:hover{background:#f7f9f7}
+  .placerow:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:8px}
+  .placerow .pmain{flex:1 1 auto;min-width:0}
+  .placerow .pl{font-size:13.3px;font-weight:600;line-height:1.35}
+  .placerow .ps{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+  .placerow .pc{flex:0 0 auto;color:var(--ink-3);font-size:14px}
+  .ptag-kind{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+  /* The shared .bt-row link renders 19px tall. app.css stays untouched (Fix 8 §1), so the
+     target is lifted here, on this page only, without moving the text. */
+  .dashpage .bt-row a{display:inline-block;padding:3px 0;margin:-3px 0}
+  .dnote{font-size:12.5px;color:var(--ink-3);margin:0}
+  .dwarn{font-size:12.5px;color:var(--amber);margin:0}
+</style>
 </head>
 <body data-nav="dash" data-no-where>
 <template id="hs-content">
-  <div class="page">
+  <div class="page dashpage">
     <div class="ph">
-      <div class="eyebrow">Dashboard</div>
-      <h1 id="dashHi">Welcome back</h1>
-      <p id="dashSub"></p>
+      <div class="dashhead">
+        <div class="dhl">
+          <h1 style="margin-bottom:6px">Dashboard</h1>
+          <p id="dashSub" style="margin:0"></p>
+        </div>
+        <div class="dashcount" id="dashCount" hidden>
+          <div>
+            <div class="n" id="dashCountN">—</div>
+            <div class="lbl" id="dashCountLbl">Monitored places</div>
+          </div>
+          <div class="note">Tracking development, government notices, meetings, and local news that may affect your community.</div>
+        </div>
+      </div>
     </div>
-    <div class="strip" id="dashStrip"></div>
+
     <div class="cols">
       <div>
-        <div class="block" style="padding:16px 18px">
-          <div class="bt-row"><h2>Development Overview</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashMapLink">Open full map →</a></div>
-          <div class="mapwrap dash-mapwrap" id="dashMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
-        </div>
         <div class="block">
-          <div class="bt-row"><h2>Needs Your Attention</h2><a href="alerts.html" data-znav="alerts.html" id="dashAttentionAll" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
-          <div id="dashAttention"></div>
+          <div class="bt-row"><h2>What&rsquo;s Changing?</h2></div>
+          <p class="dnote" id="dashChangingSub" style="margin:-8px 0 12px">Relevant updates across all your monitored places.</p>
+          <div id="dashChanging"><p class="dnote">Loading updates&hellip;</p></div>
         </div>
+
+        <!-- QUALITY-OF-LIFE IMPACT · PREMIUM
+             Phase 1 proved there is no authoritative Quality-of-Life impact plane, so no
+             label, score, explanation or direction renders anywhere on this page. This card
+             is a ROADMAP STATEMENT and is CONSTANT — it is identical whether every source
+             succeeded or every source failed, because it reports on nothing. A data failure
+             renders as a data failure, never as this card (§7 "Premium is not a data-quality
+             fallback"). Markup reuses app.css .p2/.p2h/.p2t/.p2sub/.inlinebtn — the same
+             component the Community and Property Premium cards already use. -->
+        <div class="block" style="padding:0;border:none;box-shadow:none;background:none">
+          <div class="p2" id="dashQolPremium">
+            <div class="p2h" id="dashQolLabel">Quality-of-Life Impact · Premium</div>
+            <div class="p2sub" id="dashQolAvail">Coming soon</div>
+            <div class="p2t" id="dashQolTitle">Get deeper local insights</div>
+            <div class="p2sub" id="dashQolBody" style="margin-bottom:0">See added context around major development, infrastructure, and civic activity across the places you monitor.</div>
+            <button type="button" class="inlinebtn" id="dashQolCta" style="margin-top:12px">Get Premium access &rarr;</button>
+          </div>
+        </div>
+
         <div class="block">
-          <h2 class="bt">Your Briefing</h2>
-          <p class="brief" id="dashBrief"></p>
+          <div class="bt-row"><h2>Official Dates to Know</h2></div>
+          <div id="dashDates"><p class="dnote">Loading official dates&hellip;</p></div>
         </div>
-        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent Changes</h2><a href="alerts.html" data-znav="alerts.html" id="dashAllAlerts" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
-        <div id="dashRecent"></div>
       </div>
+
       <div>
         <div class="block">
-          <div class="bt-row"><h2>Your Places</h2><a href="properties.html">Manage →</a></div>
-          <div class="bt-row" style="margin:2px 0 4px"><h3 style="font-size:12px;margin:0;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em">Addresses</h3></div>
-          <div id="dashProps"></div>
-          <button class="addbtn" type="button" style="width:100%;justify-content:center;margin-top:10px" id="dashAddPlace">+ Add Address</button>
-          <div class="bt-row" style="margin:14px 0 4px"><h3 style="font-size:12px;margin:0;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em">ZIP Codes</h3><a href="community.html" data-znav="community.html" id="dashZipOpen" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">Open →</a></div>
-          <div id="dashCommunities"></div>
-          <button class="addbtn" type="button" style="width:100%;justify-content:center;margin-top:10px" id="dashAddZip">+ Add ZIP Code</button>
+          <div class="bt-row"><h2>Your Places</h2><a href="properties.html" id="dashManagePlaces">Manage &rarr;</a></div>
+          <div id="dashPlaces"></div>
         </div>
         <div class="block">
-          <div class="bt-row"><h2 class="bt" style="margin:0"><a href="alerts.html" data-znav="alerts.html" id="dashMeetingsHead" class="section-link">Coming Up</a></h2></div>
-          <div id="dashComingUp"></div>
-        </div>
-        <div class="block" id="dashWatchBlock">
-          <div class="bt-row"><h2>Worth Watching</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashWatchMap">See on map →</a></div>
-          <div class="chips" id="dashWatch"></div>
-        </div>
-        <div class="block">
-          <div class="bt-row"><h2>Intelligence Reports</h2><a href="dashboard.html#dashReports" id="dashReportsOpen" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">Open Reports →</a></div>
-          <div id="dashReports"></div>
+          <div class="bt-row"><h2>Stay Informed</h2></div>
+          <p class="dnote" style="margin:0 0 12px">Choose the places and topics you want HomeSignal alerts about.</p>
+          <a class="inlinebtn" href="alerts.html" id="dashManageAlerts" style="text-decoration:none">Manage your alerts &rarr;</a>
         </div>
       </div>
     </div>
@@ -66,285 +157,304 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/map.js?v=ea30843b"></script>
+<script src="lib/dashboard-aggregate.js?v=9f6ae57d"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=4b05a973"></script>
+<script src="shell.js?v=01319a72"></script>
 <script>
+// ============================================================================
+// DASHBOARD — ALL MY PLACES INTELLIGENCE BRIEFING (Fix 8)
+//
+// The scope of this page is the resident's CANONICAL MY PLACES membership and nothing
+// else. It never calls HS.ensureViewedZip(), never reads HS.state.zip / myZip /
+// sessionStorage viewZip / the active address / a URL ZIP, and never writes any of them.
+// Every decision that could go silently wrong lives in lib/dashboard-aggregate.js, which
+// test/dashboard-all-places.test.mjs drives directly in Node.
+// ============================================================================
 HS.onReady(async function () {
-  // Gate 2: the URL is authoritative at the moment of the fetch (shared helper —
-  // no per-page geography rule). Must precede the S.zip reads below.
-  HS.ensureViewedZip();
-  var S = HS.state, home = S.activeProperty, zip = S.zip;
-  var realHome = HS.realHome();
-  var nav = HS.pageHref ? HS.pageHref.bind(HS) : function (p, o) { return HS.navHref(p, (o && o.zip) || zip); };
+  var A = HS.dashAgg;
+  var S = HS.state;
 
-  // Never hang silently: a failed read renders an honest retry state.
-  var c, projects, changes, meetings;
+  // ---- LEGACY ?zip= — strip it FIRST, before any CTA can be clicked -----------------
+  // Fix 8 D1 removed dashboard.html from ZIP_NAV_PAGES, so sidebar navigation no longer
+  // stamps a ZIP here. One can still ARRIVE: an old bookmark, an external link, or
+  // today.html's redirect (which forwards its query string verbatim).
+  //
+  // It matters for exactly one reason: HS.submitWaitlist falls back to
+  // HSPremiumWaitlist.zipFromLocation(location) when the CTA states no ZIP, and that reads
+  // location.search. Removing the parameter is what makes the fallback find nothing, so a
+  // FEATURE-level Premium lead can never inherit one place's ZIP.
+  //
+  // replaceState, not pushState: the cleaned URL replaces this entry rather than adding
+  // one, so Back still returns wherever the resident came from. Dashboard membership never
+  // read the parameter in the first place — this is about lead attribution.
+  //
+  // ⚠️ DISCLOSED LIMITATION, not silently absorbed: shell.js captures ?zip= into
+  // sessionStorage 'viewZip' and HS.state.zip at MODULE SCOPE (shell.js:176-184), before
+  // boot() and before any page script exists. No Dashboard-side code can prevent that; only
+  // a shared-shell change could, and this authorization excludes one. What is fully
+  // prevented here is what the rule is for: Dashboard membership and Premium attribution.
   try {
-    c = await HS.data.community(S.zip);
-    projects = await HS.data.projects(S.zip, home);
-    changes = await HS.data.changes(S.zip, home);
-    meetings = await HS.data.meetings(S.zip, home);
-  } catch (e) {
-    console.warn('[dashboard] data load failed', e);
-    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your dashboard</h1>'
-      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
-      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    var cleaned = A.searchWithoutZip(location.search);
+    if (cleaned !== null && window.history && history.replaceState) {
+      history.replaceState(history.state, '', location.pathname + cleaned + (location.hash || ''));
+    }
+  } catch (e) { /* a blocked history write must never break the briefing */ }
+
+  // ---- Dashboard-local scope label -------------------------------------------------
+  // PAGE-LOCAL ONLY. HS.setViewLabel writes state.viewLabel, which is never persisted and
+  // is rebuilt by the shell on every full-page navigation — so it cannot leak to another
+  // page. viewZip, myZip, HS.state.zip and the active address are untouched.
+  HS.setViewLabel('ALL MY PLACES', { precise: true });
+
+  // ---- Canonical My Places membership ----------------------------------------------
+  // The two stores My Places itself manages. HS.onReady resolves after boot() has awaited
+  // hydrateAccountLocation(), so both are already reconciled with the account.
+  var places = A.canonicalPlaces({
+    properties: S.properties,
+    followedZips: HS.followedCommunities ? HS.followedCommunities() : []
+  });
+  var placeCount = places.length;
+
+  // Header. The count is rendered only once membership is known — never a placeholder 0,
+  // which would read as "you monitor nothing" during a load.
+  var countBox = document.getElementById('dashCount');
+  document.getElementById('dashCountN').textContent = String(placeCount);
+  document.getElementById('dashCountLbl').textContent = placeCount === 1 ? 'Monitored place' : 'Monitored places';
+  countBox.hidden = false;
+  document.getElementById('dashSub').textContent = placeCount
+    ? ('What’s changing across your ' + placeCount + ' monitored place' + (placeCount === 1 ? '' : 's') + '?')
+    : 'What’s changing across the places you monitor?';
+
+  // ---- Premium CTA — the existing shared modal, feature-level context ----------------
+  // premiumLeadContext() carries a SOURCE and no other key, so there is no field for a ZIP
+  // or address to arrive in. HS.openPremiumModal clears any previous context before it
+  // binds (shell.js:1879), and the modal, submit handler, validation, idempotency and
+  // Acquisition Dashboard path are all the existing ones — unchanged.
+  document.getElementById('dashQolCta').addEventListener('click', function () {
+    HS.openPremiumModal(A.premiumLeadContext());
+  });
+
+  // ---- Your Places ------------------------------------------------------------------
+  // §9: no priority counts, no activity counts, no zeros. A row is a label and a
+  // drill-down to that place's own existing destination. Clicking is navigation only — it
+  // never changes Dashboard membership.
+  function placeHref(p) {
+    return p.kind === 'address'
+      ? ('property.html?id=' + encodeURIComponent(p.placeId))
+      : HS.pageHref('community.html', { zip: p.zip });
+  }
+  var placesEl = document.getElementById('dashPlaces');
+  placesEl.innerHTML = places.length
+    ? places.map(function (p) {
+        return '<a class="placerow" href="' + HS.esc(placeHref(p)) + '">'
+          + '<div class="pmain"><div class="pl">' + HS.esc(p.label) + '</div>'
+          + '<div class="ps"><span class="ptag-kind">' + (p.kind === 'address' ? 'Address' : 'ZIP Code') + '</span>'
+          + (p.sub ? ' &middot; ' + HS.esc(p.sub) : '') + '</div></div>'
+          + '<div class="pc" aria-hidden="true">&rsaquo;</div></a>';
+      }).join('')
+    : '<p class="dnote" style="margin-bottom:12px">Add a place to see changes and official dates across the locations you monitor.</p>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="inlinebtn" type="button" id="dashAddAddress">Add an address</button>'
+      + '<button class="inlinebtn" type="button" id="dashAddZip">Add a ZIP code</button></div>';
+  if (!places.length) {
+    document.getElementById('dashAddAddress').addEventListener('click', function () { HS.addHome(); });
+    document.getElementById('dashAddZip').addEventListener('click', function () { HS.openLoc(); });
+  }
+
+  // ---- Zero places: nothing to brief on, and that is a true statement ---------------
+  if (!places.length) {
+    document.getElementById('dashChanging').innerHTML =
+      '<p class="dnote">Add an address or a ZIP code and this briefing fills in with what is changing there.</p>';
+    document.getElementById('dashDates').innerHTML =
+      '<p class="dnote">Official meeting dates and comment deadlines appear here once you are monitoring a place.</p>';
     return;
   }
 
-  function mapCtx() {
-    var o = { zip: zip };
-    if (realHome && realHome.id) o.place = realHome.id;
-    return o;
-  }
+  // ---- Bounded reads ----------------------------------------------------------------
+  // Query shapes and the reason each is what it is: lib/data.js, "ALL MY PLACES readers".
+  // Every source is caught INDEPENDENTLY: a failed read is recorded as failed and is never
+  // allowed to render as "nothing is happening" — the whole point of sourceAvailability.
+  var zips = A.queryZips(places, A.MAX_QUERY_ZIPS);
+  var capped = A.queryZips(places).length > zips.length;
 
-  // FIRST-TIME vs RETURNING: a signed-out visitor has never been here — never
-  // greet them "Welcome back"; lead with what HomeSignal does. With no saved
-  // places, the subline is an invitation (plus honest sample-ZIP disclosure),
-  // never "0 saved places" framed as homes followed.
-  var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
-  document.getElementById('dashHi').textContent = S.session
-    ? (name ? 'Welcome back, ' + name : 'Welcome back')
-    : 'See what\'s changing around this place';
-  document.getElementById('dashSub').textContent = S.properties.length
-    ? S.properties.length + ' saved place' + (S.properties.length === 1 ? '' : 's') + ' — here\'s what needs your attention across them.'
-    : 'Add an address and we\'ll watch official county and permit records around it'
-      + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample ZIP code, Del Valle, TX.' : '.');
-
-  // ---------------------------------------------------------------- module pools ----
-  // ONE data plane, and it is the one this page already had: current-ZIP community meta,
-  // projects, changes and meetings, plus the visitor's saved Addresses and followed ZIPs.
-  // No portfolio aggregator, no new API, no ingest change was invented for Phase 3.
-  //
-  // TWO SIGNALS IN THIS DATA ARE VACUOUS IN PRODUCTION, measured 2026-09-10 over all
-  // 168,963 app_changes rows: `impacts` is NULL on 168,963 of them and `quiet` is true on
-  // 0. So ranking by impacts.length sorts nothing and filtering on !quiet removes nothing.
-  // `window_closes_at` is the only real attention signal there is: 1,622 rows carry one and
-  // 1,298 are still open. Every module below is therefore built on a signal that exists,
-  // rather than on a field that would make it look populated while ordering at random.
-  var liveChanges = changes.filter(function (x) { return !x.quiet; });
-
-  // A-004 NEEDS YOUR ATTENTION — the prioritized ACTION queue: changes whose public
-  // comment window is still open, soonest deadline first. This is the queue the
-  // "Need Attention" strip metric counts.
-  var attention = liveChanges
-    .filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; })
-    .sort(function (a, b) { return HS.daysUntil(a.window_closes_at) - HS.daysUntil(b.window_closes_at); });
-
-  // A-003 COMING UP — the merge of today.html's "Action windows" and this page's
-  // "Upcoming meetings". BOTH of those rendered MEETINGS (today.html: meetings.map(
-  // HS.tpl.meetingRow)), so the merge is one chronological schedule of upcoming public
-  // meetings and hearings. It is kept DISJOINT from Needs Your Attention by TYPE — a
-  // deadline is an action, a meeting is an appointment — so no item is rendered as a card
-  // twice on this page, which is what A-003 forbids.
-  var comingUp = meetings.slice().sort(function (a, b) {
-    return new Date(a.starts_at || 0) - new Date(b.starts_at || 0);
-  });
-
-  // A-002 (Dashboard half) — Place = Address + ZIP Code. The two TYPES stay distinct and
-  // keep their own drill-downs; only the Dashboard SUMMARY is unified here. My Places
-  // management (All/Addresses/ZIP Codes, Remove Address) stays on properties.html. The
-  // two add buttons reuse the existing writers so either type can be started from here.
-  var followedZips = HS.followedCommunities ? HS.followedCommunities() : [];
-  var placesMonitored = S.properties.length + followedZips.length;
-
-  // A-001 PORTFOLIO STRIP — exactly four PORTFOLIO metrics, locked.
-  // ZIP Score and Growth pressure are deliberately GONE from here: ZIP-health belongs to
-  // A-022 on authenticated /community/<zip>/, and A-001 excludes it from this strip by
-  // name. Nothing replaced them on Dashboard.
-  document.getElementById('dashStrip').innerHTML =
-    HS.tpl.statTileLink(placesMonitored, 'Places Monitored', '', 'properties.html')
-    + HS.tpl.statTileLink(liveChanges.length, 'New Changes', '', nav('alerts.html', mapCtx()))
-    + HS.tpl.statTileLink(attention.length, 'Need Attention', 'accent', nav('alerts.html', Object.assign({ band: 'open' }, mapCtx())))
-    + HS.tpl.statTileLink(comingUp.length, 'Coming Up', 'g', nav('alerts.html', Object.assign({ category: 'Government & civic' }, mapCtx())));
-
-  // Stamp ZIP-aware header links (paintNavHrefs runs at boot; re-stamp after we know data).
-  var mapHref = nav('homesignalmap.html', mapCtx());
-  ['dashMapLink', 'dashWatchMap', 'dashAllAlerts', 'dashZipOpen', 'dashMeetingsHead'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    if (id === 'dashMeetingsHead') el.href = nav('alerts.html', Object.assign({ category: 'Government & civic' }, mapCtx()));
-    else if (id === 'dashAllAlerts') el.href = nav('alerts.html', mapCtx());
-    else if (id === 'dashZipOpen') el.href = nav('community.html', mapCtx());
-    else el.href = mapHref;
-  });
-
-  // map preview — HS.buildLive is the guarded backbone chain (GL -> Leaflet raster
-  // -> schematic; never throws into this init). NEVER-FAKED rule: the home dot and
-  // home-anchored center exist ONLY for a real resident home in this ZIP — otherwise
-  // the ZIP centroid (app_community_meta.lat/lng) anchors, else the first record.
-  var items = changes.filter(function (x) { return !x.quiet; }).concat(projects)
-    .filter(function (x) { return x.lat && x.lng; }).slice(0, 6);
-  var dashMap = document.getElementById('dashMap');
-  var hasRealHome = !!realHome;
-  var center = (hasRealHome ? { lat: home.lat, lng: home.lng } : null)
-    || (c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null)
-    || (items[0] ? { lat: items[0].lat, lng: items[0].lng } : null);
-
-  function goMapPreview() { location.href = mapHref; }
-  function onMarkerClick(it) {
-    var href = HS.itemNavHref ? HS.itemNavHref(it, zip) : null;
-    if (href) location.href = href;
-  }
-
-  HS.buildLive(dashMap, {
-    center: center, items: items, home: hasRealHome ? home : null,
-    interactive: true, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300,
-    itemClick: onMarkerClick,
-    onReady: function (map) {
-      if (map && map.on) {
-        map.on('dragstart', function () { dashMap._hsDragged = true; });
-        map.on('dragend', function () { setTimeout(function () { dashMap._hsDragged = false; }, 0); });
-      }
+  function pool(items, size, fn) {          // bounded concurrency — never Promise.all(N)
+    var i = 0, out = new Array(items.length);
+    function next() {
+      if (i >= items.length) return Promise.resolve();
+      var k = i++;
+      return Promise.resolve(fn(items[k])).then(function (v) { out[k] = v; return next(); });
     }
+    var runners = [];
+    for (var r = 0; r < Math.min(size, items.length); r++) runners.push(next());
+    return Promise.all(runners).then(function () { return out; });
+  }
+
+  var ok = {};
+  function attempt(key, p) {
+    return Promise.resolve(p).then(function (v) { ok[key] = true; return v; },
+      function (e) { ok[key] = false; console.warn('[dashboard] ' + key + ' read failed', e); return null; });
+  }
+
+  var results = await Promise.all([
+    attempt('changes', HS.data.changesForZips(zips)),
+    attempt('meetings', HS.data.meetingsForZips(zips)),
+    attempt('places', HS.data.communityMetaForZips(zips)),
+    attempt('development', pool(zips, A.QUERY_CONCURRENCY, function (z) {
+      return HS.data.developmentForZip(z, 8);
+    }).then(function (lists) {
+      return lists.reduce(function (acc, l) { return acc.concat(l || []); }, []);
+    }))
+  ]);
+  var rawChanges = results[0], rawMeetings = results[1], meta = results[2] || {}, rawDev = results[3];
+  var avail = A.sourceAvailability(ok);
+
+  // ---- Normalize to one item shape, each carrying its OWN place provenance ----------
+  function labelForZip(z) {
+    var m = meta[z];
+    return (m && m.name) ? m.name : ('ZIP ' + z);
+  }
+  function placeCtx(item) {
+    if (item.placeCount > 1) return 'Affects ' + item.placeCount + ' of your places';
+    var p = item.places && item.places[0];
+    return p ? p.label : (item.zip ? labelForZip(item.zip) : '');
+  }
+
+  var items = [];
+  (rawChanges || []).forEach(function (c) {
+    var label = A.typeLabelForChange(c.category);
+    if (!label) return;                     // no authoritative category -> no row
+    items.push({
+      id: c.id, zip: c.zip, title: c.title, category: c.category,
+      source_ref: c.source_ref, occurred_at: c.occurred_at,
+      window_closes_at: c.window_closes_at,
+      typeLabel: label, kind: label === 'Local News' ? 'news' : 'gov',
+      places: A.placesForZip(places, c.zip)
+    });
+  });
+  (rawDev || []).forEach(function (p) {
+    items.push({
+      id: p.id, zip: p.zip, title: p.name, category: 'Development',
+      source_ref: p.source_ref, occurred_at: p.submitted_at,
+      window_closes_at: null, typeLabel: 'Development', kind: 'dev',
+      places: A.placesForZip(places, p.zip)
+    });
   });
 
-  // The preview surface opens the full map; marker clicks route to the record.
-  dashMap.style.cursor = 'pointer';
-  dashMap.addEventListener('click', function (e) {
-    if (dashMap._hsDragged || e.target.closest('[data-hs-map-item]')) return;
-    goMapPreview();
-  });
-  dashMap.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]')) goMapPreview();
-  });
+  var deduped = A.dedupeChanges(items);
 
-  var projectIds = new Set(projects.map(function (p) { return p.id; }));
+  // ---- What's Changing ---------------------------------------------------------------
+  // The CTA's zip is ALWAYS the record's own zip, carried with its id from the same source
+  // row — never HS.state.zip, which this page does not read at all.
+  function changeHref(it) {
+    if (it.kind === 'dev') return HS.pageHref('development.html', { zip: it.zip, id: it.id });
+    if (it.kind === 'news') return it.source_ref || null;   // the publisher's own article
+    return HS.pageHref('alerts.html', { zip: it.zip, id: it.id });
+  }
+  var CTA = { dev: 'Review development →', gov: 'View notice →', news: 'Read article →' };
 
-  // A-006 RECENT CHANGES — a concise cross-portfolio snapshot of what actually changed,
-  // not the full Alerts feed and not a "near you" physical-proximity claim. Deliberately
-  // capped; "All alerts →" remains the route to the complete record.
-  // Ordered by recency: HS.data.changes already returns occurred_at desc, and the previous
-  // impacts-based sort was a no-op (impacts is NULL on every production row), so removing
-  // it changes nothing except the honesty of the code.
-  var recent = liveChanges.slice(0, 2);
-  document.getElementById('dashRecent').innerHTML = recent.map(function (ch) {
-    var href = HS.itemNavHref ? HS.itemNavHref(ch, zip) : null;
-    return HS.tpl.miniCardLink(ch, ch.category, href);
-  }).join('');
-
-  // properties — each row selects that place and opens its property page.
-  document.getElementById('dashProps').innerHTML = S.properties.map(function (p) {
-    return '<a class="swrow swrow-link" href="property.html?id=' + encodeURIComponent(p.id) + '" data-place-id="' + HS.esc(p.id) + '">'
-      + '<div class="miniscore">' + (p.score || '') + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(HS.placeDisplayTag(p, 'Address')).toUpperCase()) + '</span></div>'
-      + '<div class="pa">' + HS.esc(p.city) + '</div></div></a>';
-  }).join('');
-  document.getElementById('dashProps').addEventListener('click', function (e) {
-    var row = e.target.closest('[data-place-id]');
-    if (row) HS.selectProperty(row.getAttribute('data-place-id'));
-  });
-
-  document.getElementById('dashAddPlace').addEventListener('click', function () { HS.addHome(); });
-  document.getElementById('dashAddZip').addEventListener('click', function () { HS.openLoc(); });
-
-  // followed ZIP codes — the dashed strip chip is hidden because Dashboard has its own
-  // "+ Add ZIP Code" addbtn, matching "+ Add Address" above.
-  document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML({ zipLabels: true, hideAdd: true });
-
-  // A-007 WORTH WATCHING — discovery only. Closest REAL project records, as already
-  // implemented; each chip is a plain link to its detail page. No follow, watch, notify,
-  // watchlist or Map Watch control may be added here.
-  var watch = projects.slice()
-    .sort(function (a, b) { return (a.distance_mi || 9e9) - (b.distance_mi || 9e9); }).slice(0, 4);
-  if (watch.length) {
-    document.getElementById('dashWatch').innerHTML = watch.map(function (p) {
-      return '<a class="wchip wchip-link" href="' + HS.esc(nav('development.html', { zip: zip, id: p.id })) + '">'
-        + HS.esc(p.name) + (p.dist ? ' · ' + HS.esc(p.dist) : '') + '</a>';
-    }).join('');
+  var changingEl = document.getElementById('dashChanging');
+  if (avail.changes === 'failed' && avail.development === 'failed') {
+    changingEl.innerHTML = '<p class="dwarn">We could not read updates for your places just now. '
+      + 'This is a loading problem, not an absence of activity — try again shortly.</p>';
+  } else if (!deduped.length) {
+    changingEl.innerHTML = avail.anyFailed
+      ? '<p class="dwarn">Part of this briefing could not be read just now, so this list is incomplete. Try again shortly.</p>'
+      : '<p class="dnote">No new government notices, planning records or local news have been filed for your places recently.</p>';
   } else {
-    var wb = document.getElementById('dashWatchBlock'); if (wb) wb.style.display = 'none';
+    changingEl.innerHTML = deduped.slice(0, 12).map(function (it) {
+      var href = changeHref(it);
+      var ext = it.kind === 'news';
+      var when = A.fmtCalendarDate(it.occurred_at);
+      return '<div class="crow">'
+        + '<div class="ck"><span class="ctype ' + it.kind + '">' + HS.esc(it.typeLabel) + '</span></div>'
+        + '<div class="cmain"><div class="ct">' + HS.esc(it.title || 'Untitled record') + '</div>'
+        + '<div class="cmeta"><span>' + HS.esc(placeCtx(it)) + '</span>'
+        + (when ? '<span>' + HS.esc(when) + '</span>' : '') + '</div></div>'
+        + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
+            + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + CTA[it.kind] + '</a>' : '')
+        + '<div class="cv" aria-hidden="true">\u203a</div>'
+        + '</div>';
+    }).join('')
+      + (avail.anyFailed ? '<p class="dwarn" style="margin-top:10px">Part of this briefing could not be read just now, so this list may be incomplete.</p>' : '')
+      + (capped ? '<p class="dnote" style="margin-top:10px">Showing updates across your first ' + zips.length + ' places.</p>' : '');
   }
 
-  // A-003 COMING UP — one chronological list, each row keeping its TYPE identity so a
-  // meeting is still recognisable as a meeting.
-  document.getElementById('dashComingUp').innerHTML = comingUp.length
-    ? comingUp.map(function (m) {
-        var href = HS.meetingNavHref ? HS.meetingNavHref(m, zip, projectIds) : null;
-        return HS.tpl.meetingRowLink(m, href);
-      }).join('')
-    : '<p class="quiet" style="font-size:12.5px;margin:0">Nothing scheduled for this ZIP yet.</p>';
+  // ---- Official Dates to Know ---------------------------------------------------------
+  // Meetings carry a TIME only when the source stated one (meetings.meeting_time). The
+  // clock component of meeting_date is a midnight-in-local-zone artifact on 96.3% of
+  // upcoming rows and is never rendered — see lib/dashboard-aggregate.js. No relative
+  // urgency label, no timezone, no participation instruction.
+  var todayYmd = new Date().toISOString().slice(0, 10);
+  var mtgItems = (rawMeetings || []).reduce(function (acc, m) {
+    (m.zips || []).forEach(function (z) {
+      acc.push(Object.assign({}, m, { zip: z, places: A.placesForZip(places, z) }));
+    });
+    return acc;
+  }, []);
+  var dated = A.officialDateItems({
+    meetings: mtgItems,
+    changes: deduped,
+    todayYmd: todayYmd
+  });
+  // A meeting reaching several of the resident's ZIPs is ONE official date, not three.
+  var seenDate = {};
+  dated = dated.filter(function (d) {
+    var k = d.kind + '\u001f' + String(d.id);
+    if (seenDate[k]) { seenDate[k].places = seenDate[k].places.concat(d.places); return false; }
+    seenDate[k] = d; return true;
+  });
 
-  // A-004 NEEDS YOUR ATTENTION — action rows, not alert cards. Each carries the closing
-  // countdown that makes it actionable and links to its own record.
-  document.getElementById('dashAttention').innerHTML = attention.length
-    ? attention.slice(0, 3).map(function (ch) {
-        var d = HS.daysUntil(ch.window_closes_at);
-        var href = HS.itemNavHref ? HS.itemNavHref(ch, zip) : null;
-        return '<div class="prow"><span class="pk" style="background:var(--red)"></span>'
-          + '<div class="pmain"><div class="pt">' + HS.esc(ch.title) + '</div>'
-          + '<div class="pd">' + HS.esc(ch.plain_language || '') + '</div>'
-          + '<div class="pmeta"><span class="win">◔ Window closes in ' + d + ' day' + (d === 1 ? '' : 's') + '</span></div></div>'
-          + (href ? '<a class="btn primary" href="' + HS.esc(href) + '">Act</a>' : '') + '</div>';
-      }).join('')
-    : '<p class="quiet" style="font-size:12.5px;margin:0">Nothing needs your attention right now.</p>';
+  var MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  function dateBlock(ymd) {
+    var p = String(ymd).split('-');
+    return '<div class="dblock"><div class="m">' + MON[Number(p[1]) - 1] + '</div>'
+      + '<div class="d">' + String(Number(p[2])) + '</div></div>';
+  }
+  function datePlaceCtx(d) {
+    var uniq = {}, labels = [];
+    (d.places || []).forEach(function (p) { if (p && !uniq[p.id]) { uniq[p.id] = 1; labels.push(p.label); } });
+    if (labels.length > 1) return 'Affects ' + labels.length + ' of your places';
+    return labels[0] || (d.zip ? labelForZip(d.zip) : '');
+  }
 
-  // A-005 YOUR BRIEFING — synthesis. It INTERPRETS what the other modules list; it must
-  // never become a second card feed, so it renders as one short paragraph and repeats no
-  // card markup.
-  var briefBits = [];
-  briefBits.push('You are monitoring <b>' + placesMonitored + ' place' + (placesMonitored === 1 ? '' : 's') + '</b>'
-    + (c && c.name ? ', and ' + HS.esc(c.name) + ' is the area in view' : '') + '.');
-  briefBits.push(liveChanges.length
-    ? 'There ' + (liveChanges.length === 1 ? 'is <b>1 change</b>' : 'are <b>' + liveChanges.length + ' changes</b>') + ' on record here.'
-    : 'No changes are on record here yet.');
-  if (attention.length) {
-    var top = attention[0], td = HS.daysUntil(top.window_closes_at);
-    briefBits.push('The most time-sensitive is <span class="hl">' + HS.esc(top.title) + '</span> — the comment window closes in '
-      + td + ' day' + (td === 1 ? '' : 's') + '.');
+  var datesEl = document.getElementById('dashDates');
+  if (avail.meetings === 'failed' && avail.changes === 'failed') {
+    datesEl.innerHTML = '<p class="dwarn">We could not read official dates for your places just now. Try again shortly.</p>';
+  } else if (!dated.length) {
+    datesEl.innerHTML = avail.anyFailed
+      ? '<p class="dwarn">Part of this section could not be read just now, so it is incomplete. Try again shortly.</p>'
+      : '<p class="dnote">No upcoming official dates are available right now.</p>';
+  } else {
+    datesEl.innerHTML = dated.slice(0, 8).map(function (d) {
+      var meta2 = [];
+      var ctx = datePlaceCtx(d);
+      if (ctx) meta2.push('<span>' + HS.esc(ctx) + '</span>');
+      if (d.kind === 'meeting') {
+        if (d.time) meta2.push('<span>' + HS.esc(d.time) + '</span>');
+        if (d.location) meta2.push('<span>' + HS.esc(d.location) + '</span>');
+      } else {
+        meta2.push('<span class="dwin">Official comment window open</span>');
+        meta2.push('<span>Deadline: ' + HS.esc(A.fmtCalendarDate(d.dateYmd)) + '</span>');
+      }
+      var href = d.kind === 'meeting'
+        ? d.href
+        : HS.pageHref('alerts.html', { zip: d.zip, id: d.id, band: 'open' });
+      var cta = d.kind === 'meeting' ? 'View meeting →' : 'Review official notice →';
+      var ext = d.kind === 'meeting';
+      return '<div class="drow">' + dateBlock(d.dateYmd)
+        + '<div class="dmain"><div class="dt">' + HS.esc(d.title) + '</div>'
+        + '<div class="dmeta">' + meta2.join('') + '</div></div>'
+        + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
+            + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + cta + '</a>' : '')
+        + '<div class="cv" aria-hidden="true">\u203a</div>'
+        + '</div>';
+    }).join('')
+      + (avail.anyFailed ? '<p class="dwarn" style="margin-top:10px">Part of this section could not be read just now, so it may be incomplete.</p>' : '');
   }
-  if (comingUp.length) {
-    briefBits.push('<b>' + comingUp.length + '</b> public meeting' + (comingUp.length === 1 ? ' is' : 's are') + ' scheduled next.');
-  }
-  if (c && c.value_trend != null) {
-    briefBits.push('Value outlook for this area is <span class="hl">' + HS.trend(c.value_trend) + ' over the next 12 months</span>.');
-  }
-  document.getElementById('dashBrief').innerHTML = briefBits.join(' ');
-
-  // A-009 INTELLIGENCE REPORTS — the report capability, generated from live data. Nothing
-  // is invented — no history, no CSV, no PDF, no persistence, no scheduling.
-  //
-  // A-019 (Phase 8) retired the reports.html PROTOTYPE once this module was proven to carry
-  // the capability, and pointed the Dashboard's own CTAs at this module. That still holds:
-  // nothing here routes through reports.html, which is pinned.
-  //
-  // ⚠️ WHAT CHANGED ON 2026-09-11: reports.html is no longer a redirect stub. It is the
-  // public-beta Property Reports IN-PROGRESS page, opened by property.html's "Generate
-  // property report" — because this module's "Property Intelligence Report" row links to
-  // dashboard.html#dashReports, i.e. to itself, which answered that click with nothing. The
-  // retired prototype did NOT come back; only the URL was reused. This module is unchanged.
-  //
-  // The flagship pick is GUARDED here. The retired prototype took projects.sort(...)[0] with
-  // no empty check and dereferenced it, which threw on the 1,959 canonical ZIPs that carry no
-  // development records (measured 2026-09-10). That code is gone for good and the in-progress
-  // page reads no project data at all; this module simply must not reproduce it.
-  var flagship = projects.slice().sort(function (a, b) {
-    return (b.impact_score || 0) - (a.impact_score || 0);
-  })[0] || null;
-  var reportRows = [
-    { icon: '⌂', t: (realHome ? realHome.address : 'This place') + ' — Property Intelligence Report',
-      d: 'Score, nearby projects, risk & value outlook', href: 'dashboard.html#dashReports' },
-    { icon: '◍', t: (c && c.zip ? c.zip : zip) + ' — Community Snapshot',
-      d: 'What\'s changing across ' + ((c && c.name) || 'this area'), href: nav('community.html', mapCtx()) }
-  ];
-  if (flagship) {
-    reportRows.push({ icon: '◈', t: flagship.name + ' — Impact Analysis',
-      d: 'Full project impact, timeline & recommended actions',
-      href: nav('development.html', { zip: zip, id: flagship.id }) });
-  }
-  reportRows.push({ icon: '✉', t: 'Your Weekly Briefing', d: 'The changes that mattered near you this week', href: 'dashboard.html#dashReports' });
-  document.getElementById('dashReports').innerHTML = reportRows.map(function (r) {
-    return '<a class="swrow swrow-link" href="' + HS.esc(r.href) + '" style="text-decoration:none">'
-      + '<div class="miniscore" style="font-size:15px">' + r.icon + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(r.t) + '</div>'
-      + '<div class="pa">' + HS.esc(r.d) + '</div></div></a>';
-  }).join('');
 });
 </script>
 </body>
