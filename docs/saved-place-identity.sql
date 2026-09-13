@@ -141,8 +141,17 @@ begin
   ------------------------------------------------- the cohort, computed IN-DB
   -- NEVER transcribed (CLAUDE.md rule 7). Partitioned BY USER, so the three
   -- legitimate cross-user repeats of the same address can never be selected.
+  -- THE KEY IS MATERIALISED ONCE, AS A COLUMN, AND EVERY LATER STEP READS THAT COLUMN.
+  -- The first version of this block re-spelled the four-part expression at each use site
+  -- and the temp table did not carry input_address, so the second spelling raised 42703
+  -- and the whole migration failed closed (correctly — nothing was written). Restating a
+  -- compound key by hand at N sites is N chances for the sites to disagree; one column is
+  -- one definition.
   create temporary table fix17_cohort on commit drop as
-  select id, user_id, address, zip, created_at,
+  select id, user_id, address, zip, input_address, created_at,
+         public.hs_premium_fold_address(address)
+           || '|' || coalesce(zip, '')
+           || '|' || public.hs_premium_fold_address(coalesce(input_address, address)) as place_key,
          row_number() over (
            partition by user_id,
                         public.hs_premium_fold_address(address),
@@ -154,10 +163,7 @@ begin
 
   select count(*) into v_excess from fix17_cohort where rn > 1;
   select count(*) into v_groups from (
-    select 1 from fix17_cohort group by user_id,
-             public.hs_premium_fold_address(address), coalesce(zip,''),
-             public.hs_premium_fold_address(coalesce(input_address, address))
-      having count(*) > 1) g;
+    select 1 from fix17_cohort group by user_id, place_key having count(*) > 1) g;
 
   -- (p3) Fail closed on the measured shape. 9 rows, 1 group, 1 excess row.
   if v_before <> 9 or v_groups <> 1 or v_excess <> 1 then

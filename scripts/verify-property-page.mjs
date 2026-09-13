@@ -116,8 +116,32 @@ ok('the served property.html still declares an honest empty-state heading',
 ok(`signed-out visitor gets that honest empty state ("${emptyHeading || '—'}")`,
   !!emptyHeading && live.text.includes(emptyHeading),
   `body began: ${live.text.slice(0, 160).replace(/\s+/g, ' ')}`);
+// COMMENTS ARE NOT PRESENTATION, AND THIS CHECK MEASURED THE WRONG THING.
+//
+// It matched the marker anywhere in page.content(), which includes inline <script> source.
+// Fix 15 (#1191) added a comment to property.html explaining that a SAMPLE address is not a
+// property — a comment whose whole point is that the persona must NOT be captured — and that
+// comment made this assertion fail. The guard is "is a fabricated home being PRESENTED", and
+// a code comment presents nothing.
+//
+// ⚠️ IT WENT UNSEEN FOR TWO HOURS BECAUSE THIS WORKFLOW RACES ITS OWN DEPLOY. Fix 15's run
+// finished 23:16:05 and its Pages deploy at 23:17:38 — 93 s later — so the green run read the
+// PREVIOUS site. The next push to touch property.html was the first to see the shipped page.
+// This is the same race the comment above §3 already records for runs #49/#50, and it means a
+// green here is only as current as the deploy behind it.
+//
+// Comments are stripped exactly as test/my-places-contract.test.mjs strips them — that file
+// already exists because three assertions in this repo went green off a comment naming the
+// very string they forbade. This is the same failure reached from the other direction.
+// ATTRIBUTES ARE STILL COVERED: stripping comments is not the same as reading rendered text,
+// so a persona in an alt=, value= or title= still fails, which is why live.html is kept.
+const stripComments = (x) => x
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+const liveNoComments = stripComments(live.html);
 for (const m of PERSONA_MARKERS) {
-  ok(`the seeded demo persona (${m}) does NOT appear`, !live.html.includes(m),
+  ok(`the seeded demo persona (${m}) does NOT appear`, !liveNoComments.includes(m),
     'a fabricated home is being presented to a signed-out visitor');
 }
 
@@ -126,7 +150,11 @@ console.log('\n4) the seed is reachable ONLY by explicit opt-in (proves §3 is n
   // If ?data=seed did NOT change anything, §3's "no persona" result would prove nothing — the
   // marker might simply never render. This is the positive control for that assertion.
   const seeded = await load(`${SITE_BASE}/property.html?data=seed`);
-  const seedShowsPersona = PERSONA_MARKERS.some((m) => seeded.html.includes(m));
+  // Compared on the SAME footing as §3 (comments stripped). If the control read raw HTML while
+  // §3 read stripped HTML, the control could pass on the comment alone and would stop proving
+  // that §3 has a real discriminator — a positive control that measures something the guarded
+  // assertion does not is not a control.
+  const seedShowsPersona = PERSONA_MARKERS.some((m) => stripComments(seeded.html).includes(m));
   ok('?data=seed DOES surface the seeded persona — so §3 tested a real discriminator',
     seedShowsPersona,
     'neither mode shows the persona, so the §3 assertion has no power; find a live seed marker and re-pin');
