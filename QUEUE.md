@@ -42,6 +42,65 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ### 2026-09-13 — ✅ FIX 17: a saved place has ONE identity, and the unit question was MEASURED
 
+**CLOSED. Merged `d7ea6c4` (#1196); all CI on that commit green** — pages · unit-tests ·
+verify-communities (39:57) · verify-alerts-page · verify-map1-card-grain ·
+verify-representative-zips. `main` tip is `534535e`, green.
+
+**Production, measured after apply (not inferred):** rows **9 → 8**, identities **8**,
+same-user duplicates **0**, cross-user repeat addresses **3/3 preserved**, dangling property
+watches **0**, archived **1** (`f3254787`, 15 fields whole; survivor `1d710257` is the OLDER
+row). Alert surface untouched: `user_subscriptions` **100**, `app_topic_prefs` **12** — and the
+founder's actual concern proven directly, **all 10 (user, community) pairs hold MULTIPLE topics,
+max 18 on one community**. Deployed `shell.js` read back through `pg_net`: md5
+`15303e9afaa17ff04f2fd3cbb1d80fa5`, **byte-identical to the merged source**.
+
+🔑 **THE INVARIANT WAS PROVEN IN ALL THREE DIRECTIONS AGAINST PRODUCTION, ROLLED BACK** — same
+identity → **REFUSED 23505**; distinct typed unit → **ALLOWED**; other user → **ALLOWED**. An
+index existing is not an index refusing; only the middle two make the first one mean something.
+
+⚠️ **THREE DEFECTS IN THIS FIX'S OWN WORK, each caught by an instrument rather than by reading:**
+1. **The in-flight guard LATCHED ON.** Released only on failure, while the success path ends in
+   `location.reload()` — so in production the stuck flag would have been invisible until a slow
+   or blocked reload left the resident unable to save anything for the life of the page. The
+   browser suite caught it in the first run. **A guard that can latch on is worse than the
+   duplicate it prevents.** Pinned on both the success path and `openHome`.
+2. **The first Part-2 migration re-spelled the four-part key at each use site** and the temp
+   cohort did not carry `input_address`, so the second spelling raised `42703`. **It failed
+   closed and wrote nothing** (verified: 9 rows, no archive, no index). The key is now
+   materialised ONCE as a `place_key` column every later step reads — one definition instead of
+   N chances to disagree.
+3. **A duplicate `saveHomeFn` declaration in `place-saved-cta.test.mjs` crashed that suite**, and
+   a crash prints **no FAIL line**. The runner said "1 test file(s) failed" while a grep for
+   `^FAIL` across the whole log returned nothing. Found only by sweeping every suite on its
+   **exit code**. This repo's own rule, hit again: attribute a red run by exit code, never by
+   absent failure text.
+
+⚠️ **LOCAL BROWSER FAILURES HERE ARE THE SANDBOX, NOT THE CHANGE — and that was proven, not
+assumed.** 57 FAIL lines across 9 suites locally (no egress to Supabase). A control run of the
+same suites in a worktree at the PR base returned **16/11/9/9/6/2/2/1 — identical, suite for
+suite**, and CI's full browser job passed on a real runner. ⚠️ The FIRST control was invalid: a
+worktree under `/tmp` cannot resolve playwright (node walks up from the file), so every suite
+reported `exit=1 FAIL=0` — a crash wearing the shape of a clean run. Put the control worktree
+where the dependency resolves, and check that it does before believing the numbers.
+
+📌 **`docs/premium-waitlist-capture.sql:84` is WRONG and is left standing** — it says
+`HS.saveHome` is "today's only writer of app_properties". There were always two;
+`saveOnboardingAddress` is the other, and its find-`isRealHome`-then-UPDATE **silently
+overwrote** a resident's existing place when they entered a different address. Its own stated
+revisit trigger ("if a second writer appears") had already fired. Both writers now share
+`savePlaceRow`. Correcting that file's comment is a separate item.
+
+📌 **Recorded, NOT taken:** the residual limit — because the typed line is part of the identity,
+one resident retyping the same house differently keeps an extra row. Closing it means capturing
+a unit COMPONENT (a field, or a designator parser), which is the product/data-model change
+decision B names. Do not close it by widening this key; that reintroduces the units-are-one-home
+assertion the measurement rules out.
+
+⚠️ **A stray remote branch `claude/fix17-verifier-repair` still exists.** Three
+`git push --delete` attempts died with "remote end hung up" and the GitHub MCP has no
+delete-branch tool. Harmless, unmerged-duplicate of `917df16`; delete by hand.
+
+
 **The defect.** `public.app_properties` was the ONLY per-user table in this schema with no
 natural-key uniqueness (`app_follows UNIQUE (user_id, target_type, target_id)`,
 `app_topic_prefs PK (user_id, category)`, `user_subscriptions UNIQUE (user_id, community_id,
