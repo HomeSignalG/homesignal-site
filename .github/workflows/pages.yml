@@ -15,9 +15,11 @@ name: pages
 # DEPLOYMENT RELIABILITY (2026-09-06). Two defects, which have to be fixed together:
 #
 #   1. The push filter named the ZIP GENERATOR's inputs while "Stage the static site"
-#      rsyncs the WHOLE repo minus .github/docs/test/node_modules into the artifact.
+#      rsynced the WHOLE repo minus .github/docs/test/node_modules into the artifact.
 #      339 of 344 shipped files - index.html, app.css, homesignalmap.html,
 #      partials/shell.html, every lib/*.js - could merge to main and never deploy.
+#      (That rsync is GONE as of Fix 19 - see "Stage the static site" below - but the
+#      push filter it motivated is still the thing keeping deploys reliable.)
 #
 #   2. `concurrency: pages-build` was ONE group shared by every run on every ref. GitHub
 #      keeps only the newest PENDING run per group, so a branch run queued behind a main
@@ -41,10 +43,11 @@ on:
   push:
     branches: [main]
     paths:
-      # Everything the artifact ships. The three negations mirror the rsync --exclude flags
-      # in "Stage the static site" below, so the trigger and the artifact cannot drift apart
-      # as the repo grows. Patterns are evaluated in order and the last match wins, so the
-      # re-included paths below survive their tree's exclusion.
+      # A deliberate SUPERSET of what the artifact ships. Since Fix 19 the artifact is an
+      # allowlist (scripts/stage_site.py), which is strictly narrower than this filter, so
+      # the trigger can only ever over-fire — it rebuilds and redeploys an identical
+      # artifact. That is the safe direction: under-firing is the Fix 18-era defect where
+      # 339 of 344 shipped files could merge to main and never deploy.
       - '**'
       - '!.github/**'
       - '!docs/**'
@@ -54,10 +57,13 @@ on:
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
+      - 'test/site-artifact-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
+      - 'scripts/stage_site.py'
+      - 'test/site-artifact-contract.test.mjs'
       - 'scripts/gen_zip_pages.py'
       - 'scripts/prove-zip-pages.mjs'
       - 'lib/community-page.js'
@@ -93,11 +99,11 @@ jobs:
 
       - name: Stage the static site
         run: |
-          mkdir -p _site
-          # everything that ships today, minus VCS/CI/dev-only trees
-          rsync -a --exclude '.git' --exclude '.github' --exclude '_site' \
-                   --exclude 'test' --exclude 'docs' --exclude 'node_modules' \
-                   ./ _site/
+          set -euo pipefail
+          # FIX 19: an ALLOWLIST, not the old six-flag rsync denylist. scripts/stage_site.py
+          # holds the artifact contract and is the only producer; a path ships only if it is
+          # named there, so internal files fail CLOSED instead of shipping by default.
+          python3 scripts/stage_site.py --src . --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
 
       - name: Generate one document per canonical ZIP
         run: |
@@ -133,6 +139,53 @@ jobs:
           git status --porcelain | grep -E '^\?\?\s+community/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
+
+      - name: Artifact contract gate (Fix 19)
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          node test/site-artifact-contract.test.mjs | tail -6
+
+      - name: Audit the REAL artifact (Fix 19)
+        # The gate above proves the producer. This proves the ARTIFACT — the actual _site
+        # tree after every build step has written into it, which is what GitHub Pages
+        # uploads. A repo-side test cannot see a later step copying something in, so the
+        # thing that ships is inspected directly rather than inferred from the thing that
+        # made it.
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          python3 - <<'PY'
+          import os, subprocess, sys
+          contract = set(subprocess.run(
+              [sys.executable, 'scripts/stage_site.py', '--src', '.', '--list-only'],
+              capture_output=True, text=True, check=True).stdout.split())
+          actual = set()
+          for root, _, files in os.walk('_site'):
+              for f in files:
+                  actual.add(os.path.relpath(os.path.join(root, f), '_site').replace(os.sep, '/'))
+          # everything the build legitimately ADDS to the staged contract
+          def generated(p):
+              return p == 'zip-pages-manifest.json' or p.startswith('community/')
+          unexpected = sorted(p for p in actual - contract if not generated(p))
+          # an empty audit is not a clean audit
+          assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
+          assert 'index.html' in actual, 'index.html absent from the real artifact'
+          print(f'artifact files: {len(actual)}  contract: {len(contract)}  '
+                f'generated: {len(actual) - len(contract)}  unexpected: {len(unexpected)}')
+          if unexpected:
+              print('UNEXPECTED FILES IN THE PUBLISHED ARTIFACT:')
+              for p in unexpected[:40]:
+                  print('   ', p)
+              sys.exit(1)
+          # and the internal families, named, against the real tree
+          for bad in ('CLAUDE.md', 'QUEUE.md', 'PLAN.md', 'DECISIONS.md', 'PROGRESS.md', '.gitignore'):
+              assert bad not in actual, f'{bad} is in the published artifact'
+          for tree in ('scripts/', 'verify/', 'fixtures/', 'supabase/', 'data/', '.claude/', 'docs/', 'test/'):
+              hit = [p for p in actual if p.startswith(tree)]
+              assert not hit, f'{tree} shipped: {hit[:5]}'
+          print('ARTIFACT AUDIT OK — the published tree is the contract plus generated ZIP documents')
+          PY
 
       - name: Confirm no generated HTML is tracked by git
         run: |
