@@ -122,7 +122,9 @@ const AGG_LINK_TOKEN = /<a\b|href|pageHref\(|location\.(?:href|assign)|window\.o
 const aggregateDestinations = [];
 {
   const surface = dash + '\n' + aggSrc;
-  const re = /View all/g;
+  // Both approved expansion labels as they appear in SOURCE: `'View all ' + total +
+  // ' changes'` and `'View ' + hidden + ' more changes'` (#1209 added the second).
+  const re = /View all|more changes/g;
   let m;
   while ((m = re.exec(surface)) !== null) {
     const win = surface.slice(Math.max(0, m.index - 200), m.index + 200);
@@ -130,7 +132,7 @@ const aggregateDestinations = [];
   }
 }
 ok(aggregateDestinations.length === 0,
-  'Fix 8 no aggregate destination renders — the Fix 8K "View all" control is an in-place button, never a link',
+  'Fix 8 no aggregate destination renders — BOTH Fix 8K expansion labels are in-place button text, never a link',
   aggregateDestinations[0]);
 // "Not a link" is also satisfied by no control existing at all, so the approved shape is
 // pinned positively alongside it.
@@ -138,6 +140,9 @@ ok(/toggleBtn = document\.createElement\('button'\);/.test(dash)
   && /toggleBtn\.type = 'button';/.test(dash)
   && !/toggleBtn\.href/.test(dash),
   'Fix 8K the approved expander is a <button type="button"> with no href');
+ok(/'View all ' \+ total \+ ' changes/.test(aggSrc)
+  && /'View ' \+ hidden \+ ' more changes/.test(aggSrc),
+  'Fix 8K both approved expansion labels are built as plain strings, not routes');
 
 // ---- the two rail CTAs route to the EXISTING surfaces ---------------------------------
 ok(/href="properties\.html"/.test(dash) && /Manage &rarr;/.test(dash),
