@@ -690,20 +690,33 @@ const ids = (list) => list.map((r) => r.id).join(',');
 // must drop it entirely rather than qualify it.
 {
   const v = A.changesPreview(mk(40), { countKnown: false });
-  ok(v.expandLabel === 'View more changes →',
-    '12o C7 unknown completeness -> the conservative label', v.expandLabel);
-  ok(!/\d/.test(v.expandLabel),
-    '12p C7 ...carrying NO numeral, so no false total is implied', v.expandLabel);
+  // 12p USED TO ASSERT THE LABEL CARRIED NO NUMERAL AT ALL. That pin encoded the reasoning
+  // that any digit implies a total we cannot support — true of `total`, false of
+  // `hiddenCount`, which is arithmetic over what we already hold. The numeral is back, and
+  // the assertions below are what keep it honest: it must equal hiddenCount exactly, and it
+  // must never be the total or carry the word "all".
+  ok(v.expandLabel === 'View 32 more changes →',
+    '12o C7 unknown completeness -> the hidden count, not the total', v.expandLabel);
+  ok(v.hiddenCount === 32 && v.expandLabel.indexOf(String(v.hiddenCount)) > 0,
+    '12p C7 ...and the numeral IS hiddenCount', { label: v.expandLabel, hidden: v.hiddenCount });
+  ok(!/\ball\b/.test(v.expandLabel) && v.expandLabel.indexOf(String(v.total)) < 0,
+    '12p C7 ...never the total, and never the word "all"', { label: v.expandLabel, total: v.total });
+  ok(A.changesPreview(mk(9), { countKnown: false }).expandLabel === 'View 1 more changes →',
+    '12p C7 ...down to a single hidden record');
   ok(v.visible.length === 8 && v.hasControl === true,
     '12q C7 ...while still bounding the preview and offering expansion', v.visible.length);
 }
 // Fail-safe: a caller that omits countKnown gets the modest label, never the confident one.
 {
+  // Asserted against the UNKNOWN label rather than against "carries no digits": both
+  // branches carry a numeral now, so the fail-closed property is that a missing or
+  // non-boolean countKnown yields the HIDDEN count and never the total.
   const v = A.changesPreview(mk(40), {});
-  ok(v.expandLabel === 'View more changes →',
+  ok(v.expandLabel === 'View 32 more changes →',
     '12r C7 an ABSENT countKnown is treated as unknown, never as complete', v.expandLabel);
-  ok(A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel === 'View more changes →',
-    '12s C7 ...and only a strict boolean true unlocks the numeral');
+  ok(A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel === 'View 32 more changes →',
+    '12s C7 ...and only a strict boolean true unlocks the TOTAL', 
+    A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel);
 }
 
 // ---- C(page). THE FOUR COMPLETENESS SIGNALS ARE ALL WIRED ---------------------------
