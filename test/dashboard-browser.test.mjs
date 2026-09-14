@@ -321,6 +321,230 @@ ok(page.url().indexOf('homesignalmap.html') >= 0, 'the retired map URL forwards 
 ok(page.url().indexOf('zip=78617') >= 0, 'the forward preserves the ZIP from the old URL');
 ok(await page.locator('#map, #mapInner').count() >= 1, 'the primary map renders its map surface');
 
+// ═══ FIX 8I. The header is the SHARED page-header system, measured against Alerts ═══
+// "Visually consistent with ALERTS" is only a claim until the two are read out of the SAME
+// browser and compared property by property. A local near-match in dashboard.html would look
+// right in a screenshot and drift the next time app.css moves — so the reference page is
+// loaded here and its computed values ARE the expectation, rather than hard-coded pixels.
+const HEADER = (sel) => {
+  const el = document.querySelector(sel);
+  if (!el) return null;
+  const c = getComputedStyle(el);
+  return { text: el.innerText.trim(), tag: el.tagName,
+    fs: c.fontSize, fw: c.fontWeight, ls: c.letterSpacing, tt: c.textTransform,
+    color: c.color, ff: c.fontFamily, lh: c.lineHeight, margin: c.margin };
+};
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+await page.waitForSelector('.ph h1', { timeout: 30000 });
+const ref = await page.evaluate((fn) => ({
+  eyebrow: new Function('sel', 'return (' + fn + ')(sel)')('.ph .eyebrow'),
+  h1: new Function('sel', 'return (' + fn + ')(sel)')('.ph h1')
+}), HEADER.toString());
+ok(ref.eyebrow && ref.eyebrow.text === 'ALERTS' && ref.h1 && ref.h1.tag === 'H1',
+  'Fix 8I reference header read from alerts.html', ref);
+
+// Every supported viewport, because a header that only holds at 1440 is not a header contract.
+for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['mobile', 390, 844]]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+  await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+  const got = await page.evaluate((fn) => {
+    const read = new Function('sel', 'return (' + fn + ')(sel)');
+    const r = (s) => { const e = document.querySelector(s); if (!e) return null;
+      const b = e.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y),
+        w: Math.round(b.width), h: Math.round(b.height) }; };
+    return {
+      eyebrow: read('.dashhead .eyebrow'), h1: read('#dashSub'),
+      h1Count: document.querySelectorAll('h1').length,
+      dashboardH1: [...document.querySelectorAll('h1')].filter((x) => x.innerText.trim() === 'Dashboard').length,
+      countN: (document.getElementById('dashCountN') || {}).textContent,
+      countLbl: (document.getElementById('dashCountLbl') || {}).textContent,
+      countVisible: !document.getElementById('dashCount').hidden,
+      rects: { eyebrow: r('.dashhead .eyebrow'), h1: r('#dashSub'), dhl: r('.dhl'), count: r('#dashCount') },
+      scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth,
+      main: [...document.querySelectorAll('.cols > div:first-child h2, .cols > div:first-child .p2h')]
+        .map((x) => x.innerText.trim()),
+      rail: [...document.querySelectorAll('.cols > div:last-child h2, .cols > div:last-child .p2h')]
+        .map((x) => x.innerText.trim())
+    };
+  }, HEADER.toString());
+
+  // 1. DASHBOARD is the small uppercase green eyebrow — byte-identical to ALERTS' own.
+  ok(got.eyebrow && got.eyebrow.text === 'DASHBOARD' && got.eyebrow.tag === 'DIV',
+    'Fix 8I [' + label + '] the label renders as uppercase DASHBOARD, not a heading', got.eyebrow);
+  for (const p of ['fs', 'fw', 'ls', 'tt', 'color', 'ff'])
+    ok(got.eyebrow && got.eyebrow[p] === ref.eyebrow[p],
+      'Fix 8I [' + label + '] eyebrow ' + p + ' matches ALERTS (' + ref.eyebrow[p] + ')',
+      got.eyebrow && got.eyebrow[p]);
+
+  // 2/3. The resident question is the primary h1; "Dashboard" is no longer one.
+  ok(got.h1 && got.h1.tag === 'H1' && /^What’s changing across/.test(got.h1.text),
+    'Fix 8I [' + label + '] the question is the primary <h1>', got.h1 && got.h1.text);
+  ok(got.dashboardH1 === 0, 'Fix 8I [' + label + '] no <h1> reads "Dashboard"', got.dashboardH1);
+  ok(got.h1Count === 1, 'Fix 8I [' + label + '] exactly one <h1> on the page', got.h1Count);
+  for (const p of ['fs', 'fw', 'ls', 'color', 'ff', 'margin'])
+    ok(got.h1 && got.h1[p] === ref.h1[p],
+      'Fix 8I [' + label + '] headline ' + p + ' matches ALERTS (' + ref.h1[p] + ')',
+      got.h1 && got.h1[p]);
+
+  // 4/5. GRAMMAR IS ASSERTED AGAINST THE RENDERED COUNT, not against a fixture the page
+  // cannot see. Whatever N the fixture produces, the sentence must agree with it — which is
+  // what makes this a contract rather than a snapshot.
+  const n = Number(got.countN);
+  ok(got.countVisible && Number.isFinite(n) && n >= 0,
+    'Fix 8I [' + label + '] the monitored-place count still renders', got.countN);
+  if (n === 1) {
+    ok(got.h1.text === 'What’s changing across your monitored place?',
+      'Fix 8I [' + label + '] N=1 drops the numeral', got.h1.text);
+    ok(got.countLbl === 'Monitored place', 'Fix 8I [' + label + '] N=1 count label is singular');
+  } else if (n > 1) {
+    ok(got.h1.text === 'What’s changing across your ' + n + ' monitored places?',
+      'Fix 8I [' + label + '] N>1 carries the count and the plural', got.h1.text);
+    ok(got.countLbl === 'Monitored places', 'Fix 8I [' + label + '] N>1 count label is plural');
+  }
+  ok(!/your 1 monitored place\b/.test(got.h1.text),
+    'Fix 8I [' + label + '] "your 1 monitored place" never renders', got.h1.text);
+
+  // 6. Layout: the count block sits beside the header without colliding, and nothing scrolls.
+  ok(got.rects.count && got.rects.dhl
+    && (got.rects.count.x >= got.rects.dhl.x + got.rects.dhl.w - 1
+        || got.rects.count.y >= got.rects.dhl.y + got.rects.dhl.h - 1),
+    'Fix 8I [' + label + '] the count block clears the header column (beside it or below it)',
+    got.rects);
+  ok(got.scrollW <= got.clientW,
+    'Fix 8I [' + label + '] no horizontal scroll', { scrollW: got.scrollW, clientW: got.clientW });
+
+  // 8. Section order is untouched by a presentation-only change.
+  ok(got.main.join(' | ') === "What’s Changing? | QUALITY-OF-LIFE IMPACT · PREMIUM | Official Dates to Know",
+    'Fix 8I [' + label + '] main column order unchanged', got.main);
+  ok(got.rail.join(' | ') === 'Your Places | Stay Informed',
+    'Fix 8I [' + label + '] right rail order unchanged', got.rail);
+}
+
+// 4 (singular), exercised deliberately. The shared fixture seeds two ZIPs, so the N=1 branch
+// above would otherwise never run — and a branch that is never reached is not tested.
+{
+  const one = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await one.addInitScript(() => {
+    try {
+      localStorage.setItem('hs:myCommunities', JSON.stringify([{ zip: '78617', name: 'Del Valle (78617)', state: 'TX' }]));
+    } catch (e) { /* a blocked storage write must not abort the run */ }
+  });
+  const p1 = await one.newPage();
+  await p1.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+  await p1.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+  const single = await p1.evaluate(() => ({
+    n: (document.getElementById('dashCountN') || {}).textContent,
+    lbl: (document.getElementById('dashCountLbl') || {}).textContent,
+    h1: (document.getElementById('dashSub') || {}).textContent
+  }));
+  if (Number(single.n) === 1) {
+    ok(single.h1 === 'What’s changing across your monitored place?',
+      'Fix 8I singular headline drops the numeral', single);
+    ok(single.lbl === 'Monitored place', 'Fix 8I singular count label', single.lbl);
+  } else {
+    console.log('SKIP — Fix 8I singular branch: the one-ZIP fixture rendered N=' + single.n
+      + ' (seed mode may contribute a saved Address), so N=1 was not reachable here. '
+      + 'The branch is pinned structurally in test/dashboard-all-places.test.mjs §10h.');
+  }
+  await one.close();
+}
+
+// ═══ FIX 8G. Monitored-ZIP attribution, in a real browser ═══
+// The seed backend only serves records for ONE ZIP, so a genuinely multi-ZIP ROW cannot be
+// rendered from fixtures. Rather than fabricate one, the cap/grammar/order are driven through
+// the SHIPPED module inside the page (page.evaluate on window.HS.dashAgg) — real code, real
+// browser — while the DOM assertions below cover what only a rendered page can show.
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+
+const g = await page.evaluate(() => {
+  const A = window.HS && window.HS.dashAgg;
+  if (!A) return { missing: true };
+  const meta = {
+    '78617': { zip: '78617', name: 'Del Valle (78617)', state: 'TX' },
+    '78657': { zip: '78657', name: 'Horseshoe Bay (78657)', state: 'TX' },
+    '75009': { zip: '75009', name: 'Celina (75009)', state: 'TX' }
+  };
+  const zips = ['78617', '78657', '75009'];
+  const map = A.buildZipLabelMap(zips, meta, []);
+  const one = { sourceZips: ['78617'] };
+  const three = { sourceZips: ['78617', '78657', '75009'] };
+  const outside = { sourceZips: ['73301'] };
+  return {
+    label: map['75009'],
+    wide1: A.monitoredZipAttribution(one, zips, map, { maxLabels: 2 }).summaryText,
+    wide3: A.monitoredZipAttribution(three, zips, map, { maxLabels: 2 }).summaryText,
+    narrow3: A.monitoredZipAttribution(three, zips, map, { maxLabels: 1 }).summaryText,
+    outside: A.monitoredZipAttribution(outside, zips, map, { maxLabels: 2 }).summaryText
+  };
+});
+ok(!g.missing, 'Fix 8G the view-model is exposed on window.HS.dashAgg in the browser');
+ok(g.label === 'Celina · ZIP 75009', 'Fix 8G the own-ZIP parenthetical is stripped in-browser too', g.label);
+ok(g.wide1 === 'Del Valle · ZIP 78617', 'Fix 8G one monitored ZIP names it', g.wide1);
+ok(g.wide3 === 'Celina · ZIP 75009 · Del Valle · ZIP 78617 · +1 more monitored ZIP',
+  'Fix 8G wide cap = 2 labels + singular overflow', g.wide3);
+ok(g.narrow3 === 'Celina · ZIP 75009 · +2 more monitored ZIPs',
+  'Fix 8G narrow cap = 1 label + plural overflow', g.narrow3);
+ok(g.outside === '', 'Fix 8G a ZIP outside the monitored set renders nothing', g.outside);
+
+// 15 + 16: the viewed place and the legacy ?zip= cannot change what is attributed. Three
+// loads whose only difference is the viewed geography must render byte-identical attribution.
+const attrTextAt = async (url, seedViewZip) => {
+  if (seedViewZip) await page.evaluate((z) => { try { sessionStorage.setItem('hs:viewZip', z); } catch (e) {} }, seedViewZip);
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.waitForSelector('#dashChanging .crow, #dashChanging p', { timeout: 30000 });
+  return page.evaluate(() => [...document.querySelectorAll('#dashChanging .crow .mzip-wide, #dashDates .drow .mzip-wide')]
+    .map((e) => e.textContent.trim()).join(' | '));
+};
+const attrA = await attrTextAt(base + '/dashboard.html?data=seed&zip=78617');
+const attrB = await attrTextAt(base + '/dashboard.html?data=seed&zip=90210');
+const attrC = await attrTextAt(base + '/dashboard.html?data=seed', '90210');
+ok(attrA === attrB, 'Fix 8G [15/16] legacy ?zip= cannot change the visible ZIP labels or order',
+  { withSeedZip: attrA.slice(0, 120), withOtherZip: attrB.slice(0, 120) });
+ok(attrA === attrC, 'Fix 8G [15] a viewed ZIP in sessionStorage cannot change them either',
+  { base: attrA.slice(0, 120), viewed: attrC.slice(0, 120) });
+ok(!/Coomes|COOMES/i.test(attrA), 'Fix 8G [A4] no saved street address renders in attribution', attrA.slice(0, 160));
+ok(!/Affects \d+ of your places/.test(attrA), 'Fix 8G [19] "Affects N of your places" is gone from the rendered page', attrA.slice(0, 160));
+
+// 20 + 21 + 22 + 23: exactly one variant is visible per viewport, it is readable text, it is
+// not interactive, and nothing scrolls sideways.
+for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['mobile', 390, 844]]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+  await page.waitForSelector('#dashChanging .crow, #dashChanging p', { timeout: 30000 });
+  const v = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#dashChanging .crow, #dashDates .drow')];
+    const per = rows.map((r) => {
+      const vis = [...r.querySelectorAll('.mzip')].filter((e) => e.offsetParent !== null || getComputedStyle(e).display !== 'none');
+      return { n: vis.length, text: vis.map((e) => e.textContent.trim()).join(''),
+        cls: vis.map((e) => e.className).join(',') };
+    });
+    return { rows: rows.length, per,
+      interactive: document.querySelectorAll('.mzip a, .mzip button, .mzip[role], .mzip[tabindex]').length,
+      scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth };
+  });
+  ok(v.rows > 0, 'Fix 8G [' + label + '] the briefing rendered rows to attribute', v.rows);
+  ok(v.per.every((p) => p.n === 1), 'Fix 8G [' + label + '] exactly ONE variant is visible per row',
+    v.per.slice(0, 3));
+  ok(v.per.every((p) => p.cls === (w <= 900 ? 'mzip mzip-narrow' : 'mzip mzip-wide')),
+    'Fix 8G [' + label + '] the 900px breakpoint picks the right variant', v.per.slice(0, 2));
+  ok(v.per.every((p) => p.text.length > 0), 'Fix 8G [' + label + '] [23] it is visible readable text',
+    v.per.slice(0, 2));
+  ok(v.interactive === 0, 'Fix 8G [' + label + '] [22] attribution is non-interactive', v.interactive);
+  ok(v.scrollW <= v.clientW, 'Fix 8G [' + label + '] [21] no horizontal scroll',
+    { scrollW: v.scrollW, clientW: v.clientW });
+}
+
+// 24 + 27: CTA routing and the Premium card are untouched by an attribution change.
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+await page.waitForSelector('#dashChanging .crow a.cgo', { timeout: 30000 });
+for (const href of await page.locator('#dashChanging .crow a.cgo').evaluateAll((a) => a.map((x) => x.getAttribute('href'))))
+  assertHref('Fix 8G [24] record CTA', href, {});
+ok(await page.locator('#dashQolLabel').count() === 1, 'Fix 8G [27] the Premium card still renders');
+
 } finally {
   await browser.close();
   srv.close();

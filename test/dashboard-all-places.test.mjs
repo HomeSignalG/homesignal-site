@@ -366,5 +366,249 @@ ok(!/Recent updates across all your monitored places/.test(dash),
   '9b ...and the "Recent" form is absent, because no audited definition backs it');
 ok(!/\bNEW\b|badge-new|isNew\(/.test(dash), '9c no fabricated "new" count or badge renders');
 
+// =====================================================================================
+console.log('\n--- §10 FIX 8I the header is the SHARED page-header system ------------------');
+// =====================================================================================
+// The Dashboard was the one page not using app.css's .ph .eyebrow / .ph h1 — it rendered
+// "Dashboard" as the large black h1 and demoted the resident's question to grey body copy.
+// These are composition facts that live in the page, so they are grepped, not driven.
+//
+// ⚠️ `dash` is COMMENT-STRIPPED (see strip() above) and that is load-bearing here: the
+// markup comment added with this change explains the absence of a "Dashboard" h1 by naming
+// it, and an HTML comment must never be able to satisfy — or fail — a check about markup.
+
+const dashRaw = read('dashboard.html');
+ok(/<div class="eyebrow">Dashboard<\/div>/.test(dash),
+  '10a DASHBOARD renders through the shared .ph .eyebrow, exactly as Alerts writes "Alerts"');
+ok(/<h1 id="dashSub"><\/h1>/.test(dash),
+  '10b ...and #dashSub is the primary <h1>, so the resident QUESTION is the headline');
+ok(!/<h1[^>]*>Dashboard<\/h1>/.test(dash),
+  '10c ...and no <h1> reads "Dashboard" — the large black treatment is gone',
+  (dash.match(/<h1[^>]*>Dashboard<\/h1>/) || [])[0]);
+ok(!/<p id="dashSub"/.test(dash),
+  '10d ...and the question is no longer a <p>');
+
+// REUSE, NOT A NEAR-MATCH. The whole point of Fix 8I is that app.css already ships this
+// component; a local font-size/colour/letter-spacing here would be a second implementation
+// that silently drifts from Alerts and Development the next time app.css moves.
+const dashCss = (dashRaw.match(/<style[\s\S]*?<\/style>/g) || []).join('\n');
+ok(!/\.eyebrow\s*\{/.test(dashCss) && !/h1\s*\{/.test(dashCss) && !/\.ph\s+h1/.test(dashCss),
+  '10e dashboard.html declares NO local eyebrow/h1 typography — app.css .ph is reused');
+ok(!/<h1[^>]*style=/.test(dash),
+  '10f ...and the h1 carries no inline style, so .ph h1 governs its margin rhythm',
+  (dash.match(/<h1[^>]*style=[^>]*>/) || [])[0]);
+
+// The right-hand summary is preserved verbatim — Fix 8I changes the left column only.
+ok(/id="dashCountN"/.test(dash) && /id="dashCountLbl"/.test(dash)
+  && /Tracking development, government notices, meetings, and local news/.test(dash),
+  '10g the monitored-place count and its supporting copy are untouched');
+
+// GRAMMAR. Singular drops the numeral; "your 1 monitored place" is the shape a naive
+// count-plus-plural expression produces and it reads as a system report, not a sentence.
+ok(/What’s changing across your monitored place\?/.test(dash),
+  '10h N = 1 reads "your monitored place" — no numeral');
+ok(/What’s changing across your ' \+ placeCount \+ ' monitored places\?/.test(dash),
+  '10i N > 1 carries the count and the plural');
+ok(/What’s changing across the places you monitor\?/.test(dash),
+  '10j N = 0 keeps its existing honest copy');
+ok(!/' monitored place' \+ \(placeCount === 1 \? '' : 's'\)/.test(dash),
+  '10k ...and the old count-plus-plural expression, which produced "your 1 monitored place", is gone');
+
+// The removals Fix 8 made stay removed — a header change must not be a door back in.
+for (const gone of ['dashStrip', 'dashMapLink', 'Welcome back', 'Good morning'])
+  ok(!new RegExp(gone).test(dash), '10l no ' + gone + ' returns with the header change');
+
+// =====================================================================================
+console.log('\n--- §11 FIX 8G explicit monitored-ZIP attribution ---------------------------');
+// =====================================================================================
+// "Affects 2 of your places" was AMBIGUOUS across the one distinction that matters, and the
+// ambiguity was live on production: a record related to ONE monitored ZIP read identically
+// to a record reaching TWO. Attribution is now derived from the record's own canonical ZIPs
+// intersected with the resident's monitored ZIPs — never from places.length, never from an
+// address, never from the viewed place.
+
+const G_PROPS = [{ id: 'p1', address: '13133 Coomes Dr', city: 'Del Valle', state: 'TX', zip: '78617' }];
+const G_ZIPS = [
+  { zip: '78617', name: 'Del Valle (78617)', state: 'TX' },
+  { zip: '78657', name: 'Horseshoe Bay (78657)', state: 'TX' },
+  { zip: '75009', name: 'Celina (75009)', state: 'TX' }
+];
+const G_META = {
+  '78617': { zip: '78617', name: 'Del Valle (78617)', county: 'Travis', state: 'TX' },
+  '78657': { zip: '78657', name: 'Horseshoe Bay (78657)', county: 'Llano', state: 'TX' },
+  '75009': { zip: '75009', name: 'Celina (75009)', county: 'Collin', state: 'TX' }
+};
+const gPlaces = A.canonicalPlaces({ properties: G_PROPS, followedZips: G_ZIPS });
+const gZips = A.queryZips(gPlaces, A.MAX_QUERY_ZIPS);
+const gMap = A.buildZipLabelMap(gZips, G_META, gPlaces);
+const WIDE = { maxLabels: A.ATTRIBUTION_MAX_LABELS_WIDE };
+const NARROW = { maxLabels: A.ATTRIBUTION_MAX_LABELS_NARROW };
+const attr = (item, opts) => A.monitoredZipAttribution(item, gZips, gMap, opts || WIDE);
+const gBase = { source_ref: 'https://gov/a', title: 'Notice of public hearing',
+  occurred_at: '2026-09-10', category: 'Government & civic' };
+
+// §2D LABEL NORMALIZATION. Measured over all 12,722 app_community_meta rows: 12,703 names
+// end with " (<their own ZIP>)" and the parenthesised ZIP matches on all 12,703 (0 mismatch);
+// the 19 exceptions are the Box Elder / Utah County pilot ZIPs, bare place names. Without the
+// strip, 99.85% of ZIPs would print the ZIP twice in two notations.
+ok(gMap['75009'] === 'Celina · ZIP 75009', '11a the own-ZIP parenthetical is stripped once', gMap['75009']);
+ok(!/\(75009\)/.test(gMap['75009']), '11b ...so the ZIP is never printed twice', gMap['75009']);
+ok(A.buildZipLabelMap(['84301'], { '84301': { name: 'Bear River City' } }, [])['84301']
+  === 'Bear River City · ZIP 84301', '11c a name with NO parenthetical is left alone');
+ok(A.stripOwnZipSuffix('Somewhere (99999)', '78617') === 'Somewhere (99999)',
+  '11d a parenthetical that is NOT this row\'s ZIP is NOT stripped — normalization, not a guess');
+// §4 precedence: server first, store second, ZIP third.
+ok(A.buildZipLabelMap(['78617'], { '78617': { name: 'Server Name (78617)' } },
+  [{ kind: 'zip', zip: '78617', label: 'Store Name' }])['78617'] === 'Server Name · ZIP 78617',
+  '11e app_community_meta.name WINS over local storage');
+ok(A.buildZipLabelMap(['78617'], {}, [{ kind: 'zip', zip: '78617', label: 'Store Name' }])['78617']
+  === 'Store Name · ZIP 78617', '11f ...and the store name is used when the server has none');
+ok(A.buildZipLabelMap(['78617'], {}, [{ kind: 'zip', zip: '78617', label: 'ZIP 78617' }])['78617']
+  === 'ZIP 78617', '11g canonicalPlaces\' own "ZIP <zip>" default is an ABSENCE, never a name');
+
+// ---- A. ZIP-ONLY TRUTHFULNESS -------------------------------------------------------
+// 1 + 2: ONE monitored ZIP that ALSO contains a saved address is still ONE relationship.
+const a1 = A.dedupeChanges([Object.assign({ id: 'c1', zip: '78617',
+  places: A.placesForZip(gPlaces, '78617') }, gBase)])[0];
+ok(a1.places.length === 2, '11h (control) the ZIP+address overlap really is 2 Places', a1.places.length);
+ok(attr(a1).summaryText === 'Del Valle · ZIP 78617',
+  '11i A1/A2 a ZIP-level record names its ONE monitored ZIP, overlap or not', attr(a1).summaryText);
+ok(attr(a1).affectedMonitoredZips.length === 1,
+  '11j ...and reports ONE affected monitored ZIP, not two', attr(a1).affectedMonitoredZips);
+// 3: a resident who saved ONLY an address in that ZIP still gets ZIP context, not the street.
+const addrOnly = A.canonicalPlaces({ properties: G_PROPS, followedZips: [] });
+const a3 = A.monitoredZipAttribution({ zip: '78617' }, A.queryZips(addrOnly),
+  A.buildZipLabelMap(A.queryZips(addrOnly), G_META, addrOnly), WIDE);
+ok(a3.summaryText === 'Del Valle · ZIP 78617',
+  '11k A3 address-only membership still yields ZIP context', a3.summaryText);
+// 4: no saved street address appears anywhere in attribution output.
+const everyText = [attr(a1), a3, attr({ zip: '75009' })]
+  .map((r) => JSON.stringify(r)).join(' ');
+ok(!/Coomes/i.test(everyText), '11l A4 no saved street address appears in attribution', everyText.slice(0, 160));
+
+// ---- B. MULTIPLE-ZIP ATTRIBUTION ----------------------------------------------------
+// 5: two monitored ZIPs -> both labels, deterministic order.
+const b2 = A.dedupeChanges([
+  Object.assign({ id: 'c2a', zip: '78657', places: A.placesForZip(gPlaces, '78657') }, gBase),
+  Object.assign({ id: 'c2b', zip: '75009', places: A.placesForZip(gPlaces, '75009') }, gBase)
+])[0];
+ok(b2.sourceZips.length === 2, '11m dedupeChanges accumulates BOTH source ZIPs', b2.sourceZips);
+ok(attr(b2).summaryText === 'Celina · ZIP 75009 · Horseshoe Bay · ZIP 78657',
+  '11n B5 both labels render, sorted by locality then ZIP', attr(b2).summaryText);
+// 6 + 7: three ZIPs -> wide 2 + "+1 more monitored ZIP"; narrow 1 + "+2 more monitored ZIPs".
+const b3 = A.dedupeChanges([
+  Object.assign({ id: 'c3a', zip: '78617', places: A.placesForZip(gPlaces, '78617') }, gBase),
+  Object.assign({ id: 'c3b', zip: '78657', places: A.placesForZip(gPlaces, '78657') }, gBase),
+  Object.assign({ id: 'c3c', zip: '75009', places: A.placesForZip(gPlaces, '75009') }, gBase)
+])[0];
+ok(attr(b3, WIDE).summaryText === 'Celina · ZIP 75009 · Del Valle · ZIP 78617 · +1 more monitored ZIP',
+  '11o B6 wide: two labels + singular overflow', attr(b3, WIDE).summaryText);
+ok(attr(b3, NARROW).summaryText === 'Celina · ZIP 75009 · +2 more monitored ZIPs',
+  '11p B6 narrow: one label + plural overflow', attr(b3, NARROW).summaryText);
+ok(attr(b3, WIDE).overflowCount === 1 && attr(b3, NARROW).overflowCount === 2,
+  '11q B7 overflow counts are the remainder, not the total');
+ok(/\+1 more monitored ZIP$/.test(attr(b3, WIDE).summaryText)
+  && /\+2 more monitored ZIPs$/.test(attr(b3, NARROW).summaryText),
+  '11r B7 singular/plural overflow grammar');
+// 8 + 9: a county record touching ZIPs the resident does NOT monitor names only the overlap.
+const county = { id: 'cty', zip: '78617',
+  sourceZips: ['78617', '73301', '78702', '78610', '75009'] };
+ok(attr(county, WIDE).affectedMonitoredZips.join(',') === '75009,78617',
+  '11s B8 only the intersection with monitored ZIPs is attributed', attr(county, WIDE).affectedMonitoredZips);
+ok(!/73301|78702|78610/.test(attr(county, WIDE).summaryText),
+  '11t B9 a source ZIP outside the monitored set never renders', attr(county, WIDE).summaryText);
+// 10: repeated ZIPs in a meeting's zips[] cannot become duplicate labels.
+const dupMtg = A.officialDateItems({ todayYmd: '2026-09-13', changes: [],
+  meetings: [{ id: 'm1', title: 'Commissioners Court', meeting_date: '2026-09-20T06:00:00+00:00',
+    zips: ['78617', '78617', '78617'], source_url: 'https://gov/m1' }] })[0];
+ok(dupMtg.sourceZips.length === 1, '11u B10 repeated meeting ZIPs dedupe before labelling', dupMtg.sourceZips);
+ok(attr(dupMtg, WIDE).summaryText === 'Del Valle · ZIP 78617',
+  '11v ...so one ZIP yields one label', attr(dupMtg, WIDE).summaryText);
+
+// ---- C. DEDUPLICATION / ORDER -------------------------------------------------------
+// 11: the complete canonical source ZIP set survives even when labels are capped.
+ok(attr(b3, NARROW).affectedMonitoredZips.length === 3,
+  '11w C11 all three ZIPs are preserved though only one label is visible',
+  attr(b3, NARROW).affectedMonitoredZips);
+// 12: ZIP/address overlap does not inflate the attribution count.
+ok(attr(a1).affectedMonitoredZips.length === 1 && a1.placeCount === 2,
+  '11x C12 placeCount 2 but attribution 1 — the count no longer drives geography');
+// 13: identity is UNCHANGED — same source_ref, different date, still two records.
+const distinct = A.dedupeChanges([
+  Object.assign({ id: 'd1', zip: '78617', places: [] }, gBase),
+  Object.assign({ id: 'd2', zip: '78617', places: [] }, gBase, { occurred_at: '2026-08-01' })
+]);
+ok(distinct.length === 2, '11y C13 same source_ref on a different date stays DISTINCT', distinct.length);
+// 14: order is stable regardless of the order the sources responded in.
+const rev = A.dedupeChanges([
+  Object.assign({ id: 'c3c', zip: '75009', places: [] }, gBase),
+  Object.assign({ id: 'c3b', zip: '78657', places: [] }, gBase),
+  Object.assign({ id: 'c3a', zip: '78617', places: [] }, gBase)
+])[0];
+ok(attr(rev, WIDE).summaryText === attr(b3, WIDE).summaryText,
+  '11z C14 label order is identical when the response order is reversed', attr(rev, WIDE).summaryText);
+// ⚠️ 11z alone does NOT isolate the attribution sort: dedupeChanges already normalizes row
+// order through compareForDedupe, so both inputs reach attribution identically. Feed the ZIP
+// list DIRECTLY, in three different arrival orders, to pin the sort itself.
+const orders = [['78617', '78657', '75009'], ['75009', '78617', '78657'], ['78657', '75009', '78617']]
+  .map((z) => attr({ id: 'o', sourceZips: z }, WIDE).affectedMonitoredZips.join(','));
+ok(orders[0] === '75009,78617,78657' && orders[1] === orders[0] && orders[2] === orders[0],
+  '11z2 C14 the ORDER is sorted by locality label then ZIP, whatever order the ZIPs arrive in', orders);
+// §5 explicitly forbids follow-creation order, which is the ONLY order the repo actually has
+// (canonicalPlaces preserves input order; the ZIP input is the hs:myCommunities array).
+ok(orders[0] !== gZips.join(','),
+  '11z3 ...and it is NOT the resident\'s follow order', { sorted: orders[0], followOrder: gZips.join(',') });
+
+// ---- D. FALLBACK LADDER (active: 1 -> 2 -> 4 -> 5; rung 3 is unreachable) ------------
+// 17: no locality name -> "ZIP <zip>".
+const noName = A.monitoredZipAttribution({ zip: '78617' }, ['78617'],
+  A.buildZipLabelMap(['78617'], {}, []), WIDE);
+ok(noName.summaryText === 'ZIP 78617' && noName.fallbackKind === 'zip_only',
+  '11aa D17 rung 2 — no locality name renders "ZIP 78617"', noName);
+ok(attr(a1).fallbackKind === 'canonical_monitored_zip', '11ab rung 1 is the labelled case');
+// 18: authoritative reach but NO displayable ZIP -> the approved truthful fallback.
+const unl = attr({ id: 'x', sourceZips: [] }, WIDE);
+ok(unl.fallbackKind === 'relevant_unlabelled' && unl.summaryText === A.ATTRIBUTION_UNLABELLED,
+  '11ac D18 rung 4 — "Relevant to a monitored ZIP" when no ZIP is displayable', unl);
+// ...and a record whose ZIPs are ALL outside the monitored set is OMITTED, never claimed.
+const outside = attr({ id: 'y', sourceZips: ['73301', '78702'] }, WIDE);
+ok(outside.fallbackKind === 'none' && outside.summaryText === '',
+  '11ad D18 rung 5 — ZIPs entirely outside the monitored set omit attribution', outside);
+// 19: the ambiguous string is gone from BOTH sections, and from the view-model.
+ok(!/Affects \d| of your places|Affects ' \+/.test(dash),
+  '11ae D19 no "Affects N of your places" remains in dashboard.html',
+  (dash.match(/.{0,60}of your places.{0,60}/) || [])[0]);
+ok(!/placeCtx|datePlaceCtx|labelForZip/.test(dash),
+  '11af D19 both page-local attribution rules are gone (§10 view-model direction)',
+  (dash.match(/.{0,40}(placeCtx|datePlaceCtx|labelForZip).{0,40}/) || [])[0]);
+ok(!/of your places/.test(strip(aggSrc)), '11ag ...and the view-model never emits it either');
+// Rung 3 must not exist as dead logic, copy or comment implying it can fire.
+ok(!/source_locality|source geography|rung ?3/i.test(strip(aggSrc).replace(/Rung 3[^\n]*UNREACHABLE[\s\S]*?forbids\./, '')),
+  '11ah rung 3 ships no conditional, copy or state — it is unreachable and absent');
+// 20 + 22: the responsive cap is the approved one, and overflow is inert text.
+ok(A.ATTRIBUTION_MAX_LABELS_WIDE === 2 && A.ATTRIBUTION_MAX_LABELS_NARROW === 1,
+  '11ai D20 the approved label cap is 2 wide / 1 narrow');
+ok(/\.mzip-narrow\{display:none\}/.test(dashRaw) && /@media\(max-width:900px\)[\s\S]{0,240}\.mzip-wide\{display:none\}/.test(dashRaw),
+  '11aj D20 the 900px breakpoint — an EXISTING one — swaps the variants, CSS only');
+ok(!/offsetWidth|scrollWidth|getBoundingClientRect|measureText/.test(dash),
+  '11ak D20 no runtime text measurement is introduced');
+ok(!/class="mzip[^"]*"[^>]*href|<a[^>]*class="mzip/.test(dash),
+  '11al D22 the overflow summary is plain, non-interactive text — no link, popover or modal');
+// 23: it is visible semantic text, not a tooltip/aria-only affordance.
+ok(!/title="[^"]*more monitored ZIP|aria-label="[^"]*more monitored ZIP/.test(dash),
+  '11am D23 the summary is not hidden behind a tooltip or aria-only content');
+
+// ---- E. REGRESSION ------------------------------------------------------------------
+ok(A.premiumLeadContext().source === 'Dashboard Quality-of-Life'
+  && A.premiumLeadContext().zip === undefined && A.premiumLeadContext().address === undefined,
+  '11an E26 Premium lead context is unchanged: source only, no zip, no address',
+  A.premiumLeadContext());
+ok(A.queryZips(gPlaces, A.MAX_QUERY_ZIPS).join(',') === '78617,78657,75009',
+  '11ao E25 All My Places scope and query set are unchanged', gZips);
+ok(!/from\(|\.select\(|supabase|sb\(\)/.test(strip(aggSrc)),
+  '11ap E28 the view-model issues NO query — no per-row or per-ZIP label lookup exists');
+ok(/A\.buildZipLabelMap\(zips, meta, places\)/.test(dash),
+  '11aq E28 ...and the page builds the label map ONCE from the already-loaded meta read');
+
 console.log(fails ? '\n' + fails + ' assertion(s) failed' : '\nAll Fix 8 All My Places assertions passed.');
 process.exit(fails ? 1 : 0);
