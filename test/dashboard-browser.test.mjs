@@ -723,9 +723,15 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['na
   });
   ok(!c7.missing && c7.limit === 8, 'Fix 8K [C] the shipped helper is exposed in-browser at PREVIEW_LIMIT 8', c7);
   ok(c7.known === 'View all 40 changes →', 'Fix 8K [C7] a provable total names the number', c7.known);
-  ok(c7.unknown === 'View more changes →' && !/\d/.test(c7.unknown),
-    'Fix 8K [C7] an unprovable total drops the numeral entirely', c7.unknown);
-  ok(c7.absent === 'View more changes →',
+  // BOTH branches carry a numeral, and they are DIFFERENT numerals: the known branch names
+  // the total (a claim about the world), the unknown branch names the hidden count (40 - 8,
+  // arithmetic over what is already loaded). Asserted as "32 and never 40" rather than as
+  // "has no digits", which is what this pin used to say.
+  ok(c7.unknown === 'View 32 more changes →',
+    'Fix 8K [C7] an unprovable total names the HIDDEN count, not the total', c7.unknown);
+  ok(c7.unknown.indexOf('40') < 0 && !/\ball\b/.test(c7.unknown),
+    'Fix 8K [C7] ...never the total, never the word "all"', c7.unknown);
+  ok(c7.absent === 'View 32 more changes →',
     'Fix 8K [C7] an ABSENT completeness flag is treated as unknown', c7.absent);
 }
 
