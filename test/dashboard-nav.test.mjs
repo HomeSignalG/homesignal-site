@@ -120,8 +120,19 @@ ok(/href="alerts\.html"/.test(dash) && /Manage your alerts &rarr;/.test(dash),
   'Fix 8 Stay Informed routes to the existing Alerts management');
 
 // ---- Places are Addresses + ZIP Codes; followed projects are NOT a Place -------------
-ok(!/followedProjectIds|followedProjects/.test(dash),
-  'Fix 8 Dashboard does not count followed projects as monitored places');
+// ⚠️ SCOPED (Fix 8J), same reason as the twin pin in project-follow-my-places.test.mjs: this
+// banned the identifiers file-wide, which is wider than the rule it states. The Dashboard now
+// has a Following section that legitimately reads followed projects; what must stay true is
+// that they are not COUNTED as Places. Asserted on the count's own inputs instead.
+const canonCall = (dash.match(/canonicalPlaces\(\{[\s\S]*?\}\)/) || [''])[0];
+ok(canonCall !== '' && !/project/i.test(canonCall) && /placeCount = places\.length/.test(dash),
+  'Fix 8 Dashboard does not count followed projects as monitored places', canonCall);
+// Following is its own rail section between Your Places and Stay Informed — never folded into
+// either, and never a fourth navigation destination.
+ok(dash.indexOf('>Your Places<') < dash.indexOf('>Following<')
+   && dash.indexOf('>Following<') < dash.indexOf('>Stay Informed<'),
+  'Fix 8J Following is its own rail section, between Your Places and Stay Informed');
+ok(!/<a [^>]*data-nav="following"/.test(dash), 'Fix 8J Following adds no navigation destination');
 ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener not inline onclick');
 
 const shell = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');

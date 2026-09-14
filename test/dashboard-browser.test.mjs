@@ -142,8 +142,18 @@ try {
   });
   ok(shape.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
     'Fix 8 main column is What\u2019s Changing → Quality-of-Life Premium → Official Dates');
+  // Fix 8J: this context is SIGNED OUT, and the Following section removes itself outright
+  // without a real session — so the signed-out rail is still exactly these two headings. That
+  // is the privacy rule showing up in the page's shape, not an accident of ordering, so it is
+  // asserted positively below as well: no heading, no node, and no project id in the markup.
   ok(shape.rail.join(' | ') === 'Your Places | Stay Informed',
-    'Fix 8 right rail is Your Places → Stay Informed');
+    'Fix 8 right rail signed-out is Your Places → Stay Informed', shape.rail);
+  const followOut = await page.evaluate(() => ({
+    node: document.querySelectorAll('#dashFollowing, #dashFollowingBody').length,
+    text: document.body.innerText.indexOf('Projects you chose to monitor')
+  }));
+  ok(followOut.node === 0 && followOut.text < 0,
+    'Fix 8J Following is absent for a signed-out visitor', followOut);
   ok(/ALL MY PLACES/.test(shape.viewing) && !/\b\d{5}\b/.test(shape.viewing),
     'Fix 8 Dashboard scope reads ALL MY PLACES and names no ZIP', shape.viewing);
   ok(/monitored place/.test(shape.sub), 'Fix 8 the header counts monitored places', shape.sub);

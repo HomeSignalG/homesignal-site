@@ -83,7 +83,16 @@ HS.onReady(async function () {
     });
   }
 
-  var view = 'all';
+  // A-010 / Fix 8J: the view is deep-linkable so another surface can land on the type it
+  // manages (the Dashboard's Following section routes here with ?view=projects). Whitelisted
+  // against the four views this page already declares as data-view buttons — an unknown or
+  // absent value falls back to 'all', which is also what every existing link resolves to, so
+  // no current entry point changes. Nothing else about the page reads the query string.
+  var VIEWS = ['all', 'addresses', 'zips', 'projects'];
+  var view = (function () {
+    var q = new URLSearchParams(location.search).get('view');
+    return VIEWS.indexOf(q) !== -1 ? q : 'all';
+  })();
 
   function strip() {
     var a = addresses(), z = zips();
