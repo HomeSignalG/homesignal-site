@@ -93,9 +93,17 @@
   <div class="page dashpage">
     <div class="ph">
       <div class="dashhead">
+        <!-- THE SHARED PAGE-HEADER SYSTEM, NOT A DASHBOARD COPY OF IT (Fix 8I). app.css
+             .ph .eyebrow / .ph h1 already carry the green uppercase label and the large
+             black headline on Alerts, Development and My Places; the eyebrow's own
+             text-transform is what renders "Dashboard" as DASHBOARD, exactly as those
+             pages write "Alerts" and get ALERTS. No typography is declared here, and the
+             h1's inline margin override is gone so .ph h1's 6px/6px rhythm governs — a
+             near-match with local CSS was the thing to avoid. The resident QUESTION is
+             the h1, matching those pages, so no h1 carries the word "Dashboard". -->
         <div class="dhl">
-          <h1 style="margin-bottom:6px">Dashboard</h1>
-          <p id="dashSub" style="margin:0"></p>
+          <div class="eyebrow">Dashboard</div>
+          <h1 id="dashSub"></h1>
         </div>
         <div class="dashcount" id="dashCount" hidden>
           <div>
@@ -225,9 +233,15 @@ HS.onReady(async function () {
   document.getElementById('dashCountN').textContent = String(placeCount);
   document.getElementById('dashCountLbl').textContent = placeCount === 1 ? 'Monitored place' : 'Monitored places';
   countBox.hidden = false;
-  document.getElementById('dashSub').textContent = placeCount
-    ? ('What’s changing across your ' + placeCount + ' monitored place' + (placeCount === 1 ? '' : 's') + '?')
-    : 'What’s changing across the places you monitor?';
+  // SINGULAR DROPS THE NUMERAL (Fix 8I). "your 1 monitored place" is the shape a
+  // count-plus-plural expression produces by default, and it reads as a system report
+  // rather than a sentence. One place is "your monitored place"; the count only earns its
+  // place in the sentence once there is more than one. The zero state is unchanged.
+  document.getElementById('dashSub').textContent = !placeCount
+    ? 'What’s changing across the places you monitor?'
+    : placeCount === 1
+      ? 'What’s changing across your monitored place?'
+      : ('What’s changing across your ' + placeCount + ' monitored places?');
 
   // ---- Premium CTA — the existing shared modal, feature-level context ----------------
   // premiumLeadContext() carries a SOURCE and no other key, so there is no field for a ZIP

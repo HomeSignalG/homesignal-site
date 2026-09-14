@@ -366,5 +366,57 @@ ok(!/Recent updates across all your monitored places/.test(dash),
   '9b ...and the "Recent" form is absent, because no audited definition backs it');
 ok(!/\bNEW\b|badge-new|isNew\(/.test(dash), '9c no fabricated "new" count or badge renders');
 
+// =====================================================================================
+console.log('\n--- §10 FIX 8I the header is the SHARED page-header system ------------------');
+// =====================================================================================
+// The Dashboard was the one page not using app.css's .ph .eyebrow / .ph h1 — it rendered
+// "Dashboard" as the large black h1 and demoted the resident's question to grey body copy.
+// These are composition facts that live in the page, so they are grepped, not driven.
+//
+// ⚠️ `dash` is COMMENT-STRIPPED (see strip() above) and that is load-bearing here: the
+// markup comment added with this change explains the absence of a "Dashboard" h1 by naming
+// it, and an HTML comment must never be able to satisfy — or fail — a check about markup.
+
+const dashRaw = read('dashboard.html');
+ok(/<div class="eyebrow">Dashboard<\/div>/.test(dash),
+  '10a DASHBOARD renders through the shared .ph .eyebrow, exactly as Alerts writes "Alerts"');
+ok(/<h1 id="dashSub"><\/h1>/.test(dash),
+  '10b ...and #dashSub is the primary <h1>, so the resident QUESTION is the headline');
+ok(!/<h1[^>]*>Dashboard<\/h1>/.test(dash),
+  '10c ...and no <h1> reads "Dashboard" — the large black treatment is gone',
+  (dash.match(/<h1[^>]*>Dashboard<\/h1>/) || [])[0]);
+ok(!/<p id="dashSub"/.test(dash),
+  '10d ...and the question is no longer a <p>');
+
+// REUSE, NOT A NEAR-MATCH. The whole point of Fix 8I is that app.css already ships this
+// component; a local font-size/colour/letter-spacing here would be a second implementation
+// that silently drifts from Alerts and Development the next time app.css moves.
+const dashCss = (dashRaw.match(/<style[\s\S]*?<\/style>/g) || []).join('\n');
+ok(!/\.eyebrow\s*\{/.test(dashCss) && !/h1\s*\{/.test(dashCss) && !/\.ph\s+h1/.test(dashCss),
+  '10e dashboard.html declares NO local eyebrow/h1 typography — app.css .ph is reused');
+ok(!/<h1[^>]*style=/.test(dash),
+  '10f ...and the h1 carries no inline style, so .ph h1 governs its margin rhythm',
+  (dash.match(/<h1[^>]*style=[^>]*>/) || [])[0]);
+
+// The right-hand summary is preserved verbatim — Fix 8I changes the left column only.
+ok(/id="dashCountN"/.test(dash) && /id="dashCountLbl"/.test(dash)
+  && /Tracking development, government notices, meetings, and local news/.test(dash),
+  '10g the monitored-place count and its supporting copy are untouched');
+
+// GRAMMAR. Singular drops the numeral; "your 1 monitored place" is the shape a naive
+// count-plus-plural expression produces and it reads as a system report, not a sentence.
+ok(/What’s changing across your monitored place\?/.test(dash),
+  '10h N = 1 reads "your monitored place" — no numeral');
+ok(/What’s changing across your ' \+ placeCount \+ ' monitored places\?/.test(dash),
+  '10i N > 1 carries the count and the plural');
+ok(/What’s changing across the places you monitor\?/.test(dash),
+  '10j N = 0 keeps its existing honest copy');
+ok(!/' monitored place' \+ \(placeCount === 1 \? '' : 's'\)/.test(dash),
+  '10k ...and the old count-plus-plural expression, which produced "your 1 monitored place", is gone');
+
+// The removals Fix 8 made stay removed — a header change must not be a door back in.
+for (const gone of ['dashStrip', 'dashMapLink', 'Welcome back', 'Good morning'])
+  ok(!new RegExp(gone).test(dash), '10l no ' + gone + ' returns with the header change');
+
 console.log(fails ? '\n' + fails + ' assertion(s) failed' : '\nAll Fix 8 All My Places assertions passed.');
 process.exit(fails ? 1 : 0);
