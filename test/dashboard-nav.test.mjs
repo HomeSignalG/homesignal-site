@@ -79,7 +79,7 @@ ok(!/app_follows/.test(dash),
   'Fix 8 Dashboard never reaches into app_follows rows directly — membership is the hydrated list');
 
 // ---- §4 main-column and rail sections, in the approved order -------------------------
-for (const h of ['What&rsquo;s Changing?', 'Official Dates to Know', 'Your Places', 'Stay Informed'])
+for (const h of ['What&rsquo;s Changing?', 'Official Dates to Know', 'My Places', 'Projects', 'Stay Informed'])
   ok(dash.includes('>' + h + '<'), 'Fix 8 Dashboard renders the "' + h.replace('&rsquo;', "'") + '" section');
 const iChanging = dash.indexOf('What&rsquo;s Changing?');
 const iQol = dash.indexOf('Quality-of-Life Impact');
@@ -87,8 +87,8 @@ const iDates = dash.indexOf('Official Dates to Know');
 ok(iChanging > 0 && iQol > iChanging && iDates > iQol,
   'Fix 8 main column order is What’s Changing -> Quality-of-Life Premium -> Official Dates',
   { iChanging, iQol, iDates });
-ok(dash.indexOf('>Your Places<') < dash.indexOf('>Stay Informed<'),
-  'Fix 8 right rail order is Your Places -> Stay Informed');
+ok(dash.indexOf('>My Places<') < dash.indexOf('>Stay Informed<'),
+  'Fix 8 right rail order is My Places -> Stay Informed');
 
 // ---- the superseded single-ZIP module set is gone ------------------------------------
 for (const gone of ['Needs Your Attention', 'Your Briefing', 'Recent Changes', 'Worth Watching',
@@ -115,7 +115,7 @@ ok(!/View all/.test(dash),
 
 // ---- the two rail CTAs route to the EXISTING surfaces ---------------------------------
 ok(/href="properties\.html"/.test(dash) && /Manage &rarr;/.test(dash),
-  'Fix 8 Your Places "Manage" routes to the existing My Places page');
+  'Fix 8 My Places "Manage" routes to the existing My Places page');
 ok(/href="alerts\.html"/.test(dash) && /Manage your alerts &rarr;/.test(dash),
   'Fix 8 Stay Informed routes to the existing Alerts management');
 
@@ -127,11 +127,12 @@ ok(/href="alerts\.html"/.test(dash) && /Manage your alerts &rarr;/.test(dash),
 const canonCall = (dash.match(/canonicalPlaces\(\{[\s\S]*?\}\)/) || [''])[0];
 ok(canonCall !== '' && !/project/i.test(canonCall) && /placeCount = places\.length/.test(dash),
   'Fix 8 Dashboard does not count followed projects as monitored places', canonCall);
-// Following is its own rail section between Your Places and Stay Informed — never folded into
-// either, and never a fourth navigation destination.
-ok(dash.indexOf('>Your Places<') < dash.indexOf('>Following<')
-   && dash.indexOf('>Following<') < dash.indexOf('>Stay Informed<'),
-  'Fix 8J Following is its own rail section, between Your Places and Stay Informed');
+// The followed-project section is its own rail section between My Places and Stay Informed —
+// never folded into either, and never a fourth navigation destination. Its resident-facing
+// heading is "Projects" (the id stays dashFollowing: identifiers are not copy).
+ok(dash.indexOf('>My Places<') < dash.indexOf('>Projects<')
+   && dash.indexOf('>Projects<') < dash.indexOf('>Stay Informed<'),
+  'Fix 8J Projects is its own rail section, between My Places and Stay Informed');
 ok(!/<a [^>]*data-nav="following"/.test(dash), 'Fix 8J Following adds no navigation destination');
 ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener not inline onclick');
 
