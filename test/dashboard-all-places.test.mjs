@@ -361,7 +361,13 @@ const AGG_LINK_TOKEN = /<a\b|href|pageHref\(|location\.(?:href|assign)|window\.o
 const aggregateDestinations = [];
 {
   const surface = dash + '\n' + strip(aggSrc);
-  const re = /View all/g;
+  // BOTH approved expansion labels, matched as they appear in SOURCE (string concatenation),
+  // never as rendered text: `'View all ' + total + ' changes'` and
+  // `'View ' + hidden + ' more changes'`. #1209 added the second form AFTER this guard was
+  // written, and a scan keyed only on "View all" could not see it — the same blind spot this
+  // guard exists to close, one label over. Measured on the shipped source: exactly two
+  // occurrences, one per label, zero link tokens in either window.
+  const re = /View all|more changes/g;
   let m;
   while ((m = re.exec(surface)) !== null) {
     const win = surface.slice(Math.max(0, m.index - 200), m.index + 200);
@@ -369,7 +375,7 @@ const aggregateDestinations = [];
   }
 }
 ok(aggregateDestinations.length === 0,
-  '8f no aggregate destination renders — the Fix 8K "View all" control is an in-place button, never a link',
+  '8f no aggregate destination renders — BOTH Fix 8K expansion labels are in-place button text, never a link',
   aggregateDestinations[0]);
 // The negative above is only meaningful while the control still EXISTS: "not a link" is also
 // satisfied by nothing rendering at all. These pin the approved shape, so the pair cannot
@@ -380,7 +386,12 @@ ok(/toggleBtn = document\.createElement\('button'\);/.test(dash)
 ok(!/toggleBtn\.href/.test(dash) && !/createElement\('a'\)/.test(dash),
   '8h ...carrying no href, and never created as an anchor');
 ok(/toggleBtn\.textContent = view\.expanded \? view\.collapseLabel : view\.expandLabel;/.test(dash),
-  '8i ...and its label is TEXT from the view-model, never a route');
+  '8i ...and EITHER label reaches it as TEXT from the view-model, never a route');
+// The negative is only meaningful for a label that still EXISTS — deleting the modest form
+// would let 8f pass vacuously for it. Pin both producers as plain string builders.
+ok(/'View all ' \+ total \+ ' changes/.test(strip(aggSrc))
+  && /'View ' \+ hidden \+ ' more changes/.test(strip(aggSrc)),
+  '8j both approved expansion labels are built as plain strings in the view-model');
 
 // =====================================================================================
 console.log('\n--- §9 "Recent" is only claimed if it is defined ---------------------------');
