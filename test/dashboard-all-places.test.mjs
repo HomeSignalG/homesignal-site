@@ -350,9 +350,37 @@ ok(/pageHref\('alerts\.html', \{ zip: d\.zip, id: d\.id, band: 'open' \}\)/.test
 ok(/Review development/.test(dash) && /View notice/.test(dash)
   && /Read article/.test(dash) && /View meeting/.test(dash),
   '8e all four record-level CTA labels are the approved ones');
-// ACCEPTANCE 26: no aggregate destination exists, so no aggregate CTA may render.
-ok(!/View all/.test(dash), '8f no aggregate "View all" CTA renders in this release',
-  (dash.match(/.{0,60}View all.{0,60}/) || [])[0]);
+// ACCEPTANCE 26, RESTATED AFTER FIX 8K — THE PROHIBITION IS A DESTINATION, NOT A PHRASE.
+// There is still no All My Places destination, so nothing may route to one. What changed is
+// that "View all" became legitimate COPY: Fix 8K's "View all N changes →" is an in-place
+// expander on a <button>, which navigates nowhere. The old substring ban therefore asserted
+// something now FALSE — a control reading "View all 40 changes →" does render — while ALSO
+// having quietly stopped guarding, because the label moved into the view-model and `dash`
+// never reads that file. Assert the forbidden PROPERTY, across BOTH surfaces.
+const AGG_LINK_TOKEN = /<a\b|href|pageHref\(|location\.(?:href|assign)|window\.open/;
+const aggregateDestinations = [];
+{
+  const surface = dash + '\n' + strip(aggSrc);
+  const re = /View all/g;
+  let m;
+  while ((m = re.exec(surface)) !== null) {
+    const win = surface.slice(Math.max(0, m.index - 200), m.index + 200);
+    if (AGG_LINK_TOKEN.test(win)) aggregateDestinations.push(win.replace(/\s+/g, ' ').trim());
+  }
+}
+ok(aggregateDestinations.length === 0,
+  '8f no aggregate destination renders — the Fix 8K "View all" control is an in-place button, never a link',
+  aggregateDestinations[0]);
+// The negative above is only meaningful while the control still EXISTS: "not a link" is also
+// satisfied by nothing rendering at all. These pin the approved shape, so the pair cannot
+// both go green on an absence.
+ok(/toggleBtn = document\.createElement\('button'\);/.test(dash)
+  && /toggleBtn\.type = 'button';/.test(dash),
+  '8g the Fix 8K expander is a semantic <button type="button">');
+ok(!/toggleBtn\.href/.test(dash) && !/createElement\('a'\)/.test(dash),
+  '8h ...carrying no href, and never created as an anchor');
+ok(/toggleBtn\.textContent = view\.expanded \? view\.collapseLabel : view\.expandLabel;/.test(dash),
+  '8i ...and its label is TEXT from the view-model, never a route');
 
 // =====================================================================================
 console.log('\n--- §9 "Recent" is only claimed if it is defined ---------------------------');
