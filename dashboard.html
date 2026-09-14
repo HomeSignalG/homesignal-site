@@ -144,6 +144,25 @@
           <div class="bt-row"><h2>Your Places</h2><a href="properties.html" id="dashManagePlaces">Manage &rarr;</a></div>
           <div id="dashPlaces"></div>
         </div>
+        <!-- FOLLOWING (Fix 8J)
+             The projects the resident explicitly chose to monitor. A followed project is NOT
+             a Place: it is absent from canonicalPlaces, from the monitored-place count, and
+             from every content read. This section only confirms the choice and routes to the
+             existing Development and My Places surfaces.
+
+             It ships HIDDEN and is REMOVED outright unless a real signed-in session is
+             present. shell.js seeds state.follows from localStorage at module scope
+             regardless of session, and clearAccountLocalState() (which strips the project:
+             keys) runs only on an explicit sign-out or an account-id change — never on a
+             session that merely expired. app_projects carries a public anon select policy, so
+             on a shared or expired browser those titles are resolvable without a session.
+             Removing the node rather than hiding it is deliberate: a hidden h2 still answers
+             querySelectorAll, so "hidden" would leave an empty heading in the rail's shape. -->
+        <div class="block" id="dashFollowing" hidden>
+          <div class="bt-row"><h2>Following</h2><a href="properties.html?view=projects" id="dashManageFollowing">Manage &rarr;</a></div>
+          <p class="dnote" style="margin:0 0 12px">Projects you chose to monitor.</p>
+          <div id="dashFollowingBody"></div>
+        </div>
         <div class="block">
           <div class="bt-row"><h2>Stay Informed</h2></div>
           <p class="dnote" style="margin:0 0 12px">Choose the places and topics you want HomeSignal alerts about.</p>
@@ -160,7 +179,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=9f6ae57d"></script>
+<script src="lib/dashboard-aggregate.js?v=ee9349c1"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=01319a72"></script>
@@ -177,6 +196,16 @@
 HS.onReady(async function () {
   var A = HS.dashAgg;
   var S = HS.state;
+
+  // ---- Following: the session gate, run before anything that can fail ----------------
+  // Fix 8J. A followed project is private account data, and this page has no auth gate.
+  // state.follows is seeded from localStorage at module scope whatever the session state, and
+  // clearAccountLocalState() only fires on an explicit sign-out or an account-id change — so
+  // an EXPIRED session still holds the previous resident's project: keys, and app_projects is
+  // anon-readable. The node is REMOVED, not hidden: a hidden h2 still answers
+  // querySelectorAll, which would leave an empty heading in the rail's shape.
+  var followingEl = document.getElementById('dashFollowing');
+  if (followingEl && !(S.session && !S.session.demo)) { followingEl.remove(); followingEl = null; }
 
   // ---- LEGACY ?zip= — strip it FIRST, before any CTA can be clicked -----------------
   // Fix 8 D1 removed dashboard.html from ZIP_NAV_PAGES, so sidebar navigation no longer
@@ -263,6 +292,55 @@ HS.onReady(async function () {
   if (!places.length) {
     document.getElementById('dashAddAddress').addEventListener('click', function () { HS.addHome(); });
     document.getElementById('dashAddZip').addEventListener('click', function () { HS.openLoc(); });
+  }
+
+  // ---- Following --------------------------------------------------------------------
+  // Deliberately BEFORE the zero-places return: a resident can follow a project while
+  // monitoring no Places at all, and this section reports follows, not membership.
+  //
+  // A FAILED READ CANNOT RENDER AS "YOU FOLLOW NOTHING". HS.data.projectsByIds swallows a
+  // PostgREST rejection into an empty array, so a failure and a fully-unresolved set are
+  // indistinguishable here. That is survivable only because the card list is built from the
+  // FOLLOW IDS and not from the returned rows: every id the resident followed gets a card
+  // either way, and one that did not resolve says so instead of vanishing. The count stays
+  // true in both cases.
+  if (followingEl) {
+    var followIds = HS.followedProjectIds ? HS.followedProjectIds() : [];
+    var followRows = [];
+    var followQuery = A.followingQueryIds(followIds);
+    if (followQuery.length) {
+      try {
+        followRows = HS.data.projectsByIds ? await HS.data.projectsByIds(followQuery) : [];
+      } catch (e) {
+        followRows = [];
+        console.warn('[dashboard] following read failed', e);
+      }
+    }
+    var following = A.followingCards({ ids: followIds, rows: followRows });
+    var followBody = document.getElementById('dashFollowingBody');
+    if (!following.total) {
+      followBody.innerHTML = '<p class="dnote">Open a project and tap Add to My Places to follow it. '
+        + 'Followed projects appear here so you can reopen them. This does not turn on email alerts.</p>';
+    } else {
+      followBody.innerHTML = following.cards.map(function (c) {
+        // The sub-line is the record's own status (or type) and its ZIP — nothing else is
+        // available without asserting currency the data cannot support. See the FOLLOWING
+        // notes in lib/dashboard-aggregate.js for what is refused and why.
+        var sub = c.unresolved
+          ? 'We could not load this project’s details.'
+          : [c.context, c.place].filter(Boolean).join(' · ');
+        var href = HS.pageHref('development.html', { id: c.id, zip: c.zip });
+        return '<a class="placerow" href="' + HS.esc(href) + '">'
+          + '<div class="pmain"><div class="pl">' + HS.esc(c.title) + '</div>'
+          + (sub ? '<div class="ps">' + HS.esc(sub) + '</div>' : '')
+          + '</div><div class="pc" aria-hidden="true">›</div></a>';
+      }).join('')
+        + (following.overflow
+            ? '<p class="dnote" style="margin-top:10px">' + following.overflow
+              + ' more followed project' + (following.overflow === 1 ? '' : 's') + ' in My Places.</p>'
+            : '');
+    }
+    followingEl.hidden = false;
   }
 
   // ---- Zero places: nothing to brief on, and that is a true statement ---------------

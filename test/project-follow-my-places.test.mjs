@@ -114,8 +114,18 @@ ok(/function canonicalPlaces/.test(agg) && /kind: 'address'/.test(agg) && /kind:
 ok(!/project/i.test(agg.slice(agg.indexOf('function canonicalPlaces'), agg.indexOf('function queryZips'))
      .replace(/^\s*\/\/.*$/gm, '')),
   'Fix 8 canonicalPlaces has no followed-project branch at all');
-ok(/placeCount = places\.length/.test(dash) && !/followedProjectIds/.test(dash),
-  'Fix 8 Dashboard does not fold followed projects into the monitored-place count');
+// ⚠️ SCOPED (Fix 8J). This used to read `!/followedProjectIds/.test(dash)` — a file-wide ban
+// on the identifier. That was strictly wider than the rule it states: the Dashboard now has a
+// Following section that legitimately calls the helper, and the count it must stay out of is
+// one expression. A pin must be scoped to the statement it is about, or it fails on changes it
+// was never written to forbid. The rule itself is UNCHANGED and is now asserted where it
+// lives: placeCount comes from canonicalPlaces, and the argument object it is built from
+// mentions no project at all.
+const canonCall = (dash.match(/canonicalPlaces\(\{[\s\S]*?\}\)/) || [''])[0];
+ok(/placeCount = places\.length/.test(dash) && canonCall !== '' && !/project/i.test(canonCall),
+  'Fix 8 Dashboard does not fold followed projects into the monitored-place count', canonCall);
+ok(!/dashCountN[\s\S]{0,200}followedProjectIds/.test(dash),
+  'Fix 8 the monitored-place count is not computed from followed projects');
 ok(!/digest\.py|user_subscriptions|pipeline_type/.test(dev + props)
   && !/from\('alerts'\)/.test(shell.match(/HS\.toggleFollow = function[\s\S]*?\n  \};/) || [''])[0],
   'Fix 1 does not enroll email alerts or touch digest');
