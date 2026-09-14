@@ -610,5 +610,153 @@ ok(!/from\(|\.select\(|supabase|sb\(\)/.test(strip(aggSrc)),
 ok(/A\.buildZipLabelMap\(zips, meta, places\)/.test(dash),
   '11aq E28 ...and the page builds the label map ONCE from the already-loaded meta read');
 
+// =====================================================================================
+// 12. FIX 8K — WHAT'S CHANGING PREVIEW + EXPAND IN PLACE
+//
+// The Dashboard already truncated at 12 with NO control and NO disclosure. These drive the
+// SHIPPED helper, so a change to the rule fails here rather than only in a browser.
+// =====================================================================================
+console.log('\n--- 12. Fix 8K What\'s Changing preview ---');
+
+const mk = (n) => Array.from({ length: n }, (_, i) => ({ id: 'r' + i, title: 'T' + i }));
+const ids = (list) => list.map((r) => r.id).join(',');
+
+// ---- A. CANONICAL PREVIEW BEHAVIOUR -------------------------------------------------
+// A1: zero eligible changes — no control. The page's existing empty branch runs instead,
+// but the helper must not invent one either.
+{
+  const v = A.changesPreview([], { countKnown: true });
+  ok(v.visible.length === 0 && v.hasControl === false && v.total === 0,
+    '12a A1 zero changes -> no rows, no control', v);
+}
+// A2: 1..8 — every record renders and NO control appears. Boundary 8 is the one that
+// actually decides the rule, so it is asserted rather than sampled around.
+{
+  let bad = null;
+  for (let n = 1; n <= 8; n++) {
+    const v = A.changesPreview(mk(n), { countKnown: true });
+    if (v.visible.length !== n || v.hasControl) bad = { n, visible: v.visible.length, ctl: v.hasControl };
+  }
+  ok(!bad, '12b A2 1..8 changes -> all render, no control at any size', bad);
+}
+// A3: exactly nine — the first case where the bound bites.
+{
+  const v = A.changesPreview(mk(9), { countKnown: true });
+  ok(v.visible.length === 8, '12c A3 nine changes -> exactly eight render', v.visible.length);
+  ok(v.expandLabel === 'View all 9 changes →',
+    '12d A3 ...labelled "View all 9 changes →"', v.expandLabel);
+  ok(ids(v.visible).indexOf('r8') === -1 && v.hiddenCount === 1,
+    '12e A3 ...and the NINTH canonical record is absent before expansion', ids(v.visible));
+}
+// A4: >9 — order identity, element by element, against the input.
+{
+  const src = mk(40);
+  const v = A.changesPreview(src, { countKnown: true });
+  ok(ids(v.visible) === ids(src.slice(0, 8)),
+    '12f A4 >9 changes -> exactly the first eight canonical records, in canonical order', ids(v.visible));
+  ok(v.total === 40 && v.expandLabel === 'View all 40 changes →',
+    '12g A4 ...count is the canonical total when completeness is known', v.expandLabel);
+}
+
+// ---- B. EXPANSION BEHAVIOUR ---------------------------------------------------------
+{
+  const src = mk(40);
+  const before = ids(src);
+  const open = A.changesPreview(src, { expanded: true, countKnown: true });
+  ok(ids(open.visible) === before,
+    '12h B5 expanding reveals EVERY currently available record, in the same canonical order');
+  ok(open.expanded === true && open.collapseLabel === 'Show fewer changes ↑',
+    '12i B5 ...and offers exactly one collapse control', open.collapseLabel);
+  // The canonical array must survive being rendered — the expanded limb returns a COPY.
+  open.visible.reverse();
+  ok(ids(src) === before, '12j B5 ...the canonical collection is NOT mutated by rendering');
+
+  const shut = A.changesPreview(src, { expanded: false, countKnown: true });
+  ok(ids(shut.visible) === ids(src.slice(0, 8)) && shut.expanded === false,
+    '12k B6 collapsing restores exactly the first eight canonical records');
+  ok(shut.expandLabel === 'View all 40 changes →',
+    '12l B6 ...and exactly one "View all [N] changes →" control', shut.expandLabel);
+  ok(ids(src) === before, '12m B6 ...with canonical data and order unchanged');
+}
+// Expanding a collection that never had a control cannot manufacture one.
+{
+  const v = A.changesPreview(mk(5), { expanded: true, countKnown: true });
+  ok(v.hasControl === false && v.expanded === false && v.visible.length === 5,
+    '12n B5 expanded:true on a 5-record collection is inert — no control, no state', v);
+}
+
+// ---- C. CAP-UNCERTAINTY BEHAVIOUR ---------------------------------------------------
+// 🔑 The numeral is a COMPLETENESS claim. When any limit could be hiding records the label
+// must drop it entirely rather than qualify it.
+{
+  const v = A.changesPreview(mk(40), { countKnown: false });
+  ok(v.expandLabel === 'View more changes →',
+    '12o C7 unknown completeness -> the conservative label', v.expandLabel);
+  ok(!/\d/.test(v.expandLabel),
+    '12p C7 ...carrying NO numeral, so no false total is implied', v.expandLabel);
+  ok(v.visible.length === 8 && v.hasControl === true,
+    '12q C7 ...while still bounding the preview and offering expansion', v.visible.length);
+}
+// Fail-safe: a caller that omits countKnown gets the modest label, never the confident one.
+{
+  const v = A.changesPreview(mk(40), {});
+  ok(v.expandLabel === 'View more changes →',
+    '12r C7 an ABSENT countKnown is treated as unknown, never as complete', v.expandLabel);
+  ok(A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel === 'View more changes →',
+    '12s C7 ...and only a strict boolean true unlocks the numeral');
+}
+
+// ---- C(page). THE FOUR COMPLETENESS SIGNALS ARE ALL WIRED ---------------------------
+// The helper cannot detect completeness itself; the page must. Each limb is pinned
+// separately so removing ONE of them fails, not just gutting the whole expression.
+ok(/var countKnown = !capped/.test(dash),
+  '12t C7 page: the ZIP cap (capped) gates the numeric count');
+ok(/countKnown[\s\S]{0,200}!avail\.anyFailed/.test(dash),
+  '12u C7 page: a FAILED source gates the numeric count');
+ok(/countKnown[\s\S]{0,200}\(rawChanges \|\| \[\]\)\.length < A\.CHANGES_QUERY_LIMIT/.test(dash),
+  '12v C7 page: the app_changes query cap is tested on the RAW length, not the deduped one');
+ok(/countKnown[\s\S]{0,200}!devCapped/.test(dash),
+  '12w C7 page: the per-ZIP development cap gates the numeric count');
+// Dedup can pull a capped 120 back under 120, so a deduped-length test proves nothing.
+ok(!/deduped\.length\s*<\s*A\.CHANGES_QUERY_LIMIT/.test(dash),
+  '12x C7 page: completeness is NEVER inferred from the deduplicated length');
+// The per-ZIP signal is unrecoverable after the concat.
+ok(/\.length >= A\.DEV_QUERY_LIMIT\) devCapped = true/.test(dash)
+  && dash.indexOf('devCapped = true') < dash.indexOf('lists.reduce'),
+  '12y C7 page: devCapped is computed BEFORE the lists are reduced/concatenated');
+// One owned number reaches both the query and the cap test.
+ok(/changesForZips\(zips, A\.CHANGES_QUERY_LIMIT\)/.test(dash),
+  '12z C7 page: the changes limit is PASSED, so query and cap test share one contract');
+ok(/developmentForZip\(z, A\.DEV_QUERY_LIMIT\)/.test(dash),
+  '12z1 C7 page: the development limit is owned by the same constant it is tested against');
+
+// ---- D. SEMANTICS ------------------------------------------------------------------
+ok(/createElement\('button'\)/.test(dash) && /toggleBtn\.type = 'button'/.test(dash),
+  '12z2 D9 the control is a real <button type="button">, not a faux link or clickable div');
+ok(/setAttribute\('aria-expanded'/.test(dash) && /setAttribute\('aria-controls', 'dashChangingList'\)/.test(dash),
+  '12z3 D9 ...carrying aria-expanded and referencing the region it controls');
+ok(/if \(!toggleBtn\) \{/.test(dash),
+  '12z4 D9 the button is created ONCE, so focus survives expand and collapse');
+ok((dash.match(/createElement\('button'\)/g) || []).length === 1,
+  '12z5 D9 exactly one control is ever constructed — no duplicate in the a11y tree');
+
+// ---- E. REGRESSION ------------------------------------------------------------------
+ok(!/slice\(0, 12\)|slice\(0,12\)/.test(dash),
+  '12z6 E the old SILENT 12-record truncation is gone');
+ok(!/alerts\.html'\s*,\s*\{\s*allPlaces|HS\.data\.changes\(|HS\.data\.news\(/.test(dash),
+  '12z7 E12 no Alerts collection query or all-places Alerts route was introduced');
+ok(!/viewZip|myZip|HS\.state\.zip|ensureViewedZip/.test(dash),
+  '12z8 E13 the Dashboard still never reads viewZip / myZip / HS.state.zip');
+ok(!/from\(|\.select\(|supabase|sb\(\)/.test(strip(aggSrc)),
+  '12z9 E11 the view-model still issues NO query — expansion re-slices loaded data');
+ok(/<div class="eyebrow">Dashboard<\/div>/.test(dash) && /<h1 id="dashSub"><\/h1>/.test(dash),
+  '12z10 E14 Fix 8I header is intact');
+ok(!/of your places/.test(dash),
+  '12z11 E15 Fix 8G: "Affects N of your places" has not returned');
+ok(/dashFollowing/.test(dash) && /followingCards/.test(strip(aggSrc)),
+  '12z12 E16 Fix 8J Following is intact');
+ok(!/overflow-y|overflow:\s*auto|overflow:\s*scroll|max-height/.test(dashCss),
+  '12z13 E17 no internal scroll container or fixed-height list was introduced');
+
 console.log(fails ? '\n' + fails + ' assertion(s) failed' : '\nAll Fix 8 All My Places assertions passed.');
 process.exit(fails ? 1 : 0);

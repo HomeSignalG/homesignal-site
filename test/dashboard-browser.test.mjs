@@ -545,6 +545,213 @@ for (const href of await page.locator('#dashChanging .crow a.cgo').evaluateAll((
   assertHref('Fix 8G [24] record CTA', href, {});
 ok(await page.locator('#dashQolLabel').count() === 1, 'Fix 8G [27] the Premium card still renders');
 
+// =====================================================================================
+// FIX 8K — WHAT'S CHANGING PREVIEW + EXPAND IN PLACE
+//
+// 🔑 THE EXTRA RECORDS ARE FED THROUGH THE REAL PIPELINE, NOT PAINTED INTO THE DOM.
+// The stock seed yields ~7 canonical records — BELOW the bound — so the control never
+// appears and a test against it would assert nothing. Rather than edit the seed fixture
+// (outside this unit's authorized scope), an init script intercepts the assignment of
+// window.HS_SEED and appends extra eligible rows BEFORE the page reads it. Everything
+// after that point is production code: the real seed branch of changesForZips, the real
+// item normalization, the real dedupeChanges, the real changesPreview, the real DOM and
+// the real button. A test that injected markup would prove only that the test can write
+// HTML.
+const seedExtra = (n) => `(() => {
+  const extra = Array.from({ length: ${n} }, (_, i) => ({
+    id: 'k8-' + i, category: 'Government & civic', related_project_id: null,
+    lens: 'value', confidence: 'Medium',
+    occurred_at: '2026-0' + (1 + (i % 9)) + '-1' + (i % 10),
+    window_closes_at: null, lat: 30.19, lng: -97.61,
+    title: 'Synthetic canonical record ' + i,
+    plain_language: 'test record', impacts: [],
+    source_ref: 'https://example.invalid/k8/' + i, approx: true
+  }));
+  let v;
+  Object.defineProperty(window, 'HS_SEED', {
+    configurable: true,
+    get() { return v; },
+    set(x) { if (x && Array.isArray(x.changes)) x.changes = x.changes.concat(extra); v = x; }
+  });
+})()`;
+
+const loadWithExtra = async (n, w, h) => {
+  const ctx2 = await browser.newContext({ viewport: { width: w, height: h } });
+  // A FRESH CONTEXT HAS NO MY PLACES, and the Dashboard is scoped to My Places — without
+  // this the briefing renders its honest "add an address or a ZIP" empty state and the
+  // assertions below would be measuring the empty case, not the bound. Same fixture the
+  // suite already installs on the shared context above.
+  await ctx2.addInitScript(() => {
+    try {
+      localStorage.setItem('hs:myCommunities', JSON.stringify([
+        { zip: '78617', name: 'Del Valle', state: 'TX' },
+        { zip: '78701', name: 'Austin', state: 'TX' }
+      ]));
+    } catch (e) { /* a blocked storage write must not abort the run */ }
+  });
+  const p2 = await ctx2.newPage();
+  await p2.addInitScript(seedExtra(n));
+  await p2.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+  await p2.waitForSelector('#dashChangingList .crow', { timeout: 30000 });
+  return { ctx2, p2 };
+};
+const snap = (pg) => pg.evaluate(() => {
+  const btn = document.getElementById('dashChangingToggle');
+  const list = document.getElementById('dashChangingList');
+  return {
+    rows: document.querySelectorAll('#dashChangingList .crow').length,
+    titles: [...document.querySelectorAll('#dashChangingList .crow .ct')].map((e) => e.textContent.trim()),
+    btnCount: document.querySelectorAll('#dashChanging button').length,
+    label: btn ? btn.textContent.trim() : null,
+    expandedAttr: btn ? btn.getAttribute('aria-expanded') : null,
+    controls: btn ? btn.getAttribute('aria-controls') : null,
+    tag: btn ? btn.tagName : null,
+    type: btn ? btn.getAttribute('type') : null,
+    tabIndex: btn ? btn.tabIndex : null,
+    focused: btn ? document.activeElement === btn : null,
+    // The control must sit BELOW the rows and ABOVE the notes (approved layout).
+    orderOk: btn && list ? (list.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : null,
+    scrollW: document.documentElement.scrollWidth,
+    clientW: document.documentElement.clientWidth,
+    // No nested scroll region may appear anywhere inside the card.
+    nestedScroll: [...document.querySelectorAll('#dashChanging, #dashChanging *')].filter((e) => {
+      const cs = getComputedStyle(e);
+      return /auto|scroll/.test(cs.overflowY) || /auto|scroll/.test(cs.overflowX) || cs.maxHeight !== 'none';
+    }).length
+  };
+});
+
+// ---- A2 boundary: the STOCK seed is under the bound, so no control may appear --------
+{
+  const a = await snap(page);
+  ok(a.rows <= 8 && a.btnCount === 0 && a.label === null,
+    'Fix 8K [A2] a collection at or under 8 renders every row and NO control', { rows: a.rows, btns: a.btnCount });
+}
+
+// ---- A3/A4 + B5/B6 + D9 at every approved viewport ----------------------------------
+for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['narrow', 899, 768], ['mobile', 390, 844]]) {
+  const { ctx2, p2 } = await loadWithExtra(20, w, h);
+  const collapsed = await snap(p2);
+  ok(collapsed.rows === 8, 'Fix 8K [' + label + '] [A4] default renders exactly 8 rows', collapsed.rows);
+  ok(collapsed.btnCount === 1, 'Fix 8K [' + label + '] [D9] exactly one control renders', collapsed.btnCount);
+  ok(collapsed.tag === 'BUTTON' && collapsed.type === 'button',
+    'Fix 8K [' + label + '] [D9] it is a semantic <button type="button">', collapsed.tag);
+  ok(collapsed.expandedAttr === 'false' && collapsed.controls === 'dashChangingList',
+    'Fix 8K [' + label + '] [D9] aria-expanded=false and aria-controls names the region', collapsed);
+  ok(collapsed.tabIndex >= 0, 'Fix 8K [' + label + '] [D9] it is in natural tab order', collapsed.tabIndex);
+  ok(collapsed.orderOk === true,
+    'Fix 8K [' + label + '] [B] the control sits BELOW the rows', collapsed.orderOk);
+  ok(/^View (all \d+|more) changes →$/.test(collapsed.label || ''),
+    'Fix 8K [' + label + '] [C] the collapsed label is an approved form', collapsed.label);
+  ok(collapsed.nestedScroll === 0,
+    'Fix 8K [' + label + '] [10] no nested scroll region or fixed-height list exists', collapsed.nestedScroll);
+  ok(collapsed.scrollW <= collapsed.clientW,
+    'Fix 8K [' + label + '] [5] no horizontal overflow collapsed', collapsed);
+
+  // Keyboard: focus the control and activate with Enter — not a synthetic click.
+  await p2.focus('#dashChangingToggle');
+  await p2.keyboard.press('Enter');
+  const open = await snap(p2);
+  ok(open.rows > 8, 'Fix 8K [' + label + '] [B5] Enter expands and reveals every loaded record', open.rows);
+  ok(open.titles.slice(0, 8).join('|') === collapsed.titles.join('|'),
+    'Fix 8K [' + label + '] [B5] the first 8 are unchanged — canonical order preserved');
+  ok(open.expandedAttr === 'true', 'Fix 8K [' + label + '] [D9] aria-expanded flips to true', open.expandedAttr);
+  ok(open.label === 'Show fewer changes ↑',
+    'Fix 8K [' + label + '] [B5] exactly one collapse control, correctly labelled', open.label);
+  ok(open.btnCount === 1, 'Fix 8K [' + label + '] [D9] still exactly one control — no duplicate', open.btnCount);
+  ok(open.focused === true,
+    'Fix 8K [' + label + '] [D9] focus stays on the control after expanding', open.focused);
+  ok(open.nestedScroll === 0,
+    'Fix 8K [' + label + '] [9] expansion uses normal document flow, not an inner scroller', open.nestedScroll);
+  ok(open.scrollW <= open.clientW,
+    'Fix 8K [' + label + '] [5] no horizontal overflow expanded', open);
+
+  // Space must work too, and must collapse back to exactly the first 8.
+  await p2.keyboard.press(' ');
+  const shut = await snap(p2);
+  ok(shut.rows === 8 && shut.titles.join('|') === collapsed.titles.join('|'),
+    'Fix 8K [' + label + '] [B6] Space collapses back to exactly the first 8 canonical records', shut.rows);
+  ok(shut.label === collapsed.label && shut.expandedAttr === 'false',
+    'Fix 8K [' + label + '] [B6] the expand control and its label are restored', shut.label);
+  ok(shut.focused === true,
+    'Fix 8K [' + label + '] [D9] focus stays on the control after collapsing', shut.focused);
+  await ctx2.close();
+}
+
+// ---- B5: expansion touches no data, no geography, no URL, no history ----------------
+{
+  const { ctx2, p2 } = await loadWithExtra(20, 1440, 900);
+  const net = [];
+  p2.on('request', (r) => net.push(r.url()));
+  const urlBefore = p2.url();
+  const histBefore = await p2.evaluate(() => history.length);
+  const stateBefore = await p2.evaluate(() => ({
+    view: (() => { try { return sessionStorage.getItem('hs:viewZip'); } catch (e) { return null; } })(),
+    my: (() => { try { return localStorage.getItem('myZip'); } catch (e) { return null; } })(),
+    zip: (window.HS && window.HS.state) ? String(window.HS.state.zip) : null
+  }));
+  await p2.click('#dashChangingToggle');
+  await p2.click('#dashChangingToggle');
+  const stateAfter = await p2.evaluate(() => ({
+    view: (() => { try { return sessionStorage.getItem('hs:viewZip'); } catch (e) { return null; } })(),
+    my: (() => { try { return localStorage.getItem('myZip'); } catch (e) { return null; } })(),
+    zip: (window.HS && window.HS.state) ? String(window.HS.state.zip) : null
+  }));
+  ok(net.length === 0, 'Fix 8K [B5] expanding and collapsing issues ZERO network requests', net.slice(0, 4));
+  ok(p2.url() === urlBefore, 'Fix 8K [B5] the URL is unchanged', p2.url());
+  ok(await p2.evaluate(() => history.length) === histBefore,
+    'Fix 8K [B5] no history entry is pushed');
+  ok(JSON.stringify(stateAfter) === JSON.stringify(stateBefore),
+    'Fix 8K [E13] viewZip / myZip / HS.state.zip are unchanged by expansion', { stateBefore, stateAfter });
+  await ctx2.close();
+}
+
+// ---- C7: the conservative label appears when completeness cannot be proven -----------
+// Driven through the shipped helper in the real browser, so the in-page copy is the one
+// under test — not a Node-only import that could drift from what ships.
+{
+  const c7 = await page.evaluate(() => {
+    const A = window.HS && window.HS.dashAgg;
+    if (!A || !A.changesPreview) return { missing: true };
+    const mk = (n) => Array.from({ length: n }, (_, i) => ({ id: 'x' + i }));
+    return {
+      known: A.changesPreview(mk(40), { countKnown: true }).expandLabel,
+      unknown: A.changesPreview(mk(40), { countKnown: false }).expandLabel,
+      absent: A.changesPreview(mk(40), {}).expandLabel,
+      limit: A.PREVIEW_LIMIT
+    };
+  });
+  ok(!c7.missing && c7.limit === 8, 'Fix 8K [C] the shipped helper is exposed in-browser at PREVIEW_LIMIT 8', c7);
+  ok(c7.known === 'View all 40 changes →', 'Fix 8K [C7] a provable total names the number', c7.known);
+  ok(c7.unknown === 'View more changes →' && !/\d/.test(c7.unknown),
+    'Fix 8K [C7] an unprovable total drops the numeral entirely', c7.unknown);
+  ok(c7.absent === 'View more changes →',
+    'Fix 8K [C7] an ABSENT completeness flag is treated as unknown', c7.absent);
+}
+
+// ---- E: the neighbouring contracts are still standing --------------------------------
+{
+  const e = await page.evaluate(() => ({
+    eyebrow: document.querySelectorAll('.ph .eyebrow').length,
+    h1: document.querySelectorAll('.ph h1').length,
+    h1id: document.querySelector('.ph h1') ? document.querySelector('.ph h1').id : null,
+    affects: /Affects \d+ of your places/.test(document.body.textContent || ''),
+    following: document.querySelectorAll('#dashFollowing').length,
+    places: document.querySelectorAll('#dashPlaces').length,
+    map: document.querySelectorAll('#map, .leaflet-container, canvas.maplibregl-canvas').length,
+    // SCOPED TO THE CARD, DELIBERATELY. The shell already ships an onboarding overlay and
+    // a location/topics modal, both role="dialog" and both pre-existing — a page-wide query
+    // reports them and turns this pin into noise that gets waved through. Fix 8K's claim is
+    // that EXPANSION happens in place, so the question is whether a dialog/drawer/carousel
+    // appeared inside What's Changing.
+    dialogInCard: document.querySelectorAll('#dashChanging dialog, #dashChanging [role="dialog"], #dashChanging .modal, #dashChanging .drawer, #dashChanging [role="tablist"]').length
+  }));
+  ok(e.eyebrow === 1 && e.h1 === 1 && e.h1id === 'dashSub', 'Fix 8K [E14] Fix 8I header is intact', e);
+  ok(e.affects === false, 'Fix 8K [E15] "Affects N of your places" has not returned');
+  ok(e.map === 0 && e.dialogInCard === 0,
+    'Fix 8K [E17] no map, and no modal/drawer/carousel inside What\'s Changing', e);
+}
+
 } finally {
   await browser.close();
   srv.close();

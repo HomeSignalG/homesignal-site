@@ -196,7 +196,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=40d04f68"></script>
+<script src="lib/dashboard-aggregate.js?v=1f8687d8"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=01319a72"></script>
@@ -400,13 +400,27 @@ HS.onReady(async function () {
       function (e) { ok[key] = false; console.warn('[dashboard] ' + key + ' read failed', e); return null; });
   }
 
+  // FIX 8K. The request limit is now PASSED, not inherited. `changesForZips(zips)` defaulted
+  // to 120 inside lib/data.js, so the page had no owned number to compare a result length
+  // against — and copying `120` here as a second literal is exactly the drift this repo has
+  // been bitten by before (a hand-maintained second copy stops covering whatever the first
+  // one gains next). One constant now travels to the query AND to the cap test, so they
+  // cannot disagree. `.limit(limit || 120)` makes this request byte-identical to the old one.
+  //
+  // `devCapped` is computed INSIDE the pool callback, before the reduce. The concat destroys
+  // per-list lengths, and per-ZIP length is the only evidence that a ZIP had more than
+  // DEV_QUERY_LIMIT development records — after the flatten the signal is unrecoverable.
+  var devCapped = false;
   var results = await Promise.all([
-    attempt('changes', HS.data.changesForZips(zips)),
+    attempt('changes', HS.data.changesForZips(zips, A.CHANGES_QUERY_LIMIT)),
     attempt('meetings', HS.data.meetingsForZips(zips)),
     attempt('places', HS.data.communityMetaForZips(zips)),
     attempt('development', pool(zips, A.QUERY_CONCURRENCY, function (z) {
-      return HS.data.developmentForZip(z, 8);
+      return HS.data.developmentForZip(z, A.DEV_QUERY_LIMIT);
     }).then(function (lists) {
+      lists.forEach(function (l) {
+        if ((l || []).length >= A.DEV_QUERY_LIMIT) devCapped = true;
+      });
       return lists.reduce(function (acc, l) { return acc.concat(l || []); }, []);
     }))
   ]);
@@ -478,22 +492,68 @@ HS.onReady(async function () {
       ? '<p class="dwarn">Part of this briefing could not be read just now, so this list is incomplete. Try again shortly.</p>'
       : '<p class="dnote">No new government notices, planning records or local news have been filed for your places recently.</p>';
   } else {
-    changingEl.innerHTML = deduped.slice(0, 12).map(function (it) {
-      var href = changeHref(it);
-      var ext = it.kind === 'news';
-      var when = A.fmtCalendarDate(it.occurred_at);
-      return '<div class="crow">'
-        + '<div class="ck"><span class="ctype ' + it.kind + '">' + HS.esc(it.typeLabel) + '</span></div>'
-        + '<div class="cmain"><div class="ct">' + HS.esc(it.title || 'Untitled record') + '</div>'
-        + '<div class="cmeta">' + attributionHTML(it)
-        + (when ? '<span>' + HS.esc(when) + '</span>' : '') + '</div></div>'
-        + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
-            + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + CTA[it.kind] + '</a>' : '')
-        + '<div class="cv" aria-hidden="true">\u203a</div>'
-        + '</div>';
-    }).join('')
+    // FIX 8K. The row markup below is UNCHANGED — same order, same identity, same Fix 8G
+    // attribution, same per-record CTA and route. The only thing that moved is WHICH slice
+    // of the canonical collection is handed to it, and that decision lives in the view-model.
+    function renderRows(list) {
+      return list.map(function (it) {
+        var href = changeHref(it);
+        var ext = it.kind === 'news';
+        var when = A.fmtCalendarDate(it.occurred_at);
+        return '<div class="crow">'
+          + '<div class="ck"><span class="ctype ' + it.kind + '">' + HS.esc(it.typeLabel) + '</span></div>'
+          + '<div class="cmain"><div class="ct">' + HS.esc(it.title || 'Untitled record') + '</div>'
+          + '<div class="cmeta">' + attributionHTML(it)
+          + (when ? '<span>' + HS.esc(when) + '</span>' : '') + '</div></div>'
+          + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
+              + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + CTA[it.kind] + '</a>' : '')
+          + '<div class="cv" aria-hidden="true">\u203a</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    // COMPLETENESS, NOT COUNT. Four independent limits can hide a record, and any one of
+    // them makes an exact total a claim we cannot support. Tested on the RAW result length,
+    // never the deduped one — dedup can pull a capped 120 back under 120, so a deduped
+    // length below the cap proves nothing. `>=` rather than `===` so a future limit change
+    // still fails safe (toward the modest label) rather than silently asserting a total.
+    var countKnown = !capped
+      && !avail.anyFailed
+      && (rawChanges || []).length < A.CHANGES_QUERY_LIMIT
+      && !devCapped;
+
+    var expanded = false;
+    changingEl.innerHTML = '<div id="dashChangingList"></div>'
+      + '<div id="dashChangingMore"></div>'
       + (avail.anyFailed ? '<p class="dwarn" style="margin-top:10px">Part of this briefing could not be read just now, so this list may be incomplete.</p>' : '')
       + (capped ? '<p class="dnote" style="margin-top:10px">Showing updates across your first ' + zips.length + ' places.</p>' : '');
+
+    var listEl = document.getElementById('dashChangingList');
+    var moreEl = document.getElementById('dashChangingMore');
+    // ONE button, created ONCE and never replaced. Re-creating it on each toggle would
+    // destroy the element the resident is standing on, so focus would jump to <body> mid
+    // interaction. Keeping the node alive makes "focus is stable" structural rather than a
+    // restore-focus workaround that has to be remembered on every future edit.
+    var toggleBtn = null;
+
+    function paint() {
+      var view = A.changesPreview(deduped, { expanded: expanded, countKnown: countKnown });
+      listEl.innerHTML = renderRows(view.visible);
+      if (!view.hasControl) return;              // 8 or fewer: no control, no count line
+      if (!toggleBtn) {
+        toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'inlinebtn';
+        toggleBtn.id = 'dashChangingToggle';
+        toggleBtn.style.marginTop = '12px';
+        toggleBtn.setAttribute('aria-controls', 'dashChangingList');
+        toggleBtn.addEventListener('click', function () { expanded = !expanded; paint(); });
+        moreEl.appendChild(toggleBtn);
+      }
+      toggleBtn.textContent = view.expanded ? view.collapseLabel : view.expandLabel;
+      toggleBtn.setAttribute('aria-expanded', view.expanded ? 'true' : 'false');
+    }
+    paint();
   }
 
   // ---- Official Dates to Know ---------------------------------------------------------
