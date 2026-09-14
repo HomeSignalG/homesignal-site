@@ -110,8 +110,8 @@ await page.click('#plViews [data-view="projects"]');
 const projHtml = await page.locator('#propGrid').innerHTML();
 ok(/SH-130 Data Center Campus/.test(projHtml) && /data-kind="project"/.test(projHtml),
   'Projects view lists the followed project');
-ok(/Location not listed on this project record/.test(projHtml),
-  'seed project without a street address says location is not listed');
+ok(/Location not listed on this development record/.test(projHtml),
+  'seed development without a street address says location is not listed');
 ok((await page.locator('button', { hasText: '+ Add Project' }).count()) === 0,
   'My Places has no + Add Project writer');
 const placesTile = await page.locator('#propStrip').innerText();
@@ -154,7 +154,7 @@ await waitReady();
 await page.waitForSelector('#propGrid');
 await page.click('#plViews [data-view="projects"]');
 const emptyProjects = await page.locator('#propGrid').innerText();
-ok(/No projects followed yet/.test(emptyProjects),
+ok(/No Developments followed yet/.test(emptyProjects),
   'Projects view is empty after unfollow', emptyProjects.slice(0, 200));
 
 await browser.close();

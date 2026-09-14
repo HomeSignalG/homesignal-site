@@ -216,7 +216,12 @@
         <div id="premiumError" class="mnote hidden" role="alert" aria-live="polite" style="color:#c23b34"></div>
         <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
       </div>
-      <div id="premiumDone" class="success hidden">
+      <!-- The failure path already announces (#premiumError is role="alert"); the SUCCESS
+           path did not, so a screen-reader user who submitted heard nothing back. role=
+           "status" is the polite counterpart and is the smallest safe change: the node
+           already exists in the markup and is only unhidden after confirmed persistence, so
+           there is no second announcement and no other Premium entry point changes. -->
+      <div id="premiumDone" class="success hidden" role="status" aria-live="polite">
         <div class="ck">✓</div>
         <h4>You're on the list</h4>
         <p>We'll email you the moment Premium launches.</p>

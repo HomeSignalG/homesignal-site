@@ -79,8 +79,13 @@ ok(!/app_follows/.test(dash),
   'Fix 8 Dashboard never reaches into app_follows rows directly — membership is the hydrated list');
 
 // ---- §4 main-column and rail sections, in the approved order -------------------------
-for (const h of ['What&rsquo;s Changing?', 'Official Dates to Know', 'My Places', 'Projects', 'Stay Informed'])
+for (const h of ['What&rsquo;s Changing?', 'Official Dates to Know', 'My Places', 'Stay Informed'])
   ok(dash.includes('>' + h + '<'), 'Fix 8 Dashboard renders the "' + h.replace('&rsquo;', "'") + '" section');
+// "Projects" left this list because it is no longer a SECTION. Followed developments are a
+// typed GROUP inside My Places, headed by an h3 the view-model builds — so the section
+// roster shrank by one while the thing it held did not move off the page.
+ok(!dash.includes('>Projects<'),
+  'Fix 8 "Projects" is no longer a rail section heading');
 const iChanging = dash.indexOf('What&rsquo;s Changing?');
 const iQol = dash.indexOf('Quality-of-Life Impact');
 const iDates = dash.indexOf('Official Dates to Know');
@@ -158,12 +163,18 @@ ok(/href="alerts\.html"/.test(dash) && /Manage your alerts &rarr;/.test(dash),
 const canonCall = (dash.match(/canonicalPlaces\(\{[\s\S]*?\}\)/) || [''])[0];
 ok(canonCall !== '' && !/project/i.test(canonCall) && /placeCount = places\.length/.test(dash),
   'Fix 8 Dashboard does not count followed projects as monitored places', canonCall);
-// The followed-project section is its own rail section between My Places and Stay Informed —
-// never folded into either, and never a fourth navigation destination. Its resident-facing
-// heading is "Projects" (the id stays dashFollowing: identifiers are not copy).
-ok(dash.indexOf('>My Places<') < dash.indexOf('>Projects<')
-   && dash.indexOf('>Projects<') < dash.indexOf('>Stay Informed<'),
-  'Fix 8J Projects is its own rail section, between My Places and Stay Informed');
+// The followed-development group now lives INSIDE the My Places card — one container for
+// the three types the resident saved — and is still never a navigation destination of its
+// own. The id stays dashFollowing: identifiers are not copy. What must remain true is the
+// containment: the group renders between the place groups and the end of that card, and
+// the Premium card that follows is a separate sibling, not a nested member of it.
+const iCardStart = dash.indexOf('id="dashManagePlaces"');
+const iDevGroup = dash.indexOf('id="dashFollowing"');
+const iPremiumCard = dash.indexOf('id="dashDevUpdatesPremium"');
+ok(iCardStart > 0 && iDevGroup > iCardStart && iPremiumCard > iDevGroup
+   && iPremiumCard < dash.indexOf('>Stay Informed<'),
+  'Fix 8J the Developments group sits inside My Places, with Premium after it',
+  { iCardStart, iDevGroup, iPremiumCard });
 ok(!/<a [^>]*data-nav="following"/.test(dash), 'Fix 8J Following adds no navigation destination');
 ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener not inline onclick');
 

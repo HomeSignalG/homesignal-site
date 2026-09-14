@@ -1,4 +1,4 @@
-// DASHBOARD RAIL COPY — "My Places" and "Projects" are the resident-facing headings.
+// DASHBOARD RAIL COPY — ONE "My Places" card with three typed groups.
 // Run: node test/dashboard-rail-copy.test.mjs
 //
 // WHY THIS FILE EXISTS. The right rail called its first card "Your Places" while the
@@ -8,13 +8,15 @@
 // whose Manage link lands on a tab already labelled "Projects" (properties.html
 // data-view="projects"). Both renames move the Dashboard TOWARD copy that already ships.
 //
-// THE RENAME IS PRESENTATION ONLY, AND THAT IS THE HALF WORTH GUARDING. The identifiers
-// (#dashFollowing, followingCards, followingQueryIds, MAX_FOLLOWING_*) are implementation
-// names, not copy, and renaming them would turn a two-line copy change into a refactor
-// touching the aggregate view-model, four suites and a route. So this file asserts the two
-// headings moved AND that nothing underneath them did: same component markup, same ids,
-// same hrefs, same caps, same order, same supporting sentence — plus the neighbouring Fix
-// 8G / 8I / 8J / 8K pins, because "copy-only" is a claim about what did NOT change.
+// THE CONSOLIDATION IS PRESENTATION ONLY, AND THAT IS THE HALF WORTH GUARDING. The two
+// rail cards ("My Places" and "Projects") are now ONE card carrying three typed groups —
+// Property Addresses, ZIP Codes, Developments — each with its own dynamic count and its own
+// filtered destination. The identifiers (#dashFollowing, followingCards, followingQueryIds,
+// MAX_FOLLOWING_*, target_type='project', ?view=projects) are implementation names, not
+// copy, and renaming them would turn a presentation change into a refactor touching the
+// view-model, four suites, a route and every stored follow. So this file asserts the new
+// resident-facing shape AND that nothing underneath it moved — plus the neighbouring Fix
+// 8G / 8I / 8J / 8K pins, because "presentation-only" is a claim about what did NOT change.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,10 +46,20 @@ console.log('\n--- §1 THE TWO HEADINGS ----------------------------------------
 // page where the heading never changed at all.
 const PLACES_ROW = '<div class="bt-row"><h2>My Places</h2>'
   + '<a href="properties.html" id="dashManagePlaces">Manage &rarr;</a></div>';
-const PROJECTS_ROW = '<div class="bt-row"><h2>Projects</h2>'
-  + '<a href="properties.html?view=projects" id="dashManageFollowing">Manage &rarr;</a></div>';
 ok(dash.includes(PLACES_ROW), '1 the places card heading is "My Places"');
-ok(dash.includes(PROJECTS_ROW), '3 the followed-project card heading is "Projects"');
+// The three typed groups are h3 INSIDE that card, never sibling h2 — three same-level
+// headings under one card title would break the outline a screen reader navigates by.
+for (const g of ['Property Addresses', 'ZIP Codes', 'Developments'])
+  ok(new RegExp("label: '" + g + "'").test(agg) || dash.includes(g),
+    '1 the typed group "' + g + '" is a resident-facing label');
+ok(/RAIL_PLACE_GROUPS[\s\S]*?label: 'Property Addresses'[\s\S]*?label: 'ZIP Codes'/.test(agg),
+  '1 the two PLACE groups are Property Addresses then ZIP Codes, in that order');
+ok(/RAIL_DEV_LABEL\s*=\s*'Developments'/.test(agg),
+  '3 the followed-development group is labelled "Developments" to residents');
+// …while the internal route value stays "projects". Display and storage are separate
+// vocabularies: renaming the route would break every existing link and follow.
+ok(/RAIL_DEV_VIEW\s*=\s*'projects'/.test(agg),
+  '3 the Developments group still routes to the existing ?view=projects filter');
 
 // The OLD copy is gone as a HEADING. Scoped to the <h2>, because "your places" survives
 // legitimately in body copy ("updates for your places just now") — a file-wide ban would
@@ -55,6 +67,7 @@ ok(dash.includes(PROJECTS_ROW), '3 the followed-project card heading is "Project
 const h2s = [...dash.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => m[1].trim());
 ok(!h2s.includes('Your Places'), '2 no card heading reads "Your Places"', h2s);
 ok(!h2s.includes('Following'), '4 no card heading reads "Following"', h2s);
+ok(!h2s.includes('Projects'), '4 no card heading reads "Projects" — it is a typed GROUP now', h2s);
 ok(!/>Your Places</.test(dash) && !/>Following</.test(dash),
   '2+4 neither old heading survives anywhere in the shipped markup',
   (dash.match(/.{0,40}>(?:Your Places|Following)<.{0,40}/) || [])[0]);
@@ -66,37 +79,48 @@ ok(!/>Your Places</.test(dash) && !/>Following</.test(dash),
 const btH2 = (css.match(/\.bt-row h2\{[^}]*\}/) || [''])[0];
 ok(btH2 !== '' && !/text-transform/.test(btH2),
   'the rail heading rule applies no text-transform, so markup case IS rendered case', btH2);
-for (const h of ['My Places', 'Projects'])
+for (const h of ['My Places'])
   ok(h === h.replace(/\b[a-z]/g, (c) => c.toUpperCase()) && h !== h.toUpperCase(),
     '"' + h + '" is Title Case, matching Official Dates to Know / Stay Informed');
 
 // =====================================================================================
-console.log('\n--- §2 THE SUPPORTING SENTENCE IS UNTOUCHED -------------------------------');
+console.log('\n--- §2 THE NO-ALERTS DISCLOSURE IS NOW PERMANENT --------------------------');
 // =====================================================================================
-// It carries the distinction the heading alone cannot: these are projects the resident
-// CHOSE to monitor, which is not the same as projects with alerts enabled.
-ok((dash.match(/Projects you chose to monitor\./g) || []).length === 1,
-  '5 "Projects you chose to monitor." renders exactly once', 
-  (dash.match(/Projects you chose to monitor\./g) || []).length);
-ok(dash.includes('<p class="dnote" style="margin:0 0 12px">Projects you chose to monitor.</p>'),
-  '5 ...in its original markup, directly under the card heading');
-ok(dash.includes(PROJECTS_ROW + '\n          <p class="dnote" style="margin:0 0 12px">Projects you chose to monitor.</p>'),
-  '5 ...and the heading still immediately precedes it');
+// The old supporting sentence ("Projects you chose to monitor.") is GONE, and so is the
+// zero-state that carried the alerts disclaimer — the Developments group is hidden at zero,
+// so a resident with no follows sees neither. That would have LOST the disclosure, which is
+// the one sentence separating "saved" from "subscribed", so it moved somewhere it always
+// renders: the Development Updates Premium card, which is constant and never data-gated.
+ok(!/Projects you chose to monitor\./.test(dash),
+  '5 the old "Projects you chose to monitor." sub-line is gone with its card');
+ok(dash.includes('Today, saving a Development to My Places lets you reopen it. It does not send alerts.'),
+  '5 the no-alerts disclosure now renders permanently on the Premium card');
+// It must not be data-gated: this is the sentence a resident needs BEFORE they follow
+// anything, and the old placement only showed it to residents who had followed nothing.
+const devCard = dash.slice(dash.indexOf('id="dashDevUpdatesPremium"'));
+ok(devCard.indexOf('It does not send alerts.') > 0
+   && devCard.indexOf('It does not send alerts.') < devCard.indexOf('dashDevUpdatesCta'),
+  '5 ...inside the constant Premium card, above its CTA');
 
 // =====================================================================================
 console.log('\n--- §3 CARD ORDER AND THE RAIL SHAPE -------------------------------------');
 // =====================================================================================
 const iPlaces = dash.indexOf('>My Places<');
-const iProjects = dash.indexOf('>Projects<');
+const iPremium = dash.indexOf('id="dashDevUpdatesPremium"');
 const iStay = dash.indexOf('>Stay Informed<');
-ok(iPlaces > 0 && iProjects > iPlaces && iStay > iProjects,
-  '6 rail order is My Places -> Projects -> Stay Informed', { iPlaces, iProjects, iStay });
-// The rail is exactly these three cards. A rename that accidentally duplicated a card would
-// still satisfy the order check above, so the membership is asserted separately.
+ok(iPlaces > 0 && iPremium > iPlaces && iStay > iPremium,
+  '6 rail order is My Places -> Development Updates Premium -> Stay Informed',
+  { iPlaces, iPremium, iStay });
+// The Premium card sits BELOW the inventory card and is never nested inside it: a roadmap
+// statement inside the card listing real saved things would read as one of them.
+ok(dash.indexOf('id="dashDevUpdatesPremium"') > dash.indexOf('id="dashFollowingBody"'),
+  '6 the Premium card follows the My Places card rather than nesting inside it');
+// The rail is exactly two card headings now. A consolidation that accidentally left the old
+// card behind would still satisfy the order check above, so membership is asserted separately.
 const rail = dash.slice(dash.indexOf('<div>', dash.indexOf('Official Dates to Know')));
 const railH2 = [...rail.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => m[1].trim());
-ok(railH2.join(' | ') === 'My Places | Projects | Stay Informed',
-  '6 the rail carries exactly three card headings, none duplicated', railH2);
+ok(railH2.join(' | ') === 'My Places | Stay Informed',
+  '6 the rail carries exactly two card headings, none duplicated', railH2);
 
 // =====================================================================================
 console.log('\n--- §4 NOTHING UNDER THE HEADINGS MOVED ----------------------------------');
@@ -104,21 +128,30 @@ console.log('\n--- §4 NOTHING UNDER THE HEADINGS MOVED ------------------------
 // 7. Routes, ids and the component markup.
 ok(/<a href="properties\.html" id="dashManagePlaces">Manage &rarr;<\/a>/.test(dash),
   '7 the My Places Manage CTA keeps its id and route');
-ok(/<a href="properties\.html\?view=projects" id="dashManageFollowing">Manage &rarr;<\/a>/.test(dash),
-  '7 the Projects Manage CTA keeps its id and route');
-ok((dash.match(/Manage &rarr;/g) || []).length === 2,
-  '7 the "Manage →" copy is unchanged on both cards');
+// ONE Manage link now. The second one is replaced by per-group overflow anchors, which
+// render only when a group actually hides rows — a link that promises nothing is the
+// defect, and two "Manage →" links on one card were an ambiguous accessible name besides.
+ok((dash.match(/Manage &rarr;/g) || []).length === 1,
+  '7 exactly one "Manage →" link, on the unified card',
+  (dash.match(/Manage &rarr;/g) || []).length);
+ok(!/id="dashManageFollowing"/.test(dash),
+  '7 the second Manage CTA is gone with the second card');
+ok(/railHref\(view\)[\s\S]{0,120}'properties\.html\?view='/.test(agg),
+  '7 per-group overflow still routes to the existing filtered My Places views');
 ok(/id="dashPlaces"/.test(dash) && /id="dashFollowing"/.test(dash)
    && /id="dashFollowingBody"/.test(dash),
   '7 no card id was renamed for terminology');
-ok(/<div class="block" id="dashFollowing" hidden>/.test(dash),
-  '7 the Projects card still ships hidden, for the Fix 8J session gate to reveal');
+ok(/<div id="dashFollowing" hidden>/.test(dash),
+  '7 the Developments GROUP still ships hidden, for the Fix 8J session gate to reveal');
 ok(!/id="dashProjects"|id="dashMyPlaces"|id="dashManageProjects"/.test(dash),
   '7 no second, copy-aligned id was invented alongside the old one');
 // No new CSS and no new component: both cards are still the shared .block/.bt-row pair the
 // other rail cards use, so the rename could not have needed a style.
-ok((dash.match(/<div class="bt-row">/g) || []).length === 5,
-  'the rename introduced no new card component — five .bt-row rows, as before',
+// Four .bt-row rows, not five: What's Changing, Official Dates, My Places, Stay Informed.
+// The Projects card's row is gone because the card is gone — the group it held is now an
+// h3 inside My Places, and the Premium card uses the shared .p2 component, not .bt-row.
+ok((dash.match(/<div class="bt-row">/g) || []).length === 4,
+  'the consolidation removed one card row and introduced no new card component',
   (dash.match(/<div class="bt-row">/g) || []).length);
 ok(!/class="[^"]*\b(myplaces|projectscard|rail-projects)\b/.test(dash),
   'no new class name was introduced for either card');
@@ -131,8 +164,8 @@ ok(/MAX_FOLLOWING_IDS\s*=\s*50/.test(agg) && /MAX_FOLLOWING_CARDS\s*=\s*4/.test(
 ok(/HS\.followedProjectIds/.test(dash) && /A\.followingQueryIds\(/.test(dash)
    && /A\.followingCards\(/.test(dash) && /HS\.data\.projectsByIds/.test(dash),
   '10 the Dashboard still reads followed projects through the same four call sites');
-ok(/does not turn on email alerts/.test(dash),
-  '10 the empty state still says following does not turn on email alerts');
+ok(/It does not send alerts\./.test(dash),
+  '10 the rail still states, permanently, that saving a Development sends no alerts');
 ok(!/user_subscriptions|pipeline_type|digest/.test(dash),
   '10 the Projects card still touches no subscription or digest concept');
 
@@ -180,8 +213,14 @@ ok(tpl.length > 2000 && /id="dashFollowing"/.test(tpl),
 ok(!/Your Places/.test(tpl) && !/\bFollowing\b/.test(tpl),
   'no resident-facing string in the rendered markup still reads "Your Places" or "Following"',
   (tpl.match(/.{0,50}(?:Your Places|Following).{0,50}/) || [])[0]);
-ok(/>My Places</.test(tpl) && />Projects</.test(tpl),
-  'the rendered markup carries both new headings');
+ok(/>My Places</.test(tpl), 'the rendered markup carries the unified card heading');
+// The typed group headings are BUILT (h3 with the count inside the heading text), so the
+// static template carries the container and the view-model carries the labels. Asserting
+// the container here and the labels in §1 is what keeps each check scoped to its own file.
+ok(/id="dashPlaces"/.test(tpl) && /id="dashFollowingBody"/.test(tpl),
+  'the rendered markup carries both group containers inside the one card');
+ok(/id="dashDevUpdatesPremium"/.test(tpl) && /Coming soon/.test(tpl),
+  'the rendered markup carries the dormant Premium card');
 
 console.log(fails ? '\n' + fails + ' failed' : '\nAll Dashboard rail copy assertions passed.');
 process.exit(fails ? 1 : 0);

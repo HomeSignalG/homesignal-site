@@ -90,6 +90,25 @@
   .placerow .ps{font-size:11.5px;color:var(--ink-3);margin-top:1px}
   .placerow .pc{flex:0 0 auto;color:var(--ink-3);font-size:14px}
   .ptag-kind{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+  /* Unified My Places rail — three typed groups inside ONE card. Deliberately no border,
+     fill, radius or shadow per group: those say "separate object", and the whole point is
+     that these are three types of one collection. A hairline top rule separates them. */
+  .railgroup + .railgroup{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .railgh{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+          color:var(--ink-3);margin:0 0 4px}
+  /* tabular-nums so the count does not shift the heading as it changes */
+  .railgc{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  .railempty{margin:4px 0 2px}
+  /* The overflow control is a LINK because it navigates — never Fix 8K's in-place button.
+     Own focus-visible ring, since it is a new navigable target. */
+  .railmore{display:inline-block;margin-top:8px;font-size:12px;font-weight:600;
+            color:var(--green);text-decoration:none;padding:4px 0}
+  .railmore:hover{text-decoration:underline}
+  .railmore:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  /* An unresolved Development is a plain div, not an anchor: no pointer, no hover lift, no
+     chevron — there is no record to open. It stays visible and counted. */
+  .placerow--unresolved{cursor:default}
+  .placerow--unresolved:hover{background:transparent}
   /* The shared .bt-row link renders 19px tall. app.css stays untouched (Fix 8 §1), so the
      target is lifted here, on this page only, without moving the text. */
   .dashpage .bt-row a{display:inline-block;padding:3px 0;margin:-3px 0}
@@ -119,7 +138,14 @@
             <div class="n" id="dashCountN">—</div>
             <div class="lbl" id="dashCountLbl">Monitored places</div>
           </div>
-          <div class="note">Tracking development, government notices, meetings, and local news that may affect your community.</div>
+          <!-- SCOPE DISCLOSURE. The previous line said "that may affect your community",
+               which left the geographic unit unstated; the feeds are anchored on the chain
+               ROOT (app_refresh_zip: community_id = coalesce(_root,_cid)), so one county's
+               notices, meetings and news populate every ZIP beneath it. Naming the ZIP as
+               what the resident monitors and the COUNTY as where records come from is the
+               same correction alerts.html already carries — a page that implies ZIP-origin
+               for county-sourced records is asserting something the data does not say. -->
+          <div class="note">Tracking development, government notices, meetings, and local news for the ZIP codes your monitored places are in. Records are sourced from the county each ZIP belongs to.</div>
         </div>
       </div>
     </div>
@@ -129,6 +155,14 @@
         <div class="block">
           <div class="bt-row"><h2>What&rsquo;s Changing?</h2></div>
           <p class="dnote" id="dashChangingSub" style="margin:-8px 0 12px">Relevant updates across all your monitored places.</p>
+          <!-- ASYNCHRONOUS STATUS, NARROWLY SCOPED. Every failure message on this page is
+               written after load, and until now nothing announced it — a screen-reader user
+               was told nothing while a sighted one saw "we could not read updates". The live
+               region is this ONE empty paragraph, present in the markup BEFORE any content
+               is injected (a region created together with its text is not reliably
+               announced). It is deliberately NOT the list container: wrapping #dashChanging
+               would make Fix 8K's in-place expansion re-announce the whole briefing. -->
+          <p class="dwarn" id="dashChangingStatus" role="status" aria-live="polite" hidden></p>
           <div id="dashChanging"><p class="dnote">Loading updates&hellip;</p></div>
         </div>
 
@@ -152,33 +186,65 @@
 
         <div class="block">
           <div class="bt-row"><h2>Official Dates to Know</h2></div>
+          <p class="dwarn" id="dashDatesStatus" role="status" aria-live="polite" hidden></p>
           <div id="dashDates"><p class="dnote">Loading official dates&hellip;</p></div>
         </div>
       </div>
 
       <div>
+        <!-- UNIFIED MY PLACES — ONE CARD, THREE TYPED GROUPS.
+             This replaces the two separate rail cards ("My Places" + "Projects"). It is a
+             PRESENTATION consolidation only: the three groups keep three different stores,
+             three identifier types, three destinations and three failure paths.
+
+               Property Addresses -> app_properties        (hydrated at boot, no network read)
+               ZIP Codes          -> app_follows(community) (hydrated at boot, no network read)
+               Developments       -> app_follows(project)   -> app_projects (a network read
+                                                               that is ALLOWED to fail)
+
+             A Development is still NOT a Place: absent from canonicalPlaces, absent from the
+             monitored-place count in the header, absent from queryZips and therefore from
+             every content read. Merging the CARDS must never merge the COLLECTIONS.
+
+             ONE h2 for the card, one Manage link, and h3 per group — three sibling h2 under
+             one card title would break the heading outline, and the group heading is the
+             thing a screen-reader user navigates by.
+
+             THE DEVELOPMENTS GROUP IS REMOVED, NOT EMPTIED, without a real session (Fix 8J):
+             shell.js seeds state.follows from localStorage at module scope regardless of
+             session, and clearAccountLocalState() runs only on an explicit sign-out or an
+             account-id change — never on a session that merely expired. app_projects carries
+             a public anon select policy, so those titles are resolvable on a shared browser.
+             Rendering "Developments · 0" there would assert a fact about an account the page
+             cannot read; removing the node says nothing instead. -->
         <div class="block">
           <div class="bt-row"><h2>My Places</h2><a href="properties.html" id="dashManagePlaces">Manage &rarr;</a></div>
           <div id="dashPlaces"></div>
+          <div id="dashFollowing" hidden>
+            <div id="dashFollowingBody"></div>
+          </div>
         </div>
-        <!-- FOLLOWING (Fix 8J)
-             The projects the resident explicitly chose to monitor. A followed project is NOT
-             a Place: it is absent from canonicalPlaces, from the monitored-place count, and
-             from every content read. This section only confirms the choice and routes to the
-             existing Development and My Places surfaces.
+        <!-- DEVELOPMENT UPDATES · PREMIUM
+             A separate card BELOW My Places, never nested inside the inventory card and never
+             among the live What's Changing / Official Dates feeds. Like the Quality-of-Life
+             card it is a ROADMAP STATEMENT and is CONSTANT — it reads identically whether
+             every source succeeded or every source failed, because it reports on nothing.
 
-             It ships HIDDEN and is REMOVED outright unless a real signed-in session is
-             present. shell.js seeds state.follows from localStorage at module scope
-             regardless of session, and clearAccountLocalState() (which strips the project:
-             keys) runs only on an explicit sign-out or an account-id change — never on a
-             session that merely expired. app_projects carries a public anon select policy, so
-             on a shared or expired browser those titles are resolvable without a session.
-             Removing the node rather than hiding it is deliberate: a hidden h2 still answers
-             querySelectorAll, so "hidden" would leave an empty heading in the rail's shape. -->
-        <div class="block" id="dashFollowing" hidden>
-          <div class="bt-row"><h2>Projects</h2><a href="properties.html?view=projects" id="dashManageFollowing">Manage &rarr;</a></div>
-          <p class="dnote" style="margin:0 0 12px">Projects you chose to monitor.</p>
-          <div id="dashFollowingBody"></div>
+             The copy is future tense throughout. There is no join today from a followed
+             development to an official-record stream: app_follows.target_id is a soft TEXT
+             reference to app_projects, while resolved_project_status is keyed to a different
+             table. Any present-tense claim here ("status changes", "new permits", "upcoming
+             decisions") would describe a capability that does not exist. Markup reuses the
+             shared app.css .p2/.p2h/.p2sub/.inlinebtn Premium component — no Dashboard-local
+             Premium CSS is declared. -->
+        <div class="block" style="padding:0;border:none;box-shadow:none;background:none">
+          <div class="p2" id="dashDevUpdatesPremium">
+            <div class="p2h" id="dashDevUpdatesLabel">Development Updates &middot; Premium</div>
+            <div class="p2sub" id="dashDevUpdatesAvail">Coming soon</div>
+            <div class="p2sub" id="dashDevUpdatesBody" style="margin-bottom:0">We&rsquo;re building a way to follow one development&rsquo;s own official record over time&mdash;the filings, hearings, and decisions that belong to it.</div>
+            <div class="p2sub" id="dashDevUpdatesToday" style="margin-bottom:0">Today, saving a Development to My Places lets you reopen it. It does not send alerts.</div>
+            <button type="button" class="inlinebtn" id="dashDevUpdatesCta" style="margin-top:12px">Get Premium access &rarr;</button>
+          </div>
         </div>
         <div class="block">
           <div class="bt-row"><h2>Stay Informed</h2></div>
@@ -196,7 +262,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=eca8faf1"></script>
+<script src="lib/dashboard-aggregate.js?v=c50f7bf3"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=01319a72"></script>
@@ -290,29 +356,79 @@ HS.onReady(async function () {
     HS.openPremiumModal(A.premiumLeadContext());
   });
 
-  // ---- Your Places ------------------------------------------------------------------
+  // ---- Development Updates Premium CTA ------------------------------------------------
+  // The SAME shared opener, the same shared modal, the same canonical waitlist path. Its
+  // context is devUpdatesLeadContext(), which carries a source and nothing else — so no ZIP,
+  // no address and no development id can reach the lead, and the attribution is the feature
+  // rather than one arbitrary place. Opening this modal is the ONLY thing the button does:
+  // it enables no alert, creates no subscription, and never calls ensureAreaSubscribed.
+  document.getElementById('dashDevUpdatesCta').addEventListener('click', function () {
+    HS.openPremiumModal(A.devUpdatesLeadContext());
+  });
+
+  // ---- My Places — the two PLACE groups ---------------------------------------------
   // §9: no priority counts, no activity counts, no zeros. A row is a label and a
   // drill-down to that place's own existing destination. Clicking is navigation only — it
   // never changes Dashboard membership.
+  //
+  // The groups are a VIEW over `places`, the same array canonicalPlaces returned. Nothing
+  // here re-derives membership, and the Developments group below is built from a different
+  // collection entirely — so a Development can never reach queryZips or the header count.
   function placeHref(p) {
     return p.kind === 'address'
       ? ('property.html?id=' + encodeURIComponent(p.placeId))
       : HS.pageHref('community.html', { zip: p.zip });
   }
+  // Every row states its TYPE in text, never by colour alone — the kind tag is the same
+  // one My Places' own cards carry, so the two surfaces name a thing identically.
+  function placeRowHTML(p) {
+    return '<a class="placerow" href="' + HS.esc(placeHref(p)) + '">'
+      + '<div class="pmain"><div class="pl">' + HS.esc(p.label) + '</div>'
+      + '<div class="ps"><span class="ptag-kind">' + (p.kind === 'address' ? 'Address' : 'ZIP Code') + '</span>'
+      + (p.sub ? ' &middot; ' + HS.esc(p.sub) : '') + '</div></div>'
+      + '<div class="pc" aria-hidden="true">&rsaquo;</div></a>';
+  }
+  // The count rides INSIDE the heading text, so a screen reader navigating by heading hears
+  // "Property Addresses, 2, heading level 3" — the number arrives with the group rather
+  // than as an orphan after it. The heading is not a link: a group at or under the preview
+  // limit hides nothing, so a heading link would promise a filtered view with nothing in it.
+  function groupHeadingHTML(g) {
+    return '<h3 class="railgh">' + HS.esc(g.label) + ' &middot; '
+      + '<span class="railgc">' + g.count + '</span></h3>';
+  }
+  // An overflow control is an ANCHOR because it navigates — deliberately NOT the in-place
+  // button Fix 8K uses in the main column. Two controls that look alike and behave
+  // differently is the comprehension failure; this one also carries no aria-expanded.
+  // It renders only when something is actually hidden (g.hasOverflow), so the promise it
+  // makes is always keepable.
+  function groupOverflowHTML(g) {
+    if (!g.hasOverflow) return '';
+    return '<a class="railmore" href="' + HS.esc(g.href) + '">' + HS.esc(g.overflowLabel) + '</a>';
+  }
+
   var placesEl = document.getElementById('dashPlaces');
-  placesEl.innerHTML = places.length
-    ? places.map(function (p) {
-        return '<a class="placerow" href="' + HS.esc(placeHref(p)) + '">'
-          + '<div class="pmain"><div class="pl">' + HS.esc(p.label) + '</div>'
-          + '<div class="ps"><span class="ptag-kind">' + (p.kind === 'address' ? 'Address' : 'ZIP Code') + '</span>'
-          + (p.sub ? ' &middot; ' + HS.esc(p.sub) : '') + '</div></div>'
-          + '<div class="pc" aria-hidden="true">&rsaquo;</div></a>';
-      }).join('')
-    : '<p class="dnote" style="margin-bottom:12px">Add a place to see changes and official dates across the locations you monitor.</p>'
+
+  if (places.length) {
+    // A group with zero members still renders its heading and an honest one-liner: an
+    // empty ZIP Codes group beside populated Addresses is a true statement about that
+    // type, not a defect — the same rule My Places' per-view empty states already follow.
+    placesEl.innerHTML = A.placeGroups(places).map(function (g) {
+      return '<div class="railgroup" data-group="' + HS.esc(g.kind) + '">'
+        + groupHeadingHTML(g)
+        + (g.count
+            ? g.visible.map(placeRowHTML).join('') + groupOverflowHTML(g)
+            : '<p class="dnote railempty">' + (g.kind === 'address' ? 'No addresses yet.' : 'No ZIP codes yet.') + '</p>')
+        + '</div>';
+    }).join('');
+  } else {
+    // ZERO PLACES: the existing whole-card empty state and the two existing add actions,
+    // unchanged. No generic "Add to My Places" — Address and ZIP Code are two different
+    // writers (a Census geocode vs a coverage lookup) and one button cannot be both.
+    placesEl.innerHTML =
+      '<p class="dnote" style="margin-bottom:12px">Add a place to see changes and official dates across the locations you monitor.</p>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
       + '<button class="inlinebtn" type="button" id="dashAddAddress">Add an address</button>'
       + '<button class="inlinebtn" type="button" id="dashAddZip">Add a ZIP code</button></div>';
-  if (!places.length) {
     document.getElementById('dashAddAddress').addEventListener('click', function () { HS.addHome(); });
     document.getElementById('dashAddZip').addEventListener('click', function () { HS.openLoc(); });
   }
@@ -339,31 +455,50 @@ HS.onReady(async function () {
         console.warn('[dashboard] following read failed', e);
       }
     }
-    var following = A.followingCards({ ids: followIds, rows: followRows });
+    // cap = RAIL_PREVIEW_LIMIT so all three groups preview at the same depth. `total` is
+    // still id-derived inside followingCards, so the count below survives a failed read.
+    var following = A.followingCards({ ids: followIds, rows: followRows, cap: A.RAIL_PREVIEW_LIMIT });
+    var devGroup = A.developmentsGroup(following);
     var followBody = document.getElementById('dashFollowingBody');
-    if (!following.total) {
-      followBody.innerHTML = '<p class="dnote">Open a project and tap Add to My Places to follow it. '
-        + 'Followed projects appear here so you can reopen them. This does not turn on email alerts.</p>';
+    if (!devGroup.count) {
+      // ZERO DEVELOPMENTS: the group is hidden entirely rather than rendered as
+      // "Developments · 0". There is no add/find action for this type, so an empty state
+      // would offer nothing actionable — and the same node is REMOVED outright when the
+      // session is unreadable, where a zero would be a claim about an account we cannot see.
+      followingEl.hidden = true;
+      followBody.innerHTML = '';
     } else {
-      followBody.innerHTML = following.cards.map(function (c) {
-        // The sub-line is the record's own status (or type) and its ZIP — nothing else is
-        // available without asserting currency the data cannot support. See the FOLLOWING
-        // notes in lib/dashboard-aggregate.js for what is refused and why.
-        var sub = c.unresolved
-          ? 'We could not load this project’s details.'
-          : [c.context, c.place].filter(Boolean).join(' · ');
-        var href = HS.pageHref('development.html', { id: c.id, zip: c.zip });
-        return '<a class="placerow" href="' + HS.esc(href) + '">'
-          + '<div class="pmain"><div class="pl">' + HS.esc(c.title) + '</div>'
-          + (sub ? '<div class="ps">' + HS.esc(sub) + '</div>' : '')
-          + '</div><div class="pc" aria-hidden="true">›</div></a>';
-      }).join('')
-        + (following.overflow
-            ? '<p class="dnote" style="margin-top:10px">' + following.overflow
-              + ' more followed project' + (following.overflow === 1 ? '' : 's') + ' in My Places.</p>'
-            : '');
+      followBody.innerHTML = '<div class="railgroup" data-group="development">'
+        + groupHeadingHTML(devGroup)
+        + devGroup.visible.map(function (c) {
+          // The sub-line is the record's own status (or type) and its ZIP — nothing else is
+          // available without asserting currency the data cannot support. See the FOLLOWING
+          // notes in lib/dashboard-aggregate.js for what is refused and why.
+          var sub = c.unresolved
+            ? 'We could not load this development’s details.'
+            : [c.context, c.place].filter(Boolean).join(' · ');
+          var label = '<div class="pmain"><div class="pl">' + HS.esc(c.title) + '</div>'
+            + (sub ? '<div class="ps">' + HS.esc(sub) + '</div>' : '') + '</div>';
+          // AN UNRESOLVED FOLLOW IS NOT A DESTINATION. The row used to be an anchor
+          // unconditionally, and c.zip is absent precisely when the record did not resolve —
+          // so HS.pageHref produced development.html with no ZIP context and the resident
+          // landed on a list about somewhere else. It stays visible and counted (removing it
+          // would make the heading disagree with the rows) but it is a plain div with no
+          // chevron, because there is no record to open. It remains removable from My Places.
+          if (c.unresolved) {
+            return '<div class="placerow placerow--unresolved" data-unresolved="1">' + label + '</div>';
+          }
+          var href = HS.pageHref('development.html', { id: c.id, zip: c.zip });
+          return '<a class="placerow" href="' + HS.esc(href) + '">' + label
+            + '<div class="pc" aria-hidden="true">›</div></a>';
+        }).join('')
+        // AN OVERFLOW MESSAGE THAT PROMISES MORE MUST BE ACTIONABLE. This was a bare <p>
+        // naming a number with no way to reach it; it is now the same anchor the two place
+        // groups use, routed to the existing ?view=projects filter.
+        + groupOverflowHTML(devGroup)
+        + '</div>';
+      followingEl.hidden = false;
     }
-    followingEl.hidden = false;
   }
 
   // ---- Zero places: nothing to brief on, and that is a true statement ---------------
@@ -483,13 +618,25 @@ HS.onReady(async function () {
   }
   var CTA = { dev: 'Review development →', gov: 'View notice →', news: 'Read article →' };
 
+  // Writes the failure text into the section's OWN persistent live region. Text-only and
+  // idempotent: a status that is set twice says the same thing once, and an empty message
+  // hides the node so an assistive technology is never handed an empty announcement.
+  function setStatus(id, msg) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.hidden = !msg;
+  }
+
   var changingEl = document.getElementById('dashChanging');
   if (avail.changes === 'failed' && avail.development === 'failed') {
-    changingEl.innerHTML = '<p class="dwarn">We could not read updates for your places just now. '
-      + 'This is a loading problem, not an absence of activity — try again shortly.</p>';
+    setStatus('dashChangingStatus', 'We could not read updates for your places just now. '
+      + 'This is a loading problem, not an absence of activity — try again shortly.');
+    changingEl.innerHTML = '';
   } else if (!deduped.length) {
+    if (avail.anyFailed) setStatus('dashChangingStatus', 'Part of this briefing could not be read just now, so this list is incomplete. Try again shortly.');
     changingEl.innerHTML = avail.anyFailed
-      ? '<p class="dwarn">Part of this briefing could not be read just now, so this list is incomplete. Try again shortly.</p>'
+      ? ''
       : '<p class="dnote">No new government notices, planning records or local news have been filed for your places recently.</p>';
   } else {
     // FIX 8K. The row markup below is UNCHANGED — same order, same identity, same Fix 8G
@@ -523,9 +670,12 @@ HS.onReady(async function () {
       && !devCapped;
 
     var expanded = false;
+    // The incompleteness notice moved OUT of this innerHTML and into the live region above.
+    // That is what keeps Fix 8K's expansion silent: paint() rewrites #dashChangingList only,
+    // and the status node is not inside it, so toggling never re-announces the briefing.
+    if (avail.anyFailed) setStatus('dashChangingStatus', 'Part of this briefing could not be read just now, so this list may be incomplete.');
     changingEl.innerHTML = '<div id="dashChangingList"></div>'
       + '<div id="dashChangingMore"></div>'
-      + (avail.anyFailed ? '<p class="dwarn" style="margin-top:10px">Part of this briefing could not be read just now, so this list may be incomplete.</p>' : '')
       + (capped ? '<p class="dnote" style="margin-top:10px">Showing updates across your first ' + zips.length + ' places.</p>' : '');
 
     var listEl = document.getElementById('dashChangingList');
@@ -597,10 +747,12 @@ HS.onReady(async function () {
   }
   var datesEl = document.getElementById('dashDates');
   if (avail.meetings === 'failed' && avail.changes === 'failed') {
-    datesEl.innerHTML = '<p class="dwarn">We could not read official dates for your places just now. Try again shortly.</p>';
+    setStatus('dashDatesStatus', 'We could not read official dates for your places just now. Try again shortly.');
+    datesEl.innerHTML = '';
   } else if (!dated.length) {
+    if (avail.anyFailed) setStatus('dashDatesStatus', 'Part of this section could not be read just now, so it is incomplete. Try again shortly.');
     datesEl.innerHTML = avail.anyFailed
-      ? '<p class="dwarn">Part of this section could not be read just now, so it is incomplete. Try again shortly.</p>'
+      ? ''
       : '<p class="dnote">No upcoming official dates are available right now.</p>';
   } else {
     datesEl.innerHTML = dated.slice(0, 8).map(function (d) {
@@ -626,8 +778,8 @@ HS.onReady(async function () {
             + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + cta + '</a>' : '')
         + '<div class="cv" aria-hidden="true">\u203a</div>'
         + '</div>';
-    }).join('')
-      + (avail.anyFailed ? '<p class="dwarn" style="margin-top:10px">Part of this section could not be read just now, so it may be incomplete.</p>' : '');
+    }).join('');
+    if (avail.anyFailed) setStatus('dashDatesStatus', 'Part of this section could not be read just now, so it may be incomplete.');
   }
 });
 </script>
