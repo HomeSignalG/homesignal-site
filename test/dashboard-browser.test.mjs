@@ -146,8 +146,8 @@ try {
   // without a real session — so the signed-out rail is still exactly these two headings. That
   // is the privacy rule showing up in the page's shape, not an accident of ordering, so it is
   // asserted positively below as well: no heading, no node, and no project id in the markup.
-  ok(shape.rail.join(' | ') === 'Your Places | Stay Informed',
-    'Fix 8 right rail signed-out is Your Places → Stay Informed', shape.rail);
+  ok(shape.rail.join(' | ') === 'My Places | Stay Informed',
+    'Fix 8 right rail signed-out is My Places → Stay Informed', shape.rail);
   const followOut = await page.evaluate(() => ({
     node: document.querySelectorAll('#dashFollowing, #dashFollowingBody').length,
     text: document.body.innerText.indexOf('Projects you chose to monitor')
@@ -417,7 +417,7 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['mo
   // 8. Section order is untouched by a presentation-only change.
   ok(got.main.join(' | ') === "What’s Changing? | QUALITY-OF-LIFE IMPACT · PREMIUM | Official Dates to Know",
     'Fix 8I [' + label + '] main column order unchanged', got.main);
-  ok(got.rail.join(' | ') === 'Your Places | Stay Informed',
+  ok(got.rail.join(' | ') === 'My Places | Stay Informed',
     'Fix 8I [' + label + '] right rail order unchanged', got.rail);
 }
 
