@@ -16,7 +16,16 @@
      on the type pill and the CTA. Without this the whole page scrolled sideways at 390px
      (measured), which §4 forbids. min-width:0 lets the column shrink; the rows then wrap. */
   .dashpage .cols > *{min-width:0}
-  @media(max-width:900px){.dashpage .cols{grid-template-columns:1fr}}
+  /* FIX 8G monitored-ZIP attribution. Both label variants are in the DOM and the EXISTING
+     900px breakpoint — the page's own wide-desktop boundary — decides which is shown. No
+     runtime text measurement, no layout jump, and `display:none` keeps the inactive variant
+     out of the accessibility tree so exactly one summary is exposed at any width. */
+  .mzip-narrow{display:none}
+  @media(max-width:900px){
+    .dashpage .cols{grid-template-columns:1fr}
+    .mzip-wide{display:none}
+    .mzip-narrow{display:inline}
+  }
   @media(max-width:560px){
     /* Stack each row's CTA under its content rather than squeezing the title to nothing. */
     .dashpage .crow,.dashpage .drow{flex-wrap:wrap}
@@ -168,7 +177,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=9f6ae57d"></script>
+<script src="lib/dashboard-aggregate.js?v=c0a78db1"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=01319a72"></script>
@@ -327,14 +336,26 @@ HS.onReady(async function () {
   var avail = A.sourceAvailability(ok);
 
   // ---- Normalize to one item shape, each carrying its OWN place provenance ----------
-  function labelForZip(z) {
-    var m = meta[z];
-    return (m && m.name) ? m.name : ('ZIP ' + z);
-  }
-  function placeCtx(item) {
-    if (item.placeCount > 1) return 'Affects ' + item.placeCount + ' of your places';
-    var p = item.places && item.places[0];
-    return p ? p.label : (item.zip ? labelForZip(item.zip) : '');
+  // FIX 8G. `placeCtx` and `datePlaceCtx` lived here and are gone. They were two
+  // near-duplicate implementations of one rule, and both collapsed to "Affects N of your
+  // places" — a string that could not distinguish ONE monitored ZIP the resident also saved
+  // an address inside from TWO genuinely affected monitored ZIPs. The rule now lives in the
+  // view-model (lib/dashboard-aggregate.js::monitoredZipAttribution) and the page renders a
+  // presentation-safe object; it decides no geography of its own.
+  //
+  // The label map is built ONCE from `meta`, which is already loaded in ONE query for every
+  // monitored ZIP — so no row and no ZIP causes a lookup, and query count is unchanged.
+  var zipLabelMap = A.buildZipLabelMap(zips, meta, places);
+  function attributionHTML(item) {
+    var wide = A.monitoredZipAttribution(item, zips, zipLabelMap, { maxLabels: A.ATTRIBUTION_MAX_LABELS_WIDE });
+    if (!wide.summaryText) return '';
+    var narrow = A.monitoredZipAttribution(item, zips, zipLabelMap, { maxLabels: A.ATTRIBUTION_MAX_LABELS_NARROW });
+    // BOTH variants are emitted and ONE is hidden by the existing 900px breakpoint. There is
+    // no runtime text measurement (forbidden) and no layout jump; `display:none` also keeps
+    // the inactive variant out of the accessibility tree, so a screen reader is offered
+    // exactly one summary at any width — never a hidden duplicate.
+    return '<span class="mzip mzip-wide">' + HS.esc(wide.summaryText) + '</span>'
+      + '<span class="mzip mzip-narrow">' + HS.esc(narrow.summaryText) + '</span>';
   }
 
   var items = [];
@@ -386,7 +407,7 @@ HS.onReady(async function () {
       return '<div class="crow">'
         + '<div class="ck"><span class="ctype ' + it.kind + '">' + HS.esc(it.typeLabel) + '</span></div>'
         + '<div class="cmain"><div class="ct">' + HS.esc(it.title || 'Untitled record') + '</div>'
-        + '<div class="cmeta"><span>' + HS.esc(placeCtx(it)) + '</span>'
+        + '<div class="cmeta">' + attributionHTML(it)
         + (when ? '<span>' + HS.esc(when) + '</span>' : '') + '</div></div>'
         + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
             + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + CTA[it.kind] + '</a>' : '')
@@ -403,9 +424,12 @@ HS.onReady(async function () {
   // upcoming rows and is never rendered — see lib/dashboard-aggregate.js. No relative
   // urgency label, no timezone, no participation instruction.
   var todayYmd = new Date().toISOString().slice(0, 10);
+  // Each expanded row carries the meeting's WHOLE canonical ZIP reach, not just the one
+  // it was expanded onto — so the collapse below re-forms one official date that can name
+  // every monitored ZIP it touches. `zips` is deduped by the view-model before labelling.
   var mtgItems = (rawMeetings || []).reduce(function (acc, m) {
     (m.zips || []).forEach(function (z) {
-      acc.push(Object.assign({}, m, { zip: z, places: A.placesForZip(places, z) }));
+      acc.push(Object.assign({}, m, { zip: z, sourceZips: m.zips, places: A.placesForZip(places, z) }));
     });
     return acc;
   }, []);
@@ -418,7 +442,12 @@ HS.onReady(async function () {
   var seenDate = {};
   dated = dated.filter(function (d) {
     var k = d.kind + '\u001f' + String(d.id);
-    if (seenDate[k]) { seenDate[k].places = seenDate[k].places.concat(d.places); return false; }
+    if (seenDate[k]) {
+      seenDate[k].places = seenDate[k].places.concat(d.places);
+      // UNION, never concat: a repeated ZIP must not become a repeated label (Fix 8G §9).
+      seenDate[k].sourceZips = A.distinctZips((seenDate[k].sourceZips || []).concat(d.sourceZips || []));
+      return false;
+    }
     seenDate[k] = d; return true;
   });
 
@@ -428,13 +457,6 @@ HS.onReady(async function () {
     return '<div class="dblock"><div class="m">' + MON[Number(p[1]) - 1] + '</div>'
       + '<div class="d">' + String(Number(p[2])) + '</div></div>';
   }
-  function datePlaceCtx(d) {
-    var uniq = {}, labels = [];
-    (d.places || []).forEach(function (p) { if (p && !uniq[p.id]) { uniq[p.id] = 1; labels.push(p.label); } });
-    if (labels.length > 1) return 'Affects ' + labels.length + ' of your places';
-    return labels[0] || (d.zip ? labelForZip(d.zip) : '');
-  }
-
   var datesEl = document.getElementById('dashDates');
   if (avail.meetings === 'failed' && avail.changes === 'failed') {
     datesEl.innerHTML = '<p class="dwarn">We could not read official dates for your places just now. Try again shortly.</p>';
@@ -445,8 +467,8 @@ HS.onReady(async function () {
   } else {
     datesEl.innerHTML = dated.slice(0, 8).map(function (d) {
       var meta2 = [];
-      var ctx = datePlaceCtx(d);
-      if (ctx) meta2.push('<span>' + HS.esc(ctx) + '</span>');
+      var ctx = attributionHTML(d);
+      if (ctx) meta2.push(ctx);
       if (d.kind === 'meeting') {
         if (d.time) meta2.push('<span>' + HS.esc(d.time) + '</span>');
         if (d.location) meta2.push('<span>' + HS.esc(d.location) + '</span>');
