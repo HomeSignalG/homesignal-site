@@ -108,10 +108,36 @@ ok(!/High Impact|Medium Impact|Low Impact|impactRating|impact_score|impact_dimen
   'Fix 8 no QoL/impact label, rating or score anywhere on Dashboard',
   (dash.match(/.{0,40}(High Impact|impactRating|impact_score).{0,40}/) || [])[0]);
 
-// ---- no AGGREGATE "View all" — there is no All My Places destination to send them to --
-ok(!/View all/.test(dash),
-  'Fix 8 no aggregate "View all" CTA renders in this release',
-  (dash.match(/.{0,50}View all.{0,50}/) || [])[0]);
+// ---- no AGGREGATE DESTINATION — there is still no All My Places page to send them to ---
+// FIX 8K RESTATED THIS PIN. The ban was on a DESTINATION, and that still holds. But
+// "View all" is now approved COPY for an in-place expander ("View all N changes →") built on
+// a <button>, so a substring ban would state something false AND still miss a real link: the
+// label is created in lib/dashboard-aggregate.js, which this file did not read. The smallest
+// necessary read is added here so the guard looks where the control is actually made.
+// Deliberately duplicated from test/dashboard-all-places.test.mjs §8 rather than shared —
+// extracting a helper would add a third file beyond this correction's approved scope.
+const aggSrc = fs.readFileSync(new URL('../lib/dashboard-aggregate.js', import.meta.url), 'utf8')
+  .replace(/^\s*\/\/.*$/gm, '');
+const AGG_LINK_TOKEN = /<a\b|href|pageHref\(|location\.(?:href|assign)|window\.open/;
+const aggregateDestinations = [];
+{
+  const surface = dash + '\n' + aggSrc;
+  const re = /View all/g;
+  let m;
+  while ((m = re.exec(surface)) !== null) {
+    const win = surface.slice(Math.max(0, m.index - 200), m.index + 200);
+    if (AGG_LINK_TOKEN.test(win)) aggregateDestinations.push(win.replace(/\s+/g, ' ').trim());
+  }
+}
+ok(aggregateDestinations.length === 0,
+  'Fix 8 no aggregate destination renders — the Fix 8K "View all" control is an in-place button, never a link',
+  aggregateDestinations[0]);
+// "Not a link" is also satisfied by no control existing at all, so the approved shape is
+// pinned positively alongside it.
+ok(/toggleBtn = document\.createElement\('button'\);/.test(dash)
+  && /toggleBtn\.type = 'button';/.test(dash)
+  && !/toggleBtn\.href/.test(dash),
+  'Fix 8K the approved expander is a <button type="button"> with no href');
 
 // ---- the two rail CTAs route to the EXISTING surfaces ---------------------------------
 ok(/href="properties\.html"/.test(dash) && /Manage &rarr;/.test(dash),
