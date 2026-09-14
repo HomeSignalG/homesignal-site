@@ -148,9 +148,20 @@ ok(!/Affects \d| of your places|Affects ' \+/.test(dash),
 ok(!/of your places/.test(agg.replace(/^\s*\/\/.*$/gm, '')),
   '9 ...and the view-model still never emits it either');
 
-// 11. Fix 8K: the What's Changing preview is byte-for-byte the same implementation.
-ok(/deduped\.slice\(0, 12\)\.map\(function \(it\) \{/.test(dash),
-  '11 Fix 8K preview still caps the list at 12 rows');
+// 11. Fix 8K: the What's Changing preview is the implementation this rename found, untouched.
+// THIS PIN WAS WRITTEN AGAINST THE 12-ROW SLICE AND IS NOW WRITTEN AGAINST THE EXPANDER.
+// The rename's claim is "nothing under the headings moved", so the pin has to name whatever
+// the preview IS at the time — not the shape it happened to have when the claim was first
+// made. The cap now lives in the view-model (A.PREVIEW_LIMIT) rather than inline in the
+// page, so both halves are asserted: the page renders THROUGH the view-model, and the
+// view-model still caps at 8.
+ok(/A\.changesPreview\(deduped, \{ expanded: expanded, countKnown: countKnown \}\)/.test(dash),
+  '11 Fix 8K preview is rendered through the view-model, not an inline slice');
+ok(/PREVIEW_LIMIT = 8;/.test(agg), '11 Fix 8K preview still caps the visible list at 8 rows');
+ok(!/deduped\.slice\(0, 12\)/.test(dash),
+  '11 ...and the superseded inline 12-row slice is gone');
+ok(/id="dashChangingList"/.test(dash) && /id="dashChangingMore"/.test(dash),
+  '11 Fix 8K expander nodes ship with the preview');
 ok(/Showing updates across your first ' \+ zips\.length \+ ' places\./.test(dash),
   '11 Fix 8K still discloses the place cap in the same words');
 ok(/id="dashChanging"/.test(dash) && /id="dashChangingSub"/.test(dash),
