@@ -1017,3 +1017,19 @@ exercised. The three bracketed calls returned inside a 15 s client timeout, whic
 path and bounds nothing about a hang. The cap rests on the deployed source plus
 `test/epa-plane-deadlines.test.mjs` sections 7 and 8 under an injected clock. The 84302
 happy-path smoke shows the change is INERT when EPA is healthy; it is not evidence of the bound.
+
+## 18. EPA FEED-FIRST SESSION CLOSED (2026-09-09)
+
+Founder call: stop feeding. Do not apply Unit 1. Do not start Tampa. Do not recon the 724.
+
+Baltimore city was the remaining B-class that was portal-up and unwired. It is live as
+`baltimore-city-housing-permits` (squash `31fcab2`, #1131, `get-address-report` v250),
+proven-keep not include-all. The 12 city ZIPs recached: HTTP 200, `_ndp` populated,
+EPA-only cohort 967 → 955. Unit 1's `indexable` change is still parked — remaining
+EPA-only B rows are blocked or stalled (Tampa / Suffolk / Oklahoma County / Howard),
+184 C were probed empty, 724 unknown were never probed at their own jurisdiction.
+
+This audit's §14 ("nothing outward-facing has moved") remains true for Unit 1 itself.
+The sitemap/`indexable` rule is unchanged. The city feed is a registry add, not an
+apply of this file.
+
