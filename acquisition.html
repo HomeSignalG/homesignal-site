@@ -1008,7 +1008,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // `theme_decided_by` is the ingest-time record; the LIVE value beside it is what
         // the dashboard filter actually used. They agree unless the classifier has moved,
         // and showing both is what would make that visible instead of silent.
-        row('Theme (live, from Map 1)', HS.mapsSocialThemeLabel(bskyTheme(p)))+
+        // Guarded like bskyTheme: if lib/maps-social-theme.js failed to load, this row is
+        // simply absent. A review card must never fail to render because a helper is
+        // missing — the founder would lose the whole fact-check surface over a 404.
+        row('Theme (live, from Map 1)',
+            (window.HS && HS.mapsSocialThemeLabel) ? HS.mapsSocialThemeLabel(bskyTheme(p)) : null)+
         row('Theme evidence at candidate time', e.theme_decided_by)+
         row('Dedupe identity', e.dedupe_key)+
         row('Visual', (e.visual&&e.visual.status)||'none')+
