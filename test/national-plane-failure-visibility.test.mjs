@@ -143,7 +143,20 @@ console.log('\n7. Map 1 does not crash when the national plane fails');
   try { cases.forEach((c) => c.records.map((x) => x.source_key)); } catch (e) { threw = true; }
   ok(!threw, '7c mapping over every outcome never throws');
   // Structural: the page maps over .records and no longer over a bare fallback array.
-  ok(/var natlSites = natl\.records\.map\(/.test(mapExec), '7d page maps over natl.records');
+  // FIX 29 put ONE admission gate in front of that map (`!natlAdmitted ? [] : …`). That `[]`
+  // is a GEOGRAPHY-CONTRACT refusal — this ZIP has no authoritative whole-ZIP geography, so
+  // proximity may not assert membership — and is NOT the read-failure fallback this section
+  // exists to forbid. The distinction is the whole point of 7a-7c: a failed READ still yields
+  // `records: []` through nationalPlaneResult and is reported via `status`, whereas a refused
+  // ADMISSION is reported via `admitted`. So the pin is split rather than relaxed: the mapped
+  // source must still be natl.records, and the ONLY thing allowed in front of it is the
+  // admission flag — anything keyed on the read outcome fails here.
+  const natlLine = (mapExec.match(/^.*var natlSites = .*$/m) || [''])[0];
+  ok(/natl\.records\.map\(/.test(natlLine), '7d page maps over natl.records', natlLine.trim());
+  ok(/^\s*var natlSites = (?:!natlAdmitted \? \[\] : )?natl\.records\.map\(/.test(natlLine),
+     '7d-i the only guard in front of the map is the Fix 29 admission gate', natlLine.trim());
+  ok(!/\b(?:ok|status|http|error|records\.length)\b[^\n]*\?/.test(natlLine),
+     '7d-ii no read-OUTCOME fallback feeds natlSites', natlLine.trim());
   ok(/HS\.nationalPlaneResult\(\{ transportError: true \}\)/.test(mapExec),
     '7e page routes a rejected fetch into the classifier, not into []');
   ok(!/rpc\/national_dc_for_zip[\s\S]{0,400}?r\.ok \? r\.json\(\) : \[\]/.test(mapExec),
