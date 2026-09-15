@@ -2252,12 +2252,21 @@ HS.onReady(function(){
         window.__HS_NATIONAL_PLANE = {
           plane: "national_dc", zip: zip, status: natl.status, reason: natl.reason,
           http: natl.http, records: natl.records.length,
+          // TRUNCATION IS ITS OWN FACT. A clipped set is a SUCCESSFUL read that is not the
+          // whole set, so it is neither `unavailable` nor a plain `ok` — reporting it as
+          // either is the same dishonesty in a different direction.
+          truncated: !!natl.truncated,
           fallback: natl.status !== HS.NATIONAL_PLANE_OK, at: new Date().toISOString()
         };
         if(natl.status !== HS.NATIONAL_PLANE_OK && window.console && console.warn){
           console.warn("[HomeSignal] national data-center plane unavailable ("
             + natl.reason + (natl.http ? "/" + natl.http : "") + ") for ZIP " + zip
             + " — map rendered without it");
+        }
+        if(natl.truncated && window.console && console.warn){
+          console.warn("[HomeSignal] national data-center plane truncated at "
+            + natl.records.length + " records for ZIP " + zip
+            + " — more exist than are shown");
         }
         var natlSites = natl.records.map(function(r){
           return { id:r.source_key, name:r.project_name,
@@ -2272,9 +2281,15 @@ HS.onReady(function(){
                    source_name:r.source_name, source_key:r.source_key,
                    relevance:"development" };
         });
-        NATIONAL_SOURCES = natlSites.length
-          ? Object.keys(natlSites.reduce(function(a,s){ a[s.source_name]=1; return a; },{}))
-          : [];
+        // ODbL CREDIT — derived ONLY from records that can actually reach the page. A site
+        // with no source_name, or none of the record_url render()'s sourced() gate requires,
+        // is dropped before anything is drawn, so crediting its source would name a source
+        // that supplied nothing visible. Measured: an array of junk rows survives the object
+        // filter and used to render the literal "Data-centre locations from undefined".
+        NATIONAL_SOURCES = Object.keys(natlSites.reduce(function(a,s){
+          if(s && s.source_name && s.record_url) a[s.source_name] = 1;
+          return a;
+        },{}));
         // The cached report's development counters describe ITS centroid-radius development set,
         // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
         // Leaving them makes the headline tile contradict the map the resident is looking at

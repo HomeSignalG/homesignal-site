@@ -180,6 +180,49 @@ for (const [reason, natl, http] of FAILURES) {
   ok(!DC_CREDIT.test(r.text), `3l[${reason}] no data-centre credit for a source that supplied nothing`);
 }
 
+
+console.log('\n4. TRUNCATION — a clipped set is a SUCCESS that is not the whole set');
+{
+  // The server says so per row (has_more). The page must not infer it from a count.
+  const clipped = JSON.stringify([
+    Object.assign({}, NATL_OK[0], { has_more: true }),
+    Object.assign({}, NATL_OK[0], { source_key: 'osm:way/2', has_more: true }),
+  ]);
+  const r = await load({ status: 200, body: clipped });
+  ok(r.pageErrors.length === 0, '4a no page errors', r.pageErrors[0]);
+  ok(r.mapUp, '4b map rendered');
+  ok(r.signal && r.signal.status === 'ok', '4c a truncated read still SUCCEEDED');
+  ok(r.signal && r.signal.truncated === true, '4d ...and the signal says it was clipped');
+  ok(r.signal && r.signal.fallback === false, '4e it is not a fallback — records DID arrive');
+  ok(r.sites >= 3, '4f local + both national records still drawn', r.sites);
+  ok(!SCARY.test(r.text), '4g no technical warning shown to the resident');
+
+  // ...and a complete read of the same shape must NOT claim truncation.
+  const wholeSet = JSON.stringify([Object.assign({}, NATL_OK[0], { has_more: false })]);
+  const c = await load({ status: 200, body: wholeSet });
+  ok(c.signal && c.signal.truncated === false, '4h a complete read reports truncated false');
+  ok(c.signal && c.signal.status === r.signal.status,
+    '4i both are `ok` — status alone cannot separate them, which is why truncated exists');
+}
+
+console.log('\n5. ADVERSARIAL — a 200 carrying an ARRAY of WRONG-SHAPED rows');
+{
+  // Classified as an array, so it passes the classifier and reaches the page. A null entry
+  // used to throw inside the .map(), take the outer catch, and lose the ZIP's LOCAL records
+  // with it. Nothing here carries a source_url, so nothing may be drawn either way.
+  const junk = JSON.stringify([
+    { nonsense: 1 }, { project_name: 'Ghost Data Center', lat: 39.02, lng: -77.46 },
+    { source_key: 'x', project_name: 'No URL DC', lat: 39.02, lng: -77.46, source_url: '' },
+    null, 42, 'string',
+  ]);
+  const r = await load({ status: 200, body: junk });
+  ok(r.pageErrors.length === 0, '5a page did not crash on wrong-shaped rows', r.pageErrors[0]);
+  ok(r.mapUp, '5b map still rendered');
+  ok(!/Ghost Data Center|No URL DC/.test(r.text), '5c NO FABRICATED RECORD IS RENDERED');
+  ok(r.sites === 1, '5d the ZIP keeps its real LOCAL record — a junk national payload costs it nothing', r.sites);
+  ok(!DC_CREDIT.test(r.text), '5e nothing sourced, so nothing credited');
+}
+
 await browser.close();
 srv.close();
 console.log(`\n${fails ? `FAILED: ${fails}` : 'ALL PASS'} — Map 1 national plane failure behaviour`);
