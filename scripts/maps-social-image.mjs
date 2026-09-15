@@ -36,7 +36,7 @@ import path from 'node:path';
 // The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
 // this module cannot carry a second copy of the rendering rules.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
@@ -68,6 +68,101 @@ const ZOOM = parseInt(val('--zoom', '15'), 10);
 // A marker matches the project when its drawn coordinate equals the project's stored
 // coordinate. ~1.1 m at the equator: this is an identity test, not a proximity search.
 const COORD_EPS = 1e-5;
+
+// ── MAPS · DATA CENTER THEME CAPTURE STATE ───────────────────────────────────────────
+//
+// WHAT CHANGES FOR A THEME POST, and nothing else does: the page is opened in the SHIPPED
+// embed mode, the SHIPPED "Data center" PROJECT TYPE control is the only one left checked,
+// and the shutter clips to the Map 1 PRODUCT CARD instead of to the bare map. Marker
+// targeting, the popup, the halo, the home-marker refusal and the coordinate checks are the
+// same code on both paths.
+//
+// EMBED MODE IS A REAL PRODUCT MODE, NOT A SCREENSHOT HACK. `?embed=1` is what the Place
+// page already uses to host Map 1 in an iframe (homesignalmap.html sets `hs-embed` in the
+// document head, before first paint). It hides the global sidebar, the global top bar, the
+// address SEARCH FORM, the radius picker, the 3D controls and everything below the map —
+// exactly the chrome a social capture must exclude — and its `.card.mapcard` becomes a flex
+// column one frame tall, so the filter panel and the map FIT 1200x630 instead of overflowing
+// it. Reusing it means the framing is the product's own, and a future change to the embed
+// layout moves this capture with it rather than leaving a private copy behind.
+const EMBED_PARAM = 'embed=1';
+
+/**
+ * Put Map 1's PROJECT TYPE row into the Data-center-only state, THROUGH THE REAL CONTROLS.
+ *
+ * Each chip is a real <input type=checkbox class="chipbox"> inside its label, and the page
+ * wires `change` (not `click`) precisely so keyboard and pointer become one path and the
+ * handler reads the control's RESULTING state. Setting `.checked` and dispatching `change`
+ * therefore runs the page's own `setType()` -> `HS.setCategoryFilter()` -> `applyFilter()`.
+ * Nothing here writes a filter value directly, and nothing fakes a chip's appearance: the
+ * checkmarks in the image are the controls' real state.
+ *
+ * Returns the before/after state of every chip so the evidence can show what was changed.
+ */
+async function applyDataCenterTypeFilter(page) {
+  return page.evaluate((wantKey) => {
+    const chips = Array.from(document.querySelectorAll('#mapkeyShapes .typechip'));
+    if (!chips.length) return { ok: false, reason: 'Map 1 rendered no PROJECT TYPE controls' };
+    const read = () => {
+      const o = {};
+      for (const c of chips) {
+        const b = c.querySelector('.chipbox');
+        o[c.getAttribute('data-cat')] = !!(b && b.checked);
+      }
+      return o;
+    };
+    const before = read();
+    if (!Object.prototype.hasOwnProperty.call(before, wantKey)) {
+      return { ok: false, reason: `Map 1 has no "${wantKey}" PROJECT TYPE control`, before };
+    }
+    for (const c of chips) {
+      const key = c.getAttribute('data-cat');
+      const box = c.querySelector('.chipbox');
+      if (!box) continue;
+      const want = key === wantKey;
+      if (box.checked !== want) {
+        box.checked = want;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    const after = read();
+    const others = Object.keys(after).filter((k) => k !== wantKey && after[k]);
+    return { ok: !!after[wantKey] && others.length === 0, before, after, still_on: others,
+             reason: after[wantKey] ? '' : 'the Data center control did not end up selected' };
+  }, 'datacenter');
+}
+
+/**
+ * The panel sections the founder-approved capture must actually contain. Asserted from the
+ * RENDERED DOM before the shutter, so a layout change that pushes a section out of frame
+ * fails the capture instead of silently shipping a cropped card.
+ */
+async function panelSectionsInFrame(page) {
+  return page.evaluate(() => {
+    const vh = window.innerHeight, vw = window.innerWidth;
+    const inFrame = (el) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= vh + 1 && r.right <= vw + 1;
+    };
+    const byText = (sel, txt) => Array.from(document.querySelectorAll(sel))
+      .find((e) => (e.textContent || '').trim().toUpperCase() === txt) || null;
+    return {
+      card_header: inFrame(document.querySelector('.card.mapcard .map-cap')),
+      card_header_text: (document.querySelector('.card.mapcard .map-cap')?.textContent || '').trim(),
+      status: inFrame(byText('.mapkey-hd', 'STATUS')),
+      project_type: inFrame(byText('.mapkey-hd', 'PROJECT TYPE')),
+      regulatory: inFrame(byText('.mapkey-hd', 'REGULATORY RECORDS')),
+      map_key: inFrame(document.getElementById('mapkeyNote')),
+      map: inFrame(document.querySelector('.card.mapcard .map-frame')),
+      // Chrome that must NOT be in a social capture. Embed mode removes it; this proves it.
+      sidebar_hidden: !document.querySelector('#hs-side')
+        || getComputedStyle(document.querySelector('#hs-side')).display === 'none',
+      search_form_hidden: !document.querySelector('.wrap>.head')
+        || getComputedStyle(document.querySelector('.wrap>.head')).display === 'none',
+    };
+  });
+}
 
 async function api(pathname, init) {
   const r = await fetch(`${SB}/rest/v1/${pathname}`, { ...init, headers: { ...H, ...(init?.headers || {}) } });
@@ -136,8 +231,11 @@ function nearly(a, b) { return typeof a === 'number' && typeof b === 'number' &&
  * Capture one project. Returns { ok, reason, file? } — a failure is always a reason, never
  * a substitute image.
  */
-async function capture(page, draft, proj) {
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`;
+async function capture(page, draft, proj, theme) {
+  // A theme capture is the Map 1 PRODUCT CARD, so it opens the page in the shipped embed
+  // mode. A plain MAPS capture is unchanged, byte for byte.
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`
+    + (theme ? `&${EMBED_PARAM}` : '');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // The page exposes its drawn markers for exactly this purpose (see homesignalmap.html:
@@ -152,6 +250,25 @@ async function capture(page, draft, proj) {
       && Array.isArray(window.siteMarkers) && window.siteMarkers.length > 0,
     { timeout: 60000 },
   ).catch(() => {});
+  // THE FILTER GOES ON BEFORE THE MARKER IS LOCATED, not after: applyFilter() changes what is
+  // on the map, so anything measured first could be stale by the shutter.
+  //
+  // ⚠️ AND `window.siteMarkers` IS NOT THE VISIBLE SET. An earlier version of this comment
+  // claimed that finding the project in that array after filtering proved it belonged to the
+  // Data center bucket. IT PROVES NOTHING: Map 1's applyFilter() keeps every marker in the
+  // array and only adds it to or removes it from the Leaflet layer group, so array membership
+  // is byte-identical before and after. Measured in a real browser —
+  // test/maps-datacenter-capture-state.browser.test.mjs — where the Residential control stays
+  // in `siteMarkers` and leaves the map. ON THE MAP is `m._map`, which Leaflet nulls on
+  // removeLayer, and that is what `markerOnMap` below asserts.
+  let filterState = null;
+  if (theme === 'datacenter') {
+    filterState = await applyDataCenterTypeFilter(page);
+    if (!filterState.ok) {
+      return { ok: false, reason: `Data center filter state could not be set: ${filterState.reason}` };
+    }
+  }
+
   // Then wait for THIS PROJECT's marker specifically. A count that has stopped changing is
   // not the same as the right draw having happened: ZIP mode issues the cached report and
   // the authoritative whole-ZIP read together, and the authoritative merge — the one that
@@ -205,11 +322,40 @@ async function capture(page, draft, proj) {
   }, [proj.source_key]);
 
   if (!found.found) {
+    if (theme === 'datacenter') {
+      return {
+        ok: false,
+        reason: 'the project has no marker on Map 1 with the Data center PROJECT TYPE filter '
+          + `selected (${found.total} markers drawn). The queue and the map disagree about this `
+          + 'record, so no image is produced rather than a picture of some other project.',
+      };
+    }
     return {
       ok: false,
       reason: `no drawn marker for this project (${found.total} markers drawn, `
         + `${found.sites} sites rendered, authoritative set present: ${found.authoritative}, `
         + `project present in it: ${found.inCache})`,
+    };
+  }
+
+  // IS IT ACTUALLY DRAWN? The framing step below already fails when a marker carries no
+  // `_map`, so a filtered-out target was always refused rather than captured — but it was
+  // refused with "could not reach the Leaflet map from the marker", which names a plumbing
+  // fault for what is really a FILTER verdict. Asking here turns that into the precise
+  // reason, and for a theme capture it is the one check that proves the project survives the
+  // Data center filter — i.e. that the post and its picture are about the same record.
+  const onMap = await page.evaluate(([idx]) => {
+    const hit = (window.siteMarkers || [])[idx];
+    return !!(hit && hit.m && hit.m._map);
+  }, [found.idx]);
+  if (!onMap) {
+    return {
+      ok: false,
+      reason: theme === 'datacenter'
+        ? 'the project is drawn on this ZIP but is NOT shown under the Data center PROJECT '
+          + 'TYPE filter, so Map 1 does not place it in the Data center bucket. No image is '
+          + 'produced rather than a halo around a marker the map is not showing.'
+        : 'the project has a marker but Map 1 is not currently showing it (filtered out)',
     };
   }
 
@@ -285,18 +431,41 @@ async function capture(page, draft, proj) {
   await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
   await page.waitForTimeout(1200);   // let the framed tiles settle
 
-  const el = await page.$('#map');
-  if (!el) return { ok: false, reason: 'no #map element' };
+  // THE SHUTTER TARGET IS THE DIFFERENCE. A plain MAPS capture clips to `#map` — the map is
+  // its whole subject. A theme capture clips to the Map 1 PRODUCT CARD, because the card's
+  // controls are what say WHICH records are on screen: the image has to show that Data center
+  // is the selected PROJECT TYPE, or the post's hook is unsupported by its own picture.
+  let panel = null;
+  if (theme === 'datacenter') {
+    panel = await panelSectionsInFrame(page);
+    // A cropped card is a card that no longer proves what it is there to prove, so a section
+    // out of frame refuses the capture instead of shipping a picture missing its controls.
+    const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
+      .filter((k) => !panel[k]);
+    if (missing.length) {
+      return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
+    }
+    if (!panel.sidebar_hidden || !panel.search_form_hidden) {
+      return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
+    }
+  }
+
+  const sel = theme === 'datacenter' ? '.card.mapcard' : '#map';
+  const el = await page.$(sel);
+  if (!el) return { ok: false, reason: `no ${sel} element` };
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const file = path.join(OUT_DIR, `${draft.zip}-${String(proj.id).slice(0, 8)}.png`);
   await el.screenshot({ path: file });
 
   return {
-    ok: true, file,
+    ok: true, file, clip: sel,
     marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
       of: found.total, how: found.how, fanned: found.fanned, delta_m: found.delta_m },
     framed: { zoom: framed.zoom, center: framed.center },
     checks: clean,
+    theme: theme || null,
+    filterState,
+    panel,
   };
 }
 
@@ -351,13 +520,17 @@ async function main() {
       continue;
     }
 
+    // THEME — from the SHIPPED predicate the Acquisition Dashboard uses, so the image this
+    // row gets is decided by the same rule that put the row in the Data Center Theme queue.
+    const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+
     let r;
-    try { r = await capture(page, d, proj); }
+    try { r = await capture(page, d, proj, theme); }
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
     if (!r.ok) {
-      results.push({ id: d.id, label, ok: false, reason: r.reason });
-      if (!DRY) await recordFailure(d, r.reason);
+      results.push({ id: d.id, label, ok: false, reason: r.reason, theme });
+      if (!DRY) await recordFailure(d, r.reason, theme);
       continue;
     }
 
@@ -402,6 +575,26 @@ async function attach(draft, objectPath, r, proj) {
     popup_text: r.checks.popupText,
     halo_present: r.checks.haloPresent,
     width: IMG_W, height: IMG_H, device_scale: SCALE,
+    // THEME CAPTURE EVIDENCE. Present only on a theme capture; absent (not false, not
+    // null-filled) on a plain MAPS capture, so the two shapes stay distinguishable.
+    ...(r.theme ? {
+      theme: r.theme,
+      clip: r.clip,
+      embed_mode: true,
+      // What the PROJECT TYPE controls were before and after, read off the controls
+      // themselves — so the checkmarks visible in the image are accounted for.
+      type_filter_before: r.filterState && r.filterState.before,
+      type_filter_after: r.filterState && r.filterState.after,
+      panel_in_frame: r.panel,
+      card_header_text: r.panel && r.panel.card_header_text,
+      theme_note: 'Captured in the shipped embed mode (?embed=1) and clipped to the Map 1 '
+        + 'product card, with the Data center PROJECT TYPE control selected and every other '
+        + 'type deselected THROUGH THE REAL CONTROLS (a change event on each chip\'s own '
+        + 'checkbox, which runs the page\'s setType/applyFilter). The project\'s marker was '
+        + 'located AFTER that filter was applied, so its presence is the proof it belongs to '
+        + 'the Data center bucket. No control state is faked and no marker is drawn by this '
+        + 'module.',
+    } : {}),
     note: 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
       + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
       + 'radius ring and no home marker, and both absences are asserted before the shutter. '
@@ -418,7 +611,7 @@ async function attach(draft, objectPath, r, proj) {
 }
 
 /** A failure is recorded on the draft; the factual text/link draft is left intact. */
-async function recordFailure(draft, reason) {
+async function recordFailure(draft, reason, theme) {
   const prev = draft.evidence || {};
   await api(`social_posts?id=eq.${draft.id}`, {
     method: 'PATCH',
@@ -431,9 +624,19 @@ async function recordFailure(draft, reason) {
           status: 'NO_PROJECT_SPECIFIC_VISUAL',
           failure_reason: reason,
           failed_at: new Date().toISOString(),
-          note: 'No project-specific Map 1 visual could be produced truthfully. The draft keeps '
-            + 'its factual text and its Map 1 link; the generic OpenGraph link card remains the '
-            + 'publication fallback and is NOT a project-specific map preview.',
+          theme: theme || null,
+          // THE FALLBACK SENTENCE IS NOT TRUE OF A THEME POST, so it is not written for one.
+          // A MAPS · Data Center Theme post publishes the Map 1 capture or it does not
+          // publish: its hook asks about a data centre, and a generic OpenGraph card shows
+          // none. The Acquisition Dashboard reads this same fact off image_bucket_path and
+          // blocks Approve, so the note and the gate agree.
+          note: theme
+            ? 'No Map 1 visual could be produced truthfully for this MAPS \u00b7 Data Center Theme '
+              + 'candidate. There is NO generic fallback for this theme: approval is blocked in '
+              + 'the Acquisition Dashboard until a real capture of the exact project exists.'
+            : 'No project-specific Map 1 visual could be produced truthfully. The draft keeps '
+              + 'its factual text and its Map 1 link; the generic OpenGraph link card remains the '
+              + 'publication fallback and is NOT a project-specific map preview.',
         },
       },
     }),
