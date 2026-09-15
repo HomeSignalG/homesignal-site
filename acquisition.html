@@ -1181,8 +1181,18 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
       '<button class="bsky-btn" data-zo="template">Download template</button>'+
       (rows.length?'<button class="bsky-btn" data-zo="current">Download current list</button>':'')+
+      // CREATE DRAFTS. Uploading an order used to imply an action that never happened —
+      // the list just sat there until someone dispatched the workflow by hand. These two
+      // buttons are that dispatch. They create DRAFTS only: the generator writes
+      // status='draft' with scheduled_slot NULL and never approves, schedules or posts,
+      // so every post still needs the Approve below. Shown only when a list exists,
+      // because with an empty list a run is a nationwide scan, not an ordered one.
+      (rows.length?('<span style="flex-basis:100%;height:0"></span>'+
+        '<button class="bsky-btn" data-zo="preview" id="zo-preview">Preview drafts (dry run)</button>'+
+        '<button class="bsky-btn" data-zo="create" id="zo-create">Create drafts</button>'):'')+
       '<input type="file" id="zo-file" accept=".csv,text/csv" style="display:none">'+
-      '</div>';
+      '</div>'+
+      '<div id="zo-run" class="muted" style="font-size:12px;margin:-4px 0 10px"></div>';
 
     var body;
     if(_zipOrder.error){
@@ -1245,6 +1255,95 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     if(act==='current'){
       var zips=(_zipOrder.rows||[]).map(function(r){ return r.zip; });
       zipOrderDownload('homesignal-zip-order.csv', HS.zipOrderToCsv(zips)); return;
+    }
+    if(act==='preview' || act==='create'){ zipOrderRun(act==='create'); return; }
+  }
+
+  // How many MAPS posts the queue currently holds. The dispatch returns 204 with NO run id,
+  // so there is nothing to poll on the GitHub side from the browser. Progress is therefore
+  // reported from the thing the founder actually cares about — how many drafts appeared —
+  // which is also the only number a workflow that started but did nothing cannot fake.
+  //
+  // It is READ FROM THE QUEUE STATE `refreshBluesky` ALREADY LOADED, never from a query of
+  // its own. This control adds no read and no write of the posts table: that absence is what
+  // test/maps-dc-zip-order.test.mjs §30-36 pins, and it stays literally true rather than
+  // technically true. The cost is nil — the number was already computed for the metrics tile.
+  function mapsQueuedCount(){
+    var n=0;
+    for(var k in _bskyRows){
+      if(Object.prototype.hasOwnProperty.call(_bskyRows,k) && _bskyRows[k] &&
+         _bskyRows[k].content_family==='MAPS') n++;
+    }
+    return n;
+  }
+
+  // The panel re-renders on every refresh, which REPLACES #zo-run. A handle captured once
+  // goes stale and the message silently lands on a detached node, so the element is looked
+  // up fresh on every write and the message is always written AFTER any refresh.
+  function zoNote(text, asHtml){
+    var n=document.getElementById('zo-run'); if(!n) return;
+    if(asHtml) n.innerHTML=text; else n.textContent=text;
+  }
+
+  var _zoRunning=false;
+  async function zipOrderRun(apply){
+    if(_zoRunning) return;                       // one dispatch at a time, per click and per page
+    var n=(_zipOrder.rows||[]).length;
+    if(apply && !confirm('Create Data Center Theme drafts for '+n+' ZIP'+(n===1?'':'s')+
+      ', in your uploaded order?\n\nThis creates DRAFTS only — nothing is approved, '+
+      'scheduled or published. You still approve each post below.')) return;
+
+    _zoRunning=true;
+    ['zo-preview','zo-create'].forEach(function(id){
+      var b=document.getElementById(id); if(b) b.disabled=true;
+    });
+    var before=mapsQueuedCount();
+    zoNote(apply ? 'Starting the generator…' : 'Starting a dry run…');
+    try{
+      var r=await window.hsClient.functions.invoke('maps-draft-dispatch',
+        { body:{ apply: !!apply, limit: 20 } });
+      // invoke() surfaces a non-2xx as r.error and puts the body out of easy reach, so the
+      // function's own reason is dug out rather than replaced with a generic failure.
+      var payload=r.data;
+      if(r.error){
+        var reason='';
+        try{ reason=(await r.error.context.json()).error||''; }catch(e){ reason=r.error.message||''; }
+        zoNote('Could not start: '+(reason||'unknown error')); return;
+      }
+      if(!payload || !payload.ok){
+        zoNote('Could not start: '+((payload&&payload.error)||'unknown error')); return;
+      }
+      if(!apply){
+        zoNote('Dry run started for '+payload.zips+' ZIPs. It writes nothing — read the '+
+          'result in the <b>Draft MAPS Bluesky candidates</b> workflow run on GitHub.', true);
+        return;
+      }
+      // Watch for the drafts to land. A run is seconds, but the ceiling is stated rather
+      // than spun forever: if nothing has appeared by then, say so instead of implying
+      // success. "0 new" is a real, honest outcome — every ZIP's newest project may
+      // already have a post.
+      zoNote('Generator started. Waiting for drafts…');
+      // Each pass reloads the queue through the SAME function the Refresh button uses, then
+      // counts what it loaded — so the number reported here and the rows on screen can never
+      // disagree. 10s spacing rather than 3s because a reload re-renders the whole queue.
+      for(var i=0;i<6;i++){
+        await new Promise(function(res){ setTimeout(res,10000); });
+        await refreshBluesky();                      // re-render FIRST, then report
+        var made=mapsQueuedCount()-before;
+        if(made>0){
+          zoNote(made+' new draft'+(made===1?'':'s')+' created.');
+          return;
+        }
+      }
+      zoNote('Started, but no new drafts after 60s. Either every ZIP\u2019s newest project '+
+        'already has a post, or the run is still going \u2014 refresh shortly.');
+    }catch(err){
+      zoNote('Could not start: '+((err&&err.message)||'unknown error'));
+    }finally{
+      _zoRunning=false;
+      ['zo-preview','zo-create'].forEach(function(id){
+        var b=document.getElementById(id); if(b) b.disabled=false;
+      });
     }
   }
 
