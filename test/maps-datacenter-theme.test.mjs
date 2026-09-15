@@ -106,8 +106,12 @@ ok(HS.mapsSocialThemeLabel('datacenter') === 'Data Center Theme', '4: the theme 
 ok(HS.mapsSocialThemeLabel('nope') === null, '4: an unknown key gets NO invented label');
 
 // ═══ 5. THE DASHBOARD — hierarchy, derived counts, preserved actions ═════════════════
-ok(/src="lib\/map\.js"/.test(DASH) && /src="lib\/maps-social-theme\.js"/.test(DASH),
-  '5: the dashboard loads the shipped classifier and the theme derivation');
+// Both must carry a content-hash cache key — test/lib-cache-keys.test.mjs is the contract,
+// and a keyless same-origin script there is a shipped fix that never reaches a warm browser.
+// Asserted WITH the key rather than around it, so dropping the key fails here too.
+ok(/src="lib\/map\.js\?v=[0-9a-f]{8}"/.test(DASH)
+   && /src="lib\/maps-social-theme\.js\?v=[0-9a-f]{8}"/.test(DASH),
+  '5: the dashboard loads the shipped classifier and the theme derivation, both content-keyed');
 ok(/id="bsky-nav"/.test(DASH), '5: the Bluesky tab carries a filter nav');
 ok(/MAPS THEMES|Maps themes/i.test(DASH), '5: the theme row is labelled as a row of MAPS THEMES');
 ok(/All Maps/.test(DASH), '5: the theme row offers "All Maps" beside the theme');

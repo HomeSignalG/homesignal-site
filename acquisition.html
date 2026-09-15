@@ -268,8 +268,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      HS.resolveMarker so the dashboard and the map can never disagree about what a Data
      center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
      define functions on window.HS and touch no DOM at load. -->
-<script src="lib/map.js"></script>
-<script src="lib/maps-social-theme.js"></script>
+<script src="lib/map.js?v=ea30843b"></script>
+<script src="lib/maps-social-theme.js?v=233a850e"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -833,6 +833,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // The bucket stays PRIVATE and no service key ever reaches the page.
   var _bskyBlobUrl = {};   // post id -> object URL for its own image
   var _bskyImgOk   = {};   // post id -> the exact image RENDERED (onload fired)
+  // ⚠️ THE QUEUE CACHE MUST BE DECLARED INSIDE THIS REGION, not above it. It used to sit
+  // with the edit modal ~250 lines below; `var` hoisting made that work in the page, but
+  // test/maps-preview-render.test.mjs EXTRACTS from `var _bskyBlobUrl = {};` to
+  // `// VISUAL STATUS.` and runs that slice in a real browser, so the approval gate's
+  // reference pointed at a symbol the harness never received (`_bskyRows is not defined`,
+  // which HANGS that test rather than failing it). Declaring it one line ABOVE the slice's
+  // first line does not fix that — the boundary is `var _bskyBlobUrl`, exactly.
+  var _bskyRows = {};      // post id -> the full row, for the gate and the edit modal
 
   // A MAPS draft that carries an image_bucket_path WILL publish with that image, so
   // the founder must have seen it before approving.
@@ -1172,7 +1180,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
   // ---- Bluesky edit modal (real textarea — a native prompt() box is too small
   // to show a multi-line, near-300-char post with its \n\n hashtag block) -------
-  var bskyEditId=null, _bskyRows={};
+  var bskyEditId=null;   // _bskyRows is declared with the queue state above
   function bskyEditCountUpdate(){
     var ta=$('bsky-edit-textarea'); var n=graphemeLen(ta.value);
     var c=$('bsky-edit-count'); c.textContent=n+'/300'; c.className='bsky-edit-count'+(n>300?' over':'');
