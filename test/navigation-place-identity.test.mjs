@@ -25,8 +25,9 @@ const shell = strip(read('shell.js'));
 const shellHtml = strip(read('partials/shell.html'));
 
 console.log('--- the ZIP hub names its place in the Viewing control ---');
-ok(/HS\.setViewLabel\(meta\.name \+ ' · ' \+ zip\)/.test(cpage),
-  'the ZIP hub identifies the place as "<locality> · <zip>", not a bare ZIP code');
+ok(/HS\.setViewLabel\(String\(meta\.name\)\.indexOf\(String\(zip\)\) >= 0/.test(cpage)
+   && /meta\.name \+ ' · ' \+ zip/.test(cpage),
+  'the ZIP hub identifies the place by its locality name, adding the ZIP only when the name lacks it');
 ok(/meta && meta\.name && HS\.setViewLabel/.test(cpage),
   'it is guarded on real metadata — no locality, no claim');
 // Locality comes from application metadata. A hard-coded city would be a fabricated place
@@ -36,23 +37,32 @@ ok(!/Bear River City|Del Valle|Brigham City/.test(cpage),
   (cpage.match(/Bear River City|Del Valle|Brigham City/) || [])[0]);
 // Set BEFORE the coverage branch, so an honest-empty ZIP is identified too rather than
 // silently falling back to "ZIP #####" exactly where the page has least else to say.
-const at = cpage.indexOf('HS.setViewLabel(meta.name');
+const at = cpage.indexOf('HS.setViewLabel(String(meta.name)');
 const branch = cpage.indexOf("if (status !== 'pass')");
 ok(at > 0 && branch > 0 && at < branch,
   'the place is named BEFORE the coverage branches, so honest-empty pages are named too',
   { at, branch });
 
-console.log('--- an AREA label must not overwrite a real saved address ---');
-// setViewLabel(label) with no opts is a NON-precise (area) label. paintTopbar keeps
-// "Viewing · <street>" for a saved address in the viewed ZIP unless the label is `precise`
-// (a searched street address). So naming the area never steals the current-place affordance.
-// Fix 9: the chip never calls that address "Your home".
+console.log('--- A ZIP PAGE IS A ZIP PLACE (founder, 2026-09-15) ---');
+// The Viewing control answers "which of my Places am I looking at". On the ZIP hub that
+// is the ZIP Code — including for a resident whose saved Address sits inside that very
+// ZIP, which is the case the 2026-09-04 cross-ZIP gate left showing "Viewing · 13313
+// COOMES DR" on /community.html?zip=78617. The page DECLARES its Place type; the chip
+// must not infer it from whether a text label happened to load.
+ok(/HS\.setViewPlaceType\('zip'\)/.test(cpage),
+  'the ZIP hub declares itself a ZIP Place');
+const declAt = cpage.indexOf("HS.setViewPlaceType('zip')");
+ok(declAt > 0 && declAt < cpage.indexOf('await'),
+  'it declares BEFORE the first await, so the chip is never briefly the saved address',
+  { declAt, firstAwait: cpage.indexOf('await') });
 ok(!/setViewLabel\(meta\.name[^)]*\{\s*precise/.test(cpage),
-  'the ZIP-hub label is an AREA label, never flagged precise');
-ok(/const homeIsCurrent = !!\(p && String\(p\.zip\) === String\(state\.zip\) && !state\.viewLabelPrecise\);/.test(shell),
-  'paintTopbar still gates the address label on the saved place being IN the viewed ZIP');
+  'the ZIP-hub label is still an AREA label, never flagged precise');
+ok(/const homeIsCurrent = !!\(p && String\(p\.zip\) === String\(state\.zip\)\s*\n?\s*&& state\.viewPlaceType !== 'zip' && !state\.viewLabelPrecise\);/.test(shell),
+  'paintTopbar gates the address label on the viewed ZIP AND on the page not being a ZIP Place');
 ok(/\(p && homeIsCurrent\)\s*\?\s*\('Viewing · ' \+ p\.address\)/.test(shell),
-  'a saved address in the viewed ZIP reads "Viewing · <street>"');
+  'where the page declares no ZIP Place, a saved address in the viewed ZIP still reads "Viewing · <street>"');
+ok((shell.match(/state\.viewPlaceType !== 'zip'/g) || []).length === 2,
+  'the switcher check-mark uses the SAME gate as the chip — one rule, never two');
 ok(!/'Your home · '/.test(shell),
   'paintTopbar never prefixes the chip with "Your home · "');
 

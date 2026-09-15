@@ -382,6 +382,26 @@ ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
 ok(!/your home/i.test(c.locLabel || ''),
   '7b the chip does not call the saved address "Your home"', c.locLabel);
 
+// ═══ 7c. A ZIP PAGE IS A ZIP PLACE — the founder's 2026-09-15 repro ═══
+// "Viewing tells you which of my Places you are looking at. If you are on a zip code page
+// you are obviously viewing a zip code." The 2026-09-04 gate covered the OTHER-ZIP case
+// only, so the ZIP hub for the saved address's OWN ZIP still read "Viewing · 13313 COOMES
+// DR" — the ZIP Place could not be named at all while an address sat inside it.
+await page.goto(base + '/community.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
+c = await chrome();
+info('ZIP hub 78617 with the same saved place', { loc: c.locLabel, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7c the ZIP hub does NOT name the saved address — it is a ZIP Place', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7c ...it names the ZIP Place', c.locLabel);
+ok(!/78617\s*·\s*78617/.test(c.locLabel || ''),
+  '7c ...once, not with the ZIP repeated after its own name', c.locLabel);
+ok(/13313 COOMES DR/.test(c.locTitle || ''),
+  '7c the saved address is still saved and still one tap away in the switcher', c.locTitle);
+
 // ═══ 8. Address mode still reaches the established experience ═══
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
 await page.click('#go');
