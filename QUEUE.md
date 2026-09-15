@@ -40,7 +40,13 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-15 — ✅ FIX 23: What's Changing shows THREE, and the rest is one click away
+### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
+
+⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `1f0fc1a` (#1224), deployed by
+`pages` run **265** at 19:05:46, **confirmed on the live signed-in Dashboard** (3 rows ·
+`View 56 more changes →`), and its record corrected in `4937298` (#1228). Every claim below
+carries its own receipt; nothing is outstanding. **The bound is a FOUNDER VALUE — 3 — and changing
+it back is a founder decision, not a cleanup.**
 
 ⚖️ **FOUNDER, 2026-09-15: "in the what is changing tile to 3 items always and they have to
 click view more changes to see the rest."** The tile shipped at **8** rows (Fix 8K). It is now
@@ -107,9 +113,16 @@ click view more changes to see the rest."** The tile shipped at **8** rows (Fix 
   **404 / 11,125 B**. The control is what makes the two 200s mean anything — a blanket-200 host
   would have answered 200 for the missing file too. **The served page requests exactly the hash
   of the build carrying 3**, so no browser can be handed a cached copy of the old bound.
-- 📌 **STILL UNEYEBALLED: the rendered tile on a real resident's Dashboard.** The bytes are
-  proven; what a logged-in resident sees is not. Expect 3 rows and, on the founder's 5 places,
-  `View 56 more changes →` where it read `View 51 more changes →`.
+- ✅ **EYEBALLED ON THE LIVE SIGNED-IN DASHBOARD (founder screenshot, 2026-09-15 14:19 CT) —
+  THE LAST UNVERIFIED LINK IS CLOSED.** `homesignal.net/dashboard.html`, ALL MY PLACES, 5
+  monitored places: **exactly 3 rows** (Oct 27 / Oct 22 / Oct 20 Commissioners Court notices)
+  and the control reading **`View 56 more changes →`**.
+  🔑 **THE NUMBER IS THE PROOF, NOT THE ROW COUNT.** It was `View 51 more changes →` at a bound
+  of 8, and 51 + 5 = 56 — the five rows the smaller bound now holds back, arriving exactly where
+  arithmetic says they must. A rendering that had silently dropped records, or one still reading
+  the old bound, could not produce that number. Total held is unchanged at 59.
+  ⚠️ **This is what the byte-level receipt above could NOT establish.** A 200 on a file proves
+  the build ships; only the rendered tile proves the resident sees it.
 
 ### 2026-09-13 — ✅ FIX 19: the artifact producer SELECTED NOTHING, and now it fails closed
 
