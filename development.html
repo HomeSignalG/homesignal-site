@@ -32,6 +32,12 @@ HS.onReady(async function () {
   // Gate 2: the URL is authoritative at the moment of the fetch (shared helper —
   // no per-page geography rule). Must precede every S.zip read below.
   HS.ensureViewedZip();
+  // AN EXPLICIT ROUTE ZIP IS A DECLARED ZIP PLACE. Synchronous, before the first await, so the
+  // Viewing control names the ZIP rather than a saved Address that merely sits inside it.
+  // Development is a TOOL, not a Place, so this is conditional: reached with no ?zip= it
+  // declares nothing and the saved address still supplies the default context. The project
+  // dossier (?id=) overrides it in applyRecordView(), which names the record's own address.
+  HS.declareRouteZipPlace();
   var S = HS.state, home = S.activeProperty;
   var id = new URLSearchParams(location.search).get('id');
   var qs = new URLSearchParams(location.search);
@@ -359,6 +365,10 @@ HS.onReady(async function () {
     if (rec.zip && /^\d{5}$/.test(String(rec.zip))) HS.state.zip = String(rec.zip);
     var addr = listedAddress(rec);
     if (addr && typeof HS.setViewLabel === 'function') HS.setViewLabel(addr, { precise: true });
+    // Opening a record retires any ZIP Place declared from the route: this view is about the
+    // project's listed address. No id — a listed project address is not a saved Place, so no
+    // saved Address is ticked in the switcher either.
+    if (addr && typeof HS.setViewPlaceType === 'function') HS.setViewPlaceType('address');
   }
   function projectFollowButton(p) {
     var following = !!(HS.isFollowing && HS.isFollowing('project', p.id));

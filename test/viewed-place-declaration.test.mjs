@@ -151,6 +151,25 @@ ok(/HS\.setViewPlaceType\('address'\)/.test(runBody),
 ok(/HS\.setViewPlaceType\('address'\);\n      loadProperty/.test(map1),
   'the ?addr= route declares an Address Place');
 
+console.log('--- 9b. DEVELOPMENT declares its route ZIP too ---');
+const dev = fs.readFileSync(new URL('../development.html', import.meta.url), 'utf8');
+ok(/HS\.declareRouteZipPlace\(\);/.test(dev), 'development.html declares the route ZIP Place');
+const dDecl = dev.indexOf('HS.declareRouteZipPlace()');
+const dAwait = dev.indexOf('await ');
+ok(dDecl > 0 && dAwait > 0 && dDecl < dAwait,
+  'it declares BEFORE the first await, so the chip is correct on first paint', { dDecl, dAwait });
+ok(/HS\.setViewPlaceType\('address'\);/.test(dev),
+  'and the project dossier retires it — that view is about the record address');
+
+// EVERY page that renders the chip and is reachable with ?zip= must declare. This is the
+// "is it global" check: the audit that found development.html missing is now the test.
+const ZIP_SCOPED = ['alerts.html', 'development.html', 'homesignalmap.html'];
+ZIP_SCOPED.forEach((f) => {
+  const src = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  ok(/declareRouteZipPlace/.test(src), f + ' declares the Place its route names');
+});
+ok(/HS\.setViewPlaceType\('zip'\)/.test(cpage), 'the ZIP hub runtime declares unconditionally');
+
 console.log('--- 10. THE ADDRESS DOSSIER declares WHICH Address it shows ---');
 const prop = fs.readFileSync(new URL('../property.html', import.meta.url), 'utf8');
 ok(/HS\.setViewPlaceType\('address', p\.id\)/.test(prop),
