@@ -2211,12 +2211,26 @@ HS.onReady(function(){
       // rules are untouched - the two fetches above are unchanged.
       // It is fetched HERE, inside the same Promise.all, because render() has no re-entry
       // point: a plane that resolved after render() would never reach the map.
-      // Failure returns [] so the page renders exactly as it does today.
+      //
+      // A FAILED READ IS NOT AN EMPTY ONE. This used to end `.catch(function(){ return []; })`
+      // with a `r.ok ? ... : []` ahead of it, so a 401, a 500, a timeout, a dropped connection
+      // and a malformed body all reached the page as the SAME value a genuinely empty ZIP
+      // produces. HS.nationalPlaneResult classifies the read instead; `records` is still always
+      // an array, so the map renders exactly as it does today either way.
       fetch(SUPABASE_URL + "/rest/v1/rpc/national_dc_for_zip", {
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_zip: zip, p_radius_mi: 5 })
-      }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+      })
+        .then(function(r){
+          // .json() rejects on truncated/non-JSON bodies; that is 'malformed', not 'network',
+          // so it is resolved into a body value here rather than thrown to the catch below.
+          return r.json().then(
+            function(b){ return HS.nationalPlaneResult({ http: r.status, body: b }); },
+            function(){  return HS.nationalPlaneResult({ http: r.status, body: null }); }
+          );
+        })
+        .catch(function(){ return HS.nationalPlaneResult({ transportError: true }); })
     ])
       .then(function(both){
         var rows = both[0], auth = both[1];
@@ -2229,7 +2243,23 @@ HS.onReady(function(){
         // `status` is Map 1's PERMIT vocabulary (pin colour); the source's own lifecycle word
         // is carried unmodified as normalized_status/raw_status so the popup can state what
         // the source actually said rather than our bucket for it.
-        var natlSites = (both[2] || []).map(function(r){
+        var natl = both[2] || HS.nationalPlaneResult(null);
+        // THE OBSERVABLE SIGNAL. Same shape the page already uses for a degraded subsystem
+        // (window.__HS_* read by the verifiers, plus one console.warn — cf. the 3D view's
+        // "[HomeSignal] 3D view unavailable (mode/reason)"). No new framework, no analytics
+        // dependency (this page does not load events.js), no resident-visible change.
+        // `fallback` is what a reader needs to know: the map drew an empty national plane.
+        window.__HS_NATIONAL_PLANE = {
+          plane: "national_dc", zip: zip, status: natl.status, reason: natl.reason,
+          http: natl.http, records: natl.records.length,
+          fallback: natl.status !== HS.NATIONAL_PLANE_OK, at: new Date().toISOString()
+        };
+        if(natl.status !== HS.NATIONAL_PLANE_OK && window.console && console.warn){
+          console.warn("[HomeSignal] national data-center plane unavailable ("
+            + natl.reason + (natl.http ? "/" + natl.http : "") + ") for ZIP " + zip
+            + " — map rendered without it");
+        }
+        var natlSites = natl.records.map(function(r){
           return { id:r.source_key, name:r.project_name,
                    status: r.normalized_status === "operational" ? "Operating" : "Approved",
                    normalized_status:r.normalized_status, raw_status:r.raw_status,
