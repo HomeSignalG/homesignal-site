@@ -204,8 +204,15 @@ ok(dcOnly.filter(m => m.rects === 1 && m.polygons === 0).length === 0,
 // The switch is reversible and does not disturb the Type row it sits under.
 await setReg(true);
 await page.waitForTimeout(250);
-ok((await readMarkers()).filter(m => m.rBadge).length === 2,
-  '5d: turning it back on repaints the R on every overlay pin (dual DC and industrial EPA)');
+// ⚖️ CHANGED BY THE 2026-09-15 RULING, from 2 to 1 — this is the assertion the ruling moves,
+// and the only one. It used to expect the INDUSTRIAL EPA record here too, because a flat
+// any-of let `facility` admit it while Data center was the only Type checked. That is exactly
+// what put 30 industrial pins under "Data center" on 78617 and 27 on 75009, with no data
+// centre among them. The DUAL record still carries its R (its Type IS datacenter); the
+// industrial one is now governed by the Industrial chip, which is off.
+ok((await readMarkers()).filter(m => m.rBadge).length === 1,
+  '5d: turning it back on repaints the R on the dual DC — and the industrial EPA record stays '
+  + 'hidden, because its own Type chip is off');
 ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes .typechip[data-cat]'))
      .filter(r => !!(r.querySelector('input') || {}).checked).map(r => r.getAttribute('data-cat')).join(',')) === 'datacenter',
   '5e: …and every Type chip is exactly where the resident left it');
@@ -214,7 +221,12 @@ ok(await page.evaluate(() => Array.from(document.querySelectorAll('#mapkeyShapes
 await setTypes(['datacenter']); await setReg(true);
 await page.waitForTimeout(250);
 const bothOn = await readMarkers();
-ok(bothOn.length === 3 && bothOn.filter(m => m.primaryPoints === 8 && m.rBadge).length === 1,
+// ⚖️ 3 → 2 under the 2026-09-15 ruling, for the same reason as §5d: with Data center the only
+// Type checked, the two DATA CENTRES draw and the industrial EPA record does not. The claim
+// under test is unchanged and is still the point of this file — the dual record appears ONCE,
+// not once per matching membership — and it is now asserted against a set where a Type chip,
+// not the regulatory switch, decides who is in the room.
+ok(bothOn.length === 2 && bothOn.filter(m => m.primaryPoints === 8 && m.rBadge).length === 1,
   '6a: BOTH ON → the dual record appears ONCE, not once per matching filter', bothOn.length);
 
 await setTypes([]); await setReg(false);

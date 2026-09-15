@@ -103,8 +103,19 @@ HS.setCategoryFilter('industrial', false);
 ok(HS.categoryVisible(deAnda) === false,
   '5d: Industrial OFF + Regulatory OFF → the overlay record is hidden');
 HS.setCategoryFilter(REG.key, true);
+// ⚖️ CHANGED BY THE 2026-09-15 RULING — this assertion WAS the bypass, stated as a
+// requirement. With Industrial off but OTHER Types still on, admitting this record via
+// `facility` is what drew 30 industrial pins under "Data center" on 78617 and 27 on 75009.
+// Regulatory is an overlay on Type, so while the resident HAS a Type selection the Type
+// chip governs. Both halves are asserted, because the ruling is about WHICH state admits it.
+ok(HS.categoryVisible(deAnda) === false,
+  '5e: Industrial OFF + Regulatory ON, while other Types are selected → NOT shown; the '
+  + 'regulatory switch is not a way past the Type row');
+HS.categoryFilterKeys.forEach(k => HS.setCategoryFilter(k, false));
+HS.setCategoryFilter(REG.key, true);
 ok(HS.categoryVisible(deAnda) === true && deAnda.categoryKey === 'industrial',
-  '5e: Type OFF + Regulatory ON → still visible via facility membership, still Industrial');
+  '5f: …but with NO Type selected at all, Regulatory ON still shows it, still Industrial — '
+  + 'the founder\'s "every Type off except EPA" scenario is preserved');
 allOn();
 
 // ── 6. DUAL-IDENTITY DATA CENTRES ARE UNCHANGED ──────────────────────────────────
