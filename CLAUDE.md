@@ -1088,11 +1088,48 @@ is still PARKED.** Full record: audit §15.
 - ✅ **`docs/coverage-state-model.sql` was updated in the same change as the apply.** Unit 1's
   six comment sites are deliberately still untouched — Unit 1 is not applied.
 - 📌 **OBSERVED WHILE MEASURING, NOT ACTED ON, NOT EPA'S FAULT: 3,575 of 12,722
-  `development_reports` rows are older than 72 h** and 580 sit in the `failed_ingest` shape,
-  so `verify-coverage-state`'s "zero unintentionally STALE ZIPs" assertion is failing in
-  production. Both crons are `active` and the newest core write is minutes old — this is
-  rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
-  frequent, not less. Separate work; do not re-derive it.
+  `development_reports` rows are older than 72 h** and 580 sit in the `failed_ingest` shape.
+  Both crons are `active` and the newest core write is minutes old — this is rolling-refresh
+  THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more frequent, not
+  less. Separate work; do not re-derive it.
+  - ⛔ **CORRECTED 2026-09-07, SAME DAY: this bullet used to end "so `verify-coverage-state`'s
+    'zero unintentionally STALE ZIPs' assertion is failing in production." The MEASUREMENT
+    stands — it was taken directly against the DB. The claim about the JOB was wrong: that
+    assertion has never run.** The job dies at its FIRST read, before any assertion is
+    evaluated. A red job was read as a verdict it never rendered.
+- 🔒 **`verify-coverage-state` HAS NOT BEEN ABLE TO RUN SINCE AT LEAST 2026-08-28, AND UNIT 2
+  DID NOT CAUSE IT.** Every run from #47 (2026-08-28) to #58 is `failure`, each dying in ~4
+  seconds with `Error: REST app_coverage_states?select=…&order=zip.asc&limit=1000 -> 500`.
+  - **Both of the obvious suspects are ruled out by ONE receipt.** Run **#56**
+    (`34036975130`, 2026-09-06, head `4a805029`) carries the identical 500 — a full day
+    before the Unit 2 apply, and on the **named-column** list, before #1112 changed the read
+    to `select=*`. Neither the split nor the column change is the cause.
+  - **The cause is reproduced AS THE ROLE, never inferred from a cost estimate.** `set role
+    anon` + `set statement_timeout='3s'` + the script's exact columns, order and limit →
+    `57014 canceling statement due to statement timeout`, which PostgREST surfaces as HTTP
+    500. Role timeouts: `anon` **3s**, `authenticated`/`authenticator` 8s, `postgres`/
+    `service_role` none. Rate: 50 rows fully materialized in **2,651 ms (~53 ms/row)**, so
+    the 1,000-row page is ~53 s — it also exceeded a 45 s cap as `postgres`.
+  - ⚠️ **A `count(*)` OVER THIS VIEW RETURNS INSTANTLY AND PROVES NOTHING.** `select count(*)
+    from (select … limit 1000)` came back in well under 3 s twice, because Postgres removes
+    the unused LEFT JOIN LATERALs when no lateral column is referenced. **Any timing probe
+    here must force the values to materialize** (aggregate them into an md5), or it measures
+    a plan the page never runs.
+  - **Positive control, which is what makes the failure readable:** as `anon`, within the 3 s
+    budget, `limit 25` selecting **all four Unit 2 columns** returns 25 rows with
+    `regulatory_overlay_state` non-null on **25 of 25**. Grants, `security_invoker` and the
+    split are all healthy for `anon` — the failure is page SIZE alone.
+  - 🔑 **SO THE JOB CURRENTLY ATTESTS TO NOTHING, INCLUDING NOTHING ABOUT THE SPLIT.** It
+    never reaches `SPLIT_LIVE`, so the `overlay_unknown` sample never runs either. This is
+    this file's own rule — *an instrument must prove it ran before its silence counts as
+    evidence* — and a red check that never executed its assertions is the same trap wearing
+    the opposite colour. **Do not read this job's red as the stale gate failing.**
+  - **NOT FIXED HERE, deliberately** (out of scope for the apply-evidence session). The fix
+    is a smaller page plus keyset pagination in `scripts/verify-coverage-state.mjs`, sized
+    against ~53 ms/row — the same treatment `verify-development`/`verify-geocodes` already
+    carry. Until then the rendered-page proof of the Unit 2 copy change is UNMADE: this job
+    is the only browser channel that renders the coverage copy, and the sandbox has no
+    egress (the agent proxy answers 403 to CONNECT for `homesignal.net:443`).
 - 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
   privilege escalation.** The live view carries `security_invoker=true` and is owned by
   `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
