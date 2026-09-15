@@ -255,6 +255,28 @@
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
 
+  /* ── Conversion band ────────────────────────────────────────────────────────────
+     Page tokens only — var(--green) on var(--card), var(--line) borders — so it reads
+     as part of the map page rather than as an ad dropped onto it. Centred and narrow:
+     it is one decision, not a column of text. */
+  .ctaband{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:28px 22px;margin:4px 0 26px;text-align:center;
+    box-shadow:0 14px 34px -26px rgba(8,30,28,.5)}
+  .ctaband[hidden]{display:none}
+  .cta-h{font-size:21px;font-weight:700;letter-spacing:-.01em;margin:0 0 7px;color:var(--ink)}
+  .cta-s{font-size:14.5px;color:var(--soft);margin:0 auto 16px;max-width:46ch;line-height:1.55}
+  .cta-btn{font-family:var(--font);font-size:15px;font-weight:600;color:#fff;
+    background:var(--green);border:0;border-radius:11px;padding:13px 26px;cursor:pointer;
+    min-height:44px;transition:background .15s ease}
+  .cta-btn:hover{background:var(--green-dark)}
+  .cta-btn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  .cta-fine{font-size:12.5px;color:var(--mute);margin:11px 0 0}
+  .cta-trust{font-size:12.5px;color:var(--mute);margin:6px 0 0}
+  @media(max-width:560px){
+    .ctaband{padding:22px 16px}
+    .cta-btn{width:100%}
+  }
+
   /* ── Property page (address dossier — case-study §4.3) ──────────────────────────
      Same visual language as the rest of the page: Inter, var(--green) #1f5130,
      var(--line) #E7ECEA borders, white cards, green/blue/orange lifecycle colors,
@@ -801,6 +823,22 @@
         </div>
       </div>
 
+      <!-- CONVERSION BAND. Until this shipped, homesignalmap.html contained ZERO calls to
+           HS.openAuth / HS.openPremiumModal / HS.openLoc — a visitor arriving from a social
+           post could pan, filter and search an address and was never once asked for
+           anything. Painted by paintCtaBand() below, which decides between the two CTAs
+           from what the page actually rendered; hidden in embed mode, where this is a
+           Place's context map and not a landing page. -->
+      <div class="ctaband" id="ctaBand" hidden>
+        <h2 class="cta-h" id="ctaH">Follow this area — free</h2>
+        <p class="cta-s" id="ctaS">Get a heads-up before comment windows and votes close —
+          while you can still weigh in.</p>
+        <button class="cta-btn" type="button" id="ctaBtn">Follow this area — free</button>
+        <p class="cta-fine" id="ctaFine">No password, no spam. Entering your email creates
+          your free account.</p>
+        <p class="cta-trust">Every item links back to the permit, agenda, or filing it came from.</p>
+      </div>
+
       <div class="foot" id="foot"></div>
     </div>
 
@@ -826,7 +864,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=01319a72"></script>
+<script src="shell.js?v=06991f8d"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -2196,6 +2234,10 @@ HS.onReady(function(){
           setIndexable(false);              // an empty ZIP is never indexed, either way
           $("results").style.display = "block";
           status(HS.zipAuthNote(auth, zip, []));
+          // THE BRANCH THAT MATTERS MOST FOR CONVERSION, and the one that does not call
+          // render(): a ZIP with nothing to draw. Without this the coverage-request CTA
+          // would be unreachable on exactly the pages it exists for.
+          paintCtaBand(0);
         }
       })
       .catch(function(){
@@ -2203,7 +2245,67 @@ HS.onReady(function(){
         window.__HS_SITES = [];
         $("results").style.display = "block";
         status("Couldn't load ZIP " + zip + ". Enter your address for the live view.", true);
+        // A FAILED READ IS NOT AN EMPTY ZIP. Asking someone to request coverage of a ZIP
+        // we may well already cover would be a false claim about our own data, so the
+        // band stays hidden and the honest error above stands alone.
+        var _b = document.getElementById("ctaBand"); if(_b) _b.hidden = true;
       });
+  }
+
+  // THE PAGE'S ONE CONVERSION DECISION, in one function so there is no second copy to
+  // drift. Two states, chosen from what the page ACTUALLY rendered, never from what we
+  // hope it rendered:
+  //
+  //   records on the page  -> "Follow this area — free"  (HS.openAuth)
+  //   nothing on the page  -> "Tell us to cover your ZIP" (HS.openLoc -> community_requests)
+  //
+  // The second is the honest ask for a ZIP whose records we do not yet carry: a resident
+  // who arrived from a post about their area and found an empty map converts into a named
+  // coverage request instead of a bounce. It is deliberately NOT shown alongside real
+  // records — asking someone to request coverage of a ZIP they can already see would be
+  // incoherent.
+  //
+  // Every string here is copy the product already ships (index.html's trust panel and
+  // "Act on it" tile, shell.js's own auth microcopy). Nothing claims a capability
+  // HomeSignal lacks: no per-street alerts, no instant notifications, and no lifecycle
+  // tracking — the engine has no project identity across filings.
+  function paintCtaBand(renderedCount){
+    var band = document.getElementById("ctaBand");
+    if(!band) return;
+    // Embed mode is a Place's context map inside an iframe, not a landing page.
+    if(document.documentElement.classList.contains("hs-embed")){ band.hidden = true; return; }
+
+    // window.HS throughout rather than the bare global: the two are the same object in a
+    // browser, but mixing them makes the function untestable in isolation — and this one
+    // is executed directly by test/acquisition-attribution.test.mjs §6.
+    var signedIn = !!(window.HS && window.HS.state && window.HS.state.session
+                      && !window.HS.state.session.demo);
+    var btn  = document.getElementById("ctaBtn");
+    var h    = document.getElementById("ctaH");
+    var sub  = document.getElementById("ctaS");
+    var fine = document.getElementById("ctaFine");
+    var empty = !renderedCount;
+
+    if(empty && ZIP_MODE && ZIP_CODE){
+      h.textContent   = "We don't have records for " + ZIP_CODE + " yet";
+      sub.textContent = "Tell us to cover it and we'll email you the moment it goes live.";
+      btn.textContent = "Tell us to cover your ZIP";
+      fine.textContent = "One email when your ZIP is live. Nothing else.";
+      btn.onclick = function(){ if(window.HS && window.HS.openLoc) window.HS.openLoc(); };
+      band.hidden = false;
+      return;
+    }
+    // A resident who already has an account does not need to be sold one, and the map is
+    // free to read either way — so there is nothing honest left to ask for here.
+    if(signedIn){ band.hidden = true; return; }
+
+    h.textContent   = "Follow this area — free";
+    sub.textContent = "Get a heads-up before comment windows and votes close — "
+                    + "while you can still weigh in.";
+    btn.textContent = "Follow this area — free";
+    fine.textContent = "No password, no spam. Entering your email creates your free account.";
+    btn.onclick = function(){ if(window.HS && window.HS.openAuth) window.HS.openAuth(); };
+    band.hidden = false;
   }
 
   function render(data){
@@ -2279,6 +2381,7 @@ HS.onReady(function(){
     // ZIP_INDEXABLE resolves async in loadZip(); whichever setIndexable() call lands last wins.
     HAS_CONTENT = ZIP_MODE && sites.length > 0;
     setIndexable(ZIP_MODE && ZIP_INDEXABLE && sites.length > 0);
+    paintCtaBand(sites.length);
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
     // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
     window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;

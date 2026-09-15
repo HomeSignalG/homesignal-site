@@ -293,6 +293,11 @@
         source:   src || (offsite ? refHost : null),
         medium:   q.get('utm_medium') || (src ? null : 'referral'),
         campaign: q.get('utm_campaign') || null,
+        // utm_content is the CREATIVE slot — one value per Bluesky post
+        // (map_fort-worth_permits_bsky_001). Without it every social conversion
+        // collapses into one campaign bucket and no post can be told from another,
+        // which is the whole question a social campaign is run to answer.
+        content:  q.get('utm_content') || null,
         referrer: document.referrer || null,
         landing:  location.pathname + location.search,
         ts:       new Date().toISOString()
@@ -309,6 +314,85 @@
     const r = HS.referral(); if (!r || !r.source) return null;
     const tok = 'ref:' + r.source + (r.campaign ? '/' + r.campaign : '');
     return tok.replace(/\s+/g, '_').slice(0, 120);
+  };
+
+  // THE STEP captureReferral's own comment promised and nothing ever built: stamp the
+  // stored first touch onto a conversion that has ALREADY been persisted. Until this
+  // existed the first touch was captured perfectly and then dropped on the floor at the
+  // one conversion that matters — HS.authSubmit, the free account, never read it.
+  //
+  // Called only AFTER the conversion row is confirmed written, so a touch can never
+  // claim a conversion that did not happen. `subjectType` is 'account' | 'waitlist' |
+  // 'area_request'; for an account the server reads auth.uid() and ignores any email we
+  // could pass, so a caller cannot attribute someone else's signup.
+  //
+  // A visit with NO first touch is still stamped, with every field null. That is
+  // deliberate: it is the direct/organic denominator, and dropping it would make every
+  // campaign look like 100% of acquisition.
+  //
+  // Never throws, never blocks a success screen — same contract as events.js. A failed
+  // stamp costs a row of reporting, not the lead.
+  HS.stampAcquisition = function (subjectType, opts) {
+    try {
+      if (CFG.DATA_SOURCE !== 'supabase' || !HS.sb) return Promise.resolve();
+      const c = HS.sb();
+      if (!c || typeof c.rpc !== 'function') return Promise.resolve();
+      opts = opts || {};
+      const r = HS.referral() || {};
+      const call = c.rpc('hs_record_acquisition_touch', {
+        p_subject_type: subjectType,
+        p_email: opts.email || null,
+        p_zip:   opts.zip   || null,
+        p_utm: {
+          source:   r.source   || null,
+          medium:   r.medium   || null,
+          campaign: r.campaign || null,
+          content:  r.content  || null,
+          referrer: r.referrer || null,
+          landing:  r.landing  || null,
+          ts:       r.ts       || null
+        }
+      });
+      if (call && typeof call.then === 'function') {
+        return Promise.resolve(call).then(function () {}, function () {});
+      }
+    } catch (e) { /* attribution must never break a conversion */ }
+    return Promise.resolve();
+  };
+
+  // ---------------------------------------------- analytics (events.js) -------
+  // events.js defines window.hsLogEvent and writes through window.hsClient. It has
+  // shipped in the Pages artifact all along (scripts/stage_site.py) and NO DOCUMENT
+  // EVER LOADED IT, so hsLogEvent was undefined and every guarded call site no-opped
+  // in silence — the events table's newest row was 2026-07-12.
+  //
+  // Loading it HERE, once, rather than adding a <script> tag to fifteen pages: a new
+  // page then gets analytics by existing, not by someone remembering. Same dynamic-load
+  // pattern as loadOnboardingLib. Deliberately NOT awaited — analytics never blocks boot.
+  function loadAnalytics() {
+    try {
+      // events.js reuses the page's client; HS.sb() is the one memoized instance.
+      if (CFG.DATA_SOURCE === 'supabase' && HS.sb) window.hsClient = HS.sb();
+    } catch (e) {}
+    if (window.hsLogEvent || document.querySelector('script[data-hs-events]')) return;
+    try {
+      const s = document.createElement('script');
+      s.src = 'events.js';                 // relative: generated ZIP docs carry <base href="/">
+      s.dataset.hsEvents = '1';
+      document.head.appendChild(s);
+    } catch (e) {}
+  }
+
+  // Fire-and-forget event helper. Safe before events.js has finished loading — it
+  // retries once on the next tick rather than dropping the first event of a session,
+  // which would systematically lose exactly the landing view a campaign is measured by.
+  HS.logEvent = function (type, payload) {
+    try {
+      if (typeof window.hsLogEvent === 'function') { window.hsLogEvent(type, payload); return; }
+      setTimeout(function () {
+        try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent(type, payload); } catch (e) {}
+      }, 1200);
+    } catch (e) {}
   };
 
   // ------------------------------------------------------------- ready gate --
@@ -766,6 +850,7 @@
       return;
     }
     try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
+    HS.stampAcquisition('area_request', { email: email, zip: zip });
     onbMsg('Request received — we will email you when your area goes live.');
     if (onbEl('onbUncovered')) onbEl('onbUncovered').classList.add('hidden');
   };
@@ -867,6 +952,10 @@
     if ($('authForm')) $('authForm').classList.remove('hidden');
     if ($('authDone')) $('authDone').classList.add('hidden');
     authMsg('New here? Entering your email creates your free account — no password, no spam.', false);
+    // SIGNUP START. `signup_intent` is the event_type the acquisition dashboard's
+    // funnel already reads; nothing had fired it since 2026-07-07 because no page
+    // defined hsLogEvent. Opening this modal IS the intent.
+    HS.logEvent('signup_intent');
     HS.openModal('authModal');
     setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
   };
@@ -884,6 +973,13 @@
         $('authForm').classList.add('hidden'); $('authDone').classList.remove('hidden');
         // reflect the new session in the top bar without a full reload
         try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
+        // SIGNUP COMPLETE + the attribution stamp for the account just created.
+        // Ordering matters twice over: after getSession, so the client carries the new
+        // JWT and the server's auth.uid() resolves; and AWAITED, so the stamp is not
+        // racing the 700ms redirect below — a navigation mid-flight would lose the one
+        // touch this account will ever have.
+        HS.logEvent('signup_complete');
+        await HS.stampAcquisition('account');
         await hydrateTopicPrefs();
         await hydrateAccountLocation();
         HS.paintTopicCounts();
@@ -1529,6 +1625,7 @@
       return;
     }
     try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
+    HS.stampAcquisition('area_request', { email: email, zip: zip });
     $('locRequest').classList.add('hidden');
     $('locDoneH').textContent = 'Request received';
     $('locDoneP').textContent = "We'll email you the moment " + zip + ' is live on HomeSignal.';
@@ -1930,6 +2027,10 @@
     // Conversion is recorded only after confirmed persistence, and is measurement
     // only — app_premium_waitlist remains the record of the lead itself.
     try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('premium_waitlist_joined'); } catch (err) {}
+    // Stamped only here, after confirmed persistence — app_premium_waitlist remains the
+    // record of the lead; this records only where it came from. The email is passed so
+    // the server can resolve the row id and then discard it; no PII is duplicated.
+    HS.stampAcquisition('waitlist', { email: lead.email, zip: lead.zip });
     $('premiumForm').classList.add('hidden');
     $('premiumDone').classList.remove('hidden');
   };
@@ -2179,6 +2280,7 @@
 
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
+    loadAnalytics();            // define hsLogEvent + hsClient; never awaited
     await injectShell();
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
@@ -2197,6 +2299,11 @@
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
     if (HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
+    // THE LANDING VIEW. Fired last, so it is never charged for a page that failed to
+    // boot. This is the funnel's first stage and had no measure at all: with no
+    // page_view the events table could not show that UTM traffic had ever arrived
+    // (measured before this change: 0 of 8,768 rows carried a utm_ in page_url).
+    HS.logEvent('page_view');
     _resolveReady(HS);
   }
 

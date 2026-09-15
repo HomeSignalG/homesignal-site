@@ -97,7 +97,14 @@ ok(W.RPC === 'hs_premium_waitlist_join',
     'app_premium_waitlist',        // the canonical table
     'hs_premium_waitlist_join',    // the one public write path
     'hs_premium_waitlist',         // the one gated admin read
-    'premium_waitlist_joined'      // an analytics event name, not a store
+    'premium_waitlist_joined',     // an analytics event name, not a store
+    // A SUBJECT-TYPE DISCRIMINATOR, NOT A STORE. acquisition_touch.subject_type is
+    // CHECKed to ('account','waitlist','area_request') and records WHERE a conversion
+    // came from; the lead itself is still written only to app_premium_waitlist, and
+    // hs_record_acquisition_touch RESOLVES its row id out of that same table rather
+    // than holding an email of its own. Admitted with that reason, the way
+    // premium_waitlist_joined above is — never because the pin was inconvenient.
+    'waitlist'
   ];
   // IDENTIFIER-shaped literals only. A permissive `[^']*` runs across quote boundaries in
   // HTML and swallows whole prose captions, which is how this pin first reported a page of

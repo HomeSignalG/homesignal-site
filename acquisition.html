@@ -740,10 +740,17 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var topics=d.topics_top||[];
     var wk=(d.signups_by_week||[]).map(function(w){ return { day:w.week, followers:w.count }; });
     var emailState=(k.email_error_rate_pct>0)?'persist':'real';
+    // 'Free accounts' is auth.users — the row signInWithOtp actually creates. It used to
+    // read public.users, the DIGEST-SUBSCRIBER table, which on 2026-09-15 held 11 rows
+    // against 28 real accounts (5 overlapping). Both numbers are now shown, each under a
+    // name that says which table it came from, so the old figure stays measurable instead
+    // of being silently replaced.
     var kpis=
-      liveTile('Users', k.users_total||0, (k.users_active||0)+' active · '+(k.unsub_rate_pct||0)+'% unsub', (k.unsub_rate_pct>0?'persist':'real'))+
+      liveTile('Free accounts', k.users_total||0, (k.users_active||0)+' activated (saved a place)')+
+      liveTile('Digest subscribers', k.digest_subscribers||0, (k.digest_active||0)+' active · '+(k.unsub_rate_pct||0)+'% unsub', (k.unsub_rate_pct>0?'persist':'real'))+
       liveTile('Topic subscriptions', k.subscriptions_total||0, 'across all users')+
-      liveTile('Signup intents', k.signup_intents||0, 'clicked subscribe')+
+      liveTile('Attributed touches', k.attributed_touches||0, 'conversions with a first touch')+
+      liveTile('Signup intents', k.signup_intents||0, 'opened the signup modal')+
       liveTile('Area requests', k.community_requests||0, 'coverage asks')+
       liveTile('Emails sent', k.emails_sent||0, (k.email_error_rate_pct||0)+'% error rate', emailState)+
       liveTile('Community pages', (k.communities_live||0).toLocaleString(), 'provisioned');
@@ -751,8 +758,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     // source click-through most readers never make (a poor engagement proxy that collapsed
     // the whole funnel), so the engagement stage is alert_view; reads are shown as a
     // secondary metric under the table, not a mandatory funnel stage.
-    var stages=[['Alert views',f.alert_view||0],['Signup intents',f.signup_intent||0],['Signups',f.signup||0]];
-    var top=stages[0][1]||1;
+    var stages=[['Page views',f.page_view||0],['Alert views',f.alert_view||0],['Signup intents',f.signup_intent||0],['Free accounts',f.signup||0],['Activated',f.activated||0]];
+    // Denominator is the LARGEST stage, not the first. page_view is a brand-new event
+    // (nothing defined hsLogEvent until 2026-09-15), so it reads 0 until traffic arrives —
+    // and `stages[0][1]||1` would then divide 8,760 alert views by 1 and print 876000%.
+    var top=stages.reduce(function(m,s){ return Math.max(m, s[1]||0); }, 0)||1;
     var funnelRows=stages.map(function(s){
       var pct=Math.round(1000*s[1]/top)/10;
       return '<tr><td>'+esc(s[0])+'</td>'+
@@ -784,6 +794,49 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
           (topicRows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Topic</th><th style="text-align:right">Followers</th><th></th></tr></thead><tbody>'+topicRows+'</tbody></table></div>'):'<div class="muted">No topic subscriptions yet.</div>')+'</div>'+
       '</div>'+
       '<div class="tile-note" style="margin-top:14px">Paid: '+paidLine+'</div>'+
+      attributionBlock(d.attribution)+
+    '</div>';
+  }
+
+  // WHERE CONVERSIONS CAME FROM. Nothing in this dashboard could answer that before
+  // 2026-09-15: the first touch was captured into localStorage and never stamped onto a
+  // conversion, so every signup was anonymous as to source. by_content is the row a
+  // Bluesky campaign is actually measured by — one utm_content value per post.
+  function attributionBlock(a){
+    a=a||{};
+    var src=a.by_source||[], content=a.by_content||[];
+    if(!src.length){
+      return '<div class="tile-note" style="margin-top:18px">'+
+        '<strong>Attribution:</strong> no conversions carry a first touch yet. '+
+        'A row appears here the first time someone signs up, joins the waitlist or '+
+        'requests coverage after landing on the site — with or without UTM parameters.</div>';
+    }
+    var srcRows=src.map(function(r){
+      return '<tr><td>'+esc(r.source||'')+'</td><td class="muted">'+esc(r.medium||'')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(r.accounts||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(r.waitlist||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(r.area_requests||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums"><strong>'+(r.conversions||0)+'</strong></td></tr>';
+    }).join('');
+    var contentRows=content.map(function(r){
+      return '<tr><td style="font-family:ui-monospace,Menlo,monospace;font-size:12px">'+esc(r.content||'')+'</td>'+
+        '<td class="muted">'+esc(r.campaign||'')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(r.accounts||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums"><strong>'+(r.conversions||0)+'</strong></td></tr>';
+    }).join('');
+    return '<div style="margin-top:20px">'+
+      '<div class="sub" style="margin:0 0 6px">Conversions by source</div>'+
+      '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Source</th><th>Medium</th>'+
+        '<th style="text-align:right">Accounts</th><th style="text-align:right">Waitlist</th>'+
+        '<th style="text-align:right">Area reqs</th><th style="text-align:right">Total</th>'+
+        '</tr></thead><tbody>'+srcRows+'</tbody></table></div>'+
+      (contentRows
+        ? '<div class="sub" style="margin:16px 0 6px">By creative (utm_content) — one row per post</div>'+
+          '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Creative</th><th>Campaign</th>'+
+          '<th style="text-align:right">Accounts</th><th style="text-align:right">Total</th>'+
+          '</tr></thead><tbody>'+contentRows+'</tbody></table></div>'
+        : '<div class="tile-note" style="margin-top:10px">No conversion carries a utm_content value yet — '+
+          'per-post reporting starts with the first tagged link.</div>')+
     '</div>';
   }
   async function wireAcqMetrics(){
