@@ -1127,6 +1127,11 @@ HS.onReady(function(){
   });
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
+  // Attribution for any NON-HomeSignal national source rendered on this page. OpenStreetMap
+  // is ODbL: displaying its records REQUIRES crediting it, so this is a licence obligation
+  // rather than a nicety. Populated per load from the plane's own source_name values, so a
+  // load that returns no national records shows no credit - never a hardcoded claim.
+  var NATIONAL_SOURCES = [];
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
   var LAST_HOME = { lat:41.5105, lng:-112.0155 };
   var CUR_RADIUS = 1;              // search radius in miles (½ / 1 / 2 / 3 / 5 / 10 / 20)
@@ -2167,13 +2172,47 @@ HS.onReady(function(){
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_zip: zip, p_kind: "development", p_authoritative: true })
-      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+      // NATIONAL DATA-CENTER PLANE. Third plane, and the ONLY one that is not
+      // jurisdiction-gated: national_dc_for_zip asks nothing about registry coverage, so a
+      // record plots in a county with no local permit/planning connector. Local connector
+      // rules are untouched - the two fetches above are unchanged.
+      // It is fetched HERE, inside the same Promise.all, because render() has no re-entry
+      // point: a plane that resolved after render() would never reach the map.
+      // Failure returns [] so the page renders exactly as it does today.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/national_dc_for_zip", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip, p_radius_mi: 5 })
+      }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
     ])
       .then(function(both){
         var rows = both[0], auth = both[1];
         if(!currentReq(token)) return;      // a newer search (or an address) already owns the page
         ZIP_AUTH = auth;
         var authSites = HS.zipAuthSitesFrom(auth);
+        // The RPC returns ONLY rows that already carry a real source URL, real coordinates
+        // and a displayable status, so nothing unsourced can enter here. These still pass
+        // through render()'s sourced() gate with everything else - no bypass.
+        // `status` is Map 1's PERMIT vocabulary (pin colour); the source's own lifecycle word
+        // is carried unmodified as normalized_status/raw_status so the popup can state what
+        // the source actually said rather than our bucket for it.
+        var natlSites = (both[2] || []).map(function(r){
+          return { id:r.source_key, name:r.project_name,
+                   status: r.normalized_status === "operational" ? "Operating" : "Approved",
+                   normalized_status:r.normalized_status, raw_status:r.raw_status,
+                   type:"datacenter", record_kind:"national_project",
+                   developer:r.developer_or_operator || null,
+                   lat:r.lat, lng:r.lng, scope:"point",
+                   location_precision:r.location_precision,
+                   location_text:r.location_text || null,
+                   record_url:r.source_url, url:r.source_url,
+                   source_name:r.source_name, source_key:r.source_key,
+                   relevance:"development" };
+        });
+        NATIONAL_SOURCES = natlSites.length
+          ? Object.keys(natlSites.reduce(function(a,s){ a[s.source_name]=1; return a; },{}))
+          : [];
         // The cached report's development counters describe ITS centroid-radius development set,
         // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
         // Leaving them makes the headline tile contradict the map the resident is looking at
@@ -2186,13 +2225,15 @@ HS.onReady(function(){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
                    counts:zipCounts,
-                   sites: HS.zipAuthMergeSites(row.sites||[], authSites),
+                   sites: HS.zipAuthMergeSites(row.sites||[], authSites).concat(natlSites),
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
-        } else if(authSites.length){
-          // No cached report row, but the ZIP's own geography is established - render it.
+        } else if(authSites.length || natlSites.length){
+          // No cached report row, but the ZIP's own geography or the national plane is
+          // established - render it. The national half is what lets a county with NO local
+          // permit/planning connector still show real data-center projects.
           render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
-                   sites: authSites, paywall:false, updated:null, facUnavailable:false });
+                   sites: authSites.concat(natlSites), paywall:false, updated:null, facUnavailable:false });
         } else {
           // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
@@ -2402,6 +2443,15 @@ HS.onReady(function(){
       "Sources: US Census geocoder · county &amp; Utah PMN planning notices · EPA FRS facilities · EPA ECHO compliance records. "+
       "Facility pins sit at their exact EPA-registered locations. County and city notices apply jurisdiction-wide (no fixed address) — their orange/blue dots are placed within the viewed area to show activity, not exact sites; open a dot for the official record. "+
       "Violations are a factual count linked to the official EPA record — not a verdict on any operator." +
+      // ODbL ATTRIBUTION — a licence obligation, rendered only when a national record is
+      // actually on the page, and built from the records' own source_name so it can never
+      // credit a source that supplied nothing. Data-centre pins from this plane are the
+      // source's record, not a HomeSignal permit finding, and say so.
+      (NATIONAL_SOURCES.length
+        ? (" Data-centre locations from " + NATIONAL_SOURCES.join(" · ")
+           + " — © OpenStreetMap contributors, ODbL. These are the source's own records, not local permit filings;"
+           + " open a pin for the original record.")
+        : "") +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
     // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
     // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
