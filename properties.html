@@ -162,6 +162,10 @@ HS.onReady(async function () {
   // a row-count guess: a ZIP that did not read is EXCLUDED from the total and from the
   // place count beside it, never folded in as a zero.
   var ALL = { devTotal: null, devPlaces: 0, needs: null, needsPlaces: 0, totalPlaces: 0 };
+  // Development rows keyed by ZIP, for the Address cards. A ZIP is present here ONLY when
+  // its read completed — absence means "not measured", which the card renders as silence
+  // rather than as a zero.
+  var DEV_BY_ZIP = {};
 
   // Says exactly how much of the membership the number covers. A tile may only claim
   // "all N places" when every one of them was actually read.
@@ -192,6 +196,10 @@ HS.onReady(async function () {
       return places.filter(function (pl) { return pl.zip && set[pl.zip]; }).length;
     }
 
+    // The ZIPs a saved Address sits in — the only ones whose ROWS are worth keeping.
+    var addrZips = {};
+    addresses().forEach(function (ap) { if (ap && ap.zip) addrZips[String(ap.zip)] = 1; });
+
     if (HS.data.projects) {
       var okZips = [], total = 0, next = 0;
       async function devWorker() {                 // bounded concurrency, never Promise.all(N)
@@ -215,6 +223,11 @@ HS.onReady(async function () {
             // test is `!== false` rather than a truthiness check.
             if (Array.isArray(list) && list.complete !== false) {
               okZips.push(zq); total += list.length;
+              // KEEP the rows for a ZIP a saved Address actually lives in, so that card can
+              // measure against its OWN ZIP (see addressCard). Only those ZIPs are retained
+              // — a resident may follow 25 ZIPs, and holding every dense payload to render
+              // two cards would be the expensive half of this page for nothing.
+              if (addrZips[zq]) DEV_BY_ZIP[zq] = list;
             }
           } catch (e) { /* quarantine the ZIP, never the tile */ }
         }
@@ -278,9 +291,34 @@ HS.onReady(async function () {
       + 'text-transform:uppercase;color:var(--ink-2)">' + HS.esc(label) + '</span>';
   }
 
+  // WHICH development rows an Address may be measured against: its OWN ZIP's, never the
+  // viewed ZIP's. `projects` is read for S.zip alone, so an Address in another ZIP was being
+  // scored against a different county's records — every one of them far away, so the card
+  // reported "0 nearby projects" about a place nothing had ever looked at. Measured on the
+  // reported account: 96 ISLAND DR (Horseshoe Bay 78657) read 0 while 78657 holds FOUR
+  // development records, all four carrying points, ~120 miles from the Del Valle rows it was
+  // actually being compared with.
+  //
+  // Returns null when that ZIP has not been measured — NOT an empty list. The two are
+  // different facts and the card renders them differently: a completed read of zero nearby
+  // records is a measurement and prints "0 nearby projects"; an absent or failed read prints
+  // nothing at all. Conflating them is what produced the original defect.
+  function devRowsFor(p) {
+    if (!p || !p.zip) return null;
+    // The viewed ZIP is already in hand at first paint, so its card never waits.
+    if (String(p.zip) === String(S.zip) && Array.isArray(projects) && projects.complete !== false) {
+      return projects;
+    }
+    var rows = DEV_BY_ZIP[String(p.zip)];
+    return Array.isArray(rows) ? rows : null;
+  }
+
   function addressCard(p) {
     // per-Address computed: nearest projects, open windows
-    var near = HS.withDistance(projects, p).filter(function (x) { return (x.distance_mi || 9e9) <= 5; });
+    var rows = devRowsFor(p);
+    var near = rows
+      ? HS.withDistance(rows, p).filter(function (x) { return (x.distance_mi || 9e9) <= 5; })
+      : null;
     // Same null-window guard as the strip (see openWindowCount). The distance gate is
     // deliberately LEFT AS IS and is reported separately: measured table-wide, 0 of 182,834
     // app_changes rows carry coordinates, so `(x.distance_mi || 9e9) <= 5` can only ever
@@ -298,7 +336,7 @@ HS.onReady(async function () {
       + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(HS.placeDisplayTag(p, 'Address')) + '</div>'
       + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
       + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs === 1 ? 's' : '') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
-      + '<span>' + near.length + ' nearby projects</span>'
+      + (near ? '<span>' + near.length + ' nearby project' + (near.length === 1 ? '' : 's') + '</span>' : '')
       + (p.value_outlook != null ? '<span style="color:var(--green);font-weight:600">+' + HS.esc(p.value_outlook) + '%</span>' : '')
       + '</div>'
       + '<div class="pacts" style="margin-top:8px">'
@@ -461,7 +499,10 @@ HS.onReady(async function () {
   render();
   // Paint the page first, then fill the two measured tiles in. The read spans every
   // Place, so it must never hold up the list the resident came here for.
-  loadAllPlaces().then(strip, function (e) { console.warn('[my places] all-places read failed', e); });
+  // render(), not strip(): the per-ZIP rows this read collects are what the Address cards
+  // measure against, so the cards have to be repainted too — otherwise an Address outside
+  // the viewed ZIP would keep showing nothing after its ZIP had actually been read.
+  loadAllPlaces().then(render, function (e) { console.warn('[my places] all-places read failed', e); });
 });
 </script>
 </body>
