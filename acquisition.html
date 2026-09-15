@@ -270,6 +270,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      define functions on window.HS and touch no DOM at load. -->
 <script src="lib/map.js?v=d4c3f937"></script>
 <script src="lib/maps-social-theme.js?v=233a850e"></script>
+<!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
+     serialize; it touches no post, no queue state and no approval. -->
+<script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1111,6 +1114,140 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     }
     host.innerHTML=fam+themes;
   }
+  // ---- POST ZIP ORDER (MAPS > Data Center Theme only) -------------------------
+  // ONE INPUT CONTROL. The founder uploads a CSV of ZIPs in the order they want Data
+  // Center Theme drafts created; this panel validates it, persists the ORDER, and shows
+  // back exactly what was stored. It creates nothing, approves nothing, schedules
+  // nothing and publishes nothing — the existing generator reads the list on its next
+  // run and every downstream contract is untouched.
+  //
+  // IT IS SCOPED TO THE THEME, not to MAPS. Rendering it under "All Maps" would imply it
+  // orders every MAPS theme, which it does not.
+  var _zipOrder = { rows: [], loaded: false, error: '' };
+
+  function zipOrderVisible(){ return _bskyFamily==='MAPS' && _bskyTheme==='datacenter'; }
+
+  async function zipOrderLoad(){
+    try{
+      var r = await window.hsClient.from('maps_dc_zip_order')
+        .select('founder_position,zip,uploaded_at').order('founder_position',{ascending:true});
+      if(r.error){ _zipOrder.error = r.error.message||'unavailable'; _zipOrder.rows=[]; }
+      else { _zipOrder.rows = r.data||[]; _zipOrder.error=''; }
+    }catch(e){ _zipOrder.error='unavailable'; _zipOrder.rows=[]; }
+    _zipOrder.loaded = true;
+  }
+
+  /** Download a generated text file. No network — the bytes are built in the page. */
+  function zipOrderDownload(name, text){
+    try{
+      var b=new Blob([text],{type:'text/csv'}); var u=URL.createObjectURL(b);
+      var a=document.createElement('a'); a.href=u; a.download=name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(u); }, 1000);
+    }catch(e){ alert('Download failed.'); }
+  }
+
+  /**
+   * Per-ZIP status, derived ONLY from the queue rows already loaded for this render.
+   * Nothing is fetched and nothing is inferred: a ZIP with no MAPS Data Center Theme post
+   * in the queue shows a dash, never a guess like "no qualifying project" — only the
+   * generator knows that, and it reports it in its own run log.
+   */
+  function zipOrderStatusMap(queueRows){
+    var m={};
+    (queueRows||[]).forEach(function(p){
+      if(p.content_family!=='MAPS' || !p.zip) return;
+      if(bskyTheme(p)!=='datacenter') return;
+      var cur=m[p.zip];
+      // approved outranks draft in the display, so a ZIP that has moved on says so.
+      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft exists');
+    });
+    return m;
+  }
+
+  function zipOrderRender(queueRows){
+    var host=document.getElementById('bsky-zip-order'); if(!host) return;
+    if(!zipOrderVisible()){ host.innerHTML=''; return; }
+    var rows=_zipOrder.rows||[];
+    var stat=zipOrderStatusMap(queueRows);
+    var head='<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'+
+      '<strong style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">Post ZIP order</strong>'+
+      (rows.length?('<span class="muted" style="font-size:12px">'+rows.length+' ZIP'+(rows.length===1?'':'s')+
+        (rows[0].uploaded_at?(' · uploaded '+new Date(rows[0].uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})):'')+
+        '</span>'):'')+'</div>'+
+      '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created.</p>';
+
+    var btns='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
+      '<button class="bsky-btn" data-zo="template">Download template</button>'+
+      (rows.length?'<button class="bsky-btn" data-zo="current">Download current list</button>':'')+
+      '<input type="file" id="zo-file" accept=".csv,text/csv" style="display:none">'+
+      '</div>';
+
+    var body;
+    if(_zipOrder.error){
+      body='<div class="muted">Ordered list unavailable ('+esc(_zipOrder.error)+').</div>';
+    } else if(!rows.length){
+      body='<div class="muted">No ordered list yet. The generator uses its normal '+
+           'nationwide selection until you upload one.</div>';
+    } else {
+      var li='';
+      for(var i=0;i<rows.length;i++){
+        var z=rows[i].zip, st=stat[z]||'';
+        li+='<div style="display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--line)">'+
+          '<span class="muted" style="min-width:26px;text-align:right;font-variant-numeric:tabular-nums">'+rows[i].founder_position+'</span>'+
+          '<span style="font-variant-numeric:tabular-nums;font-weight:600">'+esc(z)+'</span>'+
+          (st?('<span class="tile-tag '+(st==='Approved'?'t-real':'t-persist')+'" style="margin-left:auto">'+esc(st)+'</span>'):'')+
+          '</div>';
+      }
+      body='<div id="zo-list" style="max-height:260px;overflow:auto;font-size:13px">'+li+'</div>';
+    }
+    host.innerHTML='<div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel2)">'+
+      head+btns+body+'</div>';
+
+    var f=document.getElementById('zo-file');
+    if(f) f.addEventListener('change', zipOrderFileChosen);
+  }
+
+  async function zipOrderFileChosen(e){
+    var file=e.target.files && e.target.files[0]; if(!file) return;
+    e.target.value='';                                   // so the same file can be re-picked
+    var text=await file.text();
+    var parsed=(window.HS&&HS.parseZipOrderCsv) ? HS.parseZipOrderCsv(text) : null;
+    if(!parsed){ alert('The ZIP-order parser did not load. Reload the page and try again.'); return; }
+    if(!parsed.ok){
+      // EVERY problem, not just the first, so one fix-and-re-upload clears the file.
+      alert('This file was not accepted, so your current order is unchanged:\n\n'+
+            parsed.errors.slice(0,12).join('\n')+
+            (parsed.errors.length>12?('\n…and '+(parsed.errors.length-12)+' more.'):''));
+      return;
+    }
+    var note=parsed.warnings.length?('\n\n'+parsed.warnings.join('\n')):'';
+    if(!confirm('Save this order for future Data Center Theme draft creation?\n\n'+
+                parsed.zips.length+' ZIP'+(parsed.zips.length===1?'':'s')+', starting '+
+                parsed.zips.slice(0,3).join(', ')+(parsed.zips.length>3?'…':'')+
+                '\n\nThis replaces the ordered list only. Existing drafts, approved, '+
+                'scheduled and published posts are not changed.'+note)) return;
+    try{
+      // ONE TRANSACTION server-side. A half-completed replace cannot leave an empty list.
+      var r=await window.hsClient.rpc('hs_set_maps_dc_zip_order',{p_zips:parsed.zips});
+      if(r.error){ alert('Save failed, your current order is unchanged: '+(r.error.message||'')); return; }
+    }catch(err){ alert('Save failed, your current order is unchanged.'); return; }
+    await zipOrderLoad();
+    refreshBluesky();
+  }
+
+  function zipOrderAction(act){
+    if(act==='upload'){ var f=document.getElementById('zo-file'); if(f) f.click(); return; }
+    if(act==='template'){
+      zipOrderDownload('homesignal-zip-order-template.csv', HS.zipOrderTemplateCsv()); return;
+    }
+    if(act==='current'){
+      var zips=(_zipOrder.rows||[]).map(function(r){ return r.zip; });
+      zipOrderDownload('homesignal-zip-order.csv', HS.zipOrderToCsv(zips)); return;
+    }
+  }
+
   async function refreshBluesky(){
     var host=$('tab-bluesky'); if(!host) return;
     var body=document.getElementById('bsky-queue'); if(!body) return;
@@ -1146,6 +1283,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         counts.themes[tl[ti].key]=(buckets.byTheme[tl[ti].key]||[]).length;
       }
       bskyRenderNav(counts);
+      // The ordered-ZIP panel is part of the Data Center Theme view. Load it lazily —
+      // only when that theme is actually selected — so the other tabs pay nothing.
+      if(zipOrderVisible() && !_zipOrder.loaded) await zipOrderLoad();
+      zipOrderRender(rows);
       var visible;
       if(_bskyFamily==='MAPS'){
         visible=_bskyTheme ? (buckets.byTheme[_bskyTheme]||[]) : buckets.all;
@@ -1339,6 +1480,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
         '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
         '<div id="bsky-nav" style="margin:0 0 14px"></div>'+
+        '<div id="bsky-zip-order" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
       host.appendChild(card);
       host.addEventListener('click', function(e){
@@ -1358,6 +1500,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
           return;
         }
         var btn=e.target.closest && e.target.closest('.bsky-btn'); if(!btn) return;
+        // POST ZIP ORDER controls live outside any [data-post] wrapper and must be handled
+        // before the post-action lookup, which would otherwise bail out on them.
+        var zo=btn.getAttribute('data-zo');
+        if(zo){ zipOrderAction(zo); return; }
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
         blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
       });
