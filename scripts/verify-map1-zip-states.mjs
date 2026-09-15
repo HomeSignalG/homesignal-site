@@ -111,10 +111,43 @@ const page = await browser.newPage();
 
 const facBaseline = {};
 
+// ── READINESS: WAIT FOR THE RENDER, NOT FOR A VARIABLE TO EXIST ─────────────────────────────
+// `__HS_SITES !== undefined` + a fixed 3s was the wrong condition, and it produced FALSE REDS
+// on exactly the ZIPs with the most data. Measured in production 2026-09-15, tracing every
+// write to __HS_SITES with a property setter (one write per load, from render() at
+// homesignalmap.html:2400):
+//
+//     01001  write lands at 4105 / 4734 / 5233 ms      01004  at 701 / 706 / 927 ms
+//     01009  write lands at 4376 / 4858 / 5343 ms      94128  at 681 / 736 / 892 ms
+//
+// The gate measured at ~3000 ms, so for the two heavy ZIPs it read BEFORE the only write.
+// `window.__HS_SITES || []` then turned "not there yet" into an empty array, and an
+// unfinished page was reported as a page that renders nothing. Reproduced 6/6 on both a
+// reused page and a fresh context — deterministic, never a flake.
+//
+// ⚠️ THIS IS NOT "WAIT LONGER". A bigger sleep would still be a guess, and the whole failure
+// class is guessing. It waits for the render to SETTLE and says so if it never does. A
+// genuinely empty ZIP settles at 0 immediately and every assertion still runs against it, so
+// nothing is masked — which was the live question before this was measured.
+async function waitForRenderSettled(page, { quietMs = 1500, timeoutMs = 45000 } = {}) {
+  const t0 = Date.now();
+  let last = null, lastChange = Date.now();
+  for (;;) {
+    const n = await page.evaluate(() => Array.isArray(window.__HS_SITES) ? window.__HS_SITES.length : -1);
+    if (n !== last) { last = n; lastChange = Date.now(); }
+    else if (n >= 0 && Date.now() - lastChange >= quietMs) return { settled: true, n, ms: Date.now() - t0 };
+    if (Date.now() - t0 >= timeoutMs) return { settled: false, n, ms: Date.now() - t0 };
+    await page.waitForTimeout(150);
+  }
+}
+
 for (const c of CASES.filter((c) => c.zip)) {
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  const settle = await waitForRenderSettled(page);
+  ok(settle.settled, `${c.zip}: the page finished rendering`,
+     settle.settled ? `settled at ${settle.ms}ms with ${settle.n} site(s)`
+                    : `NEVER SETTLED after ${settle.ms}ms — nothing below was measured on a finished page`);
+  if (!settle.settled) { console.log(''); continue; }
 
   const m = await page.evaluate(() => {
     const sites = window.__HS_SITES || [];
@@ -132,6 +165,14 @@ for (const c of CASES.filter((c) => c.zip)) {
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
       couldNotRead: /could not be read/i.test(txt),
+      // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
+      // `could not be read` is lib/zip-authoritative.js::zipAuthNote — a statement about the
+      // authoritative READ. homesignalmap.html's outer .catch() says "Couldn't load ZIP N."
+      // instead, which matches neither existing pattern, so a page that honestly reported a
+      // failed load was scored as a page that violated its contract. Different failures,
+      // different fixes; pinned against drift by test/map1-zip-state-kind-resolution.test.mjs,
+      // which asserts this regex matches the literal string in the shipped page.
+      loadFailed: /Couldn't load ZIP/i.test(txt),
       // Matched on the address-mode DIRECTION, never on a literal. History: the phrase
       // 'street address' named a shape the geocoder never required and left the ZIP-mode hint in
       // #1079, which reddened this check on deploy; the replacement spanned the wordings known at
@@ -174,6 +215,17 @@ for (const c of CASES.filter((c) => c.zip)) {
   facBaseline[c.zip] = m.fac;
 
   console.log(`── ${c.zip} (${c.kind}) · development=${m.dev} · facilities/other=${m.fac}`);
+
+  // A page that never loaded cannot tell you anything about its contract. Reporting one as a
+  // contract violation is how a transport problem gets filed as a product bug — so it is its
+  // own failure, named INFRASTRUCTURE, and the state assertions below are SKIPPED rather than
+  // run against a page that has nothing on it.
+  if (m.loadFailed) {
+    ok(false, `INFRASTRUCTURE: ${c.zip} reported a failed load — NOTHING was verified for it`,
+       'the page said "Couldn\'t load ZIP"; this is not a contract result');
+    console.log('');
+    continue;
+  }
 
   // The invariant that applies to EVERY state: no fabricated ZIP-mode geography.
   ok(m.devWithDistance === 0,

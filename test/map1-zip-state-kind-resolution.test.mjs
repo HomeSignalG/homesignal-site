@@ -94,5 +94,49 @@ ok(zips.length >= 4, '7a: the candidate pool is populated', );
 ok(zips.length > ZIP_STATE_KINDS.length,
    '7b: it is REDUNDANT — more candidates than states, so one ZIP graduating costs no coverage');
 
+// ── 8 · READINESS: the gate waits for the RENDER, not for a variable to exist ────────────────
+// The defect this pins was measured in production: one write to __HS_SITES per load, landing at
+// 4105-5343ms on 01001/01009 and 681-927ms on 01004/94128, while the gate measured at ~3000ms.
+// It read before the only write on the two heavy ZIPs and called an unfinished page empty.
+ok(!/__HS_SITES !== undefined/.test(CODE),
+   '8a: the bare "defined" readiness check is gone — it is satisfiable before the render');
+ok(!/waitForTimeout\(3000\)/.test(CODE),
+   '8b: the fixed 3s sleep is gone — a bigger guess is still a guess');
+ok(/async function waitForRenderSettled\(/.test(CODE) && /const settle = await waitForRenderSettled\(page\)/.test(CODE),
+   '8c: it waits for the render to SETTLE, and that wait is actually called');
+ok(/Array\.isArray\(window\.__HS_SITES\)/.test(CODE),
+   '8d: readiness requires an ARRAY, not merely a defined name');
+ok(/Date\.now\(\) - lastChange >= quietMs/.test(CODE),
+   '8e: settling means the value STOPPED CHANGING, not that time passed');
+ok(/ok\(settle\.settled,/.test(CODE) && /NEVER SETTLED/.test(GATE),
+   '8f: a page that never settles is a VISIBLE failure, never a silent skip');
+// The masking question, answered structurally: a genuinely empty ZIP settles at 0 and still
+// runs every assertion, because the skip is keyed on NOT SETTLING, never on being empty.
+ok(!/if \(settle\.n === 0\)/.test(CODE) && /if \(!settle\.settled\) \{/.test(CODE),
+   '8g: only a NON-SETTLING page is skipped — an empty one is still fully asserted');
+
+// ── 9 · THE TWO FAILURE SENTENCES ARE DIFFERENT, AND THE GATE NOW KNOWS BOTH ─────────────────
+// Cross-file pin. The page has two distinct failure copies; this gate only ever matched one, so
+// an honest "the page could not load" was scored as a contract violation. These assertions read
+// the SHIPPED page and would fail if either sentence were reworded away from the pattern.
+const PAGE = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const catchLit = (PAGE.match(/status\("(Couldn't load ZIP )" \+ zip \+ "([^"]*)"/) || []);
+ok(catchLit.length === 3, '9a: located the page\'s own outer-catch sentence', catchLit[1] || 'NOT FOUND');
+const rendered = (catchLit[1] || '') + '01001' + (catchLit[2] || '');
+const loadFailedRe = /Couldn't load ZIP/i;
+const couldNotReadRe = /could not be read/i;
+ok(loadFailedRe.test(rendered),
+   '9b: the gate\'s loadFailed pattern MATCHES the page\'s real sentence', JSON.stringify(rendered.slice(0, 48)));
+ok(!couldNotReadRe.test(rendered),
+   '9c: …and couldNotRead does NOT — which is exactly why a failed load was misfiled');
+ok(couldNotReadRe.test('Development coverage for 01001 could not be read just now.'),
+   '9d: couldNotRead still matches zipAuthNote\'s sentence — it was never wrong, only incomplete');
+ok(/loadFailed: \/Couldn't load ZIP\/i\.test\(txt\)/.test(GATE),
+   '9e: the gate reads that sentence off the page');
+ok(/INFRASTRUCTURE: \$\{c\.zip\} reported a failed load/.test(GATE) && /NOTHING was verified/.test(GATE),
+   '9f: a failed load is reported as INFRASTRUCTURE, never as a contract result');
+ok(/if \(m\.loadFailed\) \{[\s\S]{0,400}?continue;/.test(CODE),
+   '9g: …and the state assertions are SKIPPED rather than run against a page that never loaded');
+
 console.log(`\n${n - bad}/${n} passed`);
 if (bad) process.exit(1);
