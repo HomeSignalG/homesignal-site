@@ -39,16 +39,27 @@ jobs:
       - name: Prove the production ZIP pages
         env:
           SITE_BASE: https://homesignal.net
-          # FROZEN CONTROLS — classes A-J, re-derived from live data 2026-09-04 and pinned
-          # here so a reclassification by normal ingestion is a visible one-line change.
-          # Same set pages.yml uses for the pre-deployment proof, plus three meetings
-          # controls: two ZIPs in one county (Santa Clara CA, 231 forward meetings, 60 ZIP
-          # children) which must receive the same cascade, and one in another county which
-          # must receive none of it.
+          # ONLY THE NON-DERIVED CONTROLS ARE PINNED. Classes A-H are read from the
+          # membership the build published into the artifact it deployed
+          # (zip-page-controls.json), so a reclassification by normal ingestion substitutes
+          # and reports instead of reddening this monitor. Every class is still asserted
+          # NON-EMPTY, which is what the freezing was protecting.
+          #
+          # WHY THIS STOPPED BEING FROZEN. The pins here named 01002 Amherst MA
+          # (fail_dev_pass) and 04401 Bangor ME (weather_thin). Both left their class by
+          # NORMAL INGESTION on 2026-09-11 — real content pushed 01002 across Rule F, and
+          # 04401's NWS weather alert expired. pages.yml was converted to derived controls
+          # the same day (#1157, #1158) and this workflow was not, so it went red on
+          # 2026-09-12 on three assertions that were each describing CORRECT production
+          # behaviour, and stayed red. A permanently red monitor reports nothing.
+          #
+          # point_dense stays pinned because "the densest development ZIP leaks no
+          # point/radius string" is a strictly stronger claim than "some page leaks none".
+          # The three meetings ZIPs are a jurisdiction control, not a Rule F class: two ZIPs
+          # in one county (Santa Clara CA, 60 ZIP children) which must receive the same
+          # cascade, and one in another county which must receive none of it.
           DEFAULT_CONTROLS: >-
-            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01002",
-             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"04401",
-             "honest_empty":"02543","fanout":"22030","point_dense":"28468",
+            {"point_dense":"28468",
              "meetings_same_a":"95002","meetings_same_b":"95008","meetings_other":"10001"}
         run: |
           set -euo pipefail

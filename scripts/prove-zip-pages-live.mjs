@@ -14,9 +14,20 @@
 //   * JavaScript is then executed separately, and asserted only to have NOT reversed the
 //     build-time decision or deleted the content the crawler was served.
 //
-// Controls are passed in as CONTROLS (classes A-J) so a reclassification by normal ingestion
-// is a visible one-line replacement rather than an edit to this file.
+// CONTROLS are DERIVED, not frozen. The build publishes the class membership it measured
+// over the artifact it deployed (scripts/lib/zip-page-controls.mjs), this reads it back from
+// the deployment, and every class is asserted NON-EMPTY. CONTROLS carries only the pins that
+// are NOT derivable: point_dense (the worst case, deliberately not an average one) and the
+// three meetings-geography ZIPs, which are a jurisdiction control rather than a Rule F class.
+//
+// ⚖️ WHY IT CHANGED (2026-09-15). The frozen pins here named 01002 Amherst MA and 04401
+// Bangor ME. Both left their class by NORMAL INGESTION on 2026-09-11; `pages` was converted
+// to derived controls the same day and this file was not, so it went red on 2026-09-12 and
+// stayed red — on three assertions that were each describing CORRECT production behaviour.
+// A monitor that is permanently red reports nothing, which is the same as no monitor.
 import { chromium } from 'playwright';
+import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, chooseControls,
+         membersFromPublished } from './lib/zip-page-controls.mjs';
 
 const SITE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 const UA_MOB = 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/W.X.Y.Z Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
@@ -48,12 +59,49 @@ const seo = (h) => ({
   links: (h.match(/<nav class="zsec">[\s\S]*?<\/nav>/) || [''])[0],
 });
 
+// Read a JSON document the deployment publishes. THROWS on anything but a parseable 200:
+// a live monitor whose inputs are missing must go red and say which file, never continue on
+// a default and report on nothing.
+const getJson = async (path) => {
+  const r = await get(`${SITE}/${path}`);
+  if (r.status !== 200) throw new Error(`${path}: HTTP ${r.status} — the deployment does not carry it`);
+  try { return JSON.parse(r.body); }
+  catch (e) { throw new Error(`${path}: not parseable JSON (${e.message})`); }
+};
+
 const main = async () => {
-  const C = JSON.parse(process.env.CONTROLS || '{}');
+  const PINS = JSON.parse(process.env.CONTROLS || '{}');
+  // Only the NON-DERIVED controls are required as pins. point_dense is the densest
+  // development ZIP — deriving it would swap the worst case for an average one — and the
+  // three meetings ZIPs are a fixed jurisdiction control, not a Rule F class.
+  for (const k of ['point_dense', 'meetings_same_a', 'meetings_same_b', 'meetings_other']) {
+    if (!PINS[k]) throw new Error(`CONTROLS is missing ${k}`);
+  }
+
+  // ---- CONTROL RESOLUTION, from the deployment itself -----------------------------------
+  const man = await getJson('zip-pages-manifest.json');
+  const published = await getJson(CONTROLS_FILE);
+  const members = membersFromPublished(published);          // fails closed, see the lib
+  const idxSet = new Set(man.indexable_zips || []);
+  if (!idxSet.size) throw new Error('zip-pages-manifest.json carries no indexable_zips');
+  // ONE build, or the membership describes documents other than the ones being read. That
+  // would surface as a scatter of unexplained class failures; this names it in one line.
+  ok(published.documents === man.documents && published.rule_f_pass === man.rule_f_pass,
+     `the published membership and the documents come from ONE build `
+     + `(documents ${published.documents}/${man.documents}, `
+     + `rule_f_pass ${published.rule_f_pass}/${man.rule_f_pass})`);
+
+  const { controls: C, empties, notes } = chooseControls(PINS, members);
+  for (const k of Object.keys(CLASSIFY)) {
+    if (PINNED_ONLY.has(k)) continue;
+    ok(!empties.includes(k), `control class ${k} is NON-EMPTY (${(members[k] || []).length} member(s)) — `
+      + `an empty class would let its assertion pass over nothing`);
+  }
+  for (const n of notes) console.log('  SUBSTITUTION:' + n);
   for (const k of ['pass_dev_pass', 'pass_dev_fail', 'fail_dev_pass', 'fail_dev_fail', 'local_news',
                    'weather_thin', 'honest_empty', 'fanout', 'point_dense',
                    'meetings_same_a', 'meetings_same_b', 'meetings_other']) {
-    if (!C[k]) throw new Error(`CONTROLS is missing ${k}`);
+    if (!C[k]) throw new Error(`no control resolved for ${k}`);
   }
   console.log(`base: ${SITE}\ncontrols: ${JSON.stringify(C)}\n`);
 
@@ -75,18 +123,38 @@ const main = async () => {
        `[${zip}] usable internal links in the initial HTML`);
     ok(!r.xRobots, `[${zip}] no X-Robots-Tag header overriding the page's own directive`);
   }
-  const idx = ['pass_dev_pass', 'pass_dev_fail', 'local_news', 'fanout', 'point_dense'];
-  const nidx = ['fail_dev_pass', 'fail_dev_fail', 'weather_thin', 'honest_empty'];
-  for (const k of idx) {
+  // ROBOTS IS ASSERTED AGAINST THE BUILD'S OWN RULE F VERDICT, per control, rather than
+  // against a hardcoded list of which classes "are" index-eligible. That list was an
+  // ASSUMPTION that happened to hold for the frozen pins and does not hold for the class
+  // definitions: honest_empty (no notices AND no meetings) can still pass Rule F on local
+  // news alone — 01002 is exactly that page today — and fanout (a notices list exists) can
+  // still be under the >= 3 threshold. Reading the verdict from the manifest is STRICTLY
+  // STRONGER: it proves Rule F reached the served bytes for every control, in both
+  // directions, instead of re-checking a guess.
+  const ROBOTS = ['pass_dev_pass', 'pass_dev_fail', 'fail_dev_pass', 'fail_dev_fail',
+                  'local_news', 'weather_thin', 'honest_empty', 'fanout', 'point_dense'];
+  for (const k of ROBOTS) {
+    const z = C[k];
     const s = seo(body[k].body);
-    ok(s.robots === 'index, follow', `[${C[k]}] ${k}: initial HTML is index, follow`);
-    ok(s.items > 0, `[${C[k]}] ${k}: initial HTML carries real Alerts items (${s.items} list sections)`);
+    const wantIdx = idxSet.has(z);
+    ok(s.robots === (wantIdx ? 'index, follow' : 'noindex, follow'),
+       `[${z}] ${k}: initial HTML is ${wantIdx ? 'index, follow' : 'noindex, follow'} — `
+       + `the build's Rule F verdict reached the served bytes`);
+    if (wantIdx) {
+      ok(s.items > 0, `[${z}] ${k}: initial HTML carries real Alerts items (${s.items} list sections)`);
+    } else {
+      ok(/No government notices on file|No upcoming public meetings on file|No qualifying local news on file/.test(body[k].body)
+         || s.items > 0, `[${z}] ${k}: honest content — either real items or a truthful empty line`);
+    }
   }
-  for (const k of nidx) {
-    const s = seo(body[k].body);
-    ok(s.robots === 'noindex, follow', `[${C[k]}] ${k}: initial HTML is noindex, follow`);
-    ok(/No government notices on file|No upcoming public meetings on file|No qualifying local news on file/.test(body[k].body)
-       || s.items > 0, `[${C[k]}] ${k}: honest content — either real items or a truthful empty line`);
+  // The class INVARIANTS the old hardcoded lists were standing in for, now asserted rather
+  // than assumed. These are true BY DEFINITION of the class, so a failure here means the
+  // membership and the Rule F pass set disagree — never a drifted pin.
+  for (const k of ['pass_dev_pass', 'pass_dev_fail', 'local_news']) {
+    ok(idxSet.has(C[k]), `[${C[k]}] ${k} is in the Rule F pass set, as its class requires`);
+  }
+  for (const k of ['fail_dev_pass', 'fail_dev_fail', 'weather_thin']) {
+    ok(!idxSet.has(C[k]), `[${C[k]}] ${k} is NOT in the Rule F pass set, as its class requires`);
   }
   // weather displays but never carries Rule F
   ok(/<h2>Weather alerts<\/h2>/.test(body.weather_thin.body),
