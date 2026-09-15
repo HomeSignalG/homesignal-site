@@ -142,12 +142,20 @@ try {
   });
   ok(shape.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
     'Fix 8 main column is What\u2019s Changing → Quality-of-Life Premium → Official Dates');
-  // Fix 8J: this context is SIGNED OUT, and the Following section removes itself outright
-  // without a real session — so the signed-out rail is still exactly these two headings. That
-  // is the privacy rule showing up in the page's shape, not an accident of ordering, so it is
-  // asserted positively below as well: no heading, no node, and no project id in the markup.
-  ok(shape.rail.join(' | ') === 'My Places | Stay Informed',
-    'Fix 8 right rail signed-out is My Places → Stay Informed', shape.rail);
+  // Fix 8J: this context is SIGNED OUT, and the Developments group removes itself outright
+  // without a real session — so the rail carries the unified My Places card (Property
+  // Addresses + ZIP Codes, no Developments node at all), the dormant Development Updates
+  // Premium card, then Stay Informed. That is the privacy rule showing up in the page's
+  // shape, not an accident of ordering, so it is asserted positively below as well: no
+  // heading, no node, and no project id in the markup.
+  //
+  // The Premium card appears here because `heads()` reads `.p2h` as well as `h2` — the same
+  // reason the main column's expectation carries QUALITY-OF-LIFE IMPACT · PREMIUM. Its text
+  // is UPPERCASE because app.css `.p2h` sets text-transform: uppercase and innerText returns
+  // RENDERED text; the markup itself reads "Development Updates · Premium".
+  ok(shape.rail.join(' | ') === 'My Places | DEVELOPMENT UPDATES · PREMIUM | Stay Informed',
+    'Fix 8 right rail signed-out is My Places → Development Updates Premium → Stay Informed',
+    shape.rail);
   const followOut = await page.evaluate(() => ({
     node: document.querySelectorAll('#dashFollowing, #dashFollowingBody').length,
     text: document.body.innerText.indexOf('Projects you chose to monitor')
@@ -417,8 +425,12 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['mo
   // 8. Section order is untouched by a presentation-only change.
   ok(got.main.join(' | ') === "What’s Changing? | QUALITY-OF-LIFE IMPACT · PREMIUM | Official Dates to Know",
     'Fix 8I [' + label + '] main column order unchanged', got.main);
-  ok(got.rail.join(' | ') === 'My Places | Stay Informed',
-    'Fix 8I [' + label + '] right rail order unchanged', got.rail);
+  // "Unchanged" means unchanged BY FIX 8I, which is presentation-only. The rail's membership
+  // did change when My Places and Projects merged and the Development Updates Premium card
+  // was added — so this pins the current three-section order at every viewport rather than a
+  // shape the page no longer has.
+  ok(got.rail.join(' | ') === 'My Places | DEVELOPMENT UPDATES · PREMIUM | Stay Informed',
+    'Fix 8I [' + label + '] right rail order unchanged by the header work', got.rail);
 }
 
 // 4 (singular), exercised deliberately. The shared fixture seeds two ZIPs, so the N=1 branch

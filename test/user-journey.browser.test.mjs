@@ -306,8 +306,14 @@ ok(dash.text.indexOf('Open full map') < 0, '4 ...and no "Open full map" copy sur
 ok(dash.strip === 0, '4 ...and no #dashStrip KPI row', dash.strip);
 ok(dash.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
   '4 Dashboard main column is the approved briefing hierarchy', dash.main);
-ok(dash.rail.join(' | ') === 'My Places | Stay Informed',
-  '4 ...and the right rail is My Places then Stay Informed', dash.rail);
+// The rail is now ONE typed My Places card (Property Addresses / ZIP Codes / Developments),
+// the dormant Development Updates Premium card, then Stay Informed. `heads()` reads `.p2h`
+// as well as `h2`, which is why the Premium card appears here exactly as the main column's
+// Quality-of-Life card does; its text is UPPERCASE because app.css `.p2h` sets
+// text-transform: uppercase and innerText returns RENDERED text.
+ok(dash.rail.join(' | ') === 'My Places | DEVELOPMENT UPDATES · PREMIUM | Stay Informed',
+  '4 ...and the right rail is My Places then Development Updates Premium then Stay Informed',
+  dash.rail);
 ok(/Coming soon/.test(dash.text) && /Get deeper local insights/.test(dash.text),
   '4 ...with the Premium coming-soon card, not a live Quality-of-Life claim');
 ok(/ALL MY PLACES/.test(dash.viewing) && !/\b\d{5}\b/.test(dash.viewing),

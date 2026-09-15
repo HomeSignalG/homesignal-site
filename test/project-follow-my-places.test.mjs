@@ -77,7 +77,7 @@ ok(/data-view="projects"/.test(props) && /function projectCard/.test(props),
   'My Places has a Projects view and a Project card');
 ok(/HS\.followedProjectIds/.test(props) && /projectsByIds/.test(data),
   'My Places loads followed projects by id, not by inventing rows');
-ok(/Location not listed on this project record/.test(props),
+ok(/Location not listed on this development record/.test(props),
   'missing street address is stated, never fabricated');
 ok(!/p\.lat|p\.lng/.test((props.match(/function projectLocationLine[\s\S]*?\n  \}/) || [''])[0]),
   'projectLocationLine does not treat lat/lng as an address');

@@ -14,7 +14,7 @@
     <div class="ph">
       <div class="eyebrow">My Places</div>
       <h1>My Places</h1>
-      <p>Everything HomeSignal watches for you. An <b>Address</b> is one location; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>projects</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a project does not turn on email alerts.</p>
+      <p>Everything HomeSignal watches for you. An <b>Address</b> is one location; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>Developments</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a Development does not turn on email alerts.</p>
     </div>
     <div class="strip" id="propStrip"></div>
     <div class="toolbar toolbar--lead">
@@ -22,7 +22,7 @@
         <button class="on" type="button" data-view="all">All</button>
         <button type="button" data-view="addresses">Addresses</button>
         <button type="button" data-view="zips">ZIP Codes</button>
-        <button type="button" data-view="projects">Projects</button>
+        <button type="button" data-view="projects">Developments</button>
       </div>
       <div class="sp"></div>
       <button class="addbtn" type="button" id="plAddAddress">+ Add Address</button>
@@ -79,7 +79,7 @@ HS.onReady(async function () {
     var byId = {};
     (rows || []).forEach(function (p) { if (p && p.id != null) byId[String(p.id)] = p; });
     return ids.map(function (id) {
-      return byId[String(id)] || { id: id, name: 'Followed project', _unresolved: true };
+      return byId[String(id)] || { id: id, name: 'Followed development', _unresolved: true };
     });
   }
 
@@ -148,17 +148,17 @@ HS.onReady(async function () {
   }
 
   function projectLocationLine(p) {
-    if (!p || p._unresolved) return 'Location not listed on this project record';
+    if (!p || p._unresolved) return 'Location not listed on this development record';
     var bits = [];
     if (p.address) bits.push(String(p.address));
     if (p.zip) bits.push('ZIP ' + String(p.zip));
     if (bits.length) return bits.join(' · ');
-    return 'Location not listed on this project record';
+    return 'Location not listed on this development record';
   }
 
   function projectCard(p) {
     var loc = projectLocationLine(p);
-    var sub = p.status || p.type || 'Followed project';
+    var sub = p.status || p.type || 'Followed development';
     var hrefOpts = { id: p.id };
     if (p.zip && /^\d{5}$/.test(String(p.zip))) hrefOpts.zip = String(p.zip);
     var href = HS.pageHref ? HS.pageHref('development.html', hrefOpts)
@@ -166,8 +166,8 @@ HS.onReady(async function () {
     return '<div class="propcard" data-kind="project" data-id="' + HS.esc(p.id) + '" data-href="' + HS.esc(href) + '">'
       + '<div class="miniscore">◎</div>'
       + '<div class="pinfo">'
-      + '<div class="ptag" style="color:var(--ink-2)">' + typeChip('Project') + (sub ? ' · ' + HS.esc(sub) : '') + '</div>'
-      + '<h3>' + HS.esc(p.name || 'Followed project') + '</h3>'
+      + '<div class="ptag" style="color:var(--ink-2)">' + typeChip('Development') + (sub ? ' · ' + HS.esc(sub) : '') + '</div>'
+      + '<h3>' + HS.esc(p.name || 'Followed development') + '</h3>'
       + '<div class="paddr">' + HS.esc(loc) + '</div>'
       + '<div class="pmeta"><span style="color:var(--ink-3)">Followed in My Places. Does not turn on email alerts.</span></div>'
       + '<div class="pacts" style="margin-top:8px">'
@@ -180,8 +180,8 @@ HS.onReady(async function () {
   function emptyCard(kind) {
     if (kind === 'projects') {
       return '<div class="propcard" style="border-style:dashed;justify-content:center">'
-        + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">No projects followed yet</div>'
-        + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">Open a project and tap Add to My Places to follow. Followed projects appear here so you can reopen them. This does not turn on email alerts.</div>'
+        + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">No Developments followed yet</div>'
+        + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">Open a development and tap Add to My Places to follow. Followed Developments appear here so you can reopen them. This does not turn on email alerts.</div>'
         + '</div></div>';
     }
     var copy = kind === 'zips'
@@ -204,9 +204,15 @@ HS.onReady(async function () {
       var n = k === 'addresses' ? a.length
         : k === 'zips' ? z.length
         : k === 'projects' ? p.length
-        : a.length + z.length + p.length;
-      var label = k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : k === 'zips' ? 'ZIP Codes' : 'Projects';
-      b.textContent = label + ' (' + n + ')';
+        : null;
+      var label = k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : k === 'zips' ? 'ZIP Codes' : 'Developments';
+      // "All" CARRIES NO COUNT. It used to print a.length + z.length + p.length while the
+      // stat tile above prints a.length + z.length — two different totals on one screen,
+      // and the larger one quietly redefined Developments as geographic places. The three
+      // TYPED counts are the truthful ones and stay; the combined figure is REMOVED rather
+      // than replaced, because no combined total is approved on any surface. "All" is a
+      // filter, and a filter does not need to assert a total to name itself.
+      b.textContent = n == null ? label : label + ' (' + n + ')';
     });
     if (view === 'all' || view === 'addresses') {
       html += a.length ? a.map(addressCard).join('') : emptyCard('addresses');
@@ -260,7 +266,7 @@ HS.onReady(async function () {
       if (act === 'unfollow-project') {
         var pid = btn.getAttribute('data-id');
         if (!pid) return;
-        if (!window.confirm('Stop following this project?\n\nIt will leave My Places. This does not change email alerts. Your Addresses and ZIP Codes are not affected.')) return;
+        if (!window.confirm('Stop following this Development?\n\nIt will leave My Places. This does not change email alerts. Your Addresses and ZIP Codes are not affected.')) return;
         if (HS.unfollowProject) await HS.unfollowProject(pid);
         followedProjects = (followedProjects || []).filter(function (row) { return String(row.id) !== String(pid); });
         render(); return;

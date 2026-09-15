@@ -79,7 +79,7 @@ ok(mixed.cards.every((c) => c && typeof c === 'object'),
 const dangCard = mixed.cards[1] || {};
 ok(dangCard.id === DANGLING && dangCard.unresolved === true,
   'the unresolved card keeps its follow id and is marked unresolved', dangCard);
-ok(dangCard.title === 'Followed project' && dangCard.context === null && dangCard.zip === null,
+ok(dangCard.title === 'Followed development' && dangCard.context === null && dangCard.zip === null,
   'the unresolved card invents no title, status or place', dangCard);
 // Order is the follow-list order: an unresolved row must not be shuffled to the end, or the
 // resident cannot tell which of their follows it is by position.
@@ -91,8 +91,16 @@ ok(mixed.cards.map((c) => c.id).join(',') === [PEARCE.id, DANGLING, BRIGHT.id].j
 const allFailed = A.followingCards({ ids: [PEARCE.id, BRIGHT.id], rows: [] });
 ok(allFailed.cards.length === 2 && allFailed.total === 2 && allFailed.cards.every((c) => c.unresolved),
   'a failed read renders every follow as unresolved — never as an empty section', allFailed);
-ok(dash.indexOf('We could not load this project’s details.') !== -1,
-  'the page states that details could not be loaded, and does not claim the project is gone');
+ok(dash.indexOf('We could not load this development’s details.') !== -1,
+  'the page states that details could not be loaded, and does not claim the development is gone');
+// AND IT IS NOT A LINK. c.zip is absent exactly when the record did not resolve, so the old
+// unconditional anchor sent the resident to a Development list for somewhere else. The row
+// stays visible and counted — removing it would make the group heading disagree with its
+// rows — but it is a plain div with no chevron, because there is no record to open.
+ok(/if \(c\.unresolved\) \{[\s\S]{0,240}placerow--unresolved/.test(dash),
+  'an unresolved follow renders as a non-anchor row');
+ok(!/placerow--unresolved[^>]*>[\s\S]{0,200}class="pc"/.test(dash),
+  'an unresolved row carries no chevron');
 
 // =====================================================================================
 console.log('\n--- §3 NO CLAIM THE DATA CANNOT SUPPORT ----------------------------------');
@@ -125,14 +133,24 @@ ok(extras.last_seen_at === undefined && extras.impact_score === undefined && ext
 // SCOPED TO THE FOLLOWING REGION, not the whole page: the Premium card legitimately renders
 // "Quality-of-Life Impact · Premium", so a page-wide search would either pass vacuously or
 // fail on unrelated copy. The region is the section's markup plus its render code.
+// The group is no longer its own .block card — it is a container INSIDE the unified My
+// Places card — so the slice starts at that container and runs to the end of the card.
 const followMarkup = (read('dashboard.html')
-  .match(/<div class="block" id="dashFollowing"[\s\S]*?<div class="block">\s*<div class="bt-row"><h2>Stay Informed/) || [''])[0];
+  .match(/<div id="dashFollowing" hidden>[\s\S]*?<div class="block" style="padding:0/) || [''])[0];
 const followJs = dash.slice(dash.indexOf('if (followingEl) {'),
   dash.indexOf('Add an address or a ZIP code and this briefing fills in'));
-const followRegion = (followMarkup + followJs).toLowerCase();
+// COMMENT-STRIPPED, for the same reason my-places-contract.test.mjs strips: this is a check
+// about what RENDERS, and a comment explaining why a word is absent must not be able to fail
+// a check that the word is absent. (It happened here: the Premium card's own comment names
+// the Quality-of-Life card it is modelled on, which tripped the banned-vocabulary scan.)
+const stripComments = (x) => x
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/^\s*\/\/.*$/gm, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
+const followRegion = stripComments(followMarkup + followJs).toLowerCase();
 // POSITIVE CONTROL. A region that failed to match is empty, and every absence below would
 // then be true of nothing — success-shaped output attesting to nothing at all.
-ok(followMarkup !== '' && followJs !== '' && followRegion.indexOf('projects you chose to monitor') !== -1
+ok(followMarkup !== '' && followJs !== '' && followRegion.indexOf('developmentsgroup') !== -1
    && followRegion.indexOf('followingcards') !== -1,
   'the scanned Following region is real — markup and render code both found',
   { markup: followMarkup.length, js: followJs.length });
@@ -145,8 +163,11 @@ for (const banned of ['updated', 'recently changed', 'needs your attention', 'hi
 
 // A follow writes app_follows and nothing else. The section must not imply otherwise, and the
 // existing project-follow copy already makes the same promise on the My Places card.
-ok(/does not turn on email alerts/i.test(dash),
-  'the empty state repeats that following does not turn on email alerts');
+// The zero-state that used to carry this promise is gone — the group is HIDDEN at zero
+// rather than rendered as "Developments · 0". So the promise moved to the constant Premium
+// card, where it renders for every resident instead of only for those following nothing.
+ok(/It does not send alerts\./.test(dash),
+  'the rail states permanently that saving a Development sends no alerts');
 ok(!/user_subscriptions|pipeline_type|digest/.test(dash),
   'the Dashboard Following section touches no subscription or digest concept');
 
@@ -225,8 +246,11 @@ ok(/pageHref\('development\.html', \{ id: c\.id, zip: c\.zip \}\)/.test(dash),
   'a card routes to the existing Development dossier by canonical id');
 ok(!/following[\s\S]{0,400}(homesignalmap|alerts\.html|property\.html)/i.test(dash.slice(dash.indexOf('A.followingCards('), dash.indexOf('A.followingCards(') + 1400)),
   'Following invents no new destination');
-ok(/id="dashManageFollowing" *>Manage/.test(read('dashboard.html'))
-   || /properties\.html\?view=projects/.test(read('dashboard.html')),
+// The route moved into the view-model (railHref) with the consolidation, so it is asserted
+// where it now lives. The value itself is unchanged: resident-facing "Developments", internal
+// ?view=projects — renaming the route would break every existing link and follow.
+ok(/railHref\(view\)[\s\S]{0,120}'properties\.html\?view='/.test(read('lib/dashboard-aggregate.js'))
+   && /RAIL_DEV_VIEW\s*=\s*'projects'/.test(read('lib/dashboard-aggregate.js')),
   'management routes to the existing My Places page');
 
 // The deep link is whitelisted against the views the page already declares, and anything else
