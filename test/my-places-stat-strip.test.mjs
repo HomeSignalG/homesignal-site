@@ -1,16 +1,26 @@
-// MY PLACES STAT STRIP — a missing comment window is not an open one, and an unmeasured
-// score is not a zero.
+// MY PLACES STAT STRIP — a missing comment window is not an open one, an unmeasured score
+// is not a zero, and a CAPPED result is not a total.
 //
-// WHAT WAS BROKEN, measured on production before the fix. ZIP 78617 holds 17 non-news
-// app_changes rows; ALL 17 carry window_closes_at NULL and 0 are open. The strip rendered
-// "17 Need you across all Places" while every Address card below it rendered "Nothing needs
-// you" — the contradiction a resident actually saw on homesignal.net.
+// WHAT WAS BROKEN (1) — measured on production. ZIP 78617 holds 17 non-news app_changes
+// rows, ALL 17 with window_closes_at NULL and 0 open. The strip rendered "17 Need you
+// across all Places" while every Address card below it rendered "Nothing needs you".
+// The cause is one coercion: HS.daysUntil returns null with no window, and `null >= 0` is
+// TRUE (null converts to 0 in a relational comparison, unlike in ==).
 //
-// THE CAUSE IS ONE JAVASCRIPT COERCION. HS.daysUntil returns null when there is no
-// window_closes_at, and `null >= 0` is TRUE (null converts to 0 in a relational comparison,
-// unlike in ==). So `daysUntil(x.window_closes_at) >= 0` accepted every record that has no
-// comment window at all. The correct form was already used in four other places in this
-// repo; three call sites had never adopted it.
+// WHAT WAS BROKEN (2) — app_properties.score is NULL on every stored row, and `p.score || 0`
+// averaged those absent values as real zeros, rendering "0 Avg Address score" as if measured.
+//
+// WHAT WAS BROKEN (3) — app_projects_for_zip caps development results at 500 and
+// lib/data.js::rpcAllRows reports `complete: true` for any array, so a truncated read is
+// indistinguishable from a whole one. ZIP 78617 holds 512 development rows; the RPC returned
+// 500; the tile presented 500 as the ZIP's set.
+//
+// HOW THIS FILE TESTS. The strip's helpers live inside properties.html's onReady closure, so
+// they cannot be imported. They are EXTRACTED FROM THE SHIPPED FILE and EXECUTED here with
+// the real HS.daysUntil pulled out of lib/templates.js — so these are behavioural assertions
+// against production code, not a search for approved strings. Source scans are used only
+// where the claim is genuinely about source (no unguarded comparison exists anywhere; no new
+// query was introduced).
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -23,9 +33,8 @@ const ok = (c, name, d) => {
 };
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(join(root, f), 'utf8');
-// Comments must never satisfy — or fail — a source scan. Both files deliberately QUOTE the
-// forbidden expression in order to explain why it is forbidden, so a scan over raw text
-// would report the defect as still present forever.
+// Comments must never satisfy — or fail — a source scan. These files deliberately QUOTE the
+// forbidden expressions in order to explain why they are forbidden.
 const strip = (x) => x
   .replace(/<!--[\s\S]*?-->/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -36,81 +45,135 @@ const props = strip(propsRaw);
 const property = strip(read('property.html'));
 const templates = read('lib/templates.js');
 
-console.log('\n--- §1 THE COERCION ITSELF (control) -------------------------------------');
-// If this ever stops being true the guard is unnecessary — so the test says WHY it exists.
-ok(null >= 0, '1a `null >= 0` is TRUE in JavaScript — this is the whole defect');
-ok(!(null > 0), '1b ...while `null > 0` is false, which is why it reads as "today, still open"');
-ok(!(undefined >= 0), '1c ...and undefined does NOT coerce, so only a null return is dangerous');
-
-// The shipped helper really does return null for an absent window — the premise of §1.
+// ---- load the SHIPPED helpers out of properties.html and run them --------------------
 const daysUntilSrc = (templates.match(/function daysUntil\(dateStr\) \{[\s\S]*?\n  \}/) || [''])[0];
-ok(/if \(!dateStr\) return null;/.test(daysUntilSrc),
-  '1d HS.daysUntil returns null for an absent window', daysUntilSrc.slice(0, 120));
+const capBlock = (props.match(/var DEV_QUERY_CAP[\s\S]*?\n  \}\n\n  function strip/) || [''])[0]
+  .replace(/\n  function strip$/, '');
+const windowBlock = (props.match(/function openWindowCount\([\s\S]*?\n  \}/) || [''])[0];
+// The score rule is two statements inside strip(); lift them verbatim.
+const scoreBlock = (props.match(/var scored = a\.filter[\s\S]*?: null;/) || [''])[0];
+
+function loadHelpers(zip) {
+  const src = daysUntilSrc + '\nvar HS = { daysUntil: daysUntil };\n'
+    + 'var S = { zip: ' + JSON.stringify(zip) + ' };\n'
+    + capBlock + '\n' + windowBlock + '\n'
+    + 'function avgScore(a) { ' + scoreBlock + ' return avg; }\n'
+    + 'return { DEV_QUERY_CAP, devCapped, devCountValue, devCountLabel, openWindowCount, avgScore };';
+  return new Function(src)();
+}
+const H = loadHelpers('78617');
+const HNoZip = loadHelpers(null);
+
+console.log('\n--- §0 THE HELPERS WERE REALLY EXTRACTED (control) ------------------------');
+ok(capBlock.includes('DEV_QUERY_CAP') && capBlock.includes('devCountLabel'),
+  '0a the cap block came out of the shipped file', capBlock.slice(0, 60));
+ok(windowBlock.includes('openWindowCount'), '0b the window helper came out too');
+ok(scoreBlock.includes('scored'), '0c the score rule came out too');
+ok(typeof H.devCountValue === 'function' && typeof H.openWindowCount === 'function',
+  '0d ...and all of it executes here, so every assertion below is behavioural');
+
+console.log('\n--- §1 THE COERCION, AND THE GUARD THAT SURVIVES 4a9494b ------------------');
+ok(null >= 0, '1a `null >= 0` is TRUE in JavaScript — this is the original defect');
+ok(/if \(!dateStr\) return null;/.test(daysUntilSrc), '1b HS.daysUntil returns null for an absent window');
+const noWindow = Array.from({ length: 17 }, () => ({ window_closes_at: null }));
+const openFuture = { window_closes_at: new Date(Date.now() + 5 * 864e5).toISOString() };
+const closedPast = { window_closes_at: new Date(Date.now() - 5 * 864e5).toISOString() };
+ok(H.openWindowCount(noWindow) === 0,
+  '1c REQ-12 a null window_closes_at does not count as open (the real 78617 shape)', H.openWindowCount(noWindow));
+ok(H.openWindowCount([...noWindow, openFuture]) === 1,
+  '1d REQ-12 a genuinely open window still counts', H.openWindowCount([...noWindow, openFuture]));
+ok(H.openWindowCount([...noWindow, closedPast]) === 0,
+  '1e REQ-12 an expired window still does not count', H.openWindowCount([...noWindow, closedPast]));
+ok(H.openWindowCount([{ window_closes_at: new Date().toISOString() }]) === 1,
+  '1f ...and one closing today is still open');
 
 console.log('\n--- §2 NO SHIPPED COMPARISON IS UNGUARDED --------------------------------');
-// The forbidden shape: a daysUntil(...) result compared to 0 with no null check. Scanned
-// across every file that ships, not just the two repaired here, so a fourth site cannot
-// appear later and go unnoticed.
-const SHIPPED = ['properties.html', 'property.html', 'alerts.html', 'shell.js',
-                 'lib/templates.js', 'lib/why.js', 'development.html', 'dashboard.html',
-                 'lib/community-page.js', 'homesignalmap.html'];
+const SHIPPED = ['properties.html', 'property.html', 'alerts.html', 'shell.js', 'lib/templates.js',
+                 'lib/why.js', 'development.html', 'dashboard.html', 'lib/community-page.js',
+                 'homesignalmap.html'];
 const unguarded = [];
 for (const f of SHIPPED) {
-  let src;
-  try { src = strip(read(f)); } catch (e) { continue; }
-  // Direct comparison of the CALL to a number, e.g. `HS.daysUntil(x.y) >= 0`.
-  const m = src.match(/(?:HS\.)?daysUntil\([^()]*\)\s*[<>]=?\s*-?\d/g) || [];
-  for (const hit of m) unguarded.push(f + ': ' + hit);
+  let src; try { src = strip(read(f)); } catch (e) { continue; }
+  for (const hit of src.match(/(?:HS\.)?daysUntil\([^()]*\)\s*[<>]=?\s*-?\d/g) || []) unguarded.push(f + ': ' + hit);
 }
-ok(unguarded.length === 0,
-  '2a no shipped file compares a daysUntil() call straight to a number', unguarded);
-
-// Positive control: the scan CAN see the shape it forbids, so 2a is not vacuous.
-ok((strip('var n = HS.daysUntil(x.window_closes_at) >= 0;')
-     .match(/(?:HS\.)?daysUntil\([^()]*\)\s*[<>]=?\s*-?\d/g) || []).length === 1,
+ok(unguarded.length === 0, '2a no shipped file compares a daysUntil() call straight to a number', unguarded);
+ok((strip('var n = HS.daysUntil(x.y) >= 0;').match(/(?:HS\.)?daysUntil\([^()]*\)\s*[<>]=?\s*-?\d/g) || []).length === 1,
   '2b CONTROL: the scan matches the forbidden shape when it is present');
+ok(/d != null && d >= 0/.test(property), '2c property.html keeps its guard (4a9494b intact)');
 
-// And the guarded form is what the repaired sites actually use.
-for (const [file, src] of [['properties.html', props], ['property.html', property]]) {
-  const guards = (src.match(/d\s*!=\s*null\s*&&\s*d\s*>=\s*0/g) || []).length;
-  ok(guards >= 1, '2c ' + file + ' uses the `d != null && d >= 0` form', guards);
+console.log('\n--- §3 A CAPPED RESULT IS NOT A TOTAL (the correction) --------------------');
+const list = (n) => Array.from({ length: n }, (_, i) => ({ id: i }));
+const CAP = H.DEV_QUERY_CAP;
+ok(CAP === 500, '3a the detected cap is the RPC\'s 500', CAP);
+// REQ-1 / REQ-2 / REQ-3 — below the cap the exact returned count is provable, so it is shown.
+ok(H.devCountValue(list(0)) === 0 && !String(H.devCountValue(list(0))).includes('+'),
+  '3b REQ-1 zero renders a plain 0, never "0+"', H.devCountValue(list(0)));
+ok(H.devCountValue(list(1)) === 1, '3c REQ-2 one renders a plain 1', H.devCountValue(list(1)));
+ok(H.devCountValue(list(CAP - 1)) === CAP - 1,
+  '3d REQ-3 immediately below the cap renders the exact count', H.devCountValue(list(CAP - 1)));
+// REQ-4 — at the cap the total is unprovable, so the value says "at least".
+ok(H.devCountValue(list(CAP)) === '500+',
+  '3e REQ-4 at the cap the value is 500+', H.devCountValue(list(CAP)));
+ok(H.devCapped(list(CAP)) === true && H.devCapped(list(CAP - 1)) === false,
+  '3f cap detection flips exactly at the boundary and nowhere else');
+// The "+" is derived from what came back, not from the constant — so a moved server cap
+// still reports what was actually received rather than a stale 500.
+ok(H.devCountValue(list(CAP + 12)) === '512+',
+  '3g the + is derived from the RETURNED count, not hardcoded', H.devCountValue(list(CAP + 12)));
+
+console.log('\n--- §4 THE LABEL SAYS ONLY WHAT IT MEASURED ------------------------------');
+const L = (n) => H.devCountLabel(list(n));
+ok(L(2) === 'Developments found · ZIP 78617', '4a REQ-6 the label names the viewed ZIP', L(2));
+ok(L(1) === 'Development found · ZIP 78617', '4b singular at exactly one', L(1));
+ok(L(0) === 'Developments found · ZIP 78617', '4c plural at zero', L(0));
+ok(L(CAP) === 'Developments found · ZIP 78617',
+  '4d REQ-5 the capped label makes no exact-total claim — it is the same honest label', L(CAP));
+ok(HNoZip.devCountLabel(list(2)) === 'Developments found',
+  '4e no viewed ZIP degrades gracefully, never "ZIP null"', HNoZip.devCountLabel(list(2)));
+// REQ-7..REQ-10 — asserted on the RENDERED label across every count, not on file text.
+for (const n of [0, 1, 2, CAP - 1, CAP, CAP + 1]) {
+  const t = L(n);
+  if (!/Development/.test(t)) ok(false, '4f REQ-7 Development terminology at n=' + n, t);
+  if (/Project/i.test(t)) ok(false, '4g REQ-7 never "Project" at n=' + n, t);
+  if (/Nearby/i.test(t)) ok(false, '4h REQ-8 never "Nearby" at n=' + n, t);
+  if (/Total/i.test(t)) ok(false, '4i REQ-9 never "Total" at n=' + n, t);
+  if (/Across all Places/i.test(t)) ok(false, '4j REQ-10 never "Across all Places" at n=' + n, t);
+  if (/All Developments|Exactly 500|500 Developments in this ZIP/i.test(t))
+    ok(false, '4k no banned completeness phrasing at n=' + n, t);
 }
-// Both properties.html sites are covered — the strip helper and the Address card.
-ok(/function openWindowCount/.test(props), '2d the strip counts through a named helper');
-ok(/openWindowCount\(changes\)/.test(props), '2e ...and the tile is built from it');
-ok(/var needs = HS\.withDistance\(changes, p\)[\s\S]{0,260}d != null && d >= 0/.test(props),
-  '2f ...and the Address card guards its own count too');
+ok(true, '4f-4k REQ-7..10 the rendered label passes every banned-word rule at 6 counts');
+// The old strings are gone from the file entirely, comments included.
+ok(!/across all Places/i.test(propsRaw), '4l "across all Places" is gone from the file');
+ok(!/Nearby projects total/i.test(propsRaw), '4m "Nearby projects total" is gone from the file');
 
-console.log('\n--- §3 AN UNMEASURED SCORE IS NOT A ZERO ---------------------------------');
-// app_properties.score is NULL on every stored row, so `p.score || 0` averaged absent
-// values as real zeros and rendered "0 Avg Address score" as a measurement.
-ok(!/p\.score \|\| 0/.test(props),
-  '3a the average no longer coerces an absent score to 0');
-ok(/typeof p\.score === 'number' && isFinite\(p\.score\)/.test(props),
-  '3b only addresses carrying a real number are averaged');
-ok(/scored\.length[\s\S]{0,140}: null;/.test(props),
-  '3c ...and with none the average is null, so the tile is omitted entirely');
-ok(/avg != null \? HS\.tpl\.statTile\(avg, 'Avg Address score'/.test(props),
-  '3d the tile still renders when a score genuinely exists');
-// The Address card was already honest and must stay that way.
+console.log('\n--- §5 SCORES (4a9494b intact) -------------------------------------------');
+ok(H.avgScore([{}, {}]) === null,
+  '5a REQ-13 absent scores are not averaged as zero — the tile is omitted', H.avgScore([{}, {}]));
+ok(H.avgScore([]) === null, '5b no addresses at all also omits the tile');
+ok(H.avgScore([{ score: 0 }, { score: 0 }]) === 0,
+  '5c REQ-14 a REAL numeric zero is a valid measurement and still renders', H.avgScore([{ score: 0 }, { score: 0 }]));
+ok(H.avgScore([{ score: 80 }, {}]) === 80,
+  '5d an absent score does not drag a measured one down', H.avgScore([{ score: 80 }, {}]));
+ok(H.avgScore([{ score: 80 }, { score: 60 }]) === 70, '5e two real scores average normally');
+ok(H.avgScore([{ score: NaN }]) === null, '5f NaN is not a measurement');
+ok(H.avgScore([{ score: '80' }]) === null, '5g a string is not a measurement either');
 ok(/miniscore">' \+ \(p\.score \|\| ''\)/.test(props),
-  '3e the Address card still renders an absent score as blank, not 0');
+  '5h the Address card still renders an absent score as blank, not 0');
 
-console.log('\n--- §4 A TILE MAY NOT CLAIM A SPAN IT DID NOT MEASURE ---------------------');
-// changes/projects are read for the VIEWED ZIP only.
-ok(/HS\.data\.changes\(S\.zip/.test(props) && /HS\.data\.projects\(S\.zip/.test(props),
-  '4a CONTROL: the page reads one ZIP, which is what makes the old label false');
-ok(!/across all Places/.test(propsRaw),
-  '4b no tile claims "across all Places" anywhere in the file, comments included');
-ok(!/Nearby projects total/.test(propsRaw),
-  '4c ...nor "Nearby projects total", which was neither nearby nor a total');
-ok(/'Need you' \+ inZip/.test(props) && /'Projects' \+ inZip/.test(props),
-  '4d both ZIP-scoped tiles name the ZIP they actually measured');
-ok(/var inZip = S\.zip \?/.test(props),
-  '4e ...and degrade to a bare label rather than printing "ZIP undefined"');
-// The Places tile IS a true all-places count and must keep its plain label.
+console.log('\n--- §6 NOTHING ABOUT THE QUERY CHANGED (REQ-11) --------------------------');
+ok(/HS\.data\.projects\(S\.zip, null\)/.test(props),
+  '6a the projects read is byte-for-byte the same call');
+ok(/HS\.data\.changes\(S\.zip, null\)/.test(props), '6b so is the changes read');
+ok((props.match(/HS\.data\.projects\(/g) || []).length === 1,
+  '6c exactly one projects call — no second/count query was added');
+ok(!/rpcAllRows|\.rpc\(|\.limit\(|app_projects_for_zip/.test(props),
+  '6d the page still issues no RPC, no limit and no direct table read of its own');
 ok(/statTile\(a\.length \+ z\.length, 'Places'/.test(props),
-  '4f the Places tile is unchanged — that one really does span every place');
+  '6e the Places tile is unchanged and remains the only all-places count');
+ok(!/Saved Items|Monitored Items/.test(propsRaw), '6f no combined My Places total was introduced');
+// The distance gate is deferred, not touched.
+ok(/\(x\.distance_mi \|\| 9e9\) <= 5/.test(props),
+  '6g the distance gate is untouched — deferred to its own decision');
 
 console.log('\n' + (fails ? fails + ' FAILED' : 'All stat-strip assertions passed'));
 process.exit(fails ? 1 : 0);

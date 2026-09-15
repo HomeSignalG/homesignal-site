@@ -112,6 +112,41 @@ HS.onReady(async function () {
     }).length;
   }
 
+  // A CAPPED RESULT CANNOT PROVE A TOTAL. app_projects_for_zip -> app_authoritative_projects_for_zip
+  // returns at most 500 development records, and lib/data.js::rpcAllRows reports
+  // `complete: true` for ANY array it gets back — so a full page and a truncated one are
+  // indistinguishable from here. Measured on production: ZIP 78617 holds 512 development
+  // rows and the RPC returned 500, so the previous tile rendered 500 as though it were the
+  // ZIP's whole set.
+  //
+  // This constant is NOT a duplicate of an existing client-side limit — there is none; the
+  // cap lives only in the RPC, and nothing in lib/data.js or config.js exposes it. It is
+  // declared here solely to DETECT the capped state, never to request rows: no query, no
+  // limit and no RPC changes with it.
+  //
+  // The rendered "+" is derived from the RETURNED count, not from this constant, so if the
+  // server cap ever moves the tile still states what it actually received rather than a
+  // stale 500.
+  var DEV_QUERY_CAP = 500;
+
+  function devCapped(list) { return (list || []).length >= DEV_QUERY_CAP; }
+
+  // At the cap: "500+" — at least this many were found, exact total unprovable from this
+  // response. Below it: the exact number, which IS provable because nothing was truncated.
+  function devCountValue(list) {
+    var n = (list || []).length;
+    return devCapped(list) ? n + '+' : n;
+  }
+
+  // Resident-facing noun is "Development" — "Project" is an internal name (app_projects,
+  // ?view=projects) and stays out of copy. Singular only at exactly one, which needs no
+  // pluralization machinery because the count never appears inside the label.
+  function devCountLabel(list) {
+    var n = (list || []).length;
+    return (n === 1 ? 'Development' : 'Developments') + ' found'
+      + (S.zip ? ' · ZIP ' + S.zip : '');
+  }
+
   function strip() {
     var a = addresses(), z = zips();
     // A SCORE THAT WAS NEVER MEASURED IS NOT A ZERO. `p.score || 0` summed absent scores as
@@ -135,7 +170,7 @@ HS.onReady(async function () {
     document.getElementById('propStrip').innerHTML =
       HS.tpl.statTile(a.length + z.length, 'Places', '')
       + HS.tpl.statTile(openWindowCount(changes), 'Need you' + inZip, 'accent')
-      + HS.tpl.statTile(projects.length, 'Projects' + inZip, '')
+      + HS.tpl.statTile(devCountValue(projects), devCountLabel(projects), '')
       + (avg != null ? HS.tpl.statTile(avg, 'Avg Address score', 'g') : '');
   }
 
