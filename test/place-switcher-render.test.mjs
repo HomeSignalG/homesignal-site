@@ -19,6 +19,8 @@ const ok = (c, name, d) => {
 const shell = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');
 const fn = (shell.match(/HS\.openSwitcher = function \(\) \{[\s\S]*?\n  \};/) || [''])[0];
 ok(fn.length > 200, 'live openSwitcher body extracted from shell.js');
+const setFn = (shell.match(/  HS\.setViewPlaceType = function \(type, id\) \{[\s\S]*?\n  \};/) || [''])[0];
+ok(setFn.length > 80, 'live setViewPlaceType body extracted from shell.js', setFn.length);
 
 function render(opts) {
   const captured = { title: '', sub: '', html: '', opened: false };
@@ -39,8 +41,16 @@ function render(opts) {
     activeProperty: opts.home || null,
     activePropId: opts.home ? opts.home.id : null,
     zip: opts.zip || '75009',
-    viewLabelPrecise: false
+    viewLabelPrecise: !!opts.precise,
+    viewPlaceType: '',
+    viewPlaceId: null
   };
+  // Declare through the SHIPPED setter, never by hand-writing the state fields, so a
+  // scenario can only ever describe a state some page can actually produce.
+  if (opts.declare) {
+    new Function('HS', 'state', 'paintTopbar', 't', 'i', setFn + '\nHS.setViewPlaceType(t, i);')(
+      {}, state, () => {}, opts.declare[0], opts.declare.length > 1 ? opts.declare[1] : null);
+  }
   const nodes = {
     switcherList: { set innerHTML(v) { captured.html = v; }, get innerHTML() { return captured.html; } },
     switcherTitle: { set textContent(v) { captured.title = v; }, get textContent() { return captured.title; } },
@@ -96,6 +106,55 @@ ok(!/class="swrow active" onclick="HS\.switchZip\('78617'\)"/.test(mixed.html),
   '...and the ZIP Code in that same area is not also checked');
 ok(!/Your home/i.test(mixed.html),
   'Fix 9: mixed HTML never labels a saved address as the user\'s home', mixed.html.slice(0, 240));
+
+
+// ───────────────────── THE CHECK MARK MEANS "THE PLACE YOU ARE VIEWING" ─────────────────────
+// It used to mean "the ZIP containing your active Address" whenever the page set a PRECISE
+// label. On the Address dossier that is always: property.html selects the property, points
+// state.zip at the property's ZIP and sets a precise label — so homeIsCurrent went false and
+// the tick fell through to the ZIP row while the chip correctly read the street. Reproduced
+// against this same live function before the fix.
+const HOME78 = { id: 'h1', address: '13313 COOMES DR', city: 'Del Valle', state: 'TX', zip: '78617' };
+const BOTH = [{ zip: '78617', name: 'Del Valle (78617)', state: 'TX' },
+               { zip: '75009', name: 'Celina', state: 'TX' }];
+const tickedRows = (html) => html.split('swrow').slice(1)
+  .filter((r) => r.indexOf('✓') >= 0)
+  .map((r) => (r.match(/<div class="pt">([^<]+)</) || [])[1]);
+
+console.log('--- the Address dossier ---');
+const dossier = render({ addresses: [HOME78], home: HOME78, zips: BOTH, zip: '78617',
+  precise: true, declare: ['address', 'h1'] });
+ok(JSON.stringify(tickedRows(dossier.html)) === '["13313 COOMES DR"]',
+  'a page declaring WHICH Address it shows ticks that Address, and nothing else',
+  tickedRows(dossier.html));
+
+console.log('--- and the cases it must not regress ---');
+// Map 1's address search declares the TYPE with no id: a searched address is not a saved
+// Place, so no saved Address may be ticked as though the resident were looking at it.
+const searched = render({ addresses: [HOME78], home: HOME78, zips: BOTH, zip: '78617',
+  precise: true, declare: ['address'] });
+ok(tickedRows(searched.html).indexOf('13313 COOMES DR') < 0,
+  'an Address declared with NO id never ticks a saved Address', tickedRows(searched.html));
+
+// The whole point of the ZIP-Place work: an explicit ZIP route wins over an address inside it.
+const zipRoute = render({ addresses: [HOME78], home: HOME78, zips: BOTH, zip: '78617',
+  declare: ['zip'] });
+ok(JSON.stringify(tickedRows(zipRoute.html)) === '["Del Valle (78617)"]',
+  'a declared ZIP Place still ticks the ZIP, not the address inside it', tickedRows(zipRoute.html));
+
+// A route that declares nothing keeps the saved-address default, in both directions.
+ok(JSON.stringify(tickedRows(render({ addresses: [HOME78], home: HOME78, zips: BOTH, zip: '78617' }).html))
+   === '["13313 COOMES DR"]', 'undeclared route + address in the viewed ZIP: the address');
+ok(JSON.stringify(tickedRows(render({ addresses: [HOME78], home: HOME78, zips: BOTH, zip: '75009' }).html))
+   === '["Celina"]', 'undeclared route + address elsewhere: the viewed ZIP');
+
+// Declaring a ZIP Place must CLEAR a previously declared Address id rather than leave it to
+// be read against the wrong type — the setter writes both fields every time.
+const cleared = { viewPlaceType: '', viewPlaceId: null };
+new Function('HS', 'state', 'paintTopbar', setFn
+  + '\nHS.setViewPlaceType("address", "h1");\nHS.setViewPlaceType("zip");')({}, cleared, () => {});
+ok(cleared.viewPlaceType === 'zip' && cleared.viewPlaceId === null,
+  'declaring a ZIP Place clears the Address id it replaces', cleared);
 
 console.log(fails ? '\n' + fails + ' failed' : '\nAll place-switcher render assertions passed.');
 process.exit(fails ? 1 : 0);

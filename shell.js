@@ -194,6 +194,16 @@
     // activeProperty (the saved home) and from zip (the viewed area's code). Never persisted.
     viewLabel: '',
     viewLabelPrecise: false,   // true when viewLabel names a searched address, not an area
+    // WHICH PLACE TYPE THE CURRENT PAGE IS ABOUT — '' | 'zip' | 'address'. The Viewing
+    // control answers "which of my Places am I looking at", so the page that IS a Place
+    // says so; the chip must never infer it from whether a text label happened to load.
+    // In-memory like viewLabel: a fresh page declares its own Place or declares nothing.
+    viewPlaceType: '',
+    // ...and WHICH one, when the page can name it. 'address' alone cannot tell "viewing my
+    // saved Address h1" from "viewing an address I just searched that is not a saved Place"
+    // — Map 1's search declares the same type — and the switcher's check mark has to tell
+    // them apart or it would tick a saved home the resident is not looking at.
+    viewPlaceId: null,
     topicPrefs: {},   // hydrated in boot() — server for signed-in, localStorage for anonymous
     get activeProperty() {
       // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
@@ -1093,6 +1103,35 @@
   // 2200 Caldwell Ln must not be told they are looking at 13313 Coomes Dr just because
   // both sit in 78617. An AREA label does not outrank it — on a saved address's own ZIP
   // the control still names that address as what is being viewed.
+  // A PAGE THAT IS A PLACE DECLARES IT — synchronously, before any fetch. The ZIP hub is
+  // the ZIP Place's own page, so landing on it IS viewing that ZIP Place (founder, 2026-09-15:
+  // "Viewing tells you which of my Places you are looking at — on a zip code page you are
+  // obviously viewing a zip code"). Declared here rather than derived from the view LABEL
+  // because the label arrives two awaits later, and a chip that named the saved address until
+  // the metadata landed would still be wrong, just briefly.
+  HS.setViewPlaceType = function (type, id) {
+    const t = type == null ? '' : String(type);
+    const i = id == null || id === '' ? null : String(id);
+    if (t === state.viewPlaceType && i === state.viewPlaceId) return;
+    state.viewPlaceType = t;
+    // Always written, never merged: declaring a ZIP Place must clear a previously declared
+    // Address id rather than leave it behind to be read against the wrong type.
+    state.viewPlaceId = i;
+    paintTopbar();
+  };
+  // A ROUTE THAT NAMES A ZIP IS A DECLARATION OF THE ZIP PLACE — the shared form of the
+  // rule the ZIP hub applies, for TOOL pages (Alerts, Map 1) that are scoped to a ZIP but
+  // are not themselves a Place. Resolution is deliberately the SAME contract as
+  // HS.ensureViewedZip: the query string's ?zip=, or a ZIP the page declares from its own
+  // PATH (/development/<zip>). EXPLICIT ONLY, and that is the whole point — a tool reached
+  // with no ZIP in its route has declared nothing, so the saved address still supplies the
+  // default context there, exactly as before. Returns the declared ZIP, or null.
+  HS.declareRouteZipPlace = function (pageZip) {
+    const explicit = (HS.parseZipParam ? HS.parseZipParam(location.search) : null)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    if (explicit) HS.setViewPlaceType('zip');
+    return explicit || null;
+  };
   HS.setViewLabel = function (label, opts) {
     const t = label == null ? '' : String(label).trim();
     const precise = !!(opts && opts.precise);
@@ -1118,8 +1157,19 @@
       // gate HS.realHome() already applies to the page-level context line. Otherwise
       // the control names the CURRENT VIEW. Nothing about the saved place changes:
       // it stays saved, stays active, and stays one tap away in the switcher.
+      //
+      // ...AND A ZIP PAGE IS A ZIP PLACE (founder-observed on production 2026-09-15, at
+      // /community.html?zip=78617 reading "Viewing · 13313 COOMES DR"). The 2026-09-04 gate
+      // fixed the OTHER ZIP only; inside the address's own ZIP the address still won, so a
+      // resident holding an address in 78617 could never see the ZIP Place "Del Valle (78617)"
+      // named — not by opening its page, not by tapping its chip, because those chips are
+      // plain links and hydrate re-elects any in-ZIP address as the active one on every load.
+      // A page that IS a Place declares it (HS.setViewPlaceType) and that declaration wins.
+      // The address stays saved, stays the active property, and still anchors home-relative
+      // data; only the question "which Place am I looking at" is answered by the page.
       const myZip = LS.get('myZip', null);
-      const homeIsCurrent = !!(p && String(p.zip) === String(state.zip) && !state.viewLabelPrecise);
+      const homeIsCurrent = !!(p && String(p.zip) === String(state.zip)
+        && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
       $('locLabel').textContent = (p && homeIsCurrent)
         ? ('Viewing · ' + p.address)
         : ((p || myZip)
@@ -1197,12 +1247,24 @@
         : 'Add an Address or a ZIP Code to focus the app on it.';
     }
     const home = state.activeProperty;
-    const homeIsCurrent = !!(home && String(home.zip) === String(state.zip) && !state.viewLabelPrecise);
+    const homeIsCurrent = !!(home && String(home.zip) === String(state.zip)
+      && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
+    // THE CHECK MARK MEANS "THE PLACE YOU ARE VIEWING", NOT "THE ZIP THAT CONTAINS YOUR
+    // ACTIVE ADDRESS". On the Address dossier those differed: the page declares no ZIP and
+    // sets a PRECISE label, so homeIsCurrent went false and the tick fell through to the ZIP
+    // row while the chip correctly read "Viewing · 13313 COOMES DR". A page that knows which
+    // saved Place it is showing now says so by id, and the tick follows that.
+    // An Address declared WITHOUT an id (Map 1's address search — a searched address is not a
+    // saved Place) deliberately keeps the old behaviour: no saved address is ticked, because
+    // none of them is what is on screen.
+    const viewedAddrId = state.viewPlaceType === 'address' ? (state.viewPlaceId || null) : null;
     const typeChip = function (label) {
       return '<span class="swtype">' + HS.esc(label) + '</span>';
     };
     const addrRows = addresses.length ? addresses.map(p => {
-      const on = p.id === state.activePropId && homeIsCurrent;
+      const on = viewedAddrId
+        ? String(p.id) === String(viewedAddrId)
+        : (p.id === state.activePropId && homeIsCurrent);
       return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchProperty(\'' + p.id + '\')">'
         + '<div class="miniscore">' + (p.score || '') + '</div>'
         + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + '</div>'
@@ -1213,7 +1275,7 @@
         + '</div>';
     }).join('') : '<div class="swempty">No Addresses yet. Add an address and we\'ll watch official records around it.</div>';
     const zipRows = zips.length ? zips.map(z => {
-      const on = String(z.zip) === String(state.zip) && !homeIsCurrent;
+      const on = String(z.zip) === String(state.zip) && !homeIsCurrent && !viewedAddrId;
       return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchZip(\'' + HS.esc(String(z.zip)) + '\')">'
         + '<div class="miniscore">◍</div>'
         + '<div class="pinfo"><div class="pt">' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</div>'

@@ -368,21 +368,88 @@ ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
 
-// ═══ 7b. POSITIVE CONTROL — on the saved place's own ZIP it is still that address ═══
-// Fix 9: the chip names the geography as Viewing, never as "Your home".
+// ═══ 7b. Map 1 AT AN EXPLICIT ?zip= IS A ZIP PLACE, even on the saved address's own ZIP ═══
+// SUPERSEDES the earlier 7b, which required "Viewing · 13313 COOMES DR" here. That was the
+// same defect the founder reported on the ZIP hub, one page over: an explicit route ZIP is a
+// declaration, and a saved Address that merely sits inside it must not override it. The
+// saved-address default survives only where the route declares nothing — covered behaviourally
+// in test/viewed-place-declaration.test.mjs §4, which does not need a browser.
+// The home is installed AFTER load on purpose: that is the account-hydration moment that used
+// to elect an in-ZIP address as the Place, so this proves the declaration outlives it.
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
 await page.waitForTimeout(300);
 c = await chrome();
-info('ZIP 78617 with the same saved place', c.locLabel);
-ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
-  '7b on the saved place\'s OWN ZIP the control says "Viewing · <street>"', c.locLabel);
+info('Map 1 ZIP 78617 with the same saved place', { loc: c.locLabel, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7b Map 1 at an explicit ?zip= does NOT name the saved address inside that ZIP', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7b ...it names the ZIP Place', c.locLabel);
 ok(!/your home/i.test(c.locLabel || ''),
   '7b the chip does not call the saved address "Your home"', c.locLabel);
+ok(/13313 COOMES DR/.test(c.locTitle || ''),
+  '7b the saved address is still saved and one tap away in the switcher', c.locTitle);
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'zip',
+  '7b ...and the page declared it, rather than the chip inferring it from a label');
+
+// ═══ 7c. ALERTS at an explicit ?zip= is a ZIP Place too ═══
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
+c = await chrome();
+info('Alerts 78617 with the same saved place', { loc: c.locLabel, saved: c.savedHome, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7c Alerts at an explicit ?zip= does NOT name the saved address inside that ZIP', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7c ...it names the ZIP Place', c.locLabel);
+// Assert against the page's OWN active property, never a hard-coded street. These two
+// sections load with ?data=seed, so the app hydrates the seed dataset's saved place over the
+// one installed here; 7b has no seed and keeps the installed one. Both are correct product
+// behaviour — the tooltip names whatever place is actually saved — and a literal address
+// pinned one environment's fixture rather than the behaviour under test.
+ok(!!(c.savedHome && c.savedHome.address && (c.locTitle || '').indexOf(c.savedHome.address) >= 0),
+  '7c the saved address is still saved and one tap away in the switcher',
+  { saved: c.savedHome, title: c.locTitle });
+
+// ═══ 7d. A ZIP PAGE IS A ZIP PLACE — the founder's 2026-09-15 repro ═══
+// "Viewing tells you which of my Places you are looking at. If you are on a zip code page
+// you are obviously viewing a zip code." The 2026-09-04 gate covered the OTHER-ZIP case
+// only, so the ZIP hub for the saved address's OWN ZIP still read "Viewing · 13313 COOMES
+// DR" — the ZIP Place could not be named at all while an address sat inside it.
+await page.goto(base + '/community.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
+c = await chrome();
+info('ZIP hub 78617 with the same saved place', { loc: c.locLabel, saved: c.savedHome, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7d the ZIP hub does NOT name the saved address — it is a ZIP Place', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7d ...it names the ZIP Place', c.locLabel);
+ok(!/78617\s*·\s*78617/.test(c.locLabel || ''),
+  '7d ...once, not with the ZIP repeated after its own name', c.locLabel);
+ok(!!(c.savedHome && c.savedHome.address && (c.locTitle || '').indexOf(c.savedHome.address) >= 0),
+  '7d the saved address is still saved and still one tap away in the switcher',
+  { saved: c.savedHome, title: c.locTitle });
 
 // ═══ 8. Address mode still reaches the established experience ═══
+// SELF-CONTAINED NAVIGATION, deliberately. This section used to inherit whichever page the
+// previous one left open, which silently became community.html (no #addr) the moment a ZIP-hub
+// section was inserted above it. A section that depends on its predecessor's final URL breaks
+// on insertion, not on a behaviour change — so it states its own starting point.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+// The saved place is part of this section's PRECONDITION, not decoration. paintTopbar's last
+// fallback is the SAMPLE branch, which names the seed community and ignores the view label
+// entirely — so with no saved place AND no myZip the chip reads "Del Valle (Sample Zip Code)"
+// however the view is declared. This section used to inherit the home from the section above
+// it; now that it navigates for itself, it installs it for itself.
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
 await page.click('#go');
 await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 60000 });
@@ -396,6 +463,13 @@ let a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
+// ZIP -> address, the one IN-PAGE Place transition in the app: entering address mode must
+// retire the ZIP declaration made at boot, or the address just searched would stay suppressed
+// by a ZIP the resident has navigated away from.
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'address',
+  '8 an in-page address search retires the ZIP Place declaration');
+ok(/2200 CALDWELL LN/i.test(c.locLabel || ''),
+  '8 ...and the chip names the searched address', c.locLabel);
 // Radius AND subject, in the heading: "Showing development within <radius> of".
 ok(/^Showing development within .+ of$/.test((a.within || '').trim()),
   '8 address mode states what is shown and the radius it is shown within', a.within);
@@ -427,6 +501,8 @@ ok(back.stale === 0, '9 no address-radius result survives into ZIP mode', back.s
 ok(back.homePins === 0, '9 no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '9 the saved home survived the whole journey', c.savedHome);
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'zip',
+  '9 ...and the ZIP Place is declared again on the return leg — ZIP -> address -> ZIP is closed');
 
 // ═══ 10. F1 — TWO SCOPES ON ONE SCREEN, NAMED SEPARATELY ═══
 // Development is measured across the whole ZIP. Facilities are an EPA query AROUND the ZIP:
