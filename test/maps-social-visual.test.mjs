@@ -88,8 +88,25 @@ ok(/live coordinates differ from the draft evidence/.test(GEN),
 ok(/record_kind !== 'development'/.test(GEN), 'facilities can never be captured');
 
 // ── surrounding development is not hidden ────────────────────────────────────────────
-ok(!/display:\s*none[^}]*marker|hideMarkers|removeLayer|clearLayers/.test(GEN),
+// ⚠️ THIS READS `GEN_CODE`, NOT `GEN`, and that is this file's own stated rule applied to a
+// line that had missed it: the check is about what the generator DOES, and the raw text also
+// matches a COMMENT that merely names the forbidden call. It failed exactly that way when the
+// Data Center Theme work added a comment explaining that Leaflet nulls `m._map` on
+// removeLayer — an explanation of the page's behaviour, not a call in this module.
+ok(!/display:\s*none[^}]*marker|hideMarkers|removeLayer|clearLayers/.test(GEN_CODE),
   'the generator never hides other markers to make a cleaner picture');
+// THE ONE SANCTIONED NARROWING, and why it is not a breach of the rule above. A MAPS · Data
+// Center Theme capture puts Map 1's PROJECT TYPE row into a Data-center-only state. That is
+// NOT the generator hiding markers: it operates the product's OWN filter control, the control
+// is inside the captured frame, and its checkmarks therefore DISCLOSE the narrowing to anyone
+// looking at the image. The rule this file protects is that a picture must not be quietly
+// cleaned up; a visible, resident-operable filter is the opposite of quiet. Asserted rather
+// than assumed — the narrowing must happen through a change event on the page's own checkbox,
+// never by touching the map.
+ok(/dispatchEvent\(new Event\('change'/.test(GEN_CODE),
+  'the theme filter is applied through the page\u2019s OWN control, not by editing the map');
+ok(!/layerGroup|\.addTo\(|L\.marker|setStyle/.test(GEN_CODE),
+  'and the generator still never touches Leaflet layers itself');
 ok(/leaflet-control-container\{display:none/.test(GEN),
   'only Leaflet’s own zoom control is hidden for the shot');
 

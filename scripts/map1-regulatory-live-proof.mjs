@@ -10,9 +10,10 @@
 // runtime (`lib/map.js`) through ONE <script> tag. There are not 12,722 Map 1 documents to
 // check — there is one file that all 12,722 canonical ZIPs resolve to. So:
 //
-//   LAYER A (GLOBAL, exhaustive)  — read the DEPLOYED /lib/map.js and prove the shipped
-//     bytes carry the three-case rule and no longer carry the flat any-of, and that the
-//     page's cache-buster points at exactly those bytes. One file proven ⇒ every ZIP.
+//   LAYER A (GLOBAL, exhaustive)  — read the DEPLOYED /lib/map.js and verify that
+//     production base-pin membership is Type-only and that Regulatory is an independent
+//     visual overlay, not a base-pin admission path; and that the page's cache-buster
+//     points at exactly those bytes. One file proven ⇒ every ZIP.
 //   LAYER B (BEHAVIOURAL, sampled) — drive real production ZIP pages in a real browser and
 //     prove the rule HOLDS as rendered. A sample is honest here because Layer A has already
 //     established there is only one implementation to sample.
@@ -50,13 +51,45 @@ const res = await fetch(BASE + '/lib/map.js?v=' + tag);
 ok(res.status === 200, 'A3: the keyed runtime URL serves', res.status);
 const js = await res.text();
 
-// The three limbs, read off the shipped bytes rather than assumed from the commit.
-ok(/Case 1 — its own Type chip is on/.test(js),
-  'A4: limb 1 present — a typed record is governed by its Type chip');
-ok(/Case 2 — untyped regulatory record: the switch is its only governor/.test(js),
-  'A5: limb 2 present — an untyped regulatory record is governed by the switch alone');
-ok(/Case 3 — typed, its Type is off, and the resident has selected no Type at all/.test(js),
-  'A6: limb 3 present — the founder\'s "every Type off except EPA" scenario');
+// ── A4-A6 — THE PREDICATE ITSELF, SCOPED TO ITS OWN BODY ─────────────────────────────
+// ⚖️ REWRITTEN 2026-09-15 for the overlay-only ruling (#1222), which DELETED the three-case
+// rule these three used to grep for. Left as they were, they failed against the shipped fix
+// while printing "the deployed runtime does not carry the fix" — the exact inverse of the
+// truth, and an abort before Layer B ever ran.
+//
+// ⚠️ WHY THE ASSERTION IS SCOPED TO THE FUNCTION BODY RATHER THAN THE FILE. `REGULATORY_
+// LEGEND`, `facility` and `isFacility` appear all over lib/map.js for legitimate reasons —
+// `visibleSignal`, the legend row, the category registry, the marker's own membership. A
+// file-wide grep therefore cannot answer "is regulatory an ADMISSION PATH": it would fire on
+// the overlay code the ruling keeps. The question is only ever about ONE function, so the
+// proof reads only that function's body.
+const cvBody = (js.match(/HS\.categoryVisible = function \(item\) \{\n([\s\S]*?)\n  \};/) || [])[1];
+ok(!!cvBody, 'A4: the deployed HS.categoryVisible body was isolated out of the shipped bytes',
+  cvBody ? cvBody.replace(/\s+/g, ' ').trim().slice(0, 96) : 'NOT FOUND');
+
+// The keys it evaluates are derived from TYPE keys only: membership in, facility keys
+// filtered OUT, the loop over what survives, and a default of false.
+const TYPE_ONLY_FILTER =
+  /\.filter\(\s*function\s*\(k\)\s*\{\s*return\s*!CATEGORY_REGISTRY\[k\]\.isFacility;\s*\}\s*\)/;
+ok(!!cvBody
+   && /markerCategories\(item\)/.test(cvBody)
+   && TYPE_ONLY_FILTER.test(cvBody)
+   && /for\s*\(let i = 0; i < typeCats\.length; i\+\+\)\s*if\s*\(categoryFilters\[typeCats\[i\]\]\)\s*return true;/.test(cvBody)
+   && /return false;/.test(cvBody),
+  'A5: base-pin membership is TYPE-ONLY — keys filtered by !isFacility, looped as typeCats, '
+  + 'default false');
+
+// THE ADMISSION-PATH NEGATIVE, and the one that catches a revert of any shape. Remove the
+// single legitimate mention — the `!isFacility` EXCLUSION asserted directly above — and NO
+// regulatory token may remain. Anything surviving that strip is an admit branch by
+// construction, because exclusion is the only role the concept has inside this function.
+// This is deliberately stronger than naming the old flat any-of (A7): it refuses a regulatory
+// admit path written in ANY new form, not just the one that shipped the defect.
+const cvRemainder = (cvBody || '').replace(TYPE_ONLY_FILTER, '');
+const regTokens = cvRemainder.match(/REGULATORY_LEGEND|isFacility|['"]facility['"]/g) || [];
+ok(!!cvBody && regTokens.length === 0,
+  'A6: regulatory is NOT an admission path inside categoryVisible — no regulatory token '
+  + 'survives once the !isFacility exclusion is removed', regTokens.join(',') || 'none');
 
 // THE NEGATIVE, which is the one that actually catches a revert: the old predicate was a
 // single unguarded loop over the whole membership set. Its shape must be gone.
@@ -149,15 +182,20 @@ for (const zip of ZIPS) {
       'B2 ' + zip + ': Data center only + Regulatory ON → ZERO pins drawn under a Type the '
       + 'resident switched off', 'bypassing=' + offType + ' pins=' + dcOnly.pins);
 
-    // ── B3. THE ACCEPTANCE SCENARIO STILL WORKS ─────────────────────────────────────
-    // "Turn OFF every Map 1 type except EPA." Regulatory must still be able to show its
-    // own layer — the fix must not have been bought by breaking this.
+    // ── B3. NO TYPE SELECTED IS GENUINELY EMPTY — IN EITHER SWITCH STATE ────────────
+    // ⚖️ INVERTED 2026-09-15 (#1222). This used to assert the OPPOSITE: that with no Type
+    // selected the switch still showed the regulatory layer ("turn OFF every Map 1 type
+    // except EPA"). The overlay-only ruling removed that limb — regulatory may never ADMIT
+    // a record — so no selected Type now means no base pin, switch or no switch.
+    // `hasReg` is kept and is now the POSITIVE CONTROL, not the condition: a zero measured
+    // on a ZIP holding no regulatory records at all would be meaningless, so the log has to
+    // show that this ZIP had something the old behaviour would have drawn.
     await setTypes(page, []); await setReg(page, true); await page.waitForTimeout(600);
     const epaOnly = await read(page);
     const hasReg = await page.evaluate(() => (window.__HS_SITES || [])
       .some(s => s && s.registry_id));
-    ok(!hasReg || epaOnly.pins > 0,
-      'B3 ' + zip + ': no Types + Regulatory ON → the regulatory layer still shows',
+    ok(epaOnly.pins === 0,
+      'B3 ' + zip + ': no Types + Regulatory ON → ZERO base pins; the switch admits nothing',
       'pins=' + epaOnly.pins + ' zipHasRegulatoryRecords=' + hasReg);
     await setTypes(page, []); await setReg(page, false); await page.waitForTimeout(600);
     ok((await read(page)).pins === 0,

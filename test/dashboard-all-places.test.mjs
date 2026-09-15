@@ -668,31 +668,35 @@ const ids = (list) => list.map((r) => r.id).join(',');
   ok(v.visible.length === 0 && v.hasControl === false && v.total === 0,
     '12a A1 zero changes -> no rows, no control', v);
 }
-// A2: 1..8 — every record renders and NO control appears. Boundary 8 is the one that
+// A2: 1..3 — every record renders and NO control appears. Boundary 3 is the one that
 // actually decides the rule, so it is asserted rather than sampled around.
+// ⚖️ THE BOUND MOVED 8 -> 3 (founder, 2026-09-15). These pins are deliberately written
+// against the literal 3 rather than against A.PREVIEW_LIMIT: a test that reads the
+// constant it is guarding passes for ANY value of it, which is how a silent edit to a
+// founder-set number gets through. The bound is the thing under test here.
 {
   let bad = null;
-  for (let n = 1; n <= 8; n++) {
+  for (let n = 1; n <= 3; n++) {
     const v = A.changesPreview(mk(n), { countKnown: true });
     if (v.visible.length !== n || v.hasControl) bad = { n, visible: v.visible.length, ctl: v.hasControl };
   }
-  ok(!bad, '12b A2 1..8 changes -> all render, no control at any size', bad);
+  ok(!bad, '12b A2 1..3 changes -> all render, no control at any size', bad);
 }
-// A3: exactly nine — the first case where the bound bites.
+// A3: exactly four — the first case where the bound bites.
 {
-  const v = A.changesPreview(mk(9), { countKnown: true });
-  ok(v.visible.length === 8, '12c A3 nine changes -> exactly eight render', v.visible.length);
-  ok(v.expandLabel === 'View all 9 changes →',
-    '12d A3 ...labelled "View all 9 changes →"', v.expandLabel);
-  ok(ids(v.visible).indexOf('r8') === -1 && v.hiddenCount === 1,
-    '12e A3 ...and the NINTH canonical record is absent before expansion', ids(v.visible));
+  const v = A.changesPreview(mk(4), { countKnown: true });
+  ok(v.visible.length === 3, '12c A3 four changes -> exactly three render', v.visible.length);
+  ok(v.expandLabel === 'View all 4 changes →',
+    '12d A3 ...labelled "View all 4 changes →"', v.expandLabel);
+  ok(ids(v.visible).indexOf('r3') === -1 && v.hiddenCount === 1,
+    '12e A3 ...and the FOURTH canonical record is absent before expansion', ids(v.visible));
 }
-// A4: >9 — order identity, element by element, against the input.
+// A4: >4 — order identity, element by element, against the input.
 {
   const src = mk(40);
   const v = A.changesPreview(src, { countKnown: true });
-  ok(ids(v.visible) === ids(src.slice(0, 8)),
-    '12f A4 >9 changes -> exactly the first eight canonical records, in canonical order', ids(v.visible));
+  ok(ids(v.visible) === ids(src.slice(0, 3)),
+    '12f A4 >4 changes -> exactly the first three canonical records, in canonical order', ids(v.visible));
   ok(v.total === 40 && v.expandLabel === 'View all 40 changes →',
     '12g A4 ...count is the canonical total when completeness is known', v.expandLabel);
 }
@@ -711,17 +715,19 @@ const ids = (list) => list.map((r) => r.id).join(',');
   ok(ids(src) === before, '12j B5 ...the canonical collection is NOT mutated by rendering');
 
   const shut = A.changesPreview(src, { expanded: false, countKnown: true });
-  ok(ids(shut.visible) === ids(src.slice(0, 8)) && shut.expanded === false,
-    '12k B6 collapsing restores exactly the first eight canonical records');
+  ok(ids(shut.visible) === ids(src.slice(0, 3)) && shut.expanded === false,
+    '12k B6 collapsing restores exactly the first three canonical records');
   ok(shut.expandLabel === 'View all 40 changes →',
     '12l B6 ...and exactly one "View all [N] changes →" control', shut.expandLabel);
   ok(ids(src) === before, '12m B6 ...with canonical data and order unchanged');
 }
-// Expanding a collection that never had a control cannot manufacture one.
+// Expanding a collection that never had a control cannot manufacture one. The size is the
+// bound itself (3), the largest collection that still has nothing to reveal — a number
+// above it would be testing the expander rather than its absence.
 {
-  const v = A.changesPreview(mk(5), { expanded: true, countKnown: true });
-  ok(v.hasControl === false && v.expanded === false && v.visible.length === 5,
-    '12n B5 expanded:true on a 5-record collection is inert — no control, no state', v);
+  const v = A.changesPreview(mk(3), { expanded: true, countKnown: true });
+  ok(v.hasControl === false && v.expanded === false && v.visible.length === 3,
+    '12n B5 expanded:true on a 3-record collection is inert — no control, no state', v);
 }
 
 // ---- C. CAP-UNCERTAINTY BEHAVIOUR ---------------------------------------------------
@@ -734,15 +740,15 @@ const ids = (list) => list.map((r) => r.id).join(',');
   // `hiddenCount`, which is arithmetic over what we already hold. The numeral is back, and
   // the assertions below are what keep it honest: it must equal hiddenCount exactly, and it
   // must never be the total or carry the word "all".
-  ok(v.expandLabel === 'View 32 more changes →',
+  ok(v.expandLabel === 'View 37 more changes →',
     '12o C7 unknown completeness -> the hidden count, not the total', v.expandLabel);
-  ok(v.hiddenCount === 32 && v.expandLabel.indexOf(String(v.hiddenCount)) > 0,
+  ok(v.hiddenCount === 37 && v.expandLabel.indexOf(String(v.hiddenCount)) > 0,
     '12p C7 ...and the numeral IS hiddenCount', { label: v.expandLabel, hidden: v.hiddenCount });
   ok(!/\ball\b/.test(v.expandLabel) && v.expandLabel.indexOf(String(v.total)) < 0,
     '12p C7 ...never the total, and never the word "all"', { label: v.expandLabel, total: v.total });
-  ok(A.changesPreview(mk(9), { countKnown: false }).expandLabel === 'View 1 more changes →',
+  ok(A.changesPreview(mk(4), { countKnown: false }).expandLabel === 'View 1 more changes →',
     '12p C7 ...down to a single hidden record');
-  ok(v.visible.length === 8 && v.hasControl === true,
+  ok(v.visible.length === 3 && v.hasControl === true,
     '12q C7 ...while still bounding the preview and offering expansion', v.visible.length);
 }
 // Fail-safe: a caller that omits countKnown gets the modest label, never the confident one.
@@ -751,9 +757,9 @@ const ids = (list) => list.map((r) => r.id).join(',');
   // branches carry a numeral now, so the fail-closed property is that a missing or
   // non-boolean countKnown yields the HIDDEN count and never the total.
   const v = A.changesPreview(mk(40), {});
-  ok(v.expandLabel === 'View 32 more changes →',
+  ok(v.expandLabel === 'View 37 more changes →',
     '12r C7 an ABSENT countKnown is treated as unknown, never as complete', v.expandLabel);
-  ok(A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel === 'View 32 more changes →',
+  ok(A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel === 'View 37 more changes →',
     '12s C7 ...and only a strict boolean true unlocks the TOTAL', 
     A.changesPreview(mk(40), { countKnown: 'yes' }).expandLabel);
 }
