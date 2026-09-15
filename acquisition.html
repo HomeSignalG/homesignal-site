@@ -264,6 +264,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   </div>
 </div>
 
+<!-- The SHIPPED Map 1 classifier. The Bluesky MAPS theme filter derives membership from
+     HS.resolveMarker so the dashboard and the map can never disagree about what a Data
+     center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
+     define functions on window.HS and touch no DOM at load. -->
+<script src="lib/map.js?v=d4c3f937"></script>
+<script src="lib/maps-social-theme.js?v=233a850e"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -827,11 +833,55 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // The bucket stays PRIVATE and no service key ever reaches the page.
   var _bskyBlobUrl = {};   // post id -> object URL for its own image
   var _bskyImgOk   = {};   // post id -> the exact image RENDERED (onload fired)
+  // ⚠️ THE QUEUE CACHE MUST BE DECLARED INSIDE THIS REGION, not above it. It used to sit
+  // with the edit modal ~250 lines below; `var` hoisting made that work in the page, but
+  // test/maps-preview-render.test.mjs EXTRACTS from `var _bskyBlobUrl = {};` to
+  // `// VISUAL STATUS.` and runs that slice in a real browser, so the approval gate's
+  // reference pointed at a symbol the harness never received (`_bskyRows is not defined`,
+  // which HANGS that test rather than failing it). Declaring it one line ABOVE the slice's
+  // first line does not fix that — the boundary is `var _bskyBlobUrl`, exactly.
+  var _bskyRows = {};      // post id -> the full row, for the gate and the edit modal
 
   // A MAPS draft that carries an image_bucket_path WILL publish with that image, so
   // the founder must have seen it before approving.
   function mapsImageRequired(p){
     return !!(p && p.content_family === 'MAPS' && p.image_bucket_path);
+  }
+  // ---------------------------------------------------------------------------
+  // THEME. Derived live from lib/maps-social-theme.js, which asks the SHIPPED Map 1
+  // classifier. No `theme` column exists and none is read: the inputs are the immutable
+  // candidate-time evidence already on the row.
+  function bskyTheme(p){
+    return (window.HS && HS.mapsSocialThemeKey) ? HS.mapsSocialThemeKey(p) : null;
+  }
+  // THE DATA CENTER THEME CONTRACT IS STRICTER THAN THE REST OF MAPS, and deliberately.
+  // An ordinary MAPS draft with no screenshot still publishes honestly as a link card
+  // whose OpenGraph image belongs to the destination page. A Data Center Theme post does
+  // not: its whole promise is "here is the record, on the real map, with Data center
+  // selected". Falling back to the generic card would ship the campaign hook with a
+  // picture that shows no data centre at all. So for this theme the Map 1 capture is
+  // MANDATORY — a missing image blocks approval rather than degrading the post.
+  function dcThemeImageMandatory(p){
+    return bskyTheme(p) === 'datacenter';
+  }
+  // The single reason a post cannot be approved right now, or '' when it can.
+  // ONE function, used by both the button and the click handler, so the two can never
+  // disagree about whether approval is allowed.
+  function bskyApprovalBlockReason(p){
+    if(!p) return '';
+    if(dcThemeImageMandatory(p) && !p.image_bucket_path){
+      var v=(p.evidence&&p.evidence.visual)||{};
+      return 'This is a MAPS \u00b7 Data Center Theme post, which publishes the real Map 1 '
+        + 'screenshot. No screenshot has been captured for it yet'
+        + (v.failure_reason ? (' \u2014 ' + v.failure_reason) : '')
+        + '. Approve is blocked until the exact image this post would publish exists and displays.';
+    }
+    if(mapsImageRequired(p) && !_bskyImgOk[p.id]){
+      return 'This post would publish the Map image stored at\n' + p.image_bucket_path +
+        '\n\nThat image has not displayed in this preview, so you would be approving '
+        + 'something you have not seen. Approve is blocked until it renders.';
+    }
+    return '';
   }
   function bskyReleaseBlobs(){
     for (var k in _bskyBlobUrl){ try{ URL.revokeObjectURL(_bskyBlobUrl[k]); }catch(e){} }
@@ -879,6 +929,13 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function bskyApplyApprovalGate(id){
     var btn = document.querySelector('[data-post="'+id+'"] button[data-act="approve"]');
     if (!btn || btn.getAttribute('data-gate') !== 'image') return;
+    var row = _bskyRows[id] || null;
+    // A theme post with no capture at all can never unlock: there is no image to render.
+    if (row && dcThemeImageMandatory(row) && !row.image_bucket_path) {
+      btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed';
+      btn.title = 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.';
+      return;
+    }
     var ok = !!_bskyImgOk[id];
     btn.disabled = !ok;
     btn.style.opacity = ok ? '1' : '0.45';
@@ -947,6 +1004,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<div><span class="muted">Evidence tier:</span> '+prec+'</div>'+
         row('Registry', e.registry_id)+
         row('Why it qualified', e.eligibility_reason)+
+        // The theme derivation, so the founder can see WHY a row is in this bucket.
+        // `theme_decided_by` is the ingest-time record; the LIVE value beside it is what
+        // the dashboard filter actually used. They agree unless the classifier has moved,
+        // and showing both is what would make that visible instead of silent.
+        // Guarded like bskyTheme: if lib/maps-social-theme.js failed to load, this row is
+        // simply absent. A review card must never fail to render because a helper is
+        // missing — the founder would lose the whole fact-check surface over a 404.
+        row('Theme (live, from Map 1)',
+            (window.HS && HS.mapsSocialThemeLabel) ? HS.mapsSocialThemeLabel(bskyTheme(p)) : null)+
+        row('Theme evidence at candidate time', e.theme_decided_by)+
         row('Dedupe identity', e.dedupe_key)+
         row('Visual', (e.visual&&e.visual.status)||'none')+
         (e.visual&&e.visual.note?('<div class="muted" style="margin-top:4px">'+esc(e.visual.note)+'</div>'):'')+
@@ -967,6 +1034,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var fam=(p.content_family==='MAPS')
       ? '<span class="tile-tag" style="background:#e7f0fb;color:#1d4f8a;border:1px solid #b9d3f0">MAPS · development</span>'
       : '<span class="tile-tag" style="background:#eef3ef;color:#2f5a44;border:1px solid #cadcd2">ALERTS · community intelligence</span>';
+    // THEME chip — makes the theme obvious without redesigning the card. It is a
+    // SUBORDINATE label beside the family, never in place of it: the row is still a MAPS
+    // candidate and is still fact-checked as one.
+    var thKey=bskyTheme(p);
+    if(thKey){
+      fam += ' <span class="tile-tag" style="background:#f3ecfb;color:#5a3a8a;border:1px solid #d8c6ef">'+
+        esc(String(HS.mapsSocialThemeLabel(thKey)||'').toUpperCase())+'</span>';
+    }
     return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
         '<div>'+fam+' '+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
@@ -993,6 +1068,49 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<button class="bsky-btn" data-act="skip" style="background:#fbeceb;color:#c23b34">Skip</button>'+
       '</div></div>';
   }
+  // ---------------------------------------------------------------------------
+  // BLUESKY POSTS > FAMILY > THEME. A VIEW, never a state change: these two variables
+  // decide WHICH rows are listed and nothing else. No row is written, no status moves,
+  // and switching filters cannot alter a draft.
+  var _bskyFamily='all';      // 'all' | 'MAPS' | 'ALERTS'
+  var _bskyTheme=null;        // null = All Maps; otherwise a theme key
+  function bskyNavBtn(scope,val,label,count,active){
+    return '<button class="bsky-nav-btn" data-scope="'+scope+'" data-val="'+esc(String(val))+'" '+
+      'style="border:1px solid '+(active?'var(--accent)':'var(--line)')+';'+
+      'background:'+(active?'var(--accent)':'var(--panel2)')+';color:'+(active?'#fff':'var(--ink)')+';'+
+      'border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;'+
+      (active?'font-weight:600;':'')+'">'+esc(label)+
+      ' <span style="opacity:.75;font-variant-numeric:tabular-nums">'+esc(String(count))+'</span></button>';
+  }
+  /**
+   * Render the family row and, when MAPS is active, the theme row beneath it.
+   * COUNTS ARE PASSED IN from the same partition that produced the listed rows, so a
+   * count can never drift from what the founder sees. Nothing here is hard-coded.
+   */
+  function bskyRenderNav(counts){
+    var host=document.getElementById('bsky-nav'); if(!host) return;
+    var fam='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-right:2px">Bluesky posts</span>'+
+      bskyNavBtn('family','all','All',counts.all,_bskyFamily==='all')+
+      bskyNavBtn('family','MAPS','MAPS',counts.maps,_bskyFamily==='MAPS')+
+      bskyNavBtn('family','ALERTS','ALERTS',counts.alerts,_bskyFamily==='ALERTS')+
+      '</div>';
+    // The theme row appears only UNDER MAPS and is indented, so the hierarchy reads as
+    // "a theme within MAPS" rather than as a third content family beside it.
+    var themes='';
+    if(_bskyFamily==='MAPS'){
+      var chips=bskyNavBtn('theme','','All Maps',counts.maps,!_bskyTheme);
+      var list=(window.HS&&HS.MAPS_SOCIAL_THEMES)||[];
+      for(var i=0;i<list.length;i++){
+        chips+=bskyNavBtn('theme',list[i].key,list[i].label,counts.themes[list[i].key]||0,_bskyTheme===list[i].key);
+      }
+      themes='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 0 18px;'+
+        'padding-left:12px;border-left:2px solid var(--line)">'+
+        '<span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-right:2px">Maps themes</span>'+
+        chips+'</div>';
+    }
+    host.innerHTML=fam+themes;
+  }
   async function refreshBluesky(){
     var host=$('tab-bluesky'); if(!host) return;
     var body=document.getElementById('bsky-queue'); if(!body) return;
@@ -1016,7 +1134,30 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         liveTile('ALERTS · community', rows.length-nMaps, 'from notices / meetings')+
         liveTile('Queued today', qToday, 'new drafts')+
         liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post');
-      body.innerHTML=rows.length?rows.map(blueskyRow).join(''):'<div class="muted">No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.</div>';
+      // ONE PARTITION drives both the counts and the listed rows (§"count and displayed
+      // rows MUST derive from the same queue result so they cannot drift").
+      var buckets=(window.HS&&HS.mapsSocialThemeBuckets)
+        ? HS.mapsSocialThemeBuckets(rows)
+        : { all: rows.filter(function(p){return p.content_family==='MAPS';}), byTheme:{} };
+      var counts={ all: rows.length, maps: buckets.all.length,
+                   alerts: rows.length-buckets.all.length, themes:{} };
+      var tl=(window.HS&&HS.MAPS_SOCIAL_THEMES)||[];
+      for(var ti=0;ti<tl.length;ti++){
+        counts.themes[tl[ti].key]=(buckets.byTheme[tl[ti].key]||[]).length;
+      }
+      bskyRenderNav(counts);
+      var visible;
+      if(_bskyFamily==='MAPS'){
+        visible=_bskyTheme ? (buckets.byTheme[_bskyTheme]||[]) : buckets.all;
+      } else if(_bskyFamily==='ALERTS'){
+        visible=rows.filter(function(p){return p.content_family!=='MAPS';});
+      } else {
+        visible=rows;
+      }
+      var emptyMsg = rows.length
+        ? 'No posts match this filter. The queue holds '+rows.length+' post(s) — switch the filter above to see them.'
+        : 'No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.';
+      body.innerHTML=visible.length?visible.map(blueskyRow).join(''):'<div class="muted">'+esc(emptyMsg)+'</div>';
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
@@ -1027,12 +1168,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // MAPS post configured to publish an image must never be approved on a preview
         // that failed to show it.
         var gr=_bskyRows[id]||null;
-        if(mapsImageRequired(gr) && !_bskyImgOk[id]){
-          alert('This post would publish the Map image stored at\n'+gr.image_bucket_path+
-                '\n\nThat image has not displayed in this preview, so you would be approving '+
-                'something you have not seen. Approve is blocked until it renders.');
-          return;
-        }
+        var block=bskyApprovalBlockReason(gr);
+        if(block){ alert(block); return; }
         var r=await window.hsClient.rpc('hs_approve_social_post',{p_id:id});
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
       } else if(act==='skip'){
@@ -1047,7 +1184,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
   // ---- Bluesky edit modal (real textarea — a native prompt() box is too small
   // to show a multi-line, near-300-char post with its \n\n hashtag block) -------
-  var bskyEditId=null, _bskyRows={};
+  var bskyEditId=null;   // _bskyRows is declared with the queue state above
   function bskyEditCountUpdate(){
     var ta=$('bsky-edit-textarea'); var n=graphemeLen(ta.value);
     var c=$('bsky-edit-count'); c.textContent=n+'/300'; c.className='bsky-edit-count'+(n>300?' over':'');
@@ -1201,9 +1338,25 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<span id="bsky-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
         '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
         '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
+        '<div id="bsky-nav" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
       host.appendChild(card);
       host.addEventListener('click', function(e){
+        // Filter chips first — they change the VIEW only and never reach blueskyAction.
+        var nav=e.target.closest && e.target.closest('.bsky-nav-btn');
+        if(nav){
+          var scope=nav.getAttribute('data-scope'), val=nav.getAttribute('data-val');
+          if(scope==='family'){
+            _bskyFamily=val;
+            // Leaving MAPS clears the theme, so the theme can never silently narrow a
+            // family it is not a theme of.
+            if(val!=='MAPS') _bskyTheme=null;
+          } else if(scope==='theme'){
+            _bskyTheme = val || null;
+          }
+          refreshBluesky();
+          return;
+        }
         var btn=e.target.closest && e.target.closest('.bsky-btn'); if(!btn) return;
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
         blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));

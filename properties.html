@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css?v=20814d85">
 </head>
-<body data-nav="props">
+<body data-nav="props" data-no-where>
 <template id="hs-content">
   <div class="page">
     <div class="ph">
@@ -44,6 +44,30 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state;
+
+  // ---- THIS PAGE'S SCOPE IS EVERY PLACE, SO IT NAMES EVERY PLACE ----------------------
+  // My Places is the CONTAINER of the resident's Places, never one of them, so the Viewing
+  // control must not name a single saved Address here. It did: with no declaration of its
+  // own the page fell through to the shell's saved-address default, and a resident whose
+  // address sits in the ZIP they are focused on read "Viewing · 13313 COOMES DR" at the top
+  // of the page listing all five of their places (founder-observed on production,
+  // 2026-09-15). #1214 established the rule that outranks that default — an explicit
+  // page-level declaration — and correctly reasoned that "no single Place is in view" here,
+  // but it recorded that as an EXEMPTION from declaring rather than as a declaration, so
+  // this page alone kept naming one Address. The Dashboard, the other all-places surface,
+  // already got the treatment and is right; this is the same one line.
+  //
+  // PAGE-LOCAL ONLY, same as dashboard.html: HS.setViewLabel writes state.viewLabel, which
+  // is never persisted and is rebuilt by the shell on every full-page navigation, so it
+  // cannot leak to another page. viewZip, myZip, HS.state.zip and the active address are
+  // all untouched — the saved address stays saved, stays active, still anchors the
+  // home-relative reads below, and is still one tap away in the switcher.
+  //
+  // `precise` is what outranks the saved-address default (shell.js::paintTopbar's
+  // homeIsCurrent gate); it is the same flag and the same call the Dashboard ships.
+  // Declared FIRST, before any await, so the chip never paints an Address and then
+  // corrects itself two fetches later.
+  HS.setViewLabel('ALL MY PLACES', { precise: true });
   // Never hang silently: a failed read renders an honest retry state.
   var changes, projects, followedProjects;
   try {

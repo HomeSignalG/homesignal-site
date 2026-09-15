@@ -838,10 +838,76 @@ satellite, and the dashboard preview. Regulatory is an **overlay**, never the pi
 An EPA/FRS record whose **class fields** (`type` / `use_type` / `layer` / `category`)
 map a project Type draws that **Type shape + operating/lifecycle colour**, with a
 **purple R** on the Type pin. Turning Regulatory **OFF** drops the R and **leaves the
-Type pin** (membership is `[typeKey, 'facility']`). Turning Type off and Regulatory on
-still shows it via `facility`. Unmapped EPA (no classifiable class field;
-FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter**, hidden when the
-overlay is off.
+Type pin** (membership is `[typeKey, 'facility']`). Unmapped EPA (no classifiable class
+field; FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter** — and under
+the 2026-09-15 ruling below they have no base pin at all, because they match no Type.
+
+⚖️ **REGULATORY IS ALWAYS AN INDEPENDENT VISUAL OVERLAY — FOUNDER RULING 2026-09-15.
+It never decides whether a base pin exists.** Stated as the code, because this is the one
+place a future session will be tempted to "simplify":
+
+```js
+basePinVisible          = recordIsInCurrentLoadedGeographicView
+                          && recordMatchesAtLeastOneSelectedType;
+regulatoryOverlayVisible = basePinVisible && regulatoryOverlayEnabled
+                          && recordHasRegulatoryStatus;
+```
+
+Regulatory is **not** a Type, **not** a Type filter, **not** a status filter controlling
+marker membership, **not** a condition that can remove / hide / count / classify /
+suppress / render a base Type pin, and **not** a condition that can hide, disable, remove
+or change the count of a Type chip. The seven Type chips always render, always clickable,
+even at zero matches.
+
+- **Reg ON → OFF** removes the R annotation only; **every base pin stays**, same shape,
+  same colour, same count.
+- **Reg OFF → ON** adds the R annotation only; **no new pin appears**.
+- **Type ON → OFF** removes that Type's pins in **both** switch states, identically.
+
+**`HS.categoryVisible` is where this lives, and the regulatory key is now ABSENT from it**
+— it filters the membership set down to its Type keys and asks only the Type row. ⛔ **Do
+not reintroduce `facility` there in any form**, flat any-of or special limb;
+`test/map1-regulatory-not-a-type-bypass.test.mjs` §6 refuses the flat any-of by name, and
+§3/§4 refuse the two limbs the superseded three-case rule carried.
+
+**Membership is UNCHANGED** — still `[typeKey, 'facility']`, still one record → one
+marker. What moved is which dimension ADMITS the record, never what it IS.
+
+⚠️ **An untyped EPA record (`['facility']` alone — the standalone purple square) therefore
+has NO base pin in any switch state.** Measured before shipping so the change is known to
+cost nothing: **0 of 216,405 production facility records are untyped** (industrial 154,512
+· energy 37,281 · logistics 23,868 · datacenter 744), so that shape is a contract guard,
+not a live population.
+
+*The dated measurements that produced this ruling stand as the receipt:* `facility` had
+been an EXISTENCE GRANT outranking the Type row, reported twice from live ZIP pages — with
+**Data center** the only Type checked, 78617 drew **30** pins and 75009 drew **27**, and
+**not one of the 57 was a data centre**. They were EPA industrial/energy records
+(`CONCRETE BATCH PLANT CELINA`, `CELINA HOT MIX PLANT`, `SANDHILL POWER PLANT`) drawn with
+the Industrial triangle the resident had just unchecked; turning Regulatory off then
+emptied the map, which is what "regulatory hides my data centers" looked like. Full
+before/after matrix on both ZIPs: `docs/map1-regulatory-type-bypass-2026-09-15.md`.
+
+🛑 **SUPERSEDED — the interim "three cases" rule (#1218, merged `f680eba`, same day).** It
+kept two limbs where Regulatory could still decide a base pin: it could REMOVE one (an
+untyped record with the switch off) and it could RENDER one (typed EPA records when no
+Type was selected, the *"turn OFF every Map 1 type except EPA"* scenario). Both are gone.
+Evidence on 542 real 78617 records after the fix: Reg ON→OFF with all types on **542 →
+542**; Industrial only **53 → 53**; Data center only + Reg ON **0 pins**; no Type selected
++ Reg ON **0 pins**. The assertions that moved with it are in the seven test files this
+change touches — `map1-dual-identity.browser` §4 now asserts an empty map rather than the
+old acceptance scenario.
+
+📌 **STILL OPEN, measured and deliberately NOT fixed here: regulatory is STILL a STATUS
+bucket.** `STATUS_FILTER_KEYS` contains `'facility'`, and `resolveMarker` stamps
+`statusKey:'facility'` / `statusLabel:'Regulated facility'` on every facility branch while
+the same object says `lifecycle:'operating'` — two contradictory status answers per record,
+already frozen into **29 of 66** rows of `test/fixtures/delvalle-golden/expected.json` as
+`popup_lifecycle: "Regulated facility"`. **Zero resident-visible effect today** (no
+production surface reads `statusLabel` or `HS.statusVisible`; the page's status dimension
+reads `mk.lifecycle` via `bucketOf`, and unchecking "Operating now" correctly removes all 30
+EPA pins on 78617), so it is latent. Fixing it regenerates the golden baseline — a separate
+unit, not to be bundled with a resident-visible filter change.
 
 Logistics (`LAYER_EXACT`) maps to **Industrial**, not Commercial: that is how
 **DE-ANDA TRUCKING** (`type: 'logistics'`) lands on the Industrial chip. It is an
@@ -1093,6 +1159,53 @@ is still PARKED.** Full record: audit §15.
   production. Both crons are `active` and the newest core write is minutes old — this is
   rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
   frequent, not less. Separate work; do not re-derive it.
+  - ⚠️ **CORRECTED 2026-09-15 — THE SECOND HALF OF THAT SENTENCE IS WRONG, AND THE WAY IT WAS
+    WRONG IS THE LESSON. `verify-coverage-state` IS NOT FAILING AN ASSERTION; IT HAS NOT RUN
+    ONE.** The stale-row COUNT stands (it is a dated measurement and is left as written). What
+    does not stand is "the assertion is failing": the job dies on its FIRST read, before any
+    invariant is evaluated. Measured — `app_coverage_states` LEFT JOINs a per-ZIP LATERAL
+    aggregate over `app_projects` (3.19M rows / 2.9 GB) whose visibility map is **0.1% set**
+    (`relallvisible` 210 of `relpages` 370,510), so it cannot go index-only despite
+    `app_projects_zip_kind_date_idx (zip, record_kind, …)` covering it, and pays ~144 random
+    heap fetches per ZIP. `EXPLAIN ANALYZE` on one 1000-row page: **55.6 s cold, 33.1 s warm**
+    (86,678 page reads even warm). The `anon` role carries **`statement_timeout = 3s`**
+    (`pg_db_role_setting`), so Postgres logs `canceling statement due to statement timeout`
+    and PostgREST returns **500** in ~3 s.
+  - 🔑 **THE INSTRUMENT IS WHY THE RECORD WAS WRONG, not carelessness in reading it.** The
+    reader threw `REST <path> -> 500` and **discarded the response body**, where PostgREST had
+    put SQLSTATE `57014` and the message naming the timeout. A read failure and an assertion
+    failure produced the same shape of red, so the plausible one got written down. Fixed: the
+    body is surfaced, `57014` drives an adaptive page ladder, and a read failure now prints
+    `INFRASTRUCTURE:` plus "NOTHING WAS VERIFIED". **A verifier that cannot say which half
+    broke will have its failures misfiled, and the misfiling is invisible.**
+  - ⚠️ **A SMALLER CONSTANT PAGE SIZE DOES NOT FIX IT — page cost varies ~17x across the ZIP
+    range.** A 50-row page measured **206 ms** at the range start and **3,516 ms** at
+    `zip > '40000'` (dense ZIPs carry 275 `app_projects` rows against 127), so any fixed size
+    is simultaneously too slow for one end and wasteful at the other. The reader uses the
+    `verify-development` ladder (halve on failure, floor 1, recover after clean pages).
+  - 📌 **THE DURABLE FIX IS DATABASE-SIDE AND IS DELIBERATELY NOT BUNDLED — it is a founder
+    call.** Setting the visibility map (a `VACUUM` on `app_projects`, plus autovacuum tuning
+    so it stays set against the `*/2` refresh churn) makes that lateral an index-only scan and
+    takes the whole read back to roughly its historical ~1 min. Until then the job is bounded
+    at 30 minutes rather than 15 and runs ~19 min (measured — the ladder pays 3 s for each page
+    that trips the cap before halving, so it is slower than the ~7 min the raw per-ZIP cost
+    predicts). **Do not read the raised bound as the fix.**
+  - ✅ **RESOLVED, AND THE ORIGINAL CLAIM TURNS OUT TO BE RIGHT — say both halves.** First full
+    run after the repair (`35001393633`, 18m50s, all 12,722 ZIPs): **every structural invariant
+    PASSES** — validity on both planes, no duplicate ZIPs, all five impossible-combination
+    checks, planes independent (**741** core-empty-with-overlay-records ZIPs), all three legacy
+    `data_quality` rules, news-is-not-coverage (9,430 ZIPs carry Local News, 194 carry news and
+    nothing else), full-universe classification, no coordinate-bearing `app_changes`,
+    determinism 3/3, and 22/22 desktop+mobile render checks. **2 fail, and they are REAL:**
+    `zero FAILED materializations` (19350, 19390, 19701, 19702, 19703 — `failed_ingest`) and
+    `zero unintentionally STALE ZIPs` (05001, 10460, 11420, 19013, 19317). Plus **167** ZIPs
+    inside the designed 7-day transient hold, which is INFO, not failure.
+    ⚠️ **So the sentence this block corrects was right about WHICH assertion and wrong about
+    WHY — and could not have known either.** It was inferred from a 500 that never reached an
+    assertion; being correct by inference is not the same as being measured, and the two are
+    indistinguishable in the record until someone makes the instrument run. The stale-ZIP
+    failure is the rolling-refresh throughput item already logged above — still separate work,
+    now with a working detector behind it.
 - 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
   privilege escalation.** The live view carries `security_invoker=true` and is owned by
   `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
@@ -1223,6 +1336,42 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
 
 
 ### Status
+- 🟢 **THE PLACE CONTEXT MAP NOW FITS ITS IFRAME — the filter panel could be SCROLLED out of
+  the frame by a zoom click** (browser-measured 2026-09-15; founder-reported from a live ZIP
+  page, `community.html?zip=78617`). A resident clicked the embedded map's zoom control and
+  the STATUS / PROJECT TYPE / REGULATORY panel vanished. **Nothing hid it and no filter state
+  changed — the embed DOCUMENT scrolled.**
+  - 🔑 **TWO CORRECT NUMBERS WERE WRONG TOGETHER, which is why no structural pin could have
+    caught it.** `.map-frame` is a hard **600px** and the panel measures **288px** at desktop
+    widths (**412px** at 390px wide), so the embed document stood **957px tall inside a 520px
+    iframe — 437px of overflow, on every embed, at every width**. The panel sits ABOVE the
+    map, so the panel was the half that left. Leaflet focuses its own container on any
+    interaction, the browser scrolls that 600px container into view, and **scrollTop went
+    0 → 343 — exactly `.map-frame`'s offset**. Zoom-OUT did not restore it and the next click
+    re-hid it, so the controls read as gone. A wheel-up over the map did scroll it back
+    (`scrollWheelZoom:false`), which is the only reason it was recoverable at all.
+  - **The fix is geometric and embed-scoped:** in `.hs-embed` the card is a flex column one
+    frame tall and `.map-frame` takes what the panel does not, so there is no overflow and
+    nothing to scroll; where the panel genuinely does not fit (narrow widths) it scrolls
+    **inside its own box** under a 45dvh ceiling. **The panel is never hidden** —
+    `test/place-context-map.test.mjs` pins that, and it is a founder decision. Both hosts'
+    iframes went `clamp(320px,58vw,520px)` → **`clamp(560px,58vw,720px)`**
+    (`lib/community-page.js`, `property.html`), so the map gets 363px at desktop / 252px on a
+    phone instead of 217px / 78px.
+  - **Full-page Map 1 is UNTOUCHED** — measured `.map-frame` still 600px at 1280x900, and the
+    change is four `.hs-embed` rules. Pinned by `test/place-context-map-fits-frame.browser.test.mjs`
+    (24 checks), proven load-bearing by three mutations: reverting the CSS reproduces the
+    defect exactly (**8 fail, scrollTop=343, all three headings off-screen**), reverting the
+    iframe floor to 320px fails §4a, and making the fit-frame rules GLOBAL fails §5 (the full
+    page's map drops 600 → 532px) — the over-flagging direction, so the pin cannot pass a
+    change that shrinks Map 1's own page.
+  - ⚠️ **OBSERVED, NOT CHANGED: the FULL page scroll-jumps on a zoom click too** — same
+    focus-scroll (scrollTop 0 → 656 at 1280x900). It is benign there (the panel stays in
+    view, and a page scroll brings it back at shorter heights) and pre-existing. Not folded
+    into this fix.
+  - ⚠️ **The sandbox cannot reach `homesignal.net` or jsDelivr** (egress policy 403), so every
+    number here is from the repo's own browser harness against the shipped page with Leaflet
+    served locally — not from production. Confirm on the real site.
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
   RECORD** (DB-verified 2026-09-06; full receipt `docs/map1-residential-total-qualification-2026-09-06.md`).
   Corrects the four defects the independent adversarial audit proved against `48214b3`.

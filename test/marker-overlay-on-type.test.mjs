@@ -97,14 +97,32 @@ ok(HS.visibleSignal(deAnda) === deAnda.signal, '5: Regulatory ON → the R is dr
 HS.setCategoryFilter(REG.key, false);
 ok(HS.visibleSignal(deAnda) === null && HS.categoryVisible(deAnda) === true,
   '5b: Regulatory OFF → R gone, Industrial pin still visible');
+// ⚖️ 2026-09-15: still false, but for a DIFFERENT reason, and the label now says which —
+// an untyped record matches no selected Type, so it has no base pin in ANY switch state.
+// (Measured: 0 of 216,405 production facility records are untyped, so this shape is a
+// contract guard, not a live population.)
 ok(HS.categoryVisible(unmapped) === false,
-  '5c: Regulatory OFF → unmapped purple square is hidden');
+  '5c: an untyped regulatory record has no base pin — no Type matches it');
 HS.setCategoryFilter('industrial', false);
 ok(HS.categoryVisible(deAnda) === false,
   '5d: Industrial OFF + Regulatory OFF → the overlay record is hidden');
 HS.setCategoryFilter(REG.key, true);
+// ⚖️ THE 2026-09-15 RULING — regulatory is ALWAYS an independent overlay, so the switch
+// never admits a record under a Type the resident turned off. Asserted in BOTH switch
+// states and in BOTH Type states, because the whole point is that the switch is not a
+// variable in this answer.
+ok(HS.categoryVisible(deAnda) === false,
+  '5e: Industrial OFF + Regulatory ON → NOT shown; the switch is not a way past the Type row');
+HS.categoryFilterKeys.forEach(k => HS.setCategoryFilter(k, false));
+HS.setCategoryFilter(REG.key, true);
+ok(HS.categoryVisible(deAnda) === false,
+  '5f: NO Type selected + Regulatory ON → still NOT shown; no base pin for an overlay to ride');
+HS.setCategoryFilter('industrial', true);
 ok(HS.categoryVisible(deAnda) === true && deAnda.categoryKey === 'industrial',
-  '5e: Type OFF + Regulatory ON → still visible via facility membership, still Industrial');
+  '5g: Industrial back ON (regulatory ON) → shown, as Industrial');
+HS.setCategoryFilter(REG.key, false);
+ok(HS.categoryVisible(deAnda) === true && HS.visibleSignal(deAnda) === null,
+  '5h: …and Regulatory OFF leaves the SAME base pin, losing only its R — the ruling, exactly');
 allOn();
 
 // ── 6. DUAL-IDENTITY DATA CENTRES ARE UNCHANGED ──────────────────────────────────

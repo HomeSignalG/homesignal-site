@@ -34,7 +34,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // lib/dashboard-aggregate.js joined the set with Fix 8. It is the Dashboard's whole
 // view-model — membership, dedup identity, meeting-time safety, Premium state — so a fix
 // in it that a browser never fetches is exactly the silent class this file exists to stop.
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js'];
+const CONTENT_KEYED = ['lib/map.js', 'lib/maps-social-theme.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 

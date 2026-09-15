@@ -61,8 +61,18 @@ ok('no placeholder/stand-in image is ever substituted',
 // ------------------------------------------------------------- STEP 6 fail-closed
 ok('the Approve button renders LOCKED for an image-bearing MAPS draft',
   /data-gate="image" disabled/.test(DASH));
+// ⚠️ REWRITTEN, NOT RELAXED. This used to pin the LITERAL inline expression
+// `if(mapsImageRequired(gr) && !_bskyImgOk[id]){ … return;` inside the click handler. That
+// expression moved into ONE shared `bskyApprovalBlockReason`, which the button gate and the
+// click handler both call — so the two can no longer disagree, which is a strictly stronger
+// form of the property this line exists to protect. Both halves are asserted: the handler
+// really does re-check and return, AND the original image rule is really still inside the
+// shared function. Pinning only the first half would let the rule be gutted while the
+// handler kept calling an empty gate.
 ok('the click handler re-checks the gate (button state alone is not the control)',
-  /if\(mapsImageRequired\(gr\) && !_bskyImgOk\[id\]\)\{[\s\S]{0,400}?return;/.test(DASH));
+  /var block=bskyApprovalBlockReason\(gr\);[\s\S]{0,120}?if\(block\)\{[\s\S]{0,80}?return;/.test(DASH));
+ok('…and the shared gate still carries the original image rule',
+  /function bskyApprovalBlockReason\(p\)\{[\s\S]{0,1600}?mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(DASH));
 ok('the gate is scoped to MAPS and does not touch ALERTS',
   /content_family === 'MAPS' && p\.image_bucket_path/.test(DASH));
 
