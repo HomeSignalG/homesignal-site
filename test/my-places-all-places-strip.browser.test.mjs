@@ -29,9 +29,16 @@ const ok = (c, name, detail) => {
 // (78617 backs both an Address and a ZIP follow — one query, two Places).
 const OVERRIDE = `
 (function () {
+  // Real coordinates: Del Valle and Horseshoe Bay are ~120 miles apart, which is the whole
+  // point — 96 ISLAND DR used to be scored against Del Valle's records and so read "0".
+  // a3 sits in the ZIP whose read does NOT complete, to prove silence rather than a zero.
   var ADDR = [
-    { id: 'a1', address: '13313 COOMES DR', city: 'DEL VALLE', state: 'TX', zip: '78617' },
-    { id: 'a2', address: '96 ISLAND DR', city: 'HORSESHOE BAY', state: 'TX', zip: '78657' }
+    { id: 'a1', address: '13313 COOMES DR', city: 'DEL VALLE', state: 'TX', zip: '78617',
+      lat: 30.1745, lng: -97.6134 },
+    { id: 'a2', address: '96 ISLAND DR', city: 'HORSESHOE BAY', state: 'TX', zip: '78657',
+      lat: 30.5240, lng: -98.3640 },
+    { id: 'a3', address: '1 CELINA WAY', city: 'CELINA', state: 'TX', zip: '75009',
+      lat: 33.3200, lng: -96.7800 }
   ];
   var ZIPS = [
     { zip: '78617', name: 'Del Valle (78617)', state: 'TX' },
@@ -56,8 +63,24 @@ const OVERRIDE = `
   HS.ready.then(function () { HS.state.properties = ADDR.slice(); });
   HS.data.projects = async function (zip) {
     window.__calls.projects.push(zip);
-    if (zip === '78617') { var a = new Array(500).fill(0).map(function (_, i) { return { id: 'p' + i }; }); a.complete = true; return a; }
-    if (zip === '78657') { var b = [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }]; b.complete = true; return b; }
+    if (zip === '78617') {
+      // 500 records: THREE within 5 mi of 13313 COOMES DR, the rest deliberately far, so the
+      // card's distance gate is still doing work — "its own ZIP" must not become "all of it".
+      var a = new Array(500).fill(0).map(function (_, i) {
+        return i < 3
+          ? { id: 'p' + i, lat: 30.1750 + i * 0.001, lng: -97.6140 }
+          : { id: 'p' + i, lat: 30.2200, lng: -97.5300 };   // ~5.5+ mi away
+      });
+      a.complete = true; return a;
+    }
+    if (zip === '78657') {
+      // All four sit inside Horseshoe Bay, within a couple of miles of 96 ISLAND DR.
+      var b = [
+        { id: 'q1', lat: 30.5240, lng: -98.3650 }, { id: 'q2', lat: 30.5260, lng: -98.3600 },
+        { id: 'q3', lat: 30.5200, lng: -98.3700 }, { id: 'q4', lat: 30.5300, lng: -98.3550 }
+      ];
+      b.complete = true; return b;
+    }
     // 75009: geography not cut over -> rpcAllRows reports complete:false with NO rows.
     var c = []; c.complete = false; return c;
   };
@@ -103,6 +126,10 @@ await page.waitForFunction(() => document.querySelectorAll('#propStrip > *').len
 const got = await page.evaluate(() => ({
   tiles: [].map.call(document.querySelectorAll('#propStrip > *'),
     t => (t.textContent || '').replace(/\s+/g, ' ').trim()),
+  cards: [].map.call(document.querySelectorAll('.propcard[data-kind="address"]'), c => ({
+    id: c.getAttribute('data-id'),
+    meta: ((c.querySelector('.pmeta') || {}).textContent || '').replace(/\s+/g, ' ').trim()
+  })),
   calls: window.__calls,
   chip: (document.getElementById('locLabel') || {}).textContent || '',
   where: !!document.getElementById('phWhere')
@@ -112,21 +139,21 @@ const tileText = got.tiles.join(' | ');
 console.log('--- rendered strip ---\n' + got.tiles.map(t => '  ' + t).join('\n'));
 
 console.log('\n--- 1. every Place is measured, and the label says how many ---');
-ok(/5\s*Places/.test(tileText), '1a: the Places tile still counts all five Places', tileText);
+ok(/6\s*Places/.test(tileText), '1a: the Places tile counts all six Places', tileText);
 // 500 (78617) + 4 (78657); 75009 did not read, so it is excluded from BOTH the total and
 // the place count beside it.
-ok(/504Developments found · 4 of 5 places/.test(tileText),
+ok(/504Developments found · 4 of 6 places/.test(tileText),
   '1b: Developments = 504 across the 4 Places that actually read', tileText);
 ok(!/\+/.test(tileText),
   '1c: NO "+" — the authoritative RPC returns one untruncatable array, so 500 is exact');
 
 console.log('\n--- 2. a notice reachable from two Places counts ONCE ---');
 // c1/c2 are one county notice materialized per ZIP; c3 is a second real one; c4 is closed.
-ok(/2Need you · all 5 places/.test(tileText),
+ok(/2Need you · all 6 places/.test(tileText),
   '2a: Need you = 2 (shared notice deduped, closed window excluded)', tileText);
 
 console.log('\n--- 3. the two tiles are scoped INDEPENDENTLY ---');
-ok(/Need you · all 5 places/.test(tileText) && /Developments found · 4 of 5 places/.test(tileText),
+ok(/Need you · all 6 places/.test(tileText) && /Developments found · 4 of 6 places/.test(tileText),
   '3a: one tile read every Place, the other did not — and each says so', tileText);
 
 console.log('\n--- 4. every Place ZIP was queried, once ---');
@@ -144,6 +171,25 @@ ok(got.calls && got.calls.windows === 1, '4c: the comment-window read is ONE que
 console.log('\n--- 5. the page still names itself, not one of its Places ---');
 ok(got.chip === 'Viewing · ALL MY PLACES', '5a: the Viewing chip names ALL MY PLACES', got.chip);
 ok(got.where === false, '5b: no single-address context line under the heading');
+
+console.log('\n--- 7. EACH ADDRESS IS MEASURED AGAINST ITS OWN ZIP ---');
+const card = (id) => (got.cards.find(c => c.id === id) || {}).meta || '';
+console.log('  cards: ' + JSON.stringify(got.cards));
+// 78617 returns 500 records, only THREE of them within 5 mi of this address — so the card
+// counts nearby records, not "everything in my ZIP". The distance gate still does work.
+ok(/3 nearby projects/.test(card('a1')),
+  '7a: the viewed-ZIP Address counts the 3 within 5 mi of it, not all 500', card('a1'));
+// THE ORIGINAL DEFECT. This address is ~120 mi from the viewed ZIP's records, so scoring it
+// against them produced "0 nearby projects" about a ZIP nothing had read. Its own ZIP holds 4.
+ok(/4 nearby projects/.test(card('a2')),
+  '7b: an Address OUTSIDE the viewed ZIP reads its OWN ZIP — 4, not 0', card('a2'));
+ok(!/0 nearby projects/.test(card('a2')),
+  '7c: ...and specifically no longer reports the unmeasured zero', card('a2'));
+// 75009's read does not complete. A completed read of zero is a measurement and prints;
+// an absent read is not, and must print NOTHING rather than "0 nearby projects".
+ok(!/nearby project/.test(card('a3')),
+  '7d: an Address whose ZIP never read stays SILENT, never "0 nearby projects"', card('a3'));
+ok(got.cards.length === 3, '7e: all three Address cards rendered', got.cards.length);
 
 console.log('\n--- 6. no page errors ---');
 ok(pageErrors.length === 0, '6a: the page threw nothing', pageErrors);
