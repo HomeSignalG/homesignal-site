@@ -838,10 +838,48 @@ satellite, and the dashboard preview. Regulatory is an **overlay**, never the pi
 An EPA/FRS record whose **class fields** (`type` / `use_type` / `layer` / `category`)
 map a project Type draws that **Type shape + operating/lifecycle colour**, with a
 **purple R** on the Type pin. Turning Regulatory **OFF** drops the R and **leaves the
-Type pin** (membership is `[typeKey, 'facility']`). Turning Type off and Regulatory on
-still shows it via `facility`. Unmapped EPA (no classifiable class field;
-FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter**, hidden when the
-overlay is off.
+Type pin** (membership is `[typeKey, 'facility']`). Unmapped EPA (no classifiable class
+field; FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter**, hidden when
+the overlay is off.
+
+⚖️ **AMENDED 2026-09-15 — "Turning Type off and Regulatory on still shows it via
+`facility`" is now TRUE ONLY WHEN NO TYPE AT ALL IS SELECTED.** As written it made
+`facility` an EXISTENCE GRANT outranking the Type row, and it was reported twice from live
+ZIP pages: with **Data center** the only Type checked, 78617 drew **30** pins and 75009
+drew **27**, and **not one of the 57 was a data centre** — they were EPA industrial/energy
+records (`CONCRETE BATCH PLANT CELINA`, `CELINA HOT MIX PLANT`, `SANDHILL POWER PLANT`)
+drawn with the Industrial triangle the resident had just unchecked. Turning Regulatory off
+then emptied the map, which is what "regulatory hides my data centers" looked like.
+
+**The rule now has three cases, and `HS.categoryVisible` is where it lives:**
+1. A record with a **classifiable Type** is governed by its **Type chip**; Regulatory
+   controls only the **R annotation**. This is the ruling's own sentence, unchanged.
+2. A record with **no** classifiable type (`['facility']` alone — the standalone purple
+   square) has no Type chip to govern it, so **Regulatory is its only governor**, in every
+   filter state. ⛔ Do not gate this limb on "no Type selected" — that hides every unmapped
+   EPA record from the DEFAULT all-types-on view, which is #1121 from a third direction.
+3. **No Type at all selected** → Regulatory admits typed EPA records too. This is the
+   founder's *"turn OFF every Map 1 type except EPA"* scenario and it is **preserved
+   exactly** (`test/map1-dual-identity.browser.test.mjs` §4 passes unchanged).
+
+**Membership is UNCHANGED** — still `[typeKey, 'facility']`, still one record → one
+marker. What moved is which dimension ADMITS the record, never what it IS. ⛔ **Do not
+restore the flat any-of** in `categoryVisible`; it is what produced both reports, and
+`test/map1-regulatory-not-a-type-bypass.test.mjs` §6 refuses it by name.
+⚠️ **Two assertions moved with the ruling and only two** — dual-identity §5d (2 → 1 R
+badge) and §6a (3 → 2 markers), both in the Data-center-only + Reg-ON state. Full receipt,
+including the before/after matrix on both ZIPs: `docs/map1-regulatory-type-bypass-2026-09-15.md`.
+
+📌 **STILL OPEN, measured and deliberately NOT fixed here: regulatory is STILL a STATUS
+bucket.** `STATUS_FILTER_KEYS` contains `'facility'`, and `resolveMarker` stamps
+`statusKey:'facility'` / `statusLabel:'Regulated facility'` on every facility branch while
+the same object says `lifecycle:'operating'` — two contradictory status answers per record,
+already frozen into **29 of 66** rows of `test/fixtures/delvalle-golden/expected.json` as
+`popup_lifecycle: "Regulated facility"`. **Zero resident-visible effect today** (no
+production surface reads `statusLabel` or `HS.statusVisible`; the page's status dimension
+reads `mk.lifecycle` via `bucketOf`, and unchecking "Operating now" correctly removes all 30
+EPA pins on 78617), so it is latent. Fixing it regenerates the golden baseline — a separate
+unit, not to be bundled with a resident-visible filter change.
 
 Logistics (`LAYER_EXACT`) maps to **Industrial**, not Commercial: that is how
 **DE-ANDA TRUCKING** (`type: 'logistics'`) lands on the Industrial chip. It is an

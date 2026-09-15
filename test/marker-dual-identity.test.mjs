@@ -95,7 +95,12 @@ ok(memberships.length === 2 && memberships.indexOf('datacenter') === 0 && member
 // by emitting a second marker.
 const list = [DUAL, PLAIN_FAC, DC_PROJECT].map(s => track(s));
 const shown = HS.filterByCategory(list);
-ok(shown.length === 3 && shown.filter(x => x.isDataCenter && x.isFacility).length === 1,
+// ⚖️ 3 → 2 under the 2026-09-15 ruling. The state here is setOnly('datacenter','facility'),
+// so Industrial is OFF and PLAIN_FAC is now governed by its own Type chip rather than
+// admitted through `facility` — the same correction §4c above already asserts. The claim
+// under test is UNCHANGED and is still the point: the dual record appears ONCE, not once
+// per matching membership. §13 below still counts 3 with every Type on.
+ok(shown.length === 2 && shown.filter(x => x.isDataCenter && x.isFacility).length === 1,
   '10: both filters on → the dual record appears ONCE in the visible set, not twice');
 setOnly('facility');
 ok(HS.filterByCategory(list).length === 2,
