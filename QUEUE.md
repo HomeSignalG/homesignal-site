@@ -40,6 +40,87 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-15 — 🟡 FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: APPLIED TO THE DATABASE, AWAITING FOUNDER APPROVAL
+
+⚠️ **NOT MERGED, NOT DEPLOYED, NO PR.** The site tree is unchanged — Fix 28 adds only three new
+files (a DDL of record, a frozen audit, one offline test + its fixture) and edits no shipped page,
+no `lib/*`, no CSS and no workflow. **What IS live is the DATABASE half**, because the contract
+required an AFTER audit reconciling all 996 baseline associations and that cannot be produced
+without applying. Rollback is one statement:
+`drop trigger trg_development_reports_dc_zip_membership on public.development_reports;`
+(the removed records then return as each ZIP refreshes, ~53 h for a full sweep).
+
+**THE DEFECT, as architecture rather than symptom.** `development_reports` is written by the
+ZIP-mode engine, which RETRIEVES around the ZIP centroid within a radius (`radius_mi: 3`, plus the
+EPA FRS ladder). Retrieval is a CANDIDATE operation. Nothing then decided MEMBERSHIP — the row is
+keyed by ZIP, so every candidate silently became a canonical member. Before the 2026-09-06
+dual-identity and 2026-09-07 overlay-on-Type rulings an EPA data-centre facility drew a purple
+square ("a regulated facility nearby") and the caption's *"nearby facilities for context"* was true
+of it; those rulings gave it the Data center TYPE pin, which is a claim about THIS ZIP. That
+interaction is the root cause, and neither ruling is wrong.
+
+- **BASELINE REPRODUCED EXACTLY, whole corpus, no sampling:** 12,722 ZIP pages · **687** carry a
+  Data center Type dot · **1,178** dots · testable **996** = inside **360** + outside **636** ·
+  **361** ZIP pages with ≥1 outside · max overshoot **13.054 mi** · ZIP 20166 **15 / 4 / 11** ·
+  no usable boundary **706** ZIP pages, of which **153** carry **182** dots (→ **FIX 29**).
+- **AFTER, re-derived from the live cache with the same audit logic:** 542 dots · 371 ZIP pages ·
+  testable 360 · inside 360 · **outside 0** · **ZIP pages with an outside dot 0** · untestable
+  **182 / 153, unchanged**. Original-association retest of all 1,178 frozen identities:
+  **636/636 removed · 360/360 retained · 182/182 untouched · 0 unexplained.**
+- **The fix is ONE trigger on `public.development_reports`**, the same shape as the existing
+  `trg_development_reports_canonical_zip`, because the `*/2` rolling refresh rewrites `sites` from
+  the engine — a data-only repair is undone within minutes. Membership is
+  `ST_Intersects(ST_SetSRID(ST_MakePoint(lng, lat), 4269), geo.zcta_boundary.geom)`, the predicate
+  `geo.zip_authoritative_membership` is already built with. **No buffer, no radius, no centroid,
+  no tolerance.**
+- 🔑 **THE TYPE PROJECTION IS PROVEN EQUAL TO THE SHIPPED CLASSIFIER, NOT ASSUMED.**
+  `public.map_site_is_datacenter_type()` mirrors `HS.trackerSiteItem` → `HS.resolveMarker`
+  branch for branch; `test/fix28-datacenter-membership.test.mjs` runs the REAL `lib/map.js` over
+  every distinct production input (426, fingerprint `73541120b71351703d6fcde9b0988e1c` recomputed
+  in the database) and gets **0 disagreements**. Classification is not changed by Fix 28 and the
+  test is what says so.
+- ⚠️ **THE FIRST AFTER-AUDIT WAS WRONG AND WAS REPLACED, NOT REINTERPRETED.** Its record identity
+  fell back to `record_url`, and dataset-precision sources (MassDOT, Chicago, Phoenix, San Jose,
+  Memphis) give EVERY record the same `record_url` — so it matched a different record and reported
+  **255 of 636 still attributed**. A per-record identity is (label, lat, lng) within the ZIP; on
+  that the answer is 0. **A wrong instrument reports a plausible number, which is the whole reason
+  the baseline had to be reproduced before anything was changed.**
+- ⚠️ **PERFORMANCE WAS A REAL DEFECT AND IS MEASURED, NOT ASSERTED.** The first trigger called the
+  full predicate once per site: **11,713 ms on ZIP 20166 (3,532 sites)**, against a refresh that
+  writes ~240 rows/hour. A count-first pass plus a cheap `position()` superset (proven to select
+  the identical 1,178 dots) takes it to **352 ms**, and a row with nothing to correct never pays
+  for a rebuild.
+- **Fresh vs cached parity, on the REAL engine path, not a simulation:** a live
+  `get-address-report` run for 20166 returned 17 Data-centre points (5 in / 12 out) and
+  `dev_refresh_collect()` stored **5, 0 outside**, with `counts.facilities` 28 == 28 stored
+  facility sites. 133 ZIPs written by the cron path in the same window: **0 outside**.
+- **Downstream inherits, proven rather than assumed.** `app_refresh_zip` reads
+  `development_reports.sites`, so `app_projects` — which feeds the Place page, the Dashboard and
+  `app_projects_for_zip` — carries **0 of the 636 and 100% of the retained** after the 361
+  affected ZIPs were re-materialized.
+- ⚠️ **SCOPE, STATED SO IT IS NOT MISTAKEN FOR COMPLETENESS: the same defect exists for every
+  OTHER Type and is untouched.** On the shard-0 affected ZIPs alone, **31,254 non-data-centre
+  points are still outside their own ZIP boundary**. That is the over-reach control (a zero would
+  have meant the gate reached past Data center) and it is also the honest size of the remaining
+  work. Not Fix 28.
+- 📌 **ADJACENT DEFECT, MEASURED AND DELIBERATELY NOT CHANGED: `public.national_dc_for_zip` is a
+  pure centroid + 5-mile radius read** — 9,966 (ZIP, record) attributions over 2,418 ZIP pages, of
+  which **8,952 are outside the ZIP polygon**. It is NOT in the Fix 28 baseline because those
+  records currently classify as *Other project*, not Data center: the page builds them with `name`
+  while `HS.trackerSiteItem` reads `label`, so no class field and no name reaches the classifier.
+  **Two separate follow-ups, neither one Fix 28.**
+- 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
+  the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
+  path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace
+  centroid), all via `featurePoint()`. MassDOT is 85 testable / 3 inside / 82 outside, which is
+  what a line's midpoint does. `geo_precision` says `point` for all of them, so the stored record
+  does NOT record its own derivation — that is the gap a source-geometry contract would close.
+- 📌 **70 distinct source records lose their last Data-centre ZIP page** (of 243 removed records,
+  173 survive elsewhere). Of the 70: **60** are physically inside a ZIP that IS a HomeSignal page
+  and were simply never retrieved there, **9** fall in a ZCTA that is not one of the 12,722, and
+  **1** is in no ZCTA at all. Fix 28 removes the false attribution; putting each record on the
+  page it belongs to is POSITIVE attribution and is engine-retrieval work.
+
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 
 ⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `1f0fc1a` (#1224), deployed by
