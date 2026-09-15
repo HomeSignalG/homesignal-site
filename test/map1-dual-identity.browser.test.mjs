@@ -177,16 +177,23 @@ ok(before.filter(m => m.primaryPoints === 3 && m.rBadge).length === 1,
 ok(before.filter(m => m.primaryPoints === 8 && m.rects === 0).length === 1,
   '3: the ordinary data-centre project draws a bare octagon — no EPA signal invented');
 
-// ── 4. THE FOUNDER'S ACCEPTANCE TEST — every type OFF, regulatory ON ──────────────
+// ── 4. EVERY TYPE OFF, REGULATORY ON → THE MAP IS EMPTY ──────────────────────────
+// ⚖️ SUPERSEDED 2026-09-15. This was "THE FOUNDER'S ACCEPTANCE TEST", asserting that with
+// every Type off the regulatory switch still showed EPA records. The later ruling makes
+// regulatory ALWAYS an independent overlay: it may never remove, render or otherwise
+// decide a base Type pin. With no Type selected there is no base pin for an overlay to
+// ride on, so the honest result is an empty map — and the Type row's own "No project
+// types are selected" note is what explains it, not a half-populated map.
 await setTypes([]); await setReg(true);
 await page.waitForTimeout(250);
 const epaOnly = await readMarkers();
-const epaOnlyDual = epaOnly.filter(m => m.primaryPoints === 8 && m.rBadge);
-ok(epaOnly.length === 2, '4a: EPA-only → exactly the two records with EPA membership remain', epaOnly.length);
-ok(epaOnlyDual.length === 1,
-  '4b: ALL TYPES OFF + REGULATORY ON → the data centre is STILL VISIBLE, STILL an octagon, STILL carrying its R badge, exactly ONCE');
-ok(epaOnly.filter(m => m.primaryPoints === 8 && m.rects === 0).length === 0,
-  '4c: …and the data-centre PROJECT (no EPA record) is correctly hidden');
+ok(epaOnly.length === 0,
+  '4a: ALL TYPES OFF + REGULATORY ON → the map is EMPTY; the switch admits no record', epaOnly.length);
+await setReg(false);
+await page.waitForTimeout(250);
+ok((await readMarkers()).length === 0,
+  '4b: …and turning the switch OFF changes nothing — it was never what was drawing them');
+await setReg(true);
 
 // ── 5. The mirror case — Data Center only, regulatory OFF ────────────────────────
 // This is where the two dimensions come apart, and it is the whole point of the split:
@@ -234,12 +241,16 @@ await page.waitForTimeout(250);
 ok((await readMarkers()).length === 0, '6b: BOTH OFF → not visible');
 
 // ── 7. One underlying record, and the page says so ────────────────────────────────
-await setTypes([]); await setReg(true);
+// Driven with Data center ON (was: every Type off) — under the 2026-09-15 ruling that
+// earlier state renders nothing, so it could no longer exercise the claim. The claim
+// itself is unchanged: dual membership must never produce a second marker object.
+await setTypes(['datacenter']); await setReg(true);
 await page.waitForTimeout(250);
 const v = await page.evaluate(() => window.__HS_VERIFY);
 ok(v.dualIdentityMarkers === 1,
   '7a: the page reports exactly ONE dual-identity marker object — dual membership never created a second record', v.dualIdentityMarkers);
-ok(v.visibleMarkers === 2, '7b: the visible count under regulatory-only is 2 underlying records, not 3', v.visibleMarkers);
+ok(v.visibleMarkers === 2,
+  '7b: Data center ON → the dual record and the DC project, 2 underlying records, not 3', v.visibleMarkers);
 
 // ── 8. The popup carries both truths, identity first ──────────────────────────────
 const popup = await page.evaluate(() => {

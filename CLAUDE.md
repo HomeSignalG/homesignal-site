@@ -839,36 +839,64 @@ An EPA/FRS record whose **class fields** (`type` / `use_type` / `layer` / `categ
 map a project Type draws that **Type shape + operating/lifecycle colour**, with a
 **purple R** on the Type pin. Turning Regulatory **OFF** drops the R and **leaves the
 Type pin** (membership is `[typeKey, 'facility']`). Unmapped EPA (no classifiable class
-field; FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter**, hidden when
-the overlay is off.
+field; FALLBACK:other / TERMINAL_NEUTRAL) stay a **purple square, no letter** — and under
+the 2026-09-15 ruling below they have no base pin at all, because they match no Type.
 
-⚖️ **AMENDED 2026-09-15 — "Turning Type off and Regulatory on still shows it via
-`facility`" is now TRUE ONLY WHEN NO TYPE AT ALL IS SELECTED.** As written it made
-`facility` an EXISTENCE GRANT outranking the Type row, and it was reported twice from live
-ZIP pages: with **Data center** the only Type checked, 78617 drew **30** pins and 75009
-drew **27**, and **not one of the 57 was a data centre** — they were EPA industrial/energy
-records (`CONCRETE BATCH PLANT CELINA`, `CELINA HOT MIX PLANT`, `SANDHILL POWER PLANT`)
-drawn with the Industrial triangle the resident had just unchecked. Turning Regulatory off
-then emptied the map, which is what "regulatory hides my data centers" looked like.
+⚖️ **REGULATORY IS ALWAYS AN INDEPENDENT VISUAL OVERLAY — FOUNDER RULING 2026-09-15.
+It never decides whether a base pin exists.** Stated as the code, because this is the one
+place a future session will be tempted to "simplify":
 
-**The rule now has three cases, and `HS.categoryVisible` is where it lives:**
-1. A record with a **classifiable Type** is governed by its **Type chip**; Regulatory
-   controls only the **R annotation**. This is the ruling's own sentence, unchanged.
-2. A record with **no** classifiable type (`['facility']` alone — the standalone purple
-   square) has no Type chip to govern it, so **Regulatory is its only governor**, in every
-   filter state. ⛔ Do not gate this limb on "no Type selected" — that hides every unmapped
-   EPA record from the DEFAULT all-types-on view, which is #1121 from a third direction.
-3. **No Type at all selected** → Regulatory admits typed EPA records too. This is the
-   founder's *"turn OFF every Map 1 type except EPA"* scenario and it is **preserved
-   exactly** (`test/map1-dual-identity.browser.test.mjs` §4 passes unchanged).
+```js
+basePinVisible          = recordIsInCurrentLoadedGeographicView
+                          && recordMatchesAtLeastOneSelectedType;
+regulatoryOverlayVisible = basePinVisible && regulatoryOverlayEnabled
+                          && recordHasRegulatoryStatus;
+```
+
+Regulatory is **not** a Type, **not** a Type filter, **not** a status filter controlling
+marker membership, **not** a condition that can remove / hide / count / classify /
+suppress / render a base Type pin, and **not** a condition that can hide, disable, remove
+or change the count of a Type chip. The seven Type chips always render, always clickable,
+even at zero matches.
+
+- **Reg ON → OFF** removes the R annotation only; **every base pin stays**, same shape,
+  same colour, same count.
+- **Reg OFF → ON** adds the R annotation only; **no new pin appears**.
+- **Type ON → OFF** removes that Type's pins in **both** switch states, identically.
+
+**`HS.categoryVisible` is where this lives, and the regulatory key is now ABSENT from it**
+— it filters the membership set down to its Type keys and asks only the Type row. ⛔ **Do
+not reintroduce `facility` there in any form**, flat any-of or special limb;
+`test/map1-regulatory-not-a-type-bypass.test.mjs` §6 refuses the flat any-of by name, and
+§3/§4 refuse the two limbs the superseded three-case rule carried.
 
 **Membership is UNCHANGED** — still `[typeKey, 'facility']`, still one record → one
-marker. What moved is which dimension ADMITS the record, never what it IS. ⛔ **Do not
-restore the flat any-of** in `categoryVisible`; it is what produced both reports, and
-`test/map1-regulatory-not-a-type-bypass.test.mjs` §6 refuses it by name.
-⚠️ **Two assertions moved with the ruling and only two** — dual-identity §5d (2 → 1 R
-badge) and §6a (3 → 2 markers), both in the Data-center-only + Reg-ON state. Full receipt,
-including the before/after matrix on both ZIPs: `docs/map1-regulatory-type-bypass-2026-09-15.md`.
+marker. What moved is which dimension ADMITS the record, never what it IS.
+
+⚠️ **An untyped EPA record (`['facility']` alone — the standalone purple square) therefore
+has NO base pin in any switch state.** Measured before shipping so the change is known to
+cost nothing: **0 of 216,405 production facility records are untyped** (industrial 154,512
+· energy 37,281 · logistics 23,868 · datacenter 744), so that shape is a contract guard,
+not a live population.
+
+*The dated measurements that produced this ruling stand as the receipt:* `facility` had
+been an EXISTENCE GRANT outranking the Type row, reported twice from live ZIP pages — with
+**Data center** the only Type checked, 78617 drew **30** pins and 75009 drew **27**, and
+**not one of the 57 was a data centre**. They were EPA industrial/energy records
+(`CONCRETE BATCH PLANT CELINA`, `CELINA HOT MIX PLANT`, `SANDHILL POWER PLANT`) drawn with
+the Industrial triangle the resident had just unchecked; turning Regulatory off then
+emptied the map, which is what "regulatory hides my data centers" looked like. Full
+before/after matrix on both ZIPs: `docs/map1-regulatory-type-bypass-2026-09-15.md`.
+
+🛑 **SUPERSEDED — the interim "three cases" rule (#1218, merged `f680eba`, same day).** It
+kept two limbs where Regulatory could still decide a base pin: it could REMOVE one (an
+untyped record with the switch off) and it could RENDER one (typed EPA records when no
+Type was selected, the *"turn OFF every Map 1 type except EPA"* scenario). Both are gone.
+Evidence on 542 real 78617 records after the fix: Reg ON→OFF with all types on **542 →
+542**; Industrial only **53 → 53**; Data center only + Reg ON **0 pins**; no Type selected
++ Reg ON **0 pins**. The assertions that moved with it are in the seven test files this
+change touches — `map1-dual-identity.browser` §4 now asserts an empty map rather than the
+old acceptance scenario.
 
 📌 **STILL OPEN, measured and deliberately NOT fixed here: regulatory is STILL a STATUS
 bucket.** `STATUS_FILTER_KEYS` contains `'facility'`, and `resolveMarker` stamps

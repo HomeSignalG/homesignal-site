@@ -102,23 +102,27 @@ ok(HS.categoryVisible(CELINA_BATCH_PLANT),
 ok(!HS.categoryVisible(DELVALLE_POWER),
   '2c: …and the energy record is correctly absent — its Type is infrastructure, not Industrial');
 
-// ── 3. THE FOUNDER'S ACCEPTANCE SCENARIO IS PRESERVED ───────────────────────────────
-// "Turn OFF every Map 1 type except EPA / Regulated facility." No Type is selected, so the
-// request is unambiguous and regulatory admits typed EPA records. Pinned live by
-// test/map1-dual-identity.browser.test.mjs §4, which this must not break.
+// ── 3. REGULATORY NEVER ADMITS A RECORD ────────────────────────────────────────────
+// ⚖️ SUPERSEDED 2026-09-15. This section previously asserted the opposite: that with no
+// Type selected the switch showed EPA records ("all types off except EPA"). Under the
+// ruling regulatory is ALWAYS an independent overlay, so no Type selected means no base
+// pin, and the switch changes nothing about that.
 setFilters([], true);
-ok(HS.categoryVisible(CELINA_BATCH_PLANT) && HS.categoryVisible(DELVALLE_POWER),
-  '3a: NO Type selected + Regulatory ON → every regulatory record is shown');
+ok(!HS.categoryVisible(CELINA_BATCH_PLANT) && !HS.categoryVisible(DELVALLE_POWER),
+  '3a: NO Type selected + Regulatory ON → NOTHING is shown; the switch admits no record');
 ok(!HS.categoryVisible(TXDOT_SEAL_COAT),
-  '3b: …and a project with no regulatory record is correctly hidden');
+  '3b: …and an ordinary project is hidden too — the state is genuinely empty');
 setFilters([], false);
 ok(!HS.categoryVisible(CELINA_BATCH_PLANT),
-  '3c: NO Type + Regulatory OFF → nothing at all, which is the genuinely empty state');
+  '3c: NO Type + Regulatory OFF → identical; the switch is not a variable in this answer');
 
-// ── 4. AN UNTYPED REGULATORY RECORD IS GOVERNED BY THE SWITCH ALONE ─────────────────
-// The standalone purple square. It has no Type chip that could govern it, so if the
-// regulatory limb were gated on "no Type selected" it would vanish from the DEFAULT
-// all-types-on view — the #1121 disappearing pin, reached from a third direction.
+// ── 4. AN UNTYPED REGULATORY RECORD HAS NO BASE PIN, IN ANY SWITCH STATE ───────────
+// ⚖️ SUPERSEDED 2026-09-15 (was: "governed by the switch alone"). A record matching no
+// selected Type has no base pin, and regulatory may not render one — so the switch cannot
+// make it appear or disappear. THAT is what stops a pin vanishing on a regulatory toggle.
+// MEASURED, so the change is known to cost nothing: 0 of 216,405 production facility
+// records are untyped (industrial 154,512 · energy 37,281 · logistics 23,868 ·
+// datacenter 744), so this shape is a contract guard, not a live population.
 const UNTYPED_FAC = { record_kind: 'facility', registry_id: '110000000001',
   name: 'A REGULATED LOCATION WITH NO STATED CLASS', status: 'Operating' };
 ok(JSON.stringify(m(UNTYPED_FAC).categories) === '["facility"]',
@@ -127,14 +131,14 @@ ok(JSON.stringify(m(UNTYPED_FAC).categories) === '["facility"]',
 ok(m(UNTYPED_FAC).shape === 'square',
   '4b: …and draws the standalone purple square', m(UNTYPED_FAC).shape);
 setFilters(HS.typeFilterKeys, true);
-ok(HS.categoryVisible(UNTYPED_FAC),
-  '4c: ALL types ON + Regulatory ON → it is shown (the default view must not lose it)');
-setFilters(['datacenter'], true);
-ok(HS.categoryVisible(UNTYPED_FAC),
-  '4d: one Type ON + Regulatory ON → still shown; no Type chip can govern it');
+ok(!HS.categoryVisible(UNTYPED_FAC),
+  '4c: ALL types ON + Regulatory ON → no base pin; it matches no Type');
 setFilters(HS.typeFilterKeys, false);
 ok(!HS.categoryVisible(UNTYPED_FAC),
-  '4e: Regulatory OFF → hidden. The switch is its ONLY governor, in every filter state');
+  '4d: ALL types ON + Regulatory OFF → IDENTICAL. The switch cannot remove what it cannot add');
+setFilters(['datacenter'], true);
+ok(!HS.categoryVisible(UNTYPED_FAC),
+  '4e: one Type ON + Regulatory ON → still no base pin');
 
 // ── 5. THE DEFAULT VIEW IS UNCHANGED, AND SO IS REGULATORY-OFF OVER IT ──────────────
 // The regression that would matter most: this ruling must not remove a single pin from the
@@ -145,9 +149,9 @@ setFilters(HS.typeFilterKeys, true);
 const defaultOn = SAMPLE.filter(HS.categoryVisible).length;
 setFilters(HS.typeFilterKeys, false);
 const defaultRegOff = SAMPLE.filter(HS.categoryVisible).length;
-ok(defaultOn === 6, '5a: ALL types ON + Regulatory ON → every record in the sample draws', defaultOn);
+ok(defaultOn === 5, '5a: ALL types ON + Regulatory ON → all 5 TYPED records draw', defaultOn);
 ok(defaultRegOff === 5,
-  '5b: ALL types ON + Regulatory OFF → only the UNTYPED square leaves; all 5 typed pins stay',
+  '5b: ALL types ON + Regulatory OFF → THE SAME 5. Not one base pin leaves on a toggle',
   defaultRegOff);
 
 // ── 6. THE OLD BEHAVIOUR IS REFUSED, NAMED ─────────────────────────────────────────
