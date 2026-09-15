@@ -38,6 +38,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
+<script src="lib/dashboard-aggregate.js?v=c50f7bf3"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=22937269"></script>
@@ -129,46 +130,114 @@ HS.onReady(async function () {
   // The `d != null &&` form is not new here: shell.js:2034, alerts.html:272 and
   // lib/templates.js (three sites) already guard exactly this way. This page and
   // property.html were the two that did not.
-  function openWindowCount(list) {
-    return (list || []).filter(function (x) {
-      var d = HS.daysUntil(x.window_closes_at);
-      return d != null && d >= 0;
-    }).length;
+  function isOpenWindow(x) {
+    var d = HS.daysUntil(x && x.window_closes_at);
+    return d != null && d >= 0;
+  }
+  function openWindowCount(list) { return (list || []).filter(isOpenWindow).length; }
+
+  // ---- THE STRIP MEASURES EVERY PLACE, NOT THE ONE ZIP IN VIEW -------------------------
+  // `changes` / `projects` above are read for the VIEWED ZIP alone, so two tiles used to
+  // name that ZIP ("Need you · ZIP 78617") on the page whose whole subject is the
+  // resident's WHOLE membership. Naming the ZIP was the honest thing to do while the
+  // number only covered it; measuring every Place is the honest thing to do instead.
+  // The per-Address cards below still read the viewed ZIP and are deliberately unchanged.
+  //
+  // 🔑 THE DEVELOPMENT COUNT GOES THROUGH THE PAGE'S OWN RPC, AND THAT IS THE WHOLE
+  // FINDING. A head-only `count: 'exact'` over `app_projects.zip` is the cheap obvious
+  // implementation and it counts a DIFFERENT POPULATION from the one a resident sees:
+  // `app_projects_for_zip` routes development through `app_authoritative_projects_for_zip`,
+  // whose set comes from `geo.zip_authoritative_membership` — the authoritative ZIP
+  // BOUNDARY — not from the `zip` column. Measured 2026-09-15 on the three ZIPs of the
+  // reported account: 75009 authoritative 470 vs `zip` column 24 · 78617 500 vs 512 ·
+  // 78657 4 vs 4. Celina would have read 24 while its page lists 470.
+  //
+  // ⛔ AND THE "500+" WAS FALSE. `DEV_QUERY_CAP = 500` assumed the RPC truncates at 500
+  // rows, so `devCapped()` printed a "+" on any ZIP at or above it. The authoritative RPC
+  // returns ONE jsonb array that no row cap can truncate (lib/data.js::rpcAllRows), and
+  // the measurement says so: of 7,996 ZIPs carrying authoritative membership, exactly ONE
+  // sits at 500 (78617 — the reported page) and 397 sit ABOVE it, up to 14,702. So 500 is
+  // not a ceiling, 78617 really holds 500, and the tile was claiming "at least 500" about
+  // a number it had in full. Honesty now rides on the RPC's own `complete` flag instead of
+  // a row-count guess: a ZIP that did not read is EXCLUDED from the total and from the
+  // place count beside it, never folded in as a zero.
+  var ALL = { devTotal: null, devPlaces: 0, needs: null, needsPlaces: 0, totalPlaces: 0 };
+
+  // Says exactly how much of the membership the number covers. A tile may only claim
+  // "all N places" when every one of them was actually read.
+  function placesScopeLabel(covered, total) {
+    if (!total) return '';
+    if (covered >= total) return total === 1 ? ' · your 1 place' : ' · all ' + total + ' places';
+    return ' · ' + covered + ' of ' + total + ' places';
   }
 
-  // A CAPPED RESULT CANNOT PROVE A TOTAL. app_projects_for_zip -> app_authoritative_projects_for_zip
-  // returns at most 500 development records, and lib/data.js::rpcAllRows reports
-  // `complete: true` for ANY array it gets back — so a full page and a truncated one are
-  // indistinguishable from here. Measured on production: ZIP 78617 holds 512 development
-  // rows and the RPC returned 500, so the previous tile rendered 500 as though it were the
-  // ZIP's whole set.
-  //
-  // This constant is NOT a duplicate of an existing client-side limit — there is none; the
-  // cap lives only in the RPC, and nothing in lib/data.js or config.js exposes it. It is
-  // declared here solely to DETECT the capped state, never to request rows: no query, no
-  // limit and no RPC changes with it.
-  //
-  // The rendered "+" is derived from the RETURNED count, not from this constant, so if the
-  // server cap ever moves the tile still states what it actually received rather than a
-  // stale 500.
-  var DEV_QUERY_CAP = 500;
+  async function loadAllPlaces() {
+    var A = HS.dashAgg;
+    // lib/data.js and lib/dashboard-aggregate.js can be served from a browser cache older
+    // than this page, so every cross-module call is guarded. A missing helper leaves the
+    // tile unrendered — never a fabricated 0. Same defensive shape as HS.data.projectsByIds
+    // elsewhere on this page.
+    if (!A || !A.canonicalPlaces || !A.queryZips) return;
+    var places = A.canonicalPlaces({ properties: S.properties, followedZips: zips() });
+    ALL.totalPlaces = places.length;
+    var q = A.queryZips(places, A.MAX_QUERY_ZIPS || 25);
+    if (!q.length) return;
 
-  function devCapped(list) { return (list || []).length >= DEV_QUERY_CAP; }
+    // How many of the resident's PLACES a set of read ZIPs accounts for. One ZIP can back
+    // two Places (a saved Address inside a followed ZIP) — the resident's unit is the
+    // Place, so that is what the label counts.
+    function coveredBy(list) {
+      var set = {};
+      (list || []).forEach(function (zz) { set[zz] = 1; });
+      return places.filter(function (pl) { return pl.zip && set[pl.zip]; }).length;
+    }
 
-  // At the cap: "500+" — at least this many were found, exact total unprovable from this
-  // response. Below it: the exact number, which IS provable because nothing was truncated.
-  function devCountValue(list) {
-    var n = (list || []).length;
-    return devCapped(list) ? n + '+' : n;
-  }
+    if (HS.data.projects) {
+      var okZips = [], total = 0, next = 0;
+      async function devWorker() {                 // bounded concurrency, never Promise.all(N)
+        while (next < q.length) {
+          var zq = q[next++];
+          try {
+            // The page's OWN development reader, so the tile counts exactly what the ZIP's
+            // page lists (it routes through app_projects_for_zip -> the authoritative set).
+            // The VIEWED ZIP was already read at the top of this callback for the Address
+            // cards, with identical arguments — reuse it rather than pull the same payload
+            // twice. That ZIP is usually the resident's densest (78617 alone is 500 rows),
+            // so the duplicate was the single most expensive thing on the page. Caught by
+            // test/my-places-all-places-strip.browser.test.mjs §4a, which counts the calls.
+            var list = (String(zq) === String(S.zip) && Array.isArray(projects))
+              ? projects
+              : await HS.data.projects(zq);
+            // complete === false is a FAILED or not-yet-cut-over read, not an empty ZIP. A
+            // ZIP whose geography has not been cut over returns {unavailable:true}, which
+            // lands here as complete:false — counting it as 0 would assert "nothing is being
+            // built" about a place nobody looked at. Seed mode sets no flag at all, so the
+            // test is `!== false` rather than a truthiness check.
+            if (Array.isArray(list) && list.complete !== false) {
+              okZips.push(zq); total += list.length;
+            }
+          } catch (e) { /* quarantine the ZIP, never the tile */ }
+        }
+      }
+      var runners = [];
+      for (var w = 0; w < Math.min(A.QUERY_CONCURRENCY || 4, q.length); w++) runners.push(devWorker());
+      await Promise.all(runners);
+      if (okZips.length) { ALL.devTotal = total; ALL.devPlaces = coveredBy(okZips); }
+    }
 
-  // Resident-facing noun is "Development" — "Project" is an internal name (app_projects,
-  // ?view=projects) and stays out of copy. Singular only at exactly one, which needs no
-  // pluralization machinery because the count never appears inside the label.
-  function devCountLabel(list) {
-    var n = (list || []).length;
-    return (n === 1 ? 'Development' : 'Developments') + ' found'
-      + (S.zip ? ' · ZIP ' + S.zip : '');
+    if (HS.data.openWindowChangesForZips) {
+      try {
+        var rows = await HS.data.openWindowChangesForZips(q);
+        // ONE notice is materialized once PER ZIP, so a county filing reachable from two of
+        // the resident's places would otherwise be counted twice. The shipped dedupe key is
+        // reused rather than re-derived (lib/dashboard-aggregate.js::changeKey, which
+        // deliberately keys on more than source_ref because a portal URL is shared by many
+        // items). Filter first with the SAME predicate the Address cards use, then dedupe.
+        var open = (rows || []).filter(isOpenWindow);
+        ALL.needs = (A.dedupeChanges ? A.dedupeChanges(open) : open).length;
+        ALL.needsPlaces = coveredBy(q);
+      } catch (e) { ALL.needs = null; console.warn('[my places] open-window read failed', e); }
+    }
   }
 
   function strip() {
@@ -181,21 +250,23 @@ HS.onReady(async function () {
     // follows with `p.score || ''`.
     var scored = a.filter(function (p) { return typeof p.score === 'number' && isFinite(p.score); });
     var avg = scored.length
-      ? Math.round(scored.reduce(function (s, p) { return s + p.score; }, 0) / scored.length)
+      ? Math.round(scored.reduce(function (s2, p) { return s2 + p.score; }, 0) / scored.length)
       : null;
-    // SCOPE: `changes` and `projects` are read for the VIEWED ZIP alone (HS.data.changes(S.zip)
-    // / HS.data.projects(S.zip)), so two tiles claimed a span they never measured — "across
-    // all Places" over one ZIP's rows, and a "total" that is neither distance-filtered nor
-    // complete. The counts are honest; only the labels were not. Naming the ZIP is the
-    // smallest true statement and adds no query. Measuring all five places instead would
-    // mean per-ZIP fan-out on this page (the Dashboard's queryZips/MAX_QUERY_ZIPS pattern),
-    // which is a product decision about query cost, not a label fix.
-    var inZip = S.zip ? ' · ZIP ' + S.zip : '';
-    document.getElementById('propStrip').innerHTML =
-      HS.tpl.statTile(a.length + z.length, 'Places', '')
-      + HS.tpl.statTile(openWindowCount(changes), 'Need you' + inZip, 'accent')
-      + HS.tpl.statTile(devCountValue(projects), devCountLabel(projects), '')
-      + (avg != null ? HS.tpl.statTile(avg, 'Avg Address score', 'g') : '');
+    // A TILE THAT CANNOT BE MEASURED IS NOT RENDERED — the rule the Avg score tile above
+    // already follows. These two are measured asynchronously, so they are absent on the
+    // first paint and appear when their read lands; they never flash a placeholder 0.
+    var html = HS.tpl.statTile(a.length + z.length, 'Places', '');
+    if (ALL.needs != null) {
+      html += HS.tpl.statTile(ALL.needs,
+        'Need you' + placesScopeLabel(ALL.needsPlaces, ALL.totalPlaces), 'accent');
+    }
+    if (ALL.devTotal != null) {
+      html += HS.tpl.statTile(ALL.devTotal,
+        (ALL.devTotal === 1 ? 'Development' : 'Developments') + ' found'
+        + placesScopeLabel(ALL.devPlaces, ALL.totalPlaces), '');
+    }
+    if (avg != null) html += HS.tpl.statTile(avg, 'Avg Address score', 'g');
+    document.getElementById('propStrip').innerHTML = html;
   }
 
   var tone = { 'Your home': 'var(--green)', 'Rental': 'var(--amber)', 'Family': 'var(--blue)' };
@@ -388,6 +459,9 @@ HS.onReady(async function () {
   });
 
   render();
+  // Paint the page first, then fill the two measured tiles in. The read spans every
+  // Place, so it must never hold up the list the resident came here for.
+  loadAllPlaces().then(strip, function (e) { console.warn('[my places] all-places read failed', e); });
 });
 </script>
 </body>
