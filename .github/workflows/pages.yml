@@ -66,6 +66,10 @@ on:
       - 'test/site-artifact-contract.test.mjs'
       - 'scripts/gen_zip_pages.py'
       - 'scripts/prove-zip-pages.mjs'
+      # The pure control-resolution core the proof runs on, and now also the producer of the
+      # membership the DEPLOYED twin reads. A lib-only change that never ran this build could
+      # ship an artifact whose controls file the live monitor cannot use.
+      - 'scripts/lib/zip-page-controls.mjs'
       - 'lib/community-page.js'
       - 'community.html'
       - '404.html'

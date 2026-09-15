@@ -110,3 +110,57 @@ export function chooseControls(pins, members) {
   return { controls, empties, notes };
 }
 
+
+// ── PUBLISHING THE MEMBERSHIP, SO THE DEPLOYED TWIN RESOLVES THE SAME CONTROLS ─────────
+//
+// ⚖️ WHY THIS EXISTS (2026-09-15). The derivation above shipped to the BUILD twin only.
+// `scripts/prove-zip-pages-live.mjs` kept the frozen pins, so when 01002 Amherst MA and
+// 04401 Bangor ME left their classes by NORMAL INGESTION on 2026-09-11, `pages` was fixed
+// and `verify-zip-pages-live` was not — it has been red ever since, on three assertions
+// that were all describing correct production behaviour.
+//
+// The live twin cannot run classifyMembers itself: that needs every document, and over the
+// network the ZIP universe is not even enumerable (the manifest lists the Rule F pass set
+// and the development-indexable set, so a ZIP in NEITHER — which is exactly the
+// fail_dev_fail class — cannot be found). So the build PUBLISHES what it already measured,
+// from the one classifier, into the same artifact as the documents it measured.
+//
+// 🔑 THE PUBLISHED FILE IS A MAP OF WHERE TO LOOK, NEVER EVIDENCE OF WHAT IS THERE. Every
+// assertion in the live twin is still made against the bytes production serves, so a wrong
+// or stale membership makes the run RED — it can never make a production regression green.
+export const CONTROLS_FILE = 'zip-page-controls.json';
+
+/** The exact document the build writes into the artifact. Pure: no I/O. */
+export function publishedControls(man, members) {
+  return {
+    generated_at: new Date().toISOString(),
+    // Carried so the live twin can prove the membership and the documents came from ONE
+    // build. A stale controls file next to newer documents would otherwise surface as a
+    // scatter of confusing class failures instead of one line naming the staleness.
+    documents: man.documents,
+    rule_f_pass: man.rule_f_pass,
+    members,
+  };
+}
+
+/**
+ * Read a published membership back, FAILING CLOSED. A missing file, a missing class, a
+ * non-array or a non-ZIP entry throws — the live twin must never quietly fall back to
+ * frozen pins, which is the failure this whole change exists to end.
+ */
+export function membersFromPublished(doc) {
+  if (!doc || typeof doc !== 'object') throw new Error(`${CONTROLS_FILE}: not a JSON object`);
+  const m = doc.members;
+  if (!m || typeof m !== 'object') throw new Error(`${CONTROLS_FILE}: no "members" object`);
+  const members = {};
+  for (const k of Object.keys(CLASSIFY)) {
+    if (PINNED_ONLY.has(k)) continue;
+    const list = m[k];
+    if (!Array.isArray(list)) throw new Error(`${CONTROLS_FILE}: members.${k} is not an array`);
+    if (!list.every((z) => typeof z === 'string' && /^\d{5}$/.test(z))) {
+      throw new Error(`${CONTROLS_FILE}: members.${k} holds a non-ZIP entry`);
+    }
+    members[k] = list;                 // an EMPTY list is legal here and fails LOUDLY later,
+  }                                    // as chooseControls' `empties` — never silently.
+  return members;
+}

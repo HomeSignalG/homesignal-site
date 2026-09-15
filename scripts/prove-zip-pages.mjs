@@ -18,10 +18,11 @@
 //   I               anonymous render (every request here is anonymous, no address, no home)
 //   J point_dense    the densest development ZIP: no coordinate may leak onto its page
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
-import { CLASSIFY, PINNED_ONLY, classifyMembers, chooseControls } from './lib/zip-page-controls.mjs';
+import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, classifyMembers, chooseControls,
+         publishedControls } from './lib/zip-page-controls.mjs';
 
 const SITE = process.env.SITE_DIR || '_site';
 const PORT = 8099;
@@ -65,6 +66,15 @@ async function resolveControls(SITE, man, pins) {
     console.log('  is already testing the right pages either way.');
     console.log('---------------------------------------------------------------');
   }
+  // PUBLISH THE MEMBERSHIP INTO THE ARTIFACT, beside the documents it describes, so the
+  // DEPLOYED twin (scripts/prove-zip-pages-live.mjs) resolves the same controls from the
+  // same classifier instead of carrying its own frozen copy. Written before any assertion
+  // can exit, and a failure here is fatal on purpose: a live monitor with no membership to
+  // read must go red, never fall back to pins.
+  await writeFile(join(SITE, CONTROLS_FILE),
+                  JSON.stringify(publishedControls(man, members)) + '\n');
+  console.log(`published ${CONTROLS_FILE}: `
+    + Object.entries(members).map(([k, v]) => `${k}=${v.length}`).join(' '));
   return controls;
 }
 

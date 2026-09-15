@@ -20,7 +20,8 @@
 // has playwright globally) and failed in CI, and the runner could not warn because it detects
 // browser suites by text-matching the TEST FILE for a playwright import, which cannot see a
 // transitive one.
-import { classifyMembers, chooseControls } from '../scripts/lib/zip-page-controls.mjs';
+import { classifyMembers, chooseControls, publishedControls, membersFromPublished,
+         CONTROLS_FILE } from '../scripts/lib/zip-page-controls.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -118,6 +119,93 @@ const main = async () => {
     catch (e) { threw = e.message; }
     ok('a manifest without dev_indexable_zips FAILS CLOSED rather than classifying every ZIP as dev-fail',
       /dev_indexable_zips/.test(threw || ''), String(threw));
+  }
+
+  console.log('\n4b) THE DEPLOYED TWIN RESOLVES THE SAME CONTROLS, OR FAILS CLOSED');
+  {
+    // scripts/prove-zip-pages-live.mjs cannot run classifyMembers: it has no _site, and over
+    // the network the ZIP universe is not enumerable (the manifest lists the Rule F pass set
+    // and the development-indexable set, so a ZIP in NEITHER — the fail_dev_fail class — is
+    // unreachable). The build therefore PUBLISHES what it measured. These pin the round trip.
+    //
+    // WHY IT IS HERE AND NOT IN A LIVE-ONLY SUITE: this is exactly the half that was missed
+    // on 2026-09-11. prove-zip-pages.mjs got derived controls, prove-zip-pages-live.mjs kept
+    // frozen pins naming 01002 and 04401, and verify-zip-pages-live went red on 2026-09-12
+    // and stayed red. Nothing offline could see it, because nothing offline read that file's
+    // control resolution.
+    const doc = publishedControls({ documents: 5, rule_f_pass: 3 }, m);
+    ok('the published document carries the build identity beside the membership',
+      doc.documents === 5 && doc.rule_f_pass === 3 && typeof doc.generated_at === 'string',
+      JSON.stringify({ d: doc.documents, r: doc.rule_f_pass }));
+
+    const back = membersFromPublished(JSON.parse(JSON.stringify(doc)));
+    ok('a published membership reads back IDENTICALLY to what the classifier measured',
+      JSON.stringify(back) === JSON.stringify(
+        Object.fromEntries(Object.entries(m).filter(([k]) => k !== 'point_dense'))),
+      JSON.stringify(back));
+
+    ok('the round trip resolves the same controls the build did',
+      JSON.stringify(chooseControls({ point_dense: '99999' }, back).controls)
+        === JSON.stringify(chooseControls({ point_dense: '99999' }, m).controls));
+
+    // FAIL CLOSED. A live monitor that quietly falls back to frozen pins when its input is
+    // missing is the bug this change removes, reintroduced one level down.
+    const throws = (v) => { try { membersFromPublished(v); return null; } catch (e) { return e.message; } };
+    ok('a missing file (null) throws, naming the file',
+      (throws(null) || '').includes(CONTROLS_FILE), String(throws(null)));
+    ok('a document with no members object throws',
+      /no "members" object/.test(throws({ documents: 5 }) || ''), String(throws({ documents: 5 })));
+    ok('a member list that is not an array throws, naming the class',
+      /members\.weather_thin is not an array/.test(
+        throws({ members: { ...m, weather_thin: '10003' } }) || ''),
+      String(throws({ members: { ...m, weather_thin: '10003' } })));
+    ok('a MISSING class throws rather than resolving eight of nine',
+      /members\.fanout is not an array/.test(
+        throws({ members: Object.fromEntries(Object.entries(m).filter(([k]) => k !== 'fanout')) }) || ''));
+    ok('a non-ZIP entry throws — a membership is ZIPs or it is not a membership',
+      /holds a non-ZIP entry/.test(throws({ members: { ...m, fanout: ['nope'] } }) || ''));
+
+    // An EMPTY list is legal to READ and must stay loud at the next step, never silent.
+    const empty = membersFromPublished({ members: { ...m, weather_thin: [] } });
+    ok('an empty class survives the read and becomes a HARD failure at chooseControls',
+      chooseControls({ point_dense: '99999' }, empty).empties.includes('weather_thin'));
+  }
+
+  console.log('\n4c) THE COMPOSITION IS THE LOAD-BEARING PIN (a helper suite cannot see a revert)');
+  {
+    // Every check above drives the pure lib. The lib can be perfect while either prover stops
+    // calling it — which is exactly the 2026-09-11 defect, where the derivation shipped and
+    // one of the two call sites kept its frozen pins. So read the two scripts.
+    const { readFileSync } = await import('node:fs');
+    const { dirname, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+    const live = readFileSync(join(root, 'scripts/prove-zip-pages-live.mjs'), 'utf8');
+    const build = readFileSync(join(root, 'scripts/prove-zip-pages.mjs'), 'utf8');
+
+    ok('the BUILD twin publishes the membership into the artifact it proves',
+      /writeFile\(join\(SITE, CONTROLS_FILE\)/.test(build) && /publishedControls\(man, members\)/.test(build));
+    ok('the LIVE twin reads that membership back through the fail-closed reader',
+      /membersFromPublished\(published\)/.test(live) && new RegExp(`getJson\\(${'CONTROLS_FILE'}\\)`).test(live));
+    ok('the LIVE twin resolves its controls through chooseControls, not from the environment',
+      /chooseControls\(PINS, members\)/.test(live));
+    ok('the LIVE twin asserts every derived class NON-EMPTY',
+      /empties\.includes\(k\)/.test(live));
+    ok('the LIVE twin no longer REQUIRES the derived classes as pins — that is the drift trap',
+      !/for \(const k of \['pass_dev_pass'[\s\S]{0,400}?CONTROLS is missing/.test(live));
+    ok('...and it still requires the four that are genuinely not derivable',
+      /'point_dense', 'meetings_same_a', 'meetings_same_b', 'meetings_other'[\s\S]{0,120}CONTROLS is missing/.test(live));
+    ok('the LIVE twin takes each control\'s expected robots from the Rule F pass set, not a hardcoded class list',
+      /idxSet\.has\(z\)/.test(live) && !/const nidx = \[/.test(live));
+
+    const wf = readFileSync(join(root, '.github/workflows/verify-zip-pages-live.yml'), 'utf8');
+    const pins = JSON.parse(/DEFAULT_CONTROLS: >-\n([\s\S]*?)\n\s*run:/.exec(wf)[1]
+      .split('\n').map((l) => l.trim()).join(' '));
+    // A YAML folded scalar that stops being valid JSON fails at RUNTIME, not at lint.
+    ok('the workflow pins parse as JSON and name exactly the non-derived controls',
+      JSON.stringify(Object.keys(pins).sort())
+        === JSON.stringify(['meetings_other', 'meetings_same_a', 'meetings_same_b', 'point_dense']),
+      JSON.stringify(Object.keys(pins)));
   }
 
   console.log('\n5) NO OFFLINE SUITE MAY REACH PLAYWRIGHT THROUGH A TRANSITIVE IMPORT');
