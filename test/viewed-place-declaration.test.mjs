@@ -161,13 +161,41 @@ ok(dDecl > 0 && dAwait > 0 && dDecl < dAwait,
 ok(/HS\.setViewPlaceType\('address'\);/.test(dev),
   'and the project dossier retires it — that view is about the record address');
 
-// EVERY page that renders the chip and is reachable with ?zip= must declare. This is the
-// "is it global" check: the audit that found development.html missing is now the test.
-const ZIP_SCOPED = ['alerts.html', 'development.html', 'homesignalmap.html'];
-ZIP_SCOPED.forEach((f) => {
+// EVERY page that renders the chip must DECLARE a Place or be exempt FOR A WRITTEN REASON.
+// FAIL-CLOSED AND DERIVED, never a typed list. The first version of this check named three
+// files — alerts/development/homesignalmap — which is the same shape as the defect it
+// guards: an instrument that only sees the cases someone typed into it. A ZIP-scoped page
+// added later would have declared nothing and nothing would have failed. The page set is
+// now read off disk, so a NEW page is in scope the moment it exists.
+const EXEMPT = {
+  'community.html': 'declares through its shared runtime, lib/community-page.js',
+  'dashboard.html': "names ALL MY PLACES — an all-places briefing, not one Place",
+  'properties.html': 'the My Places list — no single Place is in view',
+  'reports.html': 'not ZIP-scoped',
+  'index.html': 'marketing — no Place subject, saved-address default applies',
+  'about.html': 'marketing — no Place subject',
+  'contact.html': 'marketing — no Place subject',
+  'how-it-works.html': 'marketing — no Place subject',
+  'privacy.html': 'marketing — no Place subject'
+};
+const chromePages = fs.readdirSync(new URL('../', import.meta.url))
+  .filter((f) => f.endsWith('.html'))
+  .filter((f) => /<script[^>]+src="shell\.js/.test(fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8')));
+ok(chromePages.length >= 10, 'the chip-bearing page set was read off disk', chromePages.length);
+let missingDecl = [];
+chromePages.forEach((f) => {
   const src = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-  ok(/declareRouteZipPlace/.test(src), f + ' declares the Place its route names');
+  const declares = /declareRouteZipPlace|setViewPlaceType/.test(src);
+  if (!declares && !Object.prototype.hasOwnProperty.call(EXEMPT, f)) missingDecl.push(f);
 });
+ok(missingDecl.length === 0,
+  'every chip-bearing page either declares its Place or is exempt with a stated reason',
+  missingDecl);
+// The exemption list may not rot either: an entry naming a page that no longer carries the
+// chip is a stale excuse rather than a decision, so it fails too. (An exempt page that later
+// starts declaring is NOT failed here — harmless, and tightening it is not this PR's scope.)
+const staleExempt = Object.keys(EXEMPT).filter((f) => chromePages.indexOf(f) < 0);
+ok(staleExempt.length === 0, 'no exemption names a page that no longer carries the chip', staleExempt);
 ok(/HS\.setViewPlaceType\('zip'\)/.test(cpage), 'the ZIP hub runtime declares unconditionally');
 
 console.log('--- 10. THE ADDRESS DOSSIER declares WHICH Address it shows ---');
