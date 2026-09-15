@@ -541,6 +541,38 @@
   .hs-embed .card.mapcard{border:0;border-radius:0;box-shadow:none;margin:0}
   .hs-embed .results{margin:0}
   .hs-embed body{background:var(--panel)}
+  /* ── THE EMBED IS A FIXED FRAME, SO THE CARD FITS THE FRAME INSTEAD OF OVERFLOWING IT ──
+     MEASURED DEFECT (2026-09-15, reported from a live ZIP page): `.map-frame` is a hard
+     600px and the filter panel is 288px tall at desktop widths (412px at 390px wide), so
+     the embed document stood 957px tall inside a 520px iframe — 437px of overflow, on
+     EVERY embed, at every width. The panel sits ABOVE the map, so the panel was the half
+     that left: Leaflet focuses its own container on any interaction (a zoom click, a
+     marker click), the browser scrolls that 600px container into view, and the document
+     scrolled from 0 to 343 — exactly `.map-frame`'s offset — taking STATUS / PROJECT TYPE
+     / REGULATORY out of the frame. Zoom-out did NOT bring it back, and the next click
+     re-hid it, so the controls read as gone.
+
+     The fix is geometric, and it is scoped to the embed: the card becomes a flex column
+     exactly one frame tall, and the map takes whatever the panel does not. With no
+     document overflow there is nothing to scroll, so no focus-scroll can move the panel
+     out of view. `overflow:hidden` is the belt to that braces — at a width where the
+     panel genuinely cannot fit, the frame clips rather than letting the panel slide away.
+
+     THE PANEL IS NEVER HIDDEN HERE — test/place-context-map.test.mjs pins that the embed
+     hides no filter row, and that pin is a founder decision (the rows are why the iframe
+     replaced HS.buildLive). Where the panel does not fit it scrolls INSIDE ITS OWN BOX,
+     bounded by max-height, so the thing that gives is a scrollbar on the panel and never
+     the panel's presence. Full-page Map 1 is untouched: `.map-frame` keeps its 600px
+     everywhere outside `.hs-embed`, measured unchanged at 1280x900. */
+  .hs-embed,
+  .hs-embed body{height:100%;overflow:hidden}
+  .hs-embed .card.mapcard{display:flex;flex-direction:column;height:100dvh;
+    box-sizing:border-box;min-height:0}
+  /* 45dvh is a ceiling, not a height: at desktop widths the 288px panel is under it and
+     lays out exactly as it always did, with no scrollbar. It binds only where the panel
+     wraps taller than the frame can spare. */
+  .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
+  .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
 
 </style>
 </head>

@@ -1223,6 +1223,42 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
 
 
 ### Status
+- 🟢 **THE PLACE CONTEXT MAP NOW FITS ITS IFRAME — the filter panel could be SCROLLED out of
+  the frame by a zoom click** (browser-measured 2026-09-15; founder-reported from a live ZIP
+  page, `community.html?zip=78617`). A resident clicked the embedded map's zoom control and
+  the STATUS / PROJECT TYPE / REGULATORY panel vanished. **Nothing hid it and no filter state
+  changed — the embed DOCUMENT scrolled.**
+  - 🔑 **TWO CORRECT NUMBERS WERE WRONG TOGETHER, which is why no structural pin could have
+    caught it.** `.map-frame` is a hard **600px** and the panel measures **288px** at desktop
+    widths (**412px** at 390px wide), so the embed document stood **957px tall inside a 520px
+    iframe — 437px of overflow, on every embed, at every width**. The panel sits ABOVE the
+    map, so the panel was the half that left. Leaflet focuses its own container on any
+    interaction, the browser scrolls that 600px container into view, and **scrollTop went
+    0 → 343 — exactly `.map-frame`'s offset**. Zoom-OUT did not restore it and the next click
+    re-hid it, so the controls read as gone. A wheel-up over the map did scroll it back
+    (`scrollWheelZoom:false`), which is the only reason it was recoverable at all.
+  - **The fix is geometric and embed-scoped:** in `.hs-embed` the card is a flex column one
+    frame tall and `.map-frame` takes what the panel does not, so there is no overflow and
+    nothing to scroll; where the panel genuinely does not fit (narrow widths) it scrolls
+    **inside its own box** under a 45dvh ceiling. **The panel is never hidden** —
+    `test/place-context-map.test.mjs` pins that, and it is a founder decision. Both hosts'
+    iframes went `clamp(320px,58vw,520px)` → **`clamp(560px,58vw,720px)`**
+    (`lib/community-page.js`, `property.html`), so the map gets 363px at desktop / 252px on a
+    phone instead of 217px / 78px.
+  - **Full-page Map 1 is UNTOUCHED** — measured `.map-frame` still 600px at 1280x900, and the
+    change is four `.hs-embed` rules. Pinned by `test/place-context-map-fits-frame.browser.test.mjs`
+    (24 checks), proven load-bearing by three mutations: reverting the CSS reproduces the
+    defect exactly (**8 fail, scrollTop=343, all three headings off-screen**), reverting the
+    iframe floor to 320px fails §4a, and making the fit-frame rules GLOBAL fails §5 (the full
+    page's map drops 600 → 532px) — the over-flagging direction, so the pin cannot pass a
+    change that shrinks Map 1's own page.
+  - ⚠️ **OBSERVED, NOT CHANGED: the FULL page scroll-jumps on a zoom click too** — same
+    focus-scroll (scrollTop 0 → 656 at 1280x900). It is benign there (the panel stays in
+    view, and a page scroll brings it back at shorter heights) and pre-existing. Not folded
+    into this fix.
+  - ⚠️ **The sandbox cannot reach `homesignal.net` or jsDelivr** (egress policy 403), so every
+    number here is from the repo's own browser harness against the shipped page with Leaflet
+    served locally — not from production. Confirm on the real site.
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
   RECORD** (DB-verified 2026-09-06; full receipt `docs/map1-residential-total-qualification-2026-09-06.md`).
   Corrects the four defects the independent adversarial audit proved against `48214b3`.
