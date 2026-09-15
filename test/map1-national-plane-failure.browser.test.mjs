@@ -17,6 +17,8 @@ import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 let fails = 0;
 const ok = (c, name, extra) => {
@@ -72,13 +74,42 @@ async function load(natl) {
           projects: [], markers: [] }) });
     if (url.includes('/rest/v1/development_reports'))
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW) });
-    if (url.includes('supabase.co') || url.includes('jsdelivr') || url.includes('tile.'))
+    // ── VENDOR MOCKS, verbatim from the established browser-suite convention
+    // (test/map1-regulatory-toggle.browser.test.mjs). The first version of this file
+    // answered jsDelivr with `[]`, so supabase-js never defined window.supabase, the
+    // page's client was null, and EVERY case — including the two SUCCESS cases — died
+    // on `TypeError: Cannot read properties of null (reading 'from')`. That is a
+    // harness defect wearing the costume of a product defect: a national-plane bug
+    // cannot break the success path, which is exactly what made it identifiable.
+    if (url.includes('leaflet@1.9.4/dist/leaflet.js') || url.includes('leaflet@1.9.4/dist/leaflet.css')) {
+      const css = url.endsWith('.css');
+      let local = null;
+      try { local = require.resolve('leaflet/dist/leaflet' + (css ? '.css' : '.js')); } catch (e) { local = null; }
+      if (!local) return route.continue();
+      return route.fulfill({ status: 200, contentType: css ? 'text/css' : 'text/javascript',
+        body: await readFile(local, 'utf8') });
+    }
+    if (url.includes('cdn.jsdelivr.net')) {
+      const kind = url.endsWith('.css') ? 'text/css' : 'text/javascript';
+      return route.fulfill({ status: 200, contentType: kind, body: kind === 'text/css' ? '' :
+        'window.supabase=window.supabase||{createClient:function(){var q={select:function(){return q;},eq:function(){return q;},in:function(){return q;},order:function(){return q;},limit:function(){return q;},then:function(r){return Promise.resolve({data:[],error:null}).then(r);}};return{from:function(){return q;},rpc:function(){return Promise.resolve({data:null,error:null});},auth:{getSession:function(){return Promise.resolve({data:{session:null}});},onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};}}};}};' });
+    }
+    if (url.includes('tile.openstreetmap'))
+      return route.fulfill({ status: 200, contentType: 'image/png',
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') });
+    // A PostgREST table read returns an ARRAY. The catch-all used to answer `{}`, which
+    // made the page's own `(crows || []).some(...)` over /rest/v1/communities throw —
+    // again in every case, success included. Match the real shape.
+    if (url.includes('/rest/v1/'))
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-    return route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   await page.goto(base + '/homesignalmap.html?zip=20147', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => window.__HS_NATIONAL_PLANE !== undefined, { timeout: 20000 })
+  await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 })
     .catch(() => {});
+  await page.waitForFunction(() => window.__HS_NATIONAL_PLANE !== undefined, null, { timeout: 30000 })
+    .catch(() => {});
+  await page.waitForTimeout(600);
   const signal = await page.evaluate(() => window.__HS_NATIONAL_PLANE || null);
   const sites = await page.evaluate(() => (window.__HS_SITES || []).length);
   const mapUp = await page.evaluate(() => !!document.querySelector('#map .leaflet-container'));
@@ -90,6 +121,13 @@ async function load(natl) {
 // Any raw technical string a resident must never be shown.
 const SCARY = /permission denied|42501|HTTP 5\d\d|\b401\b|\b500\b|TypeError|undefined is not|stack trace/i;
 
+// ⚠️ THE ODbL CREDIT IS NOT THE WORD "OpenStreetMap". Leaflet prints
+// "© OpenStreetMap contributors" for the BASEMAP TILES on every load, national plane or
+// not — so an assertion on the bare word passes trivially when the credit is present and
+// fails trivially when it is absent. It measured the basemap, never this feature. The
+// data-centre credit is its own sentence, and that is what these cases must read.
+const DC_CREDIT = /Data-centre locations from/;
+
 console.log('\n1. SUCCESS with records — the national plane draws and reports ok');
 {
   const r = await load({ status: 200, body: JSON.stringify(NATL_OK) });
@@ -99,7 +137,8 @@ console.log('\n1. SUCCESS with records — the national plane draws and reports 
   ok(r.signal && r.signal.fallback === false, '1d fallback false');
   ok(r.signal && r.signal.records === 1, '1e one national record counted', r.signal && r.signal.records);
   ok(r.sites >= 2, '1f local + national both on the map', r.sites);
-  ok(/OpenStreetMap/.test(r.text), '1g ODbL attribution rendered');
+  ok(DC_CREDIT.test(r.text), '1g the data-centre ODbL credit is rendered');
+  ok(/OpenStreetMap/.test(r.text), '1h ...naming the source the records came from');
 }
 
 console.log('\n2. GENUINE ZERO — a successful empty read, and it is NOT a failure');
@@ -111,7 +150,7 @@ console.log('\n2. GENUINE ZERO — a successful empty read, and it is NOT a fail
   ok(r.signal && r.signal.fallback === false, '2d fallback FALSE — the distinction the defect erased');
   ok(r.signal && r.signal.records === 0, '2e zero records');
   ok(!SCARY.test(r.text), '2f no technical warning shown to the resident');
-  ok(!/OpenStreetMap/.test(r.text), '2g no ODbL credit when no record was supplied');
+  ok(!DC_CREDIT.test(r.text), '2g no data-centre credit when no record was supplied');
   ok(r.sites >= 1, '2h local records still drawn', r.sites);
 }
 
@@ -138,7 +177,7 @@ for (const [reason, natl, http] of FAILURES) {
   ok(r.signal && r.signal.plane === 'national_dc', `3i[${reason}] names the plane`);
   ok(r.signal && r.signal.zip === '20147', `3j[${reason}] carries ZIP context`);
   ok(r.signal && !isNaN(Date.parse(r.signal.at)), `3k[${reason}] carries a timestamp`);
-  ok(!/OpenStreetMap/.test(r.text), `3l[${reason}] no ODbL credit for a source that supplied nothing`);
+  ok(!DC_CREDIT.test(r.text), `3l[${reason}] no data-centre credit for a source that supplied nothing`);
 }
 
 await browser.close();
