@@ -40,7 +40,13 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-15 — ✅ FIX 23: What's Changing shows THREE, and the rest is one click away
+### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
+
+⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `1f0fc1a` (#1224), deployed by
+`pages` run **265** at 19:05:46, **confirmed on the live signed-in Dashboard** (3 rows ·
+`View 56 more changes →`), and its record corrected in `4937298` (#1228). Every claim below
+carries its own receipt; nothing is outstanding. **The bound is a FOUNDER VALUE — 3 — and changing
+it back is a founder decision, not a cleanup.**
 
 ⚖️ **FOUNDER, 2026-09-15: "in the what is changing tile to 3 items always and they have to
 click view more changes to see the rest."** The tile shipped at **8** rows (Fix 8K). It is now
