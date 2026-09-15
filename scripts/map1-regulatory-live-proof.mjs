@@ -10,9 +10,10 @@
 // runtime (`lib/map.js`) through ONE <script> tag. There are not 12,722 Map 1 documents to
 // check — there is one file that all 12,722 canonical ZIPs resolve to. So:
 //
-//   LAYER A (GLOBAL, exhaustive)  — read the DEPLOYED /lib/map.js and prove the shipped
-//     bytes carry the three-case rule and no longer carry the flat any-of, and that the
-//     page's cache-buster points at exactly those bytes. One file proven ⇒ every ZIP.
+//   LAYER A (GLOBAL, exhaustive)  — read the DEPLOYED /lib/map.js and verify that
+//     production base-pin membership is Type-only and that Regulatory is an independent
+//     visual overlay, not a base-pin admission path; and that the page's cache-buster
+//     points at exactly those bytes. One file proven ⇒ every ZIP.
 //   LAYER B (BEHAVIOURAL, sampled) — drive real production ZIP pages in a real browser and
 //     prove the rule HOLDS as rendered. A sample is honest here because Layer A has already
 //     established there is only one implementation to sample.
