@@ -256,7 +256,61 @@ const failedRows = rows.filter(r => nz(r).core === 'failed_ingest' && !FAILED_AL
   .concat(stuckHold.filter(r => !FAILED_ALLOWLIST.has(r.zip)));
 ok('coverage-pass: zero FAILED materializations (and no hold past its window)', failedRows.length === 0,
    failedRows.slice(0, 5).map(r => r.zip + ':' + nz(r).core).join(','));
+// ── THE RECENT-ATTEMPT WINDOW MUST COVER THE SWEEP PERIOD (2026-09-15) ──
+// `stale_data` means "refreshed_at >72h old AND no recent failed-attempt evidence". The
+// ladder decides "recent" with `last_refresh_attempt_at >= now() - RECENT_ATTEMPT_WINDOW_H`,
+// and that constant is only meaningful relative to how long the rolling refresh takes to
+// visit every ZIP. If a full sweep takes LONGER than the window, then for the difference
+// between them a perfectly healthy, on-schedule ZIP has no attempt inside the window and is
+// named `stale_data` — asserting an absence of retry evidence the row itself contradicts.
+//
+// That is exactly what happened: the ladder was written against a 250-rows-per-15-min
+// scheduler (~16.7h sweep, 24h SLA) where 48h was ~2x the sweep. The cron later became
+// `*/2 * * * *` -> `dev_refresh_tick(8, 20)` = 240 attempts/hour = a 53.0h sweep, and the
+// 48h constant did not follow. Measured 2026-09-15: all 25 `stale_data` ZIPs sat in a
+// 48.00h..51.94h band with ZERO outside it, and 25 of 25 carried
+// last_refresh_attempt_at > refreshed_at. The scheduler was healthy; the boundary was wrong.
+//
+// So the coupling is asserted rather than commented. This costs no extra query — the rows
+// already carry `last_refresh_attempt_at`. The OBSERVED sweep period is the oldest attempt
+// across the universe; a sweep that outgrows the window fails HERE, naming the scheduler,
+// instead of silently relabelling healthy ZIPs as stale one page at a time.
+const RECENT_ATTEMPT_WINDOW_H = 72;   // keep in sync with docs/coverage-state-model.sql
+const attemptAgesH = rows
+  .map(r => r.last_refresh_attempt_at ? (Date.now() - Date.parse(r.last_refresh_attempt_at)) / 3600000 : null)
+  .filter(a => a !== null && Number.isFinite(a));
+const neverAttempted = rows.filter(r => r.refreshed_at !== null && r.last_refresh_attempt_at === null);
+const observedSweepH = attemptAgesH.length ? Math.max(...attemptAgesH) : null;
+// A universe with no attempt timestamps at all cannot answer the question. Say so rather
+// than passing on an empty set — a vacuous check is not a check.
+if (observedSweepH === null) {
+  console.log('INFO sweep: no last_refresh_attempt_at anywhere — window coverage UNVERIFIED (nothing was measured)');
+} else {
+  ok(`coverage-pass: recent-attempt window (${RECENT_ATTEMPT_WINDOW_H}h) covers the observed sweep period`,
+     observedSweepH <= RECENT_ATTEMPT_WINDOW_H,
+     `observed sweep ${observedSweepH.toFixed(2)}h over ${attemptAgesH.length} ZIPs`
+     + ` — widen the window in docs/coverage-state-model.sql or speed the rolling refresh;`
+     + ` until they agree, healthy mid-sweep ZIPs are misreported as stale_data`);
+  console.log(`INFO sweep: observed period ${observedSweepH.toFixed(2)}h vs ${RECENT_ATTEMPT_WINDOW_H}h window`
+    + ` (${neverAttempted.length} report rows never attempted)`);
+}
+
 const staleRows = rows.filter(r => nz(r).core === 'stale_data');
+// Print the attempt-age band with the failure. A `stale_data` ZIP whose last attempt is
+// INSIDE the window is a genuine abandonment; one just OUTSIDE it is the boundary defect
+// above recurring. Without the band the two are indistinguishable in the log, and the
+// boundary case is the one that gets misfiled as a throughput problem.
+if (staleRows.length) {
+  const band = staleRows
+    .map(r => r.last_refresh_attempt_at ? (Date.now() - Date.parse(r.last_refresh_attempt_at)) / 3600000 : null)
+    .filter(a => a !== null && Number.isFinite(a));
+  const retried = staleRows.filter(r => r.last_refresh_attempt_at && r.refreshed_at
+    && Date.parse(r.last_refresh_attempt_at) > Date.parse(r.refreshed_at));
+  console.log(`INFO stale_data: ${staleRows.length} ZIP(s), attempt-age`
+    + (band.length ? ` ${Math.min(...band).toFixed(2)}h..${Math.max(...band).toFixed(2)}h` : ' unknown')
+    + `, ${retried.length} of them with an attempt NEWER than their last success`
+    + ` (if that count is high and the band hugs ${RECENT_ATTEMPT_WINDOW_H}h, this is the window, not abandonment)`);
+}
 ok('coverage-pass: zero unintentionally STALE ZIPs', staleRows.length === 0,
    staleRows.slice(0, 5).map(r => r.zip).join(','));
 ok('coverage-pass: every ZIP classified (full universe)', rows.length === metaCount && rows.length > 0);

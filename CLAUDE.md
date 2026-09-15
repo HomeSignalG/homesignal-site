@@ -1206,6 +1206,79 @@ is still PARKED.** Full record: audit §15.
     indistinguishable in the record until someone makes the instrument run. The stale-ZIP
     failure is the rolling-refresh throughput item already logged above — still separate work,
     now with a working detector behind it.
+  - ✅ **CORRECTED AND FIXED 2026-09-15 — THE STALE-ZIP FAILURE WAS NOT THROUGHPUT. IT WAS THE
+    CLASSIFICATION BOUNDARY, AND THE SCHEDULER WAS HEALTHY THE WHOLE TIME.** The line above
+    hands the stale-ZIP failure off as "the rolling-refresh throughput item" — that attribution
+    is wrong, and it is the third time in this block that a plausible cause was recorded ahead
+    of a measured one. SQL of record: `docs/coverage-state-recent-attempt-window.sql`; migration
+    `coverage_state_recent_attempt_window_72h`; pinned by
+    `test/coverage-state-attempt-window.test.mjs` (36 assertions, proven load-bearing by six
+    mutations measured on EXIT CODE).
+    - **The ladder's `failed_ingest` and `temporarily_unavailable` branches both required an
+      attempt within 48h** to mean "still being actively retried"; anything else fell through to
+      `stale_data`, which asserts there is **no recent failed-attempt evidence**. 48h was right
+      for the scheduler the ladder was written against — 250 rows/tick every 15 min, a ~16.7h
+      sweep against a 24h SLA (`docs/dev-reports-rolling-refresh.sql`), so 48h was ~2x it.
+      **The scheduler changed and the classification did not follow.** Measured from `cron.job`
+      jobid 14: `*/2 * * * *` → `dev_refresh_tick(8, 20)` = 8 × 30 = **240 attempts/hour** ⇒
+      **12,722 / 240 = 53.0h per sweep**. 53.0h > 48h, so for ~5 hours of every sweep an
+      on-schedule ZIP has no attempt inside the window and is named `stale_data`.
+    - 🔑 **THE BAND IS WHAT PROVES IT, AND IT IS WHY "THROUGHPUT" WAS THE WRONG READ.** Measured
+      before the change: `never_attempted` **0**, attempted ≤24h **5,760**, ≤48h **11,520**,
+      oldest attempt **53.03h** — a perfectly uniform 240/hr sweep reaching every ZIP. All **25**
+      `stale_data` ZIPs sat in a **48.00h..51.94h** band with **ZERO outside it**, and **25 of 25**
+      carried `last_refresh_attempt_at > refreshed_at`, i.e. every one HAD the retry evidence the
+      state denies. `temporarily_unavailable` (164) and `failed_ingest` (94) both topped out at
+      ~47.9h, pressed against the same ceiling — one population crossing a boundary as the sweep
+      hand goes round. A throughput fix would have chased a sweep that was already on schedule.
+    - **The correction is two constants, 48h → 72h, in those two branches and nothing else.** The
+      72h/7d `refreshed_at` thresholds, the content branches, the overlay plane, the column list
+      and the grants are untouched (column order and both grants re-verified after the apply;
+      `security_invoker=true` intact, owner `postgres`, view md5 `7bf6e8ae…` → `902d707d…`).
+      72h must exceed 53.0h or the defect persists by construction, and leaves ~19h for retry
+      interleaving and jitter.
+    - ⚠️ **IT DOES NOT WEAKEN VERIFICATION — IT SHARPENS IT, and the 3 are the proof.** Exactly
+      25 rows changed state: **22 → `temporarily_unavailable`** (last success 4.18..6.43d, inside
+      the designed self-releasing 7-day hold) and **3 → `failed_ingest`** (last success
+      **19.21..23.54d**). The 7-day bound is measured from `refreshed_at` and is untouched, so it
+      remains the backstop — nothing broken can hide. Those 3 had been failing for 19–23 days
+      while being retried, buried among 22 false positives the boundary itself manufactured. The
+      instrument went from **25 findings of which 0 were real to 3 of which 3 are real**. After:
+      `stale_data` **0** · `temporarily_unavailable` 187 · `failed_ingest` 97, and **97 of 97**
+      genuinely carry a last success older than 7d.
+    - **Of the five ZIPs named above as STALE, only 10460 and 11420 are attributable to this
+      change** (attempt 51.67h / 51.40h — outside 48h, inside 72h, success 6.43d / 6.42d → now
+      `temporarily_unavailable`). 05001 was genuinely refreshed (success 0.03d → `populated`);
+      19013 and 19317 happen to sit at 0.6h / 0.17h since their last attempt, so they read
+      `temporarily_unavailable` under either window at this instant. **The five `failed_ingest`
+      ZIPs (19350, 19390, 19701, 19702, 19703) were NOT rescued** and still fail — all five carry
+      a last success of 7.33–11.63 days. That is the correct outcome: the noise cleared, the real
+      signal did not.
+    - **RESIDENT-VISIBLE SURFACE: NONE, measured rather than assumed.** `lib/community-page.js:97`
+      renders `stale_data`, `temporarily_unavailable` and `failed_ingest` through **ONE** banner
+      whose text is derived from `refreshed_at` ("Records on this page were last verified N days
+      ago"), never from which of the three it is — and all 25 rows are inside that group before
+      AND after, so the copy is byte-identical on all 25 pages. `lib/coverage-copy.js` does not
+      read `coverage_state` at all ("THE GATE IS LIVE CONTENT"). The `data_quality` layout gate is
+      untouched. What changes is the `data-coverage-state` attribute on 25 pages, an instrument.
+    - 🔒 **THE COUPLING IS NOW ENFORCED, NOT COMMENTED — that is the durable half.** The defect
+      was a constant that silently stopped matching the scheduler, so "keep these in sync" as a
+      comment is precisely what already failed. Migration invariant **(d)** computes the implied
+      sweep from the live `cron.job` row (`zips / (batch × fires_per_hour)`) and RAISES if the
+      window is shorter; `scripts/verify-coverage-state.mjs` asserts the window against the
+      **observed** sweep daily, from rows it already fetches, so the next cadence change fails
+      loudly **naming the scheduler** instead of relabelling healthy ZIPs one page at a time. A
+      `stale_data` failure now also prints the attempt-age band and the retried count, because a
+      genuine abandonment and this boundary defect are otherwise indistinguishable in the log —
+      which is the whole reason this was misfiled as throughput for a week. The cron read is
+      wrapped so a permissions error warns rather than rolling back a correct view, and an
+      unevaluated check says `NOT EVALUATED` rather than passing silently.
+    - ⚠️ **NOT FIXED, AND DELIBERATELY SEPARATE: the sweep is 53h against a design that called
+      for ≤24h.** The cron carries `dev_refresh_tick(8, 20)` where the shipped design was 250/tick
+      every 15 min. Whether 240/hr is the intended cadence is a founder question (it may well be a
+      deliberate cost control — cf. the ingest repo's Actions-budget cuts). This change makes the
+      classification honest about the scheduler that actually exists; it does not speed it up, and
+      the new invariants will fail loudly if the two diverge again.
 - 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
   privilege escalation.** The live view carries `security_invoker=true` and is owned by
   `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
