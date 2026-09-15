@@ -126,7 +126,16 @@ HS.onReady(async function () {
     return { date: HS.fmtDate(ch.occurred_at, {year:'numeric',month:'long',day:'numeric'}), title: ch.title, future:false };
   });
 
-  var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
+  // "Active alerts" is a count of OPEN comment windows, so a record with no window at all
+  // must not be one. HS.daysUntil returns null when window_closes_at is absent and
+  // `null >= 0` is TRUE in JavaScript, so the bare comparison counted every window-less
+  // record. Guarded the same way shell.js:2034 and alerts.html:272 already do.
+  // (The distance gate is left as is and reported separately — no app_changes row carries
+  // coordinates, so it currently excludes everything on its own.)
+  var openAlerts = changes.filter(function (x) {
+    var d = HS.daysUntil(x.window_closes_at);
+    return d != null && d >= 0 && (x.distance_mi || 9e9) <= 5;
+  }).length;
 
   // ── ADDRESS CONTEXT MAP — Map 1, embedded ─────────────────────────────────────────────
   // PLACE MAPS ARE MAP 1. The iframe loads homesignalmap.html itself, chrome-stripped, so

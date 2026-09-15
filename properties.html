@@ -94,13 +94,48 @@ HS.onReady(async function () {
     return VIEWS.indexOf(q) !== -1 ? q : 'all';
   })();
 
+  // AN OPEN COMMENT WINDOW IS A DATE THAT EXISTS AND HAS NOT PASSED — never a missing one.
+  // `HS.daysUntil` returns NULL when there is no window_closes_at, and in JavaScript
+  // `null >= 0` is TRUE (null coerces to 0 in a relational comparison), so the bare
+  // `daysUntil(x) >= 0` this page used counted every record that has NO comment window at
+  // all as one that needs you. Measured on live data before the fix: ZIP 78617 holds 17
+  // non-news changes, ALL 17 with window_closes_at NULL and 0 open — and the strip read
+  // "17 Need you" while every Address card below it read "Nothing needs you".
+  //
+  // The `d != null &&` form is not new here: shell.js:2034, alerts.html:272 and
+  // lib/templates.js (three sites) already guard exactly this way. This page and
+  // property.html were the two that did not.
+  function openWindowCount(list) {
+    return (list || []).filter(function (x) {
+      var d = HS.daysUntil(x.window_closes_at);
+      return d != null && d >= 0;
+    }).length;
+  }
+
   function strip() {
     var a = addresses(), z = zips();
-    var avg = a.length ? Math.round(a.reduce(function (s, p) { return s + (p.score || 0); }, 0) / a.length) : null;
+    // A SCORE THAT WAS NEVER MEASURED IS NOT A ZERO. `p.score || 0` summed absent scores as
+    // real zeros and rendered "0 Avg Address score" as if it had been computed; measured,
+    // app_properties.score is NULL on every stored row, so the tile was reporting a
+    // fabricated measurement. Average only the addresses that actually carry a number, and
+    // omit the tile entirely when none does — the same rule the Address card already
+    // follows with `p.score || ''`.
+    var scored = a.filter(function (p) { return typeof p.score === 'number' && isFinite(p.score); });
+    var avg = scored.length
+      ? Math.round(scored.reduce(function (s, p) { return s + p.score; }, 0) / scored.length)
+      : null;
+    // SCOPE: `changes` and `projects` are read for the VIEWED ZIP alone (HS.data.changes(S.zip)
+    // / HS.data.projects(S.zip)), so two tiles claimed a span they never measured — "across
+    // all Places" over one ZIP's rows, and a "total" that is neither distance-filtered nor
+    // complete. The counts are honest; only the labels were not. Naming the ZIP is the
+    // smallest true statement and adds no query. Measuring all five places instead would
+    // mean per-ZIP fan-out on this page (the Dashboard's queryZips/MAX_QUERY_ZIPS pattern),
+    // which is a product decision about query cost, not a label fix.
+    var inZip = S.zip ? ' · ZIP ' + S.zip : '';
     document.getElementById('propStrip').innerHTML =
       HS.tpl.statTile(a.length + z.length, 'Places', '')
-      + HS.tpl.statTile(changes.filter(function (x) { return HS.daysUntil(x.window_closes_at) >= 0; }).length, 'Need you across all Places', 'accent')
-      + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
+      + HS.tpl.statTile(openWindowCount(changes), 'Need you' + inZip, 'accent')
+      + HS.tpl.statTile(projects.length, 'Projects' + inZip, '')
       + (avg != null ? HS.tpl.statTile(avg, 'Avg Address score', 'g') : '');
   }
 
@@ -116,7 +151,17 @@ HS.onReady(async function () {
   function addressCard(p) {
     // per-Address computed: nearest projects, open windows
     var near = HS.withDistance(projects, p).filter(function (x) { return (x.distance_mi || 9e9) <= 5; });
-    var needs = HS.withDistance(changes, p).filter(function (x) { return HS.daysUntil(x.window_closes_at) >= 0 && (x.distance_mi || 9e9) <= 5; }).length;
+    // Same null-window guard as the strip (see openWindowCount). The distance gate is
+    // deliberately LEFT AS IS and is reported separately: measured table-wide, 0 of 182,834
+    // app_changes rows carry coordinates, so `(x.distance_mi || 9e9) <= 5` can only ever
+    // exclude — which is why this card read "Nothing needs you" even while the strip was
+    // over-counting. Removing it would change what every Address card reports nationally
+    // (1,158 comment windows are open right now), so it is a product decision, not a
+    // correctness fix, and is not bundled in here.
+    var needs = HS.withDistance(changes, p).filter(function (x) {
+      var d = HS.daysUntil(x.window_closes_at);
+      return d != null && d >= 0 && (x.distance_mi || 9e9) <= 5;
+    }).length;
     return '<div class="propcard" data-kind="address" data-id="' + HS.esc(p.id) + '">'
       + '<div class="miniscore">' + (p.score || '') + '</div>'
       + '<div class="pinfo">'
