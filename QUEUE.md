@@ -100,9 +100,16 @@ click view more changes to see the rest."** The tile shipped at **8** rows (Fix 
   user-journey 6, place-context-map-fits-frame 3, acquisition-video-producer-workflow 1,
   zip-page-hydration 1). **0 introduced, 0 fixed** — all of them the sandbox's blocked jsDelivr
   egress, which is why CI, with network, is green on both.
-- 📌 **PRODUCTION PROOF IS PENDING DEPLOY** — the counts above are from the repo's own harness
-  and from CI, not from homesignal.net. Confirm on the live Dashboard: 3 rows, one control, and
-  the control's number equal to (records held − 3).
+- ✅ **PRODUCTION PROOF — MEASURED, WITH ITS CONTROL.** `pages` run **265** on `1f0fc1a`: build
+  green, **deploy green 19:05:46**. Read back through `pg_net`: `homesignal.net/dashboard.html`
+  **200 / 48,158 B**, referencing `lib/dashboard-aggregate.js?v=7a64d9c8`; that library **200 /
+  45,647 B**, serving **`var PREVIEW_LIMIT = 3;`**; control `NOSUCHFILE-fix23-control.txt`
+  **404 / 11,125 B**. The control is what makes the two 200s mean anything — a blanket-200 host
+  would have answered 200 for the missing file too. **The served page requests exactly the hash
+  of the build carrying 3**, so no browser can be handed a cached copy of the old bound.
+- 📌 **STILL UNEYEBALLED: the rendered tile on a real resident's Dashboard.** The bytes are
+  proven; what a logged-in resident sees is not. Expect 3 rows and, on the founder's 5 places,
+  `View 56 more changes →` where it read `View 51 more changes →`.
 
 ### 2026-09-13 — ✅ FIX 19: the artifact producer SELECTED NOTHING, and now it fails closed
 
