@@ -192,9 +192,12 @@ ok(!legacy.btn && !legacy.menu && !legacy.showTypes && legacy.sh === 0,
 
 // ── 2. TOGGLING ONE TYPE MOVES ONLY THAT TYPE ───────────────────────────────────────
 const V0 = await visible();
+// ⚖️ 2026-09-15: the untyped EPA fixture no longer draws a pin of its own — a record
+// matching no Type has no base pin, and regulatory annotates pins rather than sourcing
+// them. The Type pins this section is actually about are unchanged.
 ok(has(V0, /data center/) === 1 && has(V0, /industrial/) === 1 && has(V0, /commercial/) === 1
-   && has(V0, /regulated facility/) === 1,
-  '2: setup — one pin per project type, plus the EPA facility on its own', V0.join(' / '));
+   && has(V0, /regulated facility/) === 0,
+  '2: setup — one pin per project type; the untyped EPA record draws none', V0.join(' / '));
 await clickType('data_center');
 const V1 = await visible();
 ok(has(V1, /data center/) === 0, '2: unchecking Data center removes the Data center pin');
@@ -254,8 +257,12 @@ ok((await chips()).every(c => !c.checked), '6: nothing was silently re-enabled')
 // ── 7. REGULATORY IS INDEPENDENT OF TYPE ────────────────────────────────────────────
 ok(await page.evaluate(() => !!document.getElementById('regToggleBox').checked),
   '7: the Regulatory chip is untouched by every Type going off');
-ok((await visible()).length > 0,
-  '7: ...and the regulatory overlay is STILL DRAWN with no project type selected', (await visible()).join(' / '));
+// ⚖️ INVERTED 2026-09-15. "Independent" now means the switch does not decide base pins in
+// EITHER direction: with no Type selected the map is empty, and the Regulatory chip stays
+// checked and clickable while drawing nothing. The chip assertion above is the live half.
+ok((await visible()).length === 0,
+  '7: ...and with no project type selected NOTHING is drawn — the switch adds no pin',
+  (await visible()).join(' / '));
 await setReg(false);
 ok((await visible()).length === 0, '7: with regulatory off as well, the map is genuinely empty');
 await setReg(true);

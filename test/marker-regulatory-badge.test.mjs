@@ -141,7 +141,10 @@ ok(HS.categoryVisible(plain) === false,
 ok(HS.categoryVisible(overlay) === true && HS.visibleSignal(overlay) === null,
   '6e2: switch OFF -> a classifiable EPA record stays on the map as its Type pin, without the R');
 allOn();
-ok(HS.categoryVisible(plain) === true, '6f: switch ON  -> unmapped squares come back');
+// ⚖️ 2026-09-15: the switch no longer brings anything back. An untyped record matches no
+// selected Type, so it has no base pin in either switch state — the switch only annotates.
+ok(HS.categoryVisible(plain) === false,
+  '6f: switch ON -> an untyped regulatory record still has NO base pin; the switch adds none');
 
 // ── 7. THE DIMENSIONS ARE INDEPENDENT — the founder's "must NOT change" list ───────
 // Toggling regulatory must not change, reset or hide ANY Type filter, in either
@@ -170,10 +173,12 @@ ok(stageKeys.indexOf(REG.key) === -1 && !HS.STATUS_LEGEND_ROWS.some(r => r.key =
 HS.typeFilterKeys.forEach(k => HS.setCategoryFilter(k, false));
 HS.setCategoryFilter(REG.key, true);
 ok(HS.allTypeCategoriesOff() === true, '8: every Type off is reported as every Type off…');
-ok(HS.allCategoriesOff() === false, '8b: …while the map is NOT category-empty — regulatory is on');
-ok(HS.categoryVisible(plain) === true && HS.categoryVisible(dual) === true
-   && HS.categoryVisible(overlay) === true,
-  '8c: …and the regulatory records (unmapped square, dual DC, overlay-on-Type) are still drawn');
+ok(HS.allCategoriesOff() === false, '8b: …while the regulatory key itself is still on');
+// ⚖️ INVERTED 2026-09-15. Every Type off means every base pin is gone, regulatory records
+// included: the overlay rides on a Type pin and cannot substitute for one.
+ok(HS.categoryVisible(plain) === false && HS.categoryVisible(dual) === false
+   && HS.categoryVisible(overlay) === false,
+  '8c: …and with every Type off NOTHING draws — not the dual DC, not the overlay, not the square');
 HS.setCategoryFilter(REG.key, false);
 ok(HS.allTypeCategoriesOff() === true && HS.allCategoriesOff() === true,
   '8d: types off AND regulatory off is genuinely empty');
@@ -185,13 +190,17 @@ allOn();
 ok(JSON.stringify(HS.markerCategories(dual)) === JSON.stringify(['datacenter', 'facility']),
   '9: the dual record still holds exactly its two memberships');
 HS.categoryFilterKeys.forEach(k => HS.setCategoryFilter(k, k === REG.key));
-ok(HS.categoryVisible(dual) === true && track(DUAL).categoryKey === 'datacenter',
-  '9b: every Type off + regulatory ON -> the regulated data centre is still there, still a data centre');
+ok(HS.categoryVisible(dual) === false && track(DUAL).categoryKey === 'datacenter',
+  '9b: every Type off + regulatory ON -> the regulated data centre is GONE with every other '
+  + 'data centre, and is still classified a data centre while hidden');
 const list = [DUAL, OVERLAY_FAC, UNMAPPED_FAC, DC_PROJECT].map(track);
-ok(HS.filterByCategory(list).length === 3,
-  '9c: …and overlay + dual + unmapped are counted ONCE each, not once per membership', HS.filterByCategory(list).length);
+ok(HS.filterByCategory(list).length === 0,
+  '9c: …so regulatory-only selects nothing at all', HS.filterByCategory(list).length);
 allOn();
-ok(HS.filterByCategory(list).length === 4, '9d: everything on -> four records, not five');
+// 3, not 4: UNMAPPED_FAC is untyped and has no base pin. The dual record is still counted
+// ONCE despite two memberships, which is what this check has always been for.
+ok(HS.filterByCategory(list).length === 3,
+  '9d: everything on -> the three TYPED records, each exactly once', HS.filterByCategory(list).length);
 
 console.log(fails ? `\n${fails} FAILED` : '\nAll passed');
 process.exit(fails ? 1 : 0);
