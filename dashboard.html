@@ -262,7 +262,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=c50f7bf3"></script>
+<script src="lib/dashboard-aggregate.js?v=7a64d9c8"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=22937269"></script>
@@ -689,7 +689,7 @@ HS.onReady(async function () {
     function paint() {
       var view = A.changesPreview(deduped, { expanded: expanded, countKnown: countKnown });
       listEl.innerHTML = renderRows(view.visible);
-      if (!view.hasControl) return;              // 8 or fewer: no control, no count line
+      if (!view.hasControl) return;              // at or under the bound: no control, no count line
       if (!toggleBtn) {
         toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';

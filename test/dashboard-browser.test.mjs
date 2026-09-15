@@ -561,8 +561,8 @@ ok(await page.locator('#dashQolLabel').count() === 1, 'Fix 8G [27] the Premium c
 // FIX 8K — WHAT'S CHANGING PREVIEW + EXPAND IN PLACE
 //
 // 🔑 THE EXTRA RECORDS ARE FED THROUGH THE REAL PIPELINE, NOT PAINTED INTO THE DOM.
-// The stock seed yields ~7 canonical records — BELOW the bound — so the control never
-// appears and a test against it would assert nothing. Rather than edit the seed fixture
+// The stock seed yields ~7 canonical records, so expansion has too little to reveal to
+// prove anything about order or about collapsing back. Rather than edit the seed fixture
 // (outside this unit's authorized scope), an init script intercepts the assignment of
 // window.HS_SEED and appends extra eligible rows BEFORE the page reads it. Everything
 // after that point is production code: the real seed branch of changesForZips, the real
@@ -633,18 +633,67 @@ const snap = (pg) => pg.evaluate(() => {
   };
 });
 
-// ---- A2 boundary: the STOCK seed is under the bound, so no control may appear --------
+// ---- A2 boundary: a collection at or under the bound renders whole, with no control ---
+// ⚠️ THE STOCK SEED NO LONGER PROVES THIS. It yields ~7 canonical records, which was under
+// the old bound of 8 and is OVER the founder's bound of 3 — so asserting it here would now
+// measure the expander case and call it the boundary case. The seed is TRIMMED through the
+// same HS_SEED interception the expansion cases use, so the page still runs its real seed
+// branch, real normalization, real dedupe and real changesPreview on a genuinely small
+// collection. Deleting this case instead would have left the no-control limb unproven in a
+// browser at exactly the moment the bound moved.
 {
-  const a = await snap(page);
-  ok(a.rows <= 8 && a.btnCount === 0 && a.label === null,
-    'Fix 8K [A2] a collection at or under 8 renders every row and NO control', { rows: a.rows, btns: a.btnCount });
+  const ctxS = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctxS.addInitScript(() => {
+    try {
+      localStorage.setItem('hs:myCommunities', JSON.stringify([
+        { zip: '78617', name: 'Del Valle', state: 'TX' }
+      ]));
+    } catch (e) { /* a blocked storage write must not abort the run */ }
+  });
+  const pS = await ctxS.newPage();
+  // BOTH source lists are replaced, not just `changes`: What's Changing is the UNION of
+  // civic changes and development records (the page concatenates rawChanges and rawDev
+  // before dedupe), so trimming one alone leaves the other's rows and the collection is
+  // still over the bound — the first version of this case did exactly that and failed.
+  // And the changes are REPLACED rather than sliced, because a row needs an authoritative
+  // category to render at all (`typeLabelForChange`): slicing to the seed's first two
+  // rendered ZERO rows and the case timed out waiting for a row, which is an absence
+  // masquerading as a small collection. These two carry the same shape the expansion
+  // cases inject, so they are known-eligible and the count under test is the real one.
+  await pS.addInitScript(`(() => {
+    const two = [0, 1].map((i) => ({
+      id: 'a2-' + i, category: 'Government & civic', related_project_id: null,
+      lens: 'value', confidence: 'Medium',
+      occurred_at: '2026-0' + (1 + i) + '-11',
+      window_closes_at: null, lat: 30.19, lng: -97.61,
+      title: 'Synthetic canonical record ' + i,
+      plain_language: 'test record', impacts: [],
+      source_ref: 'https://example.invalid/a2/' + i, approx: true
+    }));
+    let v;
+    Object.defineProperty(window, 'HS_SEED', {
+      configurable: true,
+      get() { return v; },
+      set(x) {
+        if (x && Array.isArray(x.changes)) x.changes = two;
+        if (x && Array.isArray(x.projects)) x.projects = [];
+        v = x;
+      }
+    });
+  })()`);
+  await pS.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'networkidle', timeout: 60000 });
+  await pS.waitForSelector('#dashChangingList .crow', { timeout: 30000 });
+  const a = await snap(pS);
+  ok(a.rows > 0 && a.rows <= 3 && a.btnCount === 0 && a.label === null,
+    'Fix 8K [A2] a collection at or under 3 renders every row and NO control', { rows: a.rows, btns: a.btnCount });
+  await ctxS.close();
 }
 
 // ---- A3/A4 + B5/B6 + D9 at every approved viewport ----------------------------------
 for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['narrow', 899, 768], ['mobile', 390, 844]]) {
   const { ctx2, p2 } = await loadWithExtra(20, w, h);
   const collapsed = await snap(p2);
-  ok(collapsed.rows === 8, 'Fix 8K [' + label + '] [A4] default renders exactly 8 rows', collapsed.rows);
+  ok(collapsed.rows === 3, 'Fix 8K [' + label + '] [A4] default renders exactly 3 rows', collapsed.rows);
   ok(collapsed.btnCount === 1, 'Fix 8K [' + label + '] [D9] exactly one control renders', collapsed.btnCount);
   ok(collapsed.tag === 'BUTTON' && collapsed.type === 'button',
     'Fix 8K [' + label + '] [D9] it is a semantic <button type="button">', collapsed.tag);
@@ -664,9 +713,9 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['na
   await p2.focus('#dashChangingToggle');
   await p2.keyboard.press('Enter');
   const open = await snap(p2);
-  ok(open.rows > 8, 'Fix 8K [' + label + '] [B5] Enter expands and reveals every loaded record', open.rows);
-  ok(open.titles.slice(0, 8).join('|') === collapsed.titles.join('|'),
-    'Fix 8K [' + label + '] [B5] the first 8 are unchanged — canonical order preserved');
+  ok(open.rows > 3, 'Fix 8K [' + label + '] [B5] Enter expands and reveals every loaded record', open.rows);
+  ok(open.titles.slice(0, 3).join('|') === collapsed.titles.join('|'),
+    'Fix 8K [' + label + '] [B5] the first 3 are unchanged — canonical order preserved');
   ok(open.expandedAttr === 'true', 'Fix 8K [' + label + '] [D9] aria-expanded flips to true', open.expandedAttr);
   ok(open.label === 'Show fewer changes ↑',
     'Fix 8K [' + label + '] [B5] exactly one collapse control, correctly labelled', open.label);
@@ -681,8 +730,8 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['na
   // Space must work too, and must collapse back to exactly the first 8.
   await p2.keyboard.press(' ');
   const shut = await snap(p2);
-  ok(shut.rows === 8 && shut.titles.join('|') === collapsed.titles.join('|'),
-    'Fix 8K [' + label + '] [B6] Space collapses back to exactly the first 8 canonical records', shut.rows);
+  ok(shut.rows === 3 && shut.titles.join('|') === collapsed.titles.join('|'),
+    'Fix 8K [' + label + '] [B6] Space collapses back to exactly the first 3 canonical records', shut.rows);
   ok(shut.label === collapsed.label && shut.expandedAttr === 'false',
     'Fix 8K [' + label + '] [B6] the expand control and its label are restored', shut.label);
   ok(shut.focused === true,
@@ -733,17 +782,17 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['na
       limit: A.PREVIEW_LIMIT
     };
   });
-  ok(!c7.missing && c7.limit === 8, 'Fix 8K [C] the shipped helper is exposed in-browser at PREVIEW_LIMIT 8', c7);
+  ok(!c7.missing && c7.limit === 3, 'Fix 8K [C] the shipped helper is exposed in-browser at PREVIEW_LIMIT 3', c7);
   ok(c7.known === 'View all 40 changes →', 'Fix 8K [C7] a provable total names the number', c7.known);
   // BOTH branches carry a numeral, and they are DIFFERENT numerals: the known branch names
-  // the total (a claim about the world), the unknown branch names the hidden count (40 - 8,
-  // arithmetic over what is already loaded). Asserted as "32 and never 40" rather than as
+  // the total (a claim about the world), the unknown branch names the hidden count (40 - 3,
+  // arithmetic over what is already loaded). Asserted as "37 and never 40" rather than as
   // "has no digits", which is what this pin used to say.
-  ok(c7.unknown === 'View 32 more changes →',
+  ok(c7.unknown === 'View 37 more changes →',
     'Fix 8K [C7] an unprovable total names the HIDDEN count, not the total', c7.unknown);
   ok(c7.unknown.indexOf('40') < 0 && !/\ball\b/.test(c7.unknown),
     'Fix 8K [C7] ...never the total, never the word "all"', c7.unknown);
-  ok(c7.absent === 'View 32 more changes →',
+  ok(c7.absent === 'View 37 more changes →',
     'Fix 8K [C7] an ABSENT completeness flag is treated as unknown', c7.absent);
 }
 
