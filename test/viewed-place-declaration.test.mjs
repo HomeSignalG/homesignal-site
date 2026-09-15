@@ -88,9 +88,9 @@ ok(undeclared.label === 'Viewing · 13313 COOMES DR',
 
 console.log('--- 5. NAVIGATION: ZIP -> address -> ZIP is deterministic ---');
 // Map 1 is the only in-page Place transition in the app. Drives the LIVE setViewPlaceType.
-const setFn = (shell.match(/  HS\.setViewPlaceType = function \(type\) \{[\s\S]*?\n  \};/) || [''])[0];
+const setFn = (shell.match(/  HS\.setViewPlaceType = function \(type(?:, id)?\) \{[\s\S]*?\n  \};/) || [''])[0];
 ok(setFn.length > 80, 'live setViewPlaceType body extracted', setFn.length);
-const navState = { viewPlaceType: '' };
+const navState = { viewPlaceType: '', viewPlaceId: null };
 const trail = [];
 // Each leg is a separate call into the LIVE setter, and `repaints` proves the chip is
 // actually re-rendered on every leg — a setter that stored the value but stopped
@@ -150,6 +150,17 @@ ok(/HS\.setViewPlaceType\('address'\)/.test(runBody),
   'an in-page address search retires the ZIP declaration it replaces');
 ok(/HS\.setViewPlaceType\('address'\);\n      loadProperty/.test(map1),
   'the ?addr= route declares an Address Place');
+
+console.log('--- 10. THE ADDRESS DOSSIER declares WHICH Address it shows ---');
+const prop = fs.readFileSync(new URL('../property.html', import.meta.url), 'utf8');
+ok(/HS\.setViewPlaceType\('address', p\.id\)/.test(prop),
+  'property.html declares the Address Place BY ID, so the switcher tick can find it');
+const pDecl = prop.indexOf("HS.setViewPlaceType('address', p.id)");
+const pLabel = prop.indexOf("HS.setViewLabel(p.address, { precise: true })");
+ok(pDecl > 0 && pLabel > 0 && pLabel < pDecl,
+  'it sits with the precise label — one place states this page identity', { pLabel, pDecl });
+ok(!/setViewPlaceType\('address',/.test(map1),
+  'Map 1 never declares an id: a searched address is not a saved Place');
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nAll viewed-Place declaration assertions passed.');
 process.exit(fails ? 1 : 0);

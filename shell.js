@@ -199,6 +199,11 @@
     // says so; the chip must never infer it from whether a text label happened to load.
     // In-memory like viewLabel: a fresh page declares its own Place or declares nothing.
     viewPlaceType: '',
+    // ...and WHICH one, when the page can name it. 'address' alone cannot tell "viewing my
+    // saved Address h1" from "viewing an address I just searched that is not a saved Place"
+    // — Map 1's search declares the same type — and the switcher's check mark has to tell
+    // them apart or it would tick a saved home the resident is not looking at.
+    viewPlaceId: null,
     topicPrefs: {},   // hydrated in boot() — server for signed-in, localStorage for anonymous
     get activeProperty() {
       // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
@@ -1104,10 +1109,14 @@
   // obviously viewing a zip code"). Declared here rather than derived from the view LABEL
   // because the label arrives two awaits later, and a chip that named the saved address until
   // the metadata landed would still be wrong, just briefly.
-  HS.setViewPlaceType = function (type) {
+  HS.setViewPlaceType = function (type, id) {
     const t = type == null ? '' : String(type);
-    if (t === state.viewPlaceType) return;
+    const i = id == null || id === '' ? null : String(id);
+    if (t === state.viewPlaceType && i === state.viewPlaceId) return;
     state.viewPlaceType = t;
+    // Always written, never merged: declaring a ZIP Place must clear a previously declared
+    // Address id rather than leave it behind to be read against the wrong type.
+    state.viewPlaceId = i;
     paintTopbar();
   };
   // A ROUTE THAT NAMES A ZIP IS A DECLARATION OF THE ZIP PLACE — the shared form of the
@@ -1240,11 +1249,22 @@
     const home = state.activeProperty;
     const homeIsCurrent = !!(home && String(home.zip) === String(state.zip)
       && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
+    // THE CHECK MARK MEANS "THE PLACE YOU ARE VIEWING", NOT "THE ZIP THAT CONTAINS YOUR
+    // ACTIVE ADDRESS". On the Address dossier those differed: the page declares no ZIP and
+    // sets a PRECISE label, so homeIsCurrent went false and the tick fell through to the ZIP
+    // row while the chip correctly read "Viewing · 13313 COOMES DR". A page that knows which
+    // saved Place it is showing now says so by id, and the tick follows that.
+    // An Address declared WITHOUT an id (Map 1's address search — a searched address is not a
+    // saved Place) deliberately keeps the old behaviour: no saved address is ticked, because
+    // none of them is what is on screen.
+    const viewedAddrId = state.viewPlaceType === 'address' ? (state.viewPlaceId || null) : null;
     const typeChip = function (label) {
       return '<span class="swtype">' + HS.esc(label) + '</span>';
     };
     const addrRows = addresses.length ? addresses.map(p => {
-      const on = p.id === state.activePropId && homeIsCurrent;
+      const on = viewedAddrId
+        ? String(p.id) === String(viewedAddrId)
+        : (p.id === state.activePropId && homeIsCurrent);
       return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchProperty(\'' + p.id + '\')">'
         + '<div class="miniscore">' + (p.score || '') + '</div>'
         + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + '</div>'
@@ -1255,7 +1275,7 @@
         + '</div>';
     }).join('') : '<div class="swempty">No Addresses yet. Add an address and we\'ll watch official records around it.</div>';
     const zipRows = zips.length ? zips.map(z => {
-      const on = String(z.zip) === String(state.zip) && !homeIsCurrent;
+      const on = String(z.zip) === String(state.zip) && !homeIsCurrent && !viewedAddrId;
       return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchZip(\'' + HS.esc(String(z.zip)) + '\')">'
         + '<div class="miniscore">◍</div>'
         + '<div class="pinfo"><div class="pt">' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</div>'

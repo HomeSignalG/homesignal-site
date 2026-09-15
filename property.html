@@ -25,7 +25,7 @@
      carrying them would be a second copy of a runtime that lives one frame away. -->
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=b1c0130d"></script>
+<script src="shell.js?v=22937269"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
@@ -56,6 +56,11 @@ HS.onReady(async function () {
   // NAV-01's "browsing never overwrites the resident's saved area" still holds.
   if (p.zip && /^\d{5}$/.test(String(p.zip))) HS.state.zip = String(p.zip);
   if (typeof HS.setViewLabel === 'function') HS.setViewLabel(p.address, { precise: true });
+  // THIS DOSSIER IS AN ADDRESS PLACE, AND IT KNOWS WHICH ONE. Declared by id, so the Place
+  // switcher's check mark lands on THIS Address rather than falling through to the ZIP that
+  // contains it. The precise label above already makes the chip read the address; this is the
+  // same fact stated declaratively, for the control that needs the identity and not the text.
+  if (typeof HS.setViewPlaceType === 'function') HS.setViewPlaceType('address', p.id);
 
   function numCoord(v) {
     if (v == null || v === '') return null;
