@@ -1,0 +1,32 @@
+# TEMPORARY DIAGNOSTIC — remove after the Map 1 empty-render investigation closes.
+#
+# Read-only: loads the production page and records network/console/state. It writes to no
+# database, no artifact the site reads, and no repo file. Triggered by PUSH on its own paths
+# only, because workflow_dispatch requires the file to be on the default branch and this is
+# deliberately NOT going to main.
+name: diag-map1-empty-render
+on:
+  push:
+    paths:
+      - "scripts/diag-map1-empty-render.mjs"
+      - ".github/workflows/diag-map1-empty-render.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-save playwright@1.49 && npx playwright install --with-deps chromium
+      - name: Map 1 empty-render diagnostic v2
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIPS: "01001,01009,01004,94128"
+          REPS: "3"
+        run: node scripts/diag-map1-empty-render.mjs

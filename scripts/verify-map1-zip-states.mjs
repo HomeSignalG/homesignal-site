@@ -4,8 +4,10 @@
 // Every control ZIP's producer status is asserted in this same run rather than assumed, and
 // the two mode contracts are checked SEPARATELY - ZIP mode must carry no distance and no
 // radius semantics, address mode must send a real geocoded home and a chosen radius.
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { kindFromProducer, ZIP_STATE_KINDS } from './lib/zip-state-kind.mjs';
 
 const BASE = process.env.SITE_BASE || 'https://homesignal.net';
 let fails = 0;
@@ -14,23 +16,102 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-// Verified against production before this run:
-//   08005 pending/'unknown' · 01001 authoritative 34 markers · 01004 not_measured · 01009 complete 0 markers
-const CASES = [
-  { zip: '08005', kind: 'pending'       },
-  { zip: '01001', kind: 'authoritative' },
-  { zip: '01004', kind: 'not_measured'  },
-  { zip: '01009', kind: 'measured_zero' },
+// ── THE KIND IS RESOLVED, NEVER HARDCODED ───────────────────────────────────────────────────
+// This file's own header promises "every control ZIP's producer status is asserted in this same
+// run rather than assumed". It was not: the four kinds were a literal list, captured once and
+// commented "Verified against production before this run" — a snapshot presented as a standing
+// fact. A ZIP's geography state is a moving target, and one of them moved.
+//
+// WHAT IT COST, measured 2026-09-15: ZIP 08005 was pinned as `pending`. The producer now reports
+// `boundary_complete` with project_count 0, i.e. a MEASURED ZERO. The page correctly stopped
+// saying "not measured yet" and this gate called that a failure — for nine days, across nine
+// unrelated branches. Two red assertions, both false, on a page that was right. A gate that
+// cries wolf is a gate that gets ignored, which is the real damage.
+//
+// THE FIX IS NOT A NEW FIXTURE. Re-pinning 08005 to `measured_zero` would buy time until the
+// next ZIP moves and reproduce this exactly. The kind is now READ from the same producer the
+// page reads, per run, and the assertion block is selected from that. The candidate list below
+// only has to supply a ZIP in each state — it can never again disagree with production about
+// what state a ZIP is IN.
+const PRODUCER_RPC = 'app_zip_projects_markers';
+
+// CANDIDATES, not fixtures. Deliberately MORE than four and redundant per state, so one ZIP
+// graduating (exactly what happened to 08005) costs coverage nothing. Measured 2026-09-15:
+// 12,013 of 12,722 canonical ZIPs are boundary_complete, 706 not_measured and just 3 unknown —
+// so `pending` is the scarce state and carries all three of its live members.
+const CANDIDATES = [
+  '94128', '95219', '99128',   // unknown  -> pending        (all 3 that exist)
+  '01004',                     // not_measured
+  '01001',                     // boundary_complete, projects > 0 -> authoritative
+  '01009', '08005',            // boundary_complete, projects = 0 -> measured_zero
 ];
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
+const KINDS = ZIP_STATE_KINDS;
+
+// Read the Supabase URL + anon key out of the shipped page, so this gate cannot drift from what
+// the page actually calls. Same helper shape as scripts/verify-development.mjs.
+const pageHtml = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const grabVar = (name) => {
+  const m = pageHtml.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
+  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  return m[1];
+};
+const APIKEY = grabVar('APIKEY');
+const SUPABASE_URL = grabVar('ENDPOINT').replace(/\/functions\/v1\/.*$/, '');
+
+async function resolveKind(zip) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${PRODUCER_RPC}`, {
+    method: 'POST',
+    headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
+  });
+  if (!res.ok) return { zip, kind: null, why: `producer read ${res.status}` };
+  const auth = await res.json().catch(() => null);
+  const kind = kindFromProducer(auth);
+  return { zip, kind, why: kind ? `status=${auth && auth.status} projects=${auth && auth.project_count}`
+                                : `unresolvable payload (status=${auth && auth.status})` };
+}
+
 surfaceBanner('verify-map1-zip-states');
 console.log('LIVE Map 1 ZIP-state verification — ' + BASE + '\n');
 
+// ── Resolve every candidate against the producer BEFORE opening a browser ───────────────────
+console.log('── producer states, read live (the kinds below are measured, not assumed) ──');
+const resolved = [];
+for (const zip of CANDIDATES) resolved.push(await resolveKind(zip));
+for (const r of resolved) console.log(`   ${r.zip} -> ${r.kind || 'UNRESOLVED'}  [${r.why}]`);
+
+const unresolved = resolved.filter((r) => !r.kind);
+ok(unresolved.length === 0,
+   'every candidate ZIP resolved to a known producer state',
+   unresolved.length ? unresolved.map((r) => `${r.zip}: ${r.why}`).join('; ') : 'all resolved');
+
+// One representative per state. Browsing one ZIP per kind keeps this gate the same size it has
+// always been; the extra candidates exist for redundancy, not to lengthen the run.
+const CASES = KINDS
+  .map((kind) => {
+    const hit = resolved.find((r) => r.kind === kind);
+    return hit ? { zip: hit.zip, kind } : { zip: null, kind };
+  });
+
+// ⚠️ COVERAGE IS ASSERTED, because a state with no representative would otherwise make this
+// gate SILENTLY stop testing it — zero assertions and a green run, which is the vacuous-pass
+// shape this repo refuses everywhere else. The message says COVERAGE so it can never be
+// misread as the page being broken: those are different failures and they need different fixes.
+for (const c of CASES) {
+  if (!c.zip) {
+    ok(false, `COVERAGE: no candidate ZIP is currently in the '${c.kind}' state`,
+       'add one to CANDIDATES — the page contract for this state went UNTESTED this run');
+  }
+}
+console.log('');
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+
 const facBaseline = {};
 
-for (const c of CASES) {
+for (const c of CASES.filter((c) => c.zip)) {
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(3000);
