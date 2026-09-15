@@ -1131,6 +1131,53 @@ is still PARKED.** Full record: audit §15.
   production. Both crons are `active` and the newest core write is minutes old — this is
   rolling-refresh THROUGHPUT against a 12,722-ZIP corpus, and Phase 1B made core writes more
   frequent, not less. Separate work; do not re-derive it.
+  - ⚠️ **CORRECTED 2026-09-15 — THE SECOND HALF OF THAT SENTENCE IS WRONG, AND THE WAY IT WAS
+    WRONG IS THE LESSON. `verify-coverage-state` IS NOT FAILING AN ASSERTION; IT HAS NOT RUN
+    ONE.** The stale-row COUNT stands (it is a dated measurement and is left as written). What
+    does not stand is "the assertion is failing": the job dies on its FIRST read, before any
+    invariant is evaluated. Measured — `app_coverage_states` LEFT JOINs a per-ZIP LATERAL
+    aggregate over `app_projects` (3.19M rows / 2.9 GB) whose visibility map is **0.1% set**
+    (`relallvisible` 210 of `relpages` 370,510), so it cannot go index-only despite
+    `app_projects_zip_kind_date_idx (zip, record_kind, …)` covering it, and pays ~144 random
+    heap fetches per ZIP. `EXPLAIN ANALYZE` on one 1000-row page: **55.6 s cold, 33.1 s warm**
+    (86,678 page reads even warm). The `anon` role carries **`statement_timeout = 3s`**
+    (`pg_db_role_setting`), so Postgres logs `canceling statement due to statement timeout`
+    and PostgREST returns **500** in ~3 s.
+  - 🔑 **THE INSTRUMENT IS WHY THE RECORD WAS WRONG, not carelessness in reading it.** The
+    reader threw `REST <path> -> 500` and **discarded the response body**, where PostgREST had
+    put SQLSTATE `57014` and the message naming the timeout. A read failure and an assertion
+    failure produced the same shape of red, so the plausible one got written down. Fixed: the
+    body is surfaced, `57014` drives an adaptive page ladder, and a read failure now prints
+    `INFRASTRUCTURE:` plus "NOTHING WAS VERIFIED". **A verifier that cannot say which half
+    broke will have its failures misfiled, and the misfiling is invisible.**
+  - ⚠️ **A SMALLER CONSTANT PAGE SIZE DOES NOT FIX IT — page cost varies ~17x across the ZIP
+    range.** A 50-row page measured **206 ms** at the range start and **3,516 ms** at
+    `zip > '40000'` (dense ZIPs carry 275 `app_projects` rows against 127), so any fixed size
+    is simultaneously too slow for one end and wasteful at the other. The reader uses the
+    `verify-development` ladder (halve on failure, floor 1, recover after clean pages).
+  - 📌 **THE DURABLE FIX IS DATABASE-SIDE AND IS DELIBERATELY NOT BUNDLED — it is a founder
+    call.** Setting the visibility map (a `VACUUM` on `app_projects`, plus autovacuum tuning
+    so it stays set against the `*/2` refresh churn) makes that lateral an index-only scan and
+    takes the whole read back to roughly its historical ~1 min. Until then the job is bounded
+    at 30 minutes rather than 15 and runs ~19 min (measured — the ladder pays 3 s for each page
+    that trips the cap before halving, so it is slower than the ~7 min the raw per-ZIP cost
+    predicts). **Do not read the raised bound as the fix.**
+  - ✅ **RESOLVED, AND THE ORIGINAL CLAIM TURNS OUT TO BE RIGHT — say both halves.** First full
+    run after the repair (`35001393633`, 18m50s, all 12,722 ZIPs): **every structural invariant
+    PASSES** — validity on both planes, no duplicate ZIPs, all five impossible-combination
+    checks, planes independent (**741** core-empty-with-overlay-records ZIPs), all three legacy
+    `data_quality` rules, news-is-not-coverage (9,430 ZIPs carry Local News, 194 carry news and
+    nothing else), full-universe classification, no coordinate-bearing `app_changes`,
+    determinism 3/3, and 22/22 desktop+mobile render checks. **2 fail, and they are REAL:**
+    `zero FAILED materializations` (19350, 19390, 19701, 19702, 19703 — `failed_ingest`) and
+    `zero unintentionally STALE ZIPs` (05001, 10460, 11420, 19013, 19317). Plus **167** ZIPs
+    inside the designed 7-day transient hold, which is INFO, not failure.
+    ⚠️ **So the sentence this block corrects was right about WHICH assertion and wrong about
+    WHY — and could not have known either.** It was inferred from a 500 that never reached an
+    assertion; being correct by inference is not the same as being measured, and the two are
+    indistinguishable in the record until someone makes the instrument run. The stale-ZIP
+    failure is the rolling-refresh throughput item already logged above — still separate work,
+    now with a working detector behind it.
 - 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
   privilege escalation.** The live view carries `security_invoker=true` and is owned by
   `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
