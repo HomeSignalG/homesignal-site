@@ -21,16 +21,18 @@
 -- |-------------------------|---------------------------------------------------------------|
 -- | unsupported_source      | no development_reports row for the ZIP (engine never covered) |
 -- | failed_ingest           | refreshed_at >7d old AND last_refresh_attempt_at newer than   |
--- |                         | refreshed_at AND attempt within 48h (trying + failing,        |
+-- |                         | refreshed_at AND attempt within 72h (trying + failing,        |
 -- |                         | chronically stale)                                            |
 -- | temporarily_unavailable | refreshed_at 72h–7d old AND attempt newer than refreshed_at   |
--- |                         | AND attempt within 48h (recent attempt failed, not chronic)   |
+-- |                         | AND attempt within 72h (recent attempt failed, not chronic)   |
 -- | stale_data              | refreshed_at >72h old, no recent failed-attempt evidence      |
 -- | populated               | fresh report; dev markers > 0 OR app_changes > 0              |
 -- | facilities_only         | fresh report; only EPA-facility markers (national baseline)   |
 -- | honestly_empty          | fresh report; every source check returned 0 records           |
--- Thresholds: 72h = 3× the Phase-1 24h sweep SLA; 7d = chronic. During the
--- Phase-1 convergence week the stale classes are inflated and converge to ~0.
+-- Thresholds: 7d = chronic. The 72h figures are explained by the 2026-09-15
+-- correction below — they were originally 3× the Phase-1 24h sweep SLA, and the
+-- recent-attempt window is now pinned to the sweep period the scheduler implies.
+-- During the Phase-1 convergence week the stale classes are inflated and converge to ~0.
 --
 -- VERIFIED AT ROLLOUT (full population, 12,722):
 --   0 null/invalid states · 0 impossible combinations (honestly_empty with
@@ -94,6 +96,62 @@
 -- and silently promotes the view to the owner's rights. Never replay this file without it.
 -- ============================================================================
 
+-- ============================================================================
+-- CORRECTION 2026-09-15 — THE RECENT-ATTEMPT WINDOW WAS SHORTER THAN THE SWEEP
+-- PERIOD, SO A HEALTHY MID-SWEEP ZIP READ AS `stale_data`.
+-- Applied via MCP migration `coverage_state_recent_attempt_window_72h`.
+-- Full rationale, measurements and invariants: docs/coverage-state-recent-attempt-window.sql
+--
+-- `failed_ingest` and `temporarily_unavailable` both required an attempt within 48h to
+-- mean "still being actively retried"; a ZIP failing that clause fell through to
+-- `stale_data`, which asserts there is NO recent failed-attempt evidence.
+--
+-- 48h was right for the scheduler the ladder was written against (250 rows/tick every
+-- 15 min ⇒ a full 12,722-ZIP sweep in ~16.7h against a 24h SLA, so 48h was ~2× it).
+-- THE SCHEDULER CHANGED AND THE CLASSIFICATION DID NOT FOLLOW. Measured 2026-09-15,
+-- cron jobid 14: `*/2 * * * *` → `dev_refresh_tick(8, 20)` = 8 × 30 = 240 attempts/hour
+-- ⇒ 12,722 / 240 = 53.0h per sweep. 53.0h > 48h, so for ~5h of every sweep an
+-- on-schedule ZIP had no attempt inside the window and was named `stale_data`.
+--
+-- Production before (12,722 ZIPs): never_attempted 0 · attempted ≤24h 5,760 · ≤48h 11,520
+-- · oldest attempt 53.03h. `stale_data` = 25, attempt-age band 48.00h..51.94h with ZERO
+-- outside it, and 25/25 carrying last_refresh_attempt_at > refreshed_at — i.e. every one
+-- of them HAD the retry evidence the state claims is absent. The scheduler was healthy;
+-- the boundary was wrong.
+--
+-- Window widened 48h → 72h in BOTH branches. Nothing else moves — the 72h/7d
+-- `refreshed_at` thresholds, the content branches, the overlay plane, the column list and
+-- the grants are untouched. 72h must exceed the 53.0h sweep or the defect persists by
+-- construction; it leaves ~19h of headroom for retry interleaving and cron jitter, and
+-- reuses a threshold the ladder already carries rather than adding a third constant.
+--
+-- IT DOES NOT WEAKEN VERIFICATION — IT SHARPENS IT. Exactly 25 rows changed state:
+-- 22 → temporarily_unavailable (last SUCCESS 4.18..6.43d, inside the designed,
+-- self-releasing 7-day hold) and 3 → failed_ingest (last SUCCESS 19.21..23.54d). The
+-- 7-day bound is measured from `refreshed_at` and is untouched, so it remains the
+-- backstop: nothing broken can hide. Those 3 had been failing for 19–23 days while being
+-- retried, buried among 22 false positives the boundary itself produced — the instrument
+-- went from 25 findings of which 0 were real to 3 of which 3 are real.
+-- After apply: stale_data 0 · temporarily_unavailable 187 · failed_ingest 97 (97/97 with
+-- last success >7d). Deployed-view keyed probe: 20191 (52.03h attempt / 20.09d success)
+-- and 22035 (50.03h / 23.55d) → failed_ingest; 10460, 11420, 20764, 21056 →
+-- temporarily_unavailable. 10460 and 11420 are two of the ZIPs the daily verifier had
+-- been failing as "unintentionally STALE".
+--
+-- RESIDENT-VISIBLE SURFACE: NONE, measured. lib/community-page.js:97 renders all three
+-- of stale_data / temporarily_unavailable / failed_ingest through ONE banner whose text
+-- comes from `refreshed_at`, never from which state it is, and all 25 rows are inside
+-- that group before AND after — byte-identical copy on all 25 pages. lib/coverage-copy.js
+-- does not read coverage_state at all. The `data_quality` layout gate is untouched. What
+-- changes is the `data-coverage-state` attribute on 25 pages, an instrument.
+--
+-- 🔒 THE COUPLING IS NOW ENFORCED, NOT COMMENTED. The defect was a constant that
+-- silently stopped matching the scheduler. Invariant (d) of the migration asserts the
+-- window against the live cron row, and scripts/verify-coverage-state.mjs asserts it
+-- daily against the observed sweep — so the next cadence change fails loudly, naming the
+-- scheduler, instead of relabelling healthy ZIPs.
+-- ============================================================================
+
 create or replace view public.app_coverage_states
 with (security_invoker = true) as
 select
@@ -102,11 +160,11 @@ select
     when r.zip is null then 'unsupported_source'
     when r.refreshed_at < now() - interval '7 days'
          and r.last_refresh_attempt_at > r.refreshed_at
-         and r.last_refresh_attempt_at >= now() - interval '48 hours'
+         and r.last_refresh_attempt_at >= now() - interval '72 hours'
       then 'failed_ingest'
     when r.refreshed_at < now() - interval '72 hours'
          and r.last_refresh_attempt_at > r.refreshed_at
-         and r.last_refresh_attempt_at >= now() - interval '48 hours'
+         and r.last_refresh_attempt_at >= now() - interval '72 hours'
       then 'temporarily_unavailable'
     when r.refreshed_at < now() - interval '72 hours'
       then 'stale_data'
