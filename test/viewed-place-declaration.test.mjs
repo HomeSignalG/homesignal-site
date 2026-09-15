@@ -170,7 +170,7 @@ ok(/HS\.setViewPlaceType\('address'\);/.test(dev),
 const EXEMPT = {
   'community.html': 'declares through its shared runtime, lib/community-page.js',
   'dashboard.html': "names ALL MY PLACES — an all-places briefing, not one Place",
-  'properties.html': 'the My Places list — no single Place is in view',
+  'properties.html': 'names ALL MY PLACES — an all-places list, not one Place',
   'reports.html': 'not ZIP-scoped',
   'index.html': 'marketing — no Place subject, saved-address default applies',
   'about.html': 'marketing — no Place subject',
@@ -208,6 +208,40 @@ ok(pDecl > 0 && pLabel > 0 && pLabel < pDecl,
   'it sits with the precise label — one place states this page identity', { pLabel, pDecl });
 ok(!/setViewPlaceType\('address',/.test(map1),
   'Map 1 never declares an id: a searched address is not a saved Place');
+
+console.log('--- 11. THE ALL-PLACES SURFACES NAME EVERY PLACE, NOT ONE OF THEM ---');
+// An exemption from DECLARING a Place is not a licence to name the wrong one. Both of these
+// pages are about the resident's whole My Places membership, so the chip must say so; left
+// undeclared they fall through to the shell's saved-address default, and a resident whose
+// address sits in the ZIP they are focused on reads "Viewing · 13313 COOMES DR" at the top
+// of the page listing all of their places. That is what production did on properties.html
+// (founder-observed 2026-09-15) while dashboard.html — same situation, same shell — was
+// right, because only the Dashboard had been given the line.
+//
+// ENROLMENT IS DERIVED FROM THE STATED REASON, not typed here. A page is an all-places
+// surface exactly when its own exemption reason says so, so the reason a reviewer reads and
+// the set this section tests can never disagree, and a THIRD such page added later is
+// covered the moment its reason is written.
+const ALL_PLACES = Object.keys(EXEMPT).filter((f) => /all-places/.test(EXEMPT[f]));
+ok(ALL_PLACES.length === 2, 'both all-places surfaces are enrolled from their own stated reason', ALL_PLACES);
+ALL_PLACES.forEach((f) => {
+  const src = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  ok(/HS\.setViewLabel\('ALL MY PLACES', \{ precise: true \}\);/.test(src),
+    f + ' names ALL MY PLACES in the Viewing control');
+  // `precise` is the flag that outranks the saved-address default in paintTopbar's
+  // homeIsCurrent gate. Without it the label is set and the Address still wins, which
+  // looks like a fix and changes nothing on screen.
+  const lbl = src.indexOf("HS.setViewLabel('ALL MY PLACES'");
+  const aw = src.indexOf('await ');
+  ok(lbl > 0 && aw > 0 && lbl < aw,
+    f + ' names it BEFORE the first await, so the chip never paints an Address first',
+    { lbl, aw });
+  // The page-header context line is the SECOND surface and it has its own opt-out. Fixing
+  // only the chip leaves "Viewing · <street address>" rendered under the H1, which is the
+  // half a resident actually pointed at.
+  ok(/<body[^>]*\sdata-no-where\b/.test(src),
+    f + ' suppresses the single-address page context line (shell.js::paintWhereLine)');
+});
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nAll viewed-Place declaration assertions passed.');
 process.exit(fails ? 1 : 0);
