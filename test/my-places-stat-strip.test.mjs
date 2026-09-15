@@ -10,10 +10,22 @@
 // WHAT WAS BROKEN (2) — app_properties.score is NULL on every stored row, and `p.score || 0`
 // averaged those absent values as real zeros, rendering "0 Avg Address score" as if measured.
 //
-// WHAT WAS BROKEN (3) — app_projects_for_zip caps development results at 500 and
-// lib/data.js::rpcAllRows reports `complete: true` for any array, so a truncated read is
-// indistinguishable from a whole one. ZIP 78617 holds 512 development rows; the RPC returned
-// 500; the tile presented 500 as the ZIP's set.
+// WHAT WAS BROKEN (3) — RETRACTED 2026-09-15, and the retraction is the point. This file
+// used to assert that `app_projects_for_zip` caps development at 500, so a count at 500 had
+// to render "500+". MEASURED against production: of 7,996 ZIPs carrying authoritative
+// membership, exactly ONE sits at 500 — 78617, the ZIP that produced the original report —
+// and 397 sit ABOVE it, up to 14,702. The authoritative RPC returns ONE jsonb array that no
+// row cap can truncate (lib/data.js::rpcAllRows says so explicitly). So 500 was never a cap,
+// 78617 genuinely holds 500, and the "+" was hedging about a number the page had in full.
+// The "512 development rows" in the old text counted `app_projects.zip`, which is a DIFFERENT
+// population from the one the page lists (the authoritative ZIP boundary) — 75009 reads 470
+// there against 24 by the zip column. §3 now pins the corrected behaviour.
+//
+// WHAT CHANGED (4) — the strip measured the VIEWED ZIP and labelled itself with it. Founder
+// decision 2026-09-15: measure the resident's whole membership. That reverses this file's
+// old REQ-11 ("no second query was added"), which was never a correctness rule — #1213
+// recorded the per-ZIP fan-out as "a product decision about query cost, not a label fix".
+// The decision has now been made, so §6 pins the fan-out as BOUNDED rather than absent.
 //
 // HOW THIS FILE TESTS. The strip's helpers live inside properties.html's onReady closure, so
 // they cannot be imported. They are EXTRACTED FROM THE SHIPPED FILE and EXECUTED here with
@@ -47,29 +59,28 @@ const templates = read('lib/templates.js');
 
 // ---- load the SHIPPED helpers out of properties.html and run them --------------------
 const daysUntilSrc = (templates.match(/function daysUntil\(dateStr\) \{[\s\S]*?\n  \}/) || [''])[0];
-const capBlock = (props.match(/var DEV_QUERY_CAP[\s\S]*?\n  \}\n\n  function strip/) || [''])[0]
-  .replace(/\n  function strip$/, '');
-const windowBlock = (props.match(/function openWindowCount\([\s\S]*?\n  \}/) || [''])[0];
+// ONE definition of "an open comment window", now shared by the strip and the Address cards.
+const windowBlock = (props.match(/function isOpenWindow\([\s\S]*?function openWindowCount\([^\n]*\n/) || [''])[0];
+const scopeBlock = (props.match(/function placesScopeLabel\([\s\S]*?\n  \}/) || [''])[0];
 // The score rule is two statements inside strip(); lift them verbatim.
 const scoreBlock = (props.match(/var scored = a\.filter[\s\S]*?: null;/) || [''])[0];
 
 function loadHelpers(zip) {
   const src = daysUntilSrc + '\nvar HS = { daysUntil: daysUntil };\n'
     + 'var S = { zip: ' + JSON.stringify(zip) + ' };\n'
-    + capBlock + '\n' + windowBlock + '\n'
+    + windowBlock + '\n' + scopeBlock + '\n'
     + 'function avgScore(a) { ' + scoreBlock + ' return avg; }\n'
-    + 'return { DEV_QUERY_CAP, devCapped, devCountValue, devCountLabel, openWindowCount, avgScore };';
+    + 'return { openWindowCount, isOpenWindow, placesScopeLabel, avgScore };';
   return new Function(src)();
 }
 const H = loadHelpers('78617');
-const HNoZip = loadHelpers(null);
 
 console.log('\n--- §0 THE HELPERS WERE REALLY EXTRACTED (control) ------------------------');
-ok(capBlock.includes('DEV_QUERY_CAP') && capBlock.includes('devCountLabel'),
-  '0a the cap block came out of the shipped file', capBlock.slice(0, 60));
-ok(windowBlock.includes('openWindowCount'), '0b the window helper came out too');
+ok(windowBlock.includes('isOpenWindow') && windowBlock.includes('openWindowCount'),
+  '0a both halves of the open-window rule came out of the shipped file', windowBlock.slice(0, 60));
+ok(scopeBlock.includes('placesScopeLabel'), '0b the membership-scope label came out too');
 ok(scoreBlock.includes('scored'), '0c the score rule came out too');
-ok(typeof H.devCountValue === 'function' && typeof H.openWindowCount === 'function',
+ok(typeof H.placesScopeLabel === 'function' && typeof H.openWindowCount === 'function',
   '0d ...and all of it executes here, so every assertion below is behavioural');
 
 console.log('\n--- §1 THE COERCION, AND THE GUARD THAT SURVIVES 4a9494b ------------------');
@@ -101,50 +112,50 @@ ok((strip('var n = HS.daysUntil(x.y) >= 0;').match(/(?:HS\.)?daysUntil\([^()]*\)
   '2b CONTROL: the scan matches the forbidden shape when it is present');
 ok(/d != null && d >= 0/.test(property), '2c property.html keeps its guard (4a9494b intact)');
 
-console.log('\n--- §3 A CAPPED RESULT IS NOT A TOTAL (the correction) --------------------');
-const list = (n) => Array.from({ length: n }, (_, i) => ({ id: i }));
-const CAP = H.DEV_QUERY_CAP;
-ok(CAP === 500, '3a the detected cap is the RPC\'s 500', CAP);
-// REQ-1 / REQ-2 / REQ-3 — below the cap the exact returned count is provable, so it is shown.
-ok(H.devCountValue(list(0)) === 0 && !String(H.devCountValue(list(0))).includes('+'),
-  '3b REQ-1 zero renders a plain 0, never "0+"', H.devCountValue(list(0)));
-ok(H.devCountValue(list(1)) === 1, '3c REQ-2 one renders a plain 1', H.devCountValue(list(1)));
-ok(H.devCountValue(list(CAP - 1)) === CAP - 1,
-  '3d REQ-3 immediately below the cap renders the exact count', H.devCountValue(list(CAP - 1)));
-// REQ-4 — at the cap the total is unprovable, so the value says "at least".
-ok(H.devCountValue(list(CAP)) === '500+',
-  '3e REQ-4 at the cap the value is 500+', H.devCountValue(list(CAP)));
-ok(H.devCapped(list(CAP)) === true && H.devCapped(list(CAP - 1)) === false,
-  '3f cap detection flips exactly at the boundary and nowhere else');
-// The "+" is derived from what came back, not from the constant — so a moved server cap
-// still reports what was actually received rather than a stale 500.
-ok(H.devCountValue(list(CAP + 12)) === '512+',
-  '3g the + is derived from the RETURNED count, not hardcoded', H.devCountValue(list(CAP + 12)));
+console.log('\n--- §3 THE CAP NEVER EXISTED, SO THE "+" IS GONE (the correction) ------');
+// The old §3 asserted devCountValue(500) === "500+". Measured against production: of 7,996
+// ZIPs carrying authoritative membership exactly ONE is at 500 and 397 are ABOVE it (max
+// 14,702), and the authoritative RPC returns one untruncatable jsonb array. There is no cap
+// to detect, so the helpers that detected one are gone rather than rewritten.
+ok(!/var DEV_QUERY_CAP/.test(props), '3a DEV_QUERY_CAP is gone from the shipped code');
+ok(!/function devCapped/.test(props), '3b ...and so is the cap detector');
+ok(!/function devCountValue/.test(props), '3c ...and the value formatter that appended "+"');
+// CONTROL: the scan would still see them if they came back.
+ok(/var DEV_QUERY_CAP/.test('var DEV_QUERY_CAP = 500;'), '3d CONTROL the scan matches the shape when present');
+// Honesty now rides on the read's OWN completeness flag, not on a row-count guess.
+ok(/list\.complete !== false/.test(props),
+  '3e a ZIP whose read did not complete is excluded, never counted as a measured zero');
+ok(/Array\.isArray\(list\)/.test(props), '3f ...and a non-array response cannot be counted at all');
+// No surviving path can append a "+" to a development count.
+ok(!/devTotal[^\n]*\+ *'\+'/.test(props) && !/'\+'/.test(props),
+  "3g no code path appends a \"+\" to the rendered count");
 
-console.log('\n--- §4 THE LABEL SAYS ONLY WHAT IT MEASURED ------------------------------');
-const L = (n) => H.devCountLabel(list(n));
-ok(L(2) === 'Developments found · ZIP 78617', '4a REQ-6 the label names the viewed ZIP', L(2));
-ok(L(1) === 'Development found · ZIP 78617', '4b singular at exactly one', L(1));
-ok(L(0) === 'Developments found · ZIP 78617', '4c plural at zero', L(0));
-ok(L(CAP) === 'Developments found · ZIP 78617',
-  '4d REQ-5 the capped label makes no exact-total claim — it is the same honest label', L(CAP));
-ok(HNoZip.devCountLabel(list(2)) === 'Developments found',
-  '4e no viewed ZIP degrades gracefully, never "ZIP null"', HNoZip.devCountLabel(list(2)));
-// REQ-7..REQ-10 — asserted on the RENDERED label across every count, not on file text.
-for (const n of [0, 1, 2, CAP - 1, CAP, CAP + 1]) {
-  const t = L(n);
-  if (!/Development/.test(t)) ok(false, '4f REQ-7 Development terminology at n=' + n, t);
-  if (/Project/i.test(t)) ok(false, '4g REQ-7 never "Project" at n=' + n, t);
-  if (/Nearby/i.test(t)) ok(false, '4h REQ-8 never "Nearby" at n=' + n, t);
-  if (/Total/i.test(t)) ok(false, '4i REQ-9 never "Total" at n=' + n, t);
-  if (/Across all Places/i.test(t)) ok(false, '4j REQ-10 never "Across all Places" at n=' + n, t);
-  if (/All Developments|Exactly 500|500 Developments in this ZIP/i.test(t))
-    ok(false, '4k no banned completeness phrasing at n=' + n, t);
+console.log('\n--- §4 THE LABEL SAYS EXACTLY HOW MUCH IT MEASURED ------------------------');
+// It no longer names the viewed ZIP: this page is about every Place, and the label states
+// how many of them the number actually covers.
+ok(H.placesScopeLabel(5, 5) === ' · all 5 places',
+  '4a every Place measured -> "all N places"', H.placesScopeLabel(5, 5));
+ok(H.placesScopeLabel(4, 5) === ' · 4 of 5 places',
+  '4b REQ-5 a Place that did not read is DISCLOSED, never folded in', H.placesScopeLabel(4, 5));
+ok(H.placesScopeLabel(1, 1) === ' · your 1 place',
+  '4c singular reads naturally', H.placesScopeLabel(1, 1));
+ok(H.placesScopeLabel(0, 0) === '',
+  '4d no Places at all degrades to no claim, never "0 of 0 places"', H.placesScopeLabel(0, 0));
+ok(!/Need you' \+ inZip|ZIP ' \+ S\.zip/.test(props),
+  '4e the tiles no longer label themselves with the viewed ZIP');
+// REQ-7..REQ-10 — the banned-word rules survive the rewrite, asserted on the rendered label.
+for (const [c, t] of [[5, 5], [4, 5], [1, 1], [0, 0]]) {
+  const lbl = 'Developments found' + H.placesScopeLabel(c, t);
+  if (/Project/i.test(lbl)) ok(false, '4f REQ-7 never "Project" at ' + c + '/' + t, lbl);
+  if (/Nearby/i.test(lbl)) ok(false, '4g REQ-8 never "Nearby" at ' + c + '/' + t, lbl);
+  if (/Total/i.test(lbl)) ok(false, '4h REQ-9 never "Total" at ' + c + '/' + t, lbl);
+  if (/Across all Places/i.test(lbl)) ok(false, '4i REQ-10 never "Across all Places" at ' + c + '/' + t, lbl);
 }
-ok(true, '4f-4k REQ-7..10 the rendered label passes every banned-word rule at 6 counts');
-// The old strings are gone from the file entirely, comments included.
-ok(!/across all Places/i.test(propsRaw), '4l "across all Places" is gone from the file');
-ok(!/Nearby projects total/i.test(propsRaw), '4m "Nearby projects total" is gone from the file');
+ok(true, '4f-4i REQ-7..10 the rendered label passes every banned-word rule at 4 scopes');
+ok(/ALL\.devTotal === 1 \? 'Development' : 'Developments'/.test(props),
+  '4j REQ-7 Development terminology, singular at exactly one');
+ok(!/across all Places/i.test(propsRaw), '4k "across all Places" is gone from the file');
+ok(!/Nearby projects total/i.test(propsRaw), '4l "Nearby projects total" is gone from the file');
 
 console.log('\n--- §5 SCORES (4a9494b intact) -------------------------------------------');
 ok(H.avgScore([{}, {}]) === null,
@@ -160,20 +171,31 @@ ok(H.avgScore([{ score: '80' }]) === null, '5g a string is not a measurement eit
 ok(/miniscore">' \+ \(p\.score \|\| ''\)/.test(props),
   '5h the Address card still renders an absent score as blank, not 0');
 
-console.log('\n--- §6 NOTHING ABOUT THE QUERY CHANGED (REQ-11) --------------------------');
+console.log('\n--- §6 THE FAN-OUT IS AUTHORIZED, AND IT IS BOUNDED ---------------------');
+// REQ-11 ("no second query was added") is SUPERSEDED by the founder decision to measure
+// every Place. It was never a correctness rule — #1213 recorded the per-ZIP fan-out as a
+// product decision about query cost. What must stay true is that the cost is bounded.
 ok(/HS\.data\.projects\(S\.zip, null\)/.test(props),
-  '6a the projects read is byte-for-byte the same call');
+  '6a the Address cards\' own read is byte-for-byte the same call');
 ok(/HS\.data\.changes\(S\.zip, null\)/.test(props), '6b so is the changes read');
-ok((props.match(/HS\.data\.projects\(/g) || []).length === 1,
-  '6c exactly one projects call — no second/count query was added');
-ok(!/rpcAllRows|\.rpc\(|\.limit\(|app_projects_for_zip/.test(props),
-  '6d the page still issues no RPC, no limit and no direct table read of its own');
+ok(/MAX_QUERY_ZIPS/.test(props),
+  '6c the ZIP fan-out is capped — a resident with 200 follows cannot issue 200 reads');
+ok(/QUERY_CONCURRENCY/.test(props),
+  '6d ...and runs under bounded concurrency, never Promise.all(N)');
+// The viewed ZIP is already read for the Address cards; reading it twice would double the
+// single most expensive payload on the page (78617 alone is 500 rows).
+ok(/String\(zq\) === String\(S\.zip\)[\s\S]{0,80}\? projects/.test(props),
+  '6e the viewed ZIP\'s payload is REUSED, not fetched a second time');
+ok(/openWindowChangesForZips/.test(props),
+  '6f the comment-window read is ONE query for every ZIP, not one per ZIP');
+ok(/dedupeChanges/.test(props),
+  '6g a notice materialized once per ZIP is counted once across the membership');
 ok(/statTile\(a\.length \+ z\.length, 'Places'/.test(props),
-  '6e the Places tile is unchanged and remains the only all-places count');
-ok(!/Saved Items|Monitored Items/.test(propsRaw), '6f no combined My Places total was introduced');
+  '6h the Places tile is unchanged');
+ok(!/Saved Items|Monitored Items/.test(propsRaw), '6i no combined My Places total was introduced');
 // The distance gate is deferred, not touched.
 ok(/\(x\.distance_mi \|\| 9e9\) <= 5/.test(props),
-  '6g the distance gate is untouched — deferred to its own decision');
+  '6j the distance gate is untouched — deferred to its own decision');
 
 console.log('\n' + (fails ? fails + ' FAILED' : 'All stat-strip assertions passed'));
 process.exit(fails ? 1 : 0);

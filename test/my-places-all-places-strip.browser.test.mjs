@@ -82,7 +82,13 @@ const server = createServer(async (req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+// The repo's existing convention (map1-*.browser.test.mjs): plain launch on CI, with an
+// env override for a sandbox whose preinstalled Chromium does not match the playwright
+// build. A hardcoded executablePath is what made the first CI run of this file fail —
+// that path exists only in this sandbox.
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage();
 const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(String(e).slice(0, 300)));
