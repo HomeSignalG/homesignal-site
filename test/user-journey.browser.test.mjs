@@ -436,6 +436,13 @@ ok(/13313 COOMES DR/.test(c.locTitle || ''),
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+// The saved place is part of this section's PRECONDITION, not decoration. paintTopbar's last
+// fallback is the SAMPLE branch, which names the seed community and ignores the view label
+// entirely — so with no saved place AND no myZip the chip reads "Del Valle (Sample Zip Code)"
+// however the view is declared. This section used to inherit the home from the section above
+// it; now that it navigates for itself, it installs it for itself.
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
 await page.click('#go');
 await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 60000 });
