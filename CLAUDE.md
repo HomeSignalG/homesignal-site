@@ -1121,7 +1121,25 @@ is still PARKED.** Full record: audit §15.
     call.** Setting the visibility map (a `VACUUM` on `app_projects`, plus autovacuum tuning
     so it stays set against the `*/2` refresh churn) makes that lateral an index-only scan and
     takes the whole read back to roughly its historical ~1 min. Until then the job is bounded
-    at 30 minutes rather than 15 and runs ~7 min. **Do not read the raised bound as the fix.**
+    at 30 minutes rather than 15 and runs ~19 min (measured — the ladder pays 3 s for each page
+    that trips the cap before halving, so it is slower than the ~7 min the raw per-ZIP cost
+    predicts). **Do not read the raised bound as the fix.**
+  - ✅ **RESOLVED, AND THE ORIGINAL CLAIM TURNS OUT TO BE RIGHT — say both halves.** First full
+    run after the repair (`35001393633`, 18m50s, all 12,722 ZIPs): **every structural invariant
+    PASSES** — validity on both planes, no duplicate ZIPs, all five impossible-combination
+    checks, planes independent (**741** core-empty-with-overlay-records ZIPs), all three legacy
+    `data_quality` rules, news-is-not-coverage (9,430 ZIPs carry Local News, 194 carry news and
+    nothing else), full-universe classification, no coordinate-bearing `app_changes`,
+    determinism 3/3, and 22/22 desktop+mobile render checks. **2 fail, and they are REAL:**
+    `zero FAILED materializations` (19350, 19390, 19701, 19702, 19703 — `failed_ingest`) and
+    `zero unintentionally STALE ZIPs` (05001, 10460, 11420, 19013, 19317). Plus **167** ZIPs
+    inside the designed 7-day transient hold, which is INFO, not failure.
+    ⚠️ **So the sentence this block corrects was right about WHICH assertion and wrong about
+    WHY — and could not have known either.** It was inferred from a 500 that never reached an
+    assertion; being correct by inference is not the same as being measured, and the two are
+    indistinguishable in the record until someone makes the instrument run. The stale-ZIP
+    failure is the rolling-refresh throughput item already logged above — still separate work,
+    now with a working detector behind it.
 - 🔒 **`create or replace view` DROPS reloptions — MEASURED, not recalled, and it is a
   privilege escalation.** The live view carries `security_invoker=true` and is owned by
   `postgres`. Probe on this database: create WITH the option → `security_invoker=true`; bare
