@@ -187,10 +187,18 @@ ok(!/of your places/.test(agg.replace(/^\s*\/\/.*$/gm, '')),
 // the preview IS at the time — not the shape it happened to have when the claim was first
 // made. The cap now lives in the view-model (A.PREVIEW_LIMIT) rather than inline in the
 // page, so both halves are asserted: the page renders THROUGH the view-model, and the
-// view-model still caps at 8.
+// view-model still caps the visible list. The number moved 8 -> 3 (founder, 2026-09-15);
+// the rename's claim is unaffected, since it was about the rendering path, not the bound.
 ok(/A\.changesPreview\(deduped, \{ expanded: expanded, countKnown: countKnown \}\)/.test(dash),
   '11 Fix 8K preview is rendered through the view-model, not an inline slice');
-ok(/PREVIEW_LIMIT = 8;/.test(agg), '11 Fix 8K preview still caps the visible list at 8 rows');
+// ⚠️ `var ` IS LOAD-BEARING IN THIS REGEX, NOT TIDINESS. The bare form `/PREVIEW_LIMIT = 3;/`
+// also matches `RAIL_PREVIEW_LIMIT = 3;` — the My Places rail's own, unrelated constant — so
+// the pin passed while the What's Changing bound still read 8. Measured: mutating the bound
+// back to 8 left this assertion GREEN. A pin that can be satisfied by a different constant
+// is not guarding the one it names.
+ok(/var PREVIEW_LIMIT = 3;/.test(agg), '11 Fix 8K preview caps the visible list at 3 rows (Fix 23)');
+ok(/var RAIL_PREVIEW_LIMIT = 3;/.test(agg),
+  '11 ...control: the rail constant that made the loose form pass vacuously still exists');
 ok(!/deduped\.slice\(0, 12\)/.test(dash),
   '11 ...and the superseded inline 12-row slice is gone');
 ok(/id="dashChangingList"/.test(dash) && /id="dashChangingMore"/.test(dash),

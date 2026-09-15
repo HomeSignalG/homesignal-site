@@ -40,6 +40,48 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-15 — ✅ FIX 23: What's Changing shows THREE, and the rest is one click away
+
+⚖️ **FOUNDER, 2026-09-15: "in the what is changing tile to 3 items always and they have to
+click view more changes to see the rest."** The tile shipped at **8** rows (Fix 8K). It is now
+**3**. Nothing else about the tile moved.
+
+- 🔑 **THE WHOLE CHANGE IS ONE CONSTANT — `lib/dashboard-aggregate.js::PREVIEW_LIMIT` 8 → 3** —
+  because Fix 8K had already moved the decision out of the page and into the view-model. The
+  page reads `A.changesPreview(deduped, …)` and decides nothing, so there was no second copy of
+  the bound to find and no rendering code to touch. `dashboard.html` changed by one COMMENT
+  (`// 8 or fewer` → `// at or under the bound`) and its content-hash cache key.
+- **The honesty half of Fix 8K is untouched, and that is the point of changing only the bound.**
+  Every record past 3 is still disclosed and still one click away; the expander still
+  distinguishes a hidden count from a claimed total (`View 37 more changes →` when completeness
+  is unprovable, `View all 40 changes →` when it is provable), still returns a COPY on the
+  expanded limb, still keeps ONE button alive across toggles so focus never jumps.
+- ⚠️ **A PIN THAT NAMES A CONSTANT MUST ANCHOR THE WHOLE NAME — `/PREVIEW_LIMIT = 3;/` MATCHES
+  `RAIL_PREVIEW_LIMIT = 3;`.** The rail's own unrelated constant is already 3, so the rewritten
+  rail-copy pin passed **while the bound still read 8**. Measured by mutation, which is the only
+  reason it was caught: reverting the constant left that assertion GREEN. It is now
+  `/var PREVIEW_LIMIT = 3;/`, with a control asserting the rail constant still exists so the
+  pin cannot pass vacuously from the other direction either. Same class as Fix 19's §6b.
+- ⚠️ **THE BROWSER'S "UNDER THE BOUND" CASE STOPPED BEING ONE, SILENTLY.** `[A2]` asserted that
+  the STOCK seed (~7 canonical records) renders every row with no control. Under 8 that was the
+  boundary case; under 3 the same assertion measures the EXPANDER and calls it the boundary. It
+  now builds a genuinely small collection through the same `HS_SEED` interception the expansion
+  cases use. **Two corrections inside that one case, both found by running it:** trimming
+  `changes` alone left `projects` behind (the tile is the UNION of civic changes and development
+  records), and SLICING the seed's own changes rendered **zero** rows — a row needs an
+  authoritative category (`typeLabelForChange`) — so an absence was about to be scored as a
+  small collection. It injects two known-eligible records instead.
+- **Mutation-proved on the restored bound of 8:** `dashboard-all-places` **10 fails** ·
+  `dashboard-rail-copy` **1** (after the anchor fix; **0** before it) · `dashboard-browser`
+  **15**. Restored to 3 → all green.
+- **Tests:** offline **0 failures** across the suite; `dashboard-browser.test.mjs` **all
+  assertions passed** on real Chromium (playwright installed into the scratchpad at 1.56.0, the
+  version whose pinned chromium revision is the sandbox's own 1194 — 1.55.1 wants 1193 and
+  cannot launch).
+- 📌 **PRODUCTION PROOF IS PENDING DEPLOY** — the counts above are from the repo's own harness,
+  not from homesignal.net. Confirm on the live Dashboard: 3 rows, one control, and the control's
+  number equal to (records held − 3).
+
 ### 2026-09-13 — ✅ FIX 19: the artifact producer SELECTED NOTHING, and now it fails closed
 
 **Closes the "LEGACY ARTIFACT FAMILY" open item #1200 opened.** That item asked which way the
