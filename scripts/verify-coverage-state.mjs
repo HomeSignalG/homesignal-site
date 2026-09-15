@@ -52,13 +52,48 @@ function normalize(r) {
   };
 }
 
+// A READ FAILURE IS NOT AN ASSERTION FAILURE, AND THIS JOB COULD NOT TELL YOU WHICH.
+// The old body threw `REST <path> -> 500` and discarded the response, so the daily red
+// read as "an invariant is failing" — and was recorded that way in CLAUDE.md for over a
+// week — when in fact the very FIRST read was being cancelled and not one assertion had
+// run. PostgREST puts the Postgres SQLSTATE and message in the body; surface them.
+class ReadError extends Error {
+  constructor(path, status, body) {
+    const j = (() => { try { return JSON.parse(body); } catch { return null; } })();
+    super(`REST ${path} -> ${status}`
+      + (j?.code ? ` [${j.code}]` : '')
+      + (j?.message ? ` ${j.message}` : (body ? ` ${body.slice(0, 200)}` : '')));
+    this.status = status; this.code = j?.code || null; this.path = path;
+  }
+}
+// 57014 is `canceling statement due to statement timeout`. It is the ONE failure this
+// reader can do something about (ask for less), so it is named rather than inferred from
+// the status: PostgREST reports it as a 500, the same status a genuine outage carries.
+const isTimeout = (e) => e instanceof ReadError && (e.code === '57014' || e.status === 500);
+
 async function rest(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
   });
-  if (!res.ok) throw new Error(`REST ${path} -> ${res.status}`);
+  if (!res.ok) throw new ReadError(path, res.status, await res.text().catch(() => ''));
   return res.json();
 }
+
+// AN UNREADABLE SOURCE AND A FAILING INVARIANT MUST NOT LOOK THE SAME IN THE LOG. This
+// file is top-level await, so a throw surfaces as an unhandled rejection and prints a bare
+// stack — which is exactly how "the first read was cancelled" got recorded as "the stale
+// assertion is failing". Label it, and say plainly that nothing was verified.
+process.on('unhandledRejection', (e) => {
+  const read = e instanceof ReadError || /unreadable at floor page size/.test(e?.message || '');
+  console.error(`\n${read ? 'INFRASTRUCTURE' : 'ERROR'}: ${e?.message || e}`);
+  if (read) {
+    console.error('NOTHING WAS VERIFIED — this run could not READ the source, so it makes no');
+    console.error('claim about any invariant. Do not record it as an assertion failure.');
+  } else if (e?.stack) {
+    console.error(e.stack);
+  }
+  process.exit(1);
+});
 
 const fails = [];
 const ok = (name, cond, extra) => {
@@ -66,15 +101,53 @@ const ok = (name, cond, extra) => {
   if (!cond) fails.push(name);
 };
 
-// ── 1-3: full-population invariants (keyset-paginated; PostgREST caps at 1000) ──
+// ── 1-3: full-population invariants (keyset-paginated, ADAPTIVE page size) ──
+//
+// ⚠️ A 1000-ROW PAGE OF THIS VIEW CANNOT BE READ BY `anon`, AND THAT IS ARITHMETIC, NOT A
+// FLAKE. The view LEFT JOINs a LATERAL `count(*) FILTER (...) FROM app_projects WHERE
+// zip = m.zip` per ZIP. `app_projects` is ~3.19M rows / 2.9 GB with its visibility map
+// 0.1% set (relallvisible 210 of relpages 370,510), so that aggregate cannot go
+// index-only despite `app_projects_zip_kind_date_idx (zip, record_kind, ...)` covering
+// it — every ZIP pays ~144 random heap fetches. Measured 2026-09-15 with EXPLAIN ANALYZE:
+// one 1000-row page = 55.6 s cold, 33.1 s warm (86,678 page reads even warm — the working
+// set does not fit cache). The `anon` role carries `statement_timeout = 3s`. So the first
+// page was cancelled every single day and the run died before assertion one.
+//
+// PAGE COST IS NOT UNIFORM, which is why a smaller CONSTANT would only move the failure:
+// a 50-row page measured 206 ms at the start of the ZIP range but 3,516 ms at
+// `zip > '40000'`, a ~17x spread, because dense ZIPs carry 275 app_projects rows against
+// 127. Only an adaptive size can cross both. Same ladder as verify-development.mjs (halve
+// on a failed page, floor 1, recover after clean pages) — there it is row SIZE that
+// blows the budget, here it is per-row WORK, and the remedy is identical.
+//
+// 📌 THE DURABLE FIX IS IN THE DATABASE, NOT HERE, and is deliberately NOT bundled: with
+// the visibility map set, that lateral becomes an index-only scan and the whole read goes
+// back to ~1 min. This reader only stops lying about why it failed.
+const MAX_STEP = 32;
 const rows = [];
-for (let last = ''; ;) {
-  // `select=*` on purpose: naming regulatory_overlay_state before the view migration
-  // 400s the whole request, which would read as an outage rather than as a not-yet.
-  const page = await rest(`app_coverage_states?select=*&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
-  rows.push(...page);
-  if (page.length < 1000) break;
-  last = page[page.length - 1].zip;
+{
+  let step = MAX_STEP, last = '', clean = 0, floorRetries = 0;
+  for (;;) {
+    // `select=*` on purpose: naming regulatory_overlay_state before the view migration
+    // 400s the whole request, which would read as an outage rather than as a not-yet.
+    let page;
+    try {
+      page = await rest(`app_coverage_states?select=*&order=zip.asc&limit=${step}`
+        + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+    } catch (e) {
+      if (!isTimeout(e)) throw e;                 // a real outage is not a page-size problem
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
+      floorRetries++;
+      if (floorRetries > 3) throw new Error(`app_coverage_states unreadable at floor page size: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 2500 * floorRetries));
+      continue;
+    }
+    floorRetries = 0;
+    rows.push(...page);
+    if (page.length < step) break;
+    last = page[page.length - 1].zip;
+    if (++clean >= 3 && step < MAX_STEP) { step = Math.min(MAX_STEP, step * 2); clean = 0; }
+  }
 }
 const metaCount = Number(await fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?select=zip`, {
   method: 'HEAD',

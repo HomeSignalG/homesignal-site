@@ -1,0 +1,98 @@
+name: map1-regulatory-live-proof
+
+# THE LIVE GLOBAL CHECK for the Regulatory/Type contract (#1218), run against the DEPLOYED
+# site in a real browser. Nothing is mocked.
+#
+# WHAT MAKES IT GLOBAL RATHER THAN A SAMPLE — Map 1 is ONE document parameterised by ?zip=,
+# loading ONE runtime (lib/map.js) through ONE <script> tag. Layer A reads the DEPLOYED
+# bytes of that single file and proves the three-case rule is in them and the flat any-of is
+# not; one file proven is every one of the 12,722 canonical ZIPs proven. Layer B then drives
+# real production ZIP pages to prove those bytes BEHAVE. Neither layer is sufficient alone
+# and neither is dropped: A without B proves shipping, not behaviour; B without A is a
+# sample of 12,722 and cannot carry a global claim.
+#
+# NO SECRETS. The page uses the public anon key it already ships with, so this job needs no
+# credential and is given none. Read-only browser session against a public URL.
+#
+# ARM-GATED and DISPATCH-ONLY, matching map1-live-proof.yml: a stray dispatch makes no
+# production contact, and there is deliberately no pull_request trigger — an arm-gated
+# operational workflow that runs on PRs is red the whole time it is correctly disarmed, and
+# a permanently-red check teaches people to ignore red.
+#
+# ⚠️ NO `schedule:` HERE ON PURPOSE. A new scheduled job is founder-gated (CLAUDE.md §3).
+# Adding a cron is a one-line change once that call is made.
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs to drive (Layer B). Layer A is global regardless.'
+        default: '78617,75009,20171,85003,60601'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: map1-regulatory-live-proof
+  cancel-in-progress: false
+
+env:
+  EXPECTED_ARM: arm-2026-09-15-map1-regulatory-live-proof
+  BASE: https://homesignal.net
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ARMING GATE - refuse to touch production unless deliberately armed
+        run: |
+          set -euo pipefail
+          ARM="$(tr -d '[:space:]' < .github/map1-regulatory-live-arm)"
+          if [ "$ARM" != "$EXPECTED_ARM" ]; then
+            echo "NOT ARMED (file says: $ARM). No production contact."
+            echo "To arm: put $EXPECTED_ARM in .github/map1-regulatory-live-arm and merge."
+            exit 1
+          fi
+          echo "ARMED: $ARM"
+
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: a credential is visible to this job. This proof is a public"
+            echo "browser session and must hold none."
+            exit 1
+          fi
+          echo "no credential in scope - correct"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          set -euo pipefail
+          npm i -D playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      # An instrument must prove it ran before its silence counts as evidence.
+      - name: Prove playwright resolves
+        run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING - the proof would silently skip');process.exit(1)})"
+
+      - name: Prove the regulatory/Type contract on the deployed site
+        env:
+          BASE: ${{ env.BASE }}
+          ZIPS: ${{ inputs.zips }}
+        run: |
+          set -o pipefail
+          node scripts/map1-regulatory-live-proof.mjs 2>&1 | tee /tmp/reg-proof.log
+
+      - name: Upload the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map1-regulatory-live-proof
+          path: /tmp/reg-proof.log
+          if-no-files-found: warn
