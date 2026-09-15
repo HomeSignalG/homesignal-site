@@ -1110,6 +1110,19 @@
     state.viewPlaceType = t;
     paintTopbar();
   };
+  // A ROUTE THAT NAMES A ZIP IS A DECLARATION OF THE ZIP PLACE — the shared form of the
+  // rule the ZIP hub applies, for TOOL pages (Alerts, Map 1) that are scoped to a ZIP but
+  // are not themselves a Place. Resolution is deliberately the SAME contract as
+  // HS.ensureViewedZip: the query string's ?zip=, or a ZIP the page declares from its own
+  // PATH (/development/<zip>). EXPLICIT ONLY, and that is the whole point — a tool reached
+  // with no ZIP in its route has declared nothing, so the saved address still supplies the
+  // default context there, exactly as before. Returns the declared ZIP, or null.
+  HS.declareRouteZipPlace = function (pageZip) {
+    const explicit = (HS.parseZipParam ? HS.parseZipParam(location.search) : null)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    if (explicit) HS.setViewPlaceType('zip');
+    return explicit || null;
+  };
   HS.setViewLabel = function (label, opts) {
     const t = label == null ? '' : String(label).trim();
     const precise = !!(opts && opts.precise);

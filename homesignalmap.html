@@ -826,7 +826,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=619cf5a9"></script>
+<script src="shell.js?v=b1c0130d"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1921,6 +1921,11 @@ HS.onReady(function(){
   function run(address){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
+    // ...and it leaves the ZIP PLACE with it. This is the only in-page Place transition in
+    // the app (every other navigation is a full document load, which resets the declaration
+    // to nothing), so a ZIP declared at boot must be retired HERE or it would outlive the
+    // mode that made it true and keep suppressing the address the resident just searched.
+    if(window.HS && HS.setViewPlaceType) HS.setViewPlaceType('address');
     CUR_ADDRESS = address;
     // A real geocoded HOME now exists, so the HOME-specific view control may appear.
     document.body.classList.add("hashome");
@@ -4727,6 +4732,7 @@ HS.onReady(function(){
       var ez = u.searchParams.get("zip");
       if(ez && /^\d{5}$/.test(ez)){
         if(window.HS && HS.state) HS.state.zip = ez;
+        if(window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(ez);
         loadZip(ez);                       // Map 1's own ZIP mode, unchanged
         paintEmbedZipBoundary(ez);         // plus the real ZCTA outline, embed only
         return;                            // no loadDevTracker: the tracker is hidden here
@@ -4744,9 +4750,21 @@ HS.onReady(function(){
       return;
     }
     var a = u.searchParams.get("addr");
-    if(a && a.trim()){ loadProperty(a.trim()); return; }
+    // ?addr= is an ADDRESS route. Declared for symmetry with the ZIP branch below, and so a
+    // URL carrying BOTH params can never be read as a ZIP Place: the route asked for a
+    // property record, so the address is the Place being viewed.
+    if(a && a.trim()){
+      if(window.HS && HS.setViewPlaceType) HS.setViewPlaceType('address');
+      loadProperty(a.trim()); return;
+    }
     var z = u.searchParams.get("zip");
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
+    // AN EXPLICIT ROUTE ZIP IS A DECLARED ZIP PLACE — synchronous, before loadZip() issues a
+    // single fetch, so the Viewing control names the ZIP on first paint rather than a saved
+    // Address inside it. Placed HERE and not inside loadZip() on purpose: loadZip also serves
+    // the shell-context fallback below, which is NOT an explicit declaration, and declaring
+    // there would change the chip on a route that named no place.
+    if(z && /^\d{5}$/.test(z) && window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(z);
     // Reuse shell ZIP context when the URL has no ?zip= — never auto-load the sample default.
     if(!z && window.HS && HS.hasViewedZipContext && HS.hasViewedZipContext() && HS.state && /^\d{5}$/.test(String(HS.state.zip))){
       z = String(HS.state.zip);
