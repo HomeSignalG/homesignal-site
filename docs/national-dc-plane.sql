@@ -103,12 +103,18 @@ revoke all on public.national_dc_records from anon, authenticated;
 --
 -- SECURITY DEFINER is load-bearing, and it is a CORRECTION — see the defect note.
 -- ============================================================================
-create or replace function public.national_dc_for_zip(p_zip text, p_radius_mi numeric default 5)
+-- ⚠️ DROP + CREATE, not CREATE OR REPLACE: the return type carries has_more, and Postgres
+-- cannot replace a function whose OUT columns change. DDL is transactional, so both run in
+-- one transaction and anon never sees the function missing. A DROP discards ownership and
+-- grants, which is why both are restated below.
+drop function if exists public.national_dc_for_zip(text, numeric);
+
+create function public.national_dc_for_zip(p_zip text, p_radius_mi numeric default 5)
 returns table(source_key text, source_name text, source_url text, project_name text,
               developer_or_operator text, raw_status text, normalized_status text,
               project_type text, lat double precision, lng double precision,
               location_text text, location_precision text, distance_mi numeric,
-              last_seen_at timestamp with time zone)
+              last_seen_at timestamp with time zone, has_more boolean)
 language sql
 stable
 security definer
@@ -117,31 +123,45 @@ as $function$
   with z as (
     select home_lat, home_lng from public.development_reports where zip = p_zip limit 1
   ),
-  -- Clamped: the radius is caller-supplied on an anon-executable DEFINER function, and
-  -- an unbounded value degenerates the bbox prefilter into a full scan any anonymous
-  -- caller could trigger. 25 is far above the 5 the page passes, so no caller changes.
-  p as (select least(greatest(coalesce(p_radius_mi, 5), 0), 25) as r)
-  select r.source_key, r.source_name, r.source_url,
-         r.project_name, r.developer_or_operator,
-         r.raw_status, r.normalized_status, r.project_type,
-         r.lat, r.lng, r.location_text, r.location_precision,
-         round((3958.8 * 2 * asin(sqrt(
-             power(sin(radians(r.lat - z.home_lat) / 2), 2)
-           + cos(radians(z.home_lat)) * cos(radians(r.lat))
-           * power(sin(radians(r.lng - z.home_lng) / 2), 2)
-         )))::numeric, 2) as distance_mi,
-         r.last_seen_at
-  from public.national_dc_records r, z, p
-  where r.map_eligible
-    and r.lat between z.home_lat - (p.r / 69.0) and z.home_lat + (p.r / 69.0)
-    and r.lng between z.home_lng - (p.r / 55.0) and z.home_lng + (p.r / 55.0)
-    and (3958.8 * 2 * asin(sqrt(
-            power(sin(radians(r.lat - z.home_lat) / 2), 2)
-          + cos(radians(z.home_lat)) * cos(radians(r.lat))
-          * power(sin(radians(r.lng - z.home_lng) / 2), 2)
-        ))) <= p.r
-  order by distance_mi asc, r.source_key
-  limit 200;
+  -- Clamped: the radius is caller-supplied on an anon-executable DEFINER function, and an
+  -- unbounded value degenerates the bbox prefilter into a full scan any anonymous caller
+  -- could trigger. 25 is far above the 5 the page passes.
+  p as (select least(greatest(coalesce(p_radius_mi, 5), 0), 25) as r),
+  -- ONE place the cap is written. Fetching cap+1 is what makes overflow detectable at all:
+  -- at exactly `cap` rows you cannot tell a full set from a clipped one.
+  lim as (select 1000::int as n),
+  hits as (
+    select r.source_key, r.source_name, r.source_url,
+           r.project_name, r.developer_or_operator,
+           r.raw_status, r.normalized_status, r.project_type,
+           r.lat, r.lng, r.location_text, r.location_precision,
+           round((3958.8 * 2 * asin(sqrt(
+               power(sin(radians(r.lat - z.home_lat) / 2), 2)
+             + cos(radians(z.home_lat)) * cos(radians(r.lat))
+             * power(sin(radians(r.lng - z.home_lng) / 2), 2)
+           )))::numeric, 2) as distance_mi,
+           r.last_seen_at
+    from public.national_dc_records r, z, p
+    where r.map_eligible
+      and r.lat between z.home_lat - (p.r / 69.0) and z.home_lat + (p.r / 69.0)
+      and r.lng between z.home_lng - (p.r / 55.0) and z.home_lng + (p.r / 55.0)
+      and (3958.8 * 2 * asin(sqrt(
+              power(sin(radians(r.lat - z.home_lat) / 2), 2)
+            + cos(radians(z.home_lat)) * cos(radians(r.lat))
+            * power(sin(radians(r.lng - z.home_lng) / 2), 2)
+          ))) <= p.r
+    order by distance_mi asc, r.source_key
+    limit (select n + 1 from lim)
+  ),
+  counted as (select count(*) over () as total, hits.* from hits)
+  select c.source_key, c.source_name, c.source_url, c.project_name,
+         c.developer_or_operator, c.raw_status, c.normalized_status, c.project_type,
+         c.lat, c.lng, c.location_text, c.location_precision, c.distance_mi,
+         c.last_seen_at,
+         (c.total > (select n from lim)) as has_more
+  from counted c
+  order by c.distance_mi asc, c.source_key
+  limit (select n from lim);
 $function$;
 
 alter function public.national_dc_for_zip(text, numeric) owner to postgres;

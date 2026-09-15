@@ -217,11 +217,75 @@ console.log('\n11. The local connector pipeline and default filters are untouche
 
 console.log('\n12. Attribution can never credit a source that supplied nothing');
 {
-  ok(/NATIONAL_SOURCES = natlSites\.length/.test(mapExec),
-    '12a ODbL credit is derived from the records actually returned');
+  ok(/if\(s && s\.source_name && s\.record_url\) a\[s\.source_name\] = 1;/.test(mapExec),
+    '12a the credit names a source ONLY for a record that can actually reach the page');
+  ok(!/a\[s\.source_name\]=1; return a;/.test(mapExec),
+    '12a2 ...never from every row returned, which credited "undefined" on a junk payload');
   // On a failure there are no records, so no credit is rendered — the licence obligation
   // is met without ever asserting a source was consulted successfully.
   ok(R({ http: 500, body: null }).records.length === 0, '12b a failed read supplies no source names');
+}
+
+
+console.log('\n13. TRUNCATION IS A THIRD STATE — a clipped set is not a complete one');
+{
+  // Measured 2026-09-15 over ALL 12,722 canonical ZIPs: `limit 200` silently clipped
+  // ZIP 20166 (Sterling VA, the Loudoun data-centre corridor) at 203 eligible records —
+  // 200 returned, 3 hidden, reported as a complete success. Truncation-reported-as-
+  // complete is the same dishonesty as failure-reported-as-zero, one state over.
+  const more = (n) => Array.from({ length: n }, (_, i) => Object.assign(row('w/' + i), { has_more: true }));
+  const full = (n) => Array.from({ length: n }, (_, i) => Object.assign(row('w/' + i), { has_more: false }));
+
+  const t = R({ http: 200, body: more(3) });
+  ok(t.status === 'ok', '13a a truncated read still SUCCEEDED — status stays ok');
+  ok(t.truncated === true, '13b ...and says so');
+  ok(t.records.length === 3, '13c the rows it did return are kept');
+
+  const c = R({ http: 200, body: full(3) });
+  ok(c.truncated === false, '13d a complete read is not truncated');
+  ok(c.status === t.status, '13e both are `ok` — so status ALONE cannot tell them apart...');
+  ok(c.truncated !== t.truncated, '13f ...which is exactly why `truncated` exists');
+
+  ok(R({ http: 200, body: [] }).truncated === false, '13g an empty read is not truncated');
+  ok(R({ http: 500, body: null }).truncated === false, '13h a failed read reports truncated false, never undefined');
+  ok(R({ transportError: true }).truncated === false, '13i ...on every failure branch');
+  // The server is the authority. A page must never infer truncation from a row count,
+  // which is what made the old cap undetectable at exactly `limit` rows.
+  ok(R({ http: 200, body: full(200) }).truncated === false,
+    '13j 200 rows with has_more false is COMPLETE — the count is not the signal');
+}
+
+console.log('\n14. A ROW THAT IS NOT AN OBJECT CANNOT REACH A .map()');
+{
+  // A null/number/string entry throws the moment a caller reads a field off it, which
+  // took the whole ZIP page down with it (local records included). Measured on the real
+  // page; pre-existing since the plane shipped, fixed here.
+  const mixed = R({ http: 200, body: [row('w/1'), null, 42, 'x', row('w/2')] });
+  ok(mixed.status === 'ok', '14a a partially-junk array still succeeds');
+  ok(mixed.records.length === 2, '14b only the real rows survive', mixed.records.length);
+  let threw = false;
+  try { mixed.records.map((x) => x.source_key); } catch (e) { threw = true; }
+  ok(!threw, '14c mapping the survivors never throws');
+  // ...but an array that was non-empty and survives as EMPTY is malformed, NOT a real
+  // zero. Collapsing it to ok/0 would reintroduce this file's whole defect one level down.
+  const allJunk = R({ http: 200, body: [null, 42, 'x'] });
+  ok(allJunk.status === 'unavailable' && allJunk.reason === 'malformed',
+    '14d an all-junk array is malformed, never a successful zero');
+  ok(R({ http: 200, body: [] }).status === 'ok',
+    '14e ...while a genuinely empty array is still a successful zero');
+}
+
+console.log('\n15. The page and the DDL of record carry the same contract');
+{
+  ok(/truncated: !!natl\.truncated/.test(mapExec), '15a the signal carries truncated');
+  ok(/national data-center plane truncated at/.test(mapExec), '15b a truncated read warns, distinctly');
+  ok(/has_more boolean/.test(sqlExec), '15c the RPC returns has_more');
+  ok(/limit \(select n \+ 1 from lim\)/.test(sqlExec),
+    '15d it fetches cap+1 — at exactly `cap` rows a full set and a clipped one are identical');
+  ok(/1000::int as n/.test(sqlExec), '15e the cap is 1000, written in ONE place');
+  ok(!/limit 200;/.test(sqlExec), '15f the old silent 200 cap is gone');
+  ok(/order by c\.distance_mi asc, c\.source_key/.test(sqlExec),
+    '15g a total order, so which rows a truncation keeps is deterministic');
 }
 
 console.log(`\n${fails ? `FAILED: ${fails}` : 'ALL PASS'} — national plane failure visibility`);
