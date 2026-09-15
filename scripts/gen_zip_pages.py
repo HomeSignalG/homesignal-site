@@ -360,7 +360,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=22937269"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=dab7a152"></script>\n'
+        '<script src="/lib/community-page.js?v=059e7926"></script>\n'
         "</body>\n</html>\n")
 
 
