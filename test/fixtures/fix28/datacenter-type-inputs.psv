@@ -1,0 +1,440 @@
+# FIX 28 — FROZEN DATA CENTER TYPE CLASSIFICATION CORPUS
+#
+# Every DISTINCT classifier input behind the 1,218 point-scope Data-center CANDIDATE
+# records in production `public.development_reports.sites` on 2026-09-15, captured BEFORE
+# any Fix 28 implementation. 426 rows. The fields are exactly what HS.trackerSiteItem reads
+# (use_type, layer, label, registry_id); site_type/category are carried so the row can be
+# rebuilt verbatim.
+#
+# `expect` is NOT generated from lib/map.js. It is the verdict of the PRODUCTION SQL
+# projection public.map_site_is_datacenter_type(), read back out of the database. The test
+# that consumes this file runs the SHIPPED lib/map.js classifier and asserts the two agree,
+# so neither side can drift without a red test — and the fixture is not circular.
+#
+# idx|expect|has_rid|use_type|layer|site_type|category|label
+1|1|0|Civic/Public|civic|approved||AVION DATA CENTER DUCT BANK (AMAZON)
+2|1|0|Civic/Public|civic|approved||LAFAYETTE DATA CENTERS (SU)
+3|1|0|Commercial|commercial|approved||ADD PEMB & Foundation additions and Data Hall structures only - no MEP or other interior alterations.
+4|1|0|Commercial|commercial|approved||ALT All reviews completed under COM-ACC-25-000051. This 2nd permit is only needed to final per Kevin Dulin.    Datacente
+5|1|0|Commercial|commercial|approved||ALT Interior scope of work for Phase III of a new data center.
+6|1|0|Commercial|commercial|approved||ALT Main building data center alterations
+7|1|0|Commercial|commercial|approved||CLT 15 12MW Data Center
+8|1|0|Commercial|commercial|approved||Commercial Addition/Alteration H5 Data Centers - 4030 Lafayette Center
+9|1|0|Commercial|commercial|approved||Commercial Expansion of data center space to 3rd and 4th Floors and roof top mechanical upgrades.    certificate of occu
+10|1|0|Commercial|commercial|approved||Commercial/Industrial Projects New ground up 285,282 SF unlimited area data hall building with type II-B construction. G
+11|1|0|Commercial|commercial|approved||Commercial/Industrial Projects Shell data hall building 1, construction type II-B, two story 243,332 SF total building. 
+12|1|0|Commercial|commercial|approved||NEW Install data centers. This will include a new service that will power 20 transformers (3,250kva)  that supplies powe
+13|1|0|Commercial|commercial|built||AMAZON DATA HALL PH02- ACCESS CONTROL
+14|1|0|Commercial|commercial|built||DATA CENTER CRAC ADDITION
+15|1|0|Commercial|commercial|built||GSERVER LASALLE DATA CENTER
+16|1|0|Commercial|commercial|proposed||I M DATA CENTER-TI OF SUITE SC 37
+17|1|0|Commercial|commercial|proposed||IM DATA CENTER AZP3 SC33 PERMIT
+18|1|0|Commercial|commercial|proposed||IM DATA CENTER SPACE SC35 TI PERMIT
+19|1|0|Commercial|commercial|proposed||PHOENIX NAP II DATA CENTER - SHELL
+20|1|0|Commercial|commercial|proposed||TL PH Charlotte Data Center Campus LP
+21|1|0|Development|development|approved||ADDITIONS/ALTERATIONS/REPAIRS Construct data center and pump house renovations per plans reviewed for code compliance.
+22|1|0|Development|development|approved||ADDITIONS/ALTERATIONS/REPAIRS MECHANICAL for data center and pump house renovations per plans reviewed for code complian
+23|1|0|Development|development|approved||ADDITIONS/ALTERATIONS/REPAIRS PLUMBING for data center and pump house renovations per plans reviewed for code compliance
+24|1|0|Development|development|approved||ADDITIONS/ALTERATIONS/REPAIRS Tenant Upfit of an Existing Data Center Building Permit # CRBF-2025-050376
+25|1|0|Development|development|approved||AT&T - OAKTON DATA CENTER GENERATOR POWER (PR)
+26|1|0|Development|development|approved||AVION DATA CENTER (AMAZON)
+27|1|0|Development|development|approved||Building Commercial - New To construct a single-story 103,877 SF structure to accommodate a Data Center (established as 
+28|1|0|Development|development|approved||CHANTILLY PREMIER DATA CENTER (SU)
+29|1|0|Development|development|approved||Commercial Building SP - RTP - FIDELITY DATA CENTER - E & M TRADES - LEVEL 3 - TYPE IIA - NFPA13 - 1 STY - 155300 SF - "
+30|1|0|Development|development|approved||Commercial Replacement of Data Center cooling tower (EC-1).  Misc. steel work and associated Mechanical and Electrical w
+31|1|0|Development|development|approved||General Construction Proposed architectural renovations for the CUNY NAC Data Center on the 1st and 6th floors as descri
+32|1|0|Development|development|approved||General Construction REMOVE AND INSTALL INTERIOR PARITIONS, DOORS AND CEILINGS AT 12 FLOOR DATA CENTER. NO CHANGE TO USE
+33|1|0|Development|development|approved||LAFAYETTE DATA CENTERS
+34|1|0|Development|development|approved||MC106 Data Center Minor Amendment to the Previously MCI06 Preliminary Plat
+35|1|0|Development|development|approved||MC106 Data Center Site Development Plan for a data center located in Kansas City, Missouri. Includes drives, parking, ut
+36|1|0|Development|development|approved||MCLEARAN DATA CENTER
+37|1|0|Development|development|approved||MCLEAREN DATA CENTER
+38|1|0|Development|development|approved||NEW CONSTRUCTION Construct Data Center (IB158 #1) per plans reviewed for code compliance. BOP DCH Area #1
+39|1|0|Development|development|approved||PERMIT - RENOVATION/ALTERATION DDS 2019 CBC: INTERIOR ALTERATIONS TO EXISTING 6TH FLOOR DATA CENTER (INCLUDES REPLACEMEN
+40|1|0|Development|development|approved||PERMIT - RENOVATION/ALTERATION SPR 2019 CBRC: 1ST FLOOR INTERIOR AND EXTERIOR ALTERATIONS IN EXISTING 2-STORY DATA CENTE
+41|1|0|Development|development|approved||Rocky Branch Creek Data Center Minor Amendment A Final Development Plan for a Security Entrance, Office Building, and Da
+42|1|0|Development|development|approved||Rocky Branch Creek Data Center Minor Amendment This application is for a minor amendment for Rocky Branch Creek Data Cen
+43|1|0|Development|development|approved||Rocky Branch Creek MPD Final Plan Data Center with Secure Entrance and Office Building. MPD Final Plan
+44|1|0|Development|development|approved||Rocky Branch Creek MPD Final Plan The Final Development Plan Application is for the construction of the 2nd Data Center 
+45|1|0|Development|development|approved||Rocky Branch Creek MPD Final Plan This is a Final Master Plan Development for Phase 3 of Rocky Branch Creek Data Center.
+46|1|0|Development|development|approved||Structural Installation of reinforcing steel to support additional weight of data center racking and equipment.
+47|1|0|Development|development|approved||Structural New dunnage framing for mechanical equipment on 2nd floor roof. New steel supports for 4th floor data center 
+48|1|0|Development|development|built||Building American Tower Modular Data Center Phase 2 - Addition to Unmanned Modular data storage facility. Pro
+49|1|0|Development|development|built||General Construction MODIFY EXISTING DATA CENTER LAYOUT WITH NEW INTERIOR METAL MESH CAGE PARTITIONS & DOORS FOR 6,234 S
+50|1|0|Development|development|proposed||2100 Renaissance Blvd - Data Center
+51|1|0|Development|development|proposed||3200 Horizon Drive - Data Center
+52|1|0|Development|development|proposed||411 Swedeland Road - Data Center
+53|1|0|Development|development|proposed||600 River Road - Data Center
+54|1|0|Development|development|proposed||934 Central Data Center High-rise 140,880 GSF, 20 Story Building,  Communication Service Establishment and Eating & Drin
+55|1|0|Development|development|proposed||E THISTLE LANDING DATA CENTER G&D
+56|1|0|Development|development|proposed||Francis Harris Lane Maberry Data Center
+57|1|0|Development|development|proposed||Gravel Pike Data Center
+58|1|0|Development|development|proposed||PHOENIX NAP II DATA CENTER - G&D
+59|1|0|Development|development|proposed||QTS DATA CENTER
+60|1|0|Development|development|proposed||RBC Data Center Campus Major Amendment This is a revision to the PMPD plan (CD-AA-2026-00054) approved on May 29, 2026. 
+61|1|0|Development|development|proposed||Renaissance Blvd. - Data Center
+62|1|0|Industrial|industrial|approved||Data Center 5  GREAT OAKS BL  , SAN JOSE CA 95119-0000
+63|1|0|Industrial|industrial|built||Data Center 123  GREAT OAKS BL  , SAN JOSE CA 95119
+64|1|0|Industrial|industrial|built||Data Center 127  GREAT OAKS BL  , SAN JOSE CA 95119
+65|1|0|Industrial|industrial|built||Data Center 130  HOLGER WY  , SAN JOSE CA 95134-1361
+66|1|0|Industrial|industrial|built||Data Center 131  GREAT OAKS BL  , SAN JOSE CA 95119
+67|1|0|Industrial|industrial|built||Data Center 1657  ALVISO-MILPITAS RD  , SAN JOSE CA 95134
+68|1|0|Industrial|industrial|built||Data Center 2001  FORTUNE DR 2 , SAN JOSE CA 95131
+69|1|0|Industrial|industrial|built||Data Center 5  GREAT OAKS BL  , SAN JOSE CA 95119-0000
+70|1|0|Industrial|industrial|built||Data Center 988  ROCK AV  , SAN JOSE CA 95131-0000
+71|1|0|Industrial|industrial|proposed||Master Use Permit Land Use Application to allow a 9-story Business Support Services (Data Center) building. Parking for 
+72|1|0|Industrial|industrial|proposed||Pennhurst Data Centers
+73|1|0|Industrial|industrial|proposed||The Data Centers
+74|0|0|other project|development|approved||ACC Installing data center containment racking for Oppidan Data Center Facility located at 3900 S. Mendenhall Road, Memp
+75|0|0|other project|development|approved||ACC Project: Building a Data Center - Phase 1 The first phase of the data center project focuses on the initial deployme
+76|0|0|other project|development|built||IRON MOUNTAIN DATA CENTER - PUMP
+77|0|0|other project|development|built||IRON MOUNTAIN SC-31 DATA HALL TI
+78|0|0|other project|development|built||LA SALLE 1G SERVERS DATA CENTER T.I F/A
+79|0|0|other project|development|built||SC-33 DATA HALL
+80|0|0|other project|development|proposed||IRON MTN DATA CENTER-GATES
+81|0|0|other project|development|proposed||MCDOWELL ROAD DATA CENTER
+82|0|0|other project|development|proposed||PHX 05-3 DATA HALL 1B BESS PERMIT
+83|0|0|other project|development|proposed||PHX 05-3 DATA HALL1C BESS PERMIT
+84|0|0|other project|development|proposed||PHX05-3 DATA HALL 1A EESS
+85|0|0|other project|development|proposed||SC-35 DATA HALL OFFICE ALARM MOD
+86|1|0|unclassified|development|approved||CheckFree Data Center
+87|1|0|unclassified|development|approved||EDGE (DATA CENTER) LOOP 12
+88|1|0|unclassified|development|approved||HEWLETT PACKARD - TANDEM DATA CENTER
+89|0|0|unclassified|development|approved||Hewlett Packard- Site 2 EcoPOD
+90|0|0|unclassified|development|approved||Norwood Park, Replat of Lots 2-4 of Resub of Lots 6-7 of Replat of
+91|1|0|unclassified|development|approved||ZC-25-205 PD for certain I uses plus data center with development waivers for increased setbacks, height; site plan waiv
+92|1|0|unclassified|development|approved||ZYDECO DATA CENTER (WITHDRAWAL & RESUBMITTAL OF SP-06-0332C)
+93|1|0|unclassified|development|built||QTS (DATA CENTER) LONGHORN DR
+94|1|0|Utility|energy|built||BOSTON- DATA CENTER & HVAC EXPANSION & UPGRADES AT HQ BOSTON
+95|1|0|Utility|energy|built||BOSTON- DATA CENTER ELECTRIC UPGRADES AT HQ BOSTON
+96|1|0|Utility|energy|built||Training & Data Center Roofs CTDOT Training and Data Center Roof Replacements, Newington.
+97|1|1||datacenter|built||365 DATA CENTERS
+98|1|1||datacenter|built||A T & T ORLANDO DATA CENTER
+99|1|1||datacenter|built||ACE DATA CENTER
+100|1|1||datacenter|built||ADOA DATA CENTER
+101|1|1||datacenter|built||ADOBE DATA CENTER
+102|1|1||datacenter|built||ADP DATA CENTER (DC1)
+103|1|1||datacenter|built||AGILENT TECHNOLOGIES INC - CO SPRINGS DATA CENTER
+104|1|1||datacenter|built||ALBUQUERQUE PUBLIC SCHOOLS: DATA CENTER
+105|1|1||datacenter|built||ALIGNED DATA CENTER
+106|1|1||datacenter|built||ALIGNED DATA CENTER MEMORY TECH PHASE 1 ADDITION
+107|1|1||datacenter|built||ALIGNED DATA CENTER SLC-4
+108|1|1||datacenter|built||ALIGNED ENERGY DATA CENTERS (ASHBURN), LLC
+109|1|1||datacenter|built||ALIGNED ENERGY DATA CENTERS (PHOENIX)
+110|1|1||datacenter|built||ALIGNED ENERGY DATA CENTERS (SLC), LLC - WEST JORDAN DATA CENTER
+111|1|1||datacenter|built||ALLIANT ENERGY DATA CENTER
+112|1|1||datacenter|built||AMERITECH HOWELL DATA CENTER
+113|1|1||datacenter|built||AMERITRADE-KANSAS CITY DATA CENTER
+114|1|1||datacenter|built||ANNAPOLIS DATA CENTER
+115|1|1||datacenter|built||APPLE DATA CENTER
+116|1|1||datacenter|built||APS - ALIGNED ENERGY DATA CENTER
+117|1|1||datacenter|built||AREP BEAUMEADE DATA CENTER
+118|1|1||datacenter|built||AREP DATA CENTER
+119|1|1||datacenter|built||AREP LAS COLINAS DATA CENTER
+120|1|1||datacenter|built||ARK DATA CENTERS
+121|1|1||datacenter|built||ARVEST DATA CENTER
+122|1|1||datacenter|built||ASH2 LOCKRIDGE DATA CENTER - QTS INVESTMENT PROPERTIES ASHBURN II LLC
+123|1|1||datacenter|built||ASHBURN TO LOCKRIDGE DATA CENTER ASH 2 LOCKRIDGE
+124|1|1||datacenter|built||ATL06 DATA CENTER
+125|1|1||datacenter|built||ATT DATA CENTER
+126|1|1||datacenter|built||ATT ST LOUIS DATA CENTER
+127|1|1||datacenter|built||AURORA DATA CENTER PHASE 2
+128|1|1||datacenter|built||AURORA DATA CENTER SUBDIVISION FILING NO. 1 DEFERRED ROADWAY
+129|1|1||datacenter|built||AUSTIN DATA CENTER
+130|1|1||datacenter|built||AUSTIN DATA CENTER 2
+131|1|1||datacenter|built||BARCLAYS CAPITAL DATA CENTER
+132|1|1||datacenter|built||BEAR STEARNS & CO INC WHIPPANY DATA CENTER
+133|1|1||datacenter|built||BELLSOUTH TELECOMMUNICATIONS INC, DATA CENTER
+134|1|1||datacenter|built||BLOOMBERG DATA CENTER
+135|1|1||datacenter|built||BLUE ASH DATA CENTER
+136|1|1||datacenter|built||BROADWAY DATA CENTERNA FORMER
+137|1|1||datacenter|built||BST JACKSON DATA CENTER 72140
+138|1|1||datacenter|built||CCO-06 DATA CENTER
+139|1|1||datacenter|built||CELLCO - DUBLIN 1 - RHQ AND DATA CENTER
+140|1|1||datacenter|built||CELLCO -IRVINE DATA CENTER
+141|1|1||datacenter|built||CENTENE DATA CENTER
+142|1|1||datacenter|built||CERNER LEE'S SUMMIT DATA CENTER
+143|1|1||datacenter|built||CH3 DATA CENTER
+144|1|1||datacenter|built||CH4 DATA CENTER
+145|1|1||datacenter|built||CINGULAR WIRELESS LLC - MIDWAY DATA CENTER(DAL3152)
+146|1|1||datacenter|built||CITIBANK DATA CENTER OPERATION
+147|1|1||datacenter|built||CLT 16 12MW DATA CENTER
+148|1|1||datacenter|built||COMARCH PHOENIX DATA CENTER
+149|1|1||datacenter|built||COMCAST DATA CENTER
+150|1|1||datacenter|built||COMCAST MIRAMAR DATA CENTER
+151|1|1||datacenter|built||COMCAST XSDC DATA CENTER
+152|1|1||datacenter|built||COMED KEHOE DATA CENTER DUCT PACKAGE PROJECT
+153|1|1||datacenter|built||COMPARK DATA CENTER
+154|1|1||datacenter|built||CONAGRA FOODS INC DATA CENTER
+155|1|1||datacenter|built||CONDUENT DATA CENTER
+156|1|1||datacenter|built||CORE SCIENTIFIC DATA CENTER EXPANSION
+157|1|1||datacenter|built||CORE SCIENTIFIC DATA CENTER SITE 1 AND 2 DENTON TEXAS
+158|1|1||datacenter|built||CORE SCIENTIFIC DATA CENTER SITE 1 AND 2 DENTON TX
+159|1|1||datacenter|built||CORESITE - VA1 DATA CENTER
+160|1|1||datacenter|built||COREWELL HEALTH BRADFORD DATA CENTER
+161|1|1||datacenter|built||COREWELL HEALTH BRADFORD DATA CENTER (P0402)
+162|1|1||datacenter|built||CORNERSTONE SOUTHWEST DATA CENTER
+163|1|1||datacenter|built||CORNERSTONE SW DATA CENTER
+164|1|1||datacenter|built||CORPORATE DATA CENTER
+165|1|1||datacenter|built||CORSCALE DATA CENTERS- GCDC VA 1.1
+166|1|1||datacenter|built||CORSCALE DATA CENTERS- GCDC VA 1.2
+167|1|1||datacenter|built||COS01 DATA CENTER
+168|1|1||datacenter|built||COS02 DATA CENTER
+169|1|1||datacenter|built||CP&L CORPORATE DATA CENTER
+170|1|1||datacenter|built||CRANE DATA CENTER
+171|1|1||datacenter|built||CUBE NA DATA CENTER COMPANY LLC
+172|1|1||datacenter|built||CYRUSONE - CARROLLTON DATA CENTER
+173|1|1||datacenter|built||CYRUSONE LLC - FLORENCE DATA CENTER
+174|1|1||datacenter|built||CYRUSONE NORTHERN VIRGINIA DATA CENTER - MARIES ROAD
+175|1|1||datacenter|built||CYRUSONE NORTHERN VIRGINIA DATA CENTER - SHAW ROAD
+176|1|1||datacenter|built||D R HORTON DATA CENTER
+177|1|1||datacenter|built||DARVISH DATA CENTER
+178|1|1||datacenter|built||DATA CENTER
+179|1|1||datacenter|built||DATA CENTER (200 S 200 E SLC)
+180|1|1||datacenter|built||DATA CENTER ATLANTA, LLC
+181|1|1||datacenter|built||DATA CENTER BUILDING EXPANSION
+182|1|1||datacenter|built||DATA CENTER CAMPUS
+183|1|1||datacenter|built||DATA CENTER FULTON, LLC
+184|1|1||datacenter|built||DATACENTER PARK
+185|1|1||datacenter|built||DAWN US HOLDINGS LLC DBA EVOQUE DATA CENTER SOLUTIONS
+186|1|1||datacenter|built||DB DATA CENTER BOULDER PARK, LLC
+187|1|1||datacenter|built||DCAMM SPRINGFIELD DATA CENTER
+188|1|1||datacenter|built||DEER VALLEY TECHNOLOGY DATA CENTER
+189|1|1||datacenter|built||DES MOINES DATA CENTER
+190|1|1||datacenter|built||DFW VII DATA CENTER
+191|1|1||datacenter|built||DIGITAL ASSET DATA CENTER
+192|1|1||datacenter|built||DIGITAL CROSSROADS OF AMERICA DATA CENTER & CENTRAL PLANT
+193|1|1||datacenter|built||DIGITAL DATA CENTER
+194|1|1||datacenter|built||DORAL DATA CENTER PARKING LOT IMPROVEMENTS
+195|1|1||datacenter|built||DULLES BERRY LC4 DATA CENTER
+196|1|1||datacenter|built||DULLES BERRY LC8 DATA CENTER
+197|1|1||datacenter|built||DXC TECHNOLOGY SERVICES LLC / CHEROKEE DATA CENTER
+198|1|1||datacenter|built||E D S DATA CENTER
+199|1|1||datacenter|built||EAGAN 5 MW DATA CENTER
+200|1|1||datacenter|built||EASTGREEN INC AIG DATA CENTER
+201|1|1||datacenter|built||EBAY INC.: SLC DATA CENTER
+202|1|1||datacenter|built||EBAY PHOENIX DATA CENTER
+203|1|1||datacenter|built||EDGECORE DATA CENTER
+204|1|1||datacenter|built||EDGECORE DATA CENTER - NORTH CAMPUS
+205|1|1||datacenter|built||EDGECORE DATACENTER - FUJITSU CAMPUS ADDITION
+206|1|1||datacenter|built||EDGEX DATA CENTERS LLC / 4442 NEWCASTLE RD
+207|1|1||datacenter|built||EDMC DATA CENTER
+208|1|1||datacenter|built||EDWARDS AQUIFER RESEARCH AND DATA CENTER
+209|1|1||datacenter|built||ELK GROVE DATA CENTER LLC
+210|1|1||datacenter|built||EMERALD DATA CENTER
+211|1|1||datacenter|built||ENCORE TECHNOLOGIES DATA CENTER
+212|1|1||datacenter|built||ENSONO DATA CENTER
+213|1|1||datacenter|built||ENSONO OMAHA DATA CENTER
+214|1|1||datacenter|built||ENTERGY DATA CENTER
+215|1|1||datacenter|built||EVOQUE DATA CENTER SOLUTIONS
+216|1|1||datacenter|built||EVOQUE DATA CENTER SOLUTIONS - PNJ1
+217|1|1||datacenter|built||EXPERIAN DATA CENTER
+218|1|1||datacenter|built||EXPERIAN MCKINNEY DATA CENTER
+219|1|1||datacenter|built||EXXONMOBIL DALLAS DATA CENTER
+220|1|1||datacenter|built||FANNIE MAE DATA CENTER
+221|1|1||datacenter|built||FANNIE MAE UTC DATA CENTER
+222|1|1||datacenter|built||FEDEX ENTERPRISE DATA CENTER
+223|1|1||datacenter|built||FIREBALL GROUP LLC DATA CENTER
+224|1|1||datacenter|built||FLEXENTIAL ATL 4 DATA CENTER
+225|1|1||datacenter|built||FLEXENTIAL DATA CENTER EXPANSION
+226|1|1||datacenter|built||FRANKLIN PARK (CHI22) DATA CENTER
+227|1|1||datacenter|built||FRONTIER COMMUNICATIONS DATA CENTER FW
+228|1|1||datacenter|built||FTY01 DATA CENTER
+229|1|1||datacenter|built||GAINESVILLE CROSSING DATA CENTER - BUILDING 4
+230|1|1||datacenter|built||GAINESVILLE CROSSING DATA CENTER PHASE 1
+231|1|1||datacenter|built||GE CAPITAL DATA CENTER
+232|1|1||datacenter|built||GEORGETOWN DATA CENTER
+233|1|1||datacenter|built||GRAFTON DATA CENTER
+234|1|1||datacenter|built||GTE DATA CENTER
+235|1|1||datacenter|built||GUN CLUB ROAD DATA CENTER - PHASE 2
+236|1|1||datacenter|built||H 5 DATA CENTERS
+237|1|1||datacenter|built||H5 DATA CENTER
+238|1|1||datacenter|built||H5 DATA CENTERS
+239|1|1||datacenter|built||HB FULLER CO - DATA CENTER - ARDEN HILLS
+240|1|1||datacenter|built||HCSC CORPORATE DATA CENTER 2
+241|1|1||datacenter|built||HEALTH DIALOG BEDFORD DATACENTER
+242|1|1||datacenter|built||HEALTHPARTNERS DATA CENTER
+243|1|1||datacenter|built||HERTZ DATA CENTER
+244|1|1||datacenter|built||HEWLETT PACKARD AUSTIN DATA CENTER 2
+245|1|1||datacenter|built||HEWLETT PACKARD AUSTIN DATA CENTER SITE 1
+246|1|1||datacenter|built||HOBART DATA CENTER MASS GRADING - 1
+247|1|1||datacenter|built||HOME DEPOT-AUSTIN DATA CENTER
+248|1|1||datacenter|built||HSBC  AMHERST DATA CENTER
+249|1|1||datacenter|built||HSBC BRIDGEWATER DATA CENTER
+250|1|1||datacenter|built||HSBC LAS VEGAS DATA CENTER
+251|1|1||datacenter|built||HSBC VERNON HILLS DATA CENTER
+252|1|1||datacenter|built||HUMANA DATA CENTER
+253|1|1||datacenter|built||HUTTO DATA CENTER CAMPUS
+254|1|1||datacenter|built||IAD11 DATA CENTER
+255|1|1||datacenter|built||IAD12 & IAD13 DATA CENTER
+256|1|1||datacenter|built||INTEL CORPORATION DATA CENTER
+257|1|1||datacenter|built||INTELISHIFT US LLC - DENVER DATA CENTER
+258|1|1||datacenter|built||INTERGATE ASHBURN DATA CENTER
+259|1|1||datacenter|built||IRMO DATA CENTER
+260|1|1||datacenter|built||IRON GATE DATA CENTERS - EAGAN
+261|1|1||datacenter|built||IRON MOUNTAIN DATA CENTER
+262|1|1||datacenter|built||IRON MOUNTAIN DATA CENTER AZP3
+263|1|1||datacenter|built||IRON MOUNTAIN DATA CENTERS
+264|1|1||datacenter|built||IRON MOUNTAIN DATA CENTERS - FORTRUST
+265|1|1||datacenter|built||IRON MOUNTAIN MIAMI DATA CENTER
+266|1|1||datacenter|built||J B HUNT TRANSPORT DATA CENTER
+267|1|1||datacenter|built||JOE'S DATACENTER, LLC (1325 TRACY AVENUE)
+268|1|1||datacenter|built||JP MORGAN CHASE DATACENTER
+269|1|1||datacenter|built||JPMC AURORA DATA CENTER
+270|1|1||datacenter|built||KAISER PERMANENTE DATA CENTER
+271|1|1||datacenter|built||KAISER PERMANENTE HEALTH PLAN, PLEASANTON DATA CENTER
+272|1|1||datacenter|built||KAISER PERMANENTE WALNUT CREEK DATA CENTER
+273|1|1||datacenter|built||KAISER WALNUT CREEK DATA CENTER
+274|1|1||datacenter|built||KODAK INFORMATION SERVICES DATA CENTER
+275|1|1||datacenter|built||LAN01 LANCASTER DATA CENTER
+276|1|1||datacenter|built||LANCASTER DATA CENTER
+277|1|1||datacenter|built||LC11 & LC12 DATA CENTER
+278|1|1||datacenter|built||LEE HEALTH LAB & DATA CENTER
+279|1|1||datacenter|built||LEESBURG VA DATA CENTER (GOOGLE)
+280|1|1||datacenter|built||LEWISVILLE DATA CENTER
+281|1|1||datacenter|built||LIBERTY MUTUAL DATA CENTER
+282|1|1||datacenter|built||LIBERTY MUTUAL DATA CENTER-LIBERTY MUTUAL DATA CENTER
+283|1|1||datacenter|built||LIGHTEDGE DATA CENTER
+284|1|1||datacenter|built||LILLY LTC-N K323 MODULAR DATA CENTER ADDITION
+285|1|1||datacenter|built||LITTLE ROCK DATA CENTER
+286|1|1||datacenter|built||LOISDALE RD DATA CENTER CONNECT
+287|1|1||datacenter|built||LOUDOUN CENTER LC3 DATA CENTER
+288|1|1||datacenter|built||LOUDOUN DATA CENTER 1 (LDC1)
+289|1|1||datacenter|built||LOUDOUN METRO DATA CENTERS LM1 LM2 LM3 AND LM4
+290|1|1||datacenter|built||LOUDOUN METRO DATA CENTERS LM5-LM8
+291|1|1||datacenter|built||MANASSAS CORPORATE CENTER DATA CENTER BLDG 2
+292|1|1||datacenter|built||MANASSAS CORPORATE CENTER DATA CENTER BUILDING 6 M
+293|1|1||datacenter|built||MCDOWELL ROAD DATA CENTER
+294|1|1||datacenter|built||MCLEAREN DATA CENTER ROUGH GRADING PLAN
+295|1|1||datacenter|built||MDC1 DATA CENTER
+296|1|1||datacenter|built||MEDTRONIC DATA CENTER
+297|1|1||datacenter|built||MERIDIAN PARKWAY DATA CENTER OWNER LLC
+298|1|1||datacenter|built||METRODATA CENTER
+299|1|1||datacenter|built||MICROSOFT BLUE RIDGE (IAD11-12-13) DATA CENTER
+300|1|1||datacenter|built||MICROSOFT CHEYENNE DATA CENTER CYS17 - CYS22
+301|1|1||datacenter|built||MICROSOFT CORP-CHICAGO DATA CENTER
+302|1|1||datacenter|built||MICROSOFT CORPORATION - MKE 3B DATA CENTER
+303|1|1||datacenter|built||MICROSOFT DATA CENTER
+304|1|1||datacenter|built||MICROSOFT DATA CENTER (CCO06)
+305|1|1||datacenter|built||MICROSOFT DM1 DATA CENTER
+306|1|1||datacenter|built||MICROSOFT HOFFMAN ESTATES (CHI05) DATA CENTER
+307|1|1||datacenter|built||MICROSOFT PHX 16 DATA CENTER
+308|1|1||datacenter|built||MIDLANDS DATA CENTER
+309|1|1||datacenter|built||MONSANTO NEW DATA CENTER
+310|1|1||datacenter|built||MORGAN STANLEY DATA CENTER
+311|1|1||datacenter|built||NATIONWIDE EAST DATA CENTER
+312|1|1||datacenter|built||NDA MESA DATA CENTER
+313|1|1||datacenter|built||NETRALITY DATA CENTER
+314|1|1||datacenter|built||NETRALITY DATA CENTERS - KC2 (AIR)
+315|1|1||datacenter|built||NETRIVER DATA CENTER
+316|1|1||datacenter|built||NISSAN N.AMERICA - NISSAN DATA CENTER
+317|1|1||datacenter|built||NJFX DATA CENTER
+318|1|1||datacenter|built||NORTHERN TRUST DATA CENTER
+319|1|1||datacenter|built||NORTHLAKE DATA CENTER
+320|1|1||datacenter|built||NOVVA COLORADO - DATA CENTER CO SPRINGS
+321|1|1||datacenter|built||NOVVA DATA CENTERS
+322|1|1||datacenter|built||NTT DATA CENTER TO TSS 101
+323|1|1||datacenter|built||NTT GLOBAL DATA CENTER VA10 EARLY GRADING PLAN
+324|1|1||datacenter|built||NTT GLOBAL DATA CENTERS AMERICAS, INC.- VA1
+325|1|1||datacenter|built||NTT GLOBAL DATA CENTERS CH LLC
+326|1|1||datacenter|built||NTT GLOBAL DATA CENTERS HI, LLC
+327|1|1||datacenter|built||NTT GLOBAL DATA CENTERS VA2, LLC
+328|1|1||datacenter|built||NTT PH1 DATA CENTER
+329|1|1||datacenter|built||NTT TX-4 DATA CENTER
+330|1|1||datacenter|built||NVA05A STACKS DATA CENTER
+331|1|1||datacenter|built||NVA05C DATA CENTER
+332|1|1||datacenter|built||NVA13 - DATA CENTER SITE PLAN
+333|1|1||datacenter|built||OHSU DATA CENTER WEST
+334|1|1||datacenter|built||OMAHA DATA CENTER
+335|1|1||datacenter|built||ONE NECK DENVER DATA CENTER
+336|1|1||datacenter|built||ONENECK IT-DENVER DATA CENTER
+337|1|1||datacenter|built||OPPIDAN DATA CENTER
+338|1|1||datacenter|built||OPPIDAN DATA CENTER - MGM
+339|1|1||datacenter|built||OPPIDAN EL PASO DATA CENTER
+340|1|1||datacenter|built||ORACLE KC-7/8 DATA CENTERS
+341|1|1||datacenter|built||ORANGEBURG DATA CENTER
+342|1|1||datacenter|built||ORANGETOWN DATA CENTER
+343|1|1||datacenter|built||OSMIUM DATA CENTER
+344|1|1||datacenter|built||PAPILLION 5 MW DATA CENTER
+345|1|1||datacenter|built||PHX 10-11 DATA CENTER OFFSITE IMPROVEMENTS
+346|1|1||datacenter|built||PHX 70 - MICROSOFT DATA CENTER
+347|1|1||datacenter|built||PHX71-MICROSOFT DATA CENTER
+348|1|1||datacenter|built||PLANO DATA CENTER
+349|1|1||datacenter|built||PLEASANTON DATA CENTER
+350|1|1||datacenter|built||PNC PITTSBURGH DATA CENTER
+351|1|1||datacenter|built||PRIME DATA CENTERS - PHX01
+352|1|1||datacenter|built||PROJECT EAGLE DATA CENTER
+353|1|1||datacenter|built||PROJECT UMBRELLA (QTS DATA CENTER)
+354|1|1||datacenter|built||PROPOSED DATA CENTER DEVELOPMENT
+355|1|1||datacenter|built||PROPOSED DATA CENTER ORD-1
+356|1|1||datacenter|built||PROPOSED DATA CENTER ORD-2
+357|1|1||datacenter|built||PROSPERITY DRIVE DATA CENTER, LLC
+358|1|1||datacenter|built||QTS DFW 2 DATA CENTER SUBSTATION PROJECT
+359|1|1||datacenter|built||QTS LLC - ASHBURN-SHELLHORN DATA CENTER
+360|1|1||datacenter|built||RAGINGWIRE DATA CENTER
+361|1|1||datacenter|built||RICHARDSON DATA CENTER
+362|1|1||datacenter|built||ROBERT HALF DATA CENTER
+363|1|1||datacenter|built||ROCKY BRANCH CREEK DATA CENTER
+364|1|1||datacenter|built||SABEY DATA CENTER AUSTIN BLDG B
+365|1|1||datacenter|built||SABEY DATACENTER
+366|1|1||datacenter|built||SAMSUNG DATA CENTER
+367|1|1||datacenter|built||SBC INTERNET DATA CENTER
+368|1|1||datacenter|built||SC 1 DATA CENTER, PHASE 2
+369|1|1||datacenter|built||SCE&G IRMO DATA CENTER
+370|1|1||datacenter|built||SDC DFW-VII DATA CENTER PHASE 2
+371|1|1||datacenter|built||SHARP HEALTH CARE (DATA CENTER)
+372|1|1||datacenter|built||SI PHXL2 - DATA CENTER
+373|1|1||datacenter|built||SPECTRUM HEALTH-BRADFORD DATA CENTER
+374|1|1||datacenter|built||SPRINT LEES SUMMIT DATA CENTER - LEES SUMMIT
+375|1|1||datacenter|built||STANFORD ITSS DATA CENTER
+376|1|1||datacenter|built||STATE STREET WESTBOROUGH DATA CENTER
+377|1|1||datacenter|built||STREAM DATA CENTER PHX-01
+378|1|1||datacenter|built||SUNGARD INTERNET DATA CENTER
+379|1|1||datacenter|built||SUWANEE DATA CENTER
+380|1|1||datacenter|built||SYCAMORE DATA CENTER
+381|1|1||datacenter|built||SYCAMORE ORANGETOWN - DATA CENTER BUILDING
+382|1|1||datacenter|built||T MOBILE USA INC PARSIPPANY DATA CENTER
+383|1|1||datacenter|built||T-MOBILE FRISCO SWITCH RBO NOC DATA CENTER
+384|1|1||datacenter|built||T5 AT PORTLAND IV DATA CENTER
+385|1|1||datacenter|built||T5 DATA CENTER
+386|1|1||datacenter|built||T5 DATA CENTERS
+387|1|1||datacenter|built||TELCOFACILITIES DATA CENTER
+388|1|1||datacenter|built||TGS - PASTEUR DATA CENTER
+389|1|1||datacenter|built||THE DATA CENTERS
+390|1|1||datacenter|built||TRAVELERS DATA CENTER
+391|1|1||datacenter|built||TYSON FOODS, INC. DATA CENTER
+392|1|1||datacenter|built||TYSON/SPRINGDALE DATA CENTER
+393|1|1||datacenter|built||UFD DATA CENTER
+394|1|1||datacenter|built||UNION - DATA CENTER PHASE I DESIGN
+395|1|1||datacenter|built||UNITED HEALTHCARE SERVICES INC - DATA CENTER
+396|1|1||datacenter|built||USDATA CENTERS
+397|1|1||datacenter|built||USGS - EROS DATA CENTER
+398|1|1||datacenter|built||VANTAGE DATA CENTER TEMPORARY FEEDER
+399|1|1||datacenter|built||VANTAGE DATA CENTER VA3 LLC
+400|1|1||datacenter|built||VANTAGE DATA CENTERS AZ21 - MAIN PROJECT
+401|1|1||datacenter|built||VANTAGE DATA CENTERS GA 11
+402|1|1||datacenter|built||VANTAGE DATA CENTERS VA16
+403|1|1||datacenter|built||VANTAGE DATA CENTERS VA2 LLC
+404|1|1||datacenter|built||VAST DATA CENTER
+405|1|1||datacenter|built||VERIO DATA CENTER
+406|1|1||datacenter|built||VERIZON ORLANDO DATA CENTER
+407|1|1||datacenter|built||VERIZON WIRELESS - DATA CENTER
+408|1|1||datacenter|built||VERIZON WIRELESS - DATA CENTER DUBLIN II
+409|1|1||datacenter|built||VERIZON WIRELESS:SHADELANDS (WALNUT CREEK DATA CENTER)
+410|1|1||datacenter|built||VIA CHRISTI DATA CENTER
+411|1|1||datacenter|built||VIAWEST INC - ENGLEWOOD DATA CENTER
+412|1|1||datacenter|built||VIAWEST PLANO DATA CENTER
+413|1|1||datacenter|built||VILLAGE OF CAROL STREAM 10MW DATA CENTER
+414|1|1||datacenter|built||VINEYARD DATA CENTER
+415|1|1||datacenter|built||VISI DATA CENTER / ONENECK IT SOLUTIONS, LLC
+416|1|1||datacenter|built||VOSS II- EXPANSION NETWORK DATA CENTER
+417|1|1||datacenter|built||WAL- MART STORES, INC. - EAST DATA CENTER
+418|1|1||datacenter|built||WAL-MART -COLORADO DATA CENTER #7497
+419|1|1||datacenter|built||WEST GROUP DATA CENTER
+420|1|1||datacenter|built||WESTBOROUGH DATA CENTER
+421|1|1||datacenter|built||WILTED DATA CENTER(PLEASANT HILL)
+422|1|1||datacenter|built||XEROX PITTSBURGH DATA CENTER
+423|1|1||datacenter|built||YBOR DATA CENTER
+424|1|1||datacenter|built||YOUTH FOR TOMORROW DATA CENTER - EARLY GRADING PLA
+425|1|1||datacenter|built||ZUMOT DATA CENTER
+426|0|1||energy|built||CYRUS ONE DATA HALL 1 POWER POD 1
