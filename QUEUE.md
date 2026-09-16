@@ -40,14 +40,41 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-15 — 🟡 FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: APPLIED TO THE DATABASE, PR OPEN
+### 2026-09-16 — ✅ FIX 28 — CLOSED AND ARCHIVED: a Data center point outside the ZIP is not that ZIP's data centre
 
-⚠️ **NOT MERGED, NOT DEPLOYED.** The site tree is unchanged — Fix 28 adds only three new files
-(a DDL of record, a frozen audit, one offline test + its fixture) and edits no shipped page, no
-`lib/*`, no CSS and no workflow. **What IS live is the DATABASE half**, because the contract
-required an AFTER audit reconciling all 996 baseline associations and that cannot be produced
-without applying. Founder approved and asked for a PR on 2026-09-15; the PR is open and
-unmerged. Rollback is one statement:
+⛔ **DONE. Do not re-open, re-derive or re-measure this.** Shipped `c2273e8` (#1240), `pages` run
+279 and `unit-tests` run 2448 both green on `main`, and **no `pages build and deployment` run
+exists on the merge SHA** — the deployment source is still GitHub Actions. The site tree carries
+only three new files plus this entry; **0 `.html` / `lib/*` / CSS / workflow files changed**, so
+the resident-visible change is entirely in the data.
+
+🔑 **THE CLOSING RECEIPT IS 3,204 WRITES NOBODY IN THIS SESSION MADE.** The backfill proves the
+repair; it does not prove the GATE. Measured **2026-09-16 13:25Z, thirteen hours after the
+merge**: the `*/2` rolling refresh had rewritten **3,204 `development_reports` rows** — a quarter
+of the 12,722-row corpus — entirely on its own, straight from the engine's centroid-radius
+payloads. Whole-corpus re-measurement at that moment: **361 Data center points on polygon-backed
+ZIP pages, 0 outside, 0 ZIP pages attributing one.** Fix 29's population read **706** unchanged.
+That is the trigger holding against thirteen hours of unattended engine writes, which is the only
+form of evidence that survives the session ending.
+
+⚠️ **AND THE NUMBER ABOVE IS THE ONE THAT NEARLY WENT IN WRONG.** The first draft of this entry
+said "one hour after the merge, 307 rows" — because the elapsed time was ASSUMED from the order of
+events in the session rather than read off a clock. `select now()` said 13:25Z, not 01:1xZ. The
+weaker claim would have been perfectly plausible, internally consistent, and wrong by twelve
+hours; it would also have understated the evidence by a factor of ten. **Read the clock; do not
+infer it from your own transcript.**
+
+**Acceptance gate, against the contract's own numbers:** 636/636 confirmed-outside associations
+removed · 360/360 confirmed-inside retained · 182/182 untestable untouched · **0** unexplained
+baseline identities of 1,178 · ZIP pages attributing an outside point **361 → 0**.
+
+⚠️ **THE MERGE COMMIT MESSAGE ON `main` CARRIES TWO JUNK LINES** — a stray `</commit_message>`
+and `</invoke>` leaked from the tool call that made it. The body above them is correct and
+complete. It was NOT rewritten: force-pushing the default branch to clean up cosmetic text is a
+worse trade than the blemish, and a future reader finding it here is better served than one who
+finds it in `git log` with no explanation.
+
+Rollback, still one statement:
 `drop trigger trg_development_reports_dc_zip_membership on public.development_reports;`
 (the removed records then return as each ZIP refreshes, ~53 h for a full sweep).
 
