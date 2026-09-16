@@ -719,6 +719,29 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   code change. This is the automatic replacement for the "⚠️ not eyeballed live" caveat; the
   ingest-feeds half is a separate ingest-repo generator (see
   `docs/community-build-source-of-truth.md` §14).
+- ⛔ **RUN FULL-CORPUS LIVE VERIFIERS ONE AT A TIME — they are not free reads**
+  (measured 2026-09-16; full receipt `docs/national-plane-and-verifier-saturation-2026-09-16.md` §2).
+  Five were dispatched at once (`verify-zip-universe`, `verify-zip-pages-live`,
+  `verify-map1-zip-states`, `verify-communities`, `verify-development`). `verify-communities`
+  walks **12,722 live pages** and `verify-development` walks the uncapped cache, so the fan-out
+  saturated the database: **5,548 log lines of `57014 canceling statement due to statement
+  timeout` in one 5-minute bucket**, PostgREST's own schema-cache query timing out with it
+  (surfacing as `503 PGRST002`), and **residents' pages failing to render** —
+  `community.html?zip=11706: #commPage never rendered within 45s`. Sequence them; never start
+  one while another is running.
+  - ⚠️ **`PGRST002` IS NOT PROOF THAT DDL BROKE THE SCHEMA CACHE.** That was the first
+    diagnosis and it was WRONG. The discriminator is in `postgrest_logs`: bucket
+    `countIf(... 'reload message')` against `countIf(... 'Could not query the database for the
+    schema cache')`. Measured: the one bucket carrying 2,688 PGRST002 had **0 reload messages**,
+    while every routine reload elsewhere loaded cleanly with **0** PGRST002. A saturated
+    database starves the cache query; an invalidated cache looks nothing like it.
+  - **Healthy durations, so a long run is not read as a hung one:** `verify-development`
+    **~4 h** (238/255 min measured), `verify-communities` 23–47 min, `verify-coverage-state`
+    ~19 min, the rest ~1 min.
+  - ⚠️ **`verify-development` is RED on `main` and only its DELTA is informative** —
+    **28,263** failures on 2026-09-14, before any of that day's work. Diff the count and the
+    failure CLASS against a pre-change run; a red badge alone says nothing. It also reports a
+    **negative** `Passed:` count when failures exceed pages, which will mislead the next reader.
 
 ## 6. Related repos & services
 - **`homesignal-ingest`** — the alert engine (feeds, scraping, grading, topic
