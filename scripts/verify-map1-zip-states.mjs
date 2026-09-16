@@ -4,8 +4,10 @@
 // Every control ZIP's producer status is asserted in this same run rather than assumed, and
 // the two mode contracts are checked SEPARATELY - ZIP mode must carry no distance and no
 // radius semantics, address mode must send a real geocoded home and a chosen radius.
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { kindFromProducer, ZIP_STATE_KINDS } from './lib/zip-state-kind.mjs';
 
 const BASE = process.env.SITE_BASE || 'https://homesignal.net';
 let fails = 0;
@@ -14,26 +16,138 @@ const ok = (c, name, detail) => {
   if (!c) fails++;
 };
 
-// Verified against production before this run:
-//   08005 pending/'unknown' · 01001 authoritative 34 markers · 01004 not_measured · 01009 complete 0 markers
-const CASES = [
-  { zip: '08005', kind: 'pending'       },
-  { zip: '01001', kind: 'authoritative' },
-  { zip: '01004', kind: 'not_measured'  },
-  { zip: '01009', kind: 'measured_zero' },
+// ── THE KIND IS RESOLVED, NEVER HARDCODED ───────────────────────────────────────────────────
+// This file's own header promises "every control ZIP's producer status is asserted in this same
+// run rather than assumed". It was not: the four kinds were a literal list, captured once and
+// commented "Verified against production before this run" — a snapshot presented as a standing
+// fact. A ZIP's geography state is a moving target, and one of them moved.
+//
+// WHAT IT COST, measured 2026-09-15: ZIP 08005 was pinned as `pending`. The producer now reports
+// `boundary_complete` with project_count 0, i.e. a MEASURED ZERO. The page correctly stopped
+// saying "not measured yet" and this gate called that a failure — for nine days, across nine
+// unrelated branches. Two red assertions, both false, on a page that was right. A gate that
+// cries wolf is a gate that gets ignored, which is the real damage.
+//
+// THE FIX IS NOT A NEW FIXTURE. Re-pinning 08005 to `measured_zero` would buy time until the
+// next ZIP moves and reproduce this exactly. The kind is now READ from the same producer the
+// page reads, per run, and the assertion block is selected from that. The candidate list below
+// only has to supply a ZIP in each state — it can never again disagree with production about
+// what state a ZIP is IN.
+const PRODUCER_RPC = 'app_zip_projects_markers';
+
+// CANDIDATES, not fixtures. Deliberately MORE than four and redundant per state, so one ZIP
+// graduating (exactly what happened to 08005) costs coverage nothing. Measured 2026-09-15:
+// 12,013 of 12,722 canonical ZIPs are boundary_complete, 706 not_measured and just 3 unknown —
+// so `pending` is the scarce state and carries all three of its live members.
+const CANDIDATES = [
+  '94128', '95219', '99128',   // unknown  -> pending        (all 3 that exist)
+  '01004',                     // not_measured
+  '01001',                     // boundary_complete, projects > 0 -> authoritative
+  '01009', '08005',            // boundary_complete, projects = 0 -> measured_zero
 ];
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
+const KINDS = ZIP_STATE_KINDS;
+
+// Read the Supabase URL + anon key out of the shipped page, so this gate cannot drift from what
+// the page actually calls. Same helper shape as scripts/verify-development.mjs.
+const pageHtml = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
+const grabVar = (name) => {
+  const m = pageHtml.match(new RegExp(`var ${name}\\s*=\\s*["']([^"']+)["']`));
+  if (!m) throw new Error(`Could not read ${name} from homesignalmap.html`);
+  return m[1];
+};
+const APIKEY = grabVar('APIKEY');
+const SUPABASE_URL = grabVar('ENDPOINT').replace(/\/functions\/v1\/.*$/, '');
+
+async function resolveKind(zip) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${PRODUCER_RPC}`, {
+    method: 'POST',
+    headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
+  });
+  if (!res.ok) return { zip, kind: null, why: `producer read ${res.status}` };
+  const auth = await res.json().catch(() => null);
+  const kind = kindFromProducer(auth);
+  return { zip, kind, why: kind ? `status=${auth && auth.status} projects=${auth && auth.project_count}`
+                                : `unresolvable payload (status=${auth && auth.status})` };
+}
+
 surfaceBanner('verify-map1-zip-states');
 console.log('LIVE Map 1 ZIP-state verification — ' + BASE + '\n');
 
+// ── Resolve every candidate against the producer BEFORE opening a browser ───────────────────
+console.log('── producer states, read live (the kinds below are measured, not assumed) ──');
+const resolved = [];
+for (const zip of CANDIDATES) resolved.push(await resolveKind(zip));
+for (const r of resolved) console.log(`   ${r.zip} -> ${r.kind || 'UNRESOLVED'}  [${r.why}]`);
+
+const unresolved = resolved.filter((r) => !r.kind);
+ok(unresolved.length === 0,
+   'every candidate ZIP resolved to a known producer state',
+   unresolved.length ? unresolved.map((r) => `${r.zip}: ${r.why}`).join('; ') : 'all resolved');
+
+// One representative per state. Browsing one ZIP per kind keeps this gate the same size it has
+// always been; the extra candidates exist for redundancy, not to lengthen the run.
+const CASES = KINDS
+  .map((kind) => {
+    const hit = resolved.find((r) => r.kind === kind);
+    return hit ? { zip: hit.zip, kind } : { zip: null, kind };
+  });
+
+// ⚠️ COVERAGE IS ASSERTED, because a state with no representative would otherwise make this
+// gate SILENTLY stop testing it — zero assertions and a green run, which is the vacuous-pass
+// shape this repo refuses everywhere else. The message says COVERAGE so it can never be
+// misread as the page being broken: those are different failures and they need different fixes.
+for (const c of CASES) {
+  if (!c.zip) {
+    ok(false, `COVERAGE: no candidate ZIP is currently in the '${c.kind}' state`,
+       'add one to CANDIDATES — the page contract for this state went UNTESTED this run');
+  }
+}
+console.log('');
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+
 const facBaseline = {};
 
-for (const c of CASES) {
+// ── READINESS: WAIT FOR THE RENDER, NOT FOR A VARIABLE TO EXIST ─────────────────────────────
+// `__HS_SITES !== undefined` + a fixed 3s was the wrong condition, and it produced FALSE REDS
+// on exactly the ZIPs with the most data. Measured in production 2026-09-15, tracing every
+// write to __HS_SITES with a property setter (one write per load, from render() at
+// homesignalmap.html:2400):
+//
+//     01001  write lands at 4105 / 4734 / 5233 ms      01004  at 701 / 706 / 927 ms
+//     01009  write lands at 4376 / 4858 / 5343 ms      94128  at 681 / 736 / 892 ms
+//
+// The gate measured at ~3000 ms, so for the two heavy ZIPs it read BEFORE the only write.
+// `window.__HS_SITES || []` then turned "not there yet" into an empty array, and an
+// unfinished page was reported as a page that renders nothing. Reproduced 6/6 on both a
+// reused page and a fresh context — deterministic, never a flake.
+//
+// ⚠️ THIS IS NOT "WAIT LONGER". A bigger sleep would still be a guess, and the whole failure
+// class is guessing. It waits for the render to SETTLE and says so if it never does. A
+// genuinely empty ZIP settles at 0 immediately and every assertion still runs against it, so
+// nothing is masked — which was the live question before this was measured.
+async function waitForRenderSettled(page, { quietMs = 1500, timeoutMs = 45000 } = {}) {
+  const t0 = Date.now();
+  let last = null, lastChange = Date.now();
+  for (;;) {
+    const n = await page.evaluate(() => Array.isArray(window.__HS_SITES) ? window.__HS_SITES.length : -1);
+    if (n !== last) { last = n; lastChange = Date.now(); }
+    else if (n >= 0 && Date.now() - lastChange >= quietMs) return { settled: true, n, ms: Date.now() - t0 };
+    if (Date.now() - t0 >= timeoutMs) return { settled: false, n, ms: Date.now() - t0 };
+    await page.waitForTimeout(150);
+  }
+}
+
+for (const c of CASES.filter((c) => c.zip)) {
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => window.__HS_SITES !== undefined, { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  const settle = await waitForRenderSettled(page);
+  ok(settle.settled, `${c.zip}: the page finished rendering`,
+     settle.settled ? `settled at ${settle.ms}ms with ${settle.n} site(s)`
+                    : `NEVER SETTLED after ${settle.ms}ms — nothing below was measured on a finished page`);
+  if (!settle.settled) { console.log(''); continue; }
 
   const m = await page.evaluate(() => {
     const sites = window.__HS_SITES || [];
@@ -51,6 +165,14 @@ for (const c of CASES) {
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
       couldNotRead: /could not be read/i.test(txt),
+      // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
+      // `could not be read` is lib/zip-authoritative.js::zipAuthNote — a statement about the
+      // authoritative READ. homesignalmap.html's outer .catch() says "Couldn't load ZIP N."
+      // instead, which matches neither existing pattern, so a page that honestly reported a
+      // failed load was scored as a page that violated its contract. Different failures,
+      // different fixes; pinned against drift by test/map1-zip-state-kind-resolution.test.mjs,
+      // which asserts this regex matches the literal string in the shipped page.
+      loadFailed: /Couldn't load ZIP/i.test(txt),
       // Matched on the address-mode DIRECTION, never on a literal. History: the phrase
       // 'street address' named a shape the geocoder never required and left the ZIP-mode hint in
       // #1079, which reddened this check on deploy; the replacement spanned the wordings known at
@@ -93,6 +215,17 @@ for (const c of CASES) {
   facBaseline[c.zip] = m.fac;
 
   console.log(`── ${c.zip} (${c.kind}) · development=${m.dev} · facilities/other=${m.fac}`);
+
+  // A page that never loaded cannot tell you anything about its contract. Reporting one as a
+  // contract violation is how a transport problem gets filed as a product bug — so it is its
+  // own failure, named INFRASTRUCTURE, and the state assertions below are SKIPPED rather than
+  // run against a page that has nothing on it.
+  if (m.loadFailed) {
+    ok(false, `INFRASTRUCTURE: ${c.zip} reported a failed load — NOTHING was verified for it`,
+       'the page said "Couldn\'t load ZIP"; this is not a contract result');
+    console.log('');
+    continue;
+  }
 
   // The invariant that applies to EVERY state: no fabricated ZIP-mode geography.
   ok(m.devWithDistance === 0,

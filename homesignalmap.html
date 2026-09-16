@@ -2244,6 +2244,15 @@ HS.onReady(function(){
         // is carried unmodified as normalized_status/raw_status so the popup can state what
         // the source actually said rather than our bucket for it.
         var natl = both[2] || HS.nationalPlaneResult(null);
+        // FIX 29 — PROXIMITY IS NOT MEMBERSHIP. national_dc_for_zip selects by a 5-mile
+        // great-circle radius around development_reports.home_lat/home_lng — a ZIP CENTROID.
+        // It may only supply ZIP-page membership where authoritative whole-ZIP geography
+        // exists; otherwise distance to a centroid is the only thing asserting the record is
+        // in this ZIP, which is the substitution zipAuthNote promises the page does not make.
+        // Measured 2026-09-15: 351 of the 706 canonical ZIPs with no ZCTA polygon drew 1,597
+        // placements from 141 records this way. HS.nationalPlaneAdmitted delegates to
+        // HS.zipAuthIsComplete, so there is ONE definition of usable ZIP geography.
+        var natlAdmitted = HS.nationalPlaneAdmitted(auth);
         // THE OBSERVABLE SIGNAL. Same shape the page already uses for a degraded subsystem
         // (window.__HS_* read by the verifiers, plus one console.warn — cf. the 3D view's
         // "[HomeSignal] 3D view unavailable (mode/reason)"). No new framework, no analytics
@@ -2252,6 +2261,11 @@ HS.onReady(function(){
         window.__HS_NATIONAL_PLANE = {
           plane: "national_dc", zip: zip, status: natl.status, reason: natl.reason,
           http: natl.http, records: natl.records.length,
+          // A SUCCESSFUL READ THAT IS NOT ADMITTED IS ITS OWN FACT, and it is not a failure:
+          // `status` still reports what the read did, while `admitted` reports whether this
+          // ZIP's geography lets those records claim membership. Collapsing them would make a
+          // refused-by-contract plane indistinguishable from a broken one.
+          admitted: natlAdmitted, admission_basis: HS.zipAuthOutcome(auth),
           // TRUNCATION IS ITS OWN FACT. A clipped set is a SUCCESSFUL read that is not the
           // whole set, so it is neither `unavailable` nor a plain `ok` — reporting it as
           // either is the same dishonesty in a different direction.
@@ -2263,12 +2277,15 @@ HS.onReady(function(){
             + natl.reason + (natl.http ? "/" + natl.http : "") + ") for ZIP " + zip
             + " — map rendered without it");
         }
-        if(natl.truncated && window.console && console.warn){
+        if(natlAdmitted && natl.truncated && window.console && console.warn){
           console.warn("[HomeSignal] national data-center plane truncated at "
             + natl.records.length + " records for ZIP " + zip
             + " — more exist than are shown");
         }
-        var natlSites = natl.records.map(function(r){
+        // Gated HERE rather than by hiding markers later: a hidden marker is still a site the
+        // page has accepted as belonging to this ZIP — counted, framed and exported — and the
+        // claim being refused is membership, not visibility.
+        var natlSites = !natlAdmitted ? [] : natl.records.map(function(r){
           return { id:r.source_key, name:r.project_name,
                    status: r.normalized_status === "operational" ? "Operating" : "Approved",
                    normalized_status:r.normalized_status, raw_status:r.raw_status,

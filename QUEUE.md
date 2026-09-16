@@ -40,13 +40,14 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-15 — 🟡 FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: APPLIED TO THE DATABASE, AWAITING FOUNDER APPROVAL
+### 2026-09-15 — 🟡 FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: APPLIED TO THE DATABASE, PR OPEN
 
-⚠️ **NOT MERGED, NOT DEPLOYED, NO PR.** The site tree is unchanged — Fix 28 adds only three new
-files (a DDL of record, a frozen audit, one offline test + its fixture) and edits no shipped page,
-no `lib/*`, no CSS and no workflow. **What IS live is the DATABASE half**, because the contract
+⚠️ **NOT MERGED, NOT DEPLOYED.** The site tree is unchanged — Fix 28 adds only three new files
+(a DDL of record, a frozen audit, one offline test + its fixture) and edits no shipped page, no
+`lib/*`, no CSS and no workflow. **What IS live is the DATABASE half**, because the contract
 required an AFTER audit reconciling all 996 baseline associations and that cannot be produced
-without applying. Rollback is one statement:
+without applying. Founder approved and asked for a PR on 2026-09-15; the PR is open and
+unmerged. Rollback is one statement:
 `drop trigger trg_development_reports_dc_zip_membership on public.development_reports;`
 (the removed records then return as each ZIP refreshes, ~53 h for a full sweep).
 
@@ -103,12 +104,23 @@ interaction is the root cause, and neither ruling is wrong.
   points are still outside their own ZIP boundary**. That is the over-reach control (a zero would
   have meant the gate reached past Data center) and it is also the honest size of the remaining
   work. Not Fix 28.
-- 📌 **ADJACENT DEFECT, MEASURED AND DELIBERATELY NOT CHANGED: `public.national_dc_for_zip` is a
-  pure centroid + 5-mile radius read** — 9,966 (ZIP, record) attributions over 2,418 ZIP pages, of
-  which **8,952 are outside the ZIP polygon**. It is NOT in the Fix 28 baseline because those
-  records currently classify as *Other project*, not Data center: the page builds them with `name`
-  while `HS.trackerSiteItem` reads `label`, so no class field and no name reaches the classifier.
-  **Two separate follow-ups, neither one Fix 28.**
+- 🔗 **ADJACENT DEFECT — HALF OF IT IS NOW FIX 29, WHICH MERGED WHILE THIS WAS IN FLIGHT (#1238,
+  `3a1da30`). Read the two together, not as rivals.** `public.national_dc_for_zip` is a pure
+  centroid + 5-mile radius read: 9,966 (ZIP, record) attributions over 2,418 ZIP pages, **8,952
+  outside the ZIP polygon** (measured 2026-09-15, before either fix). **Fix 29 took the
+  NON-POLYGON half** — 1,597 placements on 351 of the 706 boundary-less ZIP pages, refused at the
+  page's data boundary by `HS.nationalPlaneAdmitted` → `HS.zipAuthIsComplete`. **They do not
+  collide:** different plane (live RPC vs cached `development_reports.sites`), different
+  population (the 706 vs the 996 testable), different layer (page JS vs DB trigger). Verified
+  after Fix 29 merged: Fix 28's firewall reads **706 / 153 / 182, unchanged**, and polygon-backed
+  Data center points are **361, 0 outside**.
+- 📌 **STILL OPEN, and neither one is Fix 28 or Fix 29: (a)** the remaining **8,369** national-plane
+  placements sit on POLYGON-backed ZIP pages and are still admitted by centroid distance, never
+  polygon-tested; **(b)** those records render as *Other project*, not Data center — verified with
+  the real classifier, `HS.resolveTrackerMarker(...)` returns `typeKey:'other'`
+  (`FALLBACK:other`), because the page builds them with `name`/`type` while `HS.trackerSiteItem`
+  reads `label`/`use_type`/`layer`. Fixing (b) would move *Other project* geography, which is why
+  it was not bundled here.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
   path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace
@@ -120,6 +132,96 @@ interaction is the root cause, and neither ruling is wrong.
   and were simply never retrieved there, **9** fall in a ZCTA that is not one of the 12,722, and
   **1** is in no ZCTA at all. Fix 28 removes the false attribution; putting each record on the
   page it belongs to is POSITIVE attribution and is engine-retrieval work.
+
+### 2026-09-15 — ✅ FIX 29 — CLOSED AND ARCHIVED: proximity is not membership, and 351 ZIP pages stopped claiming it
+
+⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `3a1da30` (#1238), deployed by
+`pages` run **35036041000** on the merge SHA, and confirmed on the LIVE site with a non-polygon and a
+polygon-backed control taken the same way before and after. Every number below is a receipt.
+
+⚖️ **THE CONTRACT: a ZIP page represents ZIP GEOGRAPHY.** A centroid may position a map; it may never
+decide whether a project belongs to a ZIP. Where HomeSignal cannot establish ZIP polygon geography, it
+does not substitute centroid proximity for membership.
+
+- 🔑 **THE DEFECT WAS MEMBERSHIP, NOT THE BOUNDARY IMPORT — and the audit that found it is the reason
+  this shipped small.** The 706 non-polygon ZIPs are real (12,722 pages · 12,016 resolve · 706 do not),
+  but the adversarial audit cleared every recovery theory: upstream-exists-but-unresolved **0**, import
+  defect **0**, vintage gap **0**, join/normalization defect **0**. Census TIGERweb answered **0/706**
+  for the missing cohort against a **706/706** control, and `geo.zcta_boundary`'s 33,791 rows equal the
+  publisher's own layer count exactly. **Do not attempt to manufacture or recover 706 polygons.**
+- **What was actually wrong:** `public.national_dc_for_zip(p_zip, p_radius_mi => 5)` takes
+  `home_lat/home_lng` from `development_reports` — a ZIP CENTROID — and selects national data-centre
+  records within a 5-mile great-circle radius. `homesignalmap.html` concatenated those `natlSites`
+  unconditionally, so on a page with no whole-ZIP geography **distance to a centroid was the only thing
+  asserting a record was in that ZIP**. Measured: **351 of the 706 pages drew 1,597 placements from just
+  141 records** — on the same map as the page's own promise that it *"will not estimate it from a circle
+  around the ZIP centre"*.
+- **The guard is one predicate, and it DELEGATES rather than defining.** `HS.nationalPlaneAdmitted`
+  calls the existing `HS.zipAuthIsComplete`, so there is exactly ONE definition of "usable ZIP
+  geography" and nothing to keep in sync. ⛔ **Do not re-implement it as
+  `zipAuthOutcome(...) === 'complete'`** — that second copy was written, caught and reverted during the
+  build, and `test/fix29-national-plane-membership.test.mjs` §D now refuses it by name.
+- **It reads the payload the page ALREADY fetched**, so it costs no request and works for anonymous
+  visitors. `public.app_zcta_boundary` states polygon availability more directly and is **not
+  anon-executable**, so it cannot gate an anonymous page load. The substitute is sound because it was
+  cross-tabbed with **zero contradictory rows**: `boundary_complete` holds for exactly the 12,013
+  canonical ZIPs carrying a polygon, `not_measured` for exactly the 706 that do not.
+- **Gated at the DATA boundary, not by hiding markers.** A refused record never becomes a site, so it
+  cannot reach `render()`, `MAP_SITES`, the counts, the three map views, the ODbL credit or
+  `__HS_SITES`. A hidden marker is still a site the page has accepted as belonging to the ZIP, and
+  membership is the claim being refused. **Fails closed** — an `unavailable` read refuses too.
+- **PRODUCTION RECEIPTS (`verify-map1-card-grain`, `site_base=https://homesignal.net`, same probe both
+  times — baseline run `35035906157` pre-deploy, run `35036245903` post-deploy):**
+
+  | control | before | after |
+  |---|---|---|
+  | **60105** non-polygon (`not_measured`) | page **21** dev sites · **21** carrying no project identity · 79 leaflet markers · 4 FAIL | page **0** · **0** · 58 markers · **all 7 PASS/CLEAN** |
+  | **20151** polygon-backed (`boundary_complete`) | page **46** · relation 24 · **22** without identity | page **46** · relation 24 · **22** without identity — **byte-identical** |
+
+  60105's authoritative relation is EMPTY, and it was drawing 21 development sites anyway. The 79 → 58
+  marker drop is exactly the 21 removed.
+- 🔑 **THE PROBE MEASURED THE POPULATION INDEPENDENTLY, AND AGREED TO THE RECORD.** It counts
+  centroid/radius records as *development sites carrying no project identity* — a different instrument
+  from the SQL — and returned **21** for 60105 and **22** for 20151, exactly the counts predicted from
+  the database before the baseline was read. Table-wide: placements **9,966 → 8,369**, which is
+  `9,966 − 1,597` exactly; **admitted on the 706 = 0**; polygon-backed unchanged at **8,369**; collateral
+  on polygon ZIPs **0**.
+- ⚠️ **THE POST-DEPLOY PROBE STILL EXITS RED, AND THAT IS CORRECT — READ THE NUMBERS, NOT THE BADGE.**
+  Its 4 remaining failures are all 20151's, because its 22 legitimately-admitted national records carry
+  no `app_projects` identity. That is a pre-existing tension between the national plane and the
+  card-grain invariant, it is **Fix 28 / card-grain territory**, and Fix 29 neither causes nor fixes it.
+  Run total went 8 → 4 and **60105 contributed 0**.
+- ⚠️ **TWO DATA-CENTRE POPULATIONS. DO NOT COMBINE THEM.** **182 canonical records across 153** of the
+  706 (`app_projects`, the `lib/map.js` classifier) are UNTOUCHED and remain **UNTESTABLE** for polygon
+  containment while no boundary exists. The **1,597 placements / 351 ZIPs / 141 records** were the
+  centroid/radius plane. The 182 are not the 1,597, and neither is canonical membership for the other.
+- **FIX 28 NON-INTERFERENCE, verified rather than asserted:** Fix 28 concerns dots outside an EXISTING
+  polygon — ZIPs that HAVE one, which is exactly the case this gate ADMITS. 20151 still draws all 22 of
+  its national records post-deploy, so that population is intact and independently testable; nothing was
+  globally hidden, and the gate performs no containment test (asserted in the suite).
+- ⚠️ **`verify` (`verify-map1-zip-states`) was RED before this branch existed and is red still.** It
+  runs against production (`SITE_BASE: https://homesignal.net`); all 8 recent runs on `main` are
+  `failure`, including run #73 on `eb393e6` before the branch. Its 5 assertions are ZIP-mode COPY on
+  08005/01001/01009, none of it touched here. **Not caused by Fix 29 and not fixed by it.**
+- **Deployment source is still GitHub Actions** — checked the way CLAUDE.md §5 requires: **no
+  "pages build and deployment" run exists on the merge SHA**, and the deployed bytes were read back
+  from `https://homesignal.net/homesignalmap.html` (HTTP 200, 309,689 bytes) carrying
+  `var natlAdmitted = …`, the gated `natlSites`, the `admitted`/`admission_basis` signal, and **zero**
+  occurrences of the old ungated form.
+- **Tests:** `test/fix29-national-plane-membership.test.mjs` — 21 checks (A non-polygon · B polygon ·
+  C proximity-alone · D no-centroid-fallback · E classifier untouched, plus Fix 28 non-interference and
+  a no-fabrication guard), proven load-bearing by **5 mutations measured on EXIT CODE**.
+  `test/national-plane-failure-visibility.test.mjs` §7d was **SPLIT, not relaxed**: the mapped source
+  must still be `natl.records` and the only guard permitted in front of it is the admission flag, so a
+  read-outcome fallback still fails (mutation-verified).
+- **Scope held:** no `geo.zcta_boundary` mutation · no geometry created · no centroid/radius replacement
+  · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
+  change · no Fix 30/31 work.
+- 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
+  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
+  obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
+  architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
+  706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 
