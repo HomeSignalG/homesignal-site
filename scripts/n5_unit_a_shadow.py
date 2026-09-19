@@ -270,12 +270,18 @@ def populate(pfx):
 def select_prefixes():
     """Completed shards to (re)build, honouring an optional PREFIXES restriction.
 
-    Same production-safety property as n5_a3_markers.prefixes(): populate() is
-    `delete from zip_authoritative_membership where left(zcta5,3)=PFX` followed by an
-    insert, so a prefix under rebuild momentarily has zero membership rows. The
-    authoritative producer raises on a membership/relation mismatch and never falls
-    back to legacy, so rebuilding a prefix that is already production_geography_verified
-    would make those live ZIP pages ERROR for the width of the rebuild.
+    ⚠️ THE HAZARD THIS DOCSTRING USED TO DESCRIBE IS GONE, AND SAYING SO IS THE POINT.
+    It read: "populate() is `delete from zip_authoritative_membership where
+    left(zcta5,3)=PFX` followed by an insert, so a prefix under rebuild momentarily
+    has zero membership rows ... those live ZIP pages ERROR for the width of the
+    rebuild." Phase 5 removed that ZIP3 delete: POPULATE now bounds its delete by the
+    PROCESSED SOURCE KEYS and touches no row belonging to any other key, so no ZIP is
+    ever momentarily empty. The sentence survived the change by one commit, which is
+    exactly how a repository ends up documenting behaviour it does not have.
+
+    ZIP3 still selects WHICH KEYS to process - this driver is the HISTORICAL /
+    backfill path. The steady-state path is source-key-scoped and lives in
+    n5_reconcile_sql; neither is a scheduler and neither is armed.
 
     Unset PREFIXES and behaviour is exactly as before - every done shard. A named
     prefix that is not a done shard is a HARD ERROR, never a silent skip.

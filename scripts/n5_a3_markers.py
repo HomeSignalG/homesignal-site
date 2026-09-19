@@ -186,7 +186,7 @@ pt as (
          case when p.dim = 1 then ST_LineInterpolatePoint(p.g, (p.i + 0.5) / p.n_on_comp::float8)
               when p.dim = 2 then ST_PointOnSurface(p.g)
               else p.g end as mp
-    from placed p)
+    from placed p),
 expected as (
   select zcta5, source_key,
          row_number() over (partition by zcta5, source_key

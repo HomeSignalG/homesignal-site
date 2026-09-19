@@ -108,3 +108,38 @@ index-driven, zero Seq Scans, GiST on `zcta_boundary`, and both DELETEs index-sc
 `source_key = scope.source_key` binds only the **second** column. §H permits "narrowly proven
 supporting indexes" — this one is not yet *proven*, and adding write amplification while ingest is
 degraded is what constraint 8 forbids. **Phase 6/7 blocker.**
+
+---
+
+## 17. SUPERSEDED IN PART — read `docs/geo-phase5-reconciliation.md` first
+
+This file is the DESIGN record written before the reconciliation was implemented and
+run. Four of its statements are corrected there by measurement, and the corrections
+matter more than the design:
+
+1. **§15's "the delete and the upsert are in the same statement"** is no longer true of
+   stage 1, and could never have been. A single statement's data-modifying CTEs share
+   one snapshot, so the INSERT's unique check still sees the deleted rows —
+   `23505 duplicate key ... (source_key, feature_id)=(K, k#0)`, measured. Whole-set
+   replacement reuses feature ids by construction, so this is the normal path, not an
+   edge case. Stage 1 is two statements in one transaction. Stages 2–4 are unaffected:
+   their deletes and inserts are disjoint by construction.
+
+2. **§16's "a supporting index is probably required"** is now PROVEN, with a positive
+   control, and the definitions are exact. `geo.n5_geom` carries `n5_geom_sk_ix` and
+   plans an Index Scan at cost **15.83**; the three destination planes plan Seq Scans at
+   **26,523 / 29,384 / 33,588** over ~2.8M rows. Still deliberately **not created** —
+   see reconciliation §7, `INDEX REQUIRED — CREATION DEFERRED UNTIL INGEST HEALTHY`.
+
+3. **§15's quotation of `select_prefixes()`'s docstring** described a ZIP3 delete that
+   Phase 5 had already removed. The docstring itself has been corrected — it survived
+   the change by one commit, which is how a repository starts documenting behaviour it
+   does not have.
+
+4. **The membership stage must derive its scope from the GEOMETRY, never from another
+   plane.** Measured as mutation M2: scoping stage 3 off `n5_boundary_membership`
+   silently places **nothing** for a brand-new key. That was the inherited shape and it
+   is the discovery blind spot itself.
+
+Everything else here still stands, including the transaction unit, idempotence, and the
+absence of any scheduler.
