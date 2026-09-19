@@ -94,6 +94,17 @@
      fill, radius or shadow per group: those say "separate object", and the whole point is
      that these are three types of one collection. A hairline top rule separates them. */
   .railgroup + .railgroup{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
+  /* THE THREE GROUPS DO NOT SHARE A PARENT, so the adjacent-sibling rule above could only
+     ever reach the second one. #dashPlaces holds the two PLACE groups; Developments lives in
+     #dashFollowing, which Fix 8J hides or removes outright on an unreadable session and so
+     cannot be folded into the same container. `+` cannot cross that boundary, so Developments
+     painted flush against the ZIP group's overflow link — measured 0px, directly beneath a
+     27px boundary, which reads as a continuation of the ZIP list rather than a new section.
+     The separator is therefore declared on the CARRIER as well, with the same three values,
+     so all three boundaries are one boundary. :not([hidden]) is belt-and-braces — a hidden
+     carrier is display:none and paints no rule — but it states that a group nobody can see
+     must not leave a divider behind it. */
+  #dashFollowing:not([hidden]){margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
   .railgh{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
           color:var(--ink-3);margin:0 0 4px}
   /* tabular-nums so the count does not shift the heading as it changes */
