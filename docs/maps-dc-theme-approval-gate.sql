@@ -1,3 +1,19 @@
+-- APPLIED 2026-09-19 as migration `maps_dc_theme_approval_gate`, ledger version
+-- 20260919151300. Live effects verified AFTER the apply, not assumed: the guard is present
+-- in pg_get_functiondef, SECURITY DEFINER and search_path=public survived the replace, the
+-- before-insert trigger exists, and eight probes ran in a rolled-back transaction (theme row
+-- with no capture REFUSED 23514 · off-theme draft still approves · non-owner still refused
+-- first · no-theme-key refused · theme:null and theme:"datacenter" accepted · ALERTS
+-- untouched with a missing key and with NULL evidence). State after: 38 draft / 0 approved.
+--
+-- ⚠️ THE MIGRATION LEDGER'S `statements` CAPTURE IS PARTIAL FOR THIS MIGRATION — it stored
+-- ONE statement where four were applied (the splice DO block, the trigger function, the
+-- trigger, and the invariants DO block). Do NOT treat supabase_migrations.schema_migrations
+-- as the reproducible source here; THIS FILE is. The recorded statements md5
+-- (5d6b5107ef9797257161c76f97271bf3, 5,066 chars) therefore covers only the first block,
+-- which is why it does not equal this file's executable body (6,585 chars) — the remaining
+-- difference is inline commentary. Re-apply from this file, then re-record.
+
 -- maps-dc-theme-approval-gate.sql — SQL OF RECORD for the server-side half of the
 -- MAPS · Data Center Theme capture contract. Parked here per CLAUDE.md §1 (#3:
 -- docs/*.sql is the DDL of record) and APPLIED as migration
