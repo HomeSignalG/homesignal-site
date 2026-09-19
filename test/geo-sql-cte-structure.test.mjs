@@ -165,5 +165,10 @@ ok(found.some(x => /CTE pt/.test(x)), `the report NAMES the offending CTE: ${fou
 const fixed = broken.replace('from placed p)\nexpected as (', 'from placed p),\nexpected as (');
 ok(checkCteChain(fixed).length === 0, 'and the same statement passes once the comma is restored');
 
-console.log(`\nPassed: ${pass}  Failed: ${fail}`);
-if (fail) process.exit(1);
+// Only self-report when invoked directly. Other suites import checkCteChain from
+// here, and a bare process.exit(1) at import time would end THEIR run before a
+// single one of their own assertions had a chance to print.
+if (process.argv[1] && process.argv[1].endsWith('geo-sql-cte-structure.test.mjs')) {
+  console.log(`\nPassed: ${pass}  Failed: ${fail}`);
+  if (fail) process.exit(1);
+}
