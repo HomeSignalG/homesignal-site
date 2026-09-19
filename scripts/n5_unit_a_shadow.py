@@ -190,27 +190,56 @@ def load_boundaries(pfx):
 # so a partial load can never commit. Held as a constant so the invariant test below runs
 # against the same shape production-of-record uses.
 POPULATE = f"""
-delete from {MEMB} where left(zcta5,3) = {{PFX}};
+with scope as (
+  select distinct m.source_key
+    from {SCRATCH} b
+    join geo.n5_boundary_membership m on m.zcta5 = b.zcta5
+   where b.prefix = {{PFX}}),
+pairs as (
+  -- GiST-driven discovery: every canonical ZCTA each scoped key's geometry touches.
+  -- Written as a JOIN on ST_Intersects so zcta_boundary_geom_gix is usable; the
+  -- `exists (...)` formulation plans as a Seq Scan on both zcta_boundary and n5_geom
+  -- (measured with EXPLAIN before this was rewritten).
+  select distinct b.zcta5, k.source_key
+    from scope k
+    join geo.n5_geom g on g.source_key = k.source_key and g.outcome = 1 and g.geom is not null
+    join geo.zcta_boundary b on ST_Intersects(ST_MakeValid(g.geom), b.geom)
+   where b.zcta5 in (select zip from public.canonical_zip_registry)),
+expected as (
+  select pr.zcta5, pr.source_key,
+         case when p2.pt is null then null else ST_Y(p2.pt) end lat,
+         case when p2.pt is null then null else ST_X(p2.pt) end lng,
+         p2.rule point_rule, x2.dim clip_dim, x2.nfeat feature_count, x2.family geom_family
+    from pairs pr
+    join geo.zcta_boundary b2 on b2.zcta5 = pr.zcta5
+    cross join lateral (
+        select ST_Intersection(ST_MakeValid(ST_Union(g2.geom)), b2.geom) clip,
+               count(*)::int nfeat, min(ST_GeometryType(g2.geom)) family
+          from geo.n5_geom g2
+         where g2.source_key = pr.source_key and g2.outcome = 1 and g2.geom is not null
+           and ST_Intersects(ST_MakeValid(g2.geom), b2.geom)) f2
+    cross join lateral (select f2.clip, f2.nfeat, f2.family,
+                        case when f2.clip is null then null else ST_Dimension(f2.clip) end::smallint dim) x2
+    cross join lateral geo.n5_rep_point(x2.clip) p2),
+del as (
+  delete from {MEMB} m
+   where m.source_key in (select source_key from scope)
+     and not exists (select 1 from expected e
+                      where e.zcta5 = m.zcta5 and e.source_key = m.source_key)
+  returning 1)
 insert into {MEMB} (zcta5, source_key, lat, lng, point_rule, clip_dim, feature_count, geom_family, run_id)
-select b.zcta5, m.source_key,
-       case when p.pt is null then null else ST_Y(p.pt) end,
-       case when p.pt is null then null else ST_X(p.pt) end,
-       p.rule, x.dim, x.nfeat, x.family, {{RUN}}
-  from {SCRATCH} b
-  join geo.n5_boundary_membership m on m.zcta5 = b.zcta5
-  cross join lateral (
-      select ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom) clip,
-             count(*)::int nfeat,
-             min(ST_GeometryType(g.geom)) family
-        from geo.n5_geom g
-       where g.source_key = m.source_key
-         and g.outcome = 1 and g.geom is not null
-         and ST_Intersects(ST_MakeValid(g.geom), b.geom)
-  ) f
-  cross join lateral (select f.clip, f.nfeat, f.family,
-                             case when f.clip is null then null else ST_Dimension(f.clip) end::smallint dim) x
-  cross join lateral geo.n5_rep_point(x.clip) p
- where b.prefix = {{PFX}};
+select e.zcta5, e.source_key, e.lat, e.lng, e.point_rule, e.clip_dim, e.feature_count, e.geom_family, {{RUN}}
+  from expected e
+on conflict (zcta5, source_key) do update
+   set lat = excluded.lat, lng = excluded.lng, point_rule = excluded.point_rule,
+       clip_dim = excluded.clip_dim, feature_count = excluded.feature_count,
+       geom_family = excluded.geom_family, run_id = excluded.run_id
+ where {MEMB}.lat is distinct from excluded.lat
+    or {MEMB}.lng is distinct from excluded.lng
+    or {MEMB}.point_rule is distinct from excluded.point_rule
+    or {MEMB}.clip_dim is distinct from excluded.clip_dim
+    or {MEMB}.feature_count is distinct from excluded.feature_count
+    or {MEMB}.geom_family is distinct from excluded.geom_family;
 insert into {STATUS} (zip, status, membership_rows, completed_at, run_id)
 select b.zcta5, 'boundary_complete',
        (select count(*) from geo.n5_boundary_membership m where m.zcta5 = b.zcta5),

@@ -127,19 +127,29 @@ select b.zcta5, m.source_key,
 #            1 km apart, so one marker per membership would hide separate project areas.
 #   POINT    the authoritative point itself.
 BUILD = f"""
-delete from {MARK} where left(zcta5,3) = {{PFX}};
-insert into {MARK} (zcta5, source_key, marker_seq, lat, lng, marker_rule, family, dim, run_id)
-with base as (
-  select b.zcta5, m.source_key, x.family, x.clip
+-- The WITH must be TOP LEVEL: PostgreSQL rejects a data-modifying CTE nested inside an
+-- INSERT ("WITH clause containing a data-modifying statement must be at the top level").
+-- Caught by EXPLAIN before this shipped.
+with scope as (
+  -- ZIP3 selects WHICH KEYS to process. It no longer selects which rows may be deleted.
+  select distinct m.source_key
     from {SCRATCH} b
     join geo.zip_authoritative_membership m on m.zcta5 = b.zcta5
+   where b.prefix = {{PFX}}),
+base as (
+  -- Those keys' membership across EVERY ZCTA, so a key spanning two prefixes is never
+  -- half-rebuilt by whichever prefix runs first. Geometry comes from geo.zcta_boundary
+  -- rather than the per-prefix scratch table for the same reason.
+  select m.zcta5, m.source_key, x.family, x.clip
+    from scope k
+    join geo.zip_authoritative_membership m on m.source_key = k.source_key
+    join geo.zcta_boundary b on b.zcta5 = m.zcta5
     cross join lateral (
         select ST_Intersection(ST_MakeValid(ST_Union(g.geom)), b.geom) clip,
                min(ST_GeometryType(g.geom)) family
           from geo.n5_geom g
          where g.source_key = m.source_key and g.outcome = 1 and g.geom is not null
-           and ST_Intersects(ST_MakeValid(g.geom), b.geom)) x
-   where b.prefix = {{PFX}}),
+           and ST_Intersects(ST_MakeValid(g.geom), b.geom)) x),
 comp as (
   select z.zcta5, z.source_key, z.family, 1 as dim, d.geom g,
          ST_Length(d.geom::geography) measure
@@ -177,15 +187,35 @@ pt as (
               when p.dim = 2 then ST_PointOnSurface(p.g)
               else p.g end as mp
     from placed p)
-select zcta5, source_key,
-       row_number() over (partition by zcta5, source_key
-                          order by dim desc, measure desc, ST_AsBinary(g) asc, i asc)::int,
-       ST_Y(mp), ST_X(mp),
-       case when dim = 1 then 'LINE_MERGED_COMPONENT_INTERVAL_{{DTAG}}M'
-            when dim = 2 then 'POLYGON_COMPONENT_POINT_ON_SURFACE'
-            else 'POINT_AUTHORITATIVE' end,
-       family, dim::smallint, {{RUN}}
-  from pt;
+expected as (
+  select zcta5, source_key,
+         row_number() over (partition by zcta5, source_key
+                            order by dim desc, measure desc, ST_AsBinary(g) asc, i asc)::int marker_seq,
+         ST_Y(mp) lat, ST_X(mp) lng,
+         case when dim = 1 then 'LINE_MERGED_COMPONENT_INTERVAL_{{DTAG}}M'
+              when dim = 2 then 'POLYGON_COMPONENT_POINT_ON_SURFACE'
+              else 'POINT_AUTHORITATIVE' end marker_rule,
+         family, dim::smallint dim
+    from pt),
+del as (
+  -- Bounded by the PROCESSED KEYS. No prefix predicate.
+  delete from {MARK} kk
+   where kk.source_key in (select source_key from scope)
+     and not exists (select 1 from expected e
+                      where e.zcta5 = kk.zcta5 and e.source_key = kk.source_key
+                        and e.marker_seq = kk.marker_seq)
+  returning 1)
+insert into {MARK} (zcta5, source_key, marker_seq, lat, lng, marker_rule, family, dim, run_id)
+select e.zcta5, e.source_key, e.marker_seq, e.lat, e.lng, e.marker_rule, e.family, e.dim, {{RUN}}
+  from expected e
+on conflict (zcta5, source_key, marker_seq) do update
+   set lat = excluded.lat, lng = excluded.lng, marker_rule = excluded.marker_rule,
+       family = excluded.family, dim = excluded.dim, run_id = excluded.run_id
+ where {MARK}.lat is distinct from excluded.lat
+    or {MARK}.lng is distinct from excluded.lng
+    or {MARK}.marker_rule is distinct from excluded.marker_rule
+    or {MARK}.family is distinct from excluded.family
+    or {MARK}.dim is distinct from excluded.dim;
 """
 
 

@@ -45,17 +45,25 @@ ok(/on conflict \(zcta5, source_key\)/i.test(RECONCILE),
 ok(/on conflict \(zcta5, source_key, marker_seq\)/i.test(RECONCILE),
    'marker identity is (zcta5, source_key, marker_seq) — a key may have many markers');
 
-// §5 the OLD prefix deletes are still present and still the two known sites. This is a
-// TRIPWIRE, not an endorsement: Phase 4 parks the replacement without applying it, so
-// these must remain exactly 2. If a THIRD appears, a new prefix-wide destroyer shipped.
-const prefixDeletes = [];
+// §5 PHASE 5 — the two resident-facing ZIP3 deletes are GONE from the production path.
+// Phase 4 tripwired their continued existence; Phase 5 removes them, so the assertion
+// inverts. ZIP3 survives ONLY as a work-distribution label (the `scope` CTE).
 for (const [name, src] of [['n5_unit_a_shadow.py', UNIT_A], ['n5_a3_markers.py', MARKERS]]) {
-  for (const m of src.matchAll(/delete from \{(MEMB|MARK)\} where left\(zcta5,3\) = \{\{PFX\}\}/g)) {
-    prefixDeletes.push(`${name}:${m[1]}`);
-  }
+  const body = /(?:POPULATE|BUILD) = f"""([\s\S]*?)\n"""/.exec(src);
+  ok(!!body, `${name}: production mutation body found`);
+  const sql = body[1];
+  ok(!/delete from \{(MEMB|MARK)\} where left\(zcta5,3\)/.test(sql),
+     `${name}: prefix-wide DELETE on the resident-facing table is GONE`);
+  ok(/delete from \{(MEMB|MARK)\}[\s\S]*?source_key in \(select source_key from scope\)/.test(sql),
+     `${name}: DELETE is bounded by the processed key set`);
+  ok(/on conflict[\s\S]*?do update/.test(sql) && /is distinct from/.test(sql),
+     `${name}: upsert updates only genuinely changed rows`);
+  ok(/with scope as \([\s\S]*?b\.prefix = \{\{PFX\}\}\)/.test(sql),
+     `${name}: ZIP3 survives only as the work-distribution scope selector`);
+  // the expected set must span ALL ZCTAs, or a key crossing two prefixes is half-deleted
+  ok(/geo\.zcta_boundary/.test(sql),
+     `${name}: expected set resolved against the national ZCTA table, not a prefix scratch`);
 }
-ok(prefixDeletes.length === 2,
-   `exactly 2 known prefix-wide deletes remain, unapplied-replacement tripwire (got ${prefixDeletes.length}: ${prefixDeletes.join(', ')})`);
 
 // §6 the primitive must not quietly become a national sweep
 ok(!/left\s*\(\s*zcta5\s*,\s*3\s*\)/i.test(RECONCILE),
