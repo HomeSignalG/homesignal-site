@@ -126,8 +126,13 @@
      mixed by hand, which is what keeps them from drifting apart later.
      inline-block, never block: the chip must hug its label the way the reference tag does. A
      full-width bar would read as a section BANNER and start competing with the card title. */
+  /* ALL-CAPS at the reference tag's OWN tracking (.05em), founder call, so the chip matches
+     DEVELOPMENT in case as well as colour. Note what is carrying the rank now: caps used to be
+     the thing that made this heading read as METADATA, because it was 10.5px and --ink-3 like
+     .ptag-kind. At 13.5px on a filled chip in --green-deep, the case is no longer the
+     discriminator — size, fill and ink are. The pin below moved with it. */
   .railgh{display:inline-block;background:var(--green-tint);color:var(--green-deep);
-          font-size:13.5px;font-weight:700;letter-spacing:0;
+          font-size:13.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
           padding:5px 10px;border-radius:6px;margin:0 0 10px}
   /* The count stays SUBORDINATE inside the chip — same ink at reduced opacity rather than a
      third colour, so the word leads the glance and the number confirms it. tabular-nums so a
