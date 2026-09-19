@@ -1,0 +1,1012 @@
+{
+ "_contract": [
+  "GEOGRAPHY DISPOSITION for every registry in jurisdiction-registry.json.",
+  "jurisdiction-registry.json answers ONE question: does this registry exist in HomeSignal ingest?",
+  "THIS FILE answers ONE question: what is its geography disposition?",
+  "geo.n5_accepted_source is the RUNTIME table. Nothing reads THIS file at runtime.",
+  "",
+  "TWO EXCLUSION MECHANISMS, VERIFIED IN CODE \u2014 they are not the same thing:",
+  "  ABSENT from geo.n5_accepted_source -> excluded at the INNER JOIN (n5_shard.py:653);",
+  "    n5_acquire_registry.py:49 raises 'STOP: no row in geo.n5_accepted_source'.",
+  "    This is UNCLASSIFIED. It is how a GOVERNANCE HOLD is enforced.",
+  "  PRESENT with a non-processable treatment -> carried into geo.n5_frozen but matched by",
+  "    NEITHER association branch (n5_shard.py:540 takes PROVEN, :543 takes RECOVERY);",
+  "    n5_acquire_registry.py:50 refuses anything that is not RECOVERY.",
+  "    This is CLASSIFIED-AND-EXCLUDED.",
+  "Both fail closed. They differ in whether the exclusion is RECORDED.",
+  "PRESENCE IS NOT ELIGIBILITY \u2014 treatment decides.",
+  "",
+  "So: a RECORDED TREATMENT must have a row; a GOVERNANCE HOLD must have none.",
+  "This file never grants eligibility by itself."
+ ],
+ "_recorded_treatments": [
+  "PROVEN",
+  "RECOVERY",
+  "NOAUTH",
+  "HIST_UNRECOVERABLE",
+  "IDENT_UNRESOLVED"
+ ],
+ "_processable_treatments": [
+  "PROVEN",
+  "RECOVERY"
+ ],
+ "_governance_holds": [
+  "PENDING_REVIEW",
+  "BLOCKED_NO_RECORDS"
+ ],
+ "_db_sentinel": {
+  "(null)": "Not a registry. geo joins use coalesce(registry_id,'(null)'), so records with a NULL registry_id map to this literal. Classified NOAUTH. Exempt from the ingest-parity check."
+ },
+ "_captured": "2026-09-19",
+ "_catalogue_md5_at_capture": "a1e6cf8febdb5e9da0b733357e018017",
+ "registries": {
+  "adams-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "adot-tip-fy2026-2030": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "akdot-stip-24-27": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "albuquerque-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "aldot-atrip-ii-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "aldot-rebuild-alabama-grant-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "allegheny-county-asbestos-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "allentown-energov-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "anaheim-land-use-cases": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ann-arbor-energov-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "anne-arundel-commercial-site-plans": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "anne-arundel-subdivision-activity": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ar-ardot-job-status-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ar-ardot-job-status-points": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "arlington-issued-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "arlington-permit-applications": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "arlington-planning-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "asheville-accela-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "aurora-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "austin-issued-construction-permits": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "austin-site-plan-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "austin-subdivision-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "austin-zoning-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "baltimore-city-housing-permits": {
+   "disposition": "PENDING_REVIEW",
+   "recommended": "PROVEN",
+   "evidence": "3,003 live development rows / 275 source keys / 38 ZIPs, 3,003 of 3,003 PINNED with stored lat/lng (arcgis __lat/__lng, spatial_zip_radius_mi 3). source_key_basis source_id:case_number (recoverable). Actively ingesting (newest created 2026-09-19 13:46:26Z). Evidence points to PROVEN; a treatment row makes it eligible for authoritative production geography, so approval is deferred to the Phase 10 gate rather than assigned here.",
+   "measured": "2026-09-19"
+  },
+  "baltimore-county-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "bellevue-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "bend-or-permit-applications": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "bentonville-catalyst-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "bismarck-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "boone-county-ky-planning-board-actions": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "boston-approved-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "boulder-construction-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "bozeman-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "brunswick-county-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "buffalo-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "burlington-vt-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "burlington-vt-zoning-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "butler-county-ks-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cabarrus-county-plan-reviews": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "caltrans-sb1-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cambridge-building-permits-addition-alteration": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cambridge-building-permits-new-construction": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cambridge-demolition-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "canyon-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "casa-grande-active-development-sites": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "centre-county-pa-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "champaign-il-special-use-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "charleston-county-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "charlotte-land-dev-commercial-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "chattanooga-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "chattanooga-permits-archive": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "chester-county-pa-act247-plans": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "chicago-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cincinnati-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "city-of-orange-active-planning-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "clark-county-active-dev-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "clark-county-active-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "clarksville-montgomery-final-subdivisions": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "clarksville-montgomery-preliminary-subdivisions": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cleveland-issued-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "clv-planning-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "coconino-county-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "colorado-springs-planning-applications": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "columbia-mo-capital-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "columbia-mo-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "columbus-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "cook-county-il-highway-construction-program": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ctdot-project-work-areas": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "dallas-specific-use-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "dekalb-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "delaware-county-pa-subdivisions-land-developments": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "denton-county-dev-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "denver-commercial-construction-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "denver-residential-construction-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "desoto-county-permits": {
+   "disposition": "HIST_UNRECOVERABLE",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "detroit-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "detroit-demolition-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "detroit-trades-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "durham-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "east-baton-rouge-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "el-paso-new-residential-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fairfax-active-site-construction": {
+   "disposition": "IDENT_UNRESOLVED",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fairfax-recent-building-permits": {
+   "disposition": "IDENT_UNRESOLVED",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fdot-active-construction-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "flathead-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "forsyth-county-ga-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fort-collins-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fort-worth-development-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "fort-worth-zoning-cases": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "frisco-active-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "georgia-dot-gpas-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "gilbert-energov-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "harris-county-permits": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "harris-county-plats": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "hartford-building-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "hdot-active-design-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "henderson-commercial-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "henderson-residential-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "houston-plat-applications": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "huntsville-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "idot-annual-program-bridges": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "idot-annual-program-construction": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "independence-twp-construction-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "indot-spms-active-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "iowa-dot-bid-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "iowa-dot-bid-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "iowa-dot-five-year-program": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "irving-development-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "itd-itip-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "itd-itip-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "jackson-county-or-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "jackson-county-or-land-use-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "johns-creek-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kcmo-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kcmo-development-cases": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kdot-wincpms-project-locations": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kent-county-de-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kenton-county-devtracking-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "knoxville-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "kytc-syp-highway-plan": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "lake-county-il-construction-program": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "lee-county-fl-development-orders": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "lexington-row-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "lincoln-residential-new-construction-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "little-rock-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "loudoun-county-residential-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "louisville-active-construction-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "madison-planning-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "maine-dot-public-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "maine-dot-public-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "marin-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "massdot-highway-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mdot-sha-project-portal": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mdot-stip-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "memphis-dpd-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mesa-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "miami-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "minneapolis-ccs-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "missoula-addresses-with-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mndot-chip-roadway-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mndot-stip-roadway-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "modot-stip-locations-accepted": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "montgomery-county-commercial-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "montgomery-county-demolition-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "montgomery-county-pa-act247-proposals": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "montgomery-county-residential-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "mt-mdt-stip-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "murfreesboro-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "naperville-building-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nashville-building-permits-issued": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ncdot-stip-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ncdot-stip-projects-points": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nddot-special-road-fund-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ndot-program-book-points": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ndot-program-book-segments": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "new-castle-county-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "new-hanover-county-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "new-orleans-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nhdot-ten-year-plan-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nj-stip-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nvdot-project-boundaries": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nyc-dob-permit-issuance": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nyc-dobnow-approved-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nysdot-capital-program-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nysdot-capital-program-projects-2": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "nysdot-capital-program-projects-3": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "odot-current-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "odot-current-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "okdot-workplan-roadways": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "oregon-dot-stip-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "oregon-dot-stip-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "overland-park-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "penndot-transportation-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "peoria-az-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "philadelphia-li-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "phoenix-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "pierce-county-pals-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "pittsburgh-pli-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "portland-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "prince-georges-county-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "provo-planning-applications": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "raleigh-building-permits": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "reno-ldc-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "ridot-rhode-restore-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "round-rock-large-development-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "salem-structure-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "san-antonio-permits-issued": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "san-antonio-prelim-plan-review": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "san-diego-approved-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "san-jose-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "san-marcos-planning-cases": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "savannah-commercial-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "scdot-project-viewer-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "scottsdale-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-construction-reconstruction": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-pavement-preservation": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-railroad-crossings": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-resurfacing": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-safety-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-safety-points": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sd-stip-structures": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "seattle-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "seattle-land-use-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "shelby-county-building-permits": {
+   "disposition": "BLOCKED_NO_RECORDS",
+   "evidence": "0 live rows in public.app_projects on 2026-09-19. Configured in ingest but producing nothing, so there is no data on which to base a treatment. Assigning one would be a claim about records that do not exist. Re-evaluate if it ever produces rows.",
+   "measured": "2026-09-19"
+  },
+  "sheridan-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sioux-falls-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "slc-planning-petitions": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "slo-county-planning-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sonoma-county-fire-rebuild-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "spokane-county-building-planning-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "stamford-major-developments": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "stlouis-county-mo-subdivisions": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "summit-county-oh-planning-commission-items": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "sussex-county-de-conditional-use": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "tacoma-accela-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "tempe-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "tennessee-dot-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "thurston-county-residential-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "topeka-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "tucson-commercial-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "tucson-residential-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "txdot-projects-info-all": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "udot-active-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "udot-active-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "vdot-syip-approved-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "vdot-syip-approved-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "virginia-beach-building-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "vtrans-project-locations": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "vtrans-project-locations-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wake-county-building-permits": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "weld-county-site-plan-review": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wisdot-highway-program-6yr": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "worcester-building-permits": {
+   "disposition": "NOAUTH",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wsdot-project-delivery-plan-complete": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wsdot-project-delivery-plan-proposed": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wsdot-project-delivery-plan-under-construction": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wvdoh-active-projects": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wydot-stip-projects": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "wydot-stip-projects-lines": {
+   "disposition": "RECOVERY",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  },
+  "york-county-pa-planning-subdivisions": {
+   "disposition": "PROVEN",
+   "source": "geo.n5_accepted_source @ 2026-09-19"
+  }
+ }
+}

@@ -1,0 +1,50 @@
+name: check-geo-registry-parity
+
+# GOVERNANCE, NOT PROCESSING. This workflow compares files and reports. It never
+# assigns a treatment, never writes production, and never dispatches acquisition,
+# membership or markers.
+#
+# It runs WITHOUT database credentials on purpose. Measured 2026-09-19: only the
+# `postgres` role can SELECT geo.n5_accepted_source (anon, authenticated AND
+# service_role all have can_select=false and no USAGE on schema geo), so an ordinary
+# CI job cannot read it. The gate therefore verifies the file half here and prints
+# "DB parity: NOT VERIFIED" rather than implying it checked something it could not.
+# A postgres-privileged job can pass --catalogue to verify the other half.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/get-address-report/jurisdiction-registry.json'
+      - 'docs/geo-registry-classification.json'
+      - 'scripts/check-geo-registry-parity.mjs'
+      - '.github/workflows/check-geo-registry-parity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/get-address-report/jurisdiction-registry.json'
+      - 'docs/geo-registry-classification.json'
+      - 'scripts/check-geo-registry-parity.mjs'
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The self-test proves the gate still rejects each failure class. A gate that
+      # cannot fail is not a gate, so this runs BEFORE the real check.
+      - name: Self-test (proves the gate can fail)
+        run: node scripts/check-geo-registry-parity.mjs --self-test
+
+      - name: Registry parity
+        run: node scripts/check-geo-registry-parity.mjs
