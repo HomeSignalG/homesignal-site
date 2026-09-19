@@ -104,7 +104,7 @@ ok(gAddr.href === 'properties.html?view=addresses', '3a Addresses overflow route
 ok(gZip.href === 'properties.html?view=zips', '3b ZIP Codes overflow route', gZip.href);
 ok(A.developmentsGroup(failedRead).href === 'properties.html?view=projects',
   '3c Developments overflow keeps the INTERNAL ?view=projects route');
-ok(gAddr.overflowLabel === 'View all 5 Property Addresses →',
+ok(gAddr.overflowLabel === 'View all 5 Addresses →',
   '3d the overflow label names the complete count, not the hidden remainder', gAddr.overflowLabel);
 // An anchor, never Fix 8K's in-place button: this one navigates, and two controls that look
 // alike but behave differently is the comprehension failure.
@@ -176,9 +176,17 @@ ok(/<h2>My Places<\/h2><a href="properties\.html" id="dashManagePlaces">/.test(d
   '6b ...on the unified card, routed to the canonical My Places page');
 ok(/<h3 class="railgh">/.test(dash), '6c group headings are h3');
 ok(!/<h2>Projects<\/h2>/.test(dash), '6d no second card heading survives');
-// The count rides inside the heading text so a screen reader hears it with the group.
-ok(/railgh">' \+ HS\.esc\(g\.label\) \+ ' &middot; '[\s\S]{0,80}g\.count/.test(dash),
-  '6e the count is inside the group heading, not an orphan beside it');
+// The count rides inside the heading text so a screen reader hears it with the group. The
+// shape changed from "Label &middot; N" to "Label (N)" when the headings gained icons; what
+// is pinned is the INVARIANT, not the punctuation — g.label and g.count must both sit inside
+// the one <h3>, with no markup between them that could split them into two announcements.
+const h3Body = (dash.match(/railgh">([\s\S]{0,260}?)<\/h3>/) || [])[1] || '';
+ok(/HS\.esc\(g\.label\)/.test(h3Body) && /g\.count/.test(h3Body),
+  '6e the count is inside the group heading, not an orphan beside it', h3Body.slice(0, 160));
+// The glyph must be DECORATIVE: it repeats nothing the label does not already say, so a
+// screen reader that announced it would read the group name twice.
+ok(/class="railic" aria-hidden="true"/.test(dash),
+  '6e2 the heading glyph is aria-hidden — the words carry the meaning, never the icon');
 ok(!/<h3[^>]*><a |<a[^>]*><h3/.test(dash), '6f group headings are not links');
 // Type is communicated in TEXT, never by colour alone.
 ok(/ptag-kind">' \+ \(p\.kind === 'address' \? 'Address' : 'ZIP Code'\)/.test(dash),

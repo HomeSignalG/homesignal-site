@@ -32,6 +32,9 @@ const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const dash = read('dashboard.html');
 const css = read('app.css');
 const agg = read('lib/dashboard-aggregate.js');
+// My Places' own page, so the rail's labels can be checked against the control they route to
+// rather than against a second copy of the same words written down here.
+const props = read('properties.html');
 
 // POSITIVE CONTROL. Every absence below is read off this one file, so a mis-resolved path
 // would make all of them vacuously true — success-shaped output attesting to nothing.
@@ -49,11 +52,17 @@ const PLACES_ROW = '<div class="bt-row"><h2>My Places</h2>'
 ok(dash.includes(PLACES_ROW), '1 the places card heading is "My Places"');
 // The three typed groups are h3 INSIDE that card, never sibling h2 — three same-level
 // headings under one card title would break the outline a screen reader navigates by.
-for (const g of ['Property Addresses', 'ZIP Codes', 'Developments'])
+for (const g of ['Addresses', 'ZIP Codes', 'Developments'])
   ok(new RegExp("label: '" + g + "'").test(agg) || dash.includes(g),
     '1 the typed group "' + g + '" is a resident-facing label');
-ok(/RAIL_PLACE_GROUPS[\s\S]*?label: 'Property Addresses'[\s\S]*?label: 'ZIP Codes'/.test(agg),
-  '1 the two PLACE groups are Property Addresses then ZIP Codes, in that order');
+// The labels are My Places' OWN segmented-control words (properties.html ships buttons
+// reading "Addresses" / "ZIP Codes" / "Developments"), so the rail and the page it links to
+// name a thing identically rather than the rail inventing a longer synonym for one of them.
+ok(/RAIL_PLACE_GROUPS[\s\S]*?label: 'Addresses'[\s\S]*?label: 'ZIP Codes'/.test(agg),
+  '1 the two PLACE groups are Addresses then ZIP Codes, in that order');
+ok(/data-view="addresses">Addresses</.test(props) && /data-view="zips">ZIP Codes</.test(props)
+   && /data-view="projects">Developments</.test(props),
+  '1 ...and those are verbatim My Places\' own segmented-control labels');
 ok(/RAIL_DEV_LABEL\s*=\s*'Developments'/.test(agg),
   '3 the followed-development group is labelled "Developments" to residents');
 // …while the internal route value stays "projects". Display and storage are separate

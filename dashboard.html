@@ -93,7 +93,13 @@
   /* Unified My Places rail — three typed groups inside ONE card. Deliberately no border,
      fill, radius or shadow per group: those say "separate object", and the whole point is
      that these are three types of one collection. A hairline top rule separates them. */
-  .railgroup + .railgroup{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
+  /* SECTION SEPARATOR vs ROW DIVIDER — these were the SAME token. `.placerow` draws
+     `border-bottom:1px solid var(--line-2)` and this rule drew `border-top` in the very same
+     `--line-2`, so a boundary between two TYPES was indistinguishable from a boundary between
+     two rows of one type, and the three groups ran together. The section rule now takes the
+     stronger `--line` (#e4e8e4) while rows keep `--line-2` (#eef1ee) — the hierarchy is
+     carried by a token the palette already ships, never by a new colour. */
+  .railgroup + .railgroup{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
   /* THE THREE GROUPS DO NOT SHARE A PARENT, so the adjacent-sibling rule above could only
      ever reach the second one. #dashPlaces holds the two PLACE groups; Developments lives in
      #dashFollowing, which Fix 8J hides or removes outright on an unreadable session and so
@@ -104,11 +110,24 @@
      so all three boundaries are one boundary. :not([hidden]) is belt-and-braces — a hidden
      carrier is display:none and paints no rule — but it states that a group nobody can see
      must not leave a divider behind it. */
-  #dashFollowing:not([hidden]){margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
-  .railgh{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
-          color:var(--ink-3);margin:0 0 4px}
-  /* tabular-nums so the count does not shift the heading as it changes */
-  .railgc{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  #dashFollowing:not([hidden]){margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+  /* THE HEADING USED TO RANK BELOW THE ROWS IT INTRODUCES. Measured on production: the
+     heading painted 10.5px/700 in --ink-3 (#83918a) while the record titles under it painted
+     13.3px/600 in --ink (#16211c) — smaller AND paler than its own contents, dressed in the
+     tiny letter-spaced all-caps this card uses for METADATA (.ptag-kind, .dblock .m). It read
+     as a label on the rows rather than a header over them, which is what made the three
+     groups need re-reading to tell apart.
+     It now outranks the record titles on size AND weight, drops the all-caps treatment, and
+     takes the darkest neutral. 700 rather than 600 is deliberate and measured: at 600 it would
+     match the record titles' own weight within 0.2px of their size — a tie, not a rank. */
+  .railgh{font-size:13.5px;font-weight:700;letter-spacing:0;color:var(--ink);margin:0 0 8px}
+  /* The count is SUBORDINATE to the label, so the word leads the glance and the number
+     confirms it. tabular-nums so a changing count cannot shift the heading. */
+  .railgc{font-weight:500;font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  /* The group's mark, from the nav's own glyph vocabulary (see RAIL_PLACE_GROUPS). --green is
+     the accent this card already carries on "Manage →" and "View all →", so this adds no new
+     colour. Fixed width so the three labels begin on one optical line whatever the glyph. */
+  .railic{display:inline-block;width:16px;font-weight:400;color:var(--green)}
   .railempty{margin:4px 0 2px}
   /* The overflow control is a LINK because it navigates — never Fix 8K's in-place button.
      Own focus-visible ring, since it is a new navigable target. */
@@ -273,7 +292,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=848593cf"></script>
-<script src="lib/dashboard-aggregate.js?v=7a64d9c8"></script>
+<script src="lib/dashboard-aggregate.js?v=2aa31001"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=22937269"></script>
@@ -400,12 +419,18 @@ HS.onReady(async function () {
       + '<div class="pc" aria-hidden="true">&rsaquo;</div></a>';
   }
   // The count rides INSIDE the heading text, so a screen reader navigating by heading hears
-  // "Property Addresses, 2, heading level 3" — the number arrives with the group rather
-  // than as an orphan after it. The heading is not a link: a group at or under the preview
-  // limit hides nothing, so a heading link would promise a filtered view with nothing in it.
+  // "Addresses (2), heading level 3" — the number arrives with the group rather than as an
+  // orphan after it. The heading is not a link: a group at or under the preview limit hides
+  // nothing, so a heading link would promise a filtered view with nothing in it.
+  //
+  // The glyph is aria-hidden and carries no information the words do not: the heading must
+  // still say "Addresses" to a reader that renders no icon at all. It is a SECOND cue for a
+  // sighted glance, never the only one.
   function groupHeadingHTML(g) {
-    return '<h3 class="railgh">' + HS.esc(g.label) + ' &middot; '
-      + '<span class="railgc">' + g.count + '</span></h3>';
+    return '<h3 class="railgh">'
+      + (g.icon ? '<span class="railic" aria-hidden="true">' + HS.esc(g.icon) + '</span>' : '')
+      + HS.esc(g.label)
+      + ' <span class="railgc">(' + g.count + ')</span></h3>';
   }
   // An overflow control is an ANCHOR because it navigates — deliberately NOT the in-place
   // button Fix 8K uses in the main column. Two controls that look alike and behave

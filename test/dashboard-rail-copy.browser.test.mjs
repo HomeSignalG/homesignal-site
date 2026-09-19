@@ -225,7 +225,9 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['laptop-1024', 1024, 768],
     '[' + label + '] ...and claims no capability that does not exist', got.forbiddenClaims);
   // Typed group headings, each carrying its own count, inside the ONE card.
   ok(got.groupHeads.length >= 2, '[' + label + '] typed group headings render', got.groupHeads);
-  ok(got.groupHeads.every((t) => /·\s*\d+$/.test(t)),
+  // "Label (N)" since the headings gained icons; what is pinned is that EVERY heading ends in
+  // its own count, never the punctuation that carries it.
+  ok(got.groupHeads.every((t) => /\(\d+\)$/.test(t)),
     '[' + label + '] every group heading carries its own count', got.groupHeads);
   ok(got.h3InsideCard, '[' + label + '] group headings are h3 inside the My Places card');
   ok(got.railScroll === 0, '[' + label + '] the rail card introduces no internal scrolling',
