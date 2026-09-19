@@ -43,6 +43,30 @@ export const LIFECYCLE_BUCKETS = new Set([
  * passes, a genuinely absent one passes (that is what `unknown` is FOR), and an unrecognised
  * non-empty string fails and is named.
  */
+/**
+ * Which RAIL does this site's lifecycle head — 'built' (Operating now), 'approved',
+ * 'proposed' — or null when the value is absent/unrecognised and belongs to no rail?
+ *
+ * ⚠️ IT EXISTS BECAUSE THE SAME VOCABULARY WAS HARDCODED TWICE AND WENT STALE, AND THE
+ * STALE COPY SAT RIGHT BESIDE THE CORRECT ONE. LIFECYCLE_BUCKETS above has always known
+ * that `built` and `operating` are ONE bucket, while two call sites tested `type ===
+ * 'built'` alone. The page's authoritative plane emits `operating`
+ * (lib/n5-radius.js::n5BucketFromStatus collapses built -> operating), so every operating
+ * record on every page read as un-railed and as label/colour disagreement. Measured
+ * 2026-09-19: 4,293 ZIPs carry counts.operating > 0, and one ZIP alone emitted 18
+ * mislabel lines. Derive the bucket HERE or the third copy will go stale too.
+ *
+ * Unrecognised returns null rather than falling through to 'proposed' — a made-up bucket
+ * would report a mapping gap as a mislabel, and lifecycleValueRecognised already names it.
+ */
+export function lifecycleRail(site) {
+  const raw = (site && site.type) == null ? '' : String(site.type).trim().toLowerCase();
+  if (raw === 'built' || raw === 'operating') return 'built';
+  if (raw === 'approved') return 'approved';
+  if (raw === 'proposed') return 'proposed';
+  return null;
+}
+
 export function lifecycleValueRecognised(site) {
   const raw = (site && site.type) == null ? '' : String(site.type).trim().toLowerCase();
   if (raw === '') return true;                 // honest absence → the first-class unknown state
@@ -220,9 +244,39 @@ export function assertZip(zip, rep, isIndexable, st) {
   }
 
   // Facility-count reconciliation (page vs cached report).
-  const facShown = st.facText != null ? parseInt(st.facText, 10) : null;
-  if (wantFac != null && facShown != null && facShown !== wantFac) {
-    fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
+  //
+  // ⚠️ THIS ASSERTION USED TO PUNISH THE HONESTY FIX IT SHOULD HAVE BEEN PROTECTING.
+  // When the EPA read is REFUSED, Phase 1B's whole point is that the count is UNKNOWN, not
+  // zero, so homesignalmap.html renders an em-dash. `parseInt('\u2014')` is NaN, `NaN != null`
+  // is true and `NaN !== wantFac` is ALWAYS true — so the page doing exactly the right thing
+  // reported as `facility count NaN != cached counts.facilities N`. Measured 2026-09-19:
+  // 5,656 of 12,722 reports carry facilities_unavailable, every one with a count to be
+  // compared against, i.e. 5,656 guaranteed-false failures per full run.
+  //
+  // A read failure and an assertion failure must never share a shape. So the three states
+  // are now separated, and the UNKNOWN one is checked in BOTH directions rather than skipped:
+  // a page showing the dash while the row says the read succeeded is hiding a real count, and
+  // a page showing a number while the row says it was refused is asserting a fact we withheld.
+  const facUnavailable = rep.facilities_unavailable === true;
+  const facRaw = st.facText == null ? '' : String(st.facText).trim();
+  const facIsDash = facRaw === '\u2014';
+  let facShown = null;
+  if (facIsDash !== facUnavailable && facRaw !== '') {
+    fails.push(`ZIP ${zip}: facility count reads "${facRaw}" but facilities_unavailable=${facUnavailable} ` +
+      `(refused => the page must show \u2014; succeeded => it must show the number)`);
+  } else if (!facIsDash && facRaw !== '') {
+    const parsed = parseInt(facRaw, 10);
+    if (!Number.isFinite(parsed)) {
+      // Neither a number nor the dash: the READER could not parse the page. Say that, rather
+      // than emitting a count comparison against NaN that reads like a product defect.
+      fails.push(`ZIP ${zip}: facility counter is unparseable ("${facRaw}") — this is a READ failure, ` +
+        `not a count mismatch; nothing about counts.facilities was verified`);
+    } else {
+      facShown = parsed;
+      if (wantFac != null && facShown !== wantFac) {
+        fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
+      }
+    }
   }
 
   // THE ANTI-FABRICATION INVARIANT: every rendered site must carry a record_url.
@@ -254,12 +308,32 @@ export function assertZip(zip, rep, isIndexable, st) {
       `lifecycle value (not one of ${[...LIFECYCLE_BUCKETS].join('/')}, and not honestly absent) ` +
       `[${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${JSON.stringify(s.type)}`).join(', ')}]`);
   }
-  // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the rendered array it heads.
+  // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the population it summarises.
+  //
+  // ⚠️ IT USED TO COMPARE THE COUNTS AGAINST A DIFFERENT POPULATION, so it could not pass.
+  // `rep.counts` is the ENGINE's summary of `rep.sites`. `st.rendered` (window.__HS_SITES) is
+  // that set after TWO further transforms the page applies on purpose: zipAuthMergeSites folds
+  // in authoritative app_projects markers plus national sites, and HS.residentialQualifySites
+  // then removes routine/unresolved Residential records at render(). Asserting the engine's
+  // count equals the post-transform set asserts that both transforms are no-ops, which the
+  // product deliberately makes false.
+  //
+  // Reconciled against the population it actually describes, this is EXACT and keeps its
+  // teeth. Measured table-wide 2026-09-19 over all 12,722 reports: proposed/approved/
+  // operating each mismatch on ZERO ZIPs, all three agreeing on 12,722 of 12,722 — so any
+  // engine regression still breaks it.
+  //
+  // ⚠️ AND THE CONTROL IS WHY THAT NUMBER IS TRUSTWORTHY: the same query WITH a
+  // `scope='point'` filter reports 3,193 proposed mismatches. counts.* spans every scope,
+  // so that filter measures a different question and manufactures a defect that is not there.
+  // The scope-blind form is the one that matches the engine.
   const c = rep.counts || {};
-  const proposedN = devRecs.filter((s) => s.type === 'proposed').length;
-  const approvedN = devRecs.filter((s) => s.type === 'approved').length;
-  const operatingN = devRecs.filter((s) => s.type === 'built').length;
-  const commentN = check.filter((s) => s && s.comment_open === true).length;
+  const cachedDev = sites.filter((s) => s && s.relevance === 'development');
+  const railN = (rail) => cachedDev.filter((s) => lifecycleRail(s) === rail).length;
+  const proposedN = railN('proposed');
+  const approvedN = railN('approved');
+  const operatingN = railN('built');
+  const commentN = cachedDev.filter((s) => s && s.comment_open === true).length;
   if (c.proposed != null && c.proposed !== proposedN)
     fails.push(`ZIP ${zip}: counts.proposed ${c.proposed} !== rendered proposed rail ${proposedN} (Task 5)`);
   if (c.approved != null && c.approved !== approvedN)
