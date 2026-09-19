@@ -128,6 +128,30 @@ const READ = () => {
         titleSize: parseFloat(T.fontSize), titleWeight: parseInt(T.fontWeight, 10),
         titleColor: T.color, metaSize: M ? parseFloat(M.fontSize) : null,
         rowDivider: R.borderBottomColor, sectionSep: G.borderTopColor,
+        // The heading's chip, and the DEVELOPMENT tag in What's Changing it is meant to
+        // match. Read together so the comparison is one paint, never two runs.
+        chipBg: H.backgroundColor, chipRadius: H.borderRadius, chipDisplay: H.display,
+        // Prefer a REAL painted tag; if this fixture's What's Changing is empty, measure what
+        // the shipped stylesheet paints for that class by probing it directly. A comparison
+        // that SKIPS whenever the fixture has no changes is not a comparison — it would go
+        // quiet exactly when someone re-tints one of the two and not the other.
+        refChip: (function () {
+          let d = document.querySelector('.ctype.dev'), probe = null;
+          if (!d) {
+            probe = document.createElement('span');
+            probe.className = 'ctype dev';
+            probe.style.position = 'absolute';
+            probe.style.left = '-9999px';
+            probe.textContent = 'DEVELOPMENT';
+            document.body.appendChild(probe);
+            d = probe;
+          }
+          const C = getComputedStyle(d);
+          const out = { bg: C.backgroundColor, color: C.color, probed: !!probe };
+          if (probe) probe.remove();
+          return out;
+        })(),
+        metaColor: M ? M.color : null,
         glyphHidden: !!h.querySelector('.railic[aria-hidden="true"]'),
         // What a screen reader is left with once the decorative glyph is dropped.
         spoken: (function () {
@@ -237,9 +261,28 @@ if (H) {
     '§3a the heading is LARGER than the record titles under it', { head: H.headSize, title: H.titleSize });
   ok(H.headWeight >= H.titleWeight,
     '§3b ...and no lighter in weight', { head: H.headWeight, title: H.titleWeight });
-  ok(H.headColor === H.titleColor,
-    '§3c ...and takes the same darkest neutral, not the muted metadata grey',
-    { head: H.headColor, title: H.titleColor });
+  // FOUNDER CALL: the heading is the same tinted chip the DEVELOPMENT tag carries in What's
+  // Changing. So the invariant is no longer "same ink as the record titles" — it is that the
+  // heading is NOT the muted metadata grey, and that it uses the REFERENCE tag's own tokens
+  // rather than a second green mixed by hand. Asserted against the live .ctype.dev in the
+  // same paint, so the two can never drift apart silently.
+  ok(H.headColor !== H.metaColor,
+    '§3c the heading is not the muted metadata grey', { head: H.headColor, meta: H.metaColor });
+  ok(H.chipBg !== 'rgba(0, 0, 0, 0)' && H.chipBg !== 'transparent',
+    '§3c2 ...it carries a filled chip rather than bare text', H.chipBg);
+  if (H.refChip) {
+    ok(H.chipBg === H.refChip.bg,
+      '§3c3 ...on the SAME tint as the DEVELOPMENT tag in What\'s Changing',
+      { heading: H.chipBg, reference: H.refChip.bg });
+    ok(H.headColor === H.refChip.color,
+      '§3c4 ...in the SAME green ink as that tag', { heading: H.headColor, reference: H.refChip.color });
+  } else {
+    ok(false, '§3c3/§3c4 could not read the reference tag at all', H.refChip);
+  }
+  // It must HUG its label. A full-width bar reads as a section banner and starts competing
+  // with the card title, which is not what the reference tag does.
+  ok(H.chipDisplay === 'inline-block' || H.chipDisplay === 'inline-flex',
+    '§3c5 ...and hugs its label rather than spanning the card', H.chipDisplay);
   ok(H.headTransform !== 'uppercase',
     '§3d ...and is not the all-caps treatment this card reserves for metadata', H.headTransform);
   ok(H.metaSize === null || H.metaSize < H.titleSize,
