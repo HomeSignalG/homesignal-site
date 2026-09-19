@@ -458,6 +458,31 @@ async function main() {
     }
   }
   const propFails = fails.length - zipFailCount;
+
+  // PASSED COUNTS PAGES, NOT FAILURE LINES. It used to be
+  // `reports.length + props.length - fails.length`, which subtracts a count of MESSAGES from
+  // a count of PAGES. One page routinely emits several: assertZip alone can push the shell,
+  // robots-substance and mislabeled-record failures for a single ZIP. So once the run is
+  // unhealthy the figure goes NEGATIVE — CLAUDE.md §5 records it doing exactly that, and a
+  // negative "Passed" is the kind of number a reader either disbelieves or silently rounds
+  // to zero, in a report whose whole job is to be believed.
+  //
+  // Identity is the message PREFIX, which every producer writes uniformly: `ZIP <zip>:`,
+  // `RUN-REPORT <zip>…:`, `ADDR <address>:`. A ZIP that fails in both the page phase and the
+  // run-report phase is ONE failed page, so RUN-REPORT keys to its ZIP. `TIME BUDGET:` names
+  // no page and is excluded — the truncated-walk warning above already reports it, and
+  // counting it would charge a page for the clock running out.
+  const failedPageKey = (msg) => {
+    let m = /^ZIP (\S+?):/.exec(msg);                 if (m) return `zip:${m[1]}`;
+    m = /^RUN-REPORT (\S+?)[: ]/.exec(msg);           if (m) return `zip:${m[1]}`;
+    m = /^ADDR (.+?):/.exec(msg);                     if (m) return `addr:${m[1]}`;
+    return null;                                      // TIME BUDGET and anything unprefixed
+  };
+  const failedPages = new Set(fails.map(failedPageKey).filter(Boolean)).size;
+  // Clamped as a belt-and-braces guard: if a future producer invents a prefix this does not
+  // know, the count degrades toward over-reporting passes rather than going negative again.
+  const passedPages = Math.max(0, (reports.length + props.length) - failedPages);
+
   await browser.close();
 
   // A truncated walk must NOT exit 0, and the summary's own Failed count must agree with the exit
@@ -477,7 +502,7 @@ async function main() {
          + `This run is INCOMPLETE and says so; it is not a pass over the full cache.`]
       : []),
     `- Property pages checked: **${props.length}**`,
-    `- Passed: **${reports.length + props.length - fails.length}** (empty-but-valid: ${emptyOk})`,
+    `- Passed: **${passedPages}** (empty-but-valid: ${emptyOk})`,
     ...(raceHealed ? [`- Re-checked after a mid-run cache refresh and found consistent: **${raceHealed}**`] : []),
     `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
