@@ -120,14 +120,24 @@
      It now outranks the record titles on size AND weight, drops the all-caps treatment, and
      takes the darkest neutral. 700 rather than 600 is deliberate and measured: at 600 it would
      match the record titles' own weight within 0.2px of their size — a tie, not a rank. */
-  .railgh{font-size:13.5px;font-weight:700;letter-spacing:0;color:var(--ink);margin:0 0 8px}
-  /* The count is SUBORDINATE to the label, so the word leads the glance and the number
-     confirms it. tabular-nums so a changing count cannot shift the heading. */
-  .railgc{font-weight:500;font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-  /* The group's mark, from the nav's own glyph vocabulary (see RAIL_PLACE_GROUPS). --green is
-     the accent this card already carries on "Manage →" and "View all →", so this adds no new
-     colour. Fixed width so the three labels begin on one optical line whatever the glyph. */
-  .railic{display:inline-block;width:16px;font-weight:400;color:var(--green)}
+  /* THE HEADING IS A TINTED CHIP, the same treatment the DEVELOPMENT tag carries in What's
+     Changing — founder call, so the two green marks on this page read as one system. It reuses
+     `.ctype.dev`'s OWN two tokens (--green-tint / --green-deep) rather than a second green
+     mixed by hand, which is what keeps them from drifting apart later.
+     inline-block, never block: the chip must hug its label the way the reference tag does. A
+     full-width bar would read as a section BANNER and start competing with the card title. */
+  .railgh{display:inline-block;background:var(--green-tint);color:var(--green-deep);
+          font-size:13.5px;font-weight:700;letter-spacing:0;
+          padding:5px 10px;border-radius:6px;margin:0 0 10px}
+  /* The count stays SUBORDINATE inside the chip — same ink at reduced opacity rather than a
+     third colour, so the word leads the glance and the number confirms it. tabular-nums so a
+     changing count cannot resize the chip. */
+  .railgc{font-weight:500;font-size:12.5px;color:inherit;opacity:.72;
+          font-variant-numeric:tabular-nums}
+  /* The group's mark, from the nav's own glyph vocabulary (see RAIL_PLACE_GROUPS). It inherits
+     the chip's ink, so the icon can never fall out of step with the label's colour. Fixed
+     width so the three labels begin on one optical line whatever the glyph. */
+  .railic{display:inline-block;width:16px;font-weight:400;color:inherit}
   .railempty{margin:4px 0 2px}
   /* The overflow control is a LINK because it navigates — never Fix 8K's in-place button.
      Own focus-visible ring, since it is a new navigable target. */
