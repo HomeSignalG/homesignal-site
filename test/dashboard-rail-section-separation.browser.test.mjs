@@ -152,6 +152,13 @@ const READ = () => {
           return out;
         })(),
         metaColor: M ? M.color : null,
+        // .ptag-kind is the card's METADATA tag — 9.5px uppercase in --ink-3. It is the thing
+        // the heading must never be mistaken for, and since the headings are now ALSO caps,
+        // it is the comparison that still means something.
+        kindTagSize: (function () {
+          const k = document.querySelector('.ptag-kind');
+          return k ? parseFloat(getComputedStyle(k).fontSize) : null;
+        })(),
         glyphHidden: !!h.querySelector('.railic[aria-hidden="true"]'),
         // What a screen reader is left with once the decorative glyph is dropped.
         spoken: (function () {
@@ -283,8 +290,14 @@ if (H) {
   // with the card title, which is not what the reference tag does.
   ok(H.chipDisplay === 'inline-block' || H.chipDisplay === 'inline-flex',
     '§3c5 ...and hugs its label rather than spanning the card', H.chipDisplay);
-  ok(H.headTransform !== 'uppercase',
-    '§3d ...and is not the all-caps treatment this card reserves for metadata', H.headTransform);
+  // FOUNDER CALL: the headings are ALL-CAPS, matching the DEVELOPMENT tag. So "not uppercase"
+  // is no longer the invariant — it never was the real one. What made the original headings
+  // read as metadata was being 10.5px and --ink-3, i.e. indistinguishable from .ptag-kind.
+  // The durable assertion is therefore against .ptag-kind itself: the heading must clearly
+  // outrank the card's metadata tags on SIZE, whatever case either of them is set in.
+  ok(H.kindTagSize === null || H.headSize > H.kindTagSize + 2,
+    '§3d the heading clearly outranks the card\'s metadata tags on size',
+    { head: H.headSize, kindTag: H.kindTagSize });
   ok(H.metaSize === null || H.metaSize < H.titleSize,
     '§3e secondary metadata stays subordinate to the record title',
     { meta: H.metaSize, title: H.titleSize });
