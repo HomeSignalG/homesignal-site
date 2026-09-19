@@ -867,6 +867,23 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function dcThemeImageMandatory(p){
     return bskyTheme(p) === 'datacenter';
   }
+  // ⚠️ WHY THIS PREDICATE EXISTS RATHER THAN `mapsImageRequired` ALONE. The button used to
+  // render its lock from `mapsImageRequired(p)`, which is MAPS **AND image_bucket_path**. A
+  // Data Center Theme draft with NO capture at all therefore has image_bucket_path null, so
+  // it failed that test, rendered as a NORMAL ENABLED Approve, and carried no
+  // `data-gate="image"` — which made `bskyApplyApprovalGate` early-return, leaving its own
+  // dcThemeImageMandatory branch DEAD FOR EXACTLY THE CASE IT WAS WRITTEN FOR. The click
+  // handler still refused (bskyApprovalBlockReason), so nothing unsafe was ever approved —
+  // but the founder was shown an enabled button and given an alert for pressing it.
+  // Measured 2026-09-19: 1 of 1 Data Center Theme posts in the live queue is in exactly
+  // this state, so the enabled-then-refuse path was the ONLY path that theme had.
+  //
+  // The two reasons a post starts locked are different facts and both belong here:
+  //   • it HAS an image  -> you must SEE that image before approving it;
+  //   • it is DC-theme and has NO image -> there is nothing to see and nothing to approve.
+  function bskyApprovalGated(p){
+    return mapsImageRequired(p) || dcThemeImageMandatory(p);
+  }
   // The single reason a post cannot be approved right now, or '' when it can.
   // ONE function, used by both the button and the click handler, so the two can never
   // disagree about whether approval is allowed.
@@ -1062,8 +1079,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
           ? ('<button class="bsky-btn" data-act="approve"'+
              // Locked until bskyRenderImage reports the exact image painted. Rendered
              // locked-by-default so a slow or failing download can never leave it open.
-             (mapsImageRequired(p)
-               ? ' data-gate="image" disabled title="Approve is locked until the exact Map image this post would publish is visible above." style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
+             // ONE predicate with bskyApplyApprovalGate (see bskyApprovalGated): a post the
+             // click handler will refuse must never be drawn as an available action.
+             (bskyApprovalGated(p)
+               ? ' data-gate="image" disabled title="'+esc(
+                   (dcThemeImageMandatory(p) && !p.image_bucket_path)
+                     ? 'Data Center Theme publishes the real Map 1 screenshot. None has been captured for this post, so there is nothing to review and Approve stays locked.'
+                     : 'Approve is locked until the exact Map image this post would publish is visible above.')+
+                 '" style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
                : ' style="background:var(--accent);color:#fff"')+
              '>Approve</button>')
           : '')+
@@ -1134,7 +1157,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(r.error){ _zipOrder.error = r.error.message||'unavailable'; _zipOrder.rows=[]; }
       else { _zipOrder.rows = r.data||[]; _zipOrder.error=''; }
     }catch(e){ _zipOrder.error='unavailable'; _zipOrder.rows=[]; }
-    _zipOrder.loaded = true;
+    // ONLY a SUCCESSFUL read counts as loaded. Setting this unconditionally made a single
+    // transient failure permanent for the life of the page: refreshBluesky loads the list
+    // only `if (!_zipOrder.loaded)`, so after one error the panel showed "unavailable"
+    // until a manual browser reload, with no way back from inside the dashboard.
+    _zipOrder.loaded = !_zipOrder.error;
   }
 
   /** Download a generated text file. No network — the bytes are built in the page. */
@@ -1153,14 +1180,36 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
    * in the queue shows a dash, never a guess like "no qualifying project" — only the
    * generator knows that, and it reports it in its own run log.
    */
+  // ⚠️ IT USED TO REPORT ONLY DATA-CENTRE DRAFTS, AND THAT MADE IT UNREADABLE. The
+  // generator drafts each ZIP's newest eligible project of ANY type — it has no theme
+  // filter — so a ZIP that produced a draft about something else scored no status here and
+  // rendered as a blank cell, identical to a ZIP that produced nothing at all. Measured
+  // 2026-09-19 on the live 10-ZIP list: 9 ZIPs each produced a draft (condominiums, an
+  // office fit-out, a parking-lot expansion, an 80 sq ft block wall) and ALL TEN ROWS READ
+  // BLANK. The founder was shown "nothing happened" for work that had happened.
+  //
+  // Silence and absence must not look alike, so every outcome now names itself. An
+  // off-theme draft is reported AS off-theme rather than hidden: that is the honest
+  // statement of what the run did, and it is how the theme/no-theme gap becomes visible
+  // instead of being absorbed into an empty cell.
+  //
+  // Still derived ONLY from the queue rows this render already loaded. A ZIP with no post
+  // says "no draft yet" and never "no qualifying project" — only the generator knows that,
+  // and it says so in its own run log.
   function zipOrderStatusMap(queueRows){
     var m={};
     (queueRows||[]).forEach(function(p){
       if(p.content_family!=='MAPS' || !p.zip) return;
-      if(bskyTheme(p)!=='datacenter') return;
+      var dc=bskyTheme(p)==='datacenter', approved=p.status==='approved';
+      // A theme post outranks an off-theme one, and approved outranks draft, so a ZIP that
+      // has moved on says so and a ZIP holding both reports the theme post.
+      var rank=(dc?2:0)+(approved?1:0);
       var cur=m[p.zip];
-      // approved outranks draft in the display, so a ZIP that has moved on says so.
-      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft exists');
+      if(cur && cur.rank>=rank) return;
+      m[p.zip]={ rank:rank,
+        cls: dc?(approved?'t-real':'t-persist'):'t-pending',
+        label: dc ? (approved?'Approved':'Draft exists')
+                  : (approved?'Approved \u00b7 not a data centre':'Draft \u00b7 not a data centre') };
     });
     return m;
   }
@@ -1181,6 +1230,13 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
       '<button class="bsky-btn" data-zo="template">Download template</button>'+
       (rows.length?'<button class="bsky-btn" data-zo="current">Download current list</button>':'')+
+      // THE WAY BACK. Uploading was a ONE-WAY DOOR: "Replace CSV" only ever replaces, so
+      // once a list existed the generator was pinned to it and the nationwide scan could be
+      // restored only by reaching into the database by hand. The body copy below has always
+      // promised "the generator uses its normal nationwide selection until you upload one",
+      // which was a promise the interface could not keep. Measured 2026-09-19: the live list
+      // had been in place since 2026-09-15 with no in-product way to lift it.
+      (rows.length?'<button class="bsky-btn" data-zo="clear" style="background:#fbeceb;color:#c23b34">Clear list</button>':'')+
       '<input type="file" id="zo-file" accept=".csv,text/csv" style="display:none">'+
       '</div>';
 
@@ -1191,16 +1247,30 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       body='<div class="muted">No ordered list yet. The generator uses its normal '+
            'nationwide selection until you upload one.</div>';
     } else {
-      var li='';
+      var li='', offTheme=0;
       for(var i=0;i<rows.length;i++){
-        var z=rows[i].zip, st=stat[z]||'';
+        var z=rows[i].zip, st=stat[z]||null;
+        if(st && st.rank<2) offTheme++;
         li+='<div style="display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--line)">'+
           '<span class="muted" style="min-width:26px;text-align:right;font-variant-numeric:tabular-nums">'+rows[i].founder_position+'</span>'+
           '<span style="font-variant-numeric:tabular-nums;font-weight:600">'+esc(z)+'</span>'+
-          (st?('<span class="tile-tag '+(st==='Approved'?'t-real':'t-persist')+'" style="margin-left:auto">'+esc(st)+'</span>'):'')+
+          (st
+            ? ('<span class="tile-tag '+st.cls+'" style="margin-left:auto">'+esc(st.label)+'</span>')
+            : ('<span class="muted" style="margin-left:auto;font-size:11.5px">no draft yet</span>'))+
           '</div>';
       }
       body='<div id="zo-list" style="max-height:260px;overflow:auto;font-size:13px">'+li+'</div>';
+      // SAY IT ONCE, WHERE IT IS TRUE. The panel is shown under the Data Center Theme chip,
+      // which implies the ordered run drafts data centres. It does not — it drafts each
+      // ZIP's newest eligible project of any type — and the founder must not have to infer
+      // that from a row of amber chips.
+      if(offTheme){
+        body+='<p class="sub" style="margin:10px 0 0;line-height:1.5">'+offTheme+' of these ZIPs '+
+          'produced a draft that is <b>not</b> a data centre. This list decides <b>which</b> '+
+          'ZIPs the generator looks at and in what order \u2014 it does not restrict the '+
+          'generator to this theme, which still drafts each ZIP\u2019s newest eligible '+
+          'project of any type. Off-theme drafts are listed under <b>All Maps</b>.</p>';
+      }
     }
     host.innerHTML='<div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel2)">'+
       head+btns+body+'</div>';
@@ -1246,6 +1316,33 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var zips=(_zipOrder.rows||[]).map(function(r){ return r.zip; });
       zipOrderDownload('homesignal-zip-order.csv', HS.zipOrderToCsv(zips)); return;
     }
+    if(act==='clear'){ zipOrderClear(); return; }
+  }
+
+  /**
+   * Remove the ordered list, returning the generator to its nationwide selection.
+   *
+   * SAME ONE TRANSACTION AS A REPLACE — hs_set_maps_dc_zip_order with an empty array — so
+   * clearing cannot half-succeed and leave a truncated order behind. It is the exact
+   * inverse of an upload and touches nothing else: no draft, no approval, no schedule.
+   *
+   * The confirm offers the download first, because a cleared list is not recoverable from
+   * this page and the founder may have no other copy of the order they typed.
+   */
+  async function zipOrderClear(){
+    var n=(_zipOrder.rows||[]).length;
+    if(!n) return;
+    if(!confirm('Remove the ordered list of '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
+                'Future draft creation returns to the generator\u2019s normal nationwide '+
+                'selection. Existing drafts, approved, scheduled and published posts are '+
+                'not changed.\n\nThis cannot be undone from here \u2014 use '+
+                '\u201cDownload current list\u201d first if you want a copy.')) return;
+    try{
+      var r=await window.hsClient.rpc('hs_set_maps_dc_zip_order',{p_zips:[]});
+      if(r.error){ alert('Clear failed, your current order is unchanged: '+(r.error.message||'')); return; }
+    }catch(err){ alert('Clear failed, your current order is unchanged.'); return; }
+    await zipOrderLoad();
+    refreshBluesky();
   }
 
   async function refreshBluesky(){
