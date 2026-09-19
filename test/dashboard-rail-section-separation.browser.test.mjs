@@ -98,8 +98,10 @@ window.supabase = { createClient: function () {
 // thing an eye actually measures — rather than trusting any one declaration.
 const READ = () => {
   const heads = [...document.querySelectorAll('h3.railgh')];
-  const find = (t) => heads.find((h) => h.innerText.trim().toUpperCase().startsWith(t));
-  const addrH = find('PROPERTY ADDRESSES'), zipH = find('ZIP CODES'), devH = find('DEVELOPMENTS');
+  // Matched on CONTAINS, not startsWith: the headings carry a leading decorative glyph, and
+  // pinning the first character would tie this suite to the icon rather than the group.
+  const find = (t) => heads.find((h) => h.innerText.trim().toUpperCase().includes(t));
+  const addrH = find('ADDRESSES'), zipH = find('ZIP CODES'), devH = find('DEVELOPMENTS');
   const grp = (h) => (h ? h.closest('.railgroup') : null);
   const bot = (el) => (el ? Math.round(el.getBoundingClientRect().bottom) : null);
   const top = (el) => (el ? Math.round(el.getBoundingClientRect().top) : null);
@@ -112,6 +114,29 @@ const READ = () => {
     subjectGap: (grp(zipH) && devH) ? top(devH) - bot(grp(zipH)) : null,
     carrierBorderTop: cs ? cs.borderTopWidth : null,
     carrierDisplay: cs ? cs.display : null,
+    // --- hierarchy: the heading measured against the rows it introduces, in one paint ---
+    hier: (function () {
+      const h = heads[0], t = document.querySelector('.placerow .pl'),
+            m = document.querySelector('.placerow .ps'), row = document.querySelector('.placerow'),
+            grp = heads[1] ? heads[1].closest('.railgroup') : null;
+      if (!h || !t || !row || !grp) return null;
+      const H = getComputedStyle(h), T = getComputedStyle(t), R = getComputedStyle(row),
+            G = getComputedStyle(grp), M = m ? getComputedStyle(m) : null;
+      return {
+        headSize: parseFloat(H.fontSize), headWeight: parseInt(H.fontWeight, 10),
+        headColor: H.color, headTransform: H.textTransform, headLetterSpacing: H.letterSpacing,
+        titleSize: parseFloat(T.fontSize), titleWeight: parseInt(T.fontWeight, 10),
+        titleColor: T.color, metaSize: M ? parseFloat(M.fontSize) : null,
+        rowDivider: R.borderBottomColor, sectionSep: G.borderTopColor,
+        glyphHidden: !!h.querySelector('.railic[aria-hidden="true"]'),
+        // What a screen reader is left with once the decorative glyph is dropped.
+        spoken: (function () {
+          const c = h.cloneNode(true);
+          c.querySelectorAll('[aria-hidden="true"]').forEach((e) => e.remove());
+          return c.textContent.replace(/\s+/g, ' ').trim();
+        })()
+      };
+    })(),
     // Every group must stay inside the ONE My Places card — the separator must never be
     // mistaken for a card break. Re-asserted here because this change touches the carrier.
     allInOneCard: (function () {
@@ -191,6 +216,62 @@ for (const [label, w, h] of [['desktop', 1440, 900], ['laptop-1024', 1024, 768],
   ok(r.allInOneCard, label + ' · all three groups stay inside the ONE My Places card', r);
   ok(r.scrollW <= r.clientW + 1, label + ' · no horizontal page scroll', r);
 }
+
+// ---- §3 THE HEADING OUTRANKS THE ROWS IT INTRODUCES ---------------------------------------
+// The defect this guards is an INVERTED hierarchy, not merely a small font. Measured on
+// production before the fix: headings painted 10.5px/700 in --ink-3 (#83918a) while the record
+// titles beneath them painted 13.3px/600 in --ink (#16211c) — a section header smaller AND
+// paler than its own contents, in the same tiny letter-spaced all-caps this card uses for
+// METADATA. That is why the three groups had to be re-read to be told apart.
+//
+// Asserted as a RELATIONSHIP to the row titles measured in the same paint, never as literal
+// pixel values, so a future restyle of the card cannot make this suite stale — only an
+// inversion can fail it.
+console.log('\n--- §3 heading vs. the rows it introduces --------------------------------------');
+await page.setViewportSize({ width: 1440, height: 900 });
+const hv = await load(['project:p-1', 'project:p-2']);
+const H = hv.hier;
+ok(!!H, '§3 precondition: a heading and a record row are both painted', H);
+if (H) {
+  ok(H.headSize > H.titleSize,
+    '§3a the heading is LARGER than the record titles under it', { head: H.headSize, title: H.titleSize });
+  ok(H.headWeight >= H.titleWeight,
+    '§3b ...and no lighter in weight', { head: H.headWeight, title: H.titleWeight });
+  ok(H.headColor === H.titleColor,
+    '§3c ...and takes the same darkest neutral, not the muted metadata grey',
+    { head: H.headColor, title: H.titleColor });
+  ok(H.headTransform !== 'uppercase',
+    '§3d ...and is not the all-caps treatment this card reserves for metadata', H.headTransform);
+  ok(H.metaSize === null || H.metaSize < H.titleSize,
+    '§3e secondary metadata stays subordinate to the record title',
+    { meta: H.metaSize, title: H.titleSize });
+  // The whole point of requirement 7: a boundary between TYPES must not look like a boundary
+  // between two rows of one type. Before the fix both were var(--line-2), byte-identical.
+  ok(H.sectionSep !== H.rowDivider,
+    '§3f the SECTION separator is a different colour from the ROW divider',
+    { section: H.sectionSep, row: H.rowDivider });
+  ok(H.glyphHidden, '§3g the heading glyph is decorative (aria-hidden)', H.glyphHidden);
+  ok(/^Addresses \(\d+\)$/.test(H.spoken),
+    '§3h ...so the heading still SPEAKS its name and count with the icon removed', H.spoken);
+}
+
+// ---- §4 A TYPED GROUP WITH ZERO MEMBERS STILL NAMES ITSELF --------------------------------
+// An empty Addresses group beside a populated ZIP Codes one is a true statement about that
+// type, not a defect — and its heading must carry the same treatment, or the card gains a
+// fourth visual rank nobody designed.
+console.log('\n--- §4 the empty typed group ---------------------------------------------------');
+const empty = await page.evaluate(() => {
+  const h = [...document.querySelectorAll('h3.railgh')]
+    .find((x) => /ADDRESSES/.test(x.innerText.toUpperCase()));
+  const g = h ? h.closest('.railgroup') : null;
+  return { heading: h ? h.innerText.trim() : null,
+           note: g ? !!g.querySelector('.railempty') : null,
+           size: h ? parseFloat(getComputedStyle(h).fontSize) : null };
+});
+ok(/\(0\)$/.test(empty.heading || ''), '§4a the empty group still states a count of zero', empty);
+ok(empty.note === true, '§4b ...and renders its honest empty note rather than vanishing', empty);
+ok(empty.size === (H ? H.headSize : null),
+  '§4c ...at the same heading rank as a populated group', empty.size);
 
 // ---- §2 THE OVER-FLAGGING DIRECTION -------------------------------------------------------
 // A separator declared on the CARRIER rather than on a group could leave a rule hanging under
