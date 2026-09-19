@@ -147,7 +147,8 @@ const READ = () => {
             d = probe;
           }
           const C = getComputedStyle(d);
-          const out = { bg: C.backgroundColor, color: C.color, probed: !!probe };
+          const out = { bg: C.backgroundColor, color: C.color,
+                        size: parseFloat(C.fontSize), probed: !!probe };
           if (probe) probe.remove();
           return out;
         })(),
@@ -155,9 +156,11 @@ const READ = () => {
         // .ptag-kind is the card's METADATA tag — 9.5px uppercase in --ink-3. It is the thing
         // the heading must never be mistaken for, and since the headings are now ALSO caps,
         // it is the comparison that still means something.
-        kindTagSize: (function () {
+        kindTag: (function () {
           const k = document.querySelector('.ptag-kind');
-          return k ? parseFloat(getComputedStyle(k).fontSize) : null;
+          if (!k) return null;
+          const K = getComputedStyle(k);
+          return { size: parseFloat(K.fontSize), bg: K.backgroundColor };
         })(),
         glyphHidden: !!h.querySelector('.railic[aria-hidden="true"]'),
         // What a screen reader is left with once the decorative glyph is dropped.
@@ -264,8 +267,17 @@ const hv = await load(['project:p-1', 'project:p-2']);
 const H = hv.hier;
 ok(!!H, '§3 precondition: a heading and a record row are both painted', H);
 if (H) {
-  ok(H.headSize > H.titleSize,
-    '§3a the heading is LARGER than the record titles under it', { head: H.headSize, title: H.titleSize });
+  // FOUNDER CALL: the chip IS the DEVELOPMENT tag, at its exact 10px. So "larger than the
+  // record titles" is no longer true and is no longer the contract — the original brief's
+  // 2-3px growth was deliberately given back. What replaces it is the thing that actually
+  // separates a heading from row content now: the heading is a FILLED chip and the row's own
+  // metadata tag is bare text. Assert the discriminator that is really load-bearing, not one
+  // that merely used to be.
+  ok(H.kindTag === null || (H.kindTag.bg === 'rgba(0, 0, 0, 0)' || H.kindTag.bg === 'transparent'),
+    '§3a the row metadata tag is bare text — no fill of its own', H.kindTag);
+  ok(H.chipBg !== 'rgba(0, 0, 0, 0)' && H.chipBg !== H.kindTag?.bg,
+    '§3a2 ...while the heading is a filled chip, which is what now separates the two',
+    { heading: H.chipBg, kindTag: H.kindTag && H.kindTag.bg });
   ok(H.headWeight >= H.titleWeight,
     '§3b ...and no lighter in weight', { head: H.headWeight, title: H.titleWeight });
   // FOUNDER CALL: the heading is the same tinted chip the DEVELOPMENT tag carries in What's
@@ -295,9 +307,20 @@ if (H) {
   // read as metadata was being 10.5px and --ink-3, i.e. indistinguishable from .ptag-kind.
   // The durable assertion is therefore against .ptag-kind itself: the heading must clearly
   // outrank the card's metadata tags on SIZE, whatever case either of them is set in.
-  ok(H.kindTagSize === null || H.headSize > H.kindTagSize + 2,
-    '§3d the heading clearly outranks the card\'s metadata tags on size',
-    { head: H.headSize, kindTag: H.kindTagSize });
+  // Not "+2" any more: at the reference tag's 10px the heading sits half a pixel above
+  // .ptag-kind's 9.5px, and that thin margin is an accepted consequence of matching
+  // DEVELOPMENT exactly. The floor that still means something is that the heading must never
+  // end up SMALLER than the metadata printed inside its own rows.
+  ok(H.kindTag === null || H.headSize >= H.kindTag.size,
+    '§3d the heading is never smaller than the metadata inside its own rows',
+    { head: H.headSize, kindTag: H.kindTag && H.kindTag.size });
+  // And it must go on matching the tag it was told to be. Size joins tint and ink as a pinned
+  // property, so "it drifted bigger again" fails here rather than being noticed on a screenshot.
+  ok(!!(H.refChip && H.refChip.size),
+    '§3d2 precondition: the reference tag\'s size was actually read', H.refChip);
+  ok(!!H.refChip && H.headSize === H.refChip.size,
+    '§3d2 ...and the heading is the SAME size as the DEVELOPMENT tag it is modelled on',
+    { heading: H.headSize, reference: H.refChip && H.refChip.size });
   ok(H.metaSize === null || H.metaSize < H.titleSize,
     '§3e secondary metadata stays subordinate to the record title',
     { meta: H.metaSize, title: H.titleSize });
