@@ -112,11 +112,13 @@ ok(/no draft yet/.test(CODE),
 // JOINED copy rather than on the raw source — a regex over the raw file would be testing
 // where the '+' happens to fall, which is not a contract.
 const COPY = DASH.replace(/'\s*\+\s*\n?\s*'/g, '');
-ok(/does not restrict the generator to this theme/.test(COPY)
-   && /newest eligible project of any type/.test(COPY),
-  '2h: the panel states in copy that the ordered run is NOT theme-filtered and drafts any type');
-ok(/which<\/b> ZIPs the generator looks at/.test(COPY),
-  '2i-pre: and states what the list DOES decide, so the correction is not just a disclaimer');
+ok(/Data Center Theme runs draft <b>only<\/b> data-centre projects/.test(COPY),
+  '2h: the panel states the ordered run IS theme-filtered, matching the shipped generator');
+ok(!/does not restrict the generator to this theme/.test(COPY),
+  '2h2: the earlier copy, true before the generator gained a theme filter, is gone — the '
+  + 'panel must never describe the opposite of what the engine does');
+ok(/came <\/?b?>?\s*|from the nationwide scan/.test(COPY),
+  '2i-pre: and it accounts for the off-theme drafts already in the queue');
 // NOT a guess dressed as a fact: the panel must never claim to know why a ZIP is empty.
 ok(!/no qualifying project/i.test(CODE.slice(CODE.indexOf('function zipOrderStatusMap'), CODE.indexOf('async function refreshBluesky'))),
   '2i: the panel still never asserts "no qualifying project" — only the generator knows that');
@@ -142,6 +144,36 @@ ok(/_zipOrder\.loaded\s*=\s*!_zipOrder\.error;/.test(CODE),
   '4a: only a successful read marks the list loaded, so a transient failure retries');
 ok(!/_zipOrder\.loaded\s*=\s*true;/.test(CODE),
   '4b: the unconditional form is gone');
+
+// ── 5 · THE GATE EXISTS SERVER-SIDE, NOT ONLY IN THIS PAGE ───────────────────────────
+// The dashboard's refusal is the FIRST of three, and on its own it was the only one.
+// bluesky-publish.yml runs every 30 minutes with REQUIRE_IMAGE="0", and
+// hs_approve_social_post carried no image check at all — so a console call, a stale tab,
+// or any approval path that is not this page could publish a Data Center Theme post with
+// no Map 1 capture. These assertions pin the SQL of record for the server-side half.
+const SQL = readFileSync(new URL('../docs/maps-dc-theme-approval-gate.sql', import.meta.url), 'utf8');
+ok(/hs_approve_social_post/.test(SQL) && /Data Center Theme/.test(SQL),
+  '5a: the parked SQL gates the approval RPC on the theme');
+ok(/evidence ->> ''theme''/.test(SQL) || /evidence->>'theme'/.test(SQL),
+  '5b: it reads the stamped candidate-time theme');
+ok(/pg_get_functiondef/.test(SQL) && /refusing to splice/.test(SQL),
+  '5d: it SPLICES the live function rather than retyping it, and fails closed on the anchor');
+ok(/if md5_after = md5_before then/.test(SQL),
+  '5e: it proves the splice took by re-reading, never by trusting execute');
+ok(/SECURITY DEFINER was lost/.test(SQL) && /pinned search_path was lost/.test(SQL),
+  '5f: it asserts the replace did not silently drop SECURITY DEFINER or the search_path — '
+  + 'a privilege change arrived at by omission is the failure mode here');
+ok(/before insert on public\.social_posts/.test(SQL) && !/before update on public\.social_posts/.test(SQL),
+  '5g: the theme-stamp trigger is INSERT-only, so it cannot block an edit or an image PATCH '
+  + 'on the 27 legacy rows');
+ok(/control_dc = 0 then/.test(SQL) && /proves nothing/.test(SQL),
+  '5h: the legacy-population invariant carries a NON-ZERO positive control, so its zero is '
+  + 'a real absence rather than a dead query');
+ok(/null is a valid decision; a missing key is not/.test(SQL),
+  '5i: a null theme is accepted — what is required is that a decision was RECORDED');
+ok(!/update\s+public\.social_posts\s+set[^;]*evidence/i.test(SQL),
+  '5j: it never backfills evidence.theme onto the legacy rows — that field records what the '
+  + 'classifier decided AT CANDIDATE TIME, and stamping it later would fabricate provenance');
 
 console.log(`\n${n - bad}/${n} passed`);
 if (bad) process.exit(1);
