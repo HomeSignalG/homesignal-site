@@ -39,6 +39,11 @@ const ENDPOINT = grabVar('ENDPOINT');                 // .../functions/v1/get-ad
 const APIKEY = grabVar('APIKEY');                     // public/anon key
 const SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
+// GITHUB_STEP_SUMMARY is capped at 1024k. A 2026-09-15 run wrote 3433k and GitHub threw the
+// WHOLE summary away — counts and all — so a run that found 28,263 failures handed back
+// nothing. The log is the complete record; these keep the summary deliverable.
+const SUMMARY_FAIL_CAP = 300;
+const SUMMARY_BYTE_CAP = 900 * 1024;
 const ZIP_PATH = process.env.ZIP_PATH || '/development/{zip}';
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 
@@ -86,7 +91,7 @@ async function loadReports() {
   let clean = 0;
   let floorRetries = 0;
   for (;;) {
-    const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip.asc&limit=${step}` +
+    const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng,facilities_unavailable&order=zip.asc&limit=${step}` +
       (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
     const res = await fetch(url, {
       headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
@@ -166,7 +171,7 @@ async function readZipState(zip) {
   const hdr = { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` };
   const q = encodeURIComponent(zip);
   const [rr, mr] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${q}&select=zip,counts,sites,home_lat,home_lng,refreshed_at&limit=1`, { headers: hdr }),
+    fetch(`${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${q}&select=zip,counts,sites,home_lat,home_lng,refreshed_at,facilities_unavailable&limit=1`, { headers: hdr }),
     fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?zip=eq.${q}&select=indexable&limit=1`, { headers: hdr }),
   ]);
   if (!rr.ok) return null;
@@ -221,13 +226,32 @@ async function renderZipPage(page, zip) {
     // Compute both in-page and flag any development point where they disagree — e.g. an orange
     // "proposed" dot whose subheader says "operating now", or a green recorded subdivision
     // labelled "Permitted construction". Falls back to no-op if the page didn't expose the hook.
+    // ⚠️ `operating` AND `built` ARE ONE BUCKET. The page's authoritative plane emits
+    // `operating` (lib/n5-radius.js::n5BucketFromStatus collapses built -> operating), and the
+    // old ternary tested `built` alone, then defaulted EVERYTHING ELSE to 'proposed'. So every
+    // operating record — correctly labelled "Recorded / operating" — was reported as label
+    // disagreeing with colour, on every page carrying one. 4,293 ZIPs hold counts.operating > 0
+    // and a single ZIP emitted 18 such lines. This mirrors LIFECYCLE_BUCKETS in
+    // scripts/lib/verify-dev-helpers.mjs, which had the vocabulary right the whole time.
+    //
+    // An UNRECOGNISED value now yields null and is SKIPPED here rather than forced into
+    // 'proposed': assertZip's lifecycleValueRecognised check already names a mapping gap, and
+    // inventing a bucket for it would report that gap as a mislabel instead.
     const OK = { built: ['operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
+    const railOf = (t) => {
+      const raw = t == null ? '' : String(t).trim().toLowerCase();
+      if (raw === 'built' || raw === 'operating') return 'built';
+      if (raw === 'approved') return 'approved';
+      if (raw === 'proposed') return 'proposed';
+      return null;
+    };
     const mislabeled = [];
     if (sites && typeof window.__HS_KIND === 'function' && window.__HS_COLORS) {
       for (const s of sites) {
         if (!s || s.relevance !== 'development' || s.scope !== 'point') continue;
+        const colorBucket = railOf(s.type);
+        if (!colorBucket) continue;
         const kind = String(window.__HS_KIND(s) || '').toLowerCase();
-        const colorBucket = s.type === 'built' ? 'built' : (s.type === 'approved' ? 'approved' : 'proposed');
         const allow = OK[colorBucket] || [];
         if (!allow.some((w) => kind.includes(w))) mislabeled.push(`${s.label || '??'} [${s.type}]→"${window.__HS_KIND(s)}"`);
       }
@@ -485,6 +509,36 @@ async function main() {
 
   await browser.close();
 
+  // ── failure CLASSIFICATION ────────────────────────────────────────────────────────
+  // CLAUDE.md §5: this job "is RED on main and only its DELTA is informative". A flat list
+  // of 28,263 lines is why. Grouping by class turns it into something a reader can diff
+  // between runs: a class appearing, or a count moving, is the signal.
+  const FAIL_CLASSES = [
+    [/facility counter is unparseable/,          'facility-counter-unreadable (READ failure)'],
+    [/facility count .* != cached counts/,       'facility-count-mismatch'],
+    [/facilities_unavailable=/,                  'facility-unknown-state-disagrees'],
+    [/violates the substance gate/,              'robots-substance-gate'],
+    [/contradicts its dot colour/,               'label-vs-colour'],
+    [/\(Task 5\)/,                               'cached-count-vs-sites (Task 5)'],
+    [/fabrication gate/,                         'no-record_url (anti-fabrication)'],
+    [/malformed record_url/,                     'malformed-record_url'],
+    [/rendered as a precise point/,              'jurisdiction-scope-as-point'],
+    [/UNRECOGNISED\s+lifecycle/,                  'unrecognised-lifecycle'],
+    [/sidebar shell did not render/,             'shell-missing'],
+    [/map did not initialize/,                   'map-dead'],
+    [/^TIME BUDGET/,                             'run-truncated'],
+  ];
+  const classOf = (m) => {
+    for (const [re, name] of FAIL_CLASSES) if (re.test(m)) return name;
+    return 'other';
+  };
+  const classTable = (list) => {
+    const by = new Map();
+    for (const f of list) by.set(classOf(f), (by.get(classOf(f)) || 0) + 1);
+    const rows = [...by.entries()].sort((a, b) => b[1] - a[1]);
+    return ['| class | count |', '|---|---:|', ...rows.map(([k, n]) => `| ${k} | ${n} |`)];
+  };
+
   // A truncated walk must NOT exit 0, and the summary's own Failed count must agree with the exit
   // code. "Ran out of time" and "everything passed" have to be distinguishable from the outside,
   // or the next reader treats a partial sweep as a full one.
@@ -506,7 +560,16 @@ async function main() {
     ...(raceHealed ? [`- Re-checked after a mid-run cache refresh and found consistent: **${raceHealed}**`] : []),
     `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
-      ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)]
+      ? [``, `## Failures by class`, ``, ...classTable(fails), ``,
+         `## Failures (first ${Math.min(fails.length, SUMMARY_FAIL_CAP)} of ${fails.length})`,
+         ...fails.slice(0, SUMMARY_FAIL_CAP).map((f) => `- ${f}`),
+         ...(fails.length > SUMMARY_FAIL_CAP
+           ? [``, `_${fails.length - SUMMARY_FAIL_CAP} further failure line(s) omitted from this summary._ ` +
+              `**They are all in the job log**, which is the complete record. The cap exists because ` +
+              `GITHUB_STEP_SUMMARY is capped at 1024k: a 2026-09-15 run produced 3433k and GitHub ` +
+              `discarded the WHOLE summary, headline counts included, so the run reported 28,263 ` +
+              `failures with no readable report of any of them._`]
+           : [])]
       : skippedForBudget.length
       ? [``, `No failures among the pages that WERE checked — but the walk was truncated, so this is ` +
           `not a clean bill for the cache. Re-run, or bound the runtime (QUEUE.md).`]
@@ -516,10 +579,23 @@ async function main() {
           `array (Task 5); the source run report shows 0 unmapped statuses / 0 missing record_urls; and every ` +
           `entity link carries ≥2 evidence records. ✓`]),
   ].join('\n');
+  // The LOG gets everything; the summary gets the capped view. A report that cannot be
+  // handed back is the same failure class as a check that cannot fail.
   console.log('\n' + summary);
+  if (fails.length > SUMMARY_FAIL_CAP) {
+    console.log(`\n## Every failure (${fails.length})`);
+    for (const f of fails) console.log(`- ${f}`);
+  }
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFileSync } = await import('node:fs');
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
+    // Belt and braces: even the capped summary is clipped to a byte budget, because one
+    // pathological failure line is enough to blow a line-count cap.
+    let out = summary;
+    if (Buffer.byteLength(out, 'utf8') > SUMMARY_BYTE_CAP) {
+      out = out.slice(0, SUMMARY_BYTE_CAP) +
+        `\n\n_… summary clipped at ${SUMMARY_BYTE_CAP} bytes; the job log holds the full record._`;
+    }
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, out + '\n');
   }
   if (fails.length) process.exit(1);
 }
