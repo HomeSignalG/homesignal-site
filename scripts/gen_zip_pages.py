@@ -40,6 +40,7 @@ STEP = 1000
 # including weather. Same cap, different populations - the SSR list is a subset.
 LN_CAP, GN_CAP, UM_CAP = 20, 10, 12
 RULE_F_MIN = 3                               # >= 3 legitimate non-weather items
+SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
 ZIP_RE = re.compile(r"^[0-9]{5}$")
@@ -251,7 +252,46 @@ def assemble(d, now_iso):
         p["n_um"] = min(len(p["um"]), UM_CAP)
         p["rule_f_count"] = p["n_ln_journalism"] + p["n_gn"] + p["n_um"]
         p["rule_f"] = p["rule_f_count"] >= RULE_F_MIN
+    link_siblings(pages)
     return pages
+
+
+def link_siblings(pages):
+    """Give every ZIP page a deterministic set of in-county sibling links.
+
+    THE PROBLEM THIS SOLVES: every one of the ~12,722 generated documents was an
+    ORPHAN. Measured before this change - 78617 and 01002 each carried ZERO links to
+    another /community/ page, and the only anchors in the initial HTML were outbound
+    rel="nofollow" source records. A corpus that large, reachable only by sitemap, is
+    the classic way a site never gets fully crawled: a sitemap is a hint, an internal
+    link is the actual crawl path, and orphan pages are routinely left unindexed.
+
+    IT IS A RING, NOT A "TOP N", AND THAT IS THE WHOLE POINT. Listing the first N ZIPs
+    of each county would make those N hubs and leave every other ZIP exactly as
+    orphaned as before - the same defect, wearing a fix. Sorting the county's ZIPs and
+    giving each one the NEXT SIB_CAP entries with wraparound makes the county a single
+    strongly-connected cycle, so every page has in-degree >= 1 and a crawler entering
+    anywhere reaches all of it.
+
+    Grouped on (state, county) rather than county alone: county names repeat across
+    states (Benton, Washington, Montgomery), and merging them would link residents to
+    another state's pages - the same wrong-geography error the ingest side keeps
+    hitting. A ZIP whose meta carries no county gets NO siblings: absent stays absent,
+    never guessed.
+
+    Deterministic by construction (sorted input, positional slice), because the build
+    is asserted byte-identical across two runs.
+    """
+    groups = {}
+    for z, p in pages.items():
+        if p["county"] and p["state"]:
+            groups.setdefault((p["state"], p["county"]), []).append(z)
+    for zs in groups.values():
+        zs.sort()
+        n = len(zs)
+        for i, z in enumerate(zs):
+            ring = [zs[(i + k) % n] for k in range(1, min(SIB_CAP, n - 1) + 1)]
+            pages[z]["siblings"] = [{"zip": s, "name": pages[s]["name"]} for s in ring]
 
 
 # ---------------------------------------------------------------- render
@@ -299,6 +339,20 @@ def render(p, built):
              f'Development &amp; permits map for {esc(z)}</a> · '
              f'<a href="/">HomeSignal home</a> · '
              f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
+    # The sibling block goes AFTER that nav and carries a DIFFERENT class, deliberately.
+    # scripts/prove-zip-pages-live.mjs scrapes `<nav class="zsec">[\s\S]*?</nav>` and takes
+    # the FIRST match to assert the page's usable internal links; a second zsec nav placed
+    # above would steal that match and redden the daily production monitor. And
+    # `<section class="zsec"><h2>` is how the control classifier counts real content
+    # sections - reusing it here would let an empty Alerts page satisfy that proof
+    # vacuously, weakening a check rather than adding one.
+    sibs = p.get("siblings") or []
+    if sibs:
+        where = f"{esc(p['county'])} County, {esc(st)}" if st else f"{esc(p['county'])} County"
+        items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
+                        for s in sibs)
+        links += (f'<nav class="zsib" aria-label="More ZIP codes in this county">'
+                  f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
