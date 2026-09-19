@@ -131,24 +131,32 @@
      the thing that made this heading read as METADATA, because it was 10.5px and --ink-3 like
      .ptag-kind. At 13.5px on a filled chip in --green-deep, the case is no longer the
      discriminator — size, fill and ink are. The pin below moved with it.
-     WEIGHT IS 600, the founder's original spec. It was carried at 700 for one release on the
-     measured ground that a 600 heading would tie the 13.3px/600 record titles — true of the
-     heading AS IT WAS THEN: sentence case, bare, in --ink. That argument expired when the chip
-     and the caps landed. A capitalised label on a filled --green-tint field in --green-deep
-     cannot be confused with a bare dark-ink row title at any weight, so the extra weight was
-     no longer buying the separation it was added for. */
+     WEIGHT IS 600, the founder's original spec.
+
+     ⚠️ SIZE IS 10px AND THE METRICS ARE THE REFERENCE TAG'S EXACTLY — 10px / .05em / caps /
+     3px 8px / radius 5px, i.e. `.ctype` above. Founder call after seeing 13.5px live: the chip
+     is meant to BE the DEVELOPMENT tag, not a larger cousin of it.
+     WHAT THIS COSTS, recorded so the next session does not "restore" the larger size believing
+     it is fixing a regression: the original brief asked for the heading to grow 2-3px, and this
+     gives that back. The heading is now 10px against .ptag-kind's 9.5px INSIDE the rows beneath
+     it — half a pixel apart. SIZE IS THEREFORE NO LONGER THE DISCRIMINATOR AT ALL; the filled
+     --green-tint chip is, and .ptag-kind has no fill. That is a real distinction, and it is what
+     the pins now assert. But it is a thinner margin than the 13.5px version carried, and it was
+     chosen deliberately with that tradeoff on the table. */
   .railgh{display:inline-block;background:var(--green-tint);color:var(--green-deep);
-          font-size:13.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-          padding:5px 10px;border-radius:6px;margin:0 0 10px}
+          font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+          padding:3px 8px;border-radius:5px;margin:0 0 9px}
   /* The count stays SUBORDINATE inside the chip — same ink at reduced opacity rather than a
      third colour, so the word leads the glance and the number confirms it. tabular-nums so a
      changing count cannot resize the chip. */
-  .railgc{font-weight:500;font-size:12.5px;color:inherit;opacity:.72;
-          font-variant-numeric:tabular-nums}
+  /* No font-size of its own: it inherits the chip's, so the count can never end up LARGER than
+     the label beside it the next time that size moves. It stayed 12.5px while the heading went
+     13.5px -> 10px, which would have inverted them. */
+  .railgc{font-weight:500;color:inherit;opacity:.72;font-variant-numeric:tabular-nums}
   /* The group's mark, from the nav's own glyph vocabulary (see RAIL_PLACE_GROUPS). It inherits
      the chip's ink, so the icon can never fall out of step with the label's colour. Fixed
      width so the three labels begin on one optical line whatever the glyph. */
-  .railic{display:inline-block;width:16px;font-weight:400;color:inherit}
+  .railic{display:inline-block;width:12px;font-weight:400;color:inherit}
   .railempty{margin:4px 0 2px}
   /* The overflow control is a LINK because it navigates — never Fix 8K's in-place button.
      Own focus-visible ring, since it is a new navigable target. */
