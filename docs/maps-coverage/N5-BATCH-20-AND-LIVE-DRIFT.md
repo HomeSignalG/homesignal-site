@@ -41,6 +41,29 @@ then recomputed **inside the database** rather than hand-edited.
 
 ## 3. 🔴 THE FAULT: the authoritative producer cannot survive the live refresh
 
+> ✅ **RESOLVED 2026-09-04, THE SAME DAY — AND THIS SECTION WAS NEVER UPDATED, WHICH COST A
+> LATER SESSION A FULL INVESTIGATION.** Option **(a)** below was implemented and applied as
+> migration `app_authoritative_producer_tolerates_descriptive_drift`; DDL of record
+> `docs/maps-authoritative-producer-drift-tolerance.sql`. The producer no longer INNER-joins:
+> it uses `left join lateral` and emits `'attributes_missing', (a.source_key is null)`, so a
+> membership with no current descriptive row is carried rather than raised on.
+>
+> **Re-verified live 2026-09-19, by calling the shipped function rather than reading it:**
+> ZIP **27560** — the worst live case, 293 memberships against 56 live projects — returns
+> **293 rows, 9 with `attributes_missing`, no exception**. Control ZIP **64165** returns
+> **29 rows, 0 attributes_missing**, so the non-zero above is a real tolerance rather than a
+> function that flags everything.
+>
+> **What that means for the text below:** the fault is fixed, the "three options" are no
+> longer an open founder decision — **(a) was taken** — and a membership refresh is no longer
+> blocked by the risk of erroring live ZIP pages. §5's state table remains a dated receipt and
+> is NOT edited. The remaining live-drift question is the OPPOSITE direction, which this
+> section never covered: a project that arrives in `app_projects` AFTER the frozen snapshot is
+> silently absent from Map 1 — no error, just invisible. Measured 2026-09-19: the membership
+> was last built **2026-09-05 21:23Z**, and on ZIP 64165 Map 1 can show nothing filed after
+> **2026-06-29** against a newest live filing of **2026-09-09**.
+
+
 `geo.zip_authoritative_membership` is derived from the **frozen** phase-1 baseline.
 `public.app_authoritative_projects_for_zip` joins it to **live** `public.app_projects` with
 an INNER join and raises when any membership fails to resolve:
