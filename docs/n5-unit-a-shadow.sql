@@ -141,6 +141,16 @@ create constraint trigger zz_shadow_complete_status
 -- single descriptive variant; the 84 that differ are resolved uniquely by that rule
 -- (0 residual ties, 0 NULL last_seen_at). `zip`, `lat` and `lng` are OVERRIDDEN from
 -- the authoritative membership, never carried from the borrowed row.
+--
+-- ⚠️ THIS IS THE SHADOW RULE, NOT THE PRODUCTION RULE (noted 2026-09-19, Phase 1).
+-- The (last_seen_at desc, id asc) selector above is CORRECT for this shadow function and
+-- its measurement is a dated receipt — do not change either. But production's
+-- resident-facing read path uses min(id): `order by p.id asc limit 1`. Verified by anon
+-- EXECUTE privilege — public.app_zip_projects_markers and
+-- public.app_authoritative_projects_for_zip both use min(id) and both grant anon; this
+-- function's proacl is postgres=X/postgres, so a resident can never reach it.
+-- Canonical contract: docs/geo-descriptive-row-contract.md. Do not carry this rule into
+-- any production path.
 create or replace function geo.n5_shadow_projects_for_zip(p_zip text, p_kind text)
 returns jsonb
 language plpgsql stable

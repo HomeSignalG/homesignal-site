@@ -122,3 +122,19 @@ and aggregated under `collate "C"`.
    `s.zip = p.zip::bpchar`. This alone turned sub-second queries into timeouts.
 4. `geo.n5_frozen` is a per-shard scratch table, currently 0 rows — it is not a
    persistent input and must not be treated as one.
+
+---
+
+## 8. Read-path function pins (added Phase 1, 2026-09-19)
+
+Live function body md5 (`md5(pg_get_functiondef(oid))`). Phase 1 changed no function;
+these are the pre-mutation pins every later phase must re-verify.
+
+| function | body md5 | anon EXECUTE | descriptive-row rule |
+|---|---|---|---|
+| `public.app_zip_projects_markers` | `4037cc5b35113c22869d3cc91fa6e1de` | true | **min(id)** |
+| `public.app_authoritative_projects_for_zip` | `a162cf212082eaf9b114d51f55d1ff66` | true | **min(id)** |
+| `public.app_projects_for_zip` | `eec5777aac02228350dd437d4e37ccba` | true | routes to the above |
+| `geo.n5_shadow_projects_for_zip` | `bfe60ff5b8cb940b5e4f2de18b606a98` | **false** | last_seen_at desc (shadow only) |
+
+Canonical rule: `docs/geo-descriptive-row-contract.md`.

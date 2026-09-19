@@ -33,6 +33,21 @@
 --       source_key. No production DDL at all; needs a Unit A amendment plus a
 --       fail-closed guard for the case where the stored id no longer exists, so a
 --       stale id can never silently drop a record.
+--
+-- ⚠️ TWO DATED CORRECTIONS (noted 2026-09-19, Phase 1). The body below is the verbatim
+-- historical record of what ran and is NOT rewritten.
+--
+-- 1. DESCRIPTIVE-ROW RULE. The (last_seen_at desc, id asc) selector quoted above is what
+--    this ROLLED-BACK attempt used. Production's resident-facing rule is min(id) —
+--    `order by p.id asc limit 1`. Canonical: docs/geo-descriptive-row-contract.md.
+--
+-- 2. THE INDEX CLAIM ABOVE IS NOW STALE. It reads "public.app_projects has NO index on
+--    source_key — its four indexes are on id and on (zip, ...)". Measured 2026-09-19:
+--    app_projects carries SIX indexes, TWO of them source_key-leading —
+--    app_projects_source_key_kind_idx (source_key, record_kind) and
+--    app_projects_skey_kind_id_idx (source_key, record_kind, id). Way forward (A) was
+--    therefore taken at some point after this file was written. The 2.13s/3.89s timings
+--    above were measured WITHOUT those indexes and must not be quoted as current.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
