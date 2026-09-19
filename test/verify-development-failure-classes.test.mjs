@@ -147,6 +147,24 @@ const repFac = (n, unavailable) => ({
   ok(has(f, /sidebar shell did not render/), 'the shell check still fires');
 }
 
+// ---- CLASS C, the product's own receipt ------------------------------------------------
+// The strongest evidence that counts.* never described the rendered set is in the PAGE, which
+// DELETES three of those keys in ZIP mode before rendering, saying why:
+//
+//   "The cached report's development counters describe ITS centroid-radius development set,
+//    which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
+//    Leaving them makes the headline tile contradict the map the resident is looking at
+//    (measured live on 78617: the tile read 48 while 55 were drawn)."
+//
+// So the verifier was asserting an equality the product had already measured as false and
+// deliberately removed. Pinned because the day the page stops deleting them, the reasoning
+// behind reconciling counts against rep.sites needs re-reading.
+const mapPage = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+ok(/delete zipCounts\.development; delete zipCounts\.proposed; delete zipCounts\.comment_open;/.test(mapPage),
+   'C: the page still DELETES the cached development counters in ZIP mode (its own repudiation)');
+ok(/facUnavailable:!!row\.facilities_unavailable/.test(mapPage),
+   'A: the page derives facUnavailable from the same column the verifier now reads');
+
 // ---- CLASS D: the report must be able to hand back what it found ----------------------
 // The 2026-09-15 run wrote a 3433k step summary against GitHub's 1024k cap, so the WHOLE
 // summary was discarded — headline counts included. A run that found 28,263 failures handed
