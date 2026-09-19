@@ -20,6 +20,11 @@ name: maps-social-image
 # already uses in this repo. It is scoped THREE ways so it cannot become ambient
 # generation: to one branch, to the arm file's path alone (an ordinary code push does not
 # fire it), and to the arming gate below. The arm file is set to DISARMED after a capture.
+#   ⚠️ UPDATED 2026-09-19: this file IS on main now, so workflow_dispatch is the live
+#   route and the push trigger is the legacy one. The push branch is deliberately NOT the
+#   current working branch: arming must not fire a production capture as a side effect of a
+#   git push. Dispatch it, naming the ref whose arm file you mean to use — checkout@v4 takes
+#   the triggering ref, so the ARMING GATE reads THAT branch's token, never main's.
 on:
   push:
     branches: [claude/acquisition-log-page-location-hlrt47]
@@ -44,7 +49,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_ARM: arm-2026-09-04-maps-social-visual-run6
+  EXPECTED_ARM: arm-2026-09-19-maps-social-visual-run7
   BASE: https://homesignal.net
 
 jobs:
