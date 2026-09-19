@@ -253,7 +253,16 @@ const main = async () => {
     ok(bad5.length === 0, 'sitemap has no malformed community URLs');
     ok(canonZips.includes(C.pass_dev_fail), 'a Rule-F-PASS control is advertised');
     ok(!canonZips.includes(C.fail_dev_pass), 'a Rule-F-FAIL control is NOT advertised');
-    ok(dev.length > 0, 'the development sitemap population survives (page-purpose separation)');
+    // INVERTED 2026-09-19, in the same change as its pre-deployment twin
+    // (scripts/prove-zip-pages.mjs). These two must move together: CLAUDE.md §5 says that if
+    // the deployed twin and the build-time proof ever disagree, the DEPLOYMENT is what
+    // changed — so leaving this one asserting the old rule would turn the daily live
+    // verifier red the day after the merge and point at the wrong cause.
+    // Every homesignalmap.html?zip= URL serves a byte-identical noindex document that
+    // canonicalises to the ZIP-less URL, so advertising them contradicted the assertions
+    // directly above. The route itself is untouched and still returns 200 (STEP 12).
+    ok(dev.length === 0,
+       'the sitemap advertises ZERO noindex homesignalmap.html?zip= URLs');
     console.log(`SITEMAP_CANONICAL_COUNT=${canonZips.length}`);
   }
 

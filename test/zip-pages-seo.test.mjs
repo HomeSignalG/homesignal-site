@@ -156,9 +156,42 @@ ok(!/community\.html\?zip=/.test(sm), 'the legacy community.html?zip= URL is gon
 ok(JSON.stringify(smZips) === JSON.stringify(man.indexable_zips),
    'the sitemap advertises EXACTLY the Rule F pass set');
 ok(man.sitemap_community_urls === man.rule_f_pass, 'manifest reconciles sitemap count with Rule F pass');
-ok(sm.includes('homesignalmap.html?zip=01002'),
-   'the development half of the sitemap is untouched (page-purpose separation)');
+// REVERSED 2026-09-19, deliberately. This used to assert the development half was
+// "untouched (page-purpose separation)". Measured against production that day: every
+// homesignalmap.html?zip= URL serves a byte-identical document (Pages ignores the query
+// string), ships `noindex, nofollow`, and canonicalises to the ZIP-less URL — so the
+// sitemap was advertising 11,718 noindex duplicates of one page, 59% of its entries.
+// A sitemap entry contradicting its own URL's robots value is the one thing this
+// generator's docstring forbids; the rule had only ever been checked on the community
+// half. Restoring the advertisement means making those URLs real documents, not
+// reverting this line.
+ok(!/homesignalmap\.html\?zip=/.test(sm),
+   'the noindex development URLs are dropped from the artifact sitemap');
+ok(man.sitemap_dev_urls_removed === 1,
+   'the manifest records how many development URLs were dropped (fixture stages 1)');
 ok(sm.includes('<loc>https://homesignal.net/</loc>'), 'static URLs survive the rewrite');
+
+// ---- 8b. SHARING + STRUCTURED DATA ------------------------------------------------------
+// Added 2026-09-19. The homepage carried Open Graph and these documents did not, so every
+// shared link rendered bare on the 8,180 pages the service spreads through.
+const ogPage = read(out1, '01001');          // Rule F PASS
+const noIdx  = read(out1, '01002');          // Rule F FAIL
+for (const [tag, want] of [
+  ['og:type', 'website'], ['og:site_name', 'HomeSignal'], ['og:locale', 'en_US'],
+]) {
+  ok(ogPage.includes(`<meta property="${tag}" content="${want}">`), `${tag} is ${want}`);
+}
+ok(/<meta property="og:title" content="Agawam \(01001\), MA/.test(ogPage),
+   'og:title carries the ZIP-specific title');
+ok(ogPage.includes('<meta property="og:url" content="https://homesignal.net/community/01001/">'),
+   'og:url is this document\'s own canonical URL');
+ok(ogPage.includes('<meta property="og:image" content="https://homesignal.net/og-default.png">'),
+   'og:image is ABSOLUTE — social crawlers do not resolve relative URLs or read <base>');
+ok(ogPage.includes('<meta name="twitter:card" content="summary_large_image">'),
+   'twitter:card is declared');
+// A noindex page is still SHARED by residents, so it carries the tags too.
+ok(/<meta property="og:title" content="Amherst \(01002\), MA/.test(noIdx),
+   'a noindex page still carries Open Graph — robots governs crawling, not sharing');
 
 // ---- 9. INITIAL-HTML CONTRACT extras ----------------------------------------------------
 ok(/Compiled from official public records on <time datetime="2026-09-04">/.test(a),
