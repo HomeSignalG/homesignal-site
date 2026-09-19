@@ -40,14 +40,31 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-09-15 — 🟡 FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: APPLIED TO THE DATABASE, PR OPEN
+### 2026-09-15 — ✅ FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: MERGED AND LIVE, BOTH HALVES
 
-⚠️ **NOT MERGED, NOT DEPLOYED.** The site tree is unchanged — Fix 28 adds only three new files
-(a DDL of record, a frozen audit, one offline test + its fixture) and edits no shipped page, no
-`lib/*`, no CSS and no workflow. **What IS live is the DATABASE half**, because the contract
-required an AFTER audit reconciling all 996 baseline associations and that cannot be produced
-without applying. Founder approved and asked for a PR on 2026-09-15; the PR is open and
-unmerged. Rollback is one statement:
+✅ **MERGED 2026-09-15 as `c2273e8` (#1240).** All four files are on `main`:
+`docs/fix28-datacenter-zip-membership.sql`, `docs/fix28-datacenter-membership-audit.sql`,
+`test/fix28-datacenter-membership.test.mjs` and `test/fixtures/fix28/datacenter-type-inputs.psv`.
+
+🛑 **THIS ENTRY READ "NOT MERGED, NOT DEPLOYED … the PR is open and unmerged" UNTIL 2026-09-19,
+and that is the defect worth recording — not the fix, which was fine.** QUEUE.md's whole job,
+stated in CLAUDE.md, is that it "must never drift from reality". It drifted, about itself, for
+four days. A pre-launch audit then read this entry, believed it, and wrote up "the repo and
+production describe different systems" as a launch-blocking risk. The risk was not real; the
+stale queue entry was. **A doc carrying a receipt is the first place to look and the LAST place
+to trust** — the entry said PR OPEN, and nobody asked GitHub.
+
+**VERIFIED 2026-09-19, both halves, against the primary sources rather than this file:**
+- `git ls-tree origin/main` — all four files present; the DDL landed in `c2273e8`.
+- `pg_trigger` — `trg_development_reports_dc_zip_membership` on `public.development_reports`,
+  user trigger, `tgenabled = 'O'` (enabled), bound to `dev_reports_enforce_dc_zip_membership`.
+- `pg_proc` — all three functions the parked DDL defines exist live:
+  `dev_reports_enforce_dc_zip_membership` (4,585 chars), `map_site_is_datacenter_type` (2,592),
+  `zip_dc_membership_outside` (511).
+
+So the repo and production agree, in substance and not merely in file presence.
+
+Rollback is still one statement:
 `drop trigger trg_development_reports_dc_zip_membership on public.development_reports;`
 (the removed records then return as each ZIP refreshes, ~53 h for a full sweep).
 
@@ -994,7 +1011,14 @@ Data center octagon, keeps its EPA square, appears once, popup reads
   membership. Not a 78617 exception.
 - Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
-### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
+### 2026-09-05 — ✅ DATA CENTER TYPE ON MAPS: the octagon now draws — MERGED
+
+✅ **The heading read "(branch, not merged)" until 2026-09-19 and was the SECOND stale in-flight
+claim in this file** (see Fix 28 above for the first and for why it matters). Verified against
+`origin/main` rather than this entry: `lib/map.js` carries the DATACENTER precedence phase — 16
+occurrences, and it reads `type_raw` — landing in **`b8adc02` (#1221), 2026-09-15**. The dated
+analysis below is unchanged and still correct; only the STATE was wrong.
+
 
 `CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
 never drew. Measured on production `app_projects` (control 3,216,489 rows): **1,190 records
