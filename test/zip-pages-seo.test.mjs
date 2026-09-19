@@ -156,8 +156,19 @@ ok(!/community\.html\?zip=/.test(sm), 'the legacy community.html?zip= URL is gon
 ok(JSON.stringify(smZips) === JSON.stringify(man.indexable_zips),
    'the sitemap advertises EXACTLY the Rule F pass set');
 ok(man.sitemap_community_urls === man.rule_f_pass, 'manifest reconciles sitemap count with Rule F pass');
-ok(sm.includes('homesignalmap.html?zip=01002'),
-   'the development half of the sitemap is untouched (page-purpose separation)');
+// REVERSED 2026-09-19, deliberately. This used to assert the development half was
+// "untouched (page-purpose separation)". Measured against production that day: every
+// homesignalmap.html?zip= URL serves a byte-identical document (Pages ignores the query
+// string), ships `noindex, nofollow`, and canonicalises to the ZIP-less URL — so the
+// sitemap was advertising 11,718 noindex duplicates of one page, 59% of its entries.
+// A sitemap entry contradicting its own URL's robots value is the one thing this
+// generator's docstring forbids; the rule had only ever been checked on the community
+// half. Restoring the advertisement means making those URLs real documents, not
+// reverting this line.
+ok(!/homesignalmap\.html\?zip=/.test(sm),
+   'the noindex development URLs are dropped from the artifact sitemap');
+ok(man.sitemap_dev_urls_removed === 1,
+   'the manifest records how many development URLs were dropped (fixture stages 1)');
 ok(sm.includes('<loc>https://homesignal.net/</loc>'), 'static URLs survive the rewrite');
 
 // ---- 9. INITIAL-HTML CONTRACT extras ----------------------------------------------------

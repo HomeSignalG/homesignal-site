@@ -368,6 +368,21 @@ def render(p, built):
 SITEMAP_LEGACY_RE = re.compile(
     r"[ \t]*<url>\s*<loc>[^<]*community\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
 
+# The development half. Measured 2026-09-19 against production: every one of these URLs
+# serves the SAME document, because GitHub Pages selects content by PATH and ignores the
+# query string entirely (docs/crawler-ground-truth-2026-09-03.md).
+#   ?zip=78617 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2
+#   ?zip=84302 -> 309,689 bytes, md5 0282424d481b23d738a8dc038c0b7ee2   <- identical
+# Both ship `noindex, nofollow` in their initial HTML and both canonicalise to the
+# ZIP-LESS https://homesignal.net/homesignalmap.html. homesignalmap.html flips its own
+# robots-meta client-side from app_community_meta.indexable, but never rewrites the
+# canonical — so even a rendered crawl consolidates all 11,718 into one URL and not one
+# of them can rank for a ZIP. Advertising them is not a no-op: it is 11,718 "submitted
+# URL marked noindex" errors in Search Console and 59% of the crawl budget spent on
+# duplicates of one page, taken away from the real /community/<zip>/ documents.
+SITEMAP_DEV_RE = re.compile(
+    r"[ \t]*<url>\s*<loc>[^<]*homesignalmap\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
+
 
 def _url_el(loc):
     return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n"
@@ -386,9 +401,29 @@ def reconcile_sitemap(out_dir, indexable):
     correct at exactly the moment the documents it points at start existing, and stays
     untouched if they never do. Same reason the deploy job is gated on main.
 
-    The development half (`homesignalmap.html?zip=`) is deliberately left ALONE: it is
-    advertised from app_community_meta.indexable, the development/facility gate, which this
-    unit does not change (page-purpose separation).
+    The development half (`homesignalmap.html?zip=`) is REMOVED, not carried over.
+
+    ⚠️ THIS REVERSES THIS FUNCTION'S ORIGINAL "leave the development half alone
+    (page-purpose separation)" RULE, deliberately. That rule was right about page PURPOSE
+    and wrong about what was being advertised: page-purpose separation assumes the two
+    halves are two sets of documents. They are not. The community half became real
+    per-ZIP documents; the development half never did, so all 11,718 of its URLs resolve
+    to ONE noindex document that canonicalises away from every ZIP (see SITEMAP_DEV_RE
+    above for the measurement). A sitemap entry for a URL whose own robots value says
+    noindex is the exact contradiction the committed generator's docstring forbids — it
+    was simply never checked on this half.
+
+    This removes the ADVERTISEMENT only. It changes no document, no robots directive, and
+    nothing a resident sees: /homesignalmap.html?zip=<zip> keeps working exactly as it
+    does today, and stays reachable from the Place pages. Restoring the advertisement is
+    the job of making those URLs real documents (`/development/<zip>/`, the pattern
+    `/community/<zip>/` already uses), at which point this filter is what should be
+    replaced — not reverted.
+
+    `scripts/gen_sitemap.py` still WRITES those URLs into the committed sitemap.xml. That
+    is left alone for the same reason its community half is: nothing serves the committed
+    file, the artifact is what ships, and retiring the committed generator's halves is a
+    separate change (its own docstring already logs that follow-up).
     """
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
@@ -399,10 +434,16 @@ def reconcile_sitemap(out_dir, indexable):
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
                 + block + "\n</urlset>\n")
         open(path, "w", encoding="utf-8").write(body)
-        return {"removed": 0, "added": len(zips)}
+        # No staged sitemap to filter, so nothing was removed from either half. Both keys
+        # are stated rather than omitted: main() reads them unconditionally, and a missing
+        # key here is a KeyError that kills the whole build on the no-sitemap path only —
+        # a branch the SEO suite's happy path never takes.
+        return {"removed": 0, "removed_dev": 0, "added": len(zips)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
+    removed_dev = len(SITEMAP_DEV_RE.findall(txt))
+    txt = SITEMAP_DEV_RE.sub("", txt)
     if "</urlset>" not in txt:
         sys.exit("ERROR: staged sitemap.xml has no </urlset> — refusing to write a broken sitemap")
     txt = txt.replace("</urlset>", block + "\n</urlset>")
@@ -412,7 +453,13 @@ def reconcile_sitemap(out_dir, indexable):
         sys.exit(f"ERROR: sitemap carries {n} community URLs for {len(zips)} indexable ZIPs")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
-    return {"removed": removed, "added": len(zips)}
+    # Every advertised URL must agree with its own robots directive. The development URLs
+    # are noindex and canonicalise away from the ZIP, so one surviving here is a defect —
+    # and a silent one, because a sitemap full of noindex URLs still parses and still
+    # returns 200. Fail the build rather than ship it.
+    if re.search(r"homesignalmap\.html\?zip=", txt):
+        sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
+    return {"removed": removed, "removed_dev": removed_dev, "added": len(zips)}
 
 
 # ---------------------------------------------------------------- build + gates
@@ -475,6 +522,7 @@ def main():
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
+          f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs")
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
@@ -491,7 +539,8 @@ def main():
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
                "rule_f_fail": len(pages) - npass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
-               "sitemap_community_urls": sm["added"]},
+               "sitemap_community_urls": sm["added"],
+               "sitemap_dev_urls_removed": sm["removed_dev"]},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 
