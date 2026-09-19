@@ -136,7 +136,18 @@ jobs:
           assert not re.search(r'community\.html\?zip=', sm), 'legacy community URL still advertised'
           assert sorted(zips) == man['indexable_zips'], 'sitemap != Rule F pass set'
           assert len(zips) == man['rule_f_pass'], 'sitemap count != Rule F pass count'
-          assert 'homesignalmap.html?zip=' in sm, 'development sitemap half was destroyed'
+          # INVERTED 2026-09-19, and it is the SAME rule this gate already states one line
+          # up: the advertised set must BE the index-eligible set. This line used to guard
+          # the development half's PRESENCE under page-purpose separation, which assumed the
+          # two halves were two sets of documents. They are not. Measured against production:
+          # every homesignalmap.html?zip= URL serves a byte-identical document (Pages selects
+          # by PATH and ignores the query string), ships `noindex, nofollow`, and canonicalises
+          # to the ZIP-less URL — so advertising 11,718 of them contradicted this gate's own
+          # premise. Restoring the advertisement means making those URLs real documents
+          # (/development/<zip>/), and this assertion is what should be replaced then.
+          assert 'homesignalmap.html?zip=' not in sm, \
+              'noindex development URLs are still advertised in the sitemap'
+          assert man['sitemap_dev_urls_removed'] >= 0, 'manifest must record the removal count'
           print(f"sitemap reconciled: {len(zips)} community URLs == rule_f_pass {man['rule_f_pass']}")
           PY
           # nothing generated may ever enter git
