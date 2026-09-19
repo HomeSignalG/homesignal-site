@@ -171,6 +171,28 @@ ok(man.sitemap_dev_urls_removed === 1,
    'the manifest records how many development URLs were dropped (fixture stages 1)');
 ok(sm.includes('<loc>https://homesignal.net/</loc>'), 'static URLs survive the rewrite');
 
+// ---- 8b. SHARING + STRUCTURED DATA ------------------------------------------------------
+// Added 2026-09-19. The homepage carried Open Graph and these documents did not, so every
+// shared link rendered bare on the 8,180 pages the service spreads through.
+const ogPage = read(out1, '01001');          // Rule F PASS
+const noIdx  = read(out1, '01002');          // Rule F FAIL
+for (const [tag, want] of [
+  ['og:type', 'website'], ['og:site_name', 'HomeSignal'], ['og:locale', 'en_US'],
+]) {
+  ok(ogPage.includes(`<meta property="${tag}" content="${want}">`), `${tag} is ${want}`);
+}
+ok(/<meta property="og:title" content="Agawam \(01001\), MA/.test(ogPage),
+   'og:title carries the ZIP-specific title');
+ok(ogPage.includes('<meta property="og:url" content="https://homesignal.net/community/01001/">'),
+   'og:url is this document\'s own canonical URL');
+ok(ogPage.includes('<meta property="og:image" content="https://homesignal.net/og-default.png">'),
+   'og:image is ABSOLUTE — social crawlers do not resolve relative URLs or read <base>');
+ok(ogPage.includes('<meta name="twitter:card" content="summary_large_image">'),
+   'twitter:card is declared');
+// A noindex page is still SHARED by residents, so it carries the tags too.
+ok(/<meta property="og:title" content="Amherst \(01002\), MA/.test(noIdx),
+   'a noindex page still carries Open Graph — robots governs crawling, not sharing');
+
 // ---- 9. INITIAL-HTML CONTRACT extras ----------------------------------------------------
 ok(/Compiled from official public records on <time datetime="2026-09-04">/.test(a),
    'the document is honestly dated with the build day');

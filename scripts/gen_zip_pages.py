@@ -267,6 +267,9 @@ def _items(items, heading, empty, kind):
     return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
 
 
+OG_IMAGE = f"{BASE}/og-default.png"
+
+
 def render(p, built):
     z, name, st = p["zip"], p["name"], p["state"]
     label = f"{name}, {st}" if st else name
@@ -331,6 +334,24 @@ def render(p, built):
         f"<title>{esc(title)}</title>\n"
         f'<meta name="description" content="{esc(desc)}">\n'
         f'<link rel="canonical" href="{esc(canon)}">\n'
+        # SHARING. The homepage carried Open Graph tags and the generated ZIP documents did
+        # not, so every link a resident pasted into Messages, Slack, Facebook or LinkedIn
+        # rendered bare — on the 8,180 pages the whole service is meant to spread through.
+        # og:image is ABSOLUTE because social crawlers do not resolve relative URLs (and do
+        # not read <base>); it is same-origin, so the document's own img-src 'self' is
+        # unaffected. og:type is "website", not "article": these documents are standing
+        # per-ZIP pages that are rewritten every build, not dated posts.
+        f'<meta property="og:type" content="website">\n'
+        f'<meta property="og:site_name" content="HomeSignal">\n'
+        f'<meta property="og:locale" content="en_US">\n'
+        f'<meta property="og:title" content="{esc(title)}">\n'
+        f'<meta property="og:description" content="{esc(desc)}">\n'
+        f'<meta property="og:url" content="{esc(canon)}">\n'
+        f'<meta property="og:image" content="{esc(OG_IMAGE)}">\n'
+        f'<meta name="twitter:card" content="summary_large_image">\n'
+        f'<meta name="twitter:title" content="{esc(title)}">\n'
+        f'<meta name="twitter:description" content="{esc(desc)}">\n'
+        f'<meta name="twitter:image" content="{esc(OG_IMAGE)}">\n'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; base-uri \'self\'; '
         "object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
