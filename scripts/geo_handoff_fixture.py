@@ -82,7 +82,8 @@ create table public.identity_conflicts     (project_id bigint);
 -- the per-ZIP input the real function reads out of development_reports.sites
 create table public.fx_sites (
   zip text, source_key text, source_seq int, record_kind text,
-  lat double precision, lng double precision, name text
+  lat double precision, lng double precision, name text,
+  registry_id text default 'reg'
 );
 """
 
@@ -120,25 +121,27 @@ begin
                                      address, start_date, end_date, scope_text, parties, provenance,
                                      source_key, source_key_basis, source_seq, last_seen_at)
     select _cid, _zip, s.name, 'T','S','St','D','sz','inv',null,
-           s.lat, s.lng, 1, 'ref','development','reg','filed','tr',
+           s.lat, s.lng, 1, 'ref','development', s.registry_id,'filed','tr',
            'addr',null,null,null,null,null,
            s.source_key, 'basis', s.source_seq, _run
       from public.fx_sites s where s.zip=_zip and s.record_kind='development'
     on conflict (zip, source_key, source_seq) do update set
       community_id=excluded.community_id, name=excluded.name, type=excluded.type,
-      lat=excluded.lat, lng=excluded.lng,
+      lat=excluded.lat, lng=excluded.lng, registry_id=excluded.registry_id,
+      record_kind=excluded.record_kind,
       source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at;
 
 {dev_tail_fac_head.split(chr(10))[-1]}
                                      address, provenance,
                                      source_key, source_key_basis, source_seq, last_seen_at)
     select _cid, _zip, s.name, 'T','S','D', s.lat, s.lng, 1,
-           'ref','facility','reg',null,'addr',null,
+           'ref','facility', s.registry_id,null,'addr',null,
            s.source_key, 'basis', s.source_seq, _run
       from public.fx_sites s where s.zip=_zip and s.record_kind='facility'
     on conflict (zip, source_key, source_seq) do update set
       community_id=excluded.community_id, name=excluded.name, type=excluded.type,
-      lat=excluded.lat, lng=excluded.lng,
+      lat=excluded.lat, lng=excluded.lng, registry_id=excluded.registry_id,
+      record_kind=excluded.record_kind,
 {fac_tail_endif}
 
 {stale}
@@ -183,7 +186,8 @@ def main():
        psql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
 
     # ---- T1: NEW ------------------------------------------------------------
-    psql(dsn, """insert into public.fx_sites values
+    psql(dsn, """insert into public.fx_sites
+      (zip,source_key,source_seq,record_kind,lat,lng,name) values
       ('19475','K-NEW',0,'development',40.01,-75.01,'n1'),
       ('19475','K-FAC',0,'facility',40.02,-75.02,'f1');""")
     psql(dsn, "select public.fx_refresh('19475');")
@@ -194,24 +198,109 @@ def main():
        psql(dsn, "select reason from geo.n5_reconcile_queue where source_key='K-FAC';"),
        "project_upsert")
 
-    # ---- T2: UPDATE re-enqueues (idempotent, one row per key) ---------------
+    # ---- T2: a RELEVANT update re-enqueues -----------------------------------
+    # ⚠️ lat must stay INSIDE the geocode fence (<=100 mi of 40.0,-75.0), or the
+    # fence fires, nulls the coordinates and enqueues for its own reason - which
+    # made an earlier version of T2/T5 pass for the wrong reason.
     psql(dsn, "update geo.n5_reconcile_queue set enqueued_at=now()-interval '1 day';")
-    psql(dsn, "update public.fx_sites set lat=41.5 where source_key='K-NEW';")
+    psql(dsn, "update public.fx_sites set lat=40.05 where source_key='K-NEW';")
     psql(dsn, "select public.fx_refresh('19475');")
-    ck("T2 UPDATE re-enqueued the key (enqueued_at bumped)",
+    ck("T2 a relevant (coordinate) update re-enqueued the key",
        psql(dsn, "select enqueued_at > now()-interval '1 minute' from geo.n5_reconcile_queue where source_key='K-NEW';"),
        "t")
     ck("T2 still exactly one row per key (no duplicate events)",
        psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-NEW';"), "1")
+    ck("T2 the fence did NOT fire (coordinates survive)",
+       psql(dsn, "select lat::text from public.app_projects where source_key='K-NEW';"), "40.05")
 
-    # ---- T5: duplicate event resets an outstanding claim --------------------
-    psql(dsn, "update geo.n5_reconcile_queue set claimed_at=now(), claimed_by='w1' where source_key='K-NEW';")
+    # ---- T2b: UNCHANGED refresh advances the heartbeat and captures NOTHING ---
+    psql(dsn, "delete from geo.n5_reconcile_queue;")
+    seen_before = psql(dsn, "select max(last_seen_at)::text from public.app_projects where zip='19475';")
     psql(dsn, "select public.fx_refresh('19475');")
-    ck("T5 re-enqueue CLEARS an existing claim (see review F2)",
-       psql(dsn, "select coalesce(claimed_by,'<null>') from geo.n5_reconcile_queue where source_key='K-NEW';"),
+    ck("T2b an unchanged refresh ADVANCED last_seen_at",
+       psql(dsn, f"select max(last_seen_at) > '{seen_before}'::timestamptz from public.app_projects where zip='19475';"),
+       "t")
+    ck("T2b and captured NOTHING (no heartbeat-driven enqueue)",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
+    for i in range(3):
+        psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2b three further unchanged refreshes still produce ZERO queue churn",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
+    ck("T2b the rows are all still present (nothing was stale-swept)",
+       psql(dsn, "select count(*) from public.app_projects where zip='19475';"), "2")
+    # BOUNDED before/after, at fixture scale - NOT a production benchmark.
+    # Each unchanged refresh upserts every row in the ZIP, so the pre-correction
+    # capture would have enqueued one key per row per refresh.
+    rows = int(psql(dsn, "select count(*) from public.app_projects where zip='19475';"))
+    refreshes = 4
+    ck("T2b before/after (fixture scale): keys the OLD scoping would enqueue "
+       f"over {refreshes} unchanged refreshes of a {rows}-row ZIP",
+       rows * refreshes, 8)
+    ck("T2b before/after (fixture scale): keys the CORRECTED scoping enqueues",
+       int(psql(dsn, "select count(*) from geo.n5_reconcile_queue;")), 0)
+
+    # ---- T2c: an IRRELEVANT column change captures nothing --------------------
+    psql(dsn, "update public.fx_sites set name='renamed' where source_key='K-NEW';")
+    psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2c changing a column the geography path never reads captures nothing",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
+    ck("T2c but the new value WAS written (unrelated refresh behaviour preserved)",
+       psql(dsn, "select name from public.app_projects where source_key='K-NEW';"), "renamed")
+
+    # ---- T2d: registry_id is relevant ----------------------------------------
+    psql(dsn, "update public.fx_sites set registry_id='other-registry' where source_key='K-NEW';")
+    psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2d a registry_id change IS captured",
+       psql(dsn, "select reason from geo.n5_reconcile_queue where source_key='K-NEW';"), "project_upsert")
+
+    # ---- T2e: a new source_seq for an existing key is NEW ---------------------
+    psql(dsn, "delete from geo.n5_reconcile_queue;")
+    psql(dsn, "insert into public.fx_sites (zip,source_key,source_seq,record_kind,lat,lng,name) "
+              "values ('19475','K-NEW',1,'development',40.06,-75.0,'seq1');")
+    psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2e a new source_seq on an existing key is captured",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-NEW';"), "1")
+
+    # ---- T2f: record_kind flip is an ELIGIBILITY change, captured -------------
+    psql(dsn, "delete from geo.n5_reconcile_queue;")
+    psql(dsn, "update public.fx_sites set record_kind='facility' where source_key='K-NEW' and source_seq=1;")
+    psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2f a record_kind flip is captured (eligibility, not silently changed)",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-NEW';"), "1")
+
+    # ---- T2g: CROSS-ZIP - change in one ZIP, the other stays quiet ------------
+    psql(dsn, "delete from geo.n5_reconcile_queue;")
+    psql(dsn, "insert into public.fx_sites (zip,source_key,source_seq,record_kind,lat,lng,name) "
+              "values ('19480','K-SPAN',0,'development',40.0,-75.0,'a'),"
+              "       ('19475','K-SPAN',0,'development',40.0,-75.0,'a');")
+    psql(dsn, "select public.fx_refresh('19475'); select public.fx_refresh('19480');")
+    psql(dsn, "delete from geo.n5_reconcile_queue;")
+    psql(dsn, "update public.fx_sites set lat=40.07 where source_key='K-SPAN' and zip='19480';")
+    psql(dsn, "select public.fx_refresh('19475');")
+    ck("T2g the UNCHANGED ZIP's refresh captures nothing for the shared key",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-SPAN';"), "0")
+    psql(dsn, "select public.fx_refresh('19480');")
+    ck("T2g the CHANGED ZIP's refresh captures the shared key",
+       psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-SPAN';"), "1")
+
+    # ---- T5: a relevant event resets an outstanding claim (F2, unchanged) -----
+    psql(dsn, "update geo.n5_reconcile_queue set claimed_at=now(), claimed_by='w1' where source_key='K-SPAN';")
+    psql(dsn, "update public.fx_sites set lat=40.08 where source_key='K-SPAN' and zip='19480';")
+    psql(dsn, "select public.fx_refresh('19480');")
+    ck("T5 a relevant re-enqueue CLEARS an existing claim (see review F2)",
+       psql(dsn, "select coalesce(claimed_by,'<null>') from geo.n5_reconcile_queue where source_key='K-SPAN';"),
        "<null>")
+    psql(dsn, "update geo.n5_reconcile_queue set claimed_at=now(), claimed_by='w2' where source_key='K-SPAN';")
+    psql(dsn, "select public.fx_refresh('19480');")
+    ck("T5b an UNCHANGED refresh does NOT disturb an in-flight claim",
+       psql(dsn, "select claimed_by from geo.n5_reconcile_queue where source_key='K-SPAN';"), "w2")
+    psql(dsn, "delete from public.fx_sites where source_key='K-SPAN'; delete from geo.n5_reconcile_queue;")
+    psql(dsn, "select public.fx_refresh('19475'); select public.fx_refresh('19480');")
 
     # ---- T3: geocode fence = coordinate change ------------------------------
+    # back to a single-row key so the fence and _stale assertions are unambiguous
+    psql(dsn, "delete from public.fx_sites where source_seq=1;")
+    psql(dsn, "select public.fx_refresh('19475');")
     psql(dsn, "delete from geo.n5_reconcile_queue;")
     psql(dsn, "update public.fx_sites set lat=1.0, lng=1.0 where source_key='K-NEW';")  # outside the fence
     psql(dsn, "select public.fx_refresh('19475');")
@@ -234,7 +323,8 @@ def main():
 
     # rebuild identical state and run the UNSPLICED function for the control
     psql(dsn, "truncate public.app_projects; delete from geo.n5_reconcile_queue;")
-    psql(dsn, "insert into public.fx_sites values ('19475','K-NEW',0,'development',40.01,-75.01,'n1');")
+    psql(dsn, "insert into public.fx_sites (zip,source_key,source_seq,record_kind,lat,lng,name) "
+              "values ('19475','K-NEW',0,'development',40.01,-75.01,'n1');")
     psql(dsn, "set check_function_bodies=on; " + fixture_function(spliced=False))
     psql(dsn, "select public.fx_refresh('19475');")
     psql(dsn, "delete from public.fx_sites where source_key='K-NEW';")
@@ -251,7 +341,8 @@ def main():
        psql(dsn, "select public.fx_refresh('19475');"), "0")
 
     # ---- T6: transaction behaviour -----------------------------------------
-    psql(dsn, "insert into public.fx_sites values ('19475','K-TX',0,'development',40.0,-75.0,'t');")
+    psql(dsn, "insert into public.fx_sites (zip,source_key,source_seq,record_kind,lat,lng,name) "
+              "values ('19475','K-TX',0,'development',40.0,-75.0,'t');")
     psql(dsn, "begin; select public.fx_refresh('19475'); rollback;")
     ck("T6 enqueue rolls back with the transaction (no phantom work)",
        psql(dsn, "select count(*) from geo.n5_reconcile_queue where source_key='K-TX';"), "0")

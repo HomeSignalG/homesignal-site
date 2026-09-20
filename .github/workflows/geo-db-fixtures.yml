@@ -12,7 +12,7 @@ name: geo-db-fixtures
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
     paths: &geo_paths
       - 'docs/geo-*.sql'
       - 'docs/geo-*.md'
@@ -99,6 +99,6 @@ jobs:
           diff -u docs/geo-reconciler-install.sql /tmp/reconciler.sql \
             || { echo "docs/geo-reconciler-install.sql is stale — regenerate it"; exit 1; }
           python3 scripts/geo_handoff_splice.py rollback \
-            6591d7f79f9a6cd0b476bbcfc2065b9a ba2e6f9d8932d08e4373bfe97ae25ffd > /tmp/rollback.sql
+            6591d7f79f9a6cd0b476bbcfc2065b9a de2df4de16ce9c5a9488cf8130b99d65 > /tmp/rollback.sql
           diff -u docs/geo-lifecycle-handoff-rollback.sql /tmp/rollback.sql \
             || { echo "docs/geo-lifecycle-handoff-rollback.sql is stale — regenerate it"; exit 1; }

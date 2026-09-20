@@ -409,3 +409,35 @@ health-precedence correction is retained in the parked artifact as instructed.
 
 F2 (re-enqueue clears an in-flight claim) remains **out of scope** as instructed —
 it is genuinely worker-only.
+
+---
+
+# Capture correction — 2026-09-20 (option B)
+
+F1 resolved by narrowing capture to the accepted contract's own scope. Full
+rationale, predicate and measurements: **manifest §9**. Summary:
+
+- **Predicate read off the geography path, not guessed.** `geo.proven_expected_geometry`
+  consumes `source_key`, `registry_id`, `lat`, `lng` under `record_kind='development'`;
+  the reconciler reads `geo.*` only. Relevant ⇔ row is NEW, or `registry_id`/`lat`/`lng`
+  changed, or `record_kind` flipped. `last_seen_at` is excluded — it is the heartbeat.
+- **Mechanism:** a ZIP-bounded pre-image CTE per upsert, joined against `RETURNING`.
+  **No `WHERE` on `DO UPDATE`** (that would stop `last_seen_at` advancing and the stale
+  sweep deletes `last_seen_at < _run`). Upsert, SET list, sweep predicates, retention
+  guards, `_stale` and returned counts untouched. **No warm-up**: an unchanged corpus
+  enqueues nothing on the first refresh.
+- **Concurrency fails toward over-capture, never a miss** — `RETURNING` reports what the
+  statement wrote; the pre-image can only be stale, which adds an idempotent re-evaluation.
+- **Fingerprint moved:** `6591d7f7…` → **`de2df4de16ce9c5a9488cf8130b99d65`**
+  (19,428 → 21,514), excision reverses, anchors 1:1 …6:1, 8 relevance comparisons,
+  heartbeat absent from the predicate, line-30 delete intact.
+
+**Two fixture defects the new tests exposed, both mine, both fixed:**
+- T2/T5 had been passing *for the wrong reason*: lat 41.5 sits >100 mi from the fence
+  origin, so the geocode fence fired and re-enqueued regardless of scoping. The test
+  now keeps the coordinate inside the fence and asserts the fence did not fire.
+- The fixture's `DO UPDATE SET` omitted `registry_id`, so a registry change could not
+  propagate and T2d failed. Production's SET list **does** include it; the fixture was
+  less complete than production and is now representative.
+
+F2 and worker implementation remain out of this pass.

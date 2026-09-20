@@ -68,12 +68,56 @@
 -- function that does not exist would leave app_refresh_zip raising 42883 on every
 -- tick, i.e. it would take the national materializer down.
 --
--- ⚠️ CAPTURE CONTRACT - READ BEFORE APPROVING. Once applied, these handoffs
--- capture lifecycle events IMMEDIATELY: app_refresh_zip runs ~240x/hour, so the
--- queue starts filling within ~2 minutes. "Reconciliation executions = 0" and
--- "queue is empty" are DIFFERENT CLAIMS and only the first stays true. See
--- docs/geo-lifecycle-handoff-review.md §F1 for the measured volume and the
--- consequence for the historical-debt boundary. Nothing here starts a worker.
+-- ⚠️ CAPTURE CONTRACT. Once applied, these handoffs capture lifecycle events
+-- IMMEDIATELY - app_refresh_zip runs ~240x/hour - so "reconciliation executions
+-- = 0" and "the queue is empty" are different claims and only the first stays
+-- true after install. Nothing here starts a worker.
+--
+-- 🔑 CAPTURE IS SCOPED TO NEW / CHANGED / REMOVED, WHICH IS WHAT THE ACCEPTED
+-- CONTRACT SAYS ("how a NEW or CHANGED live project reaches the reconciler";
+-- "A KEY THAT NEEDS EVALUATING"). An unchanged key whose refresh heartbeat
+-- advanced is NOT captured.
+--
+-- THE RELEVANCE PREDICATE IS READ OFF THE GEOGRAPHY PATH, NOT GUESSED. The only
+-- app_projects columns any accepted geography artifact consumes are the ones
+-- geo.proven_expected_geometry's `live` CTE selects - source_key, registry_id,
+-- lat, lng - under the eligibility filter record_kind = 'development'. The
+-- reconciler reads geo.* only; its sole app_projects references are in its post
+-- gate. So a change is relevant iff, for a (zip, source_key, source_seq):
+--   * the row did not exist before  (NEW), or
+--   * registry_id / lat / lng changed, or
+--   * record_kind changed           (an ELIGIBILITY flip, in either direction).
+-- last_seen_at is deliberately ABSENT from that list: it is the heartbeat.
+--
+-- HOW, WITHOUT TOUCHING THE MATERIALIZER'S UPSERT. Each upsert gains a PRE-IMAGE
+-- CTE (geo_prev_dev / geo_prev_fac) scoped to `zip = _zip` - one ZIP's rows, the
+-- same bound the upsert already has, never a corpus scan - and the handoff joins
+-- the RETURNING set against it. ⛔ NO `where` IS ADDED TO `do update`: that would
+-- stop last_seen_at advancing for unchanged rows and the stale sweep at line 156
+-- deletes `last_seen_at < _run`, so a geography optimisation would become
+-- national data loss. The upsert, its SET list, the stale-sweep predicates, the
+-- retention `not exists` guards, `_stale` and every returned count are untouched.
+--
+-- NO WARM-UP. On the first refresh after install the pre-image already holds the
+-- existing rows, so an unchanged corpus enqueues NOTHING. The historical backlog
+-- is never enrolled by installing this.
+--
+-- CONCURRENCY, AND WHICH WAY IT FAILS. Both CTEs belong to ONE statement: the
+-- pre-image reads the statement snapshot while ON CONFLICT re-reads the latest
+-- committed row, so under READ COMMITTED a concurrent writer can make the two
+-- disagree. That direction is OVER-capture (a key enqueued though nothing this
+-- statement did changed it), never a miss - and re-evaluating an unchanged key is
+-- idempotent. A missed change is the outcome that would be unsafe, and it cannot
+-- arise: RETURNING reports what this statement wrote.
+--
+-- CROSS-ZIP AND source_seq. The join key is (zip, source_key, source_seq), so a
+-- new source_seq for an existing key is NEW, and a key spanning ZIPs is captured
+-- by whichever ZIP's refresh saw the change. The reconciler is source-key scoped
+-- and rebuilds from all of a key's evidence, so one ZIP's enqueue suffices.
+--
+-- FACILITY KEYS: ELIGIBILITY UNCHANGED, EXPLICITLY. Facility upserts still
+-- enqueue exactly as before; only the CHANGE scoping is new. Nothing about which
+-- record kinds may enter the queue has moved.
 -- ============================================================================
 
 begin;
@@ -120,7 +164,12 @@ $r$        _run timestamptz; _stale int; _kept int;
 
   'A1 development upsert head -> CTE open',
 $f$    insert into public.app_projects (community_id, zip, name, type, status, stage, developer, size, investment, submitted_at, lat, lng, impact_score, source_ref, record_kind, registry_id, date_kind, type_raw,$f$,
-$r$    with geo_up_dev as (
+$r$    with geo_prev_dev as (
+      select zip, source_key, source_seq, registry_id, lat, lng, record_kind
+        from public.app_projects
+       where zip = _zip and record_kind = 'development'
+    ),
+    geo_up_dev as (
     insert into public.app_projects (community_id, zip, name, type, status, stage, developer, size, investment, submitted_at, lat, lng, impact_score, source_ref, record_kind, registry_id, date_kind, type_raw,$r$,
 
   'A2 development upsert tail -> NEW+UPDATE handoff, and facility CTE open',
@@ -128,21 +177,46 @@ $f$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_
 
     insert into public.app_projects (community_id, zip, name, type, status, developer, lat, lng, impact_score, source_ref, record_kind, registry_id, facility_env,$f$,
 $r$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at
-      returning source_key
+      returning source_key, source_seq, zip, registry_id, lat, lng, record_kind
     )
-    select array_agg(distinct source_key) into _geo_keys from geo_up_dev;
+    select array_agg(distinct u.source_key) into _geo_keys
+      from geo_up_dev u
+      left join geo_prev_dev p
+        on  p.zip        = u.zip
+        and p.source_key = u.source_key
+        and p.source_seq = u.source_seq
+     where p.source_key is null
+        or p.registry_id is distinct from u.registry_id
+        or p.lat         is distinct from u.lat
+        or p.lng         is distinct from u.lng
+        or p.record_kind is distinct from u.record_kind;
     perform geo.enqueue_work(_geo_keys, 'project_upsert');
 
-    with geo_up_fac as (
+    with geo_prev_fac as (
+      select zip, source_key, source_seq, registry_id, lat, lng, record_kind
+        from public.app_projects
+       where zip = _zip and record_kind = 'facility'
+    ),
+    geo_up_fac as (
     insert into public.app_projects (community_id, zip, name, type, status, developer, lat, lng, impact_score, source_ref, record_kind, registry_id, facility_env,$r$,
 
   'A3 facility upsert tail -> NEW+UPDATE handoff',
 $f$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at;
   end if;$f$,
 $r$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at
-      returning source_key
+      returning source_key, source_seq, zip, registry_id, lat, lng, record_kind
     )
-    select array_agg(distinct source_key) into _geo_keys from geo_up_fac;
+    select array_agg(distinct u.source_key) into _geo_keys
+      from geo_up_fac u
+      left join geo_prev_fac p
+        on  p.zip        = u.zip
+        and p.source_key = u.source_key
+        and p.source_seq = u.source_seq
+     where p.source_key is null
+        or p.registry_id is distinct from u.registry_id
+        or p.lat         is distinct from u.lat
+        or p.lng         is distinct from u.lng
+        or p.record_kind is distinct from u.record_kind;
     perform geo.enqueue_work(_geo_keys, 'project_upsert');
   end if;$r$,
 

@@ -89,8 +89,10 @@ create table if not exists public.property_company_roles (project_id bigint);
 create table if not exists public.project_facility_refs  (project_id bigint);
 create table if not exists public.identity_conflicts     (project_id bigint);
 drop table if exists public.fx_sites;
+-- must match scripts/geo_handoff_fixture.py::SCHEMA - the representative
+-- app_refresh_zip is built by that module and selects these columns.
 create table public.fx_sites (zip text, source_key text, source_seq int, record_kind text,
-  lat double precision, lng double precision, name text);
+  lat double precision, lng double precision, name text, registry_id text default 'reg');
 drop table if exists public.development_reports;
 create table public.development_reports(zip text, refreshed_at timestamptz);
 insert into public.development_reports values ('19475', now());
@@ -207,10 +209,19 @@ def main():
        DB.run_sql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
 
     # capture is live: one refresh now enqueues
-    DB.run_sql(dsn, "insert into public.fx_sites values ('19475','K-SEQ',0,'development',40.0,-75.0,'n');")
+    DB.run_sql(dsn, "insert into public.fx_sites (zip,source_key,source_seq,record_kind,lat,lng,name) "
+                    "values ('19475','K-SEQ',0,'development',40.0,-75.0,'n');")
     DB.run_sql(dsn, "select public.app_refresh_zip('19475');")
     ck("after step 8 a refresh CAPTURES (this is the contract change)",
        DB.run_sql(dsn, "select reason from geo.n5_reconcile_queue where source_key='K-SEQ';"), "project_upsert")
+    # capture is CHANGE-scoped: a second, unchanged refresh must add nothing.
+    DB.run_sql(dsn, "delete from geo.n5_reconcile_queue;")
+    DB.run_sql(dsn, "select public.app_refresh_zip('19475');")
+    ck("an UNCHANGED refresh after step 8 captures nothing (NEW/CHANGED/REMOVED only)",
+       DB.run_sql(dsn, "select count(*) from geo.n5_reconcile_queue;"), "0")
+    ck("and last_seen_at still advanced on that unchanged refresh",
+       DB.run_sql(dsn, "select count(*) from public.app_projects where zip='19475' "
+                       "and last_seen_at > now() - interval '1 minute';"), "1")
     ck("capture did NOT run reconciliation (resident geography unchanged)",
        DB.run_sql(dsn, "select (select count(*) from geo.zip_authoritative_membership)||'/'||"
                        "(select count(*) from geo.zip_authoritative_marker);"), "1/1")
@@ -248,7 +259,7 @@ def main():
        DB.run_sql(dsn, "select md5(pg_get_functiondef('public.pipeline_health_tick()'::regprocedure));"), pht0)
 
     rb, d4 = repin(artifact("geo-lifecycle-handoff-rollback.sql"),
-                   "ba2e6f9d8932d08e4373bfe97ae25ffd", arz1, expect=2)
+                   "de2df4de16ce9c5a9488cf8130b99d65", arz1, expect=2)
     ck("rollback 8 pins the post-install md5 twice (guard + message)", d4[1], 2)
     rb2, d5 = repin(rb, "6591d7f79f9a6cd0b476bbcfc2065b9a", arz0, expect=4)
     ck("rollback 8 pins the pre-install md5 four times (guard, message, check, message)", d5[1], 4)

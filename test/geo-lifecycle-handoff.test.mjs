@@ -119,7 +119,7 @@ ok(/exception when others then/.test(hrepl),
    'a failing probe must not abort the whole health tick');
 
 section('10. both rollbacks are exact and fail closed');
-ok(rollback.includes("'ba2e6f9d8932d08e4373bfe97ae25ffd'") &&
+ok(rollback.includes("'de2df4de16ce9c5a9488cf8130b99d65'") &&
    rollback.includes("'6591d7f79f9a6cd0b476bbcfc2065b9a'"),
    'handoff rollback pins both fingerprints');
 ok(/ROLLBACK DID NOT RECONSTRUCT THE ORIGINAL/.test(rollback),
@@ -199,6 +199,40 @@ section('15. the health probe evaluates NOT_ACTIVATED before the scan cap');
      'the 200,000 default must be unchanged — no threshold is altered');
   ok(/queue exceeds the %s scan cap so depth was not aggregated/.test(probe),
      'a capped depth must still be reported, not discarded');
+}
+
+
+section('16. capture is scoped to NEW / CHANGED / REMOVED');
+{
+  const upserts = repls.filter((r) => r.includes("'project_upsert'"));
+  ok(upserts.length === 2, 'both upserts carry a handoff');
+  for (const r of upserts) {
+    ok(/left join geo_prev_(dev|fac) p/.test(r), 'each upsert compares against a pre-image');
+    ok(/where p\.source_key is null/.test(r), 'a row with no pre-image is NEW');
+    for (const col of ['registry_id', 'lat', 'lng', 'record_kind']) {
+      ok(new RegExp(`p\\.${col}\\s+is distinct from\\s+u\\.${col}`).test(r),
+         `${col} is in the relevance predicate`);
+    }
+    ok(!/p\.last_seen_at\s+is distinct from/.test(r),
+       'last_seen_at is the HEARTBEAT and must never be in the relevance predicate');
+    ok(!/p\.(name|status|type|developer|address)\s+is distinct from/.test(r),
+       'columns the geography path never reads must not be in the predicate');
+  }
+  // the pre-image must be ZIP-bounded: the same bound the upsert already has.
+  const prevs = repls.filter((r) => r.includes('geo_prev_'));
+  for (const r of prevs) {
+    if (!/select zip, source_key, source_seq/.test(r)) continue;
+    ok(/from public\.app_projects\s+where zip = _zip/.test(r),
+       'the pre-image CTE is bounded to one ZIP - never a corpus scan');
+  }
+  ok(!/do update set[\s\S]{0,600}?\bwhere\b[\s\S]{0,40}is distinct from/.test(repls.join('\n')),
+     'NO where may be added to do update - it would stop last_seen_at advancing');
+  ok(/NO WARM-UP/.test(install),
+     'the artifact must state that installing enrolls no historical corpus');
+  ok(/OVER-capture[\s\S]{0,120}never a miss/.test(install),
+     'the artifact must state which way the concurrency race fails');
+  ok(/FACILITY KEYS: ELIGIBILITY UNCHANGED/.test(install),
+     'facility eligibility must be kept explicit');
 }
 
 console.log(`\n${pass + fail} checks, ${fail} failures`);

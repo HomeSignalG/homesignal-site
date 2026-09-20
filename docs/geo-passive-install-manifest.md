@@ -119,7 +119,7 @@ browser anon path and must not be done.
 
 | object | before | after (expected) | bytes |
 |---|---|---|---|
-| `public.app_refresh_zip(text)` | `6591d7f79f9a6cd0b476bbcfc2065b9a` | `ba2e6f9d8932d08e4373bfe97ae25ffd` | 19,428 → 20,233 |
+| `public.app_refresh_zip(text)` | `6591d7f79f9a6cd0b476bbcfc2065b9a` | `de2df4de16ce9c5a9488cf8130b99d65` | 19,428 → 21,514 |
 | `public.pipeline_health_tick()` | `c51e56b4158453184d966f00ef28cbb2` | `c98aad2d980a595982638a49e2472223` | 11,550 → 12,430 |
 
 Both splices: pin the pre-image md5 and **abort on mismatch**; assert every anchor
@@ -185,64 +185,77 @@ this manifest, extracts every `docs/…`/`scripts/…`/`test/…` path and asser
 is present in the working tree. A manifest naming a file that does not exist is
 the failure mode this section exists to prevent.
 
-## 9. F1 — CAPTURE SCOPE: the decision this package cannot make for you
+## 9. F1 — RESOLVED: capture is scoped to NEW / CHANGED / REMOVED (option B)
 
-**Classification: this is NOT worker-phase work and cannot be deferred to
-activation.** Capture begins at **step 8**, before any worker exists, so its write
-load and its authorization are properties of the *passive* install.
+**Decision taken: option B.** Capture now satisfies the accepted contract's own
+wording — *"how a **NEW or CHANGED** live project reaches the reconciler"*,
+*"a key that needs evaluating"*, *"NEW / CHANGED / REMOVED"*. An unchanged key
+whose refresh heartbeat advanced is no longer captured.
 
-### What the accepted contract actually says
+### The relevance predicate is read off the geography path, not guessed
 
-| source | wording |
-|---|---|
-| `geo-work-handoff.sql` line 2 | "WORK HANDOFF — how a **NEW or CHANGED** live project reaches the reconciler" |
-| `geo-work-handoff.sql` line 52 | "One queue, one meaning: **A KEY THAT NEEDS EVALUATING**" |
-| `geo-steady-state-path.md` line 102 | "**NEW / CHANGED / REMOVED** LIVE PROJECT" |
+The only `app_projects` columns any accepted geography artifact consumes are the
+ones `geo.proven_expected_geometry`'s `live` CTE selects — **`source_key`,
+`registry_id`, `lat`, `lng`** — under the eligibility filter
+**`record_kind = 'development'`**. The reconciler reads `geo.*` only; its sole
+`app_projects` references are in its post-gate. So a change is relevant iff, for
+a `(zip, source_key, source_seq)`:
 
-The contract scopes capture to **new, changed, or removed**. **It nowhere states
-that unchanged existing keys enter the queue.**
+* the row did not exist before → **NEW**, or
+* `registry_id` / `lat` / `lng` changed, or
+* `record_kind` changed → an **eligibility flip**, in either direction.
 
-### What the implementation does
+`last_seen_at` is deliberately absent: it is the heartbeat.
 
-Both upserts are `insert … on conflict (zip, source_key, source_seq) do update
-set … last_seen_at = excluded.last_seen_at`. `DO UPDATE` **returns every conflicting
-row whether or not any value changed**, so `returning source_key` yields *every key
-in the ZIP on every refresh*. The implementation therefore enqueues unchanged keys.
+### How, without touching the materializer's upsert
 
-**So the implementation is broader than the contract's stated scope, and the
-accepted documents neither authorize nor forbid that breadth. That is the gap.**
+Each upsert gains a **pre-image CTE** (`geo_prev_dev` / `geo_prev_fac`) bounded to
+`zip = _zip` — the same bound the upsert already has, never a corpus scan — and
+the handoff joins the `RETURNING` set against it.
 
-### Immediate implications, measured
+⛔ **No `WHERE` is added to `DO UPDATE`.** That would stop `last_seen_at`
+advancing for unchanged rows, and the stale sweep deletes `last_seen_at < _run` —
+a geography optimisation would become national data loss. The upsert, its SET
+list, the stale-sweep predicates, the retention `not exists` guards, `_stale` and
+every returned count are untouched.
 
-- `app_refresh_zip` runs **~240×/hour** (`dev_refresh_tick(8,20)` every 2 min).
-- Distinct `source_key` per ZIP, measured 2026-09-20: **19475 → 137 · 64165 → 120 ·
-  78617 → 533 · 10001 → 1,004**; corpus mean ≈ 253 (3,213,495 rows / 12,722 ZIPs).
-- ⚠️ **Correction to an earlier framing of mine:** I previously described this as
-  "~960 extra small inserts/hour". That counted **statements**, not rows. The real
-  figure is **~240 runs × ~253 keys ≈ 60,000 queue upserts/hour** (~1,000/min),
-  each paying PK and partial-index maintenance.
-- The queue is **PK-bounded**, so it converges to ~**233,106** rows, not unbounded
-  growth — a small table, but a continuously rewritten one.
-- ⚠️ It **exceeds the 200,000 default scan cap** in `geography_health_probe`. The
-  F11 precedence correction is what keeps that from paging CRITICAL for a system
-  that is deliberately OFF; **without F11, option A below alarms within ~2 days.**
+**No warm-up.** On the first refresh after install the pre-image already holds the
+existing rows, so an unchanged corpus enqueues nothing. Installing never enrolls
+the historical backlog.
 
-### The decision, stated precisely — no redesign offered
+**Concurrency, and which way it fails.** Both CTEs belong to one statement: the
+pre-image reads the statement snapshot while `ON CONFLICT` re-reads the latest
+committed row, so under READ COMMITTED a concurrent writer can make the two
+disagree. That direction is **over-capture, never a miss** — and re-evaluating an
+unchanged key is idempotent. A missed change cannot arise, because `RETURNING`
+reports what this statement wrote. Committed relevant changes keep their handoff
+in the same transaction.
 
-- **Option A — ratify the breadth.** Declare that "a key that needs evaluating"
-  includes unchanged keys; re-evaluation is idempotent and converges to state
-  equality, so unchanged keys cost work, never wrong answers. Consequences: the
-  ~60k/hour write load above is accepted; activation must be sized at ~233k keys
-  per sweep rather than at a change rate; F11 must ship with it. **No code changes.**
-- **Option B — restrict capture to genuinely changed keys.** This is a change to
-  capture and needs its own authorization and design; it is **not** designed here.
-  ⛔ The obvious form is unsafe: adding a `WHERE` to `DO UPDATE` stops
-  `last_seen_at` advancing, and the stale sweep deletes `last_seen_at < _run` — a
-  geography optimisation would become national data loss. Any variant must keep
-  `last_seen_at` moving and gate only the enqueue.
-- **Option C — install steps 1–7 and 9, hold step 8.** The package supports this
-  as-is: step 8 is last, refuses without its dependencies, and has an exact
-  rollback. Everything else is inert. This defers the capture decision without
-  deferring the rest of the install.
+**Cross-ZIP / `source_seq`.** The join key is `(zip, source_key, source_seq)`, so a
+new `source_seq` is NEW, and a key spanning ZIPs is captured by whichever ZIP saw
+the change; the reconciler is key-scoped and rebuilds from all of a key's
+evidence. **Facility eligibility is unchanged and explicit** — facility upserts
+still enqueue exactly as before; only the change scoping is new.
 
-**Until this is answered, the package is complete but capture is unauthorized.**
+### Load: what is estimated and what is measured
+
+⚠️ **Correcting my own earlier wording.** I wrote "~253 keys/ZIP" from
+3,213,495 rows ÷ 12,722 ZIPs. **Rows divided by ZIP count is a rows-per-ZIP
+estimate, not a measured distinct-key rate**, and I presented it as though it were
+measured. What *was* measured, on four ZIPs, read-only on 2026-09-20, is
+**distinct `source_key` per ZIP: 64165 → 120 · 19475 → 137 · 78617 → 533 ·
+10001 → 1,004**. Four ZIPs are not a national rate and no national rate is claimed
+here.
+
+**Bounded before/after, at fixture scale — not a production benchmark.** In the
+isolated fixture, four consecutive unchanged refreshes of a 2-row ZIP:
+
+| | keys enqueued |
+|---|---:|
+| pre-correction scoping (one key per upserted row per refresh) | **8** |
+| corrected scoping | **0** |
+
+The production effect is not measured and cannot be until capture is installed.
+What the correction guarantees is the *shape*: steady-state enqueue volume is now
+proportional to **relevant change**, not to refresh cadence.
+

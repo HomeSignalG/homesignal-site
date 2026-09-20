@@ -14,9 +14,9 @@ declare _out text; _before text;
 begin
   _out := pg_get_functiondef('public.app_refresh_zip(text)'::regprocedure);
   _before := md5(_out);
-  if _before <> 'ba2e6f9d8932d08e4373bfe97ae25ffd' then
+  if _before <> 'de2df4de16ce9c5a9488cf8130b99d65' then
     raise exception 'ROLLBACK PRECONDITION FAIL: live md5 is %, expected the post-install %. '
-                    'Re-derive the reversal against the current body.', _before, 'ba2e6f9d8932d08e4373bfe97ae25ffd';
+                    'Re-derive the reversal against the current body.', _before, 'de2df4de16ce9c5a9488cf8130b99d65';
   end if;
   _out := replace(_out, $q$    with geo_fence as (
     update public.app_projects set lat=null, lng=null
@@ -57,23 +57,53 @@ begin
      and not exists (select 1 from public.identity_conflicts     c where c.project_id = p.id);
   get diagnostics _stale = row_count;$q$);
   _out := replace(_out, $q$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at
-      returning source_key
+      returning source_key, source_seq, zip, registry_id, lat, lng, record_kind
     )
-    select array_agg(distinct source_key) into _geo_keys from geo_up_fac;
+    select array_agg(distinct u.source_key) into _geo_keys
+      from geo_up_fac u
+      left join geo_prev_fac p
+        on  p.zip        = u.zip
+        and p.source_key = u.source_key
+        and p.source_seq = u.source_seq
+     where p.source_key is null
+        or p.registry_id is distinct from u.registry_id
+        or p.lat         is distinct from u.lat
+        or p.lng         is distinct from u.lng
+        or p.record_kind is distinct from u.record_kind;
     perform geo.enqueue_work(_geo_keys, 'project_upsert');
   end if;$q$, $q$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at;
   end if;$q$);
   _out := replace(_out, $q$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at
-      returning source_key
+      returning source_key, source_seq, zip, registry_id, lat, lng, record_kind
     )
-    select array_agg(distinct source_key) into _geo_keys from geo_up_dev;
+    select array_agg(distinct u.source_key) into _geo_keys
+      from geo_up_dev u
+      left join geo_prev_dev p
+        on  p.zip        = u.zip
+        and p.source_key = u.source_key
+        and p.source_seq = u.source_seq
+     where p.source_key is null
+        or p.registry_id is distinct from u.registry_id
+        or p.lat         is distinct from u.lat
+        or p.lng         is distinct from u.lng
+        or p.record_kind is distinct from u.record_kind;
     perform geo.enqueue_work(_geo_keys, 'project_upsert');
 
-    with geo_up_fac as (
+    with geo_prev_fac as (
+      select zip, source_key, source_seq, registry_id, lat, lng, record_kind
+        from public.app_projects
+       where zip = _zip and record_kind = 'facility'
+    ),
+    geo_up_fac as (
     insert into public.app_projects (community_id, zip, name, type, status, developer, lat, lng, impact_score, source_ref, record_kind, registry_id, facility_env,$q$, $q$      source_key_basis=excluded.source_key_basis, last_seen_at=excluded.last_seen_at;
 
     insert into public.app_projects (community_id, zip, name, type, status, developer, lat, lng, impact_score, source_ref, record_kind, registry_id, facility_env,$q$);
-  _out := replace(_out, $q$    with geo_up_dev as (
+  _out := replace(_out, $q$    with geo_prev_dev as (
+      select zip, source_key, source_seq, registry_id, lat, lng, record_kind
+        from public.app_projects
+       where zip = _zip and record_kind = 'development'
+    ),
+    geo_up_dev as (
     insert into public.app_projects (community_id, zip, name, type, status, stage, developer, size, investment, submitted_at, lat, lng, impact_score, source_ref, record_kind, registry_id, date_kind, type_raw,$q$, $q$    insert into public.app_projects (community_id, zip, name, type, status, stage, developer, size, investment, submitted_at, lat, lng, impact_score, source_ref, record_kind, registry_id, date_kind, type_raw,$q$);
   _out := replace(_out, $q$        _run timestamptz; _stale int; _kept int;
         _geo_keys text[];$q$, $q$        _run timestamptz; _stale int; _kept int;$q$);
