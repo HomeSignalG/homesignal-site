@@ -249,6 +249,17 @@
   .rec .t{font-weight:600;font-size:14px}
   .rec .s{font-size:12.5px;color:var(--soft)}
   .rec .decidedtag{font-weight:700;color:var(--mute)}
+  /* DECISION NOTATION (2026-09-20 contract). A denied application stays in the Proposed
+     rail, so its ruling has to be readable at a glance or the rail implies the ruling
+     never happened. It is a block on its own line, not an inline muted chip, and it is
+     NOT communicated by colour alone — the outcome word is always present in the text. */
+  .rec .decnote{margin-top:3px;font-weight:700;color:#9a2f2f}
+  .rec .decnote .decsrc{font-weight:600}
+  .rec .decunv{margin-top:2px;font-size:11px;color:#5d6f72}
+  .popdec{margin-top:4px;font-weight:700;color:#9a2f2f}
+  .popdec .decsrc{font-weight:600}
+  .popunv{margin-top:2px;font-size:11px;color:#5d6f72}
+  .band-s .histnote{display:block;margin-top:2px;color:#5d6f72}
   .rec .vflag{display:inline-block;margin-top:4px;font-size:11px;color:var(--violation);
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
@@ -786,7 +797,10 @@
         </div>
         <div class="card read">
           <div class="band-h t-proposed">Proposed</div>
-          <div class="band-s">Hearings and notices you can still weigh in on</div>
+          <!-- The sub-line is written at render time (see propSub below): this category is
+               a BROWSING category and may hold applications that were later decided, so it
+               cannot carry a blanket "you can still weigh in on" claim. -->
+          <div class="band-s" id="propSub">Hearings and notices in this area</div>
           <div id="propList"></div>
         </div>
       </div>
@@ -1278,10 +1292,15 @@ HS.onReady(function(){
       // and then its stage; where it does not, it says so rather than implying "minor".
       // Data centres only: every other type is byte-for-byte unchanged.
       var mkd = HS.resolveTrackerMarker(s, frsRid);
+      // A DECIDED application's stage word is the browsing category, which on its own
+      // reads as a live state ("Proposed / hearing"). Appending the outcome keeps the
+      // category honest without moving the record out of it.
+      var decd = decisionOf(s);
+      var decSuffix = decd ? (" \u00b7 " + (decd.outcome_label || "decided")) : "";
       if(mkd.significanceApplies && mkd.significance){
-        return mkd.significance.label + " · " + stageWord(s);
+        return mkd.significance.label + " \u00b7 " + stageWord(s) + decSuffix;
       }
-      return stageWord(s);
+      return stageWord(s) + decSuffix;
     }
     // DUAL IDENTITY: a regulated facility whose own EPA record names a data centre reads
     // as what it IS first and what it CARRIES second. The words come from the resolver's
@@ -1313,11 +1332,51 @@ HS.onReady(function(){
     var stage = MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
     // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
-    return stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
+    // STATUS IS NEVER COLOUR ALONE — and a DECISION is never the pin alone either. A
+    // denied application keeps the Proposed pin, so without this the hover text and the
+    // DOM would read "Proposed data center" about an application a body refused.
+    var dec = decisionOf(s);
+    var suffix = dec ? (" \u00b7 " + (dec.outcome_label || "decided")) : "";
+    return stage ? (stage + " " + type + suffix)
+                 : (type.charAt(0).toUpperCase() + type.slice(1) + " \u00b7 lifecycle unknown" + suffix);
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
   function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
+  // ── DECISION HISTORY on the page — every surface reads these, none re-derives ─────
+  // The authority is lib/map.js (HS.decisionOf / decisionNotation / currentStatusLine /
+  // isActiveUndecided), which is itself pinned against the engine's sources/decision.ts
+  // by test/decision-vocabulary-parity.test.mjs. Nothing here decides anything; it only
+  // renders what the resolver already resolved.
+  function decisionOf(s){ return (HS.decisionOf ? HS.decisionOf(s) : null); }
+  // The record's OWN words for what kind of application it is, so the notation can read
+  // "Conditional-use application denied" instead of a generic sentence. Falls back to the
+  // neutral "Application" rather than inventing a permit class.
+  function decisionSubject(s){
+    var raw = (s && (s.type_raw || s.permit_class)) || "";
+    raw = String(raw).trim();
+    if(!raw || raw.length > 48) return "Application";
+    return raw + " application";
+  }
+  // THE PROMINENT SOURCED NOTATION. The source link is part of the notation, never a
+  // separate optional extra: an unsourced decision claim is the thing the anti-fabrication
+  // contract refuses, and HS.decisionOf already returns null without a URL.
+  function decisionNoteHTML(s, cls){
+    var d = decisionOf(s);
+    if(!d) return "";
+    var txt = HS.decisionNotation(d, decisionSubject(s));
+    var href = String(d.source_url || "");
+    var link = href ? " <a class='decsrc' href='"+esc(href)+"' target='_blank' rel='noopener'>official record ↗</a>" : "";
+    return "<div class='"+(cls||"decnote")+"'>"+esc(txt)+link+"</div>";
+  }
+  // THE CURRENT-STATUS QUALIFICATION — shown wherever a reader could otherwise take the
+  // Proposed category as a statement about today. A RECENT FETCH IS NOT PROOF OF A RECENT
+  // DECISION CHECK, so this never consults `data.updated`.
+  function currentStatusHTML(s, cls){
+    var line = HS.currentStatusLine
+      ? HS.currentStatusLine(decisionOf(s), (s && s.decision_evidence) || "none") : "";
+    return line ? "<div class='"+(cls||"decunv")+"'>"+esc(line)+"</div>" : "";
+  }
   // Facilities (scope "point") pin at their exact EPA-registered coordinates. Development
   // notices (scope "area") are jurisdiction-level — county/city-wide, no street address —
   // and the engine's raw lat/lng on them can't be trusted (its place lookup only knows Box
@@ -2479,10 +2538,19 @@ HS.onReady(function(){
     // zero we cannot support, and zero-vs-not-measured is precisely the distinction a
     // resident has to be able to draw. Show the unknown as unknown; freshLine says why.
     var DEV_UNMEASURED = ZIP_MODE && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
-    // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
-    // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
+    // cDev is the ACTIVE-PROPOSAL counter. Its tile reads "New projects proposed nearby",
+    // which is a claim about applications that are STILL UNDECIDED — so it deliberately no
+    // longer equals the orange Proposed rail, and that gap is the point. The rail is a
+    // BROWSING category and keeps historical proposals (a denied application must stay
+    // findable); the counter is an ELIGIBILITY number and must not describe a refused
+    // application as an active, pending one. Reads counts.proposed_active, the engine's
+    // projection of the same predicate (HS.isActiveUndecided); falls back to computing it
+    // locally so a report cached before this shipped still counts honestly rather than
+    // silently reverting to the browsing size.
+    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(prop) : prop.length;
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
-      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
+      : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
+         : propActive);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
@@ -2525,7 +2593,22 @@ HS.onReady(function(){
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
     listInto("builtList", builtRows, "No EPA-registered facility on record here.");
     listInto("apprList", appr, "Nothing approved on record right now.");
-    listInto("propList", prop, "No proposed item on record right now.");
+    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
+    // heading a reader takes as a statement about now, and the only one that can hold a
+    // decided application. Approved/Operating rails are byte-for-byte unchanged.
+    listInto("propList", prop, "No proposed item on record right now.", { showCurrentStatus: true });
+    // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
+    // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
+    // active claim over every row in it. Once a decided application legitimately sits
+    // here, that sentence is wrong for those rows, so the heading says what the category
+    // actually means. Shown ONLY when the rail really holds one, so a page with none is
+    // unchanged and the sentence never appears without something to explain.
+    var propNote = HS.proposedRailNote ? HS.proposedRailNote(prop) : "";
+    var propSub = $("propSub");
+    if(propSub){
+      propSub.innerHTML = "Hearings and notices in this area"
+        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
+    }
     // Non-headlined civic list (engine contract): real public hearings that aren't development.
     // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
     var civicBand = $("civicBand");
@@ -3122,7 +3205,14 @@ HS.onReady(function(){
     var fanNote = (s.scope==="point" && s._fan)
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
       : "";
+    // THE DECISION, IMMEDIATELY UNDER THE STAGE LINE. A denied application keeps the
+    // Proposed pin (browsing category), so the popup is where the reader learns the
+    // ruling — it has to sit above the source line, not below the environmental block.
+    var decHtml = decisionNoteHTML(s, "popdec");
+    // And, for anything in the Proposed category, what we can honestly say about today.
+    var statusHtml = (bucketOf(s.type, s) === "proposed") ? currentStatusHTML(s, "popunv") : "";
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
+      decHtml+statusHtml+
       "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
@@ -3180,7 +3270,18 @@ HS.onReady(function(){
       // countdown — it's resolved, not an open comment window — plus a "decided" marker.
       var mdate = s.meeting_date ? s.meeting_date.slice(0,10) : "";
       var when = mdate ? " · " + ((opts.plainDate || s.decided) ? fmtDate(mdate) : friendlyDeadline(mdate)) : "";
-      var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
+      // A recorded DECISION gets the prominent sourced notation below, so the inline
+      // "decided" chip is kept only for a record that is decided WITHOUT one — an
+      // approval detected from a notice title, which has no outcome object. Showing both
+      // would say the same thing twice in two different registers.
+      var dec = decisionOf(s);
+      var decidedTag = (s.decided && !dec) ? " · <span class='decidedtag'>decided</span>" : "";
+      // The decision, and what we can honestly say about TODAY. The second line is shown
+      // for every PROPOSED-category row, decided or not: that is the universal protection,
+      // and it is the case where decision evidence is UNAVAILABLE that most needs it.
+      var decHtml = decisionNoteHTML(s);
+      var statusHtml = (opts.showCurrentStatus && bucketOf(s.type, s) === "proposed")
+        ? currentStatusHTML(s) : "";
       var dm = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
       // data-ref makes the row's PROJECT IDENTITY observable in the DOM. The card-grain probe
@@ -3190,7 +3291,7 @@ HS.onReady(function(){
       // the rendered row is the fix, and it makes "one project = one card" checkable directly.
       return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
-        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+v+"</div></div>";
+        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
     }).join("");
   }
 

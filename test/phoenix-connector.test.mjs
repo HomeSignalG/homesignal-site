@@ -55,7 +55,12 @@ ok(ENTRY.dataset_url.startsWith('https://'), 'dataset_url is absolute https');
 // ── 2. Status vocabulary — all four live values bucketed, none in two buckets ─────
 {
   const s2b = ENTRY.status_to_bucket;
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(all.length === 4 && new Set(all).size === 4, 'all 4 live PERMIT_STAT values bucketed exactly once');
   ok(s2b.proposed.includes('OPEN') && s2b.operating.includes('DONE'), 'OPEN → proposed, DONE → operating');
   ok(s2b.exclude.includes('EXPR') && s2b.exclude.includes('VOID'), 'EXPR + VOID excluded');

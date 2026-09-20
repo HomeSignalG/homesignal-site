@@ -145,18 +145,22 @@
           "Subdivision Recorded"
         ],
         "exclude": [
-          "Withdrawn",
           "Expired",
-          "Denied",
           "VOID",
           "Vacated",
           "Cancelled",
           "Aborted",
-          "CC Rejected",
           "Closed",
           "Review Completed",
           "Inactive",
           "Admin Hold"
+        ],
+        "denied": [
+          "Denied",
+          "CC Rejected"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "record_url_precision": "record",
@@ -258,18 +262,22 @@
         ],
         "operating": [],
         "exclude": [
-          "Withdrawn",
           "Expired",
-          "Denied",
           "VOID",
           "Cancelled",
           "Aborted",
-          "CC Rejected",
-          "Intake Rejected",
           "Closed",
           "Inactive",
           "Application Incomplete",
           "Suspended"
+        ],
+        "denied": [
+          "Denied",
+          "CC Rejected",
+          "Intake Rejected"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "record_url_precision": "record",
@@ -319,7 +327,6 @@
           "Final"
         ],
         "exclude": [
-          "Withdrawn",
           "Expired",
           "Expired - License",
           "VOID",
@@ -328,9 +335,7 @@
           "Cancelled - New Permit Required",
           "New Permit Required",
           "Aborted",
-          "Denied but Closed",
           "Revoked",
-          "Rejected",
           "Closed",
           "Inactive Contractor",
           "Application Incomplete",
@@ -338,6 +343,13 @@
           "Inactive Pending Revision",
           "On Hold",
           "Suspended"
+        ],
+        "denied": [
+          "Denied but Closed",
+          "Rejected"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "record_url_precision": "record",
@@ -415,9 +427,13 @@
         "exclude": [
           "Expired",
           "Closed",
-          "Canceled",
-          "Withdrawn",
+          "Canceled"
+        ],
+        "denied": [
           "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "extra_where": "permittypemapped in ('Building','Demolition','Grading')",
@@ -494,9 +510,13 @@
         "exclude": [
           "Expired",
           "Closed",
-          "Canceled",
-          "Withdrawn",
+          "Canceled"
+        ],
+        "denied": [
           "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "applieddate",
@@ -1205,15 +1225,19 @@
           "Permit Finaled"
         ],
         "exclude": [
-          "Permit Withdrawn",
           "EXPIRED",
-          "DENIED",
           "HOLD",
           "VOIDED",
           "REVOKED",
           "APP_EXP",
           "W/REFUND",
           "XCLOSED"
+        ],
+        "denied": [
+          "DENIED"
+        ],
+        "withdrawn": [
+          "Permit Withdrawn"
         ]
       },
       "recency_days": 365,
@@ -1371,15 +1395,17 @@
           "VOIDED - Applicant Withdrew Permit",
           "VOIDED - Duplicate Permit",
           "VOIDED - Issued in Error",
-          "Permit Denied",
           "Permit Rescinded",
-          "Zoning Denied",
           "Permit Application Expired",
           "Permit not required",
           "Sub-Permit not required",
           "Different Permit Type required",
           "PERMIT CANCELLED ",
           "Permit Inactive - Awaiting Response"
+        ],
+        "denied": [
+          "Permit Denied",
+          "Zoning Denied"
         ]
       },
       "type_map": {
@@ -1560,12 +1586,16 @@
           "Closed"
         ],
         "exclude": [
-          "Withdrawn",
           "Expired",
-          "Denied",
           "Aborted",
           "VOID",
           "Cancelled"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -1867,8 +1897,10 @@
         ],
         "operating": [],
         "exclude": [
-          "REJECTED",
           "CONVERTED"
+        ],
+        "denied": [
+          "REJECTED"
         ]
       },
       "incremental_field": "DATE_CREATED",
@@ -2072,14 +2104,18 @@
         ],
         "exclude": [
           "Expired",
-          "Withdrawn",
           "Void",
-          "Denied",
           "Closed",
           "Close",
           "Closed By Rule",
           "Opt-Out",
           "Hold"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "File_Date",
@@ -2265,12 +2301,16 @@
         "exclude": [
           "Void",
           "Closed",
-          "Withdrawn",
-          "Declined - Denied",
           "Enforcement",
           "Code Violation",
           "Monitoring",
           "On Hold"
+        ],
+        "denied": [
+          "Declined - Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "AppliedDate",
@@ -2401,8 +2441,10 @@
         ],
         "operating": [],
         "exclude": [
-          "Denied",
           "Void"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "record_url_precision": "dataset",
@@ -2459,7 +2501,6 @@
         "exclude": [
           "Canceled",
           "Closed",
-          "Denied",
           "Expired",
           "Inaccessible",
           "Not Required",
@@ -2468,6 +2509,9 @@
           "Suspended",
           "Violations",
           "On Hold"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "type_map": {
@@ -2623,14 +2667,18 @@
           "Closed",
           "Closed - No Inspect Required",
           "Closed - See Land Use Case",
-          "Denied",
           "Exempted",
           "Expired",
           "Permit Canceled",
-          "Permit Denied",
           "Permit Expired",
           "Reconsideration Denied",
-          "Voided",
+          "Voided"
+        ],
+        "denied": [
+          "Denied",
+          "Permit Denied"
+        ],
+        "withdrawn": [
           "Withdrawn"
         ]
       },
@@ -2690,13 +2738,15 @@
           "Annual",
           "Cancelled",
           "Closed",
-          "Denied",
           "Expired",
           "Expired Application",
           "Stopped",
           "Suspended",
           "Suspended for Fees",
           "Hold"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "type_map": {
@@ -2798,8 +2848,10 @@
         ],
         "operating": [],
         "exclude": [
-          "Decision - Denied",
           "On Hold"
+        ],
+        "denied": [
+          "Decision - Denied"
         ]
       },
       "type_map": {
@@ -2853,10 +2905,14 @@
         "exclude": [
           "Cancelled",
           "Closed",
-          "Denied",
           "Expired",
           "Stop Work",
-          "Void",
+          "Void"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
           "Withdrawn"
         ]
       },
@@ -3160,14 +3216,18 @@
           "Exercised"
         ],
         "exclude": [
-          "Withdrawn",
           "Terminated",
           "Void",
           "Revoked",
-          "Denied",
           "Expired",
           "Closed",
           "Complete"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "_receipts": "2026-07-16 CA wire pass. Anaheim's own AGO org (services3/hPs600I3X0RTaaaq, service list enumerated live). GEOMETRY-LESS TABLE (geometryType null) -> rows geocode via Location_Primary_Address (Boulder precedent; v20 geofence applies). No ZIP column; every address embeds '..., Anaheim, Ca 92xxx' -> zip_where_template LIKE (live receipt: 92805 -> 6,333 rows all-time). FRESH: newest Application_Received 2026/06/30 (PAZ2026-00384, matches recon). 26,883 rows total / 845 since 2025-07-01 -> recency via extra_where STRING compare (dates are yyyy/mm/dd STRINGS; the connector's recency_days DATE literal would fail on a string field - do NOT set it). 23 statuses VERBATIM via returnDistinctValues 2026-07-16: 'Modified' left unmapped ON PURPOSE (ambiguous outcome - surfaces in run report); Closed/Complete excluded (MN 'Closed' precedent: no trustworthy lifecycle). 'Sex-Oriented Business' type dropped at source (licensing class, not development). record_url dataset-precision (no per-record public link; CityView-class portals are login-walled - Provo precedent)."
@@ -3254,9 +3314,11 @@
         ],
         "exclude": [
           "EXPIRED",
-          "WITHDRAWN",
           "REFUND",
           "ON HOLD"
+        ],
+        "withdrawn": [
+          "WITHDRAWN"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -3909,16 +3971,20 @@
         ],
         "exclude": [
           "Void",
-          "Withdrawn",
           "Expired",
-          "Disapproved",
           "Revoked",
-          "Denied",
           "Stop Work Order",
           "Inactive",
           "Under Violation",
           "On Hold",
           "On Hold - Customer Action Required"
+        ],
+        "denied": [
+          "Disapproved",
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "recency_days": 365,
@@ -4147,16 +4213,20 @@
           "Revisions Required"
         ],
         "exclude": [
-          "Closed - Denied",
-          "Closed - Withdrawn",
           "Closed - Incomplete",
           "Closed - Insufficient Info",
-          "Denied",
-          "Denied - Planning",
           "Hold",
           "Permit Expired",
           "Closed - Duplicate",
           "Incomplete Submission"
+        ],
+        "denied": [
+          "Closed - Denied",
+          "Denied",
+          "Denied - Planning"
+        ],
+        "withdrawn": [
+          "Closed - Withdrawn"
         ]
       },
       "extra_where": "RECORD_TYPE_TYPE in ('Commercial','Residential')",
@@ -4285,11 +4355,15 @@
           "Closed"
         ],
         "exclude": [
-          "Denied",
           "Expired",
           "Voided",
-          "Withdrawn",
           "Revised - Pending Customer"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "extra_where": "APPTYPEALIAS NOT IN ('Bond Extension','Bond Reduction')",
@@ -4831,11 +4905,15 @@
         "operating": [],
         "exclude": [
           "Void",
-          "Denied",
-          "Withdrawn",
           "Never Completed Application",
           "Expired",
           "Saved Application"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "record_url_precision": "dataset",
@@ -5048,12 +5126,16 @@
         ],
         "operating": [],
         "exclude": [
-          "Withdrawn",
           "Not Issued",
           "Not Issussed",
-          "Denied",
           "Expired",
           "Annex"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "record_url_precision": "dataset",
@@ -5207,8 +5289,10 @@
         "exclude": [
           "Expired",
           "Void",
-          "Denied",
           "Revoked"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "record_url_precision": "dataset",
@@ -5279,8 +5363,10 @@
         "operating": [],
         "exclude": [
           "Cancel",
-          "Permit Denied",
           "Dept Disapproval"
+        ],
+        "denied": [
+          "Permit Denied"
         ]
       },
       "record_url_precision": "dataset",
@@ -5477,8 +5563,10 @@
           "Historical Plat"
         ],
         "exclude": [
-          "Withdrawn",
           "Vacating Plat"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -5518,8 +5606,11 @@
           "Approved as amended"
         ],
         "operating": [],
-        "exclude": [
-          "Denied",
+        "exclude": [],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
           "Withdrawn"
         ]
       },
@@ -6709,10 +6800,12 @@
           "Closed (Project Complete)"
         ],
         "exclude": [
-          "Withdrawn by Applicant",
           "Void",
           "Refunded",
           "Refund Requested"
+        ],
+        "withdrawn": [
+          "Withdrawn by Applicant"
         ]
       },
       "incremental_field": "IssueDate",
@@ -6773,8 +6866,12 @@
         ],
         "exclude": [
           "Expired",
-          "Void",
-          "Rejected",
+          "Void"
+        ],
+        "denied": [
+          "Rejected"
+        ],
+        "withdrawn": [
           "Withdrawn"
         ]
       },
@@ -6843,8 +6940,10 @@
         ],
         "exclude": [
           "Void",
-          "Disapproved",
           "On Hold"
+        ],
+        "denied": [
+          "Disapproved"
         ]
       },
       "incremental_field": "ISSUE_DATE",
@@ -7051,12 +7150,16 @@
         "exclude": [
           "Expired",
           "Void",
-          "Withdrawn",
           "Revoked",
           "Stop Work Order",
           "Suspended",
-          "Denied",
           "On Hold"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "ISSUE_DATE",
@@ -7113,9 +7216,11 @@
         ],
         "exclude": [
           "Cancel",
-          "Denied",
           "Inactive",
           "Project Hold"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "incremental_field": "DateIssued",
@@ -7288,9 +7393,13 @@
         "exclude": [
           "Expired",
           "Void",
-          "Denied",
-          "Withdrawn",
           "On Hold"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "IssueDate",
@@ -7518,10 +7627,14 @@
         ],
         "exclude": [
           "Cancelled",
-          "Withdrawn",
           "Expired",
-          "Void",
+          "Void"
+        ],
+        "denied": [
           "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "ISSUEDATE",
@@ -7758,10 +7871,14 @@
         ],
         "exclude": [
           "Expired",
-          "Withdrawn",
           "Void",
-          "Disapproved",
           "On Hold"
+        ],
+        "denied": [
+          "Disapproved"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "incremental_field": "ISSUE_DATE",
@@ -8129,9 +8246,11 @@
         ],
         "exclude": [
           "EXPIRED",
-          "DENIED",
           "ON HOLD-STOP WORK",
           "ON HOLD"
+        ],
+        "denied": [
+          "DENIED"
         ]
       },
       "incremental_field": "ISSUED",
@@ -8277,8 +8396,10 @@
         ],
         "exclude": [
           "Expired",
-          "WithDrawn",
           "Void"
+        ],
+        "withdrawn": [
+          "WithDrawn"
         ]
       },
       "incremental_field": "PermitIssuedDate",
@@ -9508,12 +9629,16 @@
         ],
         "operating": [],
         "exclude": [
-          "Withdrawn",
-          "WITHDRAWN",
-          "WITHDRAWN BY APPLICANT",
-          "WITHDRAWN BY COUNTY",
+          "WITHDRAWN BY COUNTY"
+        ],
+        "denied": [
           "Denied",
           "DENIED"
+        ],
+        "withdrawn": [
+          "Withdrawn",
+          "WITHDRAWN",
+          "WITHDRAWN BY APPLICANT"
         ]
       },
       "incremental_field": "application_rcvd_date",
@@ -9755,11 +9880,13 @@
         ],
         "exclude": [
           "Closed",
-          "Withdrawn",
           "Not eligible",
           "No Show",
           "Void",
           "Replaced"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -9837,13 +9964,15 @@
         "exclude": [
           "Expired",
           "Revoked",
-          "Denied",
           "Lapsed",
           "Inactive",
-          "Disapproved",
           "Referred to Legal",
           "DISABLED",
           "Hold Pending Code Enforcement"
+        ],
+        "denied": [
+          "Denied",
+          "Disapproved"
         ]
       },
       "extra_where": "record_type_type IN ('Residential','Commercial','Stormwater','Right of Way') AND (record_type_category IS NULL OR record_type_category NOT IN ('Electrical','Plumbing','Mechanical','Multi-Trade','Gas Piping','Low Voltage Electrical','Fire Alarm','Sprinkler System','Reroof','Change Out','Refrigeration','Exhaust Hood','Hood Suppression','Like for Like','Repair-Replacement'))",
@@ -9948,15 +10077,19 @@
         ],
         "operating": [],
         "exclude": [
-          "DISAPPROVAL",
-          "WITHDRAWN",
-          "DENIED",
           "UNKNOWN",
           "",
           "UPHOLD THE ZONING ADMINISTRATORS DECISION",
           "OVERTURN THE ZONING ADMINISTRATORS DECISION",
           "OVERRULE THE ZONING ADMINISTRATORS DECISION",
           "OVERTUEN ZA DETERMINATION"
+        ],
+        "denied": [
+          "DISAPPROVAL",
+          "DENIED"
+        ],
+        "withdrawn": [
+          "WITHDRAWN"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -10245,7 +10378,9 @@
         "exclude": [
           "Expired",
           "Void",
-          "Abandoned",
+          "Abandoned"
+        ],
+        "denied": [
           "Denied"
         ]
       },
@@ -10302,18 +10437,22 @@
           "Closed-Finaled"
         ],
         "exclude": [
-          "Closed-Withdrawn",
           "Closed-Abandoned",
           "Closed-Expired",
-          "Closed-Denied",
           "Closed-Vacated",
           "Closed-Voided",
           "Closed-Administrative",
           "Closed-Old",
           "Closed-Conversion",
           "Expired",
-          "Denied",
           "Vacated"
+        ],
+        "denied": [
+          "Closed-Denied",
+          "Denied"
+        ],
+        "withdrawn": [
+          "Closed-Withdrawn"
         ]
       },
       "recency_days": 1095,
@@ -10510,8 +10649,10 @@
           "VOID",
           "CANCELLED",
           "EXPIRED",
-          "DENIED",
           "On Hold"
+        ],
+        "denied": [
+          "DENIED"
         ]
       },
       "extra_where": "PERMITTYPE IN ('RESIDENTIAL','COMMERCIAL','TEMPORARY IMPROVEMENTS','GREEN ENERGY')",
@@ -10666,12 +10807,16 @@
           "ABANDONED",
           "ARCHIVED",
           "DELETED",
-          "WITHDRAWN",
-          "DENIED",
-          "5. DENIED/DISAPPROVED",
           "LAPSED",
           "VOID",
           "REVOKED"
+        ],
+        "denied": [
+          "DENIED",
+          "5. DENIED/DISAPPROVED"
+        ],
+        "withdrawn": [
+          "WITHDRAWN"
         ]
       },
       "extra_where": "PermitDepartmentDescr IN ('Building','Planning and Zoning','Community Development') AND PermitTypeCode NOT IN ('CD - SHORT TERM RENTAL REGISTRATION','CD - REQUEST FOR PUBLIC INFORMATION NON EQ','BD - CP - MECHANICAL','BD - CP - RE-ROOF','BD - CP - ELECTRIC','BD - CP - RENEWAL','BD - CP - REPAIR','BD - SPECIAL INSPECTION')",
@@ -10735,12 +10880,16 @@
         ],
         "exclude": [
           "Expired",
-          "Withdrawn",
           "Expired Application",
           "Canceled",
-          "Denied",
           "VOID",
           "On Hold"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "spatial_zip_radius_mi": 3,
@@ -11200,7 +11349,6 @@
         "exclude": [
           "Voided",
           "Dismissed",
-          "Denied",
           "Cancelled - Customer",
           "Canceled - Customer",
           "Inactive",
@@ -11208,6 +11356,9 @@
           "Revoked",
           "Closed",
           "Review on Hold"
+        ],
+        "denied": [
+          "Denied"
         ]
       },
       "use_type_const": "Development",
@@ -14431,12 +14582,16 @@
         ],
         "exclude": [
           "VOID",
-          "WITHDRAWN",
-          "DENIED",
           "EXPIRED",
           "CANCELLED",
           "OUT OF JURISDICTION",
           "HOLD"
+        ],
+        "denied": [
+          "DENIED"
+        ],
+        "withdrawn": [
+          "WITHDRAWN"
         ]
       },
       "recency_days": 365,
@@ -15786,8 +15941,10 @@
         "operating": [],
         "exclude": [
           "Denied or Expired",
-          "Withdrawn",
           "Other"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "type_map": {
@@ -15849,9 +16006,13 @@
         ],
         "operating": [],
         "exclude": [
-          "Withdrawn",
-          "Denial",
           "Other"
+        ],
+        "denied": [
+          "Denial"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "type_map": {
@@ -15919,8 +16080,10 @@
           "Overhead Projects",
           "Temporarily Shored Bridges",
           "Deferred",
-          "Rejected",
           "UNKNOWN"
+        ],
+        "denied": [
+          "Rejected"
         ]
       },
       "extra_where": "COUNTIES <> 'All Counties' AND PROJECT_TYPE IN ('Maintenance','Capital','Reconstruction/Rehabilitation','Safety','New Construction','Replacement','Enhancement')",
@@ -16397,10 +16560,14 @@
           "Expired",
           "Cancelled",
           "Amendment Denied",
-          "Withdrawn",
-          "Stop Work",
+          "Stop Work"
+        ],
+        "denied": [
           "Refused",
           "Denied"
+        ],
+        "withdrawn": [
+          "Withdrawn"
         ]
       },
       "recency_days": 365,

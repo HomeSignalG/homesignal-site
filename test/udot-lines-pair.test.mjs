@@ -55,7 +55,12 @@ ok(PTS.column_map.case_number === 'pin' && LIN.column_map.case_number === 'pin',
 // ── 3. Status vocabulary — all 19 live pin_stat_nm values, bucketed exactly once ──
 {
   const s2b = LIN.status_to_bucket;
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(all.length === 19 && new Set(all).size === 19,
     `all 19 live pin_stat_nm values bucketed exactly once (got ${all.length}, ${new Set(all).size} distinct)`);
   // The six that were previously UNMAPPED and silently failing closed.
