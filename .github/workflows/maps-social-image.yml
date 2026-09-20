@@ -3,10 +3,11 @@ name: maps-social-image
 # Generate the MAPS / DEVELOPMENT social visual: a screenshot of the LIVE Map 1 ZIP page,
 # framed on a real project's own coordinates with its real marker popup open.
 #
-# DISPATCH-ONLY AND ARM-GATED, deliberately. There is no schedule and no push trigger:
-# automatic MAPS generation and publication are held, and a capture job that ran on its own
-# would be the first half of that hold quietly coming off. The arm file must match
-# EXPECTED_ARM or the job refuses before it touches anything.
+# RECURRING, BOUNDED, AND STILL SWITCHABLE OFF. The superseded header here read
+# "DISPATCH-ONLY AND ARM-GATED, deliberately … the arm file must match EXPECTED_ARM" — see
+# the trigger block below for why that changed and what replaced it. Nothing about the
+# publication hold was relaxed; it moved from "this job is hard to start" to "this job
+# cannot write the columns publication reads".
 #
 # THIS JOB NEVER PUBLISHES. It writes exactly two things: a PNG into the existing private
 # social-images bucket, and image_bucket_path + evidence.visual on the MAPS draft it
@@ -14,23 +15,51 @@ name: maps-social-image
 # selects only content_family='MAPS' AND status='draft' — an Alerts row is unreachable from
 # here.
 #
-# HOW IT IS TRIGGERED, and why it is not a schedule. workflow_dispatch only works once a
-# workflow is on the default branch, so while this lives on a feature branch the only way
-# to run it is a push trigger — the same one-off-runner pattern fetch-tabs-fixtures.yml
-# already uses in this repo. It is scoped THREE ways so it cannot become ambient
-# generation: to one branch, to the arm file's path alone (an ordinary code push does not
-# fire it), and to the arming gate below. The arm file is set to DISARMED after a capture.
+# HOW IT IS TRIGGERED — CHANGED 2026-09-20, and the reason is measured, not stylistic.
+#
+# This job used to be dispatch-only behind a ONE-SHOT arm token that was reset to DISARMED
+# after each capture. It last ran 2026-09-04 and produced the only 9 images in the queue;
+# by 2026-09-20 the drafting side had written 49 MAPS rows and 40 of them had no image at
+# all, including every Data Center Theme candidate — which cannot be approved without one.
+# The hold was not holding anything back; it was holding the pipeline's own picture out.
+#
+# ⚖️ WHAT THE ARM GATE ACTUALLY PROTECTED, and what still protects it. Its comment said a
+# capture job running on its own would be "the first half of that hold quietly coming off",
+# the hold being that automatic MAPS generation and PUBLICATION stay off. Both halves of
+# that are still true and are now enforced where they belong rather than by the job being
+# hard to start:
+#   • GENERATION is a different repo and a different job — homesignal-ingest's
+#     bluesky-generate-maps.yml, still manual, still dry by default. Untouched here.
+#   • PUBLICATION is bluesky/publish-worker.mjs, which reads status='approved' only, and
+#     the founder approves in the Acquisition Dashboard. This job cannot write `status`,
+#     `approved_at`, `scheduled_slot` or `published_at`: `assertWriteScope` throws on a
+#     patch body naming any column but `image_bucket_path` and `evidence`, and the run
+#     re-reads every row it touched afterwards and RAISES if one stopped being a draft.
+# Capturing a photograph of a page is not publishing it. What the schedule removes is the
+# manual re-arm before each run, which is exactly what the founder asked to remove.
+#
+# THE KILL SWITCH SURVIVES, as a STANDING value rather than a per-run token. Set
+# .github/maps-social-capture to anything other than EXPECTED_ENABLE and every run — cron
+# and dispatch alike — refuses at the first step. It fails CLOSED: a missing or unreadable
+# file stops the job.
+#
+# LOAD IS BOUNDED THREE WAYS, because a recurring browser job against production is the
+# thing that could go wrong here: a per-run `--limit`; a per-draft retry ladder stored on
+# the row (1h/4h/12h, then a 24h floor) so past failures cannot be re-attempted every fire;
+# and `concurrency` below, so a slow run is never overlapped by the next one.
 on:
-  push:
-    branches: [claude/acquisition-log-page-location-hlrt47]
-    paths: ['.github/maps-social-arm']
+  schedule:
+    # Every 6 hours. The drafting side is manual and writes in bursts, so this only has to
+    # drain a burst within a day, not track it minute by minute: 4 fires x 8 drafts = 32
+    # captures/day against a queue that has never exceeded 49 rows in total.
+    - cron: '25 */6 * * *'
   workflow_dispatch:
     inputs:
       limit:
         description: 'How many MAPS drafts to capture'
-        default: '5'
+        default: '8'
       ids:
-        description: 'Optional comma-separated social_posts ids'
+        description: 'Optional comma-separated social_posts ids (bypasses the retry clock)'
         default: ''
       dry:
         description: 'true = capture and upload nothing'
@@ -44,7 +73,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_ARM: arm-2026-09-04-maps-social-visual-run6
+  # A STANDING value, not a one-shot token. Changing the file to anything else disables
+  # every future run; it is never reset by a successful capture.
+  EXPECTED_ENABLE: capture-enabled
   BASE: https://homesignal.net
 
 jobs:
@@ -54,15 +85,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: ARMING GATE - refuse unless deliberately armed
+      - name: ENABLE GATE - refuse unless capture is switched on
         run: |
           set -euo pipefail
-          ARM="$(tr -d '[:space:]' < .github/maps-social-arm)"
-          if [ "$ARM" != "$EXPECTED_ARM" ]; then
-            echo "NOT ARMED ($ARM). No capture, no write."
+          # Fails closed on a missing or unreadable file: `set -u` plus the explicit test
+          # below mean an absent switch stops the job rather than defaulting it on.
+          if [ ! -r .github/maps-social-capture ]; then
+            echo "NO SWITCH FILE at .github/maps-social-capture. No capture, no write."
             exit 1
           fi
-          echo "ARMED: $ARM"
+          SW="$(tr -d '[:space:]' < .github/maps-social-capture)"
+          if [ "$SW" != "$EXPECTED_ENABLE" ]; then
+            echo "CAPTURE DISABLED ($SW). No capture, no write."
+            exit 1
+          fi
+          echo "CAPTURE ENABLED: $SW"
 
       - uses: actions/setup-node@v4
         with:
@@ -96,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/maps-social-image.mjs \
-            --limit "${{ inputs.limit || '6' }}" \
+            --limit "${{ inputs.limit || '8' }}" \
             ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
             ${{ inputs.dry == 'true' && '--dry' || '' }} \
             --out "$GITHUB_WORKSPACE/maps-social-out"
