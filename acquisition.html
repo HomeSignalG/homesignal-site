@@ -1124,6 +1124,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // IT IS SCOPED TO THE THEME, not to MAPS. Rendering it under "All Maps" would imply it
   // orders every MAPS theme, which it does not.
   var _zipOrder = { rows: [], loaded: false, error: '' };
+  // The button's own state. `busy` survives only in memory; `msg` is the last outcome
+  // and is re-rendered with the panel so it is not lost to a refresh.
+  var _zipGen = { busy: false, msg: '', bad: false };
 
   function zipOrderVisible(){ return _bskyFamily==='MAPS' && _bskyTheme==='datacenter'; }
 
@@ -1177,12 +1180,26 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '</span>'):'')+'</div>'+
       '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created.</p>';
 
+    // GENERATE is FIRST and is the only accented control here, because it is the only one
+    // that WRITES. The rest move a CSV around. It is hidden when the list is empty rather
+    // than disabled-with-a-tooltip: with no list the underlying run is the NATIONAL scan,
+    // which this button must never be able to start (the RPC refuses it too -- both, because
+    // a UI-only guard is one refactor away from being the only guard).
     var btns='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      (rows.length?('<button class="bsky-btn" data-zo="generate"'+
+        (_zipGen.busy?' disabled style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
+                     :' style="background:var(--accent);color:#fff"')+
+        '>'+(_zipGen.busy?'Generating\u2026':('Generate drafts for these '+rows.length+' ZIPs'))+
+        '</button>'):'')+
       '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
       '<button class="bsky-btn" data-zo="template">Download template</button>'+
       (rows.length?'<button class="bsky-btn" data-zo="current">Download current list</button>':'')+
       '<input type="file" id="zo-file" accept=".csv,text/csv" style="display:none">'+
-      '</div>';
+      '</div>'+
+      // Carried in state, not written straight to the DOM, so a queue re-render cannot
+      // silently erase the only report of what the last click did.
+      (_zipGen.msg?('<div id="zo-gen-status" class="muted" style="font-size:12px;margin:-4px 0 10px;'+
+        'color:'+(_zipGen.bad?'var(--bad,#a12)':'inherit')+'">'+esc(_zipGen.msg)+'</div>'):'');
 
     var body;
     if(_zipOrder.error){
@@ -1207,6 +1224,80 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
     var f=document.getElementById('zo-file');
     if(f) f.addEventListener('change', zipOrderFileChosen);
+  }
+
+  /**
+   * Ask the engine to draft posts for the ordered ZIPs.
+   *
+   * THIS PAGE NEVER DISPATCHES ANYTHING ITSELF. It holds the anon key and a founder session,
+   * no GitHub credential, and per the panel's own contract it "creates nothing". So the click
+   * calls a SECURITY DEFINER RPC that re-checks the caller and dispatches the existing
+   * workflow server-side -- the same split as hs_set_maps_dc_zip_order and
+   * hs_approve_social_post. No new generator, no second copy of the selection rules.
+   *
+   * ⚠️ ACCEPTED, NOT A BUG: a dispatch is ENQUEUED synchronously and ANSWERED later, because
+   * pg_net is asynchronous. Reporting "sent" on the RPC returning would be reporting that we
+   * queued a request, not that GitHub took it -- and a dead token answers 401 seconds later.
+   * So the outcome is read back, and `pending` is displayed as its own state rather than
+   * being rounded up to success.
+   */
+  async function zipOrderGenerate(){
+    var n=(_zipOrder.rows||[]).length;
+    if(!n){ return; }                    // no list => the national scan; never from this button
+    if(!confirm('Generate draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
+                'The engine reads this list in your order and drafts at most one post per ZIP, '+
+                'from real Map 1 project records.\n\n'+
+                'It writes DRAFTS only \u2014 nothing is approved, scheduled or posted. '+
+                'Runs take about a minute; new drafts appear in the queue above.')) return;
+    _zipGen.busy=true; _zipGen.bad=false;
+    _zipGen.msg='Requesting a run\u2026';
+    zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+    try{
+      var r=await window.hsClient.rpc('hs_request_maps_dc_generation');
+      if(r.error){
+        // The RPC's refusals are all self-describing (empty list, cool-off, missing token,
+        // not authorized), so its own message is shown rather than a generic failure.
+        _zipGen.busy=false; _zipGen.bad=true;
+        _zipGen.msg='Not started: '+(r.error.message||'the request was refused.');
+        zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+        return;
+      }
+      _zipGen.msg='Run requested \u2014 waiting for GitHub to answer\u2026';
+      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+      zipGenPoll(0);
+    }catch(err){
+      _zipGen.busy=false; _zipGen.bad=true;
+      _zipGen.msg='Not started: the request could not be sent.';
+      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+    }
+  }
+
+  /** Read back what GitHub actually said. Bounded -- an unanswered request is reported, not spun on. */
+  function zipGenPoll(tries){
+    setTimeout(async function(){
+      var st=null;
+      try{
+        var r=await window.hsClient.rpc('hs_maps_dc_generation_status');
+        st=(r && !r.error && r.data && r.data[0]) ? r.data[0] : null;
+      }catch(e){ st=null; }
+      if(st && st.state==='pending' && tries<4){ zipGenPoll(tries+1); return; }
+      _zipGen.busy=false;
+      if(!st){
+        _zipGen.bad=true; _zipGen.msg='Run requested, but its outcome could not be read.';
+      } else if(st.state==='accepted'){
+        _zipGen.bad=false;
+        _zipGen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. Drafts appear here when it '+
+                    'finishes (about a minute) \u2014 reload to see them.';
+      } else if(st.state==='pending'){
+        _zipGen.bad=true;
+        _zipGen.msg='Run requested, but GitHub has not answered yet. Check the workflow before retrying.';
+      } else {
+        _zipGen.bad=true;
+        _zipGen.msg='GitHub did not accept the run'+
+                    (st.http_status?(' (HTTP '+st.http_status+')'):'')+': '+(st.detail||'no detail');
+      }
+      await refreshBluesky();            // re-render, and pick up any drafts already written
+    }, tries===0 ? 4000 : 6000);
   }
 
   async function zipOrderFileChosen(e){
@@ -1238,6 +1329,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
 
   function zipOrderAction(act){
+    if(act==='generate'){ zipOrderGenerate(); return; }
     if(act==='upload'){ var f=document.getElementById('zo-file'); if(f) f.click(); return; }
     if(act==='template'){
       zipOrderDownload('homesignal-zip-order-template.csv', HS.zipOrderTemplateCsv()); return;
