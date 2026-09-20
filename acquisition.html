@@ -269,7 +269,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
      define functions on window.HS and touch no DOM at load. -->
 <script src="lib/map.js?v=d4c3f937"></script>
-<script src="lib/maps-social-theme.js?v=233a850e"></script>
+<script src="lib/maps-social-theme.js?v=06e5322c"></script>
 <!-- WHICH MAP IMAGE BELONGS TO WHICH DRAFT. The same module scripts/maps-social-image.mjs
      loads, so the capture job and this approval gate cannot disagree about whether the
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
@@ -869,8 +869,18 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // selected". Falling back to the generic card would ship the campaign hook with a
   // picture that shows no data centre at all. So for this theme the Map 1 capture is
   // MANDATORY — a missing image blocks approval rather than degrading the post.
+  // An ABSENCE post ("no data center filings appear in ... records for <ZIP>") is a Data
+  // Center Theme post with NO PROJECT, so there is nothing on the map to photograph. Its
+  // evidence says so in its own words: "the draft carries no project_id, so there is
+  // nothing to photograph". Requiring the mandatory capture of it would block Approve
+  // forever on the one post in the campaign that answers the question honestly when the
+  // answer is "none". It publishes like an ordinary MAPS draft — the link card, whose
+  // OpenGraph image belongs to the destination page and claims nothing about a project.
+  function bskyIsAbsence(p){
+    return !!(window.HS && HS.mapsSocialIsAbsence && HS.mapsSocialIsAbsence(p));
+  }
   function dcThemeImageMandatory(p){
-    return bskyTheme(p) === 'datacenter';
+    return bskyTheme(p) === 'datacenter' && !bskyIsAbsence(p);
   }
   // \u2500\u2500 IS THE STORED IMAGE STILL THIS DRAFT'S IMAGE? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   // From lib/maps-capture-binding.js, the SAME module the capture job uses, so "bound"

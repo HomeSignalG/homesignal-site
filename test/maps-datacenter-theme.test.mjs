@@ -148,13 +148,16 @@ const bodyOf = (name) => {
   const m = DASH.match(new RegExp('function ' + name + '\\(([^)]*)\\)\\{([\\s\\S]*?)\\n  \\}'));
   return m ? { args: m[1], body: m[2] } : null;
 };
-// `dcThemeImageMandatory` delegates to `bskyTheme`, so both are lifted into ONE scope —
-// which also proves the delegation is real rather than a second copy of the rule.
+// `dcThemeImageMandatory` delegates to `bskyTheme` AND `bskyIsAbsence`, so all three are
+// lifted into ONE scope — which also proves the delegation is real rather than a second
+// copy of the rule. If the gate ever stops delegating, the lift stops resolving and §6
+// fails rather than quietly testing a stub.
 const lifted = (() => {
-  const a = bodyOf('bskyTheme'), b = bodyOf('dcThemeImageMandatory');
-  if (!a || !b) return null;
+  const a = bodyOf('bskyTheme'), b = bodyOf('dcThemeImageMandatory'), c = bodyOf('bskyIsAbsence');
+  if (!a || !b || !c) return null;
   return new Function('HS', 'window', `
     function bskyTheme(${a.args}){${a.body}}
+    function bskyIsAbsence(${c.args}){${c.body}}
     function dcThemeImageMandatory(${b.args}){${b.body}}
     return { bskyTheme, dcThemeImageMandatory };`)(HS, { HS });
 })();
@@ -225,6 +228,59 @@ ok(!/content_family=eq\.(?!MAPS)/.test(GEN_CODE.replace('content_family=eq.MAPS'
 ok(/content_family=eq\.MAPS/.test(GEN), '8: MAPS remains the generator\'s only scope');
 // The dashboard must still show ALERTS.
 ok(/ALERTS · community intelligence/.test(DASH), '8: the ALERTS family label is preserved');
+
+
+// ═══ 9. THE ABSENCE POST — "no data center filings appear here" ══════════════════════
+// It is a Data Center Theme post with NO PROJECT. Map 1 cannot classify a record that does
+// not exist, so `markerItemFor` would hand the resolver an object with every field
+// undefined and the row would be INVISIBLE: no theme chip, no sub-nav count, and no
+// "Draft exists" badge on its ZIP in the founder's Post ZIP order list. That is what
+// production looked like for 20904 on 2026-09-20, with the draft sitting in the queue.
+// ⚠️ `over` IS SPREAD FIRST, THEN `evidence` — the reverse order let `over.evidence`
+// REPLACE the merged object and silently drop `theme_answer`, so an "unrecognised stamp"
+// case was really testing a row that was not an absence post at all. It passed, and it
+// passed for the wrong reason: a mutation that accepted ANY stamp survived it.
+const absence = (over) => post({
+  ...over,
+  evidence: { theme: 'datacenter', theme_answer: 'none_found', ...((over || {}).evidence || {}) },
+});
+
+ok(HS.mapsSocialThemeKey(absence()) === 'datacenter',
+  '9: an ABSENCE post is a theme member — it answers the campaign question, with "none"');
+ok(HS.mapsSocialIsAbsence(absence()) === true, '9: and it is identified as an absence post');
+ok(HS.mapsSocialThemeBuckets([absence()]).byTheme.datacenter.length === 1,
+  '9: so it is counted in the theme bucket the sub-nav and the ZIP badge read');
+
+// THE STAMP IS READ ONLY WHERE THERE IS NOTHING TO CLASSIFY. A row carrying a project is
+// still Map 1's answer and nothing else — otherwise this would be the second classifier
+// the whole file exists to refuse.
+ok(HS.mapsSocialThemeKey(post({
+  evidence: { type: 'Development', type_raw: null, status: 'Proposed',
+              project_name: 'Northgate Logistics Park', project_id: 'p1',
+              theme: 'datacenter', theme_answer: 'none_found' },
+})) === null,
+  '9: a PROJECT-BACKED row may NOT claim the theme from a stamp — the marker still decides');
+ok(HS.mapsSocialIsAbsence(post({
+  evidence: { theme: 'datacenter', theme_answer: 'none_found', project_id: 'p1' },
+})) === false,
+  '9: a row with a project_id is never an absence post, whatever it is stamped');
+ok(HS.mapsSocialThemeKey(post({ evidence: { theme_answer: 'none_found' } })) === null,
+  '9: an absence post with NO stamped theme yields null — nothing is invented');
+ok(HS.mapsSocialThemeKey(absence({ evidence: { theme: 'wildfire' } })) === null,
+  '9: an UNRECOGNISED stamp yields null, never a new theme');
+ok(HS.mapsSocialIsAbsence(absence({ content_family: 'ALERTS' })) === false
+   && HS.mapsSocialIsAbsence(absence({ tile: 'community' })) === false,
+  '9: the family and tile guards still apply to the absence path');
+
+// THE GATE. Making the badge correct without this would have made both absence drafts
+// PERMANENTLY unapprovable: dcThemeImageMandatory would be true, and a post with no
+// project can never obtain a bound Map 1 capture.
+ok(dcMandatory && dcMandatory(absence()) === false,
+  '9: an absence post does NOT require the Map 1 capture — there is no project to photograph');
+ok(dcMandatory && dcMandatory(withEvidence({ project_name: 'RBC Data Center Campus' })) === true,
+  '9: a record-bearing theme post still REQUIRES it — the exemption is scoped to absence');
+ok(/bskyTheme\(p\) === 'datacenter' && !bskyIsAbsence\(p\)/.test(DASH),
+  '9: the page composes the exemption from the shipped predicate, not a local re-derivation');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 if (bad) process.exit(1);
