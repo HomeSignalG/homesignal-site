@@ -4,8 +4,11 @@
 objects or builds indexes. **No step executes reconciliation, seeds work, starts a
 worker, or schedules anything.**
 
-Baseline `dedb7db`. Measurement time for every live fingerprint in this file:
-**2026-09-20, re-verified 15:0x UTC** (see §6).
+Baseline `dedb7db`. **Exact measurement times** for every live value quoted here:
+production fingerprints and invariants read **2026-09-20 15:10:18 UTC**; the
+concurrency/drift check against `origin/main` (`7d55275`) ran in the same session
+immediately before it. Both must be **re-taken in the apply window** — they are a
+precondition, not a record.
 
 ---
 
@@ -58,6 +61,21 @@ after, with both functions defined.** Reconciliation happens only when something
 calls `geo.n5_reconcile(...)`, and after a passive install nothing does — the
 handoffs only enqueue, there is no worker, and no cron job references it.
 
+## 2a. Dependencies each step actually requires
+
+| need | required by | if absent |
+|---|---|---|
+| **PostGIS** (`geometry`, `ST_*`) | steps 2, 3, 4 | step 2 aborts with `type geometry does not exist`. Measured: the sequence fixture failed exactly this way until PostGIS 3.4 was installed. |
+| `geo.n5_geom`, `n5_geom_incoming`, `n5_boundary_membership`, `zip_authoritative_membership`, `zip_authoritative_marker`, `zcta_boundary`, `n5_accepted_source` | step 3 | the reconciler body references them by name |
+| `public.app_projects`, `property_company_roles`, `project_facility_refs`, `identity_conflicts` | steps 8, and the post-gates of 3 and 8 | gate aborts (fail-closed, §4) |
+| `public.development_reports` | step 4 (`geography_health_probe` ingest freshness) | probe errors |
+| **a READABLE `cron.job` catalog** | post-gates of steps 3 and 8 | **the install ABORTS.** This is now a hard precondition, not a warning — see §4. |
+| `public.pipeline_health_check`, and `_eval` inside the live tick | step 9 | anchor will not match |
+| `geo.n5_reconcile_queue` + `geo.enqueue_work` | step 8 | step 8 refuses by name |
+| `geo.geography_health_probe` | step 9 | step 9 refuses by name |
+
+All of these exist in production today except the objects steps 1–4 create.
+
 ## 3. Ownership, grants, execution role, RLS
 
 | object | owner | grants | notes |
@@ -73,9 +91,29 @@ Verified on the isolated server after installing steps 1–4:
 `geo.n5_reconcile`, `geo.n5_reconcile_stage1` and `geo.enqueue_work`;
 `geo.n5_reconcile`'s ACL is `{postgres=X/postgres}`.
 
-The future worker must run as **service_role** (bypasses RLS) or as the owner.
-Granting it to `authenticated` would expose resident-geography DML to the browser
-anon path and is out of scope here.
+⚠️ **CORRECTED: RLS BYPASS IS NOT FUNCTION EXECUTE, AND THE PREVIOUS DRAFT OF
+THIS SECTION CONFLATED THEM.** `service_role` bypassing RLS says nothing about
+whether it may CALL these functions. `revoke all … from public` removes the
+implicit grant, so after a passive install **no role but the owner can execute
+them.** Measured on the disposable target after running the real artifacts:
+
+```
+has_function_privilege('anon',          'geo.n5_reconcile(text[],text)','EXECUTE') = f
+has_function_privilege('authenticated', 'geo.n5_reconcile(text[],text)','EXECUTE') = f
+has_function_privilege('service_role',  'geo.n5_reconcile(text[],text)','EXECUTE') = f
+has_function_privilege('service_role',  'geo.enqueue_work(text[],text)','EXECUTE') = f
+has_function_privilege('postgres',      'geo.n5_reconcile(text[],text)','EXECUTE') = t
+```
+
+**Consequence for activation, stated so it is not discovered later:** a worker
+running as `service_role` will need an **explicit `grant execute`**. That grant is
+a worker-phase act and is deliberately **not** part of this passive package — the
+package's own property is that nothing but the owner can invoke any of it.
+
+`geo.enqueue_work` is called from **inside** `app_refresh_zip`, which is invoked by
+the materializer as its own caller, so the handoffs need no additional grant.
+Granting execute to `authenticated` would expose resident-geography DML to the
+browser anon path and must not be done.
 
 ## 4. Fingerprints and fail-closed checks
 
@@ -87,18 +125,25 @@ anon path and is out of scope here.
 Both splices: pin the pre-image md5 and **abort on mismatch**; assert every anchor
 occurs **exactly once**; **prove the transformation reverses to the original**
 before applying; re-read and compare the server-rendered body after applying.
-Steps 3 and 9 additionally assert **no `app_projects` trigger** and **no geography
-cron job**, each wrapped so an unreadable catalog reports `NOT EVALUATED` rather
-than passing silently.
+Steps 3 and 8 additionally assert **no `app_projects` trigger** and **no geography
+cron job**. ⚠️ **CORRECTED — THESE NOW FAIL CLOSED.** An earlier draft made them
+`raise warning`, reasoning by analogy with a migration where an unreadable cron
+catalog must not roll back a correct view. That analogy is wrong for a
+**pre-mutation safety gate**: *"I could not check whether the scheduler is on"* is
+not permission to proceed. Each read is still wrapped so the abort **names which
+check could not run** — an unevaluated check must neither pass silently nor abort
+anonymously — but it aborts the transaction either way. Proven: with the `cron`
+schema renamed away, `docs/geo-reconciler-install.sql` exits **non-zero** and
+defines **0** functions.
 
-## 5. Capture contract
+## 5. Capture contract (created by step 8)
 
 Step 8 starts capture **immediately** — `app_refresh_zip` runs ~240×/hour, so the
 queue fills within ~2 minutes and converges to **~233,106 keys** within one ~53 h
 sweep. *"Reconciliation executions = 0"* stays true; *"the queue is empty"* does
 not. Nothing starts a worker. See `geo-lifecycle-handoff-review.md` F1.
 
-## 6. The three indexes — separate, observed steps
+## 6. Steps 5–7: the three indexes — separate, observed steps
 
 Each is its own step. Build one at a time, `CREATE INDEX CONCURRENTLY`, and
 between each: re-read the ingest gate (0 failures, p95 ≤ 15 s, 0 runs ≥ 60 s over
@@ -120,7 +165,7 @@ three are the only steps that are not wrapped in `begin/commit`. A failed
 concurrent build leaves an `indisvalid = false` index that must be dropped before
 retrying — check for one before each retry.
 
-## 7. Rollback artifacts and their limitations
+## 7. Rollback artifacts and their limitations (by step)
 
 | step | rollback | limitation |
 |---|---|---|
@@ -135,7 +180,69 @@ either function were ours.
 
 ## 8. Every referenced file exists
 
-Checked mechanically by `test/geo-lifecycle-handoff.test.mjs` §12, which reads
+Checked mechanically by `test/geo-lifecycle-handoff.test.mjs` §12 and, for the artifacts actually executed, by `scripts/geo_install_sequence_fixture.py`, whose `artifact()` raises `FileNotFoundError` on any manifest path that does not exist, which reads
 this manifest, extracts every `docs/…`/`scripts/…`/`test/…` path and asserts each
 is present in the working tree. A manifest naming a file that does not exist is
 the failure mode this section exists to prevent.
+
+## 9. F1 — CAPTURE SCOPE: the decision this package cannot make for you
+
+**Classification: this is NOT worker-phase work and cannot be deferred to
+activation.** Capture begins at **step 8**, before any worker exists, so its write
+load and its authorization are properties of the *passive* install.
+
+### What the accepted contract actually says
+
+| source | wording |
+|---|---|
+| `geo-work-handoff.sql` line 2 | "WORK HANDOFF — how a **NEW or CHANGED** live project reaches the reconciler" |
+| `geo-work-handoff.sql` line 52 | "One queue, one meaning: **A KEY THAT NEEDS EVALUATING**" |
+| `geo-steady-state-path.md` line 102 | "**NEW / CHANGED / REMOVED** LIVE PROJECT" |
+
+The contract scopes capture to **new, changed, or removed**. **It nowhere states
+that unchanged existing keys enter the queue.**
+
+### What the implementation does
+
+Both upserts are `insert … on conflict (zip, source_key, source_seq) do update
+set … last_seen_at = excluded.last_seen_at`. `DO UPDATE` **returns every conflicting
+row whether or not any value changed**, so `returning source_key` yields *every key
+in the ZIP on every refresh*. The implementation therefore enqueues unchanged keys.
+
+**So the implementation is broader than the contract's stated scope, and the
+accepted documents neither authorize nor forbid that breadth. That is the gap.**
+
+### Immediate implications, measured
+
+- `app_refresh_zip` runs **~240×/hour** (`dev_refresh_tick(8,20)` every 2 min).
+- Distinct `source_key` per ZIP, measured 2026-09-20: **19475 → 137 · 64165 → 120 ·
+  78617 → 533 · 10001 → 1,004**; corpus mean ≈ 253 (3,213,495 rows / 12,722 ZIPs).
+- ⚠️ **Correction to an earlier framing of mine:** I previously described this as
+  "~960 extra small inserts/hour". That counted **statements**, not rows. The real
+  figure is **~240 runs × ~253 keys ≈ 60,000 queue upserts/hour** (~1,000/min),
+  each paying PK and partial-index maintenance.
+- The queue is **PK-bounded**, so it converges to ~**233,106** rows, not unbounded
+  growth — a small table, but a continuously rewritten one.
+- ⚠️ It **exceeds the 200,000 default scan cap** in `geography_health_probe`. The
+  F11 precedence correction is what keeps that from paging CRITICAL for a system
+  that is deliberately OFF; **without F11, option A below alarms within ~2 days.**
+
+### The decision, stated precisely — no redesign offered
+
+- **Option A — ratify the breadth.** Declare that "a key that needs evaluating"
+  includes unchanged keys; re-evaluation is idempotent and converges to state
+  equality, so unchanged keys cost work, never wrong answers. Consequences: the
+  ~60k/hour write load above is accepted; activation must be sized at ~233k keys
+  per sweep rather than at a change rate; F11 must ship with it. **No code changes.**
+- **Option B — restrict capture to genuinely changed keys.** This is a change to
+  capture and needs its own authorization and design; it is **not** designed here.
+  ⛔ The obvious form is unsafe: adding a `WHERE` to `DO UPDATE` stops
+  `last_seen_at` advancing, and the stale sweep deletes `last_seen_at < _run` — a
+  geography optimisation would become national data loss. Any variant must keep
+  `last_seen_at` moving and gate only the enqueue.
+- **Option C — install steps 1–7 and 9, hold step 8.** The package supports this
+  as-is: step 8 is last, refuses without its dependencies, and has an exact
+  rollback. Everything else is inert. This defers the capture decision without
+  deferring the rest of the install.
+
+**Until this is answered, the package is complete but capture is unauthorized.**

@@ -1,0 +1,104 @@
+# Database-backed geography fixtures.
+#
+# These fixtures DROP SCHEMAs, so they run only against the disposable service
+# container below. scripts/geo_fixture_db.py::require_disposable enforces that at
+# runtime from four independent signals and fails closed; GEO_FIXTURE_DISPOSABLE
+# is set here and must never be set anywhere that can reach production.
+#
+# The image is postgis/postgis, not plain postgres: the PROVEN adapter and the
+# reconciler are PostGIS algebra, and a text-shimmed `geometry` would prove
+# nothing about them.
+name: geo-db-fixtures
+
+on:
+  push:
+    branches: [main]
+    paths: &geo_paths
+      - 'docs/geo-*.sql'
+      - 'docs/geo-*.md'
+      - 'scripts/geo_*.py'
+      - 'scripts/gen_geo_reconciler_install.py'
+      - 'scripts/n5_reconcile_sql.py'
+      - 'test/geo-lifecycle-handoff.test.mjs'
+      - '.github/workflows/geo-db-fixtures.yml'
+  pull_request:
+    paths: *geo_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: fixture
+          POSTGRES_DB: geo_fixture
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # Disposable target only. require_disposable() re-checks this at runtime
+      # and also refuses a non-local host and any production-shaped database.
+      GEO_FIXTURE_DISPOSABLE: '1'
+      PGPASSWORD: fixture
+      GEO_DSN: 'host=localhost port=5432 user=postgres dbname=geo_fixture'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Prove the target is reachable and is NOT production
+        run: |
+          psql "$GEO_DSN" -v ON_ERROR_STOP=1 -X -tAc "select 'reachable', version();"
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          import geo_fixture_db as DB
+          DB.require_disposable(os.environ['GEO_DSN'])
+          print('disposable-target guard: PASS')
+          PY
+
+      - name: Guard refuses without the opt-in (negative control)
+        run: |
+          set +e
+          env -u GEO_FIXTURE_DISPOSABLE python3 scripts/geo_handoff_fixture.py "$GEO_DSN" >/dev/null 2>&1
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "FAIL: the fixture ran without GEO_FIXTURE_DISPOSABLE=1"; exit 1
+          fi
+          echo "negative control: refused with exit $rc"
+
+      - name: Lifecycle-handoff behavioural fixture
+        run: python3 scripts/geo_handoff_fixture.py "$GEO_DSN"
+
+      - name: Health probe + pipeline_health_tick integration fixture
+        run: python3 scripts/geo_health_probe_fixture.py "$GEO_DSN"
+
+      - name: Accepted health state-machine fixture
+        run: |
+          python3 scripts/geo_health_fixture.py > /tmp/health_state.sql
+          psql "$GEO_DSN" -v ON_ERROR_STOP=1 -X -f /tmp/health_state.sql
+
+      - name: INSTALL + ROLLBACK sequence against the actual artifacts
+        run: python3 scripts/geo_install_sequence_fixture.py "$GEO_DSN"
+
+      - name: Offline structural pins
+        run: node test/geo-lifecycle-handoff.test.mjs
+
+      - name: Generated artifacts are in step with their generators
+        run: |
+          python3 scripts/gen_geo_reconciler_install.py > /tmp/reconciler.sql
+          diff -u docs/geo-reconciler-install.sql /tmp/reconciler.sql \
+            || { echo "docs/geo-reconciler-install.sql is stale — regenerate it"; exit 1; }
+          python3 scripts/geo_handoff_splice.py rollback \
+            6591d7f79f9a6cd0b476bbcfc2065b9a ba2e6f9d8932d08e4373bfe97ae25ffd > /tmp/rollback.sql
+          diff -u docs/geo-lifecycle-handoff-rollback.sql /tmp/rollback.sql \
+            || { echo "docs/geo-lifecycle-handoff-rollback.sql is stale — regenerate it"; exit 1; }

@@ -261,18 +261,22 @@ comment on function geo.n5_reconcile(text[], text) is
 
 do $post$
 begin
-  -- The cron read is WRAPPED so a missing or unreadable catalog warns rather than
-  -- rolling back a correct install - the same shape CLAUDE.md records for the
-  -- coverage-state window migration. An unevaluated check must SAY it was
-  -- unevaluated; it must never pass silently.
+  -- ⚠️ FAIL CLOSED. An earlier draft made these warnings, reasoning by analogy with
+  -- the coverage-state migration where an unreadable cron catalog must not roll back
+  -- a correct VIEW. That analogy is wrong here: these are PRE-MUTATION SAFETY GATES
+  -- for a production install, and "I could not check whether the scheduler is on" is
+  -- not permission to proceed. The read is still WRAPPED so the failure NAMES which
+  -- check could not run - an unevaluated check must say so rather than pass silently
+  -- OR abort anonymously - but it aborts the transaction either way.
   begin
     if (select count(*) from cron.job where jobname ~* 'geo|reconcil|n5') <> 0 then
       raise exception 'A geography cron job exists. The scheduler must remain OFF.';
     end if;
   exception
     when insufficient_privilege or undefined_table or invalid_schema_name then
-      raise warning 'SCHEDULER CHECK NOT EVALUATED: cron catalog unreadable (%). '
-                    'Confirm the scheduler is OFF by hand before approving.', sqlerrm;
+      raise exception 'STOP - SCHEDULER CHECK NOT EVALUATED: cron catalog unreadable (%). '
+                      'An unevaluated safety check is NOT permission to proceed. Establish '
+                      'that the scheduler is OFF and re-run.', sqlerrm;
   end;
   begin
     if (select count(*) from pg_trigger t
@@ -281,8 +285,8 @@ begin
     end if;
   exception
     when insufficient_privilege or undefined_table then
-      raise warning 'TRIGGER CHECK NOT EVALUATED: public.app_projects unreadable (%). '
-                    'Confirm no trigger exists by hand before approving.', sqlerrm;
+      raise exception 'STOP - TRIGGER CHECK NOT EVALUATED: public.app_projects unreadable (%). '
+                      'An unevaluated safety check is NOT permission to proceed.', sqlerrm;
   end;
 end $post$;
 

@@ -251,15 +251,31 @@ end $mig$;
 
 -- Post-conditions a reviewer can re-run independently of the migration's own
 -- NOTICEs. Any false here means the apply did not do what it claims.
+-- ⚠️ THESE GATES FAIL CLOSED. Each read is WRAPPED so that a missing or
+-- unreadable catalog aborts BY NAME rather than as an anonymous 42P01 - but it
+-- aborts either way. "I could not check whether a trigger exists" is not
+-- permission to proceed with a production mutation.
 do $post$
 begin
-  if (select count(*) from pg_trigger t
-       where t.tgrelid = 'public.app_projects'::regclass and not t.tgisinternal) <> 0 then
-    raise exception 'A trigger appeared on public.app_projects. None is authorised.';
-  end if;
-  if (select count(*) from cron.job where jobname ~* 'geo|reconcil|n5') <> 0 then
-    raise exception 'A geography cron job exists. The scheduler must remain OFF.';
-  end if;
+  begin
+    if (select count(*) from pg_trigger t
+         where t.tgrelid = 'public.app_projects'::regclass and not t.tgisinternal) <> 0 then
+      raise exception 'A trigger appeared on public.app_projects. None is authorised.';
+    end if;
+  exception
+    when insufficient_privilege or undefined_table then
+      raise exception 'STOP - TRIGGER CHECK NOT EVALUATED: public.app_projects unreadable (%). '
+                      'An unevaluated safety check is NOT permission to proceed.', sqlerrm;
+  end;
+  begin
+    if (select count(*) from cron.job where jobname ~* 'geo|reconcil|n5') <> 0 then
+      raise exception 'A geography cron job exists. The scheduler must remain OFF.';
+    end if;
+  exception
+    when insufficient_privilege or undefined_table or invalid_schema_name then
+      raise exception 'STOP - SCHEDULER CHECK NOT EVALUATED: cron catalog unreadable (%). '
+                      'An unevaluated safety check is NOT permission to proceed.', sqlerrm;
+  end;
 end $post$;
 
 commit;

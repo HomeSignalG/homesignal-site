@@ -346,3 +346,66 @@ does not reproduce the defect proves nothing.**
 - `scripts/geo_health_fixture.py` — 17 state-machine cases (runner defect fixed, F9)
 - `test/geo-lifecycle-handoff.test.mjs` — **72** offline pins, 0 failures
 - Mutation controls: 4 (handoff) + 2 (artifacts) + 1 (probe precedence, genuine), all red; baselines restored green
+
+---
+
+# Completion pass — 2026-09-20 (third pass)
+
+Closes the five outstanding requirements. No production change; F11's narrow
+health-precedence correction is retained in the parked artifact as instructed.
+
+1. **Database-backed CI fixtures.** `.github/workflows/geo-db-fixtures.yml` runs
+   all four fixtures plus the offline pins against a `postgis/postgis:16-3.4`
+   service container, and re-generates both generated artifacts to prove they are
+   in step. `scripts/geo_fixture_db.py::require_disposable` gates every fixture
+   **before the first destructive statement**, on four independent signals:
+   explicit `GEO_FIXTURE_DISPOSABLE=1`, a local host, no production-sized relation
+   (`app_projects`, membership, marker, `n5_geom` ≥ 1,000 rows), and no production
+   cron job. It **fails closed** — an unreadable signal is a refusal. Every psql
+   call now uses `ON_ERROR_STOP=1` **and** checks the return code; the probe
+   fixture previously grepped stdout for `ERROR`, which cannot see a non-zero exit
+   at all. The workflow carries a negative control that runs a fixture without the
+   opt-in and fails if it succeeds.
+
+2. **Full install + rollback sequence.** `scripts/geo_install_sequence_fixture.py`
+   — **33 checks, 0 failures** — runs the ACTUAL artifact files in manifest order
+   against representative dependencies (real PostGIS 3.4, `cron.job`,
+   `app_projects` and its three referencing tables, the seven `geo` relations) and
+   real roles (`anon`, `authenticated`, `service_role`, owner). It proves: steps
+   1–4 mutate no resident geography and seed no work; step 8 installs exactly 4
+   handoffs, no trigger, no cron, and enqueues nothing *at install*; a refresh
+   after step 8 **does** capture; step 9 reports NOT_ACTIVATED/not-alertable and
+   preserves the pre-existing check; an unreadable scheduler catalog **stops** the
+   install; and both rollbacks restore their function **byte-identically**, after
+   which a refresh captures nothing. The whole sequence leaves resident geography
+   at 1/1. **The one substitution is stated and asserted:** each splice artifact's
+   production md5 pin is repinned to the representative function's md5, with the
+   pin count asserted exactly (1 in each installer, 2 and 4 in the rollbacks) and
+   character drift bounded at ≤32 per pin. Mutation control: removing one reversal
+   from the rollback makes the sequence exit non-zero.
+
+3. **Acceptance gates fail closed.** The scheduler and trigger checks in
+   `geo-reconciler-install.sql` and `geo-lifecycle-handoff-install.sql` now
+   `raise exception` naming which check could not run, instead of warning. Proven:
+   with `cron` renamed away the install exits non-zero and defines 0 functions.
+
+4. **Manifest corrected** — exact measurement time (2026-09-20 15:10:18 UTC, and
+   marked as a precondition to re-take, not a record); a new §2a listing every
+   real dependency including **PostGIS**, which was missing and is required by
+   steps 2–4; step references made explicit (5–7 indexes, capture created by step
+   8); and the grants section rewritten. **RLS bypass is not function EXECUTE** —
+   measured, `service_role` has **no** EXECUTE on `geo.n5_reconcile` or
+   `geo.enqueue_work` after a passive install, so a worker will need an explicit
+   grant as a worker-phase act.
+
+5. **F1 resolved as a decision, not a redesign** — see manifest §9. The accepted
+   contract says "NEW or CHANGED" and "a key that needs evaluating"; it **nowhere
+   authorizes unchanged keys**, and the implementation enqueues them because
+   `DO UPDATE` returns unchanged rows. Because capture starts at step 8, the load
+   is immediate: **~60,000 queue upserts/hour** (240 runs × ~253 keys/ZIP measured),
+   converging to ~233,106 PK-bounded rows. ⚠️ That corrects my own earlier
+   "~960 inserts/hour", which counted statements rather than rows. Three options
+   are stated with consequences; none is taken here.
+
+F2 (re-enqueue clears an in-flight claim) remains **out of scope** as instructed —
+it is genuinely worker-only.

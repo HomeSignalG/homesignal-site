@@ -24,6 +24,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import geo_handoff_splice as G  # noqa: E402
+import geo_fixture_db as DB  # noqa: E402
 
 ROOT = os.path.join(HERE, "..")
 HANDOFF = os.path.join(ROOT, "docs", "geo-work-handoff.sql")
@@ -157,18 +158,17 @@ end $fx$;
 
 
 def psql(dsn, sql, tuples_only=True):
-    args = ["psql", dsn, "-v", "ON_ERROR_STOP=1", "-X"]
-    if tuples_only:
-        args += ["-tA"]
-    p = subprocess.run(args + ["-c", sql], capture_output=True, text=True)
-    if p.returncode != 0:
-        raise RuntimeError(p.stderr.strip())
-    return p.stdout.strip()
+    """ON_ERROR_STOP + return-code checked, via the shared helper."""
+    return DB.run_sql(dsn, sql)
 
 
 def main():
     dsn = sys.argv[1] if len(sys.argv) > 1 else "host=localhost port=55432 user=postgres dbname=postgres"
-    print("== building isolated fixture ==")
+    # ⛔ GUARD BEFORE THE FIRST DESTRUCTIVE STATEMENT. SCHEMA starts with
+    # `drop schema public cascade`; pointed at the wrong DSN that is not a test
+    # failure, it is the incident.
+    DB.require_disposable(dsn)
+    print("== building isolated fixture (disposable target confirmed) ==")
     psql(dsn, SCHEMA)
     psql(dsn, passive_core_sql())
 

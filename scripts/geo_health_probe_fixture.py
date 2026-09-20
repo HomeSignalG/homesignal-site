@@ -19,6 +19,9 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import geo_fixture_db as DB  # noqa: E402
+
 ROOT = os.path.join(HERE, "..")
 FAILS, CHECKS = [], [0]
 
@@ -31,17 +34,15 @@ def ck(label, got, want):
         print(f"  ok  {label}: {got!r}")
 
 
-def psql(dsn, sql, quiet=True):
-    p = subprocess.run(["psql", dsn, "-v", "ON_ERROR_STOP=1", "-X", "-tA", "-c", sql],
-                       capture_output=True, text=True)
-    if p.returncode != 0:
-        raise RuntimeError(p.stderr.strip())
-    return p.stdout.strip()
+def psql(dsn, sql):
+    return DB.run_sql(dsn, sql)
 
 
 def psql_file(dsn, path):
-    p = subprocess.run(["psql", dsn, "-X", "-f", path], capture_output=True, text=True)
-    return p.stdout + p.stderr
+    """RETURN-CODE CHECKED. The previous version returned stdout+stderr and the
+    caller grepped for 'ERROR' - which reports success for any failure whose
+    message does not contain that word, and cannot see a non-zero exit at all."""
+    return DB.run_file(dsn, path)[1]
 
 
 def core_sql():
@@ -75,12 +76,12 @@ create table public.pipeline_health_check(check_name text primary key, ok boolea
 
 def main():
     dsn = sys.argv[1] if len(sys.argv) > 1 else "host=localhost port=55432 user=postgres dbname=postgres"
-    print("== isolated health-probe fixture ==")
+    # ⛔ GUARD BEFORE THE FIRST DESTRUCTIVE STATEMENT (SCAFFOLD drops schemas).
+    DB.require_disposable(dsn)
+    print("== isolated health-probe fixture (disposable target confirmed) ==")
     psql(dsn, SCAFFOLD)
     psql(dsn, core_sql())
-    out = psql_file(dsn, os.path.join(ROOT, "docs", "geo-health-model.sql"))
-    if "ERROR" in out:
-        print(out[-1500:]); raise SystemExit("STOP: health model failed to install")
+    psql_file(dsn, os.path.join(ROOT, "docs", "geo-health-model.sql"))
 
     def probe():
         return psql(dsn, "select state from geo.geography_health_probe(_record:=false);")
