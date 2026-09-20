@@ -192,4 +192,9 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "--fn":
         sys.stdout.write(state_function())
     else:
-        sys.stdout.write("\n".join(out))
+        # NOT "\n".join(out): scenario() returns a STRING, so joining it emits one
+        # character per line and the SQL cannot parse. That defect shipped at
+        # dedb7db and was invisible because nothing ever executed this file - no
+        # workflow, test or doc referenced it. Fixed 2026-09-20; the state machine
+        # itself was sound (17 cases pass).
+        sys.stdout.write(out)
