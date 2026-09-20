@@ -57,7 +57,12 @@ ok(PTS.column_map.case_number === 'PROJECT_NUMBER' && LIN.column_map.case_number
 // and is legitimately unused on lines — an unused mapping is safe, an unmapped value is not.
 {
   const s2b = LIN.status_to_bucket;
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(new Set(all).size === all.length, 'no status value is bucketed twice');
   for (const [v, bucket] of [['Awarded', 'approved'], ['Active', 'approved'], ['Completed', 'operating']]) {
     ok(s2b[bucket].includes(v), `live Line_View value '${v}' → ${bucket}`);

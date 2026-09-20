@@ -82,7 +82,12 @@ for (const p of PAIRS) {
   const moving = [...s2b.proposed, ...s2b.approved];
   const stalled = moving.filter((v) => /hold|stall|suspend|paus|dormant|inactive/i.test(v));
   ok(stalled.length === 0, `${p.state}: no stalled-sounding status is bucketed as proposed/approved`, JSON.stringify(stalled));
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(new Set(all).size === all.length, `${p.state}: no status value is bucketed twice`);
 }
 

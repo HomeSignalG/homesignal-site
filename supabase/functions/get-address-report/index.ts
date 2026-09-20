@@ -43,7 +43,9 @@
 // from the process-limit error (shrink) — a flaky FRS 502 was making the code shrink and undercount
 // (Box Elder 23→18); floor lowered to 0.25 mi. v14 = tracker-accuracy: dedup dev items (url|title+date
 // — ingest can double-emit), age out concluded hearings older than MEETING_LOOKBACK_DAYS, and stamp
-// `decided` (approved|denied/withdrawn/tabled) so the page never shows a resolved item as "open for
+// `decided` (approved | denied | withdrawn | procedurally closed) so the page never shows a
+// resolved item as "open for comment", plus `decision` — the SOURCED notation (sources/decision.ts)
+// that keeps a denied application discoverable under Proposed instead of deleting it. See "open for
 // comment". v15 = RELEVANCE: classifyRelevance() stamps every dev item `relevance`
 // ('development'|'civic') + `rel_rule` (which rule decided — auditable, overridable, queryable in the
 // cache; 'unmatched' items are stamped, not silently dropped). Only relevance='development' counts as
@@ -69,6 +71,9 @@ import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: 
 import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
 import { readAllRows } from "./sources/pg-pages.ts";
+// THE decision-history authority, shared with all five connectors and (through the
+// parity test) the page. Imported, never restated.
+import { decisionFor, isActiveUndecided } from "./sources/decision.ts";
 import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "json" };
 import { applyYields, buildYieldsMap } from "./sources/yields.ts";
 // registry_id -> yields_to, built once at module load; empty map ⇒ applyYields is a no-op.
@@ -247,9 +252,37 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
-    const denied = /\b(denied|denies|deny|withdrawn|withdrew|withdraws|rejected|rejects|tabled|dismissed|vacated|rescinded)\b/i.test(title);
+    // ── DENIAL AND WITHDRAWAL ARE DIFFERENT FACTS, AND EACH KEEPS ITS OWN WORD ──────
+    // One regex used to collapse both (plus "tabled"/"vacated") into a single `denied`
+    // boolean whose only job was to suppress the comment window. The item then rendered
+    // as an ordinary live proposal with nothing said about the ruling. Split, so the
+    // notation can name what actually happened: a body REFUSED it, or the applicant
+    // PULLED it. `tabled`/`deferred` are deliberately in NEITHER — a tabled item has not
+    // been decided at all, so it is neither a denial nor an open comment window; it keeps
+    // its old suppression through `procedurallyClosed` and asserts no outcome.
+    const deniedRe = /\b(denied|denies|deny|rejected|rejects|dismissed|disapproved|refused)\b/i;
+    const withdrawnRe = /\b(withdrawn|withdrew|withdraws)\b/i;
+    const procedurallyClosed = /\b(tabled|vacated|rescinded|continued indefinitely)\b/i.test(title);
+    const denied = deniedRe.test(title) || withdrawnRe.test(title) || procedurallyClosed;
     const [rel, relRule] = classifyRelevance(title, (a.category as string) || "", (a.agency_name as string) || "");
-    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, relevance: rel, rel_rule: relRule, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
+    const noticeUrl = (a.source_url as string) || "";
+    // A DECISION NOTATION, from the only evidence an area notice carries: its own TITLE.
+    // Labelled `title_text` rather than `source_status` so every surface knows the
+    // notation rests on the notice's wording, not on a publisher status field — the two
+    // are not equally checkable and must not read as if they were. No date is asserted:
+    // the notice's published_at is when it was POSTED, which is a different fact from
+    // when the body ruled, and inventing one is the fabrication this whole unit removes.
+    // A decision is only built when the notice links to its own public record, so the
+    // notation can never be an unsourced claim.
+    const areaOutcome = deniedRe.test(title) ? "denied" : withdrawnRe.test(title) ? "withdrawn" : null;
+    const decision = areaOutcome
+      ? decisionFor({ bucket: areaOutcome, statusRaw: title.slice(0, 120), decisionDate: null, recordUrl: noticeUrl, urlPrecision: "record", basis: "title_text" })
+      : null;
+    // BROWSING CATEGORY IS UNCHANGED BY A DECISION — a denied application is a historical
+    // proposal and stays discoverable under Proposed. Only `decision` and the eligibility
+    // predicate change; `type` deliberately does not.
+    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, relevance: rel, rel_rule: relRule, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: noticeUrl, decision_evidence: "title_only" };
+    if (decision) s.decision = decision;
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
@@ -888,7 +921,20 @@ async function handleRequest(req: Request): Promise<Response> {
       YIELDS_MAP,
     ));
     const devRecords = [...devReal, ...permitSites];
+    // ── COUNTS ARE THREE DIFFERENT QUESTIONS AND EACH GETS ITS OWN NUMBER ──────────
+    // `proposed` is the BROWSING rail's size: everything a resident finds under Proposed,
+    // decided applications included, because they remain discoverable there.
+    // `proposed_active` is the ELIGIBILITY number: applications that are genuinely still
+    // undecided. It is the one a counter tile, an upcoming-decision list, a notification
+    // or a social claim may use. Reporting the first as if it were the second is how a
+    // denied application ends up described as an active, pending proposal.
     const proposedRecords = devRecords.filter((s) => s.type === "proposed");
+    const proposedActiveRecords = proposedRecords.filter((s) => isActiveUndecided(s));
+    // Records IN THE PROPOSED RAIL that carry a recorded decision. Scoped to the rail
+    // because that is the only place the number is used: it tells the page whether the
+    // "includes historical proposals" disclosure is warranted. An approval is also a
+    // decision, but an approved record has left this rail and is counted by `approved`.
+    const decidedRecords = proposedRecords.filter((s) => s.decision != null);
     const approvedRecords = devRecords.filter((s) => s.type === "approved");
     const operatingRecords = devRecords.filter((s) => s.type === "built");
     const commentOpenRecords = devRecords.filter((s) => s.comment_open === true);
@@ -900,7 +946,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -938,12 +984,15 @@ async function handleRequest(req: Request): Promise<Response> {
   for (const s of devReal) {
     if (s.scope === "area" && !s.decided && s.comment_deadline && String(s.comment_deadline).slice(0, 10) >= today) s.comment_open = true;
   }
+  // Same three-question split as ZIP mode — see the note there.
   const proposedRecords = devReal.filter((s) => s.type === "proposed");
+  const proposedActiveRecords = proposedRecords.filter((s) => isActiveUndecided(s));
+  const decidedRecords = proposedRecords.filter((s) => s.decision != null);
   const approvedRecords = devReal.filter((s) => s.type === "approved");
   const operatingRecords = devReal.filter((s) => s.type === "built");
   const commentOpenRecords = devReal.filter((s) => s.comment_open === true);
   const access = await accessLevel(req, supabase);
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
 }
