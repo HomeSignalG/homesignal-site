@@ -25,6 +25,11 @@ on:
       - '.gitignore'
       - 'QUEUE.md'
       - '.github/workflows/**'
+      # The capture job's ARM FILE. Without this the `unit` check never registers
+      # on a PR that only arms a capture, so branch protection blocks it forever --
+      # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
+      # job, no schedule, no step, no behaviour change.
+      - '.github/maps-social-arm'
       - '.github/workflows/unit-tests.yml'
   pull_request:
     paths:
@@ -47,6 +52,11 @@ on:
       - 'docs/government-feed-onboarding*.md'
       - 'docs/candidates/**'
       - '.github/workflows/**'
+      # The capture job's ARM FILE. Without this the `unit` check never registers
+      # on a PR that only arms a capture, so branch protection blocks it forever --
+      # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
+      # job, no schedule, no step, no behaviour change.
+      - '.github/maps-social-arm'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 
