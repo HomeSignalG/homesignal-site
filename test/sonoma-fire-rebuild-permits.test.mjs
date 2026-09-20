@@ -68,21 +68,24 @@ ok(!JSON.stringify(E.column_map).includes('__lat') && !JSON.stringify(E.column_m
     'Application Accepted/In Review': 1, 'Awaiting Applicant Response': 1, 'Waiting for Other Approvals': 1 };
   const CATEGORY_LIVE = { 'Single Family Home': 1778, 'Accessory Dwelling Unit': 246, 'Bridge': 40, 'Multi-Family Home': 30 };
 
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
   ok(Object.values(STATUS_LIVE).reduce((a, b) => a + b, 0) === 2094,
     'Permit_Status vocabulary sums EXACTLY to 2,094 — complete, not a sample');
   ok(Object.values(CATEGORY_LIVE).reduce((a, b) => a + b, 0) === 2094,
     'Category vocabulary sums EXACTLY to 2,094 — complete, not a sample');
 
-  const bucketed = new Set([...E.status_to_bucket.proposed, ...E.status_to_bucket.approved,
-                            ...E.status_to_bucket.operating, ...E.status_to_bucket.exclude]);
+  const bucketed = new Set(Object.values(E.status_to_bucket).flat());
   const unbucketed = Object.keys(STATUS_LIVE).filter((s) => !bucketed.has(s));
   ok(unbucketed.length === 0, 'every live Permit_Status is bucketed — fail-closed leaves nothing unmapped', unbucketed.join(', '));
   const unmapped = Object.keys(CATEGORY_LIVE).filter((c) => !(c in E.type_map));
   ok(unmapped.length === 0, 'every live Category is mapped — 0 unclassified', unmapped.join(', '));
 
   // No value may sit in two buckets — that is how a record double-counts.
-  const all = [...E.status_to_bucket.proposed, ...E.status_to_bucket.approved,
-               ...E.status_to_bucket.operating, ...E.status_to_bucket.exclude];
+  const all = Object.values(E.status_to_bucket).flat();
   ok(all.length === new Set(all).size, 'no Permit_Status appears in two buckets');
 }
 

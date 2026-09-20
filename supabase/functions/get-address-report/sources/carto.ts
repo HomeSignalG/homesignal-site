@@ -35,6 +35,7 @@ import {
   coverageMatches,
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
+import { browsingBucketFor, decisionFor, decisionEvidenceLevel } from "./decision.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -77,6 +78,10 @@ export interface CartoRunReport {
   fetched: number;
   emitted: number;
   excluded_by_status: ExcludedStatus[];
+  /** matched a DECISION bucket → EMITTED with a sourced decision notation. Reported
+   *  apart from excluded_by_status so "surfaced 12 denials" and "dropped 12 records"
+   *  can never read the same in a run report. */
+  decided_by_status: ExcludedStatus[];
   unmapped_statuses: UnmappedStatus[];
   /** matched a registry key only after case-folding — NON-failing drift note */
   case_insensitive_matches: CaseFoldMatch[];
@@ -140,7 +145,7 @@ async function runEntry(
 ): Promise<{ records: NormalizedRecord[]; report: CartoRunReport }> {
   const report: CartoRunReport = {
     registry_id: entry.registry_id, table: entry.table,
-    fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
+    fetched: 0, emitted: 0, excluded_by_status: [], decided_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
     blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
   };
@@ -164,6 +169,7 @@ async function runEntry(
     return { records, report };
   }
   const excludeCount = new Map<string, number>();
+  const decidedCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
 
@@ -194,19 +200,27 @@ async function runEntry(
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
     if (hit.caseInsensitive) noteCaseFold(caseFold, "status", statusRaw, hit.matchedKey);
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
+    // A DECISION bucket does NOT continue — the row is emitted with its decision
+    // attached. Counted here so the run report can distinguish surfaced from dropped.
+    if (bucket === "denied" || bucket === "withdrawn") { decidedCount.set(statusRaw, (decidedCount.get(statusRaw) ?? 0) + 1); }
     const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, typeLookup, caseFold, zip);
     if (rec) records.push(rec);
   }
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.decided_by_status = [...decidedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }
 
+// A decision bucket maps to the BROWSING category, never to a lifecycle it never reached:
+// a denied application is a HISTORICAL PROPOSAL, so it stays where a resident looks for
+// it and carries its decision beside it. See sources/decision.ts.
 const BUCKET_TO_TYPE: Record<string, NormalizedRecord["type"]> = {
   proposed: "proposed", approved: "approved", operating: "built",
+  denied: browsingBucketFor("denied"), withdrawn: browsingBucketFor("withdrawn"),
 };
 
 async function normalizeRow(
@@ -273,6 +287,16 @@ async function normalizeRow(
   }
 
   const zipVal = valOrNull(readCol(row, cm.zip));
+  // DECISION HISTORY, built from values this row already proves: the publisher's own
+  // status word, its own decision_date column, and the official URL the
+  // anti-fabrication gate already required. `decided_on` stays null when the source
+  // states no decision date — never filled from file_date or the refresh clock.
+  const decisionRec = decisionFor({
+    bucket, statusRaw,
+    decisionDate: isoDay(readCol(row, cm.decision_date)),
+    recordUrl, urlPrecision: precision,
+  });
+
   const rec: NormalizedRecord = {
     source_id: `carto:${hostOf(entry.sql_url)}:${entry.table}:${caseNo ?? title}`,
     source_class: "carto",
@@ -284,6 +308,9 @@ async function normalizeRow(
     type_raw: typeSrcVal || null,   // verbatim publisher value, pre-map (see NormalizedRecord)
     bucket,
     type: BUCKET_TO_TYPE[bucket],
+    decision: decisionRec,
+    decided: decisionRec !== null,
+    decision_evidence: decisionEvidenceLevel(entry),
     relevance: "development",
     rel_rule: `source:carto:${entry.registry_id}`,
     layer: layerFor(useType),

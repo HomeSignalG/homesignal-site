@@ -28,10 +28,40 @@
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
 import { buildGeocodeInput } from "./geo-input.ts";
+// THE decision-history authority. Imported rather than restated so the five connectors,
+// the engine and (via test/decision-vocabulary-parity.test.mjs) the page cannot drift
+// into five spellings of one contract.
+import {
+  browsingBucketFor, decisionFor, decisionEvidenceLevel,
+} from "./decision.ts";
+import type { DecisionRecord, DecisionEvidenceLevel } from "./decision.ts";
+export {
+  browsingBucketFor, decisionFor, decisionEvidenceLevel,
+  DECISION_OUTCOMES, DECISION_LABELS, DECISION_EVIDENCE_LEVELS,
+  isActiveUndecided, decisionNotation, currentStatusLine,
+  PROPOSED_INCLUDES_HISTORY_NOTE,
+} from "./decision.ts";
+export type { DecisionRecord, DecisionOutcome, DecisionEvidenceLevel } from "./decision.ts";
 
 // ───────────────────────────── types ─────────────────────────────
 
-export type Bucket = "proposed" | "approved" | "operating" | "exclude";
+export type Bucket =
+  | "proposed" | "approved" | "operating"
+  // DECISION buckets (2026-09-20). A status in one of these is EMITTED, not dropped: the
+  // application really happened and a resident searching the address must find it. It
+  // browses under `proposed` (sources/decision.ts::browsingBucketFor) and carries a
+  // sourced `decision` notation. Before this existed the only home for "Denied" was
+  // `exclude`, and 294 of 294 denial-shaped registry values sat there — the record was
+  // deleted rather than decided. See sources/decision.ts for the full measurement.
+  | "denied" | "withdrawn"
+  | "exclude";
+
+/** Buckets that produce a record. Wider than it was — `Exclude<Bucket, "exclude">` now
+ *  admits the decision members, which is exactly the intent: they emit. */
+export type EmittedBucket = Exclude<Bucket, "exclude">;
+/** The three LIFECYCLE stages a pin can be coloured by. A decision bucket is not one of
+ *  them; it maps THROUGH browsingBucketFor to `proposed`. */
+export type LifecycleBucket = "proposed" | "approved" | "operating";
 
 /** One field's source column. A single column name, an array of columns to join with a
  *  space (composite street address), or null/absent when the dataset has no such field. */
@@ -57,6 +87,14 @@ export interface StatusToBucket {
   proposed?: string[];
   approved?: string[];
   operating?: string[];
+  /** Statuses where the AUTHORITY refused the application. Emitted, never dropped. */
+  denied?: string[];
+  /** Statuses where the APPLICANT pulled the application. A different fact from a
+   *  refusal, and kept a different word for exactly that reason. */
+  withdrawn?: string[];
+  /** Administrative non-decisions (expired · void · cancelled · closed). NOT a ruling,
+   *  so they stay dropped — see sources/decision.ts for why widening this is a founder
+   *  decision rather than a maintenance edit. */
   exclude?: string[];
 }
 
@@ -187,8 +225,20 @@ export interface NormalizedRecord {
    *  NEVER interpret it, never normalise it, never fall back to the mapped value: a "raw" field
    *  that has been cleaned up cannot prove what the publisher actually said. */
   type_raw: string | null;
-  bucket: Exclude<Bucket, "exclude">;
-  type: "built" | "approved" | "proposed";   // lifecycle for the page (bucket→type)
+  bucket: EmittedBucket;
+  type: "built" | "approved" | "proposed";   // BROWSING category for the page (bucket→type)
+  /** The application's own decision history, when the source states one. Null on an
+   *  ordinary live filing. A non-null value NEVER changes `type` — the record stays in
+   *  the Proposed browsing category and gains a sourced notation beside it. */
+  decision: DecisionRecord | null;
+  /** Mirrors `decision != null`. The page and the materializer both already key on a
+   *  `decided` flag (public.app_refresh_zip writes status 'Decided' from it), so the
+   *  boolean is emitted rather than asked of every consumer. */
+  decided: boolean;
+  /** What THIS SOURCE can evidence about a current disposition — a property of the
+   *  registry entry, identical for every record it produces, so coverage is reportable
+   *  per source. It is what stops a surface claiming "still pending" from a fresh fetch. */
+  decision_evidence: DecisionEvidenceLevel;
   relevance: "development";          // permit/case filings are development by construction
   rel_rule: string;                  // "source:socrata:{registry_id}"
   layer: string;                     // map layer, derived from use_type (never from the title)
@@ -227,6 +277,10 @@ export interface SocrataRunReport {
   fetched: number;                   // raw rows pulled (after the ZIP/recency $where)
   emitted: number;                   // records that made it into a band
   excluded_by_status: ExcludedStatus[];   // matched the "exclude" bucket (intended drop)
+  /** matched a DECISION bucket → EMITTED with a decision notation. Reported separately
+   *  from excluded_by_status so "we surfaced 12 denials" and "we dropped 12 records" can
+   *  never again look the same in a run report. */
+  decided_by_status: ExcludedStatus[];
   unmapped_statuses: UnmappedStatus[];     // status in NO bucket → excluded + FLAGGED
   /** matched a registry key only after case-folding — NON-failing drift note */
   case_insensitive_matches: CaseFoldMatch[];
@@ -315,7 +369,7 @@ async function runEntry(
 ): Promise<{ records: NormalizedRecord[]; report: SocrataRunReport }> {
   const report: SocrataRunReport = {
     registry_id: entry.registry_id, dataset_id: entry.dataset_id,
-    fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
+    fetched: 0, emitted: 0, excluded_by_status: [], decided_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
     blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
   };
@@ -356,6 +410,7 @@ async function runEntry(
     return { records, report };
   }
   const excludeCount = new Map<string, number>();
+  const decidedCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
   const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
@@ -413,6 +468,12 @@ async function runEntry(
         excludeCount.set(rawStatus, (excludeCount.get(rawStatus) ?? 0) + 1);
         continue;
       }
+      // A DECISION bucket does NOT continue. The row is emitted with its decision
+      // attached; counting it here keeps "surfaced with a decision" visible in the run
+      // report instead of it being indistinguishable from an ordinary proposal.
+      if (bucket === "denied" || bucket === "withdrawn") {
+        decidedCount.set(rawStatus, (decidedCount.get(rawStatus) ?? 0) + 1);
+      }
     }
 
     const rec = await normalizeRow(row, entry, statusRaw, bucket as Exclude<Bucket, "exclude">, deps, report, zip, typeLookup, caseFold);
@@ -421,6 +482,7 @@ async function runEntry(
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.decided_by_status = [...decidedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count, sample: unmappedSample.get(status) ?? null })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
@@ -435,7 +497,7 @@ async function normalizeRow(
   row: Record<string, unknown>,
   entry: SocrataRegistryEntry,
   statusRaw: string,
-  bucket: Exclude<Bucket, "exclude">,
+  bucket: EmittedBucket,
   deps: SocrataDeps,
   report: SocrataRunReport,
   reportZip: string | null,
@@ -501,6 +563,19 @@ async function normalizeRow(
     geoPrecision = "jurisdiction"; scope = "area"; lat = null; lng = null;
   }
 
+  // DECISION HISTORY. Built from the SAME values the record already carries — the
+  // publisher's own status word, its own decision_date column, and the official URL the
+  // anti-fabrication gate already required — so the notation is evidence the row itself
+  // proves. `decided_on` stays null when the source states no decision date; it is NEVER
+  // filled from file_date or from the refresh clock.
+  const decisionRec = decisionFor({
+    bucket,
+    statusRaw,
+    decisionDate: isoDay(readCol(row, cm.decision_date)),
+    recordUrl,
+    urlPrecision: precision,
+  });
+
   const rec: NormalizedRecord = {
     source_id: `socrata:${entry.domain}:${entry.dataset_id}:${identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title}`,
     source_class: "socrata",
@@ -512,6 +587,9 @@ async function normalizeRow(
     type_raw: typeSrcVal || null,   // verbatim publisher value, pre-map (see NormalizedRecord)
     bucket,
     type: BUCKET_TO_TYPE[bucket],
+    decision: decisionRec,
+    decided: decisionRec !== null,
+    decision_evidence: decisionEvidenceLevel(entry),
     relevance: "development",
     rel_rule: `source:socrata:${entry.registry_id}`,
     layer: layerFor(useType),
@@ -676,8 +754,12 @@ export async function discoverDatasets(
 
 // ───────────────────────────── helpers ─────────────────────────────
 
-const BUCKET_TO_TYPE: Record<Exclude<Bucket, "exclude">, "built" | "approved" | "proposed"> = {
+// A decision bucket maps to the BROWSING category, never to a lifecycle it did not reach.
+// `denied` → "proposed" is the contract: a denied application is a historical proposal, so
+// it stays discoverable where a resident looks for it, with its decision attached.
+const BUCKET_TO_TYPE: Record<EmittedBucket, "built" | "approved" | "proposed"> = {
   operating: "built", approved: "approved", proposed: "proposed",
+  denied: browsingBucketFor("denied"), withdrawn: browsingBucketFor("withdrawn"),
 };
 
 /** Map layer from the (already source-derived) classification — never from the title.
@@ -763,7 +845,7 @@ export function buildNormalizedLookup<T>(
  *  exactly one; if duplicated, first wins and the map should be fixed). */
 export function buildBucketLookup(s2b: StatusToBucket, registryId = "?"): NormalizedLookup<Bucket> {
   const pairs: [string, Bucket][] = [];
-  (["proposed", "approved", "operating", "exclude"] as Bucket[]).forEach((b) => {
+  (["proposed", "approved", "operating", "denied", "withdrawn", "exclude"] as Bucket[]).forEach((b) => {
     for (const status of s2b[b] ?? []) pairs.push([status, b]);
   });
   return buildNormalizedLookup(pairs, "status_to_bucket", registryId);
