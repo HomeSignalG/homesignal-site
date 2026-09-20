@@ -241,3 +241,108 @@ Rollback is the reverse: 6R, 5R, then drop the core deliberately if wanted.
    interval is still unchosen.
 5. Both fingerprints must be re-verified in the apply window — `pipeline_health_tick`
    especially, since the other session amends it.
+
+---
+
+# Correction pass — 2026-09-20 (second pass)
+
+Two defects were found in the package by verifying claims rather than accepting
+them. Both are corrected; neither changes the accepted architecture.
+
+## F10 — 🔴 the manifest named a file that cannot be installed, and I put it there
+
+My first deployment order listed `docs/geo-source-scoped-reconcile.sql` as step 3.
+That was wrong in three independent ways, all verified at `dedb7db`:
+
+1. **Four bare, top-level resident-geography DML statements** — `delete from
+   geo.zip_authoritative_membership` (line 86), `insert into` the same (95), and
+   the identical pair for `geo.zip_authoritative_marker` (113, 120). Applying it
+   as a "passive installer" would have **mutated the exact planes this workstream
+   exists to protect.**
+2. **psql bind placeholders** (`:keys`, `:run`) — not valid SQL in any driver, so
+   it could not have executed as written.
+3. **It calls `geo.n5_expected_marker(:keys)`, which is defined nowhere in the
+   repository.** `git grep n5_expected_marker` at `dedb7db` returns call sites
+   only. The file defines exactly one function, `geo.n5_expected_membership`.
+
+**So the reconciler had never existed as an installable artifact** — the same
+class of gap as the handoff, one layer down. The canonical implementation is
+`scripts/n5_reconcile_sql.py` (`STAGES` + `render`), whose only consumer was the
+fixture, which wraps the rendered stages into a function **in a fixture schema**.
+
+Corrected: `scripts/gen_geo_reconciler_install.py` performs the same wrapping
+against `PROD_RELS` and emits `docs/geo-reconciler-install.sql`, defining
+`geo.n5_reconcile_stage1(text[],text)` and `geo.n5_reconcile(text[],text)`. The
+generator refuses if any stage leaves an unresolved `{PLACEHOLDER}`.
+
+**Defining is not running, and that is measured, not argued:** on an isolated
+PostgreSQL, resident membership/marker rows were **1/1 before the install and 1/1
+after**, with both functions defined. Grants verified:
+`has_function_privilege('public', …, 'EXECUTE')` is **false** for both, ACL
+`{postgres=X/postgres}`, and the reconciler is deliberately **not**
+`security definer`.
+
+The old file stays as the design record and is **excluded from the manifest**,
+with the reason recorded there and pinned by test §14.
+
+## F11 — 🔴 the health probe reported CRITICAL for a system that is deliberately OFF
+
+`geo.geography_health_probe` short-circuits on its scan cap **before** calling
+`geo.geography_health_state`, where NOT_ACTIVATED is rule (0). Measured on an
+isolated server:
+
+| activation | queue depth | state |
+|---|---:|---|
+| never activated | 1,000 | `NOT_ACTIVATED` |
+| never activated | **201,001** | **`CRITICAL`** — depth alone flipped the verdict |
+
+**That path is reachable in the passive-installed state**, which is why it is
+corrected rather than logged: F1 shows the queue converges to **~233,106 keys**
+within one ~53 h sweep, above the 200,000 default. My health integration marks
+CRITICAL alertable, so **installing the package as drafted would have paged the
+founder within about two days about a system that is intentionally off** — and an
+alert that fires for a correct state is how a real one gets ignored later.
+
+Corrected minimally: rule (0) is evaluated first, restoring the precedence
+`geography_health_state` already documents. **No threshold is changed** — the
+200,000 default is intact, the cap still refuses to aggregate, and CRITICAL is
+unchanged for an activated system. The capped depth is **appended to the reason**
+rather than discarded, so nothing is hidden.
+
+⚠️ **This edits an accepted artifact (`docs/geo-health-model.sql`), and the
+instruction authorising it arrived truncated ("consistent with the accepted
+contract while…"). I restored the documented precedence and invented no policy —
+but this specific change should get an explicit nod before install.**
+
+Proven by `scripts/geo_health_probe_fixture.py` — **12 checks, 0 failures** —
+which drives the REAL probe and the REAL integration replacement text (read out of
+the artifact, never retyped), not only the pure state function:
+
+| | |
+|---|---|
+| A/B | never activated, under and **over** the cap → `NOT_ACTIVATED`, depth still reported |
+| C/D | activated + over cap → `CRITICAL`; activated + 30 h past SLA → `CRITICAL` (both unchanged) |
+| E/E2 | activated + live ingest + never succeeded → `CRITICAL` (frozen signature); with a recent success → `HEALTHY` |
+| G/H | the integration text compiles; worker OFF → monitor emits `NOT_ACTIVATED`, ok, **not alertable** |
+| I/J | a genuine CRITICAL **is** alertable; a missing probe → `UNMEASURED`, never a pass |
+
+⚠️ **E was written wrong first and the contract was right.** I expected an
+activated system with a small fresh queue to be non-CRITICAL; rule (4) correctly
+calls it CRITICAL when ingest is live and reconciliation has never succeeded —
+that is the frozen-pipeline signature the model exists to catch. The fixture now
+records a success before expecting HEALTHY.
+
+⚠️ **And the first mutation control was a FALSE NEGATIVE.** Reverting only the
+`if` condition produced code that still routed through the state machine, so the
+suite stayed green and I nearly recorded the pins as load-bearing on that basis.
+Restoring the **original block verbatim** turns both the behavioural fixture and
+the offline pins red, and restoring the fix turns both green. **A mutation that
+does not reproduce the defect proves nothing.**
+
+## Evidence after the correction pass
+
+- `scripts/geo_handoff_fixture.py` — 21 checks, 0 failures
+- `scripts/geo_health_probe_fixture.py` — 12 checks, 0 failures (new)
+- `scripts/geo_health_fixture.py` — 17 state-machine cases (runner defect fixed, F9)
+- `test/geo-lifecycle-handoff.test.mjs` — **72** offline pins, 0 failures
+- Mutation controls: 4 (handoff) + 2 (artifacts) + 1 (probe precedence, genuine), all red; baselines restored green

@@ -137,5 +137,69 @@ section('11. negative control - the pins can actually fail');
      'control: removing the drift guard is detectable by these pins');
 }
 
+
+section('12. the manifest names only files that exist');
+{
+  const man = readFileSync('docs/geo-passive-install-manifest.md', 'utf8');
+  const paths = [...new Set([...man.matchAll(/(?:^|[\s`(|])((?:docs|scripts|test)\/[A-Za-z0-9._\/-]+\.(?:sql|py|mjs|md))/g)].map((m) => m[1]))];
+  ok(paths.length >= 10, `manifest should reference the package files, found ${paths.length}`);
+  for (const f of paths) {
+    let exists = true;
+    try { readFileSync(f, 'utf8'); } catch { exists = false; }
+    ok(exists, `manifest references a file that does not exist: ${f}`);
+  }
+}
+
+section('13. the reconciler installs as DEFINITIONS, never as bare DML');
+{
+  const rec = readFileSync('docs/geo-reconciler-install.sql', 'utf8');
+  const recExe = exe(rec);
+  // every DML statement must sit INSIDE a function body, never at top level.
+  const bodies = [...recExe.matchAll(/\$(s1|rec)\$([\s\S]*?)\$\1\$/g)].map((m) => m[2]).join('\n');
+  const outside = recExe.split(/\$(?:s1|rec)\$[\s\S]*?\$(?:s1|rec)\$/).join('\n');
+  ok(!/^\s*(delete|insert|update)\s+/im.test(outside),
+     'no top-level DML may appear outside a function body');
+  ok(/delete|insert/i.test(bodies), 'the DML must actually be present inside the bodies');
+  ok(!/:keys|:run\b/.test(recExe), 'no psql bind placeholders may survive into the artifact');
+  ok(!/\{[A-Z_]+\}/.test(recExe), 'no unresolved {PLACEHOLDER} may survive rendering');
+  ok(!/n5_expected_marker/.test(recExe),
+     'must not call geo.n5_expected_marker — it is defined nowhere in the repo');
+  ok(/revoke all on function geo\.n5_reconcile\(text\[\], text\) from public/.test(recExe),
+     'the reconciler must not be executable by public');
+  ok(!/security\s+definer/i.test(recExe),
+     'the reconciler must NOT be security definer');
+  ok(/NOT EVALUATED/.test(rec),
+     'an unreadable catalog must report NOT EVALUATED, never pass silently');
+}
+
+section('14. geo-source-scoped-reconcile.sql is excluded, and the reason is recorded');
+{
+  const man = readFileSync('docs/geo-passive-install-manifest.md', 'utf8');
+  const steps = man.slice(man.indexOf('## 1. Steps'), man.indexOf('## 2.'));
+  ok(!steps.includes('geo-source-scoped-reconcile.sql'),
+     'the unapplicable file must not appear in the install order');
+  ok(/n5_expected_marker/.test(man) && /defined nowhere/i.test(man),
+     'the manifest must record WHY it is excluded');
+}
+
+section('15. the health probe evaluates NOT_ACTIVATED before the scan cap');
+{
+  const hm = exe(readFileSync('docs/geo-health-model.sql', 'utf8'));
+  const probe = hm.slice(hm.indexOf('create or replace function geo.geography_health_probe'));
+  const iAct = probe.indexOf('if v_act is null then');
+  const iCap = probe.indexOf('elsif v_capped then');
+  ok(iAct > 0 && iCap > iAct,
+     'rule (0) NOT_ACTIVATED must be tested BEFORE the v_capped branch');
+  // Positional, not shape-based: a nested `if v_capped then` legitimately exists
+  // INSIDE the not-activated branch to append the cap note to the reason. What
+  // must never recur is a cap branch reached BEFORE rule (0) is evaluated.
+  ok(probe.indexOf('v_capped then') > iAct,
+     'no v_capped branch may be reached before rule (0) is evaluated');
+  ok(/_max_scan int default 200000/.test(probe),
+     'the 200,000 default must be unchanged — no threshold is altered');
+  ok(/queue exceeds the %s scan cap so depth was not aggregated/.test(probe),
+     'a capped depth must still be reported, not discarded');
+}
+
 console.log(`\n${pass + fail} checks, ${fail} failures`);
 if (fail) process.exit(1);

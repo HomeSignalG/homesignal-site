@@ -376,7 +376,37 @@ begin
   v_grow := case when v_prev is not null and v_pending > v_prev
                  then coalesce(v_grow, 0) + 1 else 0 end;
 
-  if v_capped then
+  -- 🔑 RULE (0) OUTRANKS THE SCAN CAP, AND THIS ORDERING IS LOAD-BEARING.
+  -- The cap short-circuit used to run FIRST, so a never-activated system whose
+  -- queue exceeded _max_scan reported CRITICAL and never reached
+  -- geography_health_state, where NOT_ACTIVATED is rule (0). Measured on an
+  -- isolated PostgreSQL 2026-09-20: activated_at NULL + 201,001 queued ->
+  -- 'CRITICAL: work queue exceeds the 200000 cap'; the same state at 1,000
+  -- queued -> 'NOT_ACTIVATED'. Depth alone flipped the verdict.
+  --
+  -- That path is REACHABLE IN THE PASSIVE-INSTALLED STATE, which is why it is
+  -- corrected here rather than logged: once the lifecycle handoffs are installed
+  -- the queue converges to ~233,106 keys within one ~53h materializer sweep
+  -- (docs/geo-lifecycle-handoff-review.md F1), which is ABOVE the 200,000
+  -- default. The monitor would have paged CRITICAL for a system that is
+  -- deliberately OFF, within about two days of a passive install - and an alert
+  -- that fires for a correct state is how a real one gets ignored later.
+  --
+  -- NO THRESHOLD IS CHANGED and no state is invented. _max_scan is still 200,000,
+  -- the cap still refuses to aggregate, and CRITICAL is unchanged for an ACTIVATED
+  -- system. Only the precedence documented in geography_health_state - where
+  -- NOT_ACTIVATED is evaluated before every failure rule - is restored to the
+  -- probe that wraps it. The capped depth is appended to the reason rather than
+  -- discarded, so nothing is hidden.
+  if v_act is null then
+    select s.state, s.reason into v_state, v_reason
+      from geo.geography_health_state(v_act, v_pending, v_oldest, v_succ, v_err,
+                                      v_errs, v_grow, v_ingest) s;
+    if v_capped then
+      v_reason := v_reason
+        || format('; queue exceeds the %s scan cap so depth was not aggregated', _max_scan);
+    end if;
+  elsif v_capped then
     v_state := 'CRITICAL';
     v_reason := format('work queue exceeds the %s cap; refusing to aggregate it', _max_scan);
   else
