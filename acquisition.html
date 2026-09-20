@@ -270,6 +270,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      define functions on window.HS and touch no DOM at load. -->
 <script src="lib/map.js?v=d4c3f937"></script>
 <script src="lib/maps-social-theme.js?v=233a850e"></script>
+<!-- WHICH MAP IMAGE BELONGS TO WHICH DRAFT. The same module scripts/maps-social-image.mjs
+     loads, so the capture job and this approval gate cannot disagree about whether the
+     picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
+     because the binding key includes the theme, which that lib derives. -->
+<script src="lib/maps-capture-binding.js?v=851a6622"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -867,17 +872,48 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function dcThemeImageMandatory(p){
     return bskyTheme(p) === 'datacenter';
   }
+  // \u2500\u2500 IS THE STORED IMAGE STILL THIS DRAFT'S IMAGE? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // From lib/maps-capture-binding.js, the SAME module the capture job uses, so "bound"
+  // means one thing across the pipeline. FAILS CLOSED: if that lib did not load, nothing
+  // is bound and every image-gated approval blocks. A gate that assumes the best when its
+  // own rule is missing is not a gate.
+  function bskyCaptureBound(p){
+    return !!(window.HS && HS.mapsCaptureBound && HS.mapsCaptureBound(p));
+  }
+  function bskyCaptureState(p){
+    return (window.HS && HS.mapsCaptureState) ? HS.mapsCaptureState(p) : null;
+  }
+  function bskyStateCopy(s){
+    return (window.HS && HS.mapsCaptureStateCopy) ? HS.mapsCaptureStateCopy(s) : '';
+  }
   // The single reason a post cannot be approved right now, or '' when it can.
   // ONE function, used by both the button and the click handler, so the two can never
   // disagree about whether approval is allowed.
   function bskyApprovalBlockReason(p){
     if(!p) return '';
-    if(dcThemeImageMandatory(p) && !p.image_bucket_path){
+    // A STALE IMAGE IS WORSE THAN NO IMAGE, because it renders \u2014 so the founder would see
+    // a real Map 1 screenshot, approve it, and publish a picture of the draft as it USED
+    // to be. This runs first and applies to every MAPS post, theme or not.
+    if(p.content_family==='MAPS' && p.image_bucket_path && !bskyCaptureBound(p)){
+      return 'The stored Map image for this post was captured for DIFFERENT draft details '
+        + 'than it carries now (its project coordinates, type, status, name or theme have '
+        + 'moved since). Approving would publish a picture of an older version of this '
+        + 'draft.\n\nApprove is blocked until a fresh capture matching the current draft '
+        + 'exists. The capture job picks this up automatically on its next run.';
+    }
+    if(dcThemeImageMandatory(p) && !bskyCaptureBound(p)){
       var v=(p.evidence&&p.evidence.visual)||{};
+      var st=bskyCaptureState(p);
+      // \u26a0\ufe0f THE STATE SENTENCE IS NOT DECORATION. "We could not photograph it" and "this ZIP
+      // has no data centres" are different facts, and a gate that shows only "no screenshot"
+      // invites the founder to read the second out of the first. Each state names the
+      // instrument; none of them makes a claim about what is or is not in the ZIP.
       return 'This is a MAPS \u00b7 Data Center Theme post, which publishes the real Map 1 '
-        + 'screenshot. No screenshot has been captured for it yet'
-        + (v.failure_reason ? (' \u2014 ' + v.failure_reason) : '')
-        + '. Approve is blocked until the exact image this post would publish exists and displays.';
+        + 'screenshot and has no honest fallback.\n\n'
+        + (bskyStateCopy(st) || 'No screenshot has been captured for it yet.')
+        + (v.failure_reason ? ('\n\nReported reason: ' + v.failure_reason) : '')
+        + (v.next_attempt_at ? ('\nNext automatic attempt: ' + v.next_attempt_at) : '')
+        + '\n\nApprove is blocked until the exact image this post would publish exists and displays.';
     }
     if(mapsImageRequired(p) && !_bskyImgOk[p.id]){
       return 'This post would publish the Map image stored at\n' + p.image_bucket_path +
@@ -933,10 +969,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var btn = document.querySelector('[data-post="'+id+'"] button[data-act="approve"]');
     if (!btn || btn.getAttribute('data-gate') !== 'image') return;
     var row = _bskyRows[id] || null;
-    // A theme post with no capture at all can never unlock: there is no image to render.
-    if (row && dcThemeImageMandatory(row) && !row.image_bucket_path) {
+    // A theme post with no BOUND capture can never unlock in this session. Two cases, and
+    // widening from `!image_bucket_path` to `!bound` is what adds the second: no capture at
+    // all (nothing to render), and a capture that belongs to older draft details (it WOULD
+    // render, and rendering it is exactly how a stale picture gets approved).
+    if (row && dcThemeImageMandatory(row) && !bskyCaptureBound(row)) {
       btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed';
-      btn.title = 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.';
+      btn.title = row.image_bucket_path
+        ? 'Data Center Theme: the stored screenshot was captured for different draft details. Awaiting a fresh capture.'
+        : 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.';
       return;
     }
     var ok = !!_bskyImgOk[id];
@@ -957,12 +998,33 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         : ' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>';
     }
     var v=(p.evidence&&p.evidence.visual)||{};
-    if(p.image_bucket_path && v.status==='REAL_MAP_VISUAL'){
+    // FOUR STATES, SHOWN AS FOUR. Collapsing them was how a capture failure could be read
+    // off the queue as a finding about the ZIP. Derived from the row by the shipped module,
+    // never from the stored `state` alone — a row claiming READY whose image is gone or
+    // whose inputs have moved reports as awaiting capture here too.
+    var st=bskyCaptureState(p);
+    var S=(window.HS&&HS.MAPS_CAPTURE_STATES)||{};
+    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
+    if(st===S.READY){
       return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
     }
-    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
-    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">NO PROJECT-SPECIFIC VISUAL · '+
-      'generic link-card fallback'+why+'</span>';
+    if(st===S.INELIGIBLE){
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">CANNOT BE PHOTOGRAPHED YET · '+
+        'a capture limitation, not a finding about this ZIP'+why+'</span>';
+    }
+    if(st===S.FAILED){
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">CAPTURE FAILED · '+
+        'our screenshot did not work, not a finding about this ZIP'+why+
+        (v.attempts?(' · attempt '+esc(String(v.attempts))):'')+'</span>';
+    }
+    // WAITING — including an image that exists but no longer matches the draft, which is a
+    // capture that is owed again rather than one that failed.
+    if(p.image_bucket_path){
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">IMAGE OUT OF DATE · '+
+        'captured for earlier draft details, awaiting a fresh capture</span>';
+    }
+    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">AWAITING MAP CAPTURE · '+
+      'not yet attempted'+why+'</span>';
   }
 
   // The proposed image itself. Read from the PRIVATE social-images bucket through a
@@ -1445,10 +1507,18 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         'letter-spacing:.04em;padding-top:1px">'+esc(k)+'</div>'+
         '<div style="flex:1;font-size:12px;'+(warn?'color:var(--persist)':'')+'">'+v+'</div></div>';
     };
+    // "none" WAS TRUE AND STILL MISLEADING. It described the payload correctly and said
+    // nothing about whether an image was coming, so a draft awaiting its first capture and
+    // a draft that can never have one read identically. The state is named here for the
+    // same reason it is named in the queue row.
+    var pst = bskyCaptureState(p);
+    var PS = (window.HS&&HS.MAPS_CAPTURE_STATES)||{};
     var imgLine = p.image_bucket_path
       ? ('<span id="bsky-payload-imgstate">resolving…</span> &nbsp;<span class="muted">'+
-         esc(p.image_bucket_path)+'</span>')
-      : '<span style="color:var(--persist)">none — nothing is attached to this post</span>';
+         esc(p.image_bucket_path)+'</span>'
+         + (pst===PS.READY ? '' : ' <span style="color:var(--persist)">· NOT BOUND to this draft’s current details</span>'))
+      : ('<span style="color:var(--persist)">none attached yet — '
+         + esc(bskyStateCopy(pst) || 'awaiting capture') + '</span>');
     return '<div style="margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">'+
       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);'+
       'margin-bottom:2px">Exact payload the publisher will send</div>'+

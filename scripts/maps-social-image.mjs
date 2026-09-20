@@ -36,10 +36,15 @@ import path from 'node:path';
 // The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
 // this module cannot carry a second copy of the rendering rules.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
+
+// The four capture states, from the SHIPPED module the Acquisition Dashboard reads. Taken
+// from it rather than re-declared here, so the job and the approval gate cannot come to
+// hold different opinions about what "ready" means.
+const { WAITING, READY, FAILED, INELIGIBLE } = HS.MAPS_CAPTURE_STATES;
 
 
 
@@ -170,14 +175,78 @@ async function api(pathname, init) {
   return r.status === 204 ? null : r.json();
 }
 
-/** MAPS drafts still without a project-specific visual. ALERTS rows are never selected. */
-async function pendingDrafts() {
+/**
+ * ONLY these two columns may ever be written by this module.
+ *
+ * The arm gate this job used to carry existed to keep "automatic MAPS generation and
+ * publication are held" true. Running on a schedule does not touch that hold — but the
+ * hold must stop resting on the job being hard to start, so it is enforced HERE, in the
+ * one place every write goes through. Approval, scheduling and publication live in
+ * `status`, `approved_at`, `scheduled_slot` and `published_at`; none of them is writable
+ * from this module, and a patch body naming any other column throws before it is sent.
+ */
+const WRITABLE = ['image_bucket_path', 'evidence'];
+
+function assertWriteScope(body) {
+  const keys = Object.keys(body || {});
+  const bad = keys.filter((k) => !WRITABLE.includes(k));
+  if (bad.length) {
+    throw new Error(`REFUSING WRITE: this module may only set ${WRITABLE.join(', ')} — `
+      + `patch body also named ${bad.join(', ')}. Approval/scheduling/publication are not `
+      + 'this job\'s to move.');
+  }
+  return body;
+}
+
+// ── BOUNDED RETRY ──────────────────────────────────────────────────────────────────────
+// The ladder and the due-predicate live in lib/maps-capture-binding.js, NOT here. They are
+// the answer to "which drafts does a run touch", which has to be identical in the runner
+// and in anything that audits the queue — and a predicate that only exists inside a script
+// that imports playwright and calls main() at module load cannot be executed by a test.
+// Taking them from the shipped module is what makes the retry behaviour provable offline.
+const { MAX_ATTEMPTS, INELIGIBLE_RETRY_HOURS } = HS.MAPS_CAPTURE_RETRY;
+const nextAttemptAt = (attempts) => HS.mapsCaptureNextAttemptAt(attempts);
+
+/**
+ * Drafts that need a capture on THIS run, newest first, hard-capped at LIMIT.
+ *
+ * DUPLICATE PROTECTION IS THE BINDING KEY, not the presence of a path. A draft whose
+ * stored image is bound to its current inputs is skipped — that is the common case and it
+ * costs one comparison, no browser and no request. A draft whose inputs have MOVED is
+ * re-selected even though it has a path, which is the case the old selector could not see.
+ *
+ * The read is deliberately wider than the work: PostgREST cannot express "capture_key
+ * inside evidence differs from a value computed in JS", so the filtering that needs the
+ * shipped classifier happens here, and LIMIT is applied AFTER it. `--ids` bypasses the
+ * retry clock (an operator naming a row has already decided) but never the write scope.
+ */
+async function selectDrafts() {
   const idFilter = ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '';
-  return api('social_posts?select=id,zip,post_text,evidence,image_bucket_path,status,content_family'
-    + `&content_family=eq.MAPS&status=eq.draft&image_bucket_path=is.null${idFilter}`
+  const rows = await api('social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family'
+    + `&content_family=eq.MAPS&status=eq.draft${idFilter}`
     // Newest first. A freshly generated candidate is the one worth a picture, and it is also
     // the one most likely to be in its ZIP's authoritative set — the two moved together.
-    + `&order=created_at.desc&limit=${LIMIT}`);
+    + '&order=created_at.desc&limit=500');
+
+  const now = Date.now();
+  const due = [];
+  const skipped = { bound: 0, backoff: 0, exhausted: 0 };
+  for (const d of rows) {
+    // THE SHIPPED PREDICATE, not a second opinion about it.
+    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0 });
+    if (!verdict.due) {
+      // Reported separately so "already has its picture", "waiting out a backoff" and "has
+      // burned its attempt budget" never read as one number.
+      if (Object.prototype.hasOwnProperty.call(skipped, verdict.skip)) skipped[verdict.skip]++;
+      continue;
+    }
+    due.push(d);
+    if (due.length >= LIMIT) break;
+  }
+  console.log(`maps-social-image: ${rows.length} MAPS draft(s) read · `
+    + `${skipped.bound} already bound · ${skipped.backoff} inside backoff · `
+    + `${skipped.exhausted} past ${MAX_ATTEMPTS} attempts (long floor) · ${due.length} due this run`);
+  return due;
 }
 
 /**
@@ -483,10 +552,14 @@ async function upload(objectPath, file) {
 
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
-  const drafts = await pendingDrafts();
-  console.log(`maps-social-image: ${drafts.length} MAPS draft(s) without a project-specific visual`);
-  if (has('--list')) { for (const d of drafts) console.log(` ${d.id} zip=${d.zip} ${d.evidence?.project_name}`); return; }
-  if (!drafts.length) return;
+  const drafts = await selectDrafts();
+  if (has('--list')) {
+    for (const d of drafts) {
+      console.log(` ${d.id} zip=${d.zip} state=${HS.mapsCaptureState(d)} ${d.evidence?.project_name}`);
+    }
+    return;
+  }
+  if (!drafts.length) { await proveNothingApproved(); return; }
 
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
@@ -499,14 +572,24 @@ async function main() {
   for (const d of drafts) {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
-    if (!pid) { results.push({ id: d.id, label, ok: false, reason: 'draft carries no project_id' }); continue; }
+
+    // EVERY REFUSAL IS RECORDED ON THE ROW. Five of these branches used to `continue`
+    // silently, writing nothing — so the draft carried no state, no attempt count and no
+    // retry clock, and a recurring job would have re-selected it on every single fire. An
+    // unrecorded refusal is also indistinguishable from a draft nothing has looked at yet.
+    const ineligible = async (why) => {
+      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why });
+      if (!DRY) await recordOutcome(d, INELIGIBLE, why, null);
+    };
+
+    if (!pid) { await ineligible('the draft carries no project_id, so there is nothing to photograph'); continue; }
 
     const proj = await liveProject(pid);
-    if (!proj) { results.push({ id: d.id, label, ok: false, reason: 'project row no longer in app_projects' }); continue; }
-    if (proj.record_kind !== 'development') { results.push({ id: d.id, label, ok: false, reason: 'not a development record' }); continue; }
-    if (proj.lat == null || proj.lng == null) { results.push({ id: d.id, label, ok: false, reason: 'project has no coordinates' }); continue; }
+    if (!proj) { await ineligible('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await ineligible('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await ineligible('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      results.push({ id: d.id, label, ok: false, reason: 'live coordinates differ from the draft evidence' });
+      await ineligible('the live coordinates differ from the draft evidence, so a capture would not be of this draft');
       continue;
     }
 
@@ -515,8 +598,7 @@ async function main() {
       const why = auth.status !== 'boundary_complete'
         ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      results.push({ id: d.id, label, ok: false, reason: why });
-      if (!DRY) await recordFailure(d, why);
+      await ineligible(why);
       continue;
     }
 
@@ -529,23 +611,81 @@ async function main() {
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
     if (!r.ok) {
-      results.push({ id: d.id, label, ok: false, reason: r.reason, theme });
-      if (!DRY) await recordFailure(d, r.reason, theme);
+      results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme });
+      if (!DRY) await recordOutcome(d, FAILED, r.reason, theme);
       continue;
     }
 
-    const objectPath = `maps/${d.zip}/${String(proj.id)}.png`;
-    if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, file: r.file, marker: r.marker }); continue; }
+    // THE OBJECT PATH CARRIES THE BINDING KEY'S OWN FINGERPRINT, so a re-capture after the
+    // draft moved writes a NEW object instead of silently overwriting the old one through
+    // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the
+    // picture changes, which is what makes the dashboard's per-row blob cache correct; and
+    // the superseded image survives, so a capture can be compared with the one it replaced.
+    const objectPath = `maps/${d.zip}/${String(proj.id)}-${keyStamp(d)}.png`;
+    if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file, marker: r.marker }); continue; }
     r.authMarkers = auth.markers;
     await upload(objectPath, r.file);
     await attach(d, objectPath, r, proj);
-    results.push({ id: d.id, label, ok: true, path: objectPath, marker: r.marker, framed: r.framed });
+    results.push({ id: d.id, label, ok: true, state: READY, path: objectPath, marker: r.marker, framed: r.framed });
   }
 
   await browser.close();
   console.log(JSON.stringify(results, null, 2));
   const okN = results.filter((x) => x.ok).length;
-  console.log(`maps-social-image: ${okN} real map visual(s), ${results.length - okN} honest failure(s)`);
+  const byState = (s) => results.filter((x) => x.state === s).length;
+  console.log(`maps-social-image: ${okN} real map visual(s) · ${byState(FAILED)} capture failure(s) · `
+    + `${byState(INELIGIBLE)} ineligible — none of which is a finding about a ZIP`);
+  if (!DRY) await proveNothingApproved(results.map((x) => x.id));
+}
+
+/**
+ * A short, stable stamp of the binding key for use inside an object name.
+ *
+ * Object paths are not a place for a 120-character readable key, so this is the one spot
+ * where a digest is right. It is NOT the binding record — `evidence.visual.capture_key`
+ * holds the readable key and is what every comparison uses. This only has to make two
+ * different keys produce two different file names.
+ */
+function keyStamp(draft) {
+  const key = HS.mapsCaptureKey(draft) || '';
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < key.length; i++) {
+    h1 = Math.imul(h1 ^ key.charCodeAt(i), 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + key.charCodeAt(i), 0x85ebca6b) >>> 0;
+  }
+  return (h1.toString(36) + h2.toString(36)).slice(0, 12);
+}
+
+/**
+ * RE-READ THE ROWS THIS RUN TOUCHED AND PROVE IT MOVED NOTHING IT MAY NOT MOVE.
+ *
+ * `assertWriteScope` refuses a bad patch body before it is sent; this asks the DATABASE
+ * afterwards, which is the only instrument that can catch a write this module did not know
+ * it made.
+ *
+ * ⚠️ SCOPED TO THE ROWS THIS RUN TOUCHED, NEVER TO THE WHOLE QUEUE. Asserting that NO MAPS
+ * row anywhere carries approval state would be true today — 0 of 49 are approved — and
+ * would turn this job red the first time the founder legitimately approves one. A guard
+ * that fails on the system working correctly gets switched off, and then it is not a guard.
+ * The selector only ever returns `status=draft`, so every id here was a draft before the
+ * run; still being one after it is the actual invariant.
+ *
+ * It RAISES. A capture job that has approved something has done the one thing the hold
+ * exists to prevent, and a green run that merely mentioned it in a log would be worse than
+ * a red one.
+ */
+async function proveNothingApproved(ids) {
+  if (!ids || !ids.length) { console.log('maps-social-image: approval-scope check — 0 rows touched, nothing to re-read'); return; }
+  const rows = await api('social_posts?select=id,status,approved_at,scheduled_slot,published_at'
+    + `&id=in.(${ids.join(',')})&limit=500`);
+  const moved = rows.filter((r) => r.status !== 'draft' || r.approved_at || r.scheduled_slot || r.published_at);
+  console.log(`maps-social-image: approval-scope check re-read ${rows.length} touched row(s) — `
+    + `${moved.length} left draft state`);
+  if (moved.length) {
+    for (const m of moved) console.error(`  ${m.id} status=${m.status} approved_at=${m.approved_at} scheduled=${m.scheduled_slot} published=${m.published_at}`);
+    throw new Error('REFUSING TO REPORT SUCCESS: a row this capture run touched no longer '
+      + 'reads as a draft. Capture must never move approval, scheduling or publication.');
+  }
 }
 
 /** Attach the image to THIS draft and record what the visual actually is. */
@@ -600,31 +740,72 @@ async function attach(draft, objectPath, r, proj) {
       + 'radius ring and no home marker, and both absences are asserted before the shutter. '
       + 'Surrounding development is left visible. Nothing is drawn, moved or invented.',
   };
+  // THE BINDING RECORD. `capture_key` is what every later reader compares against the
+  // draft's own inputs, so the picture can never quietly outlive the draft it was taken
+  // for. `state` is the founder-facing fact; the historical `status` literal is kept above
+  // so nothing that already tests for REAL_MAP_VISUAL changes behaviour.
+  visual.state = READY;
+  visual.capture_key = HS.mapsCaptureKey(draft);
+  visual.attempts = 0;
+  visual.next_attempt_at = null;
+  // A success clears the previous failure text rather than leaving it beside a real image,
+  // where the next reader would have to work out which one is current.
+  delete visual.failure_reason;
+  delete visual.failed_at;
+
   await api(`social_posts?id=eq.${draft.id}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
+    body: JSON.stringify(assertWriteScope({
       image_bucket_path: objectPath,
       evidence: { ...(draft.evidence || {}), visual },
-    }),
+    })),
   });
 }
 
-/** A failure is recorded on the draft; the factual text/link draft is left intact. */
-async function recordFailure(draft, reason, theme) {
+/**
+ * Record a non-success on the draft. The factual text/link draft is left intact.
+ *
+ * FAILED and INELIGIBLE are written as different states with different retry clocks,
+ * because they are different facts: one says our instrument did not work, the other says
+ * this project cannot be photographed on its ZIP page as things stand. Neither is ever a
+ * statement that the ZIP has no development — see the copy in lib/maps-capture-binding.js.
+ */
+async function recordOutcome(draft, state, reason, theme) {
   const prev = draft.evidence || {};
+  const prevVisual = prev.visual || {};
+  // An ineligible outcome does not burn an attempt: attempts measure how often our capture
+  // was tried and failed, and no number of retries fixes a project that is not in the ZIP's
+  // authoritative set. It gets the long floor instead.
+  const attempts = state === FAILED ? ((prevVisual.attempts || 0) + 1) : (prevVisual.attempts || 0);
+  const nextAt = state === FAILED
+    ? nextAttemptAt(attempts)
+    : new Date(Date.now() + INELIGIBLE_RETRY_HOURS * 3600 * 1000).toISOString();
   await api(`social_posts?id=eq.${draft.id}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
+    body: JSON.stringify(assertWriteScope({
       evidence: {
         ...prev,
         visual: {
-          ...(prev.visual || {}),
+          ...prevVisual,
+          state,
+          attempts,
+          next_attempt_at: nextAt,
+          // The draft's inputs AT THE MOMENT OF THE REFUSAL. If they move, the key moves,
+          // and the row is re-selected immediately instead of waiting out a backoff that
+          // was set against a state of the world that no longer holds.
+          attempted_key: HS.mapsCaptureKey(draft),
           status: 'NO_PROJECT_SPECIFIC_VISUAL',
           failure_reason: reason,
           failed_at: new Date().toISOString(),
           theme: theme || null,
+          // ONE SENTENCE THAT NAMES THE INSTRUMENT, stored beside the reason so the
+          // distinction survives into anything that later reads this row. Neither state's
+          // copy can be read as "no data centres here": that inference is exactly what a
+          // conflated failure state invites, and it would be a claim about the world
+          // manufactured out of a screenshot that did not happen.
+          state_note: HS.mapsCaptureStateCopy(state),
           // THE FALLBACK SENTENCE IS NOT TRUE OF A THEME POST, so it is not written for one.
           // A MAPS · Data Center Theme post publishes the Map 1 capture or it does not
           // publish: its hook asks about a data centre, and a generic OpenGraph card shows
@@ -639,7 +820,7 @@ async function recordFailure(draft, reason, theme) {
               + 'publication fallback and is NOT a project-specific map preview.',
         },
       },
-    }),
+    })),
   });
 }
 

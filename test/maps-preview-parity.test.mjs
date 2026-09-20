@@ -71,8 +71,18 @@ ok('the Approve button renders LOCKED for an image-bearing MAPS draft',
 // handler kept calling an empty gate.
 ok('the click handler re-checks the gate (button state alone is not the control)',
   /var block=bskyApprovalBlockReason\(gr\);[\s\S]{0,120}?if\(block\)\{[\s\S]{0,80}?return;/.test(DASH));
+// ⚠️ THE WINDOW WAS THE BUG, NOT THE RULE. This pinned the rule within 1,600 characters of
+// the function's opening brace; adding two earlier checks to the same gate in 2026-09
+// pushed it past that and turned the line red while the rule sat there untouched. A pin
+// whose failure mode is "someone added code above it" reports edits, not regressions. It
+// now extracts the function's actual body and asks whether the rule is IN it, which is the
+// property the line was always trying to state.
+const gateBody = (() => {
+  const m = DASH.match(/function bskyApprovalBlockReason\(p\)\{([\s\S]*?)\n  \}/);
+  return m ? m[1] : '';
+})();
 ok('…and the shared gate still carries the original image rule',
-  /function bskyApprovalBlockReason\(p\)\{[\s\S]{0,1600}?mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(DASH));
+  gateBody.length > 0 && /mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(gateBody));
 ok('the gate is scoped to MAPS and does not touch ALERTS',
   /content_family === 'MAPS' && p\.image_bucket_path/.test(DASH));
 

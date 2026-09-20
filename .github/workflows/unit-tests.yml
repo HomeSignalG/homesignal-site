@@ -29,7 +29,7 @@ on:
       # on a PR that only arms a capture, so branch protection blocks it forever --
       # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
       # job, no schedule, no step, no behaviour change.
-      - '.github/maps-social-arm'
+      - '.github/maps-social-capture'
       - '.github/workflows/unit-tests.yml'
   pull_request:
     paths:
@@ -56,7 +56,7 @@ on:
       # on a PR that only arms a capture, so branch protection blocks it forever --
       # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
       # job, no schedule, no step, no behaviour change.
-      - '.github/maps-social-arm'
+      - '.github/maps-social-capture'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 

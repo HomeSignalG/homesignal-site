@@ -168,8 +168,14 @@ ok(/function bskyApprovalBlockReason/.test(DASH),
   '6: ONE function decides whether approval is allowed');
 ok(/var block=bskyApprovalBlockReason\(gr\);\s*if\(block\)\{ alert\(block\); return; \}/.test(DASH.replace(/\n\s*/g, ' ')),
   '6: the click handler refuses through that same one function — button and handler cannot disagree');
-ok(/dcThemeImageMandatory\(row\) && !row\.image_bucket_path/.test(DASH),
-  '6: a theme post with NO capture can never unlock approval');
+// ⚖️ WIDENED 2026-09-20 from `!row.image_bucket_path` to `!bskyCaptureBound(row)`. The
+// original pin was correct and too weak: it caught "no capture at all" and missed a capture
+// taken for DIFFERENT draft details, which is the worse case because it RENDERS — the
+// founder would see a real Map 1 screenshot and approve a picture of an older version of
+// the draft. The assertion's own sentence is unchanged because its intent never moved; only
+// the definition of "no capture" got stricter.
+ok(/dcThemeImageMandatory\(row\) && !bskyCaptureBound\(row\)/.test(DASH),
+  '6: a theme post with no BOUND capture can never unlock approval');
 ok(/mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(DASH),
   '6: an attached image must have RENDERED before approval, as before');
 
