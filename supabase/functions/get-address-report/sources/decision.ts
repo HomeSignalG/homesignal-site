@@ -196,20 +196,37 @@ export function decisionEvidenceLevel(entry: {
  * this is a function rather than a `status === 'Proposed'` test repeated per surface.
  *
  * Accepts a loose row so the same function serves an engine site object, a connector
- * record and an `app_projects` row without three spellings of one rule. */
+ * record, a resolved marker item and an `app_projects` row without four spellings of one
+ * rule.
+ *
+ * ⚠️ FIELD PRECEDENCE IS LOAD-BEARING, BECAUSE `type` MEANS TWO DIFFERENT THINGS.
+ * On a connector record and an engine area site, `type` is the LIFECYCLE
+ * ("proposed"|"approved"|"built"). On a marker item built by HS.trackerSiteItem it is the
+ * project CATEGORY ("Data center"), and the lifecycle lives in `lifecycleBucket`/`status`.
+ * Reading `type` first therefore answered "is a data centre a proposal?" — no — and
+ * silently reported every live marker as not-active. Caught by
+ * test/decision-vocabulary-parity.test.mjs before it shipped. Unambiguous fields first,
+ * the overloaded one last. */
 export function isActiveUndecided(row: {
   decision?: unknown;
   decided?: unknown;
   status?: unknown;
   type?: unknown;
   bucket?: unknown;
+  lifecycleBucket?: unknown;
 } | null | undefined): boolean {
   const r = row ?? {};
-  if (r.decision) return false;                       // a recorded decision ends it
+  // ANY decision object ends it, well-formed or not. Deliberately not routed through a
+  // validator: a malformed `decision` means something tried to record one, and counting
+  // that row as a live proposal is the failure direction that reaches a resident. The
+  // validator's job is the opposite one — refusing to RENDER an unsourced notation.
+  if (r.decision) return false;
   if (r.decided === true || r.decided === "true") return false;
   // `app_projects` spelling: the materializer writes 'Decided' whenever the site says so.
   if (String(r.status ?? "").trim().toLowerCase() === "decided") return false;
-  const stage = String(r.bucket ?? r.type ?? r.status ?? "").trim().toLowerCase();
+  const stage = String(
+    r.bucket ?? r.lifecycleBucket ?? r.status ?? r.type ?? "",
+  ).trim().toLowerCase();
   return stage === "proposed";
 }
 
