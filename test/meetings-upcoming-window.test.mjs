@@ -85,10 +85,17 @@ ok(admits(c21, '2026-09-21T23:00:00+00:00'), '§2j a stated evening time today i
 
 // -------------------------------------------------------------- JS call sites (2 of 3) ----
 const js = stripJs(dataSrc);
+// THREE lower bounds now: meetings() upcoming, meetings() recent fallback, and
+// meetingsForZips(). The fallback is the only one keyed on `since` rather than the
+// cutoff, and it is the only one carrying an UPPER bound — which is what keeps it from
+// ever returning a future meeting. All three still resolve from the one boundary.
 const jsWindows = js.match(/\.gte\(\s*'meeting_date'[^)]*\)/g) || [];
-ok(jsWindows.length === 2, `§3a exactly 2 JS meeting windows (found ${jsWindows.length})`);
-ok(jsWindows.every((w) => w.includes('upcomingCutoffIso')),
-   '§3b BOTH JS call sites use the shared boundary');
+ok(jsWindows.length === 3, `§3a exactly 3 JS meeting lower bounds (found ${jsWindows.length})`);
+ok(jsWindows.filter((w) => /upcomingCutoffIso\(\)|cutoff/.test(w)).length === 2,
+   '§3b both FORWARD call sites use the shared boundary');
+ok(/const cutoff = upcomingCutoffIso\(\);/.test(js), '§3b2 meetings() derives its cutoff once');
+ok(/\.gte\('meeting_date', since\)\s*\.lt\('meeting_date', cutoff\)/.test(js),
+   '§3b3 the recent fallback is bounded ABOVE by that same cutoff');
 ok(!/\.gte\(\s*'meeting_date'\s*,\s*new Date\(\)/.test(js),
    '§3c no JS call site compares meeting_date against a raw instant');
 

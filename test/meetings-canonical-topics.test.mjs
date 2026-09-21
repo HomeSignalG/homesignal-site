@@ -50,7 +50,7 @@ ok(/from\('meetings'\)[\s\S]*\.in\('community_id', ids\)/.test(q),
 // yesterday and a 2020 archive row are both excluded, across all three call sites and
 // both languages. `meeting_date` is a DATE (96.3% of rows sit at a local midnight), so
 // comparing it to now() dropped TODAY's meetings at local midnight — before they happened.
-ok(/\.gte\('meeting_date', upcomingCutoffIso\(\)\)/.test(q),
+ok(/const cutoff = upcomingCutoffIso\(\);/.test(q) && /\.gte\('meeting_date', cutoff\)/.test(q),
   'only UPCOMING meetings (meeting_date >= the viewer\'s calendar date)');
 ok(/\.order\('meeting_date', \{ ascending: true \}\)/.test(q),
   'ordered by meeting_date ascending (soonest first)');
