@@ -275,7 +275,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
      because the binding key includes the theme, which that lib derives. -->
 <script src="lib/maps-capture-policy.js?v=b9e57bde"></script>
-<script src="lib/maps-capture-binding.js?v=c32f73f5"></script>
+<script src="lib/maps-capture-binding.js?v=5f11ea3e"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -1121,8 +1121,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         row('Dedupe identity', e.dedupe_key)+
         row('Visual', (e.visual&&e.visual.status)||'none')+
         (e.visual&&e.visual.note?('<div class="muted" style="margin-top:4px">'+esc(e.visual.note)+'</div>'):'')+
+        // ⚠️ THE ZIP COMES FROM THE ROW COLUMN, NOT FROM THE EVIDENCE COPY.
+        // `social_posts.zip` is the authoritative, non-null, first-class ZIP (59 of 59 in
+        // production). `evidence.map_zip` is a redundant copy that the absence branch did
+        // not write, so this line rendered a blank label for every absence draft while the
+        // real value sat in a column the card was not reading. A redundant copy is fine as
+        // a receipt; it is not fine as the thing a human reads. `map_zip_label` is still
+        // preferred because it carries the PLACE NAME — the label the town hashtag was
+        // derived from — and `p.zip` is the floor beneath it, never a blank.
         (e.map_destination?('<div><span class="muted">Map 1 destination:</span> <a href="'+esc(e.map_destination)+
-          '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||e.map_zip)+' ↗</a></div>'):'')+
+          '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||p.zip||'')+' ↗</a></div>'):'')+
         (e.geography_note?('<div style="margin-top:6px;color:var(--muted);border-left:3px solid var(--persist);'+
           'padding-left:8px">'+esc(e.geography_note)+'</div>'):'')+
       '</div></details>';
@@ -1715,8 +1723,41 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       ? { post_text:next, status:'draft', scheduled_slot:null, approved_at:null }
       : { post_text:next };
     try{
-      var r=await window.hsClient.from('social_posts').update(body).eq('id',bskyEditId);
+      // ── OPTIMISTIC CONCURRENCY. THE DATABASE DECIDES, ATOMICALLY WITH THE WRITE. ──────
+      // `wasApproved` is read from the row this modal LOADED, and a founder can leave an
+      // editor open for minutes while a recompose run rewrites the copy or an approval
+      // lands. Keying the write on `id` alone lets this overwrite whatever the row became.
+      //
+      // ⚠️ TWO PREDICATES, BECAUSE NEITHER ONE COVERS THE OTHER — measured, not assumed.
+      // `social_posts_bump_revision` bumps `revision` only when the PAYLOAD moves
+      // (post_text / embed / image / source_url / hashtags / evidence), by design, so that
+      // a metrics refresh does not force a re-review. A pure draft -> approved flip
+      // therefore leaves `revision` UNCHANGED. So:
+      //   • revision  catches "someone rewrote the text under me" (recompose, refresh job)
+      //   • status    catches "someone approved it under me" (the approval race)
+      // The status expected is the one this modal was opened against: an approved row is
+      // being deliberately withdrawn to draft, a draft row must still be a draft.
+      //
+      // This is the same shape the capture job already uses
+      // (`?id=eq.<id>&status=eq.draft&revision=eq.<n>`) — consistent, not novel.
+      //
+      // `.select('id')` is load-bearing: without a returned representation a PATCH that
+      // matched NOTHING and one that changed the row are indistinguishable, and the modal
+      // would report a save it never performed.
+      var q=window.hsClient.from('social_posts').update(body)
+        .eq('id',bskyEditId)
+        .eq('status', wasApproved?'approved':'draft');
+      if(row && typeof row.revision==='number') q=q.eq('revision', row.revision);
+      var r=await q.select('id');
       if(r.error){ alert('Edit failed: '+(r.error.message||'')); return; }
+      if(!r.data || !r.data.length){
+        alert('NOTHING WAS SAVED — this post changed while the editor was open.\n\n'
+          + 'It was approved, published, or rewritten by a refresh since you opened it, so '
+          + 'your text was NOT written over the newer version.\n\n'
+          + 'The list will reload; re-open the post and re-apply your edit if you still '
+          + 'want it.');
+        closeBskyEdit(); refreshBluesky(); return;
+      }
       var chk=await window.hsClient.rpc('hs_social_claim_check',{p_id:bskyEditId});
       if(!chk.error && chk.data && chk.data.length){
         alert('Saved \u2014 and this text does NOT satisfy the claim contract, so it cannot '
