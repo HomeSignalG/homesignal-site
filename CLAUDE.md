@@ -267,6 +267,60 @@ committable can fix that** — the loadable paths (`/home/user/.claude/`, `$HOME
 lie outside both repos and are recreated empty in every container. Adding entries to
 `permissions.allow` cannot help a file that never loads.
 
+🛑 **CORRECTED 2026-09-21, same day — THE THREE REMEDIES BELOW ARE RANKED BACKWARDS, AND TWO
+OF THEM CANNOT WORK IN A CLOUD SESSION.** The two-repo cwd cause above is right and is
+unchanged; only the remedies were wrong. Quoted rather than recalled
+(`code.claude.com/docs/en/settings#settings-in-cloud-sessions` and `…/permission-modes`,
+read 2026-09-21):
+
+- ⛔ **Remedy 1 (setup script writing `$HOME/.claude/settings.json`) CANNOT WORK.** *"**User
+  and project local settings** (`~/.claude/settings.json` and `.claude/settings.local.json`):
+  **not read.**"* A cloud session does not read user settings at all, so writing that file at
+  container start changes nothing — and it is billed below as *"the only durable one"*.
+- ⛔ **Remedy 2 (set the mode to Bypass permissions) DOES NOT EXIST HERE.** *"**Cloud
+  sessions**: Accept edits, Plan, and Auto. … **Bypass permissions isn't available.**"*
+  Founder screenshot 2026-09-21 agrees: the opened dropdown offers exactly `Auto` /
+  `Accept edits` / `Plan`. **There is no founder click to ask for**, so "only the founder can
+  do it" describes an action nobody can take.
+- ✅ **Remedy 3 IS THE DOCUMENTED BEHAVIOUR, NOT A HYPOTHESIS.** *"**Shared project
+  settings** (`.claude/settings.json`): **read in a session with one repository**, because
+  the file is part of the clone and the session starts inside it. … A session with several
+  repositories starts above the clones, so … it loads only the plugins and marketplaces the
+  file declares, **not permission rules**, hooks, `env`, or other keys."* The ⚠️ HYPOTHESIS
+  caveat below is lifted — it is the one remedy that works, and it was ranked last.
+- 🔑 **`defaultMode` IS NOT THE LOAD-BEARING KEY IN THOSE FILES — `permissions.allow` IS.**
+  *"Cloud sessions don't honor `defaultMode: \"bypassPermissions\"` or `\"dontAsk\"` from your
+  settings files, so a repository's checked-in settings can't start a cloud session in
+  bypass-permissions mode. **The setting is ignored silently.**"* So the `defaultMode` line
+  both repos ship has never done anything in a cloud session, in **any** session shape — not
+  merely in the two-repo one. The opening paragraph of this section credits it; read that
+  paragraph as the allow-list alone.
+
+✅ **THE UNKNOWN THIS SECTION LEAVES OPEN IS ANSWERED — in auto mode, a loaded allow rule
+DOES govern.** *"Each action goes through a fixed decision order. The first matching step
+wins: 1. Actions matching your allow, ask, or deny rules **resolve immediately**"* — ahead of
+the classifier, with four listed exceptions (protected-path writes and critical-path `rm`;
+`requiresUserInteraction` MCP tools and org-`ask` connector tools; shell commands carrying
+per-command allowed domains; ask rules matching on command content). `mcp__Supabase__*` is
+none of them. So the retraction below is **right** that the ~8 denials were fully explained
+by "nothing was loaded", and the question it correctly refused to answer now has a documented
+answer: **the classifier does not override a loaded allow rule.** Auto mode is the intended
+cloud mode; leave it selected.
+
+⚖️ **THE OPERATIONAL RULE, replacing the ranking below: OPEN THE SESSION ON ONE REPO, THEN
+`add_repo` THE OTHER.** Start on `homesignal-site` alone → cwd IS the repo → its
+`permissions.allow` loads → Supabase stops prompting → then attach `homesignal-ingest`
+mid-session. **Rules already in effect are not unloaded by a later `add_repo`**, so "both
+repos AND no prompts" is reachable; attaching both AT CREATION is what forfeits it.
+
+⛔ **Two further measured non-fixes, so neither is retried:** widening `permissions.allow`
+(the `mcp__Supabase__*` wildcard AND `execute_sql` by name are already present — an unloaded
+file cannot be repaired by adding to it), and asking Claude to write a settings file (the
+auto-mode classifier refuses it as `[Self-Modification]`, which is correct and must not be
+worked around).
+
+*(Retained below as the dated receipt of the first ranking. **Do not follow items 1 and 2.**)*
+
 **The three remedies, in order of durability:**
 1. **Environment setup script (the only durable one).** Have the environment write
    `$HOME/.claude/settings.json` at container start with `defaultMode: bypassPermissions`
@@ -389,6 +443,16 @@ brand-new DB row is immediately reachable by `?id=`, `?zip=`, and — once it ha
 **Step 0 — the first minute: front-load all permissions.** Handle these once, up front,
 then run with no prompts (this is the whole point — the build must run unattended /
 overnight). Self-check: `cat .claude/settings.json`.
+- 🛑 **CORRECTED 2026-09-21 — OPEN THE SESSION ON *ONE* REPO, THEN `add_repo` THE OTHER.**
+  The two bullets below are backwards and are retained as the dated receipt. A cloud session
+  with **several** repositories starts ABOVE the clones and loads **no permission rules** from
+  either `.claude/settings.json`; with **one** it loads them (documented, not a hypothesis) and
+  Supabase stops prompting. **`defaultMode: bypassPermissions` is ignored silently in cloud
+  sessions** and "Bypass permissions" is not offered in the web mode picker at all — so there
+  is nothing to set manually, and `permissions.allow` is the load-bearing half of those files.
+  A later `add_repo` does not unload rules already in effect, so **start on `homesignal-site`
+  alone, then attach `homesignal-ingest`** — both repos AND no prompts. Quotes and the four
+  measured non-fixes: the Supabase standing-access section above. *(Retained, do not follow:)*
 - **Permission mode = Bypass permissions.** This repo ships `.claude/settings.json`
   (`defaultMode: bypassPermissions` + allow-list), so a **fresh** session starts clean.
   If already mid-session, set the web-UI mode to Bypass manually — a committed file
