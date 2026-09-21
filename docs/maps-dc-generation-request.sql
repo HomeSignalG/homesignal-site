@@ -24,11 +24,19 @@
 --
 -- 🔑 WHAT CHANGED HERE IS ONE DISPATCH INPUT, AND THAT IS THE WHOLE POINT. The refresh is
 -- implemented where the composer already lives (homesignal-ingest
--- bluesky/lib/maps-refresh.mjs, shared by the generator AND the standalone
+-- bluesky/lib/recompose-gate.mjs::disposeRow, shared by the generator AND the standalone
 -- recompose-maps-drafts workflow so the two cannot disagree). This file gained
 -- `'refresh', 'true'` in the inputs object and NOTHING ELSE — no new table, no new
 -- function, no second dispatch, no copy rule. A privileged SQL path is the wrong place to
 -- decide what a post says.
+--
+-- ⚠️ THAT MODULE NAME CHANGED AFTER THIS FILE WAS FIRST WRITTEN, and the reason matters.
+-- This comment named `bluesky/lib/maps-refresh.mjs::refreshDraft`, a module the same
+-- session added — and homesignal-ingest #537 had independently merged the SAME
+-- abstraction, `recompose-gate.mjs::disposeRow`, strictly stronger because it runs MAPS
+-- eligibility BEFORE the composer. The duplicate was deleted in #540 and the generator
+-- rewired onto #537's gate. Nothing in THIS file changed as a result; only the name of
+-- the thing it points at.
 --
 -- ⚠️ WHY THE INPUT IS SENT EXPLICITLY WHEN THE WORKFLOW ALREADY DEFAULTS IT TO TRUE. A
 -- workflow default is editable in the other repo without this file changing, so a silent
@@ -37,13 +45,20 @@
 -- that omits it (an API caller, or a human using the Actions tab).
 --
 -- ⚠️ THE REFRESH'S OWN SAFETY IS THE SCRIPT'S CONTRACT, NOT A PROMISE MADE HERE, and it is
--- narrower than the create path's: `refreshDraft` returns SKIPPED_NON_DRAFT for any row
--- whose status is not `draft`, so an APPROVED, SCHEDULED or PUBLISHED payload is never
--- rewritten — the founder approved specific words and they are not ours to change
+-- narrower than the create path's: `disposeRow` returns the `non_draft` disposition for
+-- any row whose status is not `draft`, so an APPROVED, SCHEDULED or PUBLISHED payload is
+-- never rewritten — the founder approved specific words and they are not ours to change
 -- afterwards. The patch it produces has exactly three keys (post_text, hashtags, and the
 -- evidence claim block, merged); it touches no status, no schedule, no screenshot binding.
--- Pinned by homesignal-ingest tests/test_maps_refresh_outcomes.mjs §5/§23 and
--- tests/test_maps_founder_zip_order.mjs §24-26b.
+--
+-- 🔒 AND THAT REFUSAL IS IN THE WRITE, NOT ONLY IN THE DECISION. `disposeRow` judges
+-- status from the row read at the START of the run, and a curated run takes about a
+-- minute — so the founder approving a draft in that window is the single most likely
+-- thing for them to be doing while this button's run is in flight. Both write paths send
+-- `?id=eq.<id>&status=eq.draft` with `return=representation`, so the DATABASE refuses a
+-- raced row atomically and the run REPORTS it rather than counting a refresh it never
+-- performed. Pinned by homesignal-ingest tests/test_maps_recompose_eligibility.mjs,
+-- tests/test_publish_binding.mjs §10 and tests/test_maps_founder_zip_order.mjs §24-26b/§27.
 --
 -- WHY AN RPC AND NOT AN EDGE FUNCTION. acquisition.html already reaches the server
 -- through SECURITY DEFINER RPCs for every privileged action it takes
@@ -226,30 +241,43 @@ $function$;
 grant execute on function public.hs_request_maps_dc_generation() to authenticated;
 grant execute on function public.hs_maps_dc_generation_status() to authenticated;
 
--- ── ⚠️ THE 2026-09-21 AMENDMENT IS **NOT APPLIED** ──────────────────────────
--- This file is the DDL of record and it now describes a function body that differs from
--- the live one by one jsonb key. `create or replace function` is idempotent and the whole
--- file is replayable, but NOTHING HERE HAS BEEN RUN: applying a production migration was
--- not authorized for this change, so the live RPC still dispatches without `refresh`.
+-- ── ✅ THE 2026-09-21 AMENDMENT IS APPLIED ────────────────────────────
+-- Migration `maps_dc_generation_request_refresh_input_20260921`, version 20260921161153,
+-- applied from THIS file. `hs_maps_dc_generation_status()` was not touched (md5
+-- `44480c69095567b7176179a7d12e3248` before and after).
 --
--- WHAT THAT MEANS IN PRACTICE, stated so nobody reads the button as fixed: until this is
--- applied, the dashboard's Generate click dispatches with three inputs, the workflow's own
--- `refresh` default (true) governs, and the refresh therefore ALREADY HAPPENS. The apply
--- is what makes the intent explicit at the call site rather than dependent on a default in
--- another repo — see the note on that at the top. So the order of operations is safe in
--- either sequence, and neither half silently disables the other.
+-- 🔑 THE FUNCTIONAL DELTA IS EXACTLY ONE jsonb KEY, AND THAT WAS PROVEN RATHER THAN
+-- ASSERTED — because the raw numbers said otherwise and would have read as a clean apply.
+-- `pg_get_functiondef` md5 `d83cf6576132352a67a20531005857dc` (2,283 chars) →
+-- `83bc3a5696caebc3b5c014108f2a950a` (3,753 chars): **+1,470 characters for a one-key
+-- change.** The cause is that the PREVIOUSLY applied body (migration 20260920160834) was
+-- comment-light, so replaying this file also brought ~1,451 characters of COMMENTS into
+-- the stored body — inert in plpgsql, but not "one key", and saying so would have been a
+-- naked assertion contradicted by the character count sitting beside it.
+--   The proof compares the BODY (`pg_proc.prosrc`, stored verbatim) with `--` comments
+--   stripped and whitespace collapsed: prior 1,775 chars / md5
+--   `42ed11d5f84f2f8791f00246fe1a90e7`; live 1,794 / `2d01689f7095b7758b0169abfd28eb64`.
+--   **+19 chars, exactly the length of `, 'refresh', 'true'`**, and excising precisely
+--   that string from the live code reproduces the prior md5 byte for byte.
+--   ⚠️ Do NOT run that comparison over `pg_get_functiondef`: it re-renders the HEADER in
+--   uppercase and as `TABLE(net_request_id ...)`, which shifts every token and reports a
+--   40-line "diff" that is entirely the instrument. The body is the only comparable half.
 --
--- ⚠️ AND THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: the vault secret
--- `github_actions_pat` is DEAD (HTTP 401 since 2026-09-15, per public.pipeline_health_check
--- and homesignal-ingest/CLAUDE.md). No dispatch of any shape succeeds until the founder
--- re-mints it. This amendment does not change that and does not work around it.
-
--- ── PROVEN AFTER APPLY, not asserted ────────────────────────────────────────
--- A non-admin caller (service role, auth.jwt() null -> email '') is REFUSED:
---   SQLSTATE 42501, 'not authorized'   [measured 2026-09-20]
--- The vault secret `github_actions_pat` EXISTS but is DEAD -- public.pipeline_health_check
--- reads github_credential ok=false, 'HTTP 401 Bad credentials', since 2026-09-15. So this
--- button reports `bad_credential` with that exact wording until the founder re-mints that
--- secret IN PLACE, at which point it starts working with NO code change. The existing
--- pipeline-health-monitor already alarms on that credential, so the button needs no
--- monitoring of its own.
+-- 🔑 THE ORDERING WAS NOT OPTIONAL, AND AN EARLIER NOTE IN THIS FILE HAD IT WRONG.
+-- That note said the two halves were "safe in either sequence". One direction is: with the
+-- SQL unapplied the button dispatches three inputs and the workflow's own `refresh`
+-- default (true) governs, so the refresh already happens. **The other direction breaks the
+-- button outright** — a `workflow_dispatch` carrying an input the target workflow does not
+-- DECLARE is rejected by GitHub with 422 "Unexpected inputs provided", and this RPC
+-- dispatches `ref: 'main'`. So the ingest side had to land first, and it did:
+-- `refresh:` is declared in `bluesky-generate-maps.yml` on `origin/main`
+-- (`type: boolean`, `required: false`, `default: true`), verified before this was applied
+-- and again after. The runner passes `--no-refresh` only when the input is literally
+-- "false", so an omitted key still refreshes.
+--
+-- ⚠️ THE BUTTON STILL DOES NOT WORK, AND THIS DID NOT CHANGE THAT.
+-- `vault.github_actions_pat` has returned HTTP 401 since 2026-09-15
+-- (`public.pipeline_health_check.github_credential`), so the `net.http_post` above fails
+-- for every dispatch shape. Only the founder can re-mint it. This apply makes the intent
+-- explicit at the call site instead of dependent on a default in another repo; it neither
+-- fixes nor works around the dead token.

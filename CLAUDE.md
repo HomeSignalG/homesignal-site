@@ -920,23 +920,39 @@ things and no more:**
      for anything held or awaiting a Map screenshot. A held draft and one owed a capture both
      finish the run without being publishable.
 2. **`docs/maps-dc-generation-request.sql`** — the DDL of record gains **one jsonb key**,
-   `'refresh', 'true'`, in the dispatch inputs. 🅿️ **PARKED AND NOT APPLIED** (see below).
+   `'refresh', 'true'`, in the dispatch inputs. ✅ **APPLIED 2026-09-21** (see below).
 3. **Nothing else.** The page holds the anon key and a founder session; it still creates
    nothing and refreshes nothing itself. No new table, no new RPC, no copy rule in the browser
    — a privileged SQL path is the wrong place to decide what a post says.
 
-- 🅿️ **THE MIGRATION IS NOT APPLIED, AND THE ORDER IS NOT FREE — MERGE THE INGEST CHANGE
-  FIRST.** Until it is applied, the button dispatches three inputs and the ingest workflow's
-  own `refresh` default (true) governs, so the refresh already happens. The apply makes the
-  intent explicit at the call site instead of dependent on a default in another repo.
-  - 🛑 **"SAFE EITHER WAY" WAS WRONG, and this bullet claimed it. An independent review found
-    it.** A `workflow_dispatch` carrying an input the target workflow does **not DECLARE** is
-    rejected by GitHub with **422 "Unexpected inputs provided"**, and this RPC dispatches
-    `ref: 'main'`. So applying this SQL **before** `homesignal-ingest`'s `refresh` input
-    reaches its `main` **breaks the button outright** — the one ordering a human running a
-    parked migration by hand would actually hit, and the one the note did not mention.
-    "Neither half silently disables the other" is still true: the failure is a loud 422, not
-    a silent no-op. **The ordering is: ingest merges, then apply.**
+- ✅ **THE MIGRATION IS APPLIED (2026-09-21), AND THE ORDER WAS NOT FREE — THE INGEST
+  CHANGE WENT FIRST.** Migration `maps_dc_generation_request_refresh_input_20260921`
+  (version `20260921161153`), applied from `docs/maps-dc-generation-request.sql`; the
+  status RPC was untouched (md5 `44480c69095567b7176179a7d12e3248` before and after).
+  - 🔑 **THE FUNCTIONAL DELTA IS EXACTLY ONE jsonb KEY, AND THE RAW NUMBERS SAID
+    OTHERWISE.** `pg_get_functiondef` md5 `d83cf657…` (2,283 chars) → `83bc3a56…`
+    (**3,753** chars) — **+1,470 for a one-key change**, because the previously applied body
+    (20260920160834) was comment-light and replaying the file also stored ~1,451 characters
+    of COMMENTS. Inert in plpgsql, but not "one key", and reporting it as one would have
+    been an assertion contradicted by the character count beside it. **Proof on the BODY**
+    (`pg_proc.prosrc`, stored verbatim), comments stripped and whitespace collapsed:
+    1,775 → 1,794 chars, **+19 = exactly `, 'refresh', 'true'`**, and excising precisely
+    that string reproduces the prior md5 `42ed11d5f84f2f8791f00246fe1a90e7` byte for byte.
+  - ⚠️ **DO NOT RUN THAT COMPARISON OVER `pg_get_functiondef` — it manufactures a diff.**
+    It re-renders the HEADER in uppercase and as `TABLE(net_request_id …)`, so a token-wise
+    compare shifts by one and reports ~40 differing positions that are **entirely the
+    instrument**. That is what the first pass reported, and it read exactly like a body that
+    had changed everywhere. The body is the only comparable half.
+  - 🛑 **"SAFE EITHER WAY" WAS WRONG, and this bullet used to claim it. An independent
+    review found it.** A `workflow_dispatch` carrying an input the target workflow does
+    **not DECLARE** is rejected with **422 "Unexpected inputs provided"**, and this RPC
+    dispatches `ref: 'main'`. So applying the SQL **before** `homesignal-ingest`'s `refresh`
+    input reached its `main` **would have broken the button outright** — the one ordering a
+    human running a parked migration by hand would actually hit. **Ingest merged first**
+    (#540), and `refresh:` was re-verified on `origin/main` (`type: boolean`,
+    `required: false`, `default: true`) immediately before and after the apply. The runner
+    adds `--no-refresh` only when the input is literally `"false"`, so an omitted key still
+    refreshes.
 - ⚠️ **THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: `vault.github_actions_pat` is
   DEAD** (HTTP 401 since 2026-09-15, per `public.pipeline_health_check`). No dispatch of any
   shape succeeds until the founder re-mints it. This change neither fixes nor works around it.
