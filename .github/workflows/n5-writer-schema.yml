@@ -1,0 +1,43 @@
+# Refuse a merge whose N5 writer omits a column production requires.
+#
+# Three such defects reached a runner before anything caught them, each found only by the
+# database refusing the insert; a fourth was then found by this gate instead of by
+# production. They are one class: a writer's INSERT column list is a second copy of the
+# schema and nothing compared the two.
+#
+# It reads the LIVE catalogue, so a column ADDED to production fails here the same day.
+# That is the half no in-repo fixture can do, and it is why this needs the secret.
+name: n5-writer-schema
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/n5_orchestrate.py'
+      - 'scripts/n5_shard.py'
+      - 'scripts/check_n5_writer_schema.py'
+      - '.github/workflows/n5-writer-schema.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/n5_orchestrate.py'
+      - 'scripts/n5_shard.py'
+      - 'scripts/check_n5_writer_schema.py'
+  # Daily, because the defect can arrive from the DATABASE side with no repo event at all -
+  # exactly the reasoning the meetings-enrollment and feeds-sync gates already carry.
+  schedule:
+    - cron: '43 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  writer-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Writer/schema contract
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python scripts/check_n5_writer_schema.py

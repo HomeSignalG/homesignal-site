@@ -205,11 +205,27 @@ begin
 end
 $do$;
 
-insert into geo.n5_snapshot (snapshot_id, taken_at, cutoff, scope, n_rows, notes)
+-- sources / projects / pairs / checksum are NOT NULL with no default. This writer named
+-- none of them and would have aborted the whole transaction here, AFTER paying for the
+-- ~3M-row capture. It was found by scripts/check_n5_writer_schema.py rather than by a
+-- production run, which is the entire point of that gate.
+-- The four expressions reproduce the BASELINE's own semantics, verified against the frozen
+-- phase1-2026-09-01 row before use: n_rows 2,976,275 / sources 234 / projects 925,463 /
+-- pairs 2,753,802, and count(distinct registry_id) on that snapshot returns exactly 234.
+-- checksum is the SAME order-independent sum the shard manifest and the FREEZE_DRIFT gate
+-- use - addition commutes, so no sort is involved and no collation can be disagreed about.
+insert into geo.n5_snapshot
+  (snapshot_id, taken_at, cutoff, scope, sources, projects, pairs, n_rows, checksum, notes)
 select {lit(snapshot_id)}, now(), now(),
        'public.n5_expected_input(cutoff) - the canonical contract',
-       count(*), 'opened by n5_orchestrate.py'
-  from preservation.app_project_identity where snapshot_id = {lit(snapshot_id)}
+       count(distinct i.registry_id),
+       count(distinct i.source_key),
+       count(distinct i.source_key||'|'||i.zip),
+       count(*),
+       sum(('x'||substr(md5(i.source_key||'|'||i.zip||'|'
+            ||coalesce(i.source_seq::text,'')),1,8))::bit(32)::bigint),
+       'opened by n5_orchestrate.py'
+  from preservation.app_project_identity i where i.snapshot_id = {lit(snapshot_id)}
 on conflict (snapshot_id) do nothing;
 
 insert into geo.n5_generation (generation_id, snapshot_id, cutoff, state, note)
