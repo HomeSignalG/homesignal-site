@@ -103,8 +103,13 @@ ok(HS.mapsCaptureState(CASE_A) === S.WAITING,
 
 ok(HS.mapsDcCapturePolicyApplies(CASE_B) === false,
   '1c: policy does NOT govern an absence draft');
-ok(HS.mapsCaptureState(CASE_B) === S.INELIGIBLE,
-  '1d: and its state agrees — INELIGIBLE, not AWAITING a capture that will never come');
+// ⚖️ SUPERSEDED — EVERY POST GETS A MAP (later founder ruling). An absence post now
+// RECEIVES a ZIP-scope capture, so AWAITING is the honest reading: a capture really is
+// owed and really is coming. The old expectation (INELIGIBLE, "a capture that will never
+// come") was true of a capture path that refused anything it could not pin, and that path
+// is gone.
+ok(HS.mapsCaptureState(CASE_B) === S.WAITING,
+  '1d: an absence draft AWAITS its ZIP-scope capture, like every other post');
 
 ok(HS.mapsDcCapturePolicyApplies(CASE_C) === false,
   '1e: policy does NOT govern an ordinary (non-theme) MAPS draft');
@@ -124,12 +129,19 @@ ok(HS.mapsSocialIsAbsence(CASE_A) === false, '2b: and does NOT claim a project d
 ok(HS.mapsCaptureState(CASE_B) !== S.READY,
   '2c: an absence never reports READY — it has no image and claims none');
 
-// ── §3 DERIVED, NOT STAMPED — THE LOAD-BEARING ONE ───────────────────────────────────
-// The unstamped and stamped absence rows must be indistinguishable. Before the fix the
-// unstamped one read AWAITING and the stamped one read INELIGIBLE, so correctness depended
-// on whether a job in another repository had reached the row.
-ok(HS.mapsCaptureState(CASE_B) === HS.mapsCaptureState(CASE_B_STAMPED),
-  '3a: an absence row reports the SAME state with and without the worker’s visual stamp');
+// ── §3 THE DEFECT #1273 FOUND IS CURED BY A DIFFERENT ROUTE — read this before reverting
+// Its complaint was that an absence row's state depended on whether an out-of-band worker
+// had reached it: sixteen read AWAITING, two read CAPTURE_INELIGIBLE, identical rows. The
+// cure there was to derive "unphotographable" from the row. Under the later ruling the row
+// is PHOTOGRAPHABLE, so the cure is that the capture is no longer optional: every absence
+// row is AWAITING until its ZIP map is bound, and then READY. The state still stops
+// depending on the stamp — it converges on it.
+//
+// ⚠️ A STAMPED ROW LEGITIMATELY DIFFERS FROM AN UNSTAMPED ONE NOW, and that is ordinary:
+// it is the same before/after-capture difference every project-backed post has. What must
+// NOT come back is a permanent split where one of the two states is unreachable.
+ok(HS.mapsCaptureState(CASE_B) === S.WAITING,
+  '3a: an unstamped absence row AWAITS its capture rather than being written off');
 ok(!CASE_B.evidence.visual,
   '3b: control — the derived case genuinely carries no visual stamp to read');
 ok(CASE_B_STAMPED.evidence.visual.state === S.INELIGIBLE,
@@ -153,12 +165,14 @@ ok(HS.mapsCaptureState(stale) === S.WAITING,
 const BIND = readFileSync(new URL('../lib/maps-capture-binding.js', import.meta.url), 'utf8');
 const fn = BIND.slice(BIND.indexOf('HS.mapsCaptureState = function'),
   BIND.indexOf('HS.mapsCaptureStateCopy'));
-ok(/mapsSocialIsAbsence/.test(fn),
-  '5a: the state machine consults the shared absence predicate');
-ok(fn.indexOf('mapsSocialIsAbsence') < fn.indexOf("evidence) || {}).visual"),
-  '5b: and consults it BEFORE reading the stored visual stamp — derived beats stamped');
-ok(/typeof HS\.mapsSocialIsAbsence === 'function'/.test(fn),
-  '5c: it fails closed if the predicate module did not load, rather than assuming');
+// ⚖️ SUPERSEDED with §1d/§3a. The state machine no longer short-circuits on absence,
+// because an absence post is no longer unphotographable. These now pin the SUPERSESSION
+// itself, so a future session that reinstates the short-circuit fails here and has to read
+// why rather than discovering it from 18 empty posts.
+ok(!/return STATES\.INELIGIBLE;/.test(fn.slice(0, fn.indexOf("evidence) || {}).visual"))),
+  '5a: the state machine does NOT write absence off before reading the row\'s own evidence');
+ok(/EVERY POST GETS A MAP/.test(fn),
+  '5b: and the superseded carve-out is recorded in place, not silently deleted');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 if (bad) process.exit(1);
