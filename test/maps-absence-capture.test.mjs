@@ -112,8 +112,17 @@ ok(!/siteMarkers\s*\|\|\s*\[\]\)\.length\s*>\s*0/.test(ABS),
 // fifth copy in the same session that removed four.
 ok(/async function finishCapture\(d, label, r, proj, results\)/.test(GEN_CODE),
   '5a: there is ONE shared finish path');
-ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 2,
-  '5b: …and exactly two call sites use it — the project path and the absence path');
+// ⚖️ THREE CALL SITES NOW. The third is `zipFallback`, which turns the four
+// record-shaped refusals (the project row is gone / is not a development row / has no
+// coordinates / is outside the ZIP's authoritative set) into ZIP-scope captures instead of
+// leaving those drafts with no map. Corrected with its reason recorded rather than by
+// relaxing the count: what must hold is that every path finishes through the SAME function,
+// so the FAILED record, the key-fingerprinted object name and the attach stay one
+// implementation.
+ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 3,
+  '5b: …and every path finishes through it — project, absence, and the ZIP fallback');
+ok(/const zipFallback = async/.test(GEN_CODE),
+  '5b₁: …including the ZIP fallback for a project that cannot truthfully be pinned');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');
 ok((GEN_CODE.match(/await attach\(d, objectPath, r, proj\)/g) || []).length === 1,
@@ -132,7 +141,7 @@ ok(/wrote\.ok/.test(FIN),
 ok(/proj \? String\(proj\.id\) : 'nodc'/.test(FIN),
   '6a: an absence object is named `nodc`, never a project-shaped placeholder that the next '
   + 'reader would take for a project id that has stopped resolving');
-ok(/keyStamp\(d\)/.test(FIN),
+ok(/keyStamp\(d, scope\)/.test(FIN),
   '6b: …and still carries the binding key\'s fingerprint, so a re-capture writes a new '
   + 'object rather than silently overwriting the old one');
 

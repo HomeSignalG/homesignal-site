@@ -274,8 +274,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      loads, so the capture job and this approval gate cannot disagree about whether the
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
      because the binding key includes the theme, which that lib derives. -->
-<script src="lib/maps-capture-policy.js?v=7adaa803"></script>
-<script src="lib/maps-capture-binding.js?v=c2733a04"></script>
+<script src="lib/maps-capture-policy.js?v=1491d6a2"></script>
+<script src="lib/maps-capture-binding.js?v=a1aa6ca4"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -859,8 +859,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
   // A MAPS draft that carries an image_bucket_path WILL publish with that image, so
   // the founder must have seen it before approving.
+  // ⚖️ EVERY MAPS POST PUBLISHES WITH A MAP, so every MAPS post is image-gated: the
+  // Approve button renders LOCKED and the founder must have seen the exact image first.
+  //
+  // 🗑️ IT USED TO REQUIRE `&& p.image_bucket_path`, which made the lock conditional on the
+  // very thing being checked — a MAPS draft with NO image got no `data-gate="image"`, so
+  // `bskyLockApprove` returned at its first line and the button rendered ENABLED. Measured
+  // 2026-09-21: 27 of 55 MAPS drafts carry no image, so that was the common case.
   function mapsImageRequired(p){
-    return !!(p && p.content_family === 'MAPS' && p.image_bucket_path);
+    return !!(p && p.content_family === 'MAPS');
   }
   // ---------------------------------------------------------------------------
   // THEME. Derived live from lib/maps-social-theme.js, which asks the SHIPPED Map 1
@@ -896,8 +903,28 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function bskyIsAbsence(p){
     return !!(window.HS && HS.mapsSocialIsAbsence && HS.mapsSocialIsAbsence(p));
   }
-  function dcThemeImageMandatory(p){
+  // The theme whose capture carries an ADDITIONAL burden of proof — that the picture shows
+  // the required Map 1 filter state. NOT the map requirement, which is universal and lives
+  // in HS.mapsMapGateBlock below.
+  //
+  // 🗑️ `dcThemeImageMandatory` CARRIED BOTH QUESTIONS AND THAT WAS THE DEFECT: because it
+  // was one expression, "is a map required at all" was only ever asked of one theme.
+  // Measured 2026-09-21: 29 of 55 MAPS drafts carry no theme and 26 of those no image, and
+  // nothing at any surface required one of them.
+  function dcThemeMapPolicyApplies(p){
     return bskyTheme(p) === 'datacenter';
+  }
+  // THE UNIVERSAL GATE. FAILS CLOSED: if lib/maps-capture-binding.js did not load we cannot
+  // tell whether this post has its map, so every MAPS approval blocks. A gate that assumes
+  // the best when its own rule is missing is not a gate.
+  function bskyMapGateBlock(p){
+    if(!p || p.content_family !== 'MAPS') return '';
+    if(!(window.HS && HS.mapsMapGateBlock)){
+      return 'The Map capture rules (lib/maps-capture-binding.js) did not load, so whether '
+        + 'this post has its map cannot be established. Approve is blocked until the page '
+        + 'loads that module \u2014 reload, and report it if it persists.';
+    }
+    return HS.mapsMapGateBlock(p) || '';
   }
   // \u2500\u2500 IS THE STORED IMAGE STILL THIS DRAFT'S IMAGE? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   // From lib/maps-capture-binding.js, the SAME module the capture job uses, so "bound"
@@ -945,19 +972,23 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         + 'draft.\n\nApprove is blocked until a fresh capture matching the current draft '
         + 'exists. The capture job picks this up automatically on its next run.';
     }
-    if(dcThemeImageMandatory(p) && !bskyCaptureBound(p)){
-      var v=(p.evidence&&p.evidence.visual)||{};
-      var st=bskyCaptureState(p);
-      // \u26a0\ufe0f THE STATE SENTENCE IS NOT DECORATION. "We could not photograph it" and "this ZIP
-      // has no data centres" are different facts, and a gate that shows only "no screenshot"
-      // invites the founder to read the second out of the first. Each state names the
-      // instrument; none of them makes a claim about what is or is not in the ZIP.
-      return 'This is a MAPS \u00b7 Data Center Theme post, which publishes the real Map 1 '
-        + 'screenshot and has no honest fallback.\n\n'
-        + (bskyStateCopy(st) || 'No screenshot has been captured for it yet.')
-        + (v.failure_reason ? ('\n\nReported reason: ' + v.failure_reason) : '')
-        + (v.next_attempt_at ? ('\nNext automatic attempt: ' + v.next_attempt_at) : '')
-        + '\n\nApprove is blocked until the exact image this post would publish exists and displays.';
+    // ⚖️ THE UNIVERSAL MAP REQUIREMENT. Every MAPS post — project-backed or not, themed
+    // or not, an absence answer or a filing — publishes with a map, so every MAPS post is
+    // blocked here until it has one that is bound to it right now.
+    //
+    // ⚠️ THE STATE SENTENCE IS NOT DECORATION. "We could not photograph it" and "this ZIP
+    // has no data centres" are different facts, and a gate that shows only "no screenshot"
+    // invites the founder to read the second out of the first. Each state names the
+    // instrument; none of them makes a claim about what is or is not in the ZIP.
+    var mapBlock = bskyMapGateBlock(p);
+    if(mapBlock){
+      // The Data Center addendum says WHY there is no degraded fallback for that theme. It
+      // changes the sentence, never the verdict — the verdict above is already universal.
+      return mapBlock + (dcThemeMapPolicyApplies(p)
+        ? '\n\nThis is a MAPS \u00b7 Data Center Theme post: its picture must also prove the '
+          + 'required Map 1 filter state (every STATUS on, Data center the only PROJECT '
+          + 'TYPE, REGULATORY off), so there is no degraded card it could fall back to.'
+        : '');
     }
     if(mapsImageRequired(p) && !_bskyImgOk[_bskyImgKey(p)]){
       return 'This post would publish the Map image stored at\n' + p.image_bucket_path +
@@ -1014,19 +1045,27 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var btn = document.querySelector('[data-post="'+id+'"] button[data-act="approve"]');
     if (!btn || btn.getAttribute('data-gate') !== 'image') return;
     var row = _bskyRows[id] || null;
-    // A theme post with no BOUND capture can never unlock in this session. Two cases, and
-    // widening from `!image_bucket_path` to `!bound` is what adds the second: no capture at
-    // all (nothing to render), and a capture that belongs to older draft details (it WOULD
-    // render, and rendering it is exactly how a stale picture gets approved).
-    if (row && dcThemeImageMandatory(row) && !bskyCaptureBound(row)) {
+    // ⚖️ UNIVERSAL: ANY MAPS post without a current bound map can never unlock in this
+    // session. This read `dcThemeImageMandatory(row)`, so the button silently stayed
+    // unlockable for every non-Data-Center draft — the same scoping defect as the reason
+    // function, in the half that actually greys the control. ONE predicate now, shared with
+    // `bskyApprovalBlockReason`, so the button and the click handler cannot disagree.
+    //
+    // Three cases, not two: no capture at all (nothing to render), a capture that belongs
+    // to older draft details (it WOULD render, and rendering it is how a stale picture gets
+    // approved), and a capture whose recorded scope this draft cannot claim.
+    if (row && bskyMapGateBlock(row)) {
       btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed';
       var rv=(row.evidence&&row.evidence.visual)||{};
-      var rKey=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(row):null;
+      var rScope=(window.HS&&HS.mapsCaptureStoredScope)?HS.mapsCaptureStoredScope(rv,row):null;
+      var rKey=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(row,rScope):null;
+      var pfx = dcThemeMapPolicyApplies(row) ? 'Data Center Theme: ' : 'Every MAPS post publishes with a map. ';
       btn.title = !row.image_bucket_path
-        ? 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.'
+        ? (pfx + 'no Map 1 screenshot has been captured for it yet \u2014 a project map when its '
+           + 'record can be pinned, otherwise the map of the ZIP.')
         : ((rKey && rv.capture_key === rKey)
-          ? 'Data Center Theme: the stored screenshot does not satisfy the current map-state policy (all statuses on, Data center only, Regulatory off). The draft has NOT changed. Awaiting a fresh capture.'
-          : 'Data Center Theme: the stored screenshot was captured for different draft details. Awaiting a fresh capture.');
+          ? (pfx + 'the stored screenshot does not satisfy the current map-state policy (all statuses on, Data center only, Regulatory off). The draft has NOT changed. Awaiting a fresh capture.')
+          : (pfx + 'the stored screenshot was captured for different draft details, or records a scope this draft cannot claim. Awaiting a fresh capture.'));
       return;
     }
     var ok = !!(row && _bskyImgOk[_bskyImgKey(row)]);

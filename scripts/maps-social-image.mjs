@@ -723,9 +723,13 @@ async function upload(objectPath, file) {
  */
 async function finishCapture(d, label, r, proj, results) {
   const theme = r.theme || null;
+  // WHAT THE PICTURE IS OF, fixed here so the key, the object name, the stored evidence and
+  // a refusal record cannot disagree about it. `proj` is null for every ZIP-scope capture —
+  // the absence answer and the four record-shaped demotions alike.
+  const scope = proj ? 'project' : 'zip';
 
   if (!r.ok) {
-    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme);
+    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme, scope);
     results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme,
       ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
     return;
@@ -741,7 +745,7 @@ async function finishCapture(d, label, r, proj, results) {
   // A project-shaped placeholder there would read to the next person as a project id that
   // has stopped resolving, which is a different and much worse fact.
   const subject = proj ? String(proj.id) : 'nodc';
-  const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d)}.png`;
+  const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d, scope)}.png`;
 
   if (DRY) {
     results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file,
@@ -813,15 +817,16 @@ async function main() {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
 
-    // EVERY REFUSAL IS RECORDED ON THE ROW. Five of these branches used to `continue`
-    // silently, writing nothing — so the draft carried no state, no attempt count and no
-    // retry clock, and a recurring job would have re-selected it on every single fire. An
-    // unrecorded refusal is also indistinguishable from a draft nothing has looked at yet.
-    const ineligible = async (why) => {
-      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, why, null);
-      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why,
-        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
-    };
+    // 🗑️ THE `ineligible(...)` HELPER IS GONE, AND ITS ABSENCE IS THE POINT. It recorded a
+    // refusal on the row for five record-shaped conditions; under the every-post-gets-a-map
+    // ruling every one of those is a DEMOTION to ZIP scope instead, so nothing here can
+    // produce CAPTURE_INELIGIBLE any more. Leaving an uncalled helper behind would read to
+    // the next session as a live path.
+    //
+    // ⚠️ INELIGIBLE IS NOT DELETED FROM THE VOCABULARY. 28 production rows still carry that
+    // stamp from runs before this, `lib/maps-capture-binding.js` still reports it, and its
+    // long retry floor is what brings those rows back for a capture. What changed is that
+    // no row SHAPE earns it: it is now only ever a historical value.
 
     // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
     // This branch used to read `await ineligible('the draft carries no project_id, so there
@@ -843,12 +848,43 @@ async function main() {
       continue;
     }
 
+    // ⚖️ A PROJECT THAT CANNOT BE TRUTHFULLY PINNED IS A REASON TO PHOTOGRAPH THE ZIP, NOT
+    // A REASON TO SHIP A POST WITH NO MAP — founder ruling, 2026-09-21. The five branches
+    // below each ended the draft's run with `ineligible(...)` and no picture at all. The
+    // fallback the ruling states is:
+    //
+    //     PROJECT MAP  ->  (if the project cannot be truthfully represented)  ->  ZIP MAP
+    //
+    // and never PROJECT MAP -> NO MAP. #1280 reached this conclusion for the ABSENCE post
+    // (no project at all) and left these four, which are the same fact arriving later: the
+    // row names a project, and Map 1 cannot place it.
+    //
+    // ⛔ THIS IS NOT "any failure becomes a ZIP map". These are all statements about the
+    // RECORD — it is gone, it is not a development row, it has no coordinates, it has moved
+    // away from the draft, or the ZIP's authoritative set does not contain it. A genuine
+    // INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter could not
+    // verify the controls) still returns `{ok:false}` from `capture*()` and is still
+    // recorded as CAPTURE_FAILED by `finishCapture`. Hiding a broken instrument behind a
+    // weaker screenshot is the one thing the ruling explicitly forbids.
+    const zipFallback = async (why) => {
+      const themeZ = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+      let rz;
+      try { rz = await captureAbsence(page, d, themeZ); }
+      catch (e) { rz = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
+      if (rz.theme === undefined) rz.theme = themeZ || null;
+      // The reason the picture is of the ZIP rides on the row, so a reader can tell a
+      // deliberate fallback from an absence answer. `proj` stays null, which is what makes
+      // `finishCapture` key and name it at ZIP scope.
+      if (rz.ok) rz.zip_scope_reason = why;
+      await finishCapture(d, label, rz, null, results);
+    };
+
     const proj = await liveProject(pid);
-    if (!proj) { await ineligible('the project row is no longer in app_projects'); continue; }
-    if (proj.record_kind !== 'development') { await ineligible('the live row is not a development record'); continue; }
-    if (proj.lat == null || proj.lng == null) { await ineligible('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
+    if (!proj) { await zipFallback('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await zipFallback('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await zipFallback('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      await ineligible('the live coordinates differ from the draft evidence, so a capture would not be of this draft');
+      await zipFallback('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
       continue;
     }
 
@@ -857,7 +893,7 @@ async function main() {
       const why = auth.status !== 'boundary_complete'
         ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      await ineligible(why);
+      await zipFallback(why);
       continue;
     }
 
@@ -891,8 +927,12 @@ async function main() {
  * holds the readable key and is what every comparison uses. This only has to make two
  * different keys produce two different file names.
  */
-function keyStamp(draft) {
-  const key = HS.mapsCaptureKey(draft) || '';
+function keyStamp(draft, scope) {
+  // AT THE SCOPE ACTUALLY SHOT. Hashing the draft's widest scope would give a project-keyed
+  // file name to a ZIP-scope picture and — worse — would not MOVE when the ZIP key moves,
+  // so a superseded ZIP capture would be overwritten in place instead of landing beside its
+  // replacement. The path has to follow the binding record.
+  const key = HS.mapsCaptureKey(draft, scope) || '';
   let h1 = 0x811c9dc5, h2 = 0x01000193;
   for (let i = 0; i < key.length; i++) {
     h1 = Math.imul(h1 ^ key.charCodeAt(i), 0x01000193) >>> 0;
@@ -972,6 +1012,16 @@ async function guardedPatch(draft, body) {
 async function attach(draft, objectPath, r, proj) {
   const visual = {
     kind: r.absence ? 'map1_zip_screenshot_no_project' : 'map1_zip_screenshot',
+    // ⚖️ SCOPE IS RECORDED ON THE VISUAL ITSELF, so a reader of the row knows what the
+    // picture is OF without parsing the policy block or the key. This is the half of the
+    // honesty contract #1278 had and #1280 dropped: measured 2026-09-21, all 18 live
+    // absence captures carry no scope anywhere, so the enforced map-state guard defaulted
+    // them to `project` and demanded a target that cannot exist.
+    //
+    // ⛔ A ZIP CAPTURE MUST NEVER BE READ BACK AS PROOF THAT A PARTICULAR PROJECT APPEARED,
+    // which is exactly what an unlabelled picture beside a project-bearing row invites.
+    scope,
+    ...(r.zip_scope_reason ? { zip_scope_reason: r.zip_scope_reason } : {}),
     status: 'REAL_MAP_VISUAL',
     bucket: 'social-images',
     path: objectPath,
@@ -1064,7 +1114,10 @@ async function attach(draft, objectPath, r, proj) {
   // for. `state` is the founder-facing fact; the historical `status` literal is kept above
   // so nothing that already tests for REAL_MAP_VISUAL changes behaviour.
   visual.state = READY;
-  visual.capture_key = HS.mapsCaptureKey(draft);
+  // AT THE SCOPE THIS CAPTURE ACTUALLY RECORDED. The draft's own widest scope is only where
+  // the attempt STARTED; a project-bearing draft demoted to the ZIP would otherwise be
+  // stamped with a project key it was never given, and be unbound forever.
+  visual.capture_key = HS.mapsCaptureKey(draft, r.scope || (proj ? 'project' : 'zip'));
   visual.attempts = 0;
   visual.next_attempt_at = null;
   // A success clears the previous failure text rather than leaving it beside a real image,
@@ -1086,7 +1139,11 @@ async function attach(draft, objectPath, r, proj) {
  * this project cannot be photographed on its ZIP page as things stand. Neither is ever a
  * statement that the ZIP has no development — see the copy in lib/maps-capture-binding.js.
  */
-async function recordOutcome(draft, state, reason, theme) {
+// `scope` is the scope the attempt was MADE at, passed in rather than re-derived: on a
+// thrown capture there is no result object to read it from, and re-deriving it from the
+// draft alone would key the refusal at `project` for a ZIP attempt — so the key-moved
+// release in `mapsCaptureDue` would fire every run and the backoff would never hold.
+async function recordOutcome(draft, state, reason, theme, scope) {
   const prev = draft.evidence || {};
   const prevVisual = prev.visual || {};
   // An ineligible outcome does not burn an attempt: attempts measure how often our capture
@@ -1107,7 +1164,7 @@ async function recordOutcome(draft, state, reason, theme) {
           // The draft's inputs AT THE MOMENT OF THE REFUSAL. If they move, the key moves,
           // and the row is re-selected immediately instead of waiting out a backoff that
           // was set against a state of the world that no longer holds.
-          attempted_key: HS.mapsCaptureKey(draft),
+          attempted_key: HS.mapsCaptureKey(draft, scope),
           status: 'NO_PROJECT_SPECIFIC_VISUAL',
           failure_reason: reason,
           failed_at: new Date().toISOString(),

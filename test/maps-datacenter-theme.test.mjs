@@ -150,25 +150,38 @@ const bodyOf = (name) => {
   const m = DASH.match(new RegExp('function ' + name + '\\(([^)]*)\\)\\{([\\s\\S]*?)\\n  \\}'));
   return m ? { args: m[1], body: m[2] } : null;
 };
-// `dcThemeImageMandatory` delegates to `bskyTheme` AND `bskyIsAbsence`, so all three are
-// lifted into ONE scope — which also proves the delegation is real rather than a second
-// copy of the rule. If the gate ever stops delegating, the lift stops resolving and §6
-// fails rather than quietly testing a stub.
+// ⚖️ TWO PREDICATES ARE LIFTED NOW, AND THE SPLIT IS THE POINT. `dcThemeImageMandatory`
+// carried BOTH questions in one expression — "does this post need a map at all" and "does
+// its picture additionally have to prove the Data Center filter state" — so the first was
+// only ever asked of one theme. Measured 2026-09-21: 29 of 55 MAPS drafts carry no theme
+// and 26 of those no image, and nothing at any surface required one of them.
+//
+//   bskyMapGateBlock        — UNIVERSAL: every MAPS post needs a current bound map
+//   dcThemeMapPolicyApplies — THEME-SPECIFIC: and a DC capture also proves the filter state
 const lifted = (() => {
-  const a = bodyOf('bskyTheme'), b = bodyOf('dcThemeImageMandatory'), c = bodyOf('bskyIsAbsence');
-  if (!a || !b || !c) return null;
+  const a = bodyOf('bskyTheme'), b = bodyOf('dcThemeMapPolicyApplies'),
+    c = bodyOf('bskyIsAbsence'), d = bodyOf('bskyMapGateBlock');
+  if (!a || !b || !c || !d) return null;
   return new Function('HS', 'window', `
     function bskyTheme(${a.args}){${a.body}}
     function bskyIsAbsence(${c.args}){${c.body}}
-    function dcThemeImageMandatory(${b.args}){${b.body}}
-    return { bskyTheme, dcThemeImageMandatory };`)(HS, { HS });
+    function dcThemeMapPolicyApplies(${b.args}){${b.body}}
+    function bskyMapGateBlock(${d.args}){${d.body}}
+    return { bskyTheme, dcThemeMapPolicyApplies, bskyMapGateBlock };`)(HS, { HS });
 })();
-const dcMandatory = lifted && lifted.dcThemeImageMandatory;
-ok(typeof dcMandatory === 'function', '6: the Data Center Theme image gate is liftable and runnable');
-ok(dcMandatory && dcMandatory(withEvidence({ project_name: 'RBC Data Center Campus' })) === true,
-  '6: a Data Center Theme post declares the Map 1 screenshot MANDATORY');
-ok(dcMandatory && dcMandatory(post()) === false,
-  '6: an ordinary MAPS post does NOT require a capture — the stricter rule is scoped to the theme');
+const dcPolicy = lifted && lifted.dcThemeMapPolicyApplies;
+const mapGate = lifted && lifted.bskyMapGateBlock;
+ok(typeof dcPolicy === 'function' && typeof mapGate === 'function',
+  '6: both the universal map gate and the theme policy are liftable and runnable');
+ok(mapGate && mapGate(withEvidence({ project_name: 'RBC Data Center Campus' }, { zip: '80210' })) !== '',
+  '6: a Data Center Theme post with no bound map is BLOCKED');
+ok(mapGate && mapGate(post({ zip: '80210' })) !== '',
+  '6: and so is an ordinary MAPS post — the requirement is universal, not scoped to a theme');
+ok(mapGate && mapGate({ content_family: 'ALERTS' }) === '',
+  '6: while an ALERTS post is untouched — the rule is scoped to the MAPS family');
+ok(dcPolicy && dcPolicy(withEvidence({ project_name: 'RBC Data Center Campus' })) === true
+  && dcPolicy(post()) === false,
+  '6: the THEME-SPECIFIC policy still applies to the Data Center Theme only');
 ok(/function bskyApprovalBlockReason/.test(DASH),
   '6: ONE function decides whether approval is allowed');
 ok(/var block=bskyApprovalBlockReason\(gr\);\s*if\(block\)\{ alert\(block\); return; \}/.test(DASH.replace(/\n\s*/g, ' ')),
@@ -179,8 +192,8 @@ ok(/var block=bskyApprovalBlockReason\(gr\);\s*if\(block\)\{ alert\(block\); ret
 // founder would see a real Map 1 screenshot and approve a picture of an older version of
 // the draft. The assertion's own sentence is unchanged because its intent never moved; only
 // the definition of "no capture" got stricter.
-ok(/dcThemeImageMandatory\(row\) && !bskyCaptureBound\(row\)/.test(DASH),
-  '6: a theme post with no BOUND capture can never unlock approval');
+ok(/if \(row && bskyMapGateBlock\(row\)\) \{/.test(DASH),
+  '6: ANY MAPS post with no BOUND map can never unlock approval — the button reads the same universal predicate');
 ok(/mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]/.test(DASH),
   '6: an attached image must have RENDERED before approval, as before');
 // ⚠️ KEYED ON THE IMAGE PATH, NOT THE ROW ID. A re-capture writes a NEW object, so a cache
@@ -304,19 +317,25 @@ ok(HS.mapsSocialIsAbsence(absence({ content_family: 'ALERTS' })) === false
 // its picture is of its ZIP's Map 1 page rather than of a project
 // (scripts/maps-social-image.mjs::captureAbsence). Nothing is permanently unapprovable; a
 // capture is simply owed first, which is the ruling.
-ok(dcMandatory && dcMandatory(absence()) === true,
-  '9: an absence post REQUIRES the Map 1 capture too — its ZIP\'s map is the picture');
-ok(dcMandatory && dcMandatory(withEvidence({ project_name: 'RBC Data Center Campus' })) === true,
-  '9: a record-bearing theme post still REQUIRES it — the rule is now uniform');
-ok(/function dcThemeImageMandatory\(p\)\{\s*return bskyTheme\(p\) === 'datacenter';\s*\}/.test(DASH),
-  '9: the page requires it for the whole theme, with no absence limb left in the expression');
-// ⛔ AND THE SCOPE IS STILL A SCOPE. An ordinary (non-theme) MAPS draft publishes its link
-// card and must NOT acquire a mandatory capture from this change.
-ok(dcMandatory && dcMandatory(post({
+ok(mapGate && mapGate(absence({ zip: '80210' })) !== '',
+  '9: an absence post REQUIRES a map too — its ZIP\'s map is the picture');
+ok(mapGate && mapGate(withEvidence({ project_name: 'RBC Data Center Campus' }, { zip: '80210' })) !== '',
+  '9: a record-bearing theme post still REQUIRES one — the rule is uniform');
+ok(!/theme\(p\) === 'datacenter' && !bskyIsAbsence\(p\)/.test(DASH),
+  '9: no absence limb survives in the page\'s expression');
+ok(/function bskyIsAbsence\(p\)\{/.test(DASH),
+  '9: while the absence PREDICATE survives — what kind of post this is stays answerable');
+// ⚖️ SUPERSEDED — §7 of the ruling: "Do not accidentally scope the new mandatory-map
+// rule only to Data Center Theme." An ordinary MAPS draft needs a map like every other one;
+// what it does NOT acquire is the theme's additional burden of proving the filter state.
+// Both halves are asserted, because that distinction is the whole architecture.
+const ordinary = post({ zip: '80210',
   evidence: { type: 'Residential', type_raw: 'SINGLE FAMILY', status: 'Proposed',
-              project_name: 'Elm Street Townhomes', project_id: 'p9' },
-})) === false,
-  '9: an ordinary MAPS draft is still not image-mandatory — the theme is the boundary');
+              project_name: 'Elm Street Townhomes', project_id: 'p9' } });
+ok(mapGate && mapGate(ordinary) !== '',
+  '9: an ordinary MAPS draft IS map-gated — the family is the boundary, not the theme');
+ok(dcPolicy && dcPolicy(ordinary) === false,
+  '9: …but it does NOT acquire the Data Center map-state burden — that scope is still a scope');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 if (bad) process.exit(1);
