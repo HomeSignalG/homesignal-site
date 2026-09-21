@@ -18,6 +18,7 @@ import {
   validateTabsSite,
   LIFECYCLE_BUCKETS,
   lifecycleValueRecognised,
+  lifecycleRaw,
   ingestionIssues,
 } from './lib/verify-dev-helpers.mjs';
 
@@ -39,7 +40,7 @@ const zipUrl = (zip) => SITE_BASE + ZIP_PATH.replace('{zip}', encodeURIComponent
 
 async function loadCachedRow(zip) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${encodeURIComponent(zip)}&select=zip,counts,sites,home_lat,home_lng,refreshed_at`,
+    `${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${encodeURIComponent(zip)}&select=zip,counts,sites,home_lat,home_lng,refreshed_at,facilities_unavailable`,
     { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } },
   );
   if (!res.ok) throw new Error(`Supabase read ${zip}: ${res.status}`);
@@ -221,7 +222,28 @@ async function verifyZipPage(page, spec, cached) {
     if (expect.devMax != null && (cached.counts?.development || 0) > expect.devMax) {
       fail('facilities-only expectation', `cached development ${cached.counts?.development} > ${expect.devMax}`);
     }
-    if (expect.facilitiesOnly && !/EPA-registered facilities/i.test(st.facilitiesNote)) {
+    // ⚠️ ASK THE PAGE'S OWN CONDITION, NEVER ONE BRANCH OF IT. `homesignalmap.html`'s
+    // coverage note has a FAC_UNAVAILABLE branch that TAKES PRECEDENCE over the
+    // facilities copy and deliberately suppresses it — "the facility count for this area
+    // cannot be confirmed and is shown as unavailable rather than zero" (Phase 1B: a
+    // refused EPA read renders as UNKNOWN, never as fact). This assertion accepted only
+    // the other branch, so it failed 58102 for showing the sentence the page is RIGHT to
+    // show while EPA has been down since 2026-08-09, and would have gone red on every
+    // facilities-only ZIP the moment the outage began.
+    //
+    // Both branches are now asserted against the SAME flag the page reads
+    // (`development_reports.facilities_unavailable` -> `data.facUnavailable` ->
+    // FAC_UNAVAILABLE), so this is STRICTLY STRONGER than before rather than a relaxation:
+    // an outage page claiming a confirmed facility count now fails too, which nothing
+    // caught previously.
+    if (expect.facilitiesOnly && cached.facilities_unavailable === true) {
+      if (/cannot be confirmed|unavailable rather than zero/i.test(st.facilitiesNote)) {
+        pass('facilities-only note', 'EPA unavailable → honest count-unknown copy shown');
+      } else {
+        fail('facilities-only note', `facilities_unavailable=true but note claims a count: `
+          + `"${st.facilitiesNote.slice(0, 60)}"`);
+      }
+    } else if (expect.facilitiesOnly && !/EPA-registered facilities/i.test(st.facilitiesNote)) {
       fail('facilities-only note', `note="${st.facilitiesNote.slice(0, 60)}"`);
     } else if (expect.facilitiesOnly) {
       pass('facilities-only note', 'honest EPA-only coverage copy shown');
@@ -287,7 +309,7 @@ async function verifyZipPage(page, spec, cached) {
     if (badBucket.length) {
       const census = {};
       for (const s of badBucket) {
-        const k = JSON.stringify((s && s.type) == null ? null : String(s.type));
+        const k = JSON.stringify(lifecycleRaw(s) || null);
         census[k] = (census[k] || 0) + 1;
       }
       const named = Object.entries(census).sort((a, b) => b[1] - a[1])
@@ -299,7 +321,7 @@ async function verifyZipPage(page, spec, cached) {
       // source that stopped stating lifecycle at all — is visible without a failure first.
       const seen = {};
       for (const s of devRecs) {
-        const k = ((s && s.type) == null || String(s.type).trim() === '') ? '(absent)' : String(s.type).toLowerCase();
+        const k = lifecycleRaw(s) === '' ? '(absent)' : lifecycleRaw(s);
         seen[k] = (seen[k] || 0) + 1;
       }
       const dist = Object.entries(seen).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · ');

@@ -44,6 +44,37 @@ export const LIFECYCLE_BUCKETS = new Set([
  * non-empty string fails and is named.
  */
 /**
+ * The RAW lifecycle string for a site, from the field that actually carries it.
+ *
+ * ⚠️ `type` MEANS TWO DIFFERENT THINGS, AND BOTH REACH `window.__HS_SITES`. On a cached
+ * engine site and on an authoritative marker (lib/zip-authoritative.js::zipAuthSiteFromMarker,
+ * which sets `type: bucket`) it is the LIFECYCLE. On a NATIONAL data-centre record
+ * (lib/data.js, the `national_dc_for_zip` plane) it is the project CATEGORY — the literal
+ * string `datacenter` — and the lifecycle is in `status` ('Operating'/'Approved'), exactly as
+ * that code's own comment says: "Map 1's pin vocabulary is PERMIT status". Reading `type`
+ * alone reported all 31 national records across the panel as unrecognised lifecycles.
+ *
+ * ⛔ IT DELIBERATELY DOES NOT READ `bucket`, THOUGH lib/map.js::isActiveUndecided DOES.
+ * That function answers an ELIGIBILITY question and is decision-aware by design; `bucket`
+ * carries the §7.05 DECISION vocabulary, and a denied proposal is `bucket:'denied'` while its
+ * lifecycle is still `type:'proposed'`. Measured on the panel's own cached corpus: 52
+ * `withdrawn` and 6 `denied` buckets sit over `type:'proposed'`, and neither word is in
+ * LIFECYCLE_BUCKETS — so copying that precedence wholesale would have INVENTED 58 failures
+ * while fixing 31. This asks "what is this record's lifecycle", never "was it decided".
+ *
+ * Reading `status` ahead of `type` is a proven no-op for everything but the national plane:
+ * measured 2026-09-21 over 237,713 cached sites across 1,481 ZIPs, sites carrying a `status`
+ * key = 0, against a control of 237,713 carrying `type` and 0 whose `type` falls outside the
+ * lifecycle vocabulary.
+ */
+export function lifecycleRaw(site) {
+  const s = site || {};
+  const status = s.status == null ? '' : String(s.status).trim();
+  if (status !== '') return status.toLowerCase();
+  return s.type == null ? '' : String(s.type).trim().toLowerCase();
+}
+
+/**
  * Which RAIL does this site's lifecycle head — 'built' (Operating now), 'approved',
  * 'proposed' — or null when the value is absent/unrecognised and belongs to no rail?
  *
@@ -60,7 +91,7 @@ export const LIFECYCLE_BUCKETS = new Set([
  * would report a mapping gap as a mislabel, and lifecycleValueRecognised already names it.
  */
 export function lifecycleRail(site) {
-  const raw = (site && site.type) == null ? '' : String(site.type).trim().toLowerCase();
+  const raw = lifecycleRaw(site);
   if (raw === 'built' || raw === 'operating') return 'built';
   if (raw === 'approved') return 'approved';
   if (raw === 'proposed') return 'proposed';
@@ -68,7 +99,7 @@ export function lifecycleRail(site) {
 }
 
 export function lifecycleValueRecognised(site) {
-  const raw = (site && site.type) == null ? '' : String(site.type).trim().toLowerCase();
+  const raw = lifecycleRaw(site);
   if (raw === '') return true;                 // honest absence → the first-class unknown state
   return LIFECYCLE_BUCKETS.has(raw);
 }
@@ -306,7 +337,7 @@ export function assertZip(zip, rep, isIndexable, st) {
   if (badBucket.length) {
     fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) carrying an UNRECOGNISED ` +
       `lifecycle value (not one of ${[...LIFECYCLE_BUCKETS].join('/')}, and not honestly absent) ` +
-      `[${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${JSON.stringify(s.type)}`).join(', ')}]`);
+      `[${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${JSON.stringify(lifecycleRaw(s))}`).join(', ')}]`);
   }
   // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the population it summarises.
   //
