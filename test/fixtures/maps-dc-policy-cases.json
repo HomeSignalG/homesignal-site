@@ -1,252 +1,288 @@
 {
-  "_doc": [
-    "SHARED FIXTURES for the MAPS · Data Center Theme map-state policy (dc-map-state@1).",
-    "",
-    "ONE file, read by BOTH halves of the policy, because the policy is expressed twice:",
-    "  • lib/maps-capture-policy.js  HS.mapsDcCapturePolicyEvidence  (browser + capture job)",
-    "  • homesignal-ingest/supabase/migrations/…_maps_dc_capture_policy_approval_guard.sql",
-    "    public.hs_maps_dc_capture_policy_violations                (the server approval guard)",
-    "",
-    "Two implementations of one rule is how the two halves drift apart, and a drift here is",
-    "invisible: the browser would block an approval the server allows, or the reverse. So",
-    "test/maps-dc-policy-parity.test.mjs runs the JS validator over every case offline, and —",
-    "when database credentials are present — sends the identical cases to the SQL guard and",
-    "requires the SAME verdict on every one. Adding a case here adds it to both sides at once.",
-    "",
-    "`expect_governed` is the SCOPE question (does this policy apply to this row at all) and",
-    "`expect_ok` is the VERDICT. They are separate on purpose: a row the policy does not",
-    "govern must produce NO violations, which is a different fact from a compliant capture.",
-    "",
-    "The evidence shape is taken verbatim from the live Mesa draft 78ee8931-c114-4824-9a29-",
-    "32f6b50b38c2 (ZIP 85212, project 055e0472-fa71-44ca-b5af-614d315f86b1) so the fixtures",
-    "cannot drift into a shape the queue does not carry.",
-    "`project` names which project block a case is built from — `project` (the Mesa data centre) by default, or `ordinary_project` for the non-data-centre scope control. A fixture whose 'ordinary' row still classified as a data centre would test nothing."
-  ],
-  "project": {
-    "lat": 33.350771,
-    "lng": -111.678122,
-    "type": "Commercial",
-    "type_raw": "Commercial/Industrial Projects",
-    "status": "Approved",
-    "project_id": "055e0472-fa71-44ca-b5af-614d315f86b1",
-    "source_key": "socrata:data.mesaaz.gov:dzpk-hxfb:PMT26-01256",
-    "project_name": "Commercial/Industrial Projects New ground up 285,282 SF unlimited area data hall building with type II-B construction. G"
+ "_doc": [
+  "SHARED FIXTURES for the MAPS · Data Center Theme map-state policy (dc-map-state@1).",
+  "",
+  "ONE file, read by BOTH halves of the policy, because the policy is expressed twice:",
+  "  • lib/maps-capture-policy.js  HS.mapsDcCapturePolicyEvidence  (browser + capture job)",
+  "  • homesignal-ingest/supabase/migrations/…_maps_dc_capture_policy_approval_guard.sql",
+  "    public.hs_maps_dc_capture_policy_violations                (the server approval guard)",
+  "",
+  "Two implementations of one rule is how the two halves drift apart, and a drift here is",
+  "invisible: the browser would block an approval the server allows, or the reverse. So",
+  "test/maps-dc-policy-parity.test.mjs runs the JS validator over every case offline, and —",
+  "when database credentials are present — sends the identical cases to the SQL guard and",
+  "requires the SAME verdict on every one. Adding a case here adds it to both sides at once.",
+  "",
+  "`expect_governed` is the SCOPE question (does this policy apply to this row at all) and",
+  "`expect_ok` is the VERDICT. They are separate on purpose: a row the policy does not",
+  "govern must produce NO violations, which is a different fact from a compliant capture.",
+  "",
+  "The evidence shape is taken verbatim from the live Mesa draft 78ee8931-c114-4824-9a29-",
+  "32f6b50b38c2 (ZIP 85212, project 055e0472-fa71-44ca-b5af-614d315f86b1) so the fixtures",
+  "cannot drift into a shape the queue does not carry.",
+  "`project` names which project block a case is built from — `project` (the Mesa data centre) by default, or `ordinary_project` for the non-data-centre scope control. A fixture whose 'ordinary' row still classified as a data centre would test nothing."
+ ],
+ "project": {
+  "lat": 33.350771,
+  "lng": -111.678122,
+  "type": "Commercial",
+  "type_raw": "Commercial/Industrial Projects",
+  "status": "Approved",
+  "project_id": "055e0472-fa71-44ca-b5af-614d315f86b1",
+  "source_key": "socrata:data.mesaaz.gov:dzpk-hxfb:PMT26-01256",
+  "project_name": "Commercial/Industrial Projects New ground up 285,282 SF unlimited area data hall building with type II-B construction. G"
+ },
+ "compliant_statuses": {
+  "operating": true,
+  "approved": true,
+  "proposed": true,
+  "unknown": true
+ },
+ "compliant_types": {
+  "datacenter": true,
+  "industrial": false,
+  "residential": false,
+  "infrastructure": false,
+  "commercial": false,
+  "civic": false,
+  "other": false
+ },
+ "compliant_rendered": {
+  "target_on_map": true,
+  "on_map_total": 4,
+  "non_datacenter_development_on_map": 0,
+  "regulatory_only_on_map": 0,
+  "regulatory_badges_drawn": 0,
+  "dual_identity_target": false
+ },
+ "cases": [
+  {
+   "name": "compliant",
+   "governed": true,
+   "ok": true,
+   "note": "the state the founder asked for: every status on, Data center only, Regulatory off"
   },
-  "compliant_statuses": {
-    "operating": true,
-    "approved": true,
-    "proposed": true,
-    "unknown": true
+  {
+   "name": "legacy_no_capture_policy",
+   "governed": true,
+   "ok": false,
+   "legacy": true,
+   "mutate": {
+    "drop_capture_policy": true
+   },
+   "note": "every image captured before this policy existed — the Mesa regression case"
   },
-  "compliant_types": {
-    "datacenter": true,
-    "industrial": false,
-    "residential": false,
-    "infrastructure": false,
-    "commercial": false,
-    "civic": false,
-    "other": false
+  {
+   "name": "wrong_policy_version",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "policy": "dc-map-state@0"
+   },
+   "note": "a current-LOOKING record that names an older policy"
   },
-  "compliant_rendered": {
-    "target_on_map": true,
-    "on_map_total": 4,
-    "non_datacenter_development_on_map": 0,
-    "regulatory_only_on_map": 0,
-    "regulatory_badges_drawn": 0,
-    "dual_identity_target": false
+  {
+   "name": "status_off",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "applied_status_off": "unknown",
+    "final_status_off": "unknown"
+   },
+   "note": "Lifecycle unknown left off — a whole class of record silently missing from the map"
   },
-  "cases": [
-    {
-      "name": "compliant",
-      "governed": true,
-      "ok": true,
-      "note": "the state the founder asked for: every status on, Data center only, Regulatory off"
-    },
-    {
-      "name": "legacy_no_capture_policy",
-      "governed": true,
-      "ok": false,
-      "legacy": true,
-      "mutate": {
-        "drop_capture_policy": true
-      },
-      "note": "every image captured before this policy existed — the Mesa regression case"
-    },
-    {
-      "name": "wrong_policy_version",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "policy": "dc-map-state@0"
-      },
-      "note": "a current-LOOKING record that names an older policy"
-    },
-    {
-      "name": "status_off",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "applied_status_off": "unknown",
-        "final_status_off": "unknown"
-      },
-      "note": "Lifecycle unknown left off — a whole class of record silently missing from the map"
-    },
-    {
-      "name": "unknown_status_control_set",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "extra_status": "demolished"
-      },
-      "note": "Map 1 grew a control this policy was never reasoned about"
-    },
-    {
-      "name": "extra_type_on",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "applied_type_on": "industrial",
-        "final_type_on": "industrial"
-      },
-      "note": "the 2026-09-15 bypass symptom: non-data-centre pins on a Data Center card"
-    },
-    {
-      "name": "regulatory_on",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "regulatory": true
-      },
-      "note": "THE MESA DEFECT ITSELF — Regulatory facilities left checked"
-    },
-    {
-      "name": "regulatory_not_measured",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "drop_regulatory": true
-      },
-      "note": "absent is not false; a guard that reads a missing key as compliant is not a guard"
-    },
-    {
-      "name": "regulatory_string_false",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "regulatory_string": "false"
-      },
-      "note": "the STRING \"false\" is not a measured boolean"
-    },
-    {
-      "name": "applied_and_final_disagree",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "final_drop_type": "other"
-      },
-      "note": "a control moved between applying the filter and the shutter"
-    },
-    {
-      "name": "rendered_not_measured",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "drop_rendered": true
-      },
-      "note": "controls alone are a claim about the panel, not about the markers"
-    },
-    {
-      "name": "target_not_on_map",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "rendered": {
-          "target_on_map": false
-        }
-      },
-      "note": "a picture of a map the subject is not on"
-    },
-    {
-      "name": "non_datacenter_markers_rendered",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "rendered": {
-          "non_datacenter_development_on_map": 3
-        }
-      },
-      "note": "COMPLIANT-LOOKING CONTROLS, CONTRADICTORY RENDER — the case metadata alone would pass"
-    },
-    {
-      "name": "regulatory_only_markers_rendered",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "rendered": {
-          "regulatory_only_on_map": 1
-        }
-      },
-      "note": "a regulatory-only record drawn while the overlay is required off"
-    },
-    {
-      "name": "regulatory_badges_rendered",
-      "governed": true,
-      "ok": false,
-      "mutate": {
-        "rendered": {
-          "regulatory_badges_drawn": 2
-        }
-      },
-      "note": "the purple R still painted — the overlay did not follow its own switch"
-    },
-    {
-      "name": "dual_identity_target_compliant",
-      "governed": true,
-      "ok": true,
-      "mutate": {
-        "rendered": {
-          "dual_identity_target": true
-        }
-      },
-      "note": "a dual-identity data centre STAYS through its development identity; only its badge follows the off state"
-    },
-    {
-      "name": "alerts_row",
-      "governed": false,
-      "ok": true,
-      "content_family": "ALERTS",
-      "note": "scope control — every ALERTS post must be untouched"
-    },
-    {
-      "name": "ordinary_maps_row",
-      "governed": false,
-      "ok": true,
-      "theme": null,
-      "mutate": {
-        "drop_capture_policy": true
-      },
-      "note": "scope control — a REAL non-data-centre MAPS draft (live row 3aa89855, ZIP 80210, a Denver ADU). It carries no capture_policy and must stay exactly as valid as it was: the policy governs Data Center Theme posts only.",
-      "project": "ordinary_project"
-    },
-    {
-      "name": "absence_post",
-      "governed": false,
-      "ok": true,
-      "absence": true,
-      "mutate": {
-        "drop_capture_policy": true
-      },
-      "note": "scope control — no project, nothing on a map to photograph, existing behaviour preserved"
+  {
+   "name": "unknown_status_control_set",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "extra_status": "demolished"
+   },
+   "note": "Map 1 grew a control this policy was never reasoned about"
+  },
+  {
+   "name": "extra_type_on",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "applied_type_on": "industrial",
+    "final_type_on": "industrial"
+   },
+   "note": "the 2026-09-15 bypass symptom: non-data-centre pins on a Data Center card"
+  },
+  {
+   "name": "regulatory_on",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "regulatory": true
+   },
+   "note": "THE MESA DEFECT ITSELF — Regulatory facilities left checked"
+  },
+  {
+   "name": "regulatory_not_measured",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "drop_regulatory": true
+   },
+   "note": "absent is not false; a guard that reads a missing key as compliant is not a guard"
+  },
+  {
+   "name": "regulatory_string_false",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "regulatory_string": "false"
+   },
+   "note": "the STRING \"false\" is not a measured boolean"
+  },
+  {
+   "name": "applied_and_final_disagree",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "final_drop_type": "other"
+   },
+   "note": "a control moved between applying the filter and the shutter"
+  },
+  {
+   "name": "rendered_not_measured",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "drop_rendered": true
+   },
+   "note": "controls alone are a claim about the panel, not about the markers"
+  },
+  {
+   "name": "target_not_on_map",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "rendered": {
+     "target_on_map": false
     }
-  ],
-  "ordinary_project": {
-    "lat": 39.681,
-    "lng": -104.981,
-    "type": "Residential",
-    "type_raw": "New Building",
-    "status": "Approved",
-    "project_id": "3aa89855-eae6-4f84-a381-6d384c7bae13",
-    "source_key": "socrata:denver:residential:1764-S-SHERMAN",
-    "project_name": "New Building 1764 S Sherman ST ADU"
+   },
+   "note": "a picture of a map the subject is not on"
+  },
+  {
+   "name": "non_datacenter_markers_rendered",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "rendered": {
+     "non_datacenter_development_on_map": 3
+    }
+   },
+   "note": "COMPLIANT-LOOKING CONTROLS, CONTRADICTORY RENDER — the case metadata alone would pass"
+  },
+  {
+   "name": "regulatory_only_markers_rendered",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "rendered": {
+     "regulatory_only_on_map": 1
+    }
+   },
+   "note": "a regulatory-only record drawn while the overlay is required off"
+  },
+  {
+   "name": "regulatory_badges_rendered",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "rendered": {
+     "regulatory_badges_drawn": 2
+    }
+   },
+   "note": "the purple R still painted — the overlay did not follow its own switch"
+  },
+  {
+   "name": "dual_identity_target_compliant",
+   "governed": true,
+   "ok": true,
+   "mutate": {
+    "rendered": {
+     "dual_identity_target": true
+    }
+   },
+   "note": "a dual-identity data centre STAYS through its development identity; only its badge follows the off state"
+  },
+  {
+   "name": "alerts_row",
+   "governed": false,
+   "ok": true,
+   "content_family": "ALERTS",
+   "note": "scope control — every ALERTS post must be untouched"
+  },
+  {
+   "name": "ordinary_maps_row",
+   "governed": false,
+   "ok": true,
+   "theme": null,
+   "mutate": {
+    "drop_capture_policy": true
+   },
+   "note": "scope control — a REAL non-data-centre MAPS draft (live row 3aa89855, ZIP 80210, a Denver ADU). It carries no capture_policy and must stay exactly as valid as it was: the policy governs Data Center Theme posts only.",
+   "project": "ordinary_project"
+  },
+  {
+   "name": "absence_post",
+   "governed": false,
+   "ok": true,
+   "absence": true,
+   "mutate": {
+    "drop_capture_policy": true
+   },
+   "note": "scope control — no project, nothing on a map to photograph, existing behaviour preserved"
+  },
+  {
+   "name": "zip_scope_no_target",
+   "governed": true,
+   "ok": true,
+   "mutate": {
+    "scope": "zip",
+    "rendered": {
+     "target_on_map": false
+    }
+   },
+   "note": "⚖️ every post gets a map: a ZIP-scope capture has no target by construction, so target_on_map must NOT be required. This is the case that gives the 18 absence posts a picture."
+  },
+  {
+   "name": "zip_scope_absent_still_needs_target",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "rendered": {
+     "target_on_map": false
+    }
+   },
+   "note": "the SAME blob with no scope key is a legacy PROJECT capture and is still refused for a missing target — the default must not flip to zip, or the guard silently stops guarding every pre-scope row"
+  },
+  {
+   "name": "zip_scope_still_proves_the_filter",
+   "governed": true,
+   "ok": false,
+   "mutate": {
+    "scope": "zip",
+    "rendered": {
+     "target_on_map": false,
+     "regulatory_badges_drawn": 3
+    }
+   },
+   "note": "ZIP scope relaxes the TARGET and nothing else: a ZIP map that still drew regulatory badges is refused, so the three filter dimensions are still proven"
   }
+ ],
+ "ordinary_project": {
+  "lat": 39.681,
+  "lng": -104.981,
+  "type": "Residential",
+  "type_raw": "New Building",
+  "status": "Approved",
+  "project_id": "3aa89855-eae6-4f84-a381-6d384c7bae13",
+  "source_key": "socrata:denver:residential:1764-S-SHERMAN",
+  "project_name": "New Building 1764 S Sherman ST ADU"
+ }
 }

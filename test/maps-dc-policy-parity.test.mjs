@@ -68,6 +68,10 @@ function buildRow(c) {
     rendered,
   };
   if (m.drop_rendered) delete capture_policy.rendered;
+  // SCOPE. Omitted by default on purpose: a blob with no `scope` key is a pre-scope capture
+  // and must still be judged as PROJECT scope on both sides, which is what case
+  // `zip_scope_absent_still_needs_target` pins.
+  if (m.scope) capture_policy.scope = m.scope;
 
   const evidence = clone(FX[c.project || 'project']);
   evidence.theme = ('theme' in c) ? c.theme : 'datacenter';
