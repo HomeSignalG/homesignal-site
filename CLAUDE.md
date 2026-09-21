@@ -2900,3 +2900,41 @@ the entity link connecting River Bottoms Ranch LLC ↔ Neuralink via shared phon
   Deploy as ONE esbuild bundle (`esbuild index.ts --bundle --format=esm --external:jsr:*
   --minify-whitespace`) with a provenance header naming the repo commit; the repo's
   readable multi-file source stays the parked reference.
+
+
+---
+
+## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
+
+**Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
+
+### Required behavior
+
+1. **Find the canonical path before coding.** Trace source → ingest/normalization → canonical storage/API/RPC → resident-facing surface → downstream consumer. Verify it in current code and production data; do not infer it from names or memory.
+2. **Reuse; do not re-decide.** A downstream feature may format, filter, or present canonical output, but it must not independently re-answer a question the canonical layer already answers. If Map 1 determines the qualified data-center dots for a ZIP, MAPS/social generation must consume that same canonical result; it may not query one convenient source and independently decide whether a data center exists.
+3. **Blocked canonical path = STOP, not bypass.** If the canonical layer is missing data, stale, unavailable, too slow, or lacks an interface, repair or extend the canonical path. If that cannot be done safely within scope, stop and report the blocker. Never route around it silently.
+4. **No temporary shortcuts.** “Temporary,” “for now,” “just for this ZIP/source/page,” “fallback,” and “until the real fix” do not make a duplicate truth path acceptable. A temporary bypass tends to become production architecture.
+5. **Universal fixes only for systemic defects.** If a defect can affect multiple ZIPs, communities, sources, users, or future additions, fix the shared contract/pipeline. Do not patch the observed ZIP, row, source, or UI instance as the solution.
+6. **Fail closed on uncertainty.** Missing, stale, incomplete, contradictory, or unverified canonical evidence must not be converted into a confident resident-facing claim. Surface UNKNOWN/blocked state or withhold publication as appropriate.
+7. **Prove there is one path.** Before PR/merge, search for alternate implementations of the same decision across the repo(s). The receipt must name the canonical function/table/RPC/contract and show that touched consumers use it rather than duplicate its logic.
+8. **CI must defend architectural invariants where practical.** When repairing a shortcut defect, add a regression/contract test that fails if the bypass is reintroduced or if a consumer diverges from canonical output. Prefer parity/contract tests over incident-specific fixtures.
+9. **Cross-repo rule.** When the canonical producer is in one HomeSignal repo and the consumer is in another, do not duplicate the producer logic in the consumer repo. Define/test the interface between them and keep the truth decision on one side.
+10. **No convenience exception.** Faster implementation, fewer files, avoiding a migration, avoiding a dependency, or making a test pass is never sufficient reason to violate this rule.
+
+### Mandatory pre-implementation statement
+
+For any change that affects how resident-facing facts are derived, state before editing:
+
+- **Canonical truth path:** source → canonical layer → consumer
+- **Decision owner:** function/RPC/table/contract that owns the truth decision
+- **Shortcut check:** search showing no competing/parallel decision path is being added
+
+If those cannot be named, **do not implement yet**. Investigate until they can be named or stop with the blocker.
+
+### Mandatory review question
+
+Every relevant PR must be reviewable against this question:
+
+> **Does this change preserve one canonical truth path, or does it create a shortcut/second way to decide the same fact?**
+
+If it creates a second way, reject it even if its local tests pass.
