@@ -1270,7 +1270,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(bskyTheme(p)!=='datacenter') return;
       var cur=m[p.zip];
       // approved outranks draft in the display, so a ZIP that has moved on says so.
-      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft exists');
+      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft \u2014 will refresh');
     });
     return m;
   }
@@ -1285,7 +1285,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       (rows.length?('<span class="muted" style="font-size:12px">'+rows.length+' ZIP'+(rows.length===1?'':'s')+
         (rows[0].uploaded_at?(' · uploaded '+new Date(rows[0].uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})):'')+
         '</span>'):'')+'</div>'+
-      '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created.</p>';
+      '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created. Running the action also refreshes existing drafts on these ZIPs.</p>';
 
     // GENERATE is FIRST and is the only accented control here, because it is the only one
     // that WRITES. The rest move a CSV around. It is hidden when the list is empty rather
@@ -1533,9 +1533,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         if(!claims.error && claims.data && claims.data.length){
           alert('This draft does not satisfy the claim contract, so it cannot be approved:\n\n'
             + claims.data.join('\n')
-            + '\n\nNothing was changed. A draft composed before the contract needs refreshing: '
-            + 'press \u201cCreate + refresh drafts\u201d on the Data Center Theme panel (it now '
-            + 'refreshes existing drafts too), or run Actions \u2192 Recompose MAPS drafts.');
+            + '\n\nNothing was changed. A draft composed before the contract needs refreshing. '
+            + 'If this ZIP is in the Data Center Theme list above, press \u201cCreate + refresh '
+            + 'drafts\u201d \u2014 it refreshes existing drafts too, but ONLY on the ZIPs in that '
+            + 'list. For any other ZIP, run Actions \u2192 Recompose MAPS drafts.');
           return;
         }
         var r=await window.hsClient.rpc('hs_approve_social_post',{

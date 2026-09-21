@@ -871,10 +871,18 @@ things and no more:**
    nothing and refreshes nothing itself. No new table, no new RPC, no copy rule in the browser
    — a privileged SQL path is the wrong place to decide what a post says.
 
-- 🅿️ **THE MIGRATION IS NOT APPLIED, AND THE ORDER IS SAFE EITHER WAY.** Until it is, the
-  button dispatches three inputs and the workflow's own `refresh` default (true) governs — so
-  the refresh already happens. The apply makes the intent explicit at the call site instead of
-  dependent on a default in another repo. Neither half silently disables the other.
+- 🅿️ **THE MIGRATION IS NOT APPLIED, AND THE ORDER IS NOT FREE — MERGE THE INGEST CHANGE
+  FIRST.** Until it is applied, the button dispatches three inputs and the ingest workflow's
+  own `refresh` default (true) governs, so the refresh already happens. The apply makes the
+  intent explicit at the call site instead of dependent on a default in another repo.
+  - 🛑 **"SAFE EITHER WAY" WAS WRONG, and this bullet claimed it. An independent review found
+    it.** A `workflow_dispatch` carrying an input the target workflow does **not DECLARE** is
+    rejected by GitHub with **422 "Unexpected inputs provided"**, and this RPC dispatches
+    `ref: 'main'`. So applying this SQL **before** `homesignal-ingest`'s `refresh` input
+    reaches its `main` **breaks the button outright** — the one ordering a human running a
+    parked migration by hand would actually hit, and the one the note did not mention.
+    "Neither half silently disables the other" is still true: the failure is a loud 422, not
+    a silent no-op. **The ordering is: ingest merges, then apply.**
 - ⚠️ **THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: `vault.github_actions_pat` is
   DEAD** (HTTP 401 since 2026-09-15, per `public.pipeline_health_check`). No dispatch of any
   shape succeeds until the founder re-mints it. This change neither fixes nor works around it.
