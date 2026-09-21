@@ -473,3 +473,121 @@ $$;
 --    production, for a test. The fail-closed property is what this gate exists for
 --    and it is proven; the success path is proven by the first real generation.
 -- ============================================================================
+
+-- ============================================================================
+-- PART 2 — STEPS 2/4/5/9 SUPPORT. Executable, applied 2026-09-21.
+-- Migrations: n5_generation_aware_shards_and_captured_identity,
+--             n5_capture_zip_prefix_index,
+--             n5_reconcile_chunk_sargable_zip_range
+-- ============================================================================
+
+-- (a) The captured contract also carries app_project_id so the freeze resolves
+--     source_key_basis from ONE contract instead of re-expressing the predicate beside it.
+drop function if exists public.n5_expected_captured(text);
+create function public.n5_expected_captured(p_snapshot_id text)
+returns table (source_key text, zip text, source_seq smallint, registry_id text,
+               lat double precision, lng double precision, app_project_id uuid)
+language sql stable set search_path to 'public', 'preservation', 'pg_temp'
+as $$
+  select i.source_key, i.zip, i.source_seq, i.registry_id, i.lat, i.lng, i.app_project_id
+    from preservation.app_project_identity i
+   where i.snapshot_id = p_snapshot_id
+     and i.record_kind = 'development'
+     and i.source_key is not null
+     and i.zip is not null
+     and i.zip ~ '^[0-9]{5}$'
+     and split_part(i.source_key, ':', 1) <> 'epa_frs';
+$$;
+
+-- (b) Shards belong to a GENERATION, not merely a snapshot: state keyed on snapshot alone
+--     cannot tell a failed generation from its replacement.
+alter table geo.n5_shard add column if not exists generation_id text;
+alter table geo.n5_shard add column if not exists claimed_by text;
+alter table geo.n5_shard add column if not exists claim_expires_at timestamptz;
+alter table geo.n5_shard add column if not exists attempts integer not null default 0;
+create index if not exists n5_shard_gen_state_ix on geo.n5_shard (generation_id, state);
+update geo.n5_shard s set generation_id = 'legacy-phase1-2026-09-01'
+ where s.generation_id is null and s.snapshot_id = 'phase1-2026-09-01';
+
+-- (c) Lease-based claim. FOR UPDATE SKIP LOCKED is what makes two concurrent orchestrators
+--     SAFE rather than merely unlikely to collide; a lease is what stops a dead worker
+--     stranding its shard forever.
+create or replace function geo.n5_claim_shard(
+  p_generation_id text, p_worker text, p_lease_seconds int default 3600)
+returns geo.n5_shard
+language plpgsql set search_path to 'geo', 'public', 'pg_temp'
+as $$
+declare s geo.n5_shard;
+begin
+  if p_worker is null or length(trim(p_worker)) = 0 then
+    raise exception 'n5_claim_shard: worker identity required' using errcode = '22023';
+  end if;
+  if not exists (select 1 from geo.n5_generation g
+                  where g.generation_id = p_generation_id and g.state = 'BUILDING') then
+    raise exception 'n5_claim_shard: generation % is not BUILDING', p_generation_id
+      using errcode = '22023';
+  end if;
+  select * into s from geo.n5_shard
+   where generation_id = p_generation_id
+     and (state = 'pending'
+          or (state = 'running' and claim_expires_at is not null and claim_expires_at < now()))
+   order by z3 for update skip locked limit 1;
+  if not found then return null; end if;
+  update geo.n5_shard
+     set state = 'running', claimed_by = p_worker,
+         claim_expires_at = now() + make_interval(secs => p_lease_seconds),
+         attempts = attempts + 1, started_at = now()
+   where snapshot_id = s.snapshot_id and z3 = s.z3 and generation_id = s.generation_id
+  returning * into s;
+  return s;
+end
+$$;
+
+-- (d) THE INDEX THE BUILD ALWAYS NEEDED. preservation.app_project_identity carried only its
+--     PK (snapshot_id, app_project_id) plus a PARTIAL index over four z3 prefixes left from
+--     a targeted operation, so every other prefix full-scanned 3.17M rows / 1,129 MB — paid
+--     544 times over during the original ~75-hour build.
+create index if not exists app_project_identity_snapshot_kind_zip
+  on preservation.app_project_identity (snapshot_id, record_kind, zip);
+
+-- (e) ⚠️ AND THE INDEX ALONE FIXED NOTHING, WHICH IS THE LESSON. n5_reconcile_chunk filtered
+--     with left(zip, n) = prefix, which is NOT sargable — Postgres cannot turn it into a
+--     range scan, so the new index went unused and the chunk still exceeded 60s. Rewritten
+--     to a closed range. Every ZIP in this corpus is exactly 5 digits (asserted nationally:
+--     0 rows fail '^[0-9]{5}$'), so prefix p maps to [rpad(p,5,'0'), rpad(p,5,'9')].
+--     CONTROL: the same chunk returned byte-identical counts before and after —
+--     expected 26,978 / resolved 15,204 / unresolved 0 / unaccounted 11,774 — so the change
+--     moved the speed and not the answer. Full body: migration
+--     n5_reconcile_chunk_sargable_zip_range.
+
+-- ============================================================================
+-- D-2 MEASUREMENT (read-only; D-2 is NOT solved here, only made measurable)
+--
+-- Chunk z3='016', reconciled: expected 7,704 · resolved 67 (0.87%) · unresolved 0 ·
+-- unaccounted 7,637. Cohort frozen in geo.n5_d2_cohort_20260921 BEFORE classification so
+-- the categories provably sum to what they explain.
+--
+--   C2_resolved_under_other_zcta      44   0.58%   USPS ZIP <> containing ZCTA
+--   C4b_assoc_unjudgeable_ev2      7,593  99.42%   treatment = NOAUTH
+--   C3 / C4a / C4c / C5 / C6           0      0%
+--   ----------------------------------------------
+--   TOTAL                          7,637    100%   exact, 0 unexplained
+--
+-- All 7,593 are registry `worcester-building-permits`, whose n5_accepted_source row is
+-- NOAUTH with exactly 7,593 projects — the chunk reconciles to a single source. NOAUTH
+-- means no authoritative geometry exists, so build_associations correctly classifies them
+-- ev=2 unjudgeable. That is a SOURCE CAPABILITY limit, not a freshness defect, not a
+-- ZIP/ZCTA defect, and not something build_associations should be changed to "fix".
+--
+-- 🔑 WHAT WAS ACTUALLY WRONG IS THAT NOBODY COULD SEE IT. The legacy build had no
+-- unresolved accounting, so these 7,593 did not appear anywhere — they simply were not on
+-- the map. Under the new contract they land in geo.n5_generation_unresolved with a reason
+-- code, which satisfies INV-1 and makes them countable. They are still not on the map, but
+-- honestly so.
+--
+-- ⚠️ SCOPE: z3='016' only. Bucket '0' as a whole carries 11,774 unaccounted and its mix is
+-- NOT measured here — the bucket-wide classification exceeded the query budget. Do not
+-- extrapolate this 99/0.6 split nationally; the 8 NOAUTH registries total 30,036 projects,
+-- which is 3.2% of the 925,463-project baseline, so most chunks will look nothing like
+-- Worcester.
+-- ============================================================================

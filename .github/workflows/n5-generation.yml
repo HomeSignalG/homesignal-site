@@ -1,0 +1,68 @@
+# N5 GEOGRAPHY GENERATION — the lifecycle the 544-shard build never had.
+#
+# The original national build completed on 2026-09-05 and stopped, because its unit of work
+# was "build every ZIP3 prefix once" and every prefix reached done. Nothing failed; there
+# was simply nothing that would ever run again. This workflow is that something.
+#
+# ⛔ IT CANNOT ACTIVATE A GENERATION. `activate` is manual-dispatch only and even then the
+# decision belongs to geo.n5_generation_activate(), which re-derives every condition and
+# raises. A green run of this workflow means work advanced — never that production moved.
+#
+# The scheduled job runs MODE=work only. With no BUILDING generation it is a clean no-op,
+# so the schedule costs one short job and reports honestly rather than red.
+name: n5-generation
+
+on:
+  schedule:
+    # Every 2 hours. Chosen against measured cost, not taste: the 2026-09-02..09-05 build
+    # was ~75 wall-clock hours for 544 shards (~8 min/shard serial-equivalent), so a
+    # 50-minute bounded tick advances several shards and a national generation completes in
+    # days rather than never. Raise MAX_SHARDS before shortening this interval.
+    - cron: '17 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'status | open | work | reconcile | ready | activate'
+        required: true
+        default: 'status'
+      generation:
+        description: 'generation id (blank = discover the single BUILDING one)'
+        required: false
+        default: ''
+      max_shards:
+        description: 'shards per invocation'
+        required: false
+        default: '4'
+      chunks:
+        description: 'reconcile/activate chunk keys, comma separated'
+        required: false
+        default: '0,1,2,3,4,5,6,7,8,9'
+
+concurrency:
+  # ONE orchestrator at a time. This is belt-and-braces, not the control: geo.n5_claim_shard
+  # uses FOR UPDATE SKIP LOCKED, so two runs interleave safely even if this were removed.
+  # A workflow-level lock cannot protect against a hand-run script; the database one can.
+  group: n5-generation
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    # Bounded so a wedged shard cannot hold the lane. The lease in n5_claim_shard is what
+    # releases the shard afterwards; this only bounds the runner.
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Orchestrate
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MODE: ${{ github.event.inputs.mode || 'work' }}
+          GENERATION: ${{ github.event.inputs.generation || '' }}
+          MAX_SHARDS: ${{ github.event.inputs.max_shards || '4' }}
+          CHUNKS: ${{ github.event.inputs.chunks || '0,1,2,3,4,5,6,7,8,9' }}
+          MAX_SECONDS: '3000'
+          WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python scripts/n5_orchestrate.py
