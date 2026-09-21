@@ -40,15 +40,19 @@ ok('no service-role key is present in the page',
 
 // --------------------------------------------------- rendered, not merely resolved
 ok('_bskyImgOk is set only inside an img.onload handler',
-  /img\.onload\s*=\s*function\(\)\{\s*_bskyImgOk\[p\.id\]\s*=\s*true/.test(DASH));
+  /img\.onload\s*=\s*function\(\)\{\s*_bskyImgOk\[_bskyImgKey\(p\)\]\s*=\s*true/.test(DASH));
 ok('an image error path clears nothing and reports the failure',
   /img\.onerror/.test(DASH) && /failed to render/.test(DASH));
 ok('object URLs are revoked before each re-render',
   /revokeObjectURL/.test(DASH) && /bskyReleaseBlobs\(\);\s*\/\//.test(DASH));
 
 // ------------------------------------------------------------- CASE B isolation
-// Each post's blob is keyed by its own id, so one draft can never show another's image.
-ok('blob cache is keyed per post id', /_bskyBlobUrl\[p\.id\]/.test(DASH));
+// Each post's blob is keyed by its own id AND its own image path, so one draft can never show
+// another's image — and, since a re-capture writes a NEW object path, a draft can never show
+// its OWN superseded image either. Keying on the id alone was the second of those defects.
+ok('blob cache is keyed per post id AND image path',
+  /function _bskyImgKey\(p\)\{ return String\(p && p\.id\) \+ '\|' \+ String\(\(p && p\.image_bucket_path\) \|\| ''\); \}/.test(DASH)
+  && /_bskyBlobUrl\[_k\]/.test(DASH) && !/_bskyBlobUrl\[p\.id\]/.test(DASH));
 ok('the modal drops a late callback that belongs to a different post',
   /if\(bskyEditId!==pid\) return;/.test(DASH));
 
@@ -82,7 +86,7 @@ const gateBody = (() => {
   return m ? m[1] : '';
 })();
 ok('…and the shared gate still carries the original image rule',
-  gateBody.length > 0 && /mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(gateBody));
+  gateBody.length > 0 && /mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]/.test(gateBody));
 ok('the gate is scoped to MAPS and does not touch ALERTS',
   /content_family === 'MAPS' && p\.image_bucket_path/.test(DASH));
 

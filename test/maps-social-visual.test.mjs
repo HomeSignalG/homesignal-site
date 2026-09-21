@@ -21,6 +21,12 @@ const GEN_CODE = GEN
 // reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
   .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1 ')
   .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
+// The Data Center map-state policy lives in its own SHIPPED module, which the generator
+// injects into the captured browser. It is stripped the same way and for the same reason.
+const strip = (src) => src
+  .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1 ')
+  .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
+const POLICY_CODE = strip(readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8'));
 
 let n = 0, bad = 0;
 const ok = (cond, msg) => { n++; if (cond) console.log('PASS — ' + msg); else { bad++; console.log('FAIL — ' + msg); } };
@@ -103,10 +109,22 @@ ok(!/display:\s*none[^}]*marker|hideMarkers|removeLayer|clearLayers/.test(GEN_CO
 // cleaned up; a visible, resident-operable filter is the opposite of quiet. Asserted rather
 // than assumed — the narrowing must happen through a change event on the page's own checkbox,
 // never by touching the map.
-ok(/dispatchEvent\(new Event\('change'/.test(GEN_CODE),
+// The manoeuvre now lives in lib/maps-capture-policy.js and the generator INJECTS it, so the
+// pin reads that module: asserting against the generator alone would go green while the
+// shared implementation — the one the capture actually runs — was gutted.
+ok(/dispatchEvent\(new Event\('change'/.test(POLICY_CODE),
   'the theme filter is applied through the page\u2019s OWN control, not by editing the map');
-ok(!/layerGroup|\.addTo\(|L\.marker|setStyle/.test(GEN_CODE),
-  'and the generator still never touches Leaflet layers itself');
+ok(/addScriptTag\(\{ content: POLICY_SRC \}\)/.test(GEN_CODE),
+  'and the generator reaches it by injecting the SHIPPED module, not by re-typing it');
+// ALL THREE DIMENSIONS are operated, and all three controls are inside the captured frame —
+// so the checkmarks in the image disclose the whole narrowing, not a third of it.
+ok(/#mapkey \.stagechip\[data-stage="/.test(POLICY_CODE)
+  && /#mapkeyShapes \.typechip\[data-cat="/.test(POLICY_CODE)
+  && /getElementById\('regToggleBox'\)/.test(POLICY_CODE),
+  'STATUS, PROJECT TYPE and REGULATORY are each operated through their own visible control');
+ok(!/layerGroup|\.addTo\(|L\.marker|setStyle/.test(GEN_CODE)
+  && !/layerGroup|\.addTo\(|L\.marker|setStyle/.test(POLICY_CODE),
+  'and neither the generator nor the policy ever touches Leaflet layers itself');
 ok(/leaflet-control-container\{display:none/.test(GEN),
   'only Leaflet’s own zoom control is hidden for the shot');
 

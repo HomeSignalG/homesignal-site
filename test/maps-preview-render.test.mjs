@@ -85,7 +85,14 @@ const rowX = { id: 'X', content_family: 'MAPS', image_bucket_path: 'maps/missing
 const rowC = { id: 'C', content_family: 'MAPS', image_bucket_path: null, evidence: {} };
 const rowAl = { id: 'AL', content_family: 'ALERTS', image_bucket_path: 'maps/a.png' };
 
+// ⚠️ THE ROW IS REGISTERED FIRST, exactly as the shipped queue renderer does. The gate keys
+// its "this image has painted" flag on the row id PLUS its image path — because a re-capture
+// writes a NEW object path, and a flag keyed on the id alone would let a SUPERSEDED blob mark
+// a new image as seen. So the gate needs the row to know which path it is asking about, and
+// a row it has never seen stays LOCKED (§ below pins that, so the dependency is a stated
+// property rather than an accident of this harness).
 const render = async (row) => page.evaluate((r) => new Promise((res) => {
+  _bskyRows[r.id] = r;
   const host = document.getElementById('vis-' + r.id);
   bskyRenderImage(host, r, null, (okFlag) => { bskyApplyApprovalGate(r.id); res(okFlag); });
 }), row);
@@ -100,6 +107,23 @@ ok('CASE A — it is rendered from a blob: URL (the download path), not a remote
   !!a && a.src.startsWith('blob:'), a && a.src);
 ok('CASE A — approve UNLOCKS once the exact image has painted',
   (await page.evaluate(() => !document.querySelector('[data-post="A"] button').disabled)) === true);
+
+// CASE A2 — A NEW IMAGE ON THE SAME ROW IS A CACHE MISS ------------------------------
+// This is the "a cached blob shows an older image" path, and it is the reason the flag is
+// keyed on the path. The row keeps its id and gets a NEW object (what a re-capture writes);
+// the gate must LOCK again until that specific image has painted.
+const rowA2 = { id: 'A', content_family: 'MAPS', image_bucket_path: 'maps/b.png', evidence: {} };
+await page.evaluate((r) => { _bskyRows[r.id] = r; bskyApplyApprovalGate(r.id); }, rowA2);
+ok('CASE A2 — a re-captured row LOCKS again: the old blob cannot vouch for the new image',
+  (await page.evaluate(() => document.querySelector('[data-post="A"] button').disabled)) === true);
+const a2Ok = await render(rowA2);
+const a2 = await page.evaluate(() => document.querySelector('#vis-A img').src);
+ok('CASE A2 — …and the NEW object is fetched and painted, not served from the id cache',
+  a2Ok === true && a2.startsWith('blob:') && a2 !== a.src, `${a.src} vs ${a2}`);
+ok('CASE A2 — approve unlocks only once THAT image has painted',
+  (await page.evaluate(() => !document.querySelector('[data-post="A"] button').disabled)) === true);
+// Restore case A's own row so the later cases read the state they were written against.
+await render(rowA);
 
 // CASE B ---------------------------------------------------------------------------
 await render(rowB);
