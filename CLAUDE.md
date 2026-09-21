@@ -1271,6 +1271,33 @@ things and no more:**
 - **The mandatory-image rule is still SCOPED to the Data Center Theme** and still the
   dashboard's (`bskyMapsImageMandatory`). A general MAPS post publishes the Map 1 link card,
   whose image belongs to the destination page; an absence post can never have one.
+- 🔑 **"AWAITING A SCREENSHOT" AND "REFUSED, RECORDED ON THE ROW" ARE DIFFERENT STATES, AND
+  READING ONE AS THE OTHER INVENTS A BLOCKER (measured 2026-09-21).** Of **26** Data Center
+  Theme drafts: **7** carry an image (`REAL_MAP_VISUAL`, 4 of them with `capture_policy`),
+  **18** are ABSENCE posts with no image, and **1** is project-backed with no image (ZIP
+  64165). 7 + 18 + 1 = 26 exact; controls MAPS drafts 55, non-DC 29, MAPS rows NOT `draft` 0.
+  All **19** imageless rows carry `visual.state = CAPTURE_INELIGIBLE`.
+  - ⚠️ **I reported this as "20 of 26 blocked on missing screenshots" and as "a queue-drain
+    rate problem the next capture run clears." Both halves were wrong**, the second in the
+    reassuring direction — a drain reading predicts the count FALLING on its own, which is
+    the reading that stops anyone looking. The 18 absence posts are **exempt** from the
+    mandatory-image rule above (nothing to photograph), so they are approvable now; and
+    `CAPTURE_INELIGIBLE` is a refusal the capture job WRITES, returned at its first gate
+    every time, so the number cannot fall with more runs. **Read `visual.state` before
+    calling a draft blocked.**
+  - **64165 is correctly stuck and must not be chased from the capture path.** Its project is
+    absent from `geo.zip_authoritative_membership` under every `zcta5`, because it was
+    ingested AFTER the serving generation's watermark — which is `#1275`'s `ACTIVE_LEGACY`
+    condition (`CURRENT = NO`, cutoff 2026-09-01, 20.13 days), already owned there. Retrying
+    cannot clear an upstream `geo` blocker, and a newer generation reaching `ACTIVE` is
+    dispatch-only with `CONSUMER_CUTOVER_AUTHORIZED = NO`. Its fallback is honest.
+  - ⚠️ **QUOTE THE GENERATION CUTOFF, NEVER `completed_at` — I used the write clock and
+    understated staleness by 4.3 days, an error `docs/n5-generation-contract.sql` already
+    names in as many words.** Also: `app_projects.zip` is SOURCE-STATED and is not a
+    membership claim — in 64165 it places 117 development rows where membership holds 29, and
+    **84 of the difference sit in neighbouring ZCTAs**, which is `FIX 29` working, not a
+    defect. Full receipt, including what was deliberately NOT measured:
+    `docs/maps-dc-draft-population-2026-09-21.md`.
 
 ---
 
