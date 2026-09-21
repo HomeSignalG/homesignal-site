@@ -384,14 +384,41 @@ reworded.post_text = 'A completely different sentence about the same project.';
 ok(HS.mapsCaptureBound(reworded),
   '11p: a text-only edit leaves the capture BOUND — no recapture for a recompose');
 
-// THE ABSENCE POST keeps its existing behaviour: no project, nothing to photograph, and the
-// policy must not reach it.
+// ⚖️ THE ABSENCE POST IS GOVERNED AND KEYED LIKE ANY OTHER — FOUNDER RULING, 2026-09-21:
+// every MAPS post gets a map, even when there is no data centre. This block previously
+// asserted the opposite on both counts; it is flipped, not deleted, so the change of rule
+// is visible where the old rule was pinned.
 const absence = { id: 'abs', content_family: 'MAPS', tile: 'development', status: 'draft',
   zip: '64155', image_bucket_path: null,
   evidence: { theme: 'datacenter', theme_answer: 'none_found' } };
 ok(HS.mapsSocialIsAbsence(absence) === true, '11q: the absence post is recognised as one');
-ok(HS.mapsDcCapturePolicyApplies(absence) === false,
-  '11r: …and the map-state policy does NOT govern it — it acquires no image requirement');
+ok(HS.mapsDcCapturePolicyApplies(absence) === true,
+  '11r: …and the map-state policy DOES govern it — the map state is the whole subject of '
+  + 'its picture, so an unpoliced absence capture would be unreadable as evidence');
+
+// ITS KEY IS REAL, WHICH IS WHAT MAKES THE RULING REACHABLE AT ALL. While this returned
+// null an absence capture could never report bound, however real the screenshot was.
+const absKey = HS.mapsCaptureKey(absence);
+ok(typeof absKey === 'string' && absKey.length > 0,
+  '11s: an absence draft has a capture key rather than null');
+ok(absKey.indexOf('|absence|') > -1,
+  '11t: …carrying a literal absence segment, so it can never collide with a project key');
+ok(absKey.indexOf('64155') > -1 && absKey.indexOf(HS.MAPS_DC_CAPTURE_POLICY.key) > -1,
+  '11u: …and it names the ZIP it photographs and the map-state policy it was taken under');
+
+// THE KEY MOVES WITH THE POLICY AND WITH NOTHING ELSE THAT CANNOT CHANGE THE PICTURE.
+const absReworded = JSON.parse(JSON.stringify(absence));
+absReworded.post_text = 'Different words about the same empty map.';
+ok(HS.mapsCaptureKey(absReworded) === absKey,
+  '11v: a text-only edit does NOT move an absence key either — wording is not a map state');
+
+// A MAPS ROW WITH NO PROJECT THAT IS *NOT* A GENUINE ABSENCE ANSWER STAYS UNKEYED. The
+// branch is scoped to the shared absence predicate, not to "project_id is missing", so a
+// malformed row still fails closed the way it always did.
+const notAbsence = JSON.parse(JSON.stringify(absence));
+delete notAbsence.evidence.theme_answer;
+ok(HS.mapsCaptureKey(notAbsence) === null,
+  '11w: a projectless row that is not a genuine absence answer is still unkeyed (fails closed)');
 
 // A CAPTURE FAILURE IS NEVER A FINDING ABOUT A ZIP — and §9 above only covers the four
 // STATE sentences. The policy's own refusal reasons are shown to the founder beside them, so

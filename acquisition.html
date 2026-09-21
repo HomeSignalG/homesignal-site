@@ -274,8 +274,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      loads, so the capture job and this approval gate cannot disagree about whether the
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
      because the binding key includes the theme, which that lib derives. -->
-<script src="lib/maps-capture-policy.js?v=b9e57bde"></script>
-<script src="lib/maps-capture-binding.js?v=5f11ea3e"></script>
+<script src="lib/maps-capture-policy.js?v=7adaa803"></script>
+<script src="lib/maps-capture-binding.js?v=c2733a04"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -876,18 +876,28 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // selected". Falling back to the generic card would ship the campaign hook with a
   // picture that shows no data centre at all. So for this theme the Map 1 capture is
   // MANDATORY — a missing image blocks approval rather than degrading the post.
-  // An ABSENCE post ("no data center filings appear in ... records for <ZIP>") is a Data
-  // Center Theme post with NO PROJECT, so there is nothing on the map to photograph. Its
-  // evidence says so in its own words: "the draft carries no project_id, so there is
-  // nothing to photograph". Requiring the mandatory capture of it would block Approve
-  // forever on the one post in the campaign that answers the question honestly when the
-  // answer is "none". It publishes like an ordinary MAPS draft — the link card, whose
-  // OpenGraph image belongs to the destination page and claims nothing about a project.
+  // ⚖️ AN ABSENCE POST IS INCLUDED — FOUNDER RULING, 2026-09-21, stated three times before
+  // it was implemented: **every MAPS post gets a map, even when there is no data centre.**
+  //
+  // 🛑 THIS EXCLUDED IT, AND THE PARAGRAPH THAT JUSTIFIED THE EXCLUSION IS KEPT BELOW AS THE
+  // DATED RECORD, because the reasoning error is the lesson. It read: "an ABSENCE post is a
+  // Data Center Theme post with NO PROJECT, so there is nothing on the map to photograph …
+  // requiring the mandatory capture of it would block Approve forever on the one post in the
+  // campaign that answers the question honestly when the answer is 'none'." Every clause is
+  // true except the one that matters: "no PROJECT to photograph" is not "no MAP to
+  // photograph". The ZIP's Map 1 page renders either way, and that page — Data center the
+  // only type selected, showing no recent filings — is precisely what the absence post is
+  // about. Nothing blocks forever: the capture worker photographs these rows now
+  // (scripts/maps-social-image.mjs::captureAbsence).
+  //
+  // ⚠️ THE COST IS REAL AND IS THE POINT: until a capture lands, an absence draft is NOT
+  // approvable. That is the ruling — a post without its map does not go out — not a side
+  // effect to be engineered around.
   function bskyIsAbsence(p){
     return !!(window.HS && HS.mapsSocialIsAbsence && HS.mapsSocialIsAbsence(p));
   }
   function dcThemeImageMandatory(p){
-    return bskyTheme(p) === 'datacenter' && !bskyIsAbsence(p);
+    return bskyTheme(p) === 'datacenter';
   }
   // \u2500\u2500 IS THE STORED IMAGE STILL THIS DRAFT'S IMAGE? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   // From lib/maps-capture-binding.js, the SAME module the capture job uses, so "bound"
@@ -1044,6 +1054,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var st=bskyCaptureState(p);
     var S=(window.HS&&HS.MAPS_CAPTURE_STATES)||{};
     var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
+    // ⚠️ A REASON FROM A SUPERSEDED VERDICT MUST NOT BE PRINTED UNDER THE CURRENT ONE.
+    // Absence rows written before the 2026-09-21 ruling carry
+    // `failure_reason: "the draft carries no project_id, so there is nothing to photograph"`
+    // beside `state: CAPTURE_INELIGIBLE`. The state machine now discounts that stamp and
+    // derives AWAITING, so printing the old sentence would put the exact wording the
+    // founder corrected underneath the corrected status — a contradiction in one line.
+    // Scoped to that combination: a CURRENT failure reason still prints, on every state.
+    if(st!==v.state) why='';
     if(st===S.READY){
       return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
     }

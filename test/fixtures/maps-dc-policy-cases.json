@@ -20,7 +20,8 @@
     "The evidence shape is taken verbatim from the live Mesa draft 78ee8931-c114-4824-9a29-",
     "32f6b50b38c2 (ZIP 85212, project 055e0472-fa71-44ca-b5af-614d315f86b1) so the fixtures",
     "cannot drift into a shape the queue does not carry.",
-    "`project` names which project block a case is built from — `project` (the Mesa data centre) by default, or `ordinary_project` for the non-data-centre scope control. A fixture whose 'ordinary' row still classified as a data centre would test nothing."
+    "`project` names which project block a case is built from — `project` (the Mesa data centre) by default, or `ordinary_project` for the non-data-centre scope control. A fixture whose 'ordinary' row still classified as a data centre would test nothing.",
+    "`absence` builds a row with no project_id and theme_answer=none_found. Since the 2026-09-21 founder ruling these rows are GOVERNED like any other Data Center Theme post — every MAPS post gets a map — and their captures record rendered.target_sought=false."
   ],
   "project": {
     "lat": 33.350771,
@@ -48,6 +49,7 @@
     "other": false
   },
   "compliant_rendered": {
+    "target_sought": true,
     "target_on_map": true,
     "on_map_total": 4,
     "non_datacenter_development_on_map": 0,
@@ -230,13 +232,56 @@
     },
     {
       "name": "absence_post",
-      "governed": false,
-      "ok": true,
+      "governed": true,
+      "ok": false,
+      "legacy": true,
       "absence": true,
       "mutate": {
         "drop_capture_policy": true
       },
-      "note": "scope control — no project, nothing on a map to photograph, existing behaviour preserved"
+      "note": "FOUNDER RULING 2026-09-21 — every MAPS post gets a map, so an absence post IS governed. This case previously asserted governed=false; it now carries a pre-ruling image with no capture_policy, which is exactly the state every existing absence row is in, and must read LEGACY rather than compliant."
+    },
+    {
+      "name": "absence_post_compliant",
+      "governed": true,
+      "ok": true,
+      "absence": true,
+      "mutate": {
+        "rendered": {
+          "target_sought": false,
+          "target_on_map": false,
+          "on_map_total": 0
+        }
+      },
+      "note": "a real absence capture: the same policy, no target sought, nothing drawn. The picture the ruling exists to produce."
+    },
+    {
+      "name": "absence_post_claiming_a_target",
+      "governed": true,
+      "ok": false,
+      "absence": true,
+      "mutate": {
+        "rendered": {
+          "target_sought": true,
+          "target_on_map": false,
+          "on_map_total": 0
+        }
+      },
+      "note": "THE OVER-FLAGGING CONTROL. target_sought must not become a general excuse for an undrawn target: a record claiming one WAS sought is still refused when it was not drawn."
+    },
+    {
+      "name": "absence_post_markers_outside_the_window",
+      "governed": true,
+      "ok": true,
+      "absence": true,
+      "mutate": {
+        "rendered": {
+          "target_sought": false,
+          "target_on_map": false,
+          "on_map_total": 3
+        }
+      },
+      "note": "⛔ AND THE MAP MAY LEGITIMATELY SHOW DATA CENTRES. The absence sentence is window-bounded (‘no filings from the last N months’) while this policy turns ALL FOUR status controls on, so an operating data centre filed years ago is drawn and contradicts nothing. Do not add an on_map_total==0 assertion; it was written and its own numbers killed it."
     }
   ],
   "ordinary_project": {

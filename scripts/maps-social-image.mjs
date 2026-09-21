@@ -572,6 +572,130 @@ async function capture(page, draft, proj, theme) {
   };
 }
 
+// ⚖️ EVERY POST GETS A MAP, INCLUDING THE "NO DATA CENTER" ONE — FOUNDER RULING, 2026-09-21,
+// stated three times before it was implemented. This function is why it kept being lost.
+//
+// 🔑 THE ERROR WAS ONE SUBSTITUTION: "there is no PROJECT to photograph" was read as "there
+// is no MAP to photograph". They are different facts. A ZIP's Map 1 page exists and renders
+// whether or not a data centre has ever been filed there, and a screenshot OF THAT PAGE is a
+// real screenshot of a real page — so the founder's "no fake graphics, EVER" rule is
+// satisfied in full. Nothing is drawn that the page did not draw. What the absence post's
+// picture shows is the ZIP's own map with the Data center PROJECT TYPE selected and no
+// data-centre markers on it, which is precisely what the post says in words.
+//
+// The capture is the project capture MINUS the marker work, never a different picture:
+// same URL, same embed card, same Data Center map-state policy, same home-pin veto, same
+// panel-in-frame assertions, same clip target, same shutter. `applyDataCenterCapturePolicy`
+// was ALREADY called with a null target (see capture()), and
+// `mapsDcCaptureVerifyAtShutter` already guards its target check with `if (targetKey && …)`,
+// so both halves of the policy run unchanged here with no target — still refusing the shot
+// if any non-data-centre development, any regulatory-only marker or any regulatory badge is
+// on the map at the shutter.
+//
+// ⛔ THERE IS NO HALO AND NO POPUP, and that is not a weaker capture — it is the correct
+// one. A halo means "this marker is the subject"; an absence post's subject is the ABSENCE,
+// so haloing anything would point at a record the post is not about. The project path's
+// `popupOpen && haloPresent` assertion is therefore not relaxed here, it is INAPPLICABLE,
+// and asserting it would refuse every absence capture forever.
+//
+// ⚠️ FRAMING IS THE PAGE'S OWN. The project path calls `map.setView(project coords)`; there
+// are no project coords here, so nothing is set and ZIP mode's own `zipFitRadius` framing
+// stands. That is the same view a resident opening the link would see, which is the honest
+// frame for a post whose subject is the whole ZIP.
+async function captureAbsence(page, draft, theme) {
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`
+    + (theme ? `&${EMBED_PARAM}` : '');
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.addScriptTag({ content: POLICY_SRC });
+
+  // Wait for the page to have ISSUED its reads, not for markers to exist — zero drawn
+  // markers is the expected and correct outcome here, so waiting on a non-empty
+  // `siteMarkers` would time out on exactly the ZIPs this exists to photograph.
+  await page.waitForFunction(
+    () => Array.isArray(window.__HS_SITES),
+    { timeout: 60000 },
+  ).catch(() => {});
+
+  let policyApply = null;
+  if (theme === 'datacenter') {
+    policyApply = await applyDataCenterCapturePolicy(page, null);
+    if (!policyApply.ok) {
+      return { ok: false, reason: `Data Center map-state policy could not be applied: ${policyApply.reason}` };
+    }
+  }
+
+  // ⛔ NO `drew` FLOOR. The project path refuses when the map drew no markers, because a
+  // project capture with nothing drawn cannot contain its subject. An absence capture's
+  // subject IS the empty result, so a marker count of zero is the success case and a floor
+  // here would invert the whole rule.
+
+  const clean = await page.evaluate(() => ({
+    homePins: document.querySelectorAll('.homepin').length,
+    vectorPaths: document.querySelectorAll('#mapInner path.leaflet-interactive').length,
+    markersDrawn: (window.siteMarkers || []).length,
+    markersOnMap: (window.siteMarkers || []).filter((x) => x && x.m && x.m._map).length,
+    sites: (window.__HS_SITES || []).length,
+  }));
+  // The home pin is the veto for the same reason as the project path: a broadcast post has
+  // no home and no radius.
+  if (clean.homePins > 0) return { ok: false, reason: 'refused: a home marker is on the map' };
+
+  await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
+  await page.waitForTimeout(1200);
+
+  let panel = null;
+  if (theme === 'datacenter') {
+    panel = await panelSectionsInFrame(page);
+    const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
+      .filter((k) => !panel[k]);
+    if (missing.length) {
+      return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
+    }
+    if (!panel.sidebar_hidden || !panel.search_form_hidden) {
+      return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
+    }
+  }
+
+  let policyRecord = null;
+  if (theme === 'datacenter') {
+    // NULL TARGET, DELIBERATELY. Every other invariant in this verifier still runs and can
+    // still refuse the shot; only the "is the target still drawn" limb is skipped, because
+    // there is no target. See the guard at lib/maps-capture-policy.js:463.
+    const verify = await page.evaluate(() => window.HS.mapsDcCaptureVerifyAtShutter(null));
+    if (!verify.ok) {
+      return { ok: false, reason: `the Data Center map state did not hold to the shutter: ${verify.reason}` };
+    }
+    policyRecord = await page.evaluate(
+      ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
+      [policyApply, verify],
+    );
+    const ev = HS.mapsDcCapturePolicyEvidence({ capture_policy: policyRecord });
+    if (!ev.ok) {
+      return { ok: false, reason: `the measured map state does not satisfy policy ${HS.MAPS_DC_CAPTURE_POLICY.key}: ${ev.problems.join('; ')}` };
+    }
+  }
+
+  const sel = theme === 'datacenter' ? '.card.mapcard' : '#map';
+  const el = await page.$(sel);
+  if (!el) return { ok: false, reason: `no ${sel} element` };
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  // Keyed on the DRAFT, not a project — there isn't one, and inventing a project-shaped
+  // name for a file that is about a ZIP is how the next reader concludes it has a project.
+  const file = path.join(OUT_DIR, `${draft.zip}-nodc-${String(draft.id).slice(0, 8)}.png`);
+  await el.screenshot({ path: file });
+
+  return {
+    ok: true, file, clip: sel,
+    // `marker` and `framed` are ABSENT rather than null-filled: this image has no marker
+    // subject and no imposed frame, and a present-but-empty field reads as a failed lookup.
+    absence: true,
+    checks: clean,
+    theme: theme || null,
+    policyRecord,
+    panel,
+  };
+}
+
 /** Upload through the EXISTING private social-images bucket. No new storage system. */
 async function upload(objectPath, file) {
   const bytes = fs.readFileSync(file);
@@ -582,6 +706,69 @@ async function upload(objectPath, file) {
   });
   if (!r.ok) throw new Error(`upload -> ${r.status} ${await r.text()}`);
   return objectPath;
+}
+
+/**
+ * ONE FINISH PATH FOR BOTH CAPTURE KINDS — record a failure, name the object, upload, attach.
+ *
+ * 🔑 THIS IS SHARED ON PURPOSE, AND THE REASON IS THE SAME ONE THAT MADE THE ABSENCE POST GO
+ * UNPHOTOGRAPHED FOR SO LONG: the two kinds differ ONLY in what is in front of the lens.
+ * Everything after the shutter — the FAILED record, the key-fingerprinted object path, the
+ * dry-run short circuit, upload-before-attach, and the refusal to write over a row that moved
+ * mid-capture — is one implementation. A second copy would agree today and drift silently,
+ * which is exactly how a rule ends up true on one path and false on the other.
+ *
+ * `proj` is NULL for an absence capture, and every place that would have read it has a named
+ * absence form rather than a blank — see `attach()` and the object path below.
+ */
+async function finishCapture(d, label, r, proj, results) {
+  const theme = r.theme || null;
+
+  if (!r.ok) {
+    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme);
+    results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme,
+      ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
+    return;
+  }
+
+  // THE OBJECT PATH CARRIES THE BINDING KEY'S OWN FINGERPRINT, so a re-capture after the
+  // draft moved writes a NEW object instead of silently overwriting the old one through
+  // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the picture
+  // changes, which is what makes the dashboard's per-row blob cache correct; and the
+  // superseded image survives, so a capture can be compared with the one it replaced.
+  //
+  // The subject segment is the project id, or the literal `nodc` when there is no project.
+  // A project-shaped placeholder there would read to the next person as a project id that
+  // has stopped resolving, which is a different and much worse fact.
+  const subject = proj ? String(proj.id) : 'nodc';
+  const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d)}.png`;
+
+  if (DRY) {
+    results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file,
+      ...(r.absence ? { absence: true } : { marker: r.marker }) });
+    return;
+  }
+
+  // THE UPLOAD LANDS FIRST AND IS HARMLESS ON ITS OWN. The object path carries this draft's
+  // own key fingerprint, so an orphan object is unreferenced bytes — it is not a picture
+  // attached to a row, and nothing reads the bucket except through `image_bucket_path`.
+  // Uploading after a successful attach would be worse: the row would name an object that
+  // does not exist yet.
+  await upload(objectPath, r.file);
+  const wrote = await attach(d, objectPath, r, proj);
+  if (!wrote.ok) {
+    // The row moved while we were photographing it. Report it, leave the previous image and
+    // the previous evidence untouched, and let the next run re-select it against whatever the
+    // draft is NOW. Forcing the write is the one thing that must not happen here.
+    console.warn(`maps-social-image: ${d.id} — SKIPPED (stale): the draft changed during this `
+      + `capture (status or revision ${d.revision} moved). Nothing was written; the uploaded `
+      + `object ${objectPath} is unreferenced.`);
+    results.push({ id: d.id, label, ok: false, state: WAITING, stale: true,
+      reason: 'the draft changed during this capture; the result was not attached' });
+    return;
+  }
+  results.push({ id: d.id, label, ok: true, state: READY, path: objectPath,
+    ...(r.absence ? { absence: true } : { marker: r.marker, framed: r.framed }) });
 }
 
 async function main() {
@@ -636,7 +823,25 @@ async function main() {
         ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
     };
 
-    if (!pid) { await ineligible('the draft carries no project_id, so there is nothing to photograph'); continue; }
+    // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
+    // This branch used to read `await ineligible('the draft carries no project_id, so there
+    // is nothing to photograph')` and `continue`, and that sentence is the one the founder
+    // was reading off the Acquisition Dashboard. It states a true fact about PROJECTS and
+    // draws a false conclusion about MAPS: the ZIP's Map 1 page renders either way, and the
+    // post's whole subject is that page. See captureAbsence() for why this is still a real
+    // screenshot of a real page and not a fabrication.
+    if (!pid) {
+      const themeA = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+      let ra;
+      try { ra = await captureAbsence(page, d, themeA); }
+      catch (e) { ra = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
+      // A refusal returns `{ok:false, reason}` and nothing else, so the theme is carried in
+      // here rather than read off the result — otherwise a FAILED absence row would be
+      // recorded with no theme and the dashboard could not tell which queue it belongs to.
+      if (ra.theme === undefined) ra.theme = themeA || null;
+      await finishCapture(d, label, ra, null, results);
+      continue;
+    }
 
     const proj = await liveProject(pid);
     if (!proj) { await ineligible('the project row is no longer in app_projects'); continue; }
@@ -664,40 +869,9 @@ async function main() {
     try { r = await capture(page, d, proj, theme); }
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
-    if (!r.ok) {
-      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme);
-      results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme,
-        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
-      continue;
-    }
-
-    // THE OBJECT PATH CARRIES THE BINDING KEY'S OWN FINGERPRINT, so a re-capture after the
-    // draft moved writes a NEW object instead of silently overwriting the old one through
-    // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the
-    // picture changes, which is what makes the dashboard's per-row blob cache correct; and
-    // the superseded image survives, so a capture can be compared with the one it replaced.
-    const objectPath = `maps/${d.zip}/${String(proj.id)}-${keyStamp(d)}.png`;
-    if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file, marker: r.marker }); continue; }
-    r.authMarkers = auth.markers;
-    // THE UPLOAD LANDS FIRST AND IS HARMLESS ON ITS OWN. The object path carries this
-    // draft's own key fingerprint, so an orphan object is unreferenced bytes — it is not a
-    // picture attached to a row, and nothing reads the bucket except through
-    // `image_bucket_path`. Uploading after a successful attach would be worse: the row would
-    // name an object that does not exist yet.
-    await upload(objectPath, r.file);
-    const wrote = await attach(d, objectPath, r, proj);
-    if (!wrote.ok) {
-      // The row moved while we were photographing it. Report it, leave the previous image and
-      // the previous evidence untouched, and let the next run re-select it against whatever
-      // the draft is NOW. Forcing the write is the one thing that must not happen here.
-      console.warn(`maps-social-image: ${d.id} — SKIPPED (stale): the draft changed during this `
-        + `capture (status or revision ${d.revision} moved). Nothing was written; the uploaded `
-        + `object ${objectPath} is unreferenced.`);
-      results.push({ id: d.id, label, ok: false, state: WAITING, stale: true,
-        reason: 'the draft changed during this capture; the result was not attached' });
-      continue;
-    }
-    results.push({ id: d.id, label, ok: true, state: READY, path: objectPath, marker: r.marker, framed: r.framed });
+    if (r.theme === undefined) r.theme = theme || null;
+    if (r.ok) r.authMarkers = auth.markers;
+    await finishCapture(d, label, r, proj, results);
   }
 
   await browser.close();
@@ -797,29 +971,42 @@ async function guardedPatch(draft, body) {
 /** Attach the image to THIS draft and record what the visual actually is. */
 async function attach(draft, objectPath, r, proj) {
   const visual = {
-    kind: 'map1_zip_screenshot',
+    kind: r.absence ? 'map1_zip_screenshot_no_project' : 'map1_zip_screenshot',
     status: 'REAL_MAP_VISUAL',
     bucket: 'social-images',
     path: objectPath,
     captured_at: new Date().toISOString(),
     page_url: `${BASE}/homesignalmap.html?zip=${draft.zip}`,
-    project_lat: proj.lat,
-    project_lng: proj.lng,
-    marker_lat: r.marker.lat,
-    marker_lng: r.marker.lng,
-    marker_label: r.marker.label,
-    matched_by: r.marker.how,
-    marker_display_fanned: r.marker.fanned,
-    marker_vs_stored_point_m: r.marker.delta_m,
-    markers_on_map: r.marker.of,
-    framed_zoom: r.framed.zoom,
-    authoritative_zip_status: 'boundary_complete',
-    authoritative_markers_in_zip: r.authMarkers,
+    // ⚖️ THE PROJECT BLOCK IS ABSENT ON AN ABSENCE CAPTURE, never null-filled — the same
+    // convention the theme block below already uses, and for the same reason: a
+    // present-but-empty `marker_lat` reads as a lookup that failed, while its absence reads
+    // as what it is, a picture with no project subject. An absence capture that emitted
+    // `project_lat: null` would also make `attach` the one place in this pipeline claiming a
+    // project exists for a draft that has none.
+    ...(r.absence ? {
+      subject: 'zip_no_qualifying_project',
+      markers_drawn: r.checks.markersDrawn,
+      markers_on_map: r.checks.markersOnMap,
+      sites_rendered: r.checks.sites,
+    } : {
+      project_lat: proj.lat,
+      project_lng: proj.lng,
+      marker_lat: r.marker.lat,
+      marker_lng: r.marker.lng,
+      marker_label: r.marker.label,
+      matched_by: r.marker.how,
+      marker_display_fanned: r.marker.fanned,
+      marker_vs_stored_point_m: r.marker.delta_m,
+      markers_on_map: r.marker.of,
+      framed_zoom: r.framed.zoom,
+      authoritative_zip_status: 'boundary_complete',
+      authoritative_markers_in_zip: r.authMarkers,
+      popup_open: r.checks.popupOpen,
+      popup_text: r.checks.popupText,
+      halo_present: r.checks.haloPresent,
+    }),
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
-    popup_open: r.checks.popupOpen,
-    popup_text: r.checks.popupText,
-    halo_present: r.checks.haloPresent,
     width: IMG_W, height: IMG_H, device_scale: SCALE,
     // THEME CAPTURE EVIDENCE. Present only on a theme capture; absent (not false, not
     // null-filled) on a plain MAPS capture, so the two shapes stay distinguishable.
@@ -843,15 +1030,34 @@ async function attach(draft, objectPath, r, proj) {
         + 'product card under map-state policy ' + HS.MAPS_DC_CAPTURE_POLICY.key + ': all four '
         + 'STATUS controls on, Data center the only PROJECT TYPE, the REGULATORY overlay OFF — '
         + 'set THROUGH THE REAL CONTROLS (a change event on each control\'s own checkbox, which '
-        + 'runs the page\'s setStage/setType/setRegulatory and its applyFilter). The project\'s '
-        + 'marker was located AFTER that policy was applied and the controls plus the drawn '
-        + 'layer were re-read at the shutter. No control state is faked and no marker is drawn '
+        + 'runs the page\'s setStage/setType/setRegulatory and its applyFilter). '
+        // The located-marker sentence is the project path's, and it is the only part of this
+        // note that an absence capture cannot honestly say. The policy itself ran in full —
+        // only its "is the target still drawn" limb is inapplicable with no target.
+        + (r.absence
+          ? 'No target marker was sought, because this capture\'s subject is the absence of '
+            + 'one; every other limb of the policy ran and the controls plus the drawn layer '
+            + 'were re-read at the shutter. '
+          : 'The project\'s marker was located AFTER that policy was applied and the controls '
+            + 'plus the drawn layer were re-read at the shutter. ')
+        + 'No control state is faked and no marker is drawn '
         + 'by this module. This records what the CONTROLS said; it is not a digest of the PNG.',
     } : {}),
-    note: 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
-      + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
-      + 'radius ring and no home marker, and both absences are asserted before the shutter. '
-      + 'Surrounding development is left visible. Nothing is drawn, moved or invented.',
+    // ⚠️ THE NOTE BRANCHES BECAUSE IT IS EVIDENCE, NOT DECORATION. The project sentence names
+    // a popup, a halo and a project-coordinate frame; an absence capture has none of the
+    // three, so reusing it here would put three false statements in the one field whose job
+    // is to say what was actually photographed. Same rule as the fields above.
+    note: r.absence
+      ? 'Screenshot of the live Map 1 ZIP page in the ZIP\'s own default framing, with no '
+        + 'marker singled out, no popup opened and no halo drawn — because this post\'s '
+        + 'subject is the ABSENCE of a qualifying project, not any one record. ZIP mode draws '
+        + 'no radius ring and no home marker, and both absences are asserted before the '
+        + 'shutter. A marker count of zero here is the page\'s own result, photographed as it '
+        + 'rendered. Nothing is drawn, moved or invented.'
+      : 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
+        + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
+        + 'radius ring and no home marker, and both absences are asserted before the shutter. '
+        + 'Surrounding development is left visible. Nothing is drawn, moved or invented.',
   };
   // THE BINDING RECORD. `capture_key` is what every later reader compares against the
   // draft's own inputs, so the picture can never quietly outlive the draft it was taken
