@@ -11,10 +11,6 @@ with mk as materialized (
          ) as j
 ),
 tgt as (select 'arcgis:kcmo-development-cases:CD-CPC-2026-00142'::text as sk),
-proj as (
-  select p.* from mk, jsonb_array_elements(coalesce(mk.j->'projects','[]'::jsonb)) e,
-       lateral (select e as p) q(p)
-),
 pr as (select e as p from mk, jsonb_array_elements(coalesce(mk.j->'projects','[]'::jsonb)) e),
 mr as (select e as m from mk, jsonb_array_elements(coalesce(mk.j->'markers','[]'::jsonb))  e)
 select 1 as ord, 'RPC status' as k, (select coalesce(j->>'status','(null)') from mk) as v
