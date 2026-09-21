@@ -1260,6 +1260,21 @@ things and no more:**
 - ⚠️ **THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: `vault.github_actions_pat` is
   DEAD** (HTTP 401 since 2026-09-15, per `public.pipeline_health_check`). No dispatch of any
   shape succeeds until the founder re-mints it. This change neither fixes nor works around it.
+- ✅ **RESOLVED 2026-09-21 — THE PAT WAS RE-MINTED AND THE DIGEST IS SENDING. The bullet above
+  is the dated receipt; DO NOT act on it as a current blocker.** Measured live, not recalled:
+  `public.pipeline_health_check` reads `github_credential` **ok = true, detail `HTTP 200`**,
+  healthy `since` **2026-09-20 18:10:00Z**, and `digest_delivery` **ok = true** with newest
+  delivery **2026-09-20 23:42:44Z**. `public.email_deliveries` holds **73 rows (+27 since the
+  gap, all on 2026-09-20)**, so the "46 rows ever / nothing since 2026-08-01" figure carried in
+  `homesignal-ingest/CLAUDE.md` is superseded too. pg_cron job 1 `homesignal-digest-5pm-et` is
+  **`active = true`** (`0 * * * *`). All **10** health checks read `ok`.
+  - ⚠️ **A "THIS IS BLOCKED" NOTE IS THE MOST EXPENSIVE KIND OF STALE, which is why this
+    correction is worth its space.** A stale coverage number makes a report wrong; a stale
+    blocker stops work that is no longer blocked, and sends the next session to chase a fixed
+    problem — or to hold back a change that would ship fine. This one sat for ~26 hours across
+    BOTH repos. **Re-read `public.pipeline_health_check` before quoting any blocker from this
+    file**; it is one query and it is the difference between a receipt and a standing fact
+    (Rule #0a).
 - 🔑 **A COPY REFRESH COSTS NO SCREENSHOT, and `lib/maps-capture-binding.js` is why.** That
   module deliberately EXCLUDES `post_text` from the capture key — *"the wording of a sentence
   does not change a screenshot of a map… Including it would recapture every draft on every
