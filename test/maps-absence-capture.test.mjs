@@ -138,9 +138,20 @@ ok(/wrote\.ok/.test(FIN),
   '5g: …and still refuses to write over a draft that moved during the capture');
 
 // ── §6 THE OBJECT PATH DOES NOT INVENT A PROJECT ─────────────────────────────────────
-ok(/proj \? String\(proj\.id\) : 'nodc'/.test(FIN),
+ok(/proj \? String\(proj\.id\) :/.test(FIN) && /'nodc'/.test(FIN),
   '6a: an absence object is named `nodc`, never a project-shaped placeholder that the next '
   + 'reader would take for a project id that has stopped resolving');
+// ⚠️ 6a USED TO PIN THE WHOLE TERNARY LITERALLY, `proj ? String(proj.id) : 'nodc'`, WHICH
+// MADE IT A PIN AGAINST A THIRD CASE EXISTING rather than against inventing a project. A
+// project-backed row whose pin could not be drawn is NOT an absence, and filing its object
+// under `nodc` asserts the project does not exist. The rule 6a is really about — the false
+// branch never produces a project-shaped id — is unchanged and still holds for both values.
+ok(/zip_scope_reason \? 'zip' : 'nodc'/.test(FIN),
+  '6a1: …and a project-backed ZIP fallback is named `zip`, so the bucket distinguishes '
+  + '"nothing is here" from "something is here and the map could not pin it"');
+ok(!/: *'?(undefined|null|0)'?\)/.test(FIN.slice(FIN.indexOf('const subject'), FIN.indexOf('const subject') + 200)),
+  '6a2: control — the subject is never an empty or falsy literal, which would collide '
+  + 'every ZIP\'s fallback objects onto one name');
 ok(/keyStamp\(d, scope\)/.test(FIN),
   '6b: …and still carries the binding key\'s fingerprint, so a re-capture writes a new '
   + 'object rather than silently overwriting the old one');

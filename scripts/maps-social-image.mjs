@@ -741,10 +741,23 @@ async function finishCapture(d, label, r, proj, results) {
   // changes, which is what makes the dashboard's per-row blob cache correct; and the
   // superseded image survives, so a capture can be compared with the one it replaced.
   //
-  // The subject segment is the project id, or the literal `nodc` when there is no project.
+  // The subject segment is the project id, or a literal when the picture is of the ZIP.
   // A project-shaped placeholder there would read to the next person as a project id that
   // has stopped resolving, which is a different and much worse fact.
-  const subject = proj ? String(proj.id) : 'nodc';
+  //
+  // 🔑 THERE ARE THREE VALUES, NOT TWO, AND THE THIRD IS THE ONE THAT IS EASY TO MISS.
+  // `nodc` says the draft NAMES NO PROJECT — true of an absence post and FALSE of a
+  // project-backed row whose pin could not be drawn. Those are different claims: one is
+  // "we looked and there is nothing here", the other is "there is something here and the
+  // map could not put a dot on it". Collapsing them would file a real project's fallback
+  // under a name asserting the project does not exist. `zip_scope_reason` distinguishes
+  // them on the row; this makes the stored OBJECT say it too, so a reader listing the
+  // bucket does not have to join back to `social_posts` to find out what they are looking
+  // at. (This third value is #1283's, arrived at independently and adopted here — that PR
+  // and this one solved the same branch and each had one half of the identity right: it
+  // named the object correctly while keying it at project scope, and this keyed it at ZIP
+  // scope while naming it `nodc`.)
+  const subject = proj ? String(proj.id) : (r.zip_scope_reason ? 'zip' : 'nodc');
   const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d, scope)}.png`;
 
   if (DRY) {
