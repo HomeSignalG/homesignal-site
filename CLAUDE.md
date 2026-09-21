@@ -844,6 +844,54 @@ legal/framing change not covered by the one-time sign-off.
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
+## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
+
+**The Acquisition Dashboard's "Create + refresh drafts" action does both halves: it creates
+eligible MAPS drafts that do not exist, and refreshes eligible existing UNPUBLISHED drafts
+through the current composer and claim-validation rules.** The run reports **created /
+updated / unchanged / held-with-a-reason / awaiting-or-requiring-a-new-image**, and
+⚖️ **"workflow completed" must not mean "every post is ready."**
+
+**The engine half lives in `homesignal-ingest`** (`bluesky/lib/maps-refresh.mjs`, shared by
+the generator and the standalone recompose workflow so the two cannot disagree about what a
+draft should say). That repo's CLAUDE.md carries the full record. **This repo changed three
+things and no more:**
+
+1. **`acquisition.html` copy** — the button label, the confirm dialog (it promised creation
+   only), the accepted-run message, and the claim-contract alert that used to name the manual
+   `Actions → Recompose MAPS drafts` route as the ONLY way to refresh a stale draft. That last
+   line was the gap stated in-product.
+   - ⚠️ **THE ACCEPTED-RUN MESSAGE IS DELIBERATELY NOT REASSURING.** It says outright that
+     finishing is not the same as being ready to approve, and points at the run's own summary
+     for anything held or awaiting a Map screenshot. A held draft and one owed a capture both
+     finish the run without being publishable.
+2. **`docs/maps-dc-generation-request.sql`** — the DDL of record gains **one jsonb key**,
+   `'refresh', 'true'`, in the dispatch inputs. 🅿️ **PARKED AND NOT APPLIED** (see below).
+3. **Nothing else.** The page holds the anon key and a founder session; it still creates
+   nothing and refreshes nothing itself. No new table, no new RPC, no copy rule in the browser
+   — a privileged SQL path is the wrong place to decide what a post says.
+
+- 🅿️ **THE MIGRATION IS NOT APPLIED, AND THE ORDER IS SAFE EITHER WAY.** Until it is, the
+  button dispatches three inputs and the workflow's own `refresh` default (true) governs — so
+  the refresh already happens. The apply makes the intent explicit at the call site instead of
+  dependent on a default in another repo. Neither half silently disables the other.
+- ⚠️ **THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: `vault.github_actions_pat` is
+  DEAD** (HTTP 401 since 2026-09-15, per `public.pipeline_health_check`). No dispatch of any
+  shape succeeds until the founder re-mints it. This change neither fixes nor works around it.
+- 🔑 **A COPY REFRESH COSTS NO SCREENSHOT, and `lib/maps-capture-binding.js` is why.** That
+  module deliberately EXCLUDES `post_text` from the capture key — *"the wording of a sentence
+  does not change a screenshot of a map… Including it would recapture every draft on every
+  recompose."* So the 2026-09-21 date-first copy rewrite, which changes every dated draft's
+  text, invalidates NO image. **The engine reports image state without recomputing that key**
+  (it compares the draft's stored map-view evidence against the live record as VALUES), because
+  a second copy of the key is the one disagreement neither the capture job nor the Approve gate
+  could detect on its own — which that module's own header says.
+- **The mandatory-image rule is still SCOPED to the Data Center Theme** and still the
+  dashboard's (`bskyMapsImageMandatory`). A general MAPS post publishes the Map 1 link card,
+  whose image belongs to the destination page; an absence post can never have one.
+
+---
+
 ## 7.05 A DENIED PROPOSAL IS KEPT, SOURCED, AND UNCOUNTED ⚖️ FOUNDER CONTRACT (2026-09-20)
 
 **A genuine proposal that was DENIED remains discoverable under Proposed, with a prominent

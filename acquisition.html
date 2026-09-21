@@ -1224,6 +1224,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
   /**
    * Per-ZIP status, derived ONLY from the queue rows already loaded for this render.
+   * ⚖️ 2026-09-21: the panel's action now CREATES AND REFRESHES (founder requirement).
+   * The page itself still creates nothing and refreshes nothing — it holds the anon key and a
+   * founder session, so it asks a SECURITY DEFINER RPC to dispatch the existing workflow, and
+   * the engine does both halves through ONE shared decision (homesignal-ingest
+   * bluesky/lib/maps-refresh.mjs). No second generator, no copy rule in the browser.
+   *
    * Nothing is fetched and nothing is inferred: a ZIP with no MAPS Data Center Theme post
    * in the queue shows a dash, never a guess like "no qualifying project" — only the
    * generator knows that, and it reports it in its own run log.
@@ -1261,7 +1267,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       (rows.length?('<button class="bsky-btn" data-zo="generate"'+
         (_zipGen.busy?' disabled style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
                      :' style="background:var(--accent);color:#fff"')+
-        '>'+(_zipGen.busy?'Generating\u2026':('Generate drafts for these '+rows.length+' ZIPs'))+
+        '>'+(_zipGen.busy?'Working\u2026':('Create + refresh drafts for these '+rows.length+' ZIPs'))+
         '</button>'):'')+
       '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
       '<button class="bsky-btn" data-zo="template">Download template</button>'+
@@ -1316,11 +1322,17 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   async function zipOrderGenerate(){
     var n=(_zipOrder.rows||[]).length;
     if(!n){ return; }                    // no list => the national scan; never from this button
-    if(!confirm('Generate draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
-                'The engine reads this list in your order and drafts at most one post per ZIP, '+
-                'from real Map 1 project records.\n\n'+
-                'It writes DRAFTS only \u2014 nothing is approved, scheduled or posted. '+
-                'Runs take about a minute; new drafts appear in the queue above.')) return;
+    // ⚖️ FOUNDER REQUIREMENT 2026-09-21 — this action CREATES and REFRESHES, so the
+    // confirm says both. The old wording promised creation only, which is what the button
+    // did; a resident-facing surface is not the only place a stale promise costs something.
+    if(!confirm('Create and refresh draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
+                'The engine reads this list in your order and, for each ZIP, drafts at most '+
+                'one post from real Map 1 project records \u2014 and brings any existing '+
+                'unpublished draft up to the current wording and fact-checking rules.\n\n'+
+                'It writes DRAFTS only \u2014 nothing is approved, scheduled or posted, and an '+
+                'already-approved post is never rewritten.\n\n'+
+                'Runs take about a minute. Some posts may still need a Map screenshot '+
+                'afterwards, so \u201cfinished\u201d does not always mean \u201cready to approve\u201d.')) return;
     _zipGen.busy=true; _zipGen.bad=false;
     _zipGen.msg='Requesting a run\u2026';
     zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
@@ -1358,8 +1370,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         _zipGen.bad=true; _zipGen.msg='Run requested, but its outcome could not be read.';
       } else if(st.state==='accepted'){
         _zipGen.bad=false;
-        _zipGen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. Drafts appear here when it '+
-                    'finishes (about a minute) \u2014 reload to see them.';
+        // ⚠️ "ACCEPTED" IS NOT "READY", AND NEITHER IS "FINISHED". The run reports its own
+        // created / updated / unchanged / held / awaiting-image counts on its Actions summary;
+        // this message must not imply that every post it touched can be approved. A held draft
+        // and a draft awaiting its Map screenshot both finish the run without being publishable.
+        _zipGen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. It creates missing '+
+                    'drafts and refreshes existing ones (about a minute) \u2014 reload to see them. '+
+                    'Check the run\u2019s own summary for anything it held or that still needs a '+
+                    'Map screenshot; finishing is not the same as being ready to approve.';
       } else if(st.state==='pending'){
         _zipGen.bad=true;
         _zipGen.msg='Run requested, but GitHub has not answered yet. Check the workflow before retrying.';
@@ -1486,8 +1504,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         if(!claims.error && claims.data && claims.data.length){
           alert('This draft does not satisfy the claim contract, so it cannot be approved:\n\n'
             + claims.data.join('\n')
-            + '\n\nNothing was changed. A draft composed before the contract needs recomposing '
-            + '(Actions \u2192 Recompose MAPS drafts).');
+            + '\n\nNothing was changed. A draft composed before the contract needs refreshing: '
+            + 'press \u201cCreate + refresh drafts\u201d on the Data Center Theme panel (it now '
+            + 'refreshes existing drafts too), or run Actions \u2192 Recompose MAPS drafts.');
           return;
         }
         var r=await window.hsClient.rpc('hs_approve_social_post',{

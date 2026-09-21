@@ -17,6 +17,34 @@
 -- EXISTING bluesky/generate-maps.mjs. A second implementation of the selection rules is
 -- exactly what the cross-repo mandate forbids, so there isn't one.
 --
+-- ⚖️ AMENDED 2026-09-21 (FOUNDER REQUIREMENT) — THE BUTTON NOW ALSO REFRESHES.
+-- "The Data Center Theme dashboard action must support both: creating eligible drafts that
+-- do not exist, and refreshing eligible existing unpublished drafts through the current
+-- composer and claim-validation rules."
+--
+-- 🔑 WHAT CHANGED HERE IS ONE DISPATCH INPUT, AND THAT IS THE WHOLE POINT. The refresh is
+-- implemented where the composer already lives (homesignal-ingest
+-- bluesky/lib/maps-refresh.mjs, shared by the generator AND the standalone
+-- recompose-maps-drafts workflow so the two cannot disagree). This file gained
+-- `'refresh', 'true'` in the inputs object and NOTHING ELSE — no new table, no new
+-- function, no second dispatch, no copy rule. A privileged SQL path is the wrong place to
+-- decide what a post says.
+--
+-- ⚠️ WHY THE INPUT IS SENT EXPLICITLY WHEN THE WORKFLOW ALREADY DEFAULTS IT TO TRUE. A
+-- workflow default is editable in the other repo without this file changing, so a silent
+-- flip there would silently change what this button does. Sending the value states the
+-- intent at the call site, and the workflow's own default then only governs a dispatch
+-- that omits it (an API caller, or a human using the Actions tab).
+--
+-- ⚠️ THE REFRESH'S OWN SAFETY IS THE SCRIPT'S CONTRACT, NOT A PROMISE MADE HERE, and it is
+-- narrower than the create path's: `refreshDraft` returns SKIPPED_NON_DRAFT for any row
+-- whose status is not `draft`, so an APPROVED, SCHEDULED or PUBLISHED payload is never
+-- rewritten — the founder approved specific words and they are not ours to change
+-- afterwards. The patch it produces has exactly three keys (post_text, hashtags, and the
+-- evidence claim block, merged); it touches no status, no schedule, no screenshot binding.
+-- Pinned by homesignal-ingest tests/test_maps_refresh_outcomes.mjs §5/§23 and
+-- tests/test_maps_founder_zip_order.mjs §24-26b.
+--
 -- WHY AN RPC AND NOT AN EDGE FUNCTION. acquisition.html already reaches the server
 -- through SECURITY DEFINER RPCs for every privileged action it takes
 -- (hs_set_maps_dc_zip_order, hs_approve_social_post, hs_acquisition_dashboard). The page
@@ -105,6 +133,13 @@ begin
 
   -- One draft per ZIP is the curated contract, so the run limit IS the list length.
   -- DERIVED rather than stored, so the two cannot disagree after a CSV upload.
+  --
+  -- ⚠️ IT BOUNDS CREATES ONLY, AND THAT IS CORRECT RATHER THAN AN OVERSIGHT. `--limit`
+  -- caps how many NEW drafts a run inserts; the refresh pass is bounded by a different
+  -- thing — the founder's own ZIP list, since it only ever touches existing drafts on
+  -- those ZIPs. Applying the create limit to the refresh would leave some of the
+  -- founder's ZIPs carrying superseded copy with nothing saying which, which is the
+  -- invisible-drift shape this requirement exists to end.
   _limit := _zips;
 
   select decrypted_secret into _pat from vault.decrypted_secrets where name = 'github_actions_pat';
@@ -118,7 +153,11 @@ begin
     url     := 'https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/bluesky-generate-maps.yml/dispatches',
     body    := jsonb_build_object(
                  'ref', 'main',
-                 'inputs', jsonb_build_object('apply', 'true', 'limit', _limit::text, 'zips', '')),
+                 -- ⚖️ 2026-09-21: `refresh` is the founder's create-AND-refresh requirement.
+                 -- Sent as the STRING 'true' because workflow_dispatch inputs are strings
+                 -- over the API even when the workflow declares them `type: boolean`.
+                 'inputs', jsonb_build_object('apply', 'true', 'limit', _limit::text,
+                                              'zips', '', 'refresh', 'true')),
     headers := jsonb_build_object(
                  'Authorization', 'Bearer ' || _pat,
                  'Accept', 'application/vnd.github+json',
@@ -186,6 +225,24 @@ $function$;
 
 grant execute on function public.hs_request_maps_dc_generation() to authenticated;
 grant execute on function public.hs_maps_dc_generation_status() to authenticated;
+
+-- ── ⚠️ THE 2026-09-21 AMENDMENT IS **NOT APPLIED** ──────────────────────────
+-- This file is the DDL of record and it now describes a function body that differs from
+-- the live one by one jsonb key. `create or replace function` is idempotent and the whole
+-- file is replayable, but NOTHING HERE HAS BEEN RUN: applying a production migration was
+-- not authorized for this change, so the live RPC still dispatches without `refresh`.
+--
+-- WHAT THAT MEANS IN PRACTICE, stated so nobody reads the button as fixed: until this is
+-- applied, the dashboard's Generate click dispatches with three inputs, the workflow's own
+-- `refresh` default (true) governs, and the refresh therefore ALREADY HAPPENS. The apply
+-- is what makes the intent explicit at the call site rather than dependent on a default in
+-- another repo — see the note on that at the top. So the order of operations is safe in
+-- either sequence, and neither half silently disables the other.
+--
+-- ⚠️ AND THE BUTTON REMAINS BLOCKED ON SOMETHING ELSE ENTIRELY: the vault secret
+-- `github_actions_pat` is DEAD (HTTP 401 since 2026-09-15, per public.pipeline_health_check
+-- and homesignal-ingest/CLAUDE.md). No dispatch of any shape succeeds until the founder
+-- re-mints it. This amendment does not change that and does not work around it.
 
 -- ── PROVEN AFTER APPLY, not asserted ────────────────────────────────────────
 -- A non-admin caller (service role, auth.jwt() null -> email '') is REFUSED:
