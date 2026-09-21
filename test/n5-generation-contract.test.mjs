@@ -99,4 +99,23 @@ ok(/ACTIVE_LEGACY/.test(ddl),
 ok(/refusing a vacuous pass/i.test(ddl),
   '§6b a reconciliation covering zero records must not read as clean');
 
+// ── §7 THE CAPTURE SUPPLIES EVERY NOT-NULL COLUMN ITS TABLE DEMANDS ─────────────────
+// This section exists because the first real `open` run failed on it, not because review
+// caught it: preservation.app_project_identity declares identity_hash and content_hash
+// NOT NULL with no default and no generation expression, and the insert named neither.
+// It failed closed (one transaction, 0 rows written), but a structural pin is what turns
+// "the database refused it once" into "this cannot come back".
+const capture = (orch.match(/insert into preservation\.app_project_identity[\s\S]*?"capture"\)/) || [''])[0];
+ok(capture.length > 0, '§7a the capture statement is still findable');
+for (const col of ['identity_hash', 'content_hash']) {
+  ok(new RegExp(`\\b${col}\\b`).test(capture),
+    `§7b the capture must name ${col} — it is NOT NULL with no default`);
+}
+// The hash covers record_kind, so hashing the column while storing a literal would be a
+// latent divergence the moment the WHERE clause widened. One source, not two.
+ok(/p\.record_kind, p\.source_ref/.test(capture),
+  '§7c record_kind is selected from p, never written as a literal beside a hash of p.record_kind');
+ok(!/'development', p\.source_ref/.test(capture),
+  '§7d the superseded literal form must not return');
+
 console.log(`n5-generation-contract: ${n} checks passed`);
