@@ -274,7 +274,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      loads, so the capture job and this approval gate cannot disagree about whether the
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
      because the binding key includes the theme, which that lib derives. -->
-<script src="lib/maps-capture-binding.js?v=851a6622"></script>
+<script src="lib/maps-capture-policy.js?v=b9e57bde"></script>
+<script src="lib/maps-capture-binding.js?v=c32f73f5"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -839,8 +840,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // The founder is therefore looking at the object itself, not at a URL the browser
   // resolved separately, which is what makes the parity claim true rather than likely.
   // The bucket stays PRIVATE and no service key ever reaches the page.
-  var _bskyBlobUrl = {};   // post id -> object URL for its own image
-  var _bskyImgOk   = {};   // post id -> the exact image RENDERED (onload fired)
+  var _bskyBlobUrl = {};   // post id + image path -> object URL for THAT image
+  var _bskyImgOk   = {};   // post id + image path -> the exact image RENDERED (onload fired)
+  // ⚠️ KEYED ON THE IMAGE PATH, NOT ON THE ROW ID. A re-capture writes a NEW object
+  // (the path carries the binding key's fingerprint), so a cache keyed on `p.id` alone would
+  // hand back the blob of the SUPERSEDED picture and report it rendered — the founder would
+  // approve the old map believing they had seen the new one. Keying on the path means a new
+  // image is a cache MISS by construction.
+  function _bskyImgKey(p){ return String(p && p.id) + '|' + String((p && p.image_bucket_path) || ''); }
   // ⚠️ THE QUEUE CACHE MUST BE DECLARED INSIDE THIS REGION, not above it. It used to sit
   // with the edit modal ~250 lines below; `var` hoisting made that work in the page, but
   // test/maps-preview-render.test.mjs EXTRACTS from `var _bskyBlobUrl = {};` to
@@ -905,6 +912,23 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     // a real Map 1 screenshot, approve it, and publish a picture of the draft as it USED
     // to be. This runs first and applies to every MAPS post, theme or not.
     if(p.content_family==='MAPS' && p.image_bucket_path && !bskyCaptureBound(p)){
+      // ── WHICH THING MOVED? SAY THE RIGHT ONE. ─────────────────────────────────────
+      // Two different facts land here and they have different remedies. If the draft's own
+      // inputs moved, the picture is of an older PROJECT STATE. If the draft is unchanged
+      // and only the Data Center MAP-STATE POLICY moved, the project has not changed at all
+      // and saying it has sends the founder hunting a data problem that does not exist.
+      // The discriminator is the capture KEY: equal key + failing policy evidence means the
+      // policy moved, nothing else.
+      var vv=(p.evidence&&p.evidence.visual)||{};
+      var keyNow=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(p):null;
+      var policyOnly = !!keyNow && vv.capture_key === keyNow
+        && !!(window.HS&&HS.mapsDcCapturePolicyCopy);
+      if(policyOnly){
+        return (HS.mapsDcCapturePolicyCopy(vv) || 'The stored screenshot no longer satisfies '
+          + 'the current Data Center map-state policy.')
+          + '\n\nApprove is blocked until a fresh capture under the current policy exists. '
+          + 'The capture job picks this up automatically on its next run.';
+      }
       return 'The stored Map image for this post was captured for DIFFERENT draft details '
         + 'than it carries now (its project coordinates, type, status, name or theme have '
         + 'moved since). Approving would publish a picture of an older version of this '
@@ -925,7 +949,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         + (v.next_attempt_at ? ('\nNext automatic attempt: ' + v.next_attempt_at) : '')
         + '\n\nApprove is blocked until the exact image this post would publish exists and displays.';
     }
-    if(mapsImageRequired(p) && !_bskyImgOk[p.id]){
+    if(mapsImageRequired(p) && !_bskyImgOk[_bskyImgKey(p)]){
       return 'This post would publish the Map image stored at\n' + p.image_bucket_path +
         '\n\nThat image has not displayed in this preview, so you would be approving '
         + 'something you have not seen. Approve is blocked until it renders.';
@@ -937,12 +961,13 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     _bskyBlobUrl = {}; _bskyImgOk = {};
   }
   function bskyImageBlobUrl(p){
-    if (_bskyBlobUrl[p.id]) return Promise.resolve(_bskyBlobUrl[p.id]);
+    var _k = _bskyImgKey(p);
+    if (_bskyBlobUrl[_k]) return Promise.resolve(_bskyBlobUrl[_k]);
     return window.hsClient.storage.from('social-images').download(p.image_bucket_path)
       .then(function(r){
         if (r.error || !r.data) return null;
         var u = URL.createObjectURL(r.data);
-        _bskyBlobUrl[p.id] = u;
+        _bskyBlobUrl[_k] = u;
         return u;
       })
       .catch(function(){ return null; });
@@ -963,7 +988,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var img = document.createElement('img');
       img.alt = '';                                  // decorative here; see payload panel
       if (imgAttrs) img.setAttribute('style', imgAttrs);
-      img.onload  = function(){ _bskyImgOk[p.id] = true; if (onSettled) onSettled(true); };
+      img.onload  = function(){ _bskyImgOk[_bskyImgKey(p)] = true; if (onSettled) onSettled(true); };
       img.onerror = function(){
         host.innerHTML = '<div class="muted" style="font-size:12px;color:var(--persist)">'+
           'Image downloaded but failed to render.</div>';
@@ -985,12 +1010,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     // render, and rendering it is exactly how a stale picture gets approved).
     if (row && dcThemeImageMandatory(row) && !bskyCaptureBound(row)) {
       btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed';
-      btn.title = row.image_bucket_path
-        ? 'Data Center Theme: the stored screenshot was captured for different draft details. Awaiting a fresh capture.'
-        : 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.';
+      var rv=(row.evidence&&row.evidence.visual)||{};
+      var rKey=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(row):null;
+      btn.title = !row.image_bucket_path
+        ? 'Data Center Theme requires the real Map 1 screenshot, which has not been captured.'
+        : ((rKey && rv.capture_key === rKey)
+          ? 'Data Center Theme: the stored screenshot does not satisfy the current map-state policy (all statuses on, Data center only, Regulatory off). The draft has NOT changed. Awaiting a fresh capture.'
+          : 'Data Center Theme: the stored screenshot was captured for different draft details. Awaiting a fresh capture.');
       return;
     }
-    var ok = !!_bskyImgOk[id];
+    var ok = !!(row && _bskyImgOk[_bskyImgKey(row)]);
     btn.disabled = !ok;
     btn.style.opacity = ok ? '1' : '0.45';
     btn.style.cursor  = ok ? 'pointer' : 'not-allowed';

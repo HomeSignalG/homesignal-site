@@ -36,7 +36,7 @@ import path from 'node:path';
 // The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
 // this module cannot carry a second copy of the rendering rules.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
@@ -92,49 +92,37 @@ const COORD_EPS = 1e-5;
 // layout moves this capture with it rather than leaving a private copy behind.
 const EMBED_PARAM = 'embed=1';
 
+// ── THE POLICY MODULE, INJECTED INTO THE THROWAWAY BROWSER ───────────────────────────
+// lib/maps-capture-policy.js is the ONE definition of the map state a Data Center Theme
+// screenshot must show. It is injected here rather than copied, so this job and
+// test/maps-datacenter-capture-state.browser.test.mjs drive IDENTICAL code — a test that
+// re-typed the manoeuvre would pass while production stayed broken, which is exactly what
+// the previous browser suite did.
+//
+// `addScriptTag` (not `eval`): homesignalmap.html's CSP is
+// `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net` — inline is allowed and
+// `unsafe-eval` is not. Injected into this throwaway DOM only, never into the deployed
+// site, the same established pattern as the selection halo.
+const POLICY_SRC = fs.readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8');
+
 /**
- * Put Map 1's PROJECT TYPE row into the Data-center-only state, THROUGH THE REAL CONTROLS.
+ * Put Map 1 into the Data Center Theme capture state, THROUGH THE REAL CONTROLS.
  *
- * Each chip is a real <input type=checkbox class="chipbox"> inside its label, and the page
- * wires `change` (not `click`) precisely so keyboard and pointer become one path and the
- * handler reads the control's RESULTING state. Setting `.checked` and dispatching `change`
- * therefore runs the page's own `setType()` -> `HS.setCategoryFilter()` -> `applyFilter()`.
- * Nothing here writes a filter value directly, and nothing fakes a chip's appearance: the
- * checkmarks in the image are the controls' real state.
+ * Every status control on, Data center the only PROJECT TYPE, the REGULATORY overlay off —
+ * all three dimensions, because a filter panel in a screenshot is a claim about WHICH
+ * RECORDS ARE ON SCREEN and three dimensions decide that. The previous version set ONE of
+ * them and published whatever the other two happened to be.
  *
- * Returns the before/after state of every chip so the evidence can show what was changed.
+ * Nothing here writes a filter value directly and nothing fakes a chip's appearance: each
+ * control's own checkbox gets `.checked` plus a `change` event, which runs the page's own
+ * setStage / setType / setRegulatory -> applyFilter. The checkmarks in the image are the
+ * controls' real state.
  */
-async function applyDataCenterTypeFilter(page) {
-  return page.evaluate((wantKey) => {
-    const chips = Array.from(document.querySelectorAll('#mapkeyShapes .typechip'));
-    if (!chips.length) return { ok: false, reason: 'Map 1 rendered no PROJECT TYPE controls' };
-    const read = () => {
-      const o = {};
-      for (const c of chips) {
-        const b = c.querySelector('.chipbox');
-        o[c.getAttribute('data-cat')] = !!(b && b.checked);
-      }
-      return o;
-    };
-    const before = read();
-    if (!Object.prototype.hasOwnProperty.call(before, wantKey)) {
-      return { ok: false, reason: `Map 1 has no "${wantKey}" PROJECT TYPE control`, before };
-    }
-    for (const c of chips) {
-      const key = c.getAttribute('data-cat');
-      const box = c.querySelector('.chipbox');
-      if (!box) continue;
-      const want = key === wantKey;
-      if (box.checked !== want) {
-        box.checked = want;
-        box.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }
-    const after = read();
-    const others = Object.keys(after).filter((k) => k !== wantKey && after[k]);
-    return { ok: !!after[wantKey] && others.length === 0, before, after, still_on: others,
-             reason: after[wantKey] ? '' : 'the Data center control did not end up selected' };
-  }, 'datacenter');
+async function applyDataCenterCapturePolicy(page, targetKey) {
+  return page.evaluate(
+    ([key]) => window.HS.mapsDcCaptureApplyPolicy({ targetKey: key }),
+    [targetKey],
+  );
 }
 
 /**
@@ -222,7 +210,7 @@ const nextAttemptAt = (attempts) => HS.mapsCaptureNextAttemptAt(attempts);
  */
 async function selectDrafts() {
   const idFilter = ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '';
-  const rows = await api('social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family'
+  const rows = await api('social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family,revision'
     + `&content_family=eq.MAPS&status=eq.draft${idFilter}`
     // Newest first. A freshly generated candidate is the one worth a picture, and it is also
     // the one most likely to be in its ZIP's authoritative set — the two moved together.
@@ -306,6 +294,8 @@ async function capture(page, draft, proj, theme) {
   const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`
     + (theme ? `&${EMBED_PARAM}` : '');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // THE POLICY MODULE RIDES WITH THE PAGE, never a copy of it in this file.
+  await page.addScriptTag({ content: POLICY_SRC });
 
   // The page exposes its drawn markers for exactly this purpose (see homesignalmap.html:
   // "Lets the offline browser proof open a specific marker's real popup instead of
@@ -330,11 +320,20 @@ async function capture(page, draft, proj, theme) {
   // test/maps-datacenter-capture-state.browser.test.mjs — where the Residential control stays
   // in `siteMarkers` and leaves the map. ON THE MAP is `m._map`, which Leaflet nulls on
   // removeLayer, and that is what `markerOnMap` below asserts.
-  let filterState = null;
+  //
+  // ⚠️ THE POLICY IS APPLIED WITH NO TARGET, ON PURPOSE. ZIP mode issues the cached report and
+  // the authoritative whole-ZIP read TOGETHER, and the authoritative merge — the one carrying
+  // `zip_project_ref` — can land after a first pass has already settled. Asking the policy to
+  // judge "is the target drawn?" here would turn that race into a capture failure with a
+  // truthful-sounding but WRONG reason ("not shown under this policy") for a project the page
+  // simply had not drawn yet. So this step sets and settles the three control dimensions; the
+  // target's own visibility is waited for below and then ASSERTED at the shutter, where it is
+  // a statement about the image.
+  let policyApply = null;
   if (theme === 'datacenter') {
-    filterState = await applyDataCenterTypeFilter(page);
-    if (!filterState.ok) {
-      return { ok: false, reason: `Data center filter state could not be set: ${filterState.reason}` };
+    policyApply = await applyDataCenterCapturePolicy(page, null);
+    if (!policyApply.ok) {
+      return { ok: false, reason: `Data Center map-state policy could not be applied: ${policyApply.reason}` };
     }
   }
 
@@ -346,11 +345,17 @@ async function capture(page, draft, proj, theme) {
   // authoritative set, the marker must appear; waiting for the marker itself removes the
   // race instead of guessing at a duration. Measured: settling on the count captured 1 of 7,
   // because six reads landed on the pre-authoritative draw.
+  //
+  // For a theme capture it waits for the marker to be ON THE MAP, not merely present in
+  // `window.siteMarkers` — the filter is already applied by now, and array membership is
+  // byte-identical either side of it, so the weaker condition would be satisfied by a marker
+  // the map is not showing.
   await page.waitForFunction(
-    (key) => (window.siteMarkers || []).some(
-      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key,
+    ([key, needOnMap]) => (window.siteMarkers || []).some(
+      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key
+        && (!needOnMap || !!(x.m && x.m._map)),
     ),
-    proj.source_key,
+    [proj.source_key, theme === 'datacenter'],
     { timeout: 90000, polling: 700 },
   ).catch(() => {});
 
@@ -519,6 +524,35 @@ async function capture(page, draft, proj, theme) {
     }
   }
 
+  // ── RE-READ THE CONTROLS AND THE DRAWN LAYER, AT THE SHUTTER ───────────────────────
+  // ⚠️ THE READING TAKEN WHEN THE FILTER WAS APPLIED IS NOT A STATEMENT ABOUT THE IMAGE.
+  // Between there and here the capture calls `map.setView(...)`, opens the marker's popup
+  // and injects a stylesheet — each of which re-enters the page and any of which could, in
+  // principle, run a handler that moves a control or redraws the layer. So the policy is
+  // verified AGAIN, immediately before `el.screenshot()`, and a failure refuses the capture
+  // rather than saving an image whose panel and whose markers disagree with the record.
+  let policyRecord = null;
+  if (theme === 'datacenter') {
+    const verify = await page.evaluate(
+      ([key]) => window.HS.mapsDcCaptureVerifyAtShutter(key),
+      [proj.source_key],
+    );
+    if (!verify.ok) {
+      return { ok: false, reason: `the Data Center map state did not hold to the shutter: ${verify.reason}` };
+    }
+    policyRecord = await page.evaluate(
+      ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
+      [policyApply, verify],
+    );
+    // The row will only be treated as bound if this record validates, so validating it HERE
+    // — before an image is written or uploaded — turns a would-be silently-unusable capture
+    // into a named refusal. The SHIPPED validator, never a second opinion about it.
+    const ev = HS.mapsDcCapturePolicyEvidence({ capture_policy: policyRecord });
+    if (!ev.ok) {
+      return { ok: false, reason: `the measured map state does not satisfy policy ${HS.MAPS_DC_CAPTURE_POLICY.key}: ${ev.problems.join('; ')}` };
+    }
+  }
+
   const sel = theme === 'datacenter' ? '.card.mapcard' : '#map';
   const el = await page.$(sel);
   if (!el) return { ok: false, reason: `no ${sel} element` };
@@ -533,7 +567,7 @@ async function capture(page, draft, proj, theme) {
     framed: { zoom: framed.zoom, center: framed.center },
     checks: clean,
     theme: theme || null,
-    filterState,
+    policyRecord,
     panel,
   };
 }
@@ -566,6 +600,25 @@ async function main() {
     viewport: { width: IMG_W, height: IMG_H },
     deviceScaleFactor: SCALE,
   });
+  // ── EACH CAPTURE STARTS FROM THE PRODUCT'S OWN DEFAULT STATE ───────────────────────
+  // lib/map.js persists the PROJECT TYPE and REGULATORY selections in `sessionStorage`
+  // (`hs.map.categoryFilters`) and this job reuses ONE browser context for every draft in a
+  // run, so without this the SECOND capture inherits the FIRST's filter state. That is not
+  // hypothetical: the shipped Mesa evidence records `type_filter_before` byte-identical to
+  // `type_filter_after` (datacenter true, six falses) — a "before" no fresh page can produce.
+  // For a theme capture the policy overwrites all three dimensions anyway, so what this
+  // protects is the ORDINARY MAPS capture that follows one, which sets no filters at all and
+  // would otherwise be photographed through the previous draft's Data-center-only view.
+  //
+  // It clears the CAPTURE browser's own ephemeral session, never a resident's: this context
+  // is created and destroyed inside this function, and nothing here touches localStorage or
+  // any stored preference of the deployed site.
+  await ctx.addInitScript(() => {
+    try {
+      window.sessionStorage.removeItem('hs.map.categoryFilters');
+      window.sessionStorage.removeItem('hs.map.statusFilters');
+    } catch (e) { /* storage blocked -> the page already falls back to its defaults */ }
+  });
   const page = await ctx.newPage();
   const results = [];
 
@@ -578,8 +631,9 @@ async function main() {
     // retry clock, and a recurring job would have re-selected it on every single fire. An
     // unrecorded refusal is also indistinguishable from a draft nothing has looked at yet.
     const ineligible = async (why) => {
-      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why });
-      if (!DRY) await recordOutcome(d, INELIGIBLE, why, null);
+      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, why, null);
+      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why,
+        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
     };
 
     if (!pid) { await ineligible('the draft carries no project_id, so there is nothing to photograph'); continue; }
@@ -611,8 +665,9 @@ async function main() {
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
     if (!r.ok) {
-      results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme });
-      if (!DRY) await recordOutcome(d, FAILED, r.reason, theme);
+      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme);
+      results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme,
+        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
       continue;
     }
 
@@ -624,8 +679,24 @@ async function main() {
     const objectPath = `maps/${d.zip}/${String(proj.id)}-${keyStamp(d)}.png`;
     if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file, marker: r.marker }); continue; }
     r.authMarkers = auth.markers;
+    // THE UPLOAD LANDS FIRST AND IS HARMLESS ON ITS OWN. The object path carries this
+    // draft's own key fingerprint, so an orphan object is unreferenced bytes — it is not a
+    // picture attached to a row, and nothing reads the bucket except through
+    // `image_bucket_path`. Uploading after a successful attach would be worse: the row would
+    // name an object that does not exist yet.
     await upload(objectPath, r.file);
-    await attach(d, objectPath, r, proj);
+    const wrote = await attach(d, objectPath, r, proj);
+    if (!wrote.ok) {
+      // The row moved while we were photographing it. Report it, leave the previous image and
+      // the previous evidence untouched, and let the next run re-select it against whatever
+      // the draft is NOW. Forcing the write is the one thing that must not happen here.
+      console.warn(`maps-social-image: ${d.id} — SKIPPED (stale): the draft changed during this `
+        + `capture (status or revision ${d.revision} moved). Nothing was written; the uploaded `
+        + `object ${objectPath} is unreferenced.`);
+      results.push({ id: d.id, label, ok: false, state: WAITING, stale: true,
+        reason: 'the draft changed during this capture; the result was not attached' });
+      continue;
+    }
     results.push({ id: d.id, label, ok: true, state: READY, path: objectPath, marker: r.marker, framed: r.framed });
   }
 
@@ -688,6 +759,41 @@ async function proveNothingApproved(ids) {
   }
 }
 
+// ── THE ATTACH IS CONDITIONAL, IN ONE STATEMENT ──────────────────────────────────────
+//
+// A capture reads a draft, spends 30-90 seconds in a browser, and then writes. In that
+// window the row can legitimately move: the founder can approve it, a recompose can rewrite
+// its text, another run can attach a newer image. A read followed by an unconditional write
+// is not a guard — it is a race with a comment on it.
+//
+// So every write this module makes carries its preconditions IN THE `WHERE` CLAUSE, which
+// PostgREST expresses as filters on the PATCH. One statement, evaluated by Postgres:
+//
+//   id       — this draft
+//   status   — STILL a draft. Approval is not this job's to move, and an approved row's
+//              payload fingerprint is bound to the image it was approved with, so writing a
+//              new image under it would break that binding (the publication guard would then
+//              refuse to publish at all).
+//   revision — STILL the revision the capture was planned against. `social_posts_bump_revision`
+//              increments it whenever post_text, embed, embed_kind, image_bucket_path,
+//              source_url, hashtags or evidence changes, so equality here means NOTHING this
+//              module merges from its snapshot has moved underneath it.
+//
+// `return=representation` is what makes the refusal VISIBLE: zero rows back means a
+// precondition failed. The run reports the draft as skipped/stale and leaves the old image
+// and the old evidence exactly as they are. It never re-reads and retries, and it never
+// drops a filter to make the write land.
+async function guardedPatch(draft, body) {
+  const q = `social_posts?id=eq.${draft.id}&status=eq.draft&revision=eq.${Number(draft.revision)}`;
+  const rows = await api(q, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(assertWriteScope(body)),
+  });
+  const n = Array.isArray(rows) ? rows.length : 0;
+  return { ok: n === 1, rows: n };
+}
+
 /** Attach the image to THIS draft and record what the visual actually is. */
 async function attach(draft, objectPath, r, proj) {
   const visual = {
@@ -721,19 +827,26 @@ async function attach(draft, objectPath, r, proj) {
       theme: r.theme,
       clip: r.clip,
       embed_mode: true,
-      // What the PROJECT TYPE controls were before and after, read off the controls
-      // themselves — so the checkmarks visible in the image are accounted for.
-      type_filter_before: r.filterState && r.filterState.before,
-      type_filter_after: r.filterState && r.filterState.after,
+      // THE MEASURED MAP STATE — all three filter dimensions, read off the controls
+      // themselves and off the drawn Leaflet layer, so the checkmarks visible in the image
+      // and the markers visible in the image are both accounted for. Built by the SHIPPED
+      // lib/maps-capture-policy.js, which is also what validates it on the way back out.
+      capture_policy: r.policyRecord,
+      // Kept under their historical names so anything already reading them keeps working.
+      // They are the TYPE half of `capture_policy`, not a second measurement.
+      type_filter_before: r.policyRecord && r.policyRecord.observed_before
+        && r.policyRecord.observed_before.types,
+      type_filter_after: r.policyRecord && r.policyRecord.applied && r.policyRecord.applied.types,
       panel_in_frame: r.panel,
       card_header_text: r.panel && r.panel.card_header_text,
       theme_note: 'Captured in the shipped embed mode (?embed=1) and clipped to the Map 1 '
-        + 'product card, with the Data center PROJECT TYPE control selected and every other '
-        + 'type deselected THROUGH THE REAL CONTROLS (a change event on each chip\'s own '
-        + 'checkbox, which runs the page\'s setType/applyFilter). The project\'s marker was '
-        + 'located AFTER that filter was applied, so its presence is the proof it belongs to '
-        + 'the Data center bucket. No control state is faked and no marker is drawn by this '
-        + 'module.',
+        + 'product card under map-state policy ' + HS.MAPS_DC_CAPTURE_POLICY.key + ': all four '
+        + 'STATUS controls on, Data center the only PROJECT TYPE, the REGULATORY overlay OFF — '
+        + 'set THROUGH THE REAL CONTROLS (a change event on each control\'s own checkbox, which '
+        + 'runs the page\'s setStage/setType/setRegulatory and its applyFilter). The project\'s '
+        + 'marker was located AFTER that policy was applied and the controls plus the drawn '
+        + 'layer were re-read at the shutter. No control state is faked and no marker is drawn '
+        + 'by this module. This records what the CONTROLS said; it is not a digest of the PNG.',
     } : {}),
     note: 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
       + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
@@ -753,13 +866,9 @@ async function attach(draft, objectPath, r, proj) {
   delete visual.failure_reason;
   delete visual.failed_at;
 
-  await api(`social_posts?id=eq.${draft.id}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify(assertWriteScope({
-      image_bucket_path: objectPath,
-      evidence: { ...(draft.evidence || {}), visual },
-    })),
+  return guardedPatch(draft, {
+    image_bucket_path: objectPath,
+    evidence: { ...(draft.evidence || {}), visual },
   });
 }
 
@@ -781,10 +890,7 @@ async function recordOutcome(draft, state, reason, theme) {
   const nextAt = state === FAILED
     ? nextAttemptAt(attempts)
     : new Date(Date.now() + INELIGIBLE_RETRY_HOURS * 3600 * 1000).toISOString();
-  await api(`social_posts?id=eq.${draft.id}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify(assertWriteScope({
+  return guardedPatch(draft, {
       evidence: {
         ...prev,
         visual: {
@@ -820,7 +926,6 @@ async function recordOutcome(draft, state, reason, theme) {
               + 'publication fallback and is NOT a project-specific map preview.',
         },
       },
-    })),
   });
 }
 

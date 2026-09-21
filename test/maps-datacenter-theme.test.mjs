@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 const DASH = readFileSync(new URL('../acquisition.html', import.meta.url), 'utf8');
 const GEN = readFileSync(new URL('../scripts/maps-social-image.mjs', import.meta.url), 'utf8');
 const THEME_SRC = readFileSync(new URL('../lib/maps-social-theme.js', import.meta.url), 'utf8');
+const POLICY_SRC = readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8');
 
 // Comment-stripped views. A doc comment naming a forbidden concept is not the same as using
 // it, and this unit's files explain at length what they refuse to do.
@@ -22,6 +23,7 @@ const strip = (src) => src
   .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
 const GEN_CODE = strip(GEN);
 const THEME_CODE = strip(THEME_SRC);
+const POLICY_CODE = strip(POLICY_SRC);
 
 let n = 0, bad = 0;
 const ok = (cond, msg) => { n++; if (cond) console.log('PASS — ' + msg); else { bad++; console.log('FAIL — ' + msg); } };
@@ -179,16 +181,34 @@ ok(/var block=bskyApprovalBlockReason\(gr\);\s*if\(block\)\{ alert\(block\); ret
 // the definition of "no capture" got stricter.
 ok(/dcThemeImageMandatory\(row\) && !bskyCaptureBound\(row\)/.test(DASH),
   '6: a theme post with no BOUND capture can never unlock approval');
-ok(/mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/.test(DASH),
+ok(/mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]/.test(DASH),
   '6: an attached image must have RENDERED before approval, as before');
+// ⚠️ KEYED ON THE IMAGE PATH, NOT THE ROW ID. A re-capture writes a NEW object, so a cache
+// keyed on the id alone would return the SUPERSEDED picture's blob and report it rendered —
+// the founder would approve the old map believing they had seen the new one.
+ok(/function _bskyImgKey\(p\)\{ return String\(p && p\.id\) \+ '\|' \+ String\(\(p && p\.image_bucket_path\) \|\| ''\); \}/.test(DASH),
+  '6: …and that render flag is keyed on the row id PLUS its image path');
 
 // ═══ 7. THE CAPTURE — real controls, real marker, real product card ═════════════════
-ok(/applyDataCenterTypeFilter/.test(GEN_CODE), '7: the generator has a Data center capture state');
-ok(/dispatchEvent\(new Event\('change'/.test(GEN_CODE),
+// ⚠️ THE MANOEUVRE MOVED INTO lib/maps-capture-policy.js AND THE GENERATOR NOW INJECTS IT.
+// The pins move with it: asserting against the generator alone would pass while the shared
+// module — the thing the browser suite and the capture both actually run — was gutted.
+ok(/applyDataCenterCapturePolicy/.test(GEN_CODE) && /mapsDcCaptureApplyPolicy/.test(GEN_CODE),
+  '7: the generator applies the SHIPPED Data Center map-state policy');
+ok(/addScriptTag\(\{ content: POLICY_SRC \}\)/.test(GEN_CODE),
+  '7: …by INJECTING that module, so there is one implementation and not two');
+ok(/dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/.test(POLICY_CODE),
   '7: the filter is applied THROUGH THE REAL CONTROLS (a change event on the page\'s own checkbox)');
-ok(!/HS\.setCategoryFilter|applyFilter\(\)/.test(GEN_CODE),
-  '7: the generator never writes a filter value directly — it drives the page\'s own handler');
-ok(/#mapkeyShapes \.typechip/.test(GEN_CODE),
+// ALL THREE DIMENSIONS, which is the whole of this fix: the previous version set the PROJECT
+// TYPE row and said nothing about STATUS or the REGULATORY overlay, so the picture published
+// whatever those happened to be.
+ok(/#mapkey \.stagechip\[data-stage="/.test(POLICY_CODE),
+  '7: …including every STATUS control');
+ok(/getElementById\('regToggleBox'\)/.test(POLICY_CODE) && /regulatory: false/.test(POLICY_CODE),
+  '7: …and the REGULATORY overlay, which the policy requires OFF');
+ok(!/HS\.setCategoryFilter|HS\.setStatusFilter/.test(POLICY_CODE),
+  '7: the policy never writes a filter value directly — it drives the page\'s own handler');
+ok(/#mapkeyShapes \.typechip/.test(POLICY_CODE),
   '7: it addresses the shipped PROJECT TYPE chips by their own selector');
 // ORDER: the filter must go on BEFORE the project's marker is located, so the marker's
 // survival is the proof of bucket membership.
@@ -197,7 +217,7 @@ ok(/#mapkeyShapes \.typechip/.test(GEN_CODE),
 // applyDataCenterTypeFilter(page) {` declaration near the top of the file — so the check
 // compared a fixed early offset against the marker wait and could never fail. Proven by
 // mutation: moving the call after the wait left it green.
-const iFilter = GEN_CODE.indexOf('await applyDataCenterTypeFilter(page)');
+const iFilter = GEN_CODE.indexOf('await applyDataCenterCapturePolicy(page');
 const iMarker = GEN_CODE.indexOf('proj.source_key');
 ok(iFilter > 0 && iMarker > 0 && iFilter < iMarker,
   '7: the Data center filter is applied BEFORE the project marker is located');

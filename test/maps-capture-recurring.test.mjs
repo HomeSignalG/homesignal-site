@@ -19,7 +19,8 @@ const DASH = readFileSync(new URL('../acquisition.html', import.meta.url), 'utf8
 const WF = readFileSync(new URL('../.github/workflows/maps-social-image.yml', import.meta.url), 'utf8');
 
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-binding.js']) {
+for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js',
+                 '../lib/maps-capture-binding.js']) {
   (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
@@ -58,12 +59,28 @@ function draft(over) {
     evidence: e
   };
 }
+// The measured map state a CURRENT Data Center capture records. The Pennhurst fixture is a
+// project-backed Data Center Theme draft, so a capture of it is governed by
+// dc-map-state@1 — a fixture without this record would describe a state that can no longer
+// be bound, and every "bound" assertion below would be testing the wrong thing.
+const COMPLIANT_POLICY = {
+  policy: (HS.MAPS_DC_CAPTURE_POLICY || {}).key,
+  applied: { statuses: { operating: true, approved: true, proposed: true, unknown: true },
+             types: { datacenter: true, industrial: false, residential: false, infrastructure: false,
+                      commercial: false, civic: false, other: false }, regulatory: false },
+  final:   { statuses: { operating: true, approved: true, proposed: true, unknown: true },
+             types: { datacenter: true, industrial: false, residential: false, infrastructure: false,
+                      commercial: false, civic: false, other: false }, regulatory: false },
+  rendered: { target_on_map: true, on_map_total: 3, non_datacenter_development_on_map: 0,
+              regulatory_only_on_map: 0, regulatory_badges_drawn: 0, dual_identity_target: false },
+};
 // A draft with a real, bound capture.
 function bound(over) {
   const d = draft(over);
   d.image_bucket_path = 'maps/' + d.zip + '/proj.png';
   d.evidence.visual = Object.assign({
-    status: 'REAL_MAP_VISUAL', state: S.READY, capture_key: HS.mapsCaptureKey(d), attempts: 0
+    status: 'REAL_MAP_VISUAL', state: S.READY, capture_key: HS.mapsCaptureKey(d), attempts: 0,
+    capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
   }, (over && over.visual) || {});
   return d;
 }
@@ -271,10 +288,160 @@ ok(/maps-social-capture/.test(WF), '10n: behind a standing enable switch');
 ok(/HS\.mapsCaptureBound/.test(DASH), '10o: the dashboard gate reads the SHIPPED binding rule');
 ok(/return !!\(window\.HS && HS\.mapsCaptureBound && HS\.mapsCaptureBound\(p\)\);/.test(DASH),
   '10p: and FAILS CLOSED when that module is absent — no lib means nothing is bound');
-ok(/dcThemeImageMandatory\(p\) && !bskyCaptureBound\(p\)/.test(DASH),
+// ⚠️ ANCHORED ON `if(`, NOT A BARE SUBSTRING. A substring pin matches happily inside
+// `if(false && <the condition>)`, so a one-word mutation that disables the whole gate went
+// green against the earlier form of both of these lines — MEASURED, not hypothesised. The
+// condition has to be the WHOLE of the `if`, or the pin is not pinning the branch.
+ok(/if\(dcThemeImageMandatory\(p\) && !bskyCaptureBound\(p\)\)\{/.test(DASH),
   '10q: a Data Center Theme draft needs a BOUND image, not merely any image');
-ok(/p\.content_family==='MAPS' && p\.image_bucket_path && !bskyCaptureBound\(p\)/.test(DASH),
+ok(/if\(p\.content_family==='MAPS' && p\.image_bucket_path && !bskyCaptureBound\(p\)\)\{/.test(DASH),
   '10r: and ANY MAPS draft with an unbound image is blocked ahead of every other check');
+ok(/if \(row && dcThemeImageMandatory\(row\) && !bskyCaptureBound\(row\)\) \{/.test(DASH),
+  '10s: …and the BUTTON gate carries the same condition, whole, so button and handler cannot disagree');
+ok(/if\(mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]\)\{/.test(DASH),
+  '10t: …as does the "you must have SEEN this exact image" rule');
+
+
+// ── §11 THE DATA CENTER MAP-STATE POLICY: KEYS, INVALIDATION AND BLAST RADIUS ─────────
+// The Pennhurst fixture above IS a project-backed Data Center Theme draft, so it is governed
+// by the policy. That is what makes §11 a measurement rather than a description.
+const DCPOL = HS.MAPS_DC_CAPTURE_POLICY;
+const dcPost = draft();
+ok(HS.mapsDcCapturePolicyApplies(dcPost) === true,
+  '11a: the fixture draft is a project-backed Data Center Theme post, so the policy governs it');
+ok(HS.mapsCaptureKey(dcPost).endsWith('|' + DCPOL.key),
+  '11b: its capture key carries the policy version', HS.mapsCaptureKey(dcPost).slice(-24));
+
+// ⛔ THE BLAST RADIUS. An ordinary MAPS capture is governed by no map-state policy and its
+// picture is exactly as valid as it was, so its key must be BYTE-FOR-BYTE what it was before
+// this change. A global 'v1' -> 'v2' bump would have invalidated all of them.
+const ordinary = draft({ evidence: { type: 'Residential', type_raw: 'New Building',
+  project_name: 'New Building 1764 S Sherman ST ADU', status: 'Approved' } });
+ok(HS.mapsDcCapturePolicyApplies(ordinary) === false,
+  '11c: a non-data-centre MAPS draft is NOT governed by the policy');
+ok(HS.mapsCaptureKey(ordinary).indexOf(DCPOL.key) === -1,
+  '11d: …so its capture key carries NO policy segment', HS.mapsCaptureKey(ordinary));
+ok(HS.mapsCaptureKey(ordinary).split('|').length === 11,
+  '11e: …and is the same 11-field shape it has always been',
+  HS.mapsCaptureKey(ordinary).split('|').length);
+ok(HS.mapsCaptureKey(ordinary).startsWith('v1|'),
+  '11f: the key PREFIX is untouched — no global version bump');
+
+// A full policy record, built by the SHIPPED builder rather than typed here.
+const compliantPolicy = COMPLIANT_POLICY;
+function dcBound(over) {
+  const d = draft();
+  d.image_bucket_path = 'maps/19475/x.png';
+  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null,
+    capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
+  if (d.evidence.visual.capture_key === null) d.evidence.visual.capture_key = HS.mapsCaptureKey(d);
+  return d;
+}
+ok(HS.mapsCaptureBound(dcBound()) && HS.mapsCaptureState(dcBound()) === S.READY,
+  '11g: a compliant Data Center capture is BOUND and READY');
+ok(!HS.mapsCaptureDue(dcBound(), T0).due && HS.mapsCaptureDue(dcBound(), T0).skip === 'bound',
+  '11h: …so a second run against it is a NO-OP');
+ok(!HS.mapsCaptureDue(dcBound(), T0, { ignoreClock: true }).due,
+  '11i: …and --ids does not re-photograph it either — an explicit id bypasses the CLOCK, never boundness');
+
+// LEGACY INVALIDATION. Every image captured before this policy existed carries a key without
+// the policy segment AND no measured evidence. It must become unbound and due.
+const legacy = draft();
+legacy.image_bucket_path = 'maps/19475/legacy.png';
+legacy.evidence.visual = { state: S.READY, status: 'REAL_MAP_VISUAL',
+  capture_key: 'v1|19475|0cd2dcd6-9710-4b1b-a670-78f9abec5b86|'
+    + 'arcgis:chester-county-pa-act247-plans:CU-03-26-18866|40.19413|-75.56109|Industrial|Industrial|'
+    + 'Proposed|Pennhurst Data Centers|datacenter' };
+ok(!HS.mapsCaptureBound(legacy), '11j: a PRE-POLICY Data Center capture is UNBOUND');
+ok(HS.mapsCaptureState(legacy) === S.WAITING,
+  '11k: …reported as awaiting capture, never as READY — the picture renders, and that is the danger');
+ok(HS.mapsCaptureDue(legacy, T0).due, '11l: …and due for replacement on the next run');
+
+// A CURRENT-LOOKING KEY IS NOT ENOUGH. This is the "matching key conceals contradictory
+// evidence" path: the key is exactly right and the measurements are not.
+for (const [name, over] of [
+  ['no capture_policy at all', { capture_policy: undefined }],
+  ['a stale policy version', { capture_policy: Object.assign({}, compliantPolicy, { policy: 'dc-map-state@0' }) }],
+  ['REGULATORY left on', { capture_policy: JSON.parse(JSON.stringify(
+      Object.assign({}, compliantPolicy, {
+        applied: Object.assign({}, compliantPolicy.applied, { regulatory: true }),
+        final: Object.assign({}, compliantPolicy.final, { regulatory: true }) }))) }],
+  ['non-data-centre markers rendered', { capture_policy: JSON.parse(JSON.stringify(
+      Object.assign({}, compliantPolicy, {
+        rendered: Object.assign({}, compliantPolicy.rendered, { non_datacenter_development_on_map: 4 }) }))) }],
+]) {
+  const row = dcBound(over);
+  ok(row.evidence.visual.capture_key === HS.mapsCaptureKey(row),
+    `11m/${name}: the key MATCHES this draft exactly`);
+  ok(!HS.mapsCaptureBound(row), `11n/${name}: …and it is still NOT bound`);
+  ok(HS.mapsCaptureDue(row, T0).due, `11o/${name}: …so a capture is owed`);
+}
+
+// TEXT-ONLY EDITS STILL DO NOT RECAPTURE. The policy must not have widened the key into
+// things that do not change a screenshot.
+const reworded = dcBound();
+reworded.post_text = 'A completely different sentence about the same project.';
+ok(HS.mapsCaptureBound(reworded),
+  '11p: a text-only edit leaves the capture BOUND — no recapture for a recompose');
+
+// THE ABSENCE POST keeps its existing behaviour: no project, nothing to photograph, and the
+// policy must not reach it.
+const absence = { id: 'abs', content_family: 'MAPS', tile: 'development', status: 'draft',
+  zip: '64155', image_bucket_path: null,
+  evidence: { theme: 'datacenter', theme_answer: 'none_found' } };
+ok(HS.mapsSocialIsAbsence(absence) === true, '11q: the absence post is recognised as one');
+ok(HS.mapsDcCapturePolicyApplies(absence) === false,
+  '11r: …and the map-state policy does NOT govern it — it acquires no image requirement');
+
+// A CAPTURE FAILURE IS NEVER A FINDING ABOUT A ZIP — and §9 above only covers the four
+// STATE sentences. The policy's own refusal reasons are shown to the founder beside them, so
+// they are held to the same bar: each one names an instrument (a control, the policy, the
+// map's own drawing), never the absence of development.
+const POLICY_SRC = readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8');
+const reasonLines = POLICY_SRC.split('\n').filter((l) => /reason:|problems\.push|return lbl|v := /.test(l));
+ok(reasonLines.length > 0, '11s: the policy module has refusal text to check', reasonLines.length);
+ok(!/\bno\b[^'"]{0,40}\b(data cent|development|project)s?\b[^'"]{0,20}\b(here|in this zip|found)\b/i.test(POLICY_SRC),
+  '11t: none of it claims a ZIP has no data centres — the failure names the instrument');
+
+// ── §12 THE ATTACH IS CONDITIONAL — STRUCTURAL PINS ──────────────────────────────────
+// A read-then-unconditional-write is a race with a comment on it. These pin the preconditions
+// into the WHERE clause, which is the only place Postgres will evaluate them atomically.
+ok(/status=eq\.draft&revision=eq\.\$\{Number\(draft\.revision\)\}/.test(GEN),
+  '12a: every write filters on status=draft AND the observed revision');
+ok(/Prefer: 'return=representation'/.test(GEN),
+  '12b: …and asks for the rows back, so a refused precondition is VISIBLE rather than silent');
+ok(/return guardedPatch\(draft, \{/.test(GEN) && (GEN.match(/guardedPatch\(draft/g) || []).length >= 2,
+  '12c: BOTH the success attach and the failure record go through that one guard');
+ok(!/social_posts\?id=eq\.\$\{draft\.id\}`, \{\n\s*method: 'PATCH'/.test(GEN),
+  '12d: the old unconditional PATCH is gone');
+ok(/select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family,revision/.test(GEN),
+  '12e: the selector reads `revision`, or the guard would have nothing to compare');
+ok(/SKIPPED \(stale\)/.test(GEN),
+  '12f: a refused attach is reported as stale and skipped — never forced');
+ok(/state: WAITING, stale: true/.test(GEN),
+  '12g: …and the row is left for the next run rather than marked failed');
+
+// ── §13 THE POLICY REACHES THE CAPTURE PATH AND THE DASHBOARD ────────────────────────
+ok(/mapsDcCaptureApplyPolicy/.test(GEN), '13a: the capture script applies the SHIPPED policy');
+ok(/mapsDcCaptureVerifyAtShutter/.test(GEN),
+  '13b: …and re-verifies at the shutter, after framing and the popup');
+ok(/mapsDcCapturePolicyEvidence/.test(GEN),
+  '13c: …and validates its own record before an image is written');
+ok(/addScriptTag\(\{ content: POLICY_SRC \}\)/.test(GEN),
+  '13d: the policy module is INJECTED, never re-typed inside the capture script');
+ok(!/applyDataCenterTypeFilter/.test(GEN),
+  '13e: the old PROJECT-TYPE-only filter helper is gone');
+ok(/removeItem\('hs\.map\.categoryFilters'\)/.test(GEN),
+  '13f: each capture starts from the product default — the sessionStorage bleed that produced '
+  + 'the Mesa evidence\'s identical before/after is closed');
+ok(/lib\/maps-capture-policy\.js\?v=/.test(DASH),
+  '13g: the dashboard loads the policy module, with a cache key');
+ok(/_bskyImgKey\(p\)/.test(DASH),
+  '13h: its image cache is keyed on the IMAGE PATH, so a new capture cannot be masked by an old blob');
+ok(/mapsDcCapturePolicyCopy/.test(DASH),
+  '13i: …and it explains policy staleness in its own words, never as "the project changed"');
+ok(/The draft has NOT changed/.test(DASH),
+  '13j: the tooltip says so explicitly');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);
