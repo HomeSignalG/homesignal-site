@@ -1475,7 +1475,28 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         var gr=_bskyRows[id]||null;
         var block=bskyApprovalBlockReason(gr);
         if(block){ alert(block); return; }
-        var r=await window.hsClient.rpc('hs_approve_social_post',{p_id:id});
+        // \u26a0\ufe0f APPROVE THE PAYLOAD YOU READ, NOT THE ROW ID. Passing only p_id
+        // approves whatever the row holds AT THE MOMENT OF THE CLICK, and between this
+        // queue's last refresh and that click a recompose job, a repair script or another
+        // tab can have rewritten post_text, swapped the image or changed the destination.
+        // The server compares each of these against the stored row and refuses on any
+        // difference (SQLSTATE 40001), so a stale review fails loudly instead of silently
+        // approving text nobody read.
+        var claims=await window.hsClient.rpc('hs_social_claim_check',{p_id:id});
+        if(!claims.error && claims.data && claims.data.length){
+          alert('This draft does not satisfy the claim contract, so it cannot be approved:\n\n'
+            + claims.data.join('\n')
+            + '\n\nNothing was changed. A draft composed before the contract needs recomposing '
+            + '(Actions \u2192 Recompose MAPS drafts).');
+          return;
+        }
+        var r=await window.hsClient.rpc('hs_approve_social_post',{
+          p_id:id,
+          p_reviewed_revision: (gr&&gr.revision!=null)?gr.revision:null,
+          p_reviewed_text: gr?gr.post_text:null,
+          p_reviewed_image_path: gr?(gr.image_bucket_path||''):null,
+          p_reviewed_embed_uri: gr?((gr.embed&&gr.embed.uri)||''):null
+        });
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
       } else if(act==='skip'){
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
@@ -1620,14 +1641,39 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     ta.focus();
   }
   function closeBskyEdit(){ $('bsky-edit-overlay').style.display='none'; bskyEditId=null; }
+  // \u26a0\ufe0f FREE TEXT DOES NOT INHERIT A VALIDATION. This modal writes post_text
+  // straight to PostgREST under the owner's RLS policy, so it never touches the composer
+  // and nothing here can vouch for what was typed. Two consequences, both enforced rather
+  // than advised:
+  //
+  //   \u2022 an edit to an APPROVED row sends it back to `draft` in the SAME update. The
+  //     database refuses to keep an approval over a changed payload (the publication
+  //     guard), so doing anything else would simply fail \u2014 this makes the intent
+  //     explicit and tells the founder it now needs re-approval.
+  //   \u2022 after the write, the server's own claim gate is read back and reported. The
+  //     text is NOT rewritten and the edit is NOT reverted: an edit the founder made is
+  //     theirs, and the gate's job is to stop it being APPROVED, not to overrule it.
   async function saveBskyEdit(){
     if(!bskyEditId) return;
     var next=$('bsky-edit-textarea').value;
     var n=graphemeLen(next);
     if(n>300){ alert('Too long: '+n+'/300 graphemes.'); return; }
+    var row=_bskyRows[bskyEditId]||null;
+    var wasApproved=!!(row&&row.status==='approved');
+    if(wasApproved && !confirm('This post is APPROVED. Editing its text withdraws that '
+      + 'approval and returns it to draft for re-review.\n\nContinue?')) return;
+    var body=wasApproved
+      ? { post_text:next, status:'draft', scheduled_slot:null, approved_at:null }
+      : { post_text:next };
     try{
-      var r=await window.hsClient.from('social_posts').update({post_text:next}).eq('id',bskyEditId);
+      var r=await window.hsClient.from('social_posts').update(body).eq('id',bskyEditId);
       if(r.error){ alert('Edit failed: '+(r.error.message||'')); return; }
+      var chk=await window.hsClient.rpc('hs_social_claim_check',{p_id:bskyEditId});
+      if(!chk.error && chk.data && chk.data.length){
+        alert('Saved \u2014 and this text does NOT satisfy the claim contract, so it cannot '
+          + 'be approved as written:\n\n' + chk.data.join('\n')
+          + '\n\nYour words were kept exactly as typed. Nothing was rewritten.');
+      }
       closeBskyEdit();
       refreshBluesky();
     }catch(e){ alert('Edit error.'); }
