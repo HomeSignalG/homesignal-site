@@ -35,6 +35,11 @@ from n3_pilot import (  # noqa: E402  - one implementation, imported not re-deri
 )
 
 SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
+# EVERY BUILD ARTIFACT BELONGS TO A GENERATION. Shard state keyed on snapshot alone cannot
+# tell a failed generation from its replacement, so a restart would resume the wrong build
+# and a second orchestrator would silently collide with the first. Required, never derived
+# from "whichever build is newest": fail closed on a missing or conflicting identity.
+GENERATION = os.environ.get("GENERATION", "").strip()
 Z3_ENV = os.environ.get("Z3", "AUTO").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
 DISK_FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
@@ -595,11 +600,10 @@ def freeze_zips(z3):
     registry, so the list is total by construction: a ZIP present in the basis but absent
     from the registry would otherwise be skipped silently, and the freeze would look clean.
     """
-    rows = sql(f"""select distinct i.zip as zip
-                     from preservation.app_project_identity i
-                    where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
-                      and left(i.zip,3)={lit(z3)}
-                    order by i.zip;""", f"freeze zips {z3}", read_only=True)
+    rows = sql(f"""select distinct e.zip as zip
+                     from public.n5_expected_captured({lit(SNAPSHOT)}) e
+                    where e.zip >= {lit(z3 + "00")} and e.zip <= {lit(z3 + "99")}
+                    order by e.zip;""", f"freeze zips {z3}", read_only=True)
     return [r["zip"] for r in rows]
 
 
@@ -609,7 +613,8 @@ def run_shard(z3):
     say("SHARD", z3)
     t_shard = time.time()
     man = sql(f"""select projects, pairs, zips, checksum from geo.n5_shard
-                   where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "manifest", read_only=True)[0]
+                   where snapshot_id={lit(SNAPSHOT)} and generation_id={lit(GENERATION)}
+                     and z3={lit(z3)};""", "manifest", read_only=True)[0]
     say("manifest projects / pairs / zips",
         f"{man['projects']} / {man['pairs']} / {man['zips']}")
 
@@ -647,13 +652,14 @@ def run_shard(z3):
     for z in zips:
         sql(f"""set statement_timeout='110s';
                 insert into geo.n5_frozen (z3,source_key,zip,source_seq,registry_id,treatment,lat,lng,source_key_basis)
-                select {lit(z3)}, i.source_key, i.zip, i.source_seq,
-                       coalesce(i.registry_id,'(null)'), a.treatment, i.lat, i.lng, p.source_key_basis
-                  from preservation.app_project_identity i
-                  join geo.n5_accepted_source a on a.registry_id = coalesce(i.registry_id,'(null)')
-                  left join public.app_projects p on p.id = i.app_project_id
-                 where i.snapshot_id={lit(SNAPSHOT)} and i.record_kind='development'
-                   and left(i.zip,3) = {lit(z3)} and i.zip = {lit(z)};""", f"freeze {z}")
+                select {lit(z3)}, e.source_key, e.zip, e.source_seq,
+                       coalesce(e.registry_id,'(null)'),
+                       coalesce(a.treatment,'UNCLASSIFIED'), e.lat, e.lng, p.source_key_basis
+                  from public.n5_expected_captured({lit(SNAPSHOT)}) e
+                  left join geo.n5_accepted_source a
+                         on a.registry_id = coalesce(e.registry_id,'(null)')
+                  left join public.app_projects p on p.id = e.app_project_id
+                 where e.zip = {lit(z)};""", f"freeze {z}")
     # The whole table was just replaced, so its planner statistics describe the PREVIOUS
     # shard until autoanalyze happens to catch up. Cheap here, and it removes the
     # stale-statistics class of plan blow-up on the dense shards. Hardening: it is not
@@ -775,7 +781,8 @@ def run_shard(z3):
     if verified and disk_ok:
         sql(f"""update geo.n5_shard set state='done', finished_at=now(),
                        detail={lit(json.dumps(detail))}::jsonb
-                 where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "mark done")
+                 where snapshot_id={lit(SNAPSHOT)} and generation_id={lit(GENERATION)}
+                   and z3={lit(z3)};""", "mark done")
         say("SHARD RESULT", "DONE")
         return True
     reason = ("NOT_VERIFIED" if not verified else "") + ("+" if not verified and not disk_ok else "") \
@@ -788,7 +795,8 @@ def halt(z3, reason, detail):
     detail["halt_reason"] = reason
     sql(f"""update geo.n5_shard set state='halted', finished_at=now(),
                    detail={lit(json.dumps(detail))}::jsonb
-             where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};""", "mark halted")
+             where snapshot_id={lit(SNAPSHOT)} and generation_id={lit(GENERATION)}
+               and z3={lit(z3)};""", "mark halted")
     say("SHARD RESULT", f"HALTED - {reason}")
     return False
 
@@ -844,7 +852,28 @@ def _assert_helper_contracts():
 def main():
     say("mode", "n5-shard (bounded national association build, shard by shard)")
     _assert_helper_contracts()
-    say("freeze basis", f"preservation.app_project_identity @ {SNAPSHOT}, record_kind=development")
+
+    # GENERATION IDENTITY IS REQUIRED AND VERIFIED, NEVER INFERRED. A build that picks
+    # "whichever generation looks newest" is how a restart resumes the wrong one and how two
+    # orchestrators collide without either noticing. Three fail-closed checks before any row
+    # is written: the id is present, the generation exists and is BUILDING, and its snapshot
+    # is the one this process was told to freeze from.
+    if not GENERATION:
+        raise SystemExit("STOP: GENERATION is required. Shard state is generation-scoped; "
+                         "refusing to build without an explicit generation identity.")
+    gen = sql(f"select generation_id, snapshot_id, state from geo.n5_generation "
+              f"where generation_id={lit(GENERATION)};", "generation", read_only=True)
+    if not gen:
+        raise SystemExit(f"STOP: generation {GENERATION} does not exist. Nothing was written.")
+    gen = gen[0]
+    if gen["state"] != "BUILDING":
+        raise SystemExit(f"STOP: generation {GENERATION} is {gen['state']}, not BUILDING. "
+                         f"Refusing to write shards into a generation that is not open.")
+    if gen["snapshot_id"] != SNAPSHOT:
+        raise SystemExit(f"STOP: generation {GENERATION} is bound to snapshot "
+                         f"{gen['snapshot_id']} but SNAPSHOT={SNAPSHOT}. Conflicting identity.")
+    say("generation", f"{GENERATION} (BUILDING, snapshot {SNAPSHOT})")
+    say("freeze basis", f"public.n5_expected_captured({SNAPSHOT}) - the canonical contract")
     snap = sql(f"select sources, projects, pairs, n_rows from geo.n5_snapshot "
                f"where snapshot_id={lit(SNAPSHOT)};", "snap")[0]
     say("baseline sources / projects / pairs",
@@ -859,7 +888,8 @@ def main():
     todo = parse_shard_list(Z3_ENV, MAX_SHARDS)
     if todo is None:
         todo = [r["z3"] for r in sql(
-            f"""select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} and state='pending'
+            f"""select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)}
+                   and generation_id={lit(GENERATION)} and state='pending'
                  order by pairs asc, z3 limit {MAX_SHARDS};""", "pick")]
     say("shards this run", f"{len(todo)}: " + ",".join(todo))
 
@@ -870,7 +900,8 @@ def main():
     # first query happened to sit.
     if todo:
         known = {r["z3"] for r in sql(
-            f"select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)};", "manifest ids")}
+            f"select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} "
+            f"and generation_id={lit(GENERATION)};", "manifest ids")}
         unknown = [z for z in todo if z not in known]
         if unknown:
             raise SystemExit(f"STOP: shard id(s) not in the {SNAPSHOT} manifest: {unknown}. "
@@ -881,7 +912,8 @@ def main():
     done = 0
     for z3 in todo:
         sql(f"update geo.n5_shard set state='running', started_at=now() "
-            f"where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};", "mark running")
+            f"where snapshot_id={lit(SNAPSHOT)} and generation_id={lit(GENERATION)} "
+            f"and z3={lit(z3)};", "mark running")
         try:
             ok = run_shard(z3)
         except BaseException as e:
@@ -898,7 +930,7 @@ def main():
     say("", "")
     say("shards completed this run", done)
     rem = one(sql(f"select count(*) n from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} "
-                  f"and state='pending';", "rem"), "n")
+                  f"and generation_id={lit(GENERATION)} and state='pending';", "rem"), "n")
     say("shards still pending", rem)
     cache = sql("select count(*) feats, count(distinct source_key) projects, "
                 "pg_size_pretty(pg_total_relation_size('geo.n5_geom')) sz from geo.n5_geom;", "cache")[0]
