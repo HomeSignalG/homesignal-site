@@ -3,16 +3,30 @@
 --   20260921221056  dc_step2a_evidence_foundation           sections 1-5
 --   20260921221318  dc_step2a_selftest                      section 6
 --   20260921221903  dc_step2a_selftest_pin_seeded_contract  check 52, spliced into the live body
+--   20260921224439  dc_step2a_expect_fail_not_exercised_55006     the NOT EXERCISED branch
+--   20260921225745  dc_step2a_expect_fail_55006_scope_correction  its comment, narrowed to
+--                                                                 the shape actually observed
 -- Live is byte-identical to this file on all 7 function bodies (md5 of pg_proc.prosrc):
 --   dc_source_contract_stamp    0fb171eb21a7e59fed7f2ce7fd576373
 --   dc_acquisition_run_guard    31aab8306a27dccf764c3f87e3d1cf3e
 --   dc_source_observation_guard 3e4c10dcda59b02b605abf79e43667a0
 --   dc_mark_run_advanced        cd0614b23ac2a29453d48683087ce16f
---   dc_step2a_expect_fail       1861fefb7cae48d6087d5af0f1372150
+--   dc_step2a_expect_fail       69f0e9f452eec2bed8792c9554b40f10
 --   dc_step2a_expect_ok         5879f15776f141a0bab44d8c1229e673
 --   dc_step2a_selftest          961caf6a8be196641df42b614599826f
 -- and on the object set: 22 check constraints, 3 FKs, 12 non-pkey indexes, 6 triggers, 0 policies,
 -- 0 anon/authenticated grants. Selftest: 54 checks, 54 passing.
+--
+-- THE 55006 BRANCH IN dc_step2a_expect_fail EXISTS BECAUSE THE SUITE'S RESULT DEPENDED ON HOW
+-- IT WAS CALLED. Measured immediately after the first apply: called on its own, 54/54 pass on six
+-- consecutive runs; called in a roll-up UNION whose sibling branch counted rows in these same
+-- tables, checks 08 and 28 reported `WRONG ERROR [55006] cannot TRUNCATE "dc_source_observation"
+-- because it is being used by active queries in this session`. The UNION shape is the ONLY one
+-- observed to do it -- a lateral subselect over the same table was tried and did not. That is Postgres refusing the
+-- TRUNCATE on its own concurrency rule BEFORE the guard could -- the guard is fine, the
+-- instrument was ambiguous. expect_fail was already right to refuse to bank a wrong-reason error
+-- as a refusal (that is the whole point of p_expect); what was missing was saying WHICH half
+-- broke, so the next reader does not chase a phantom guard failure.
 --
 -- CHECK 52 EXISTS BECAUSE A MUTATION FOUND THE SUITE'S OWN GAP, not because review did. Widening
 -- Atlas's anti-truncation floor 1000 -> 1 originally moved NO check: check 20 proves the floor
@@ -559,6 +573,18 @@ begin
 exception
   when sqlstate 'HS998' then
     return 'NO ERROR RAISED (the statement was accepted)';
+  when sqlstate '55006' then
+    -- POSTGRES PRE-EMPTED THE GUARD, so this check was NOT EXERCISED and must not be read as a
+    -- guard failure. TRUNCATE is refused outright while the same SESSION holds an open query on
+    -- the table, which happens when dc_step2a_selftest() is a branch of a UNION whose SIBLING
+    -- branch reads these tables. (Measured: a LATERAL subselect reading the same table alongside
+    -- it did NOT reproduce it -- do not widen this claim past what was observed.) The guard
+    -- never ran, so there is nothing to
+    -- report about it -- but a vacuous PASS here would let a removed TRUNCATE trigger score
+    -- green, so it stays a failure and says exactly what to do instead.
+    return 'NOT EXERCISED [55006] ' || sqlerrm
+        || ' -- Postgres refused before the guard could. Call public.dc_step2a_selftest() as the '
+        || 'ONLY thing in its statement; the TRUNCATE checks cannot run beside a read of these tables.';
   when others then
     if sqlerrm ~ p_expect then
       return null;                                   -- refused, and refused for the right reason
