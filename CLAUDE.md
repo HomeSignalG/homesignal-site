@@ -243,11 +243,28 @@ entry**: enumerating individual tool names goes stale the moment the MCP server 
 (`get_logs` is listed in both files and is NOT a real tool — the tool is `query_logs`).
 Never replace the wildcard with an enumeration.
 
-⚠️ **A permission prompt for a Supabase tool therefore means the SETTINGS did not load, not
-that approval is needed.** The usual cause is a session started outside a repo directory, or
-one where `add_repo` attached the repo mid-session — §3 Step 0 already says a committed file
-cannot flip a running session. Fix the session (start fresh, both repos in sources), do not
-ask the founder to approve tool-by-tool.
+⚠️ **THERE ARE TWO GATES, AND THE ALLOW-LIST IS ONLY ONE OF THEM. CHECK THE MODE PICKER
+FIRST.** A Supabase prompt is almost never a missing allow rule.
+
+1. **PERMISSION MODE — check this before anything else.** The dropdown at the bottom of the
+   web-UI input box (beside the model name) shows the session's mode. **If it reads `Auto`,
+   that is the cause, and NOTHING in `.claude/settings.json` can fix it.** Auto mode runs a
+   separate *classifier* that is not governed by `permissions.allow` at all. Only the
+   founder can change it — click that dropdown and choose **Bypass permissions**. Measured
+   2026-09-21: a session sitting in `Auto` prompted for `mcp__Supabase__execute_sql`, a tool
+   explicitly allow-listed in BOTH repos, and in the same session the classifier denied a
+   plain `git push` and a plain `git diff --stat` ~8 times, each refusal reading *"denied by
+   the Claude Code auto mode classifier."* **Adding allow entries does nothing to this gate
+   — do not try to fix it by widening the list.**
+2. **SETTINGS NOT LOADED.** A session started ABOVE the repos (cwd `/home/user`, where there
+   is no `.claude/` — verified) loads NEITHER repo's settings file, and `add_repo` attaching
+   a repo mid-session does not apply it either. §3 Step 0 already says a committed file
+   cannot flip a running session. Fix by starting fresh **inside a repo**, both repos in
+   sources.
+
+**In neither case is the answer to approve tool-by-tool, and in neither case is the answer a
+bigger allow-list.** Say which gate it is, and if it is the mode picker, say so plainly — it
+is a one-click founder action and no amount of repo work substitutes for it.
 
 ⛔ **THIS WIDENS NOTHING ELSE, and the exclusions are the point:**
 - **§4's key rule is UNCHANGED.** A file that ships still carries the public **anon key**
