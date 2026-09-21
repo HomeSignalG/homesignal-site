@@ -230,6 +230,43 @@ Consequences that are non-negotiable:
 
 ---
 
+## Supabase access is STANDING — do not ask for permission (founder rule, 2026-09-21)
+
+**Every session has Supabase access already, and reading or writing the project database
+through the `mcp__Supabase__*` tools is pre-authorized. Do not stop to ask for it.**
+
+Both repos ship `.claude/settings.json` with `defaultMode: bypassPermissions` and the
+`mcp__Supabase__*` wildcard, so a fresh session starts with the whole Supabase toolset
+allow-listed — `execute_sql`, `apply_migration`, `deploy_edge_function`, `query_logs`,
+`get_advisors`, the `list_*`/`get_*` reads, all of it. **The wildcard is the load-bearing
+entry**: enumerating individual tool names goes stale the moment the MCP server adds one
+(`get_logs` is listed in both files and is NOT a real tool — the tool is `query_logs`).
+Never replace the wildcard with an enumeration.
+
+⚠️ **A permission prompt for a Supabase tool therefore means the SETTINGS did not load, not
+that approval is needed.** The usual cause is a session started outside a repo directory, or
+one where `add_repo` attached the repo mid-session — §3 Step 0 already says a committed file
+cannot flip a running session. Fix the session (start fresh, both repos in sources), do not
+ask the founder to approve tool-by-tool.
+
+⛔ **THIS WIDENS NOTHING ELSE, and the exclusions are the point:**
+- **§4's key rule is UNCHANGED.** A file that ships still carries the public **anon key**
+  only; RLS and `SECURITY DEFINER` functions remain the gate, and a service-role key never
+  reaches the browser.
+- **A destructive database change is still gated** — dropping or truncating a table, deleting
+  rows at scale, a migration that is not additive. Holding the tool is not authorization for
+  the act.
+- **Subscriber data and PII are still never exposed**, and the §3 / §7 stop lists stand as
+  written (schema changes beyond what exists, a same-level systematic ZIP collision, a legal
+  or consent change).
+- The autonomy envelope in the standing grant above is unchanged: this rule removes a
+  PROMPT, it does not promote a gated change to an autonomous one.
+
+**The rule is about the PROMPT, not the JUDGEMENT:** reach for Supabase without asking, then
+apply the same discipline to what you do with it.
+
+---
+
 ## 1. Sources of truth (read this before changing anything)
 
 Precedence, highest first. When two disagree, the higher one wins and the lower is
