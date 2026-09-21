@@ -112,8 +112,17 @@ ok(!/siteMarkers\s*\|\|\s*\[\]\)\.length\s*>\s*0/.test(ABS),
 // fifth copy in the same session that removed four.
 ok(/async function finishCapture\(d, label, r, proj, results\)/.test(GEN_CODE),
   '5a: there is ONE shared finish path');
-ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 2,
-  '5b: …and exactly two call sites use it — the project path and the absence path');
+// ⚖️ THREE CALL SITES NOW. The third is `zipFallback`, which turns the four
+// record-shaped refusals (the project row is gone / is not a development row / has no
+// coordinates / is outside the ZIP's authoritative set) into ZIP-scope captures instead of
+// leaving those drafts with no map. Corrected with its reason recorded rather than by
+// relaxing the count: what must hold is that every path finishes through the SAME function,
+// so the FAILED record, the key-fingerprinted object name and the attach stay one
+// implementation.
+ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 3,
+  '5b: …and every path finishes through it — project, absence, and the ZIP fallback');
+ok(/const zipFallback = async/.test(GEN_CODE),
+  '5b₁: …including the ZIP fallback for a project that cannot truthfully be pinned');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');
 ok((GEN_CODE.match(/await attach\(d, objectPath, r, proj\)/g) || []).length === 1,
@@ -129,10 +138,21 @@ ok(/wrote\.ok/.test(FIN),
   '5g: …and still refuses to write over a draft that moved during the capture');
 
 // ── §6 THE OBJECT PATH DOES NOT INVENT A PROJECT ─────────────────────────────────────
-ok(/proj \? String\(proj\.id\) : 'nodc'/.test(FIN),
+ok(/proj \? String\(proj\.id\) :/.test(FIN) && /'nodc'/.test(FIN),
   '6a: an absence object is named `nodc`, never a project-shaped placeholder that the next '
   + 'reader would take for a project id that has stopped resolving');
-ok(/keyStamp\(d\)/.test(FIN),
+// ⚠️ 6a USED TO PIN THE WHOLE TERNARY LITERALLY, `proj ? String(proj.id) : 'nodc'`, WHICH
+// MADE IT A PIN AGAINST A THIRD CASE EXISTING rather than against inventing a project. A
+// project-backed row whose pin could not be drawn is NOT an absence, and filing its object
+// under `nodc` asserts the project does not exist. The rule 6a is really about — the false
+// branch never produces a project-shaped id — is unchanged and still holds for both values.
+ok(/zip_scope_reason \? 'zip' : 'nodc'/.test(FIN),
+  '6a1: …and a project-backed ZIP fallback is named `zip`, so the bucket distinguishes '
+  + '"nothing is here" from "something is here and the map could not pin it"');
+ok(!/: *'?(undefined|null|0)'?\)/.test(FIN.slice(FIN.indexOf('const subject'), FIN.indexOf('const subject') + 200)),
+  '6a2: control — the subject is never an empty or falsy literal, which would collide '
+  + 'every ZIP\'s fallback objects onto one name');
+ok(/keyStamp\(d, scope\)/.test(FIN),
   '6b: …and still carries the binding key\'s fingerprint, so a re-capture writes a new '
   + 'object rather than silently overwriting the old one');
 

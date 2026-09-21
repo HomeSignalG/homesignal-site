@@ -261,16 +261,34 @@ ok(HS.mapsCaptureStateCopy('SOMETHING_ELSE') === '',
 ok(/HS\.mapsCaptureDue\(d, now, \{ ignoreClock: ONLY_IDS\.length > 0 \}\)/.test(GEN),
   '10a: the capture script uses the SHIPPED predicate — not a second copy of it');
 ok(/HS\.MAPS_CAPTURE_RETRY/.test(GEN), '10b: and the SHIPPED retry ladder');
-ok(/visual\.capture_key = HS\.mapsCaptureKey\(draft\)/.test(GEN),
-  '10c: a successful capture records the binding key');
-ok(/attempted_key: HS\.mapsCaptureKey\(draft\)/.test(GEN),
-  '10d: a refusal records the inputs it was refusing, so a later change can release the clock');
-ok(/-\$\{keyStamp\(d\)\}\.png/.test(GEN),
-  '10e: the object name carries the key stamp, so a re-capture cannot silently overwrite the old image');
+// ⚖️ AT THE SCOPE THE SHUTTER ACTUALLY USED. Keying at the draft's own widest scope
+// stamps a PROJECT key on a ZIP-scope picture, which then never matches what
+// `mapsCaptureBound` computes for it — permanently unbound, the same shape as the null key
+// #1280 replaced for the absence post. The scope argument is the load-bearing half.
+ok(/visual\.capture_key = HS\.mapsCaptureKey\(draft, r\.scope \|\| \(proj \? 'project' : 'zip'\)\)/.test(GEN),
+  '10c: a successful capture records the binding key AT THE SCOPE IT SHOT');
+ok(/attempted_key: HS\.mapsCaptureKey\(draft, scope\)/.test(GEN),
+  '10d: a refusal records the inputs it was refusing, at the scope it attempted, so a later change can release the clock');
+ok(/const scope = proj \? 'project' : 'zip';/.test(GEN),
+  '10d₁: …and that scope is fixed once in finishCapture, so key, path and refusal cannot disagree');
+ok(/-\$\{keyStamp\(d, scope\)\}\.png/.test(GEN),
+  '10e: the object name carries the key stamp AT THE SHOT SCOPE, so a re-capture cannot silently overwrite the old image');
 // EVERY refusal branch must record an outcome. Five of them used to `continue` silently,
 // which under a recurring job means re-selecting the same row on every single fire.
-ok((GEN.match(/recordOutcome\(/g) || []).length >= 3,
-  '10f: refusals are recorded on the row rather than dropped silently');
+// ⚖️ THE COUNT DROPPED because five record-shaped refusals became ZIP-scope CAPTURES.
+// Corrected with its reason recorded, rather than by lowering a threshold to make it pass:
+// what must still hold is that a refusal is never silent, and there are still both a
+// definition and a call site.
+ok((GEN.match(/recordOutcome\(/g) || []).length >= 2,
+  '10f: refusals are still recorded on the row rather than dropped silently');
+// ⚠️ COMMENT-STRIPPED. The source quotes `await ineligible(...)` verbatim in order to
+// record what was removed, so a pin that searches the whole file finds the very string it
+// forbids — the trap this repo has already paid for twice.
+const GEN_EXEC = GEN.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+ok(/const zipFallback = async/.test(GEN_EXEC),
+  '10f₀₀: the comment-stripped source still holds the real code (control for §10f₀)');
+ok(!/await ineligible\(/.test(GEN_EXEC),
+  '10f₀: …and no record-shaped condition ends a draft with no picture any more');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
   '10g: the old silent-continue refusal is gone');
 ok(/ineligible\(/.test(GEN), '10h: deterministic refusals go through one INELIGIBLE helper');
@@ -292,12 +310,17 @@ ok(/return !!\(window\.HS && HS\.mapsCaptureBound && HS\.mapsCaptureBound\(p\)\)
 // `if(false && <the condition>)`, so a one-word mutation that disables the whole gate went
 // green against the earlier form of both of these lines — MEASURED, not hypothesised. The
 // condition has to be the WHOLE of the `if`, or the pin is not pinning the branch.
-ok(/if\(dcThemeImageMandatory\(p\) && !bskyCaptureBound\(p\)\)\{/.test(DASH),
-  '10q: a Data Center Theme draft needs a BOUND image, not merely any image');
+// ⚖️ SUPERSEDED — EVERY MAPS POST MUST HAVE A MAP. This pinned a condition scoped to ONE
+// theme, so the basic question was only ever asked of a minority of the corpus. The pin is
+// now the strictly stronger one: the gate must consult a predicate keyed on the FAMILY.
+ok(/var mapBlock = bskyMapGateBlock\(p\);\n\s*if\(mapBlock\)\{/.test(DASH),
+  '10q: EVERY MAPS draft needs a BOUND map — the handler gate is universal, not per-theme');
+ok(/function bskyMapGateBlock\(p\)\{\n\s*if\(!p \|\| p\.content_family !== 'MAPS'\) return '';/.test(DASH),
+  '10q₁: …and that predicate keys on the FAMILY, so no theme carve-out can narrow it');
 ok(/if\(p\.content_family==='MAPS' && p\.image_bucket_path && !bskyCaptureBound\(p\)\)\{/.test(DASH),
   '10r: and ANY MAPS draft with an unbound image is blocked ahead of every other check');
-ok(/if \(row && dcThemeImageMandatory\(row\) && !bskyCaptureBound\(row\)\) \{/.test(DASH),
-  '10s: …and the BUTTON gate carries the same condition, whole, so button and handler cannot disagree');
+ok(/if \(row && bskyMapGateBlock\(row\)\) \{/.test(DASH),
+  '10s: …and the BUTTON gate calls the SAME predicate, whole, so button and handler cannot disagree');
 ok(/if\(mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]\)\{/.test(DASH),
   '10t: …as does the "you must have SEEN this exact image" rule');
 
@@ -412,13 +435,19 @@ absReworded.post_text = 'Different words about the same empty map.';
 ok(HS.mapsCaptureKey(absReworded) === absKey,
   '11v: a text-only edit does NOT move an absence key either — wording is not a map state');
 
-// A MAPS ROW WITH NO PROJECT THAT IS *NOT* A GENUINE ABSENCE ANSWER STAYS UNKEYED. The
-// branch is scoped to the shared absence predicate, not to "project_id is missing", so a
-// malformed row still fails closed the way it always did.
+// A MAPS ROW WITH NO PROJECT THAT IS *NOT* A GENUINE ABSENCE ANSWER IS KEYED AT ZIP SCOPE.
 const notAbsence = JSON.parse(JSON.stringify(absence));
 delete notAbsence.evidence.theme_answer;
-ok(HS.mapsCaptureKey(notAbsence) === null,
-  '11w: a projectless row that is not a genuine absence answer is still unkeyed (fails closed)');
+// ⚖️ SUPERSEDED — the founder's matrix lists "no project_id -> zip" as its own case,
+// distinct from the absence answer. Leaving such a row unkeyed left it permanently
+// unbindable, and a post cannot be required to have a map it can never bind to. It is keyed
+// at ZIP scope with the OTHER subject token, because it claims nothing about filings.
+const naKey = HS.mapsCaptureKey(notAbsence);
+ok(typeof naKey === 'string' && naKey.indexOf(`v1|${notAbsence.zip}|zip-scope|`) === 0,
+  '11w: a projectless row that is not an absence answer is keyed at ZIP scope, not left unkeyed', naKey);
+ok(naKey !== HS.mapsCaptureKey(absence),
+  '11w₁: …and it is a DIFFERENT key from the absence answer\'s, so neither picture says the other\'s thing',
+  `${naKey} vs ${HS.mapsCaptureKey(absence)}`);
 
 // A CAPTURE FAILURE IS NEVER A FINDING ABOUT A ZIP — and §9 above only covers the four
 // STATE sentences. The policy's own refusal reasons are shown to the founder beside them, so

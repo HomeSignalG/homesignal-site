@@ -39,6 +39,12 @@ const slice = (from, to) => {
 };
 const shipped = slice('  var _bskyBlobUrl = {};', '  // VISUAL STATUS.')
               + slice('  function mapsVisual(p){', '  function mapsEvidence(');
+// ⚖️ THE SHIPPED MAP-GATE LIBS ARE LOADED, NOT STUBBED. The approval gate now consults
+// the UNIVERSAL map requirement (HS.mapsMapGateBlock), which FAILS CLOSED when its module
+// is absent — so a harness that omits them would lock every button and this suite would be
+// measuring the fail-closed branch while claiming to measure the image-painted one.
+const LIBS = ['map', 'maps-social-theme', 'maps-capture-policy', 'maps-capture-binding']
+  .map((f) => readFileSync(join(HERE, '..', 'lib', `${f}.js`), 'utf8')).join('\n');
 
 // Two DIFFERENT 1x1 PNGs, so "each draft shows its own image" is a real comparison.
 const PNG_RED  = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -60,6 +66,8 @@ window.hsClient={ storage:{ from:function(){ return { download:function(path){
   return Promise.resolve(b ? {data:new Blob([b],{type:'image/png'}),error:null}
                            : {data:null,error:{message:'Object not found'}});
 } }; } } };
+window.HS = window.HS || {};
+${LIBS}
 ${shipped}
 </script>`;
 
@@ -79,10 +87,18 @@ await page.addInitScript(({ a, b }) => {
 }, { a: PNG_RED.toString('base64'), b: PNG_BLUE.toString('base64') });
 await page.goto(pathToFileURL(file).href);
 
-const rowA = { id: 'A', content_family: 'MAPS', image_bucket_path: 'maps/a.png', evidence: {} };
-const rowB = { id: 'B', content_family: 'MAPS', image_bucket_path: 'maps/b.png', evidence: {} };
-const rowX = { id: 'X', content_family: 'MAPS', image_bucket_path: 'maps/missing.png', evidence: {} };
-const rowC = { id: 'C', content_family: 'MAPS', image_bucket_path: null, evidence: {} };
+// ⚖️ EACH MAPS ROW CARRIES A ZIP AND A BOUND ZIP-SCOPE CAPTURE, because every MAPS post
+// now needs one to reach approval at all. Without it the universal gate refuses first and
+// the image-painted gate — the thing this suite exists to measure — is never reached. The
+// key is stamped IN-PAGE by the shipped builder, never typed here.
+const mapsRow = (id, path) => ({
+  id, content_family: 'MAPS', tile: 'development', zip: '80210', image_bucket_path: path,
+  evidence: { visual: { scope: 'zip' } },
+});
+const rowA = mapsRow('A', 'maps/a.png');
+const rowB = mapsRow('B', 'maps/b.png');
+const rowX = mapsRow('X', 'maps/missing.png');
+const rowC = mapsRow('C', null);
 const rowAl = { id: 'AL', content_family: 'ALERTS', image_bucket_path: 'maps/a.png' };
 
 // ⚠️ THE ROW IS REGISTERED FIRST, exactly as the shipped queue renderer does. The gate keys
@@ -92,6 +108,9 @@ const rowAl = { id: 'AL', content_family: 'ALERTS', image_bucket_path: 'maps/a.p
 // a row it has never seen stays LOCKED (§ below pins that, so the dependency is a stated
 // property rather than an accident of this harness).
 const render = async (row) => page.evaluate((r) => new Promise((res) => {
+  if (r.content_family === 'MAPS' && r.evidence && r.evidence.visual) {
+    r.evidence.visual.capture_key = HS.mapsCaptureKey(r, 'zip');
+  }
   _bskyRows[r.id] = r;
   const host = document.getElementById('vis-' + r.id);
   bskyRenderImage(host, r, null, (okFlag) => { bskyApplyApprovalGate(r.id); res(okFlag); });
@@ -112,8 +131,11 @@ ok('CASE A — approve UNLOCKS once the exact image has painted',
 // This is the "a cached blob shows an older image" path, and it is the reason the flag is
 // keyed on the path. The row keeps its id and gets a NEW object (what a re-capture writes);
 // the gate must LOCK again until that specific image has painted.
-const rowA2 = { id: 'A', content_family: 'MAPS', image_bucket_path: 'maps/b.png', evidence: {} };
-await page.evaluate((r) => { _bskyRows[r.id] = r; bskyApplyApprovalGate(r.id); }, rowA2);
+const rowA2 = mapsRow('A', 'maps/b.png');
+await page.evaluate((r) => {
+  r.evidence.visual.capture_key = HS.mapsCaptureKey(r, 'zip');
+  _bskyRows[r.id] = r; bskyApplyApprovalGate(r.id);
+}, rowA2);
 ok('CASE A2 — a re-captured row LOCKS again: the old blob cannot vouch for the new image',
   (await page.evaluate(() => document.querySelector('[data-post="A"] button').disabled)) === true);
 const a2Ok = await render(rowA2);
@@ -155,8 +177,15 @@ ok('FAIL CLOSED — approve stays LOCKED when the image cannot be shown',
   (await page.evaluate(() => document.querySelector('[data-post="X"] button').disabled)) === true);
 
 // CASE C + ALERTS -------------------------------------------------------------------
-ok('CASE C — a no-image MAPS draft is not image-gated and renders no <img>',
-  (await page.evaluate((r) => mapsImageRequired(r) === false && mapsVisual(r) === '', rowC)) === true);
+// ⚖️ FLIPPED — EVERY MAPS POST MUST HAVE A MAP. A no-image MAPS draft used to be "not
+// image-gated", which is how 27 of 55 drafts rendered an ENABLED Approve button with no map
+// behind it: `mapsImageRequired` required `image_bucket_path`, so the lock was conditional
+// on the very thing it was meant to demand. It still renders no <img> — there is nothing to
+// render — but it is gated, and the gate holds it shut.
+ok('CASE C — a no-image MAPS draft IS image-gated, and still renders no <img>',
+  (await page.evaluate((r) => mapsImageRequired(r) === true && mapsVisual(r) === '', rowC)) === true);
+ok('CASE C — …and the universal map gate blocks it, naming the missing screenshot',
+  (await page.evaluate((r) => /No Map 1 screenshot exists/.test(bskyMapGateBlock(r)), rowC)) === true);
 ok('ALERTS is never image-gated by this change',
   (await page.evaluate((r) => mapsImageRequired(r) === false, rowAl)) === true);
 ok('no CSP violation was reported while rendering', cspViolations.length === 0,

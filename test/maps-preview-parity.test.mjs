@@ -87,8 +87,13 @@ const gateBody = (() => {
 })();
 ok('…and the shared gate still carries the original image rule',
   gateBody.length > 0 && /mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]/.test(gateBody));
+// ⚖️ RE-ANCHORED — the scope test is the FAMILY, and it no longer rides on
+// `&& p.image_bucket_path`. That conjunction made the map requirement conditional on the
+// image it was meant to require. What must stay true is that ALERTS is untouched, which is
+// the property this line was always about.
 ok('the gate is scoped to MAPS and does not touch ALERTS',
-  /content_family === 'MAPS' && p\.image_bucket_path/.test(DASH));
+  /content_family === 'MAPS'/.test(DASH)
+  && /if\(!p \|\| p\.content_family !== 'MAPS'\) return '';/.test(DASH));
 
 // ------------------------------------------------- payload parity vs the REAL publisher
 if (!existsSync(WORKER_PATH)) {

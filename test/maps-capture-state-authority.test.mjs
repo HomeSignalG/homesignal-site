@@ -215,8 +215,19 @@ ok(HS.mapsCaptureState(stale) === S.WAITING,
 // the old assertion protected — derived beats stamped — is unchanged and is now §5b's
 // behavioural twin in §3.
 const BIND = readFileSync(new URL('../lib/maps-capture-binding.js', import.meta.url), 'utf8');
-const fn = BIND.slice(BIND.indexOf('HS.mapsCaptureState = function'),
-  BIND.indexOf('HS.mapsCaptureStateCopy'));
+// ⚠️ THE END ANCHOR IS SEARCHED **FROM THE START ANCHOR**, AND THE SLICE IS CONTROLLED.
+// A bare `BIND.indexOf('HS.mapsCaptureStateCopy')` finds the FIRST occurrence anywhere in
+// the file, so the moment another function ABOVE `mapsCaptureState` called that helper —
+// which `mapsMapGateBlock` now does — the end index landed before the start and `slice`
+// returned the empty string. A positive regex then fails, which is the lucky direction; a
+// `!/.../ ` assertion beside it would have gone GREEN on nothing.
+const fnStart = BIND.indexOf('HS.mapsCaptureState = function');
+const fn = BIND.slice(fnStart, BIND.indexOf('HS.mapsCaptureStateCopy', fnStart));
+ok(fnStart > -1 && fn.length > 200 && fn.length < 8000
+  && /HS\.mapsCaptureState = function/.test(fn) && /STATES\.READY/.test(fn)
+  && !/HS\.mapsMapGateBlock = function/.test(fn),
+  '5₀: the structural slice IS mapsCaptureState and nothing else (control for §5)',
+  `${fn.length} chars`);
 ok(/mapsSocialIsAbsence/.test(fn),
   '5a: the state machine consults the shared absence predicate');
 ok(/typeof HS\.mapsSocialIsAbsence === 'function'/.test(fn),
