@@ -835,6 +835,154 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 
 ---
 
+## 6.5 EMAIL SUBSCRIPTIONS: ONE STORE, ONE RESOLVER, TWO CONSUMERS ⚖️ FOUNDER-APPROVED (2026-09-21)
+
+**`public.user_subscriptions` is the ONE mutable subscription store.** Grain
+`(user_id, community_id, stream, topic)`, plus `origin` and `sort_order`, with
+`pipeline_type` GENERATED and `(stream, topic)` foreign-keyed to
+`public.alert_topic_catalog`. One resolver — `public.alert_subscription_state.subscribed`
+/ `public.is_subscribed()`. Two consumers that BOTH read it: `public.digest_recipients`
+(delivery, `homesignal-ingest/digest.py::_recipients`) and `public.my_alert_subscriptions`
+(the UI, `shell.js::hydrateTopicPrefs`). **UI = DELIVERY is the contract**: the page cannot
+show a topic as on while the digest treats it as off, because there is no second answer to
+disagree with.
+
+SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a10.sql`, plus
+`docs/alert-subscription-canonical-CURRENT-STATE.sql` — a dated **read-back** from
+`pg_get_viewdef` / `pg_get_functiondef`, not a hand-written copy. **Read CURRENT-STATE
+before touching any of it.**
+
+**Five streams, and notices/meetings NEVER collapse** — `notices | meetings | news |
+global | emerging`. The predecessor unique key was
+`(user_id, community_id, pipeline_type, topic)` and notices+meetings share
+`pipeline_type='government_notice'`, so **one of the two selections was silently
+overwritten**. That is why the migration moved 120 → 155 rows: **+35 recovered meetings
+selections**, per-stream before→after otherwise identical, fingerprint
+`fb43a08716a1a8d73072dea830b79088` unchanged.
+
+- ⚖️ **FOLLOWING IS NOT ENROLLMENT** (founder contract A). `origin='follow_floor'` is a
+  pre-staged follow and is **never** `subscribed`; only `origin='explicit'` is a selection.
+  ⛔ **Never infer consent from a follow, a subscription row, an account, a ZIP, an email
+  address, or an existing follow-floor row.**
+- ⚖️ **`alert_email_consent` is modelled SEPARATELY from `marketing_consent`** (founder
+  contract F) and is what delivery gates on. No legal conclusion is drawn from the split.
+- **Per-place unsubscribe is preserved** (contract G): `users` is keyed
+  `(email, community_id)`, so one place stopping never stops another.
+
+### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
+
+A1 seeded `alert_topic_catalog` from `digest.py::CANONICAL_TOPICS` alone; A3 then added the
+`(stream, topic)` FK. **A community offering a label the catalog has never seen therefore
+stopped being a quiet omission and became a signup-time abort.** Measured live in a
+rolled-back transaction, with a control that passes:
+
+```
+community under test: Box Elder County
+catalog rows for the newly offered topic ........ 0
+RESIDENT SELECTS THE NEWLY OFFERED TOPIC ........ FAILED
+  -> violates foreign key constraint "user_subscriptions_topic_catalog_fk"
+CONTROL, catalogued topic, same user + community . SUCCEEDED
+```
+
+Exposure when found: **18 live communities offering a `City government (X)` label absent
+from the 58-row catalog** (Orem, Provo, Lehi, Spanish Fork, Saratoga Springs … — Utah
+County cities), across **25 ZIP pages**.
+
+- **A6 repaired the snapshot**, computing the set in the database — the 18 are named
+  nowhere, so a replay on a moved population is correct rather than stale (claims rule 7).
+- ⛔ **A6 ALONE WAS NOT ENOUGH, AND A CI GATE ALONE CANNOT BE.** A community seed is a
+  **migration**; it lands between two runs of a daily check, and in that window a resident
+  on the new ZIP cannot subscribe. Same reasoning as `canonical_zip_registry`: *the drift
+  arrives through a migration, so an application-side guard could never catch it.*
+- **A8 is the DB-side preventer, and it REFUSES NOTHING.** Two statement-level triggers on
+  `communities` absorb any offered topic into the catalog, `ON CONFLICT DO NOTHING`, landing
+  `active=false`. ⛔ **Do not "strengthen" it into a trigger that REJECTS an uncatalogued
+  topic** — that converts a silent signup break into a **blocked community build**, which is
+  worse and contradicts §0 ("a new community must be addable as pure data — zero
+  engineering").
+- 🔑 **OFFERABLE IS NOT DELIVERABLE, and the split is deliberate.** New catalog rows are
+  `active=false`: whether a topic can be **emailed** is a decision about
+  `digest.py::CANONICAL_TOPICS`, and making it as a side effect of seeding a community is
+  exactly how a resident comes to pick a topic nothing will ever send. `active` gates
+  nothing today (`digest_recipients` does not join the catalog); it is what makes an
+  undeliverable pick **observable** via `stored_undeliverable` instead of invisible.
+- **A7 is the detector** — `public.alert_subscription_integrity`, one row, every defect
+  count beside a control. `uncatalogued_offerings` MUST be 0.
+- 🔑 **A10 EXISTS BECAUSE DROPPING A8's TRIGGERS MOVES NO NUMBER.** `uncatalogued_offerings`
+  would stay 0 until the next community build, then break signup — a guard that stops
+  guarding with nothing failing. The view therefore reports its own preventers:
+  `absorb_triggers` MUST be 2, `freeze_trigger` MUST be 1, `snapshot_retained` MUST be true.
+
+### ⚠️ A9 — THE APPROVED DESIGN'S LAST STEP HAD NOT SHIPPED, AND ITS NAME HID THAT
+
+Founder **mandatory change 1** reads: *"Do not drop `topics_pre_migration` … Freeze it
+read-only as proposed and retain it after production cutover."* **That presupposes a rename
+that never happened.** A5 was re-scoped mid-flight to append `sort_order` to the state view
+(`create or replace view` can only APPEND columns) and the rename went with it. Measured:
+`users.topics` still existed, under its old name, **writable** — so the three-store
+divergence this workstream exists to end still had one store open while every report called
+it frozen. **A report can be internally consistent and still describe work that did not
+happen; check the column, not the plan.**
+
+A9 renames it to `users.topics_pre_migration` and freezes it **with a trigger, not a
+column-privilege revoke** — making one column read-only by privilege means revoking
+table-level UPDATE and re-granting every other column, which silently stops covering a
+column added later. Verified live with the controls that matter (a freeze that also blocked
+ordinary `users` writes would break signup, and a BEFORE INSERT trigger is exactly the shape
+that does it): frozen write REFUSED · ordinary UPDATE SUCCEEDED · INSERT without the column
+SUCCEEDED · INSERT carrying it REFUSED · digest recipients 8 → 8.
+
+### The gates, and which repo holds which half
+
+| half | where | what it proves |
+|---|---|---|
+| structural | `scripts/check-alert-subscription-parity.mjs` + `check-alert-subscription-parity.yml` (this repo) | the UI reads canonical; no second mutable store; a6/a8/a9 are EXECUTABLE, not prose |
+| offline delivery | `homesignal-ingest/tests/test_alert_confirmation_contract.py` | one resolver, no duplicated eligibility gate |
+| **live** | `homesignal-ingest/scripts/check_alert_subscription_live.py` + `check-alert-subscription-live.yml`, **daily** | the invariant in PRODUCTION, including `uncatalogued_offerings` and A10's three guard columns |
+
+- ⚠️ **THE LIVE HALF LIVES IN THE INGEST REPO ON PURPOSE.** The first version checked the
+  sibling repo out here, could not (no cross-repo token), and then reported **three negative
+  assertions as PASS against a file that was not there** — an absence reading as an answer.
+  The structural gate now **SKIPs** a missing input rather than passing it.
+- **The live gate FAILS CLOSED and says why**: absent credentials, a non-2xx read, zero
+  rows or a zero control are refusals, never a quiet pass. It runs with the service key
+  because `alert_subscription_integrity` is `security_invoker` — under `anon`, RLS correctly
+  hides other people's rows and `subscription_rows` would read 0.
+
+### 🔑 WHICH PLACE'S ROWS THE ALERTS PAGE SHOWS — `selectPlaceRows`
+
+**Subscriptions are per `(user, community)` and delivery groups by community, so the
+community is the unit.** But resolving a ZIP to one is a network call, and letting it
+DECIDE means a transient failure renders *"no topics selected"* for a resident who has
+them — UI-says-off while delivery-says-on, the exact disagreement this model exists to
+end, reintroduced through an error path. So `shell.js::hydrateTopicPrefs` does **one**
+read (RLS already scopes `my_alert_subscriptions` to the resident) and picks the place
+**in memory**, with the resolved id as a HINT: community match → exact ZIP match → the
+single community on file → **nothing**.
+
+⚠️ **ZIP EQUALITY ALONE IS WRONG AND WAS SHIPPED FOR ONE ITERATION OF THIS AUDIT.**
+Measured: **every live community is a COUNTY with many ZIPs** (Travis 85, Box Elder 18,
+Chester 39) while `users.zip_code` holds exactly **one** of them — the last one written.
+A resident who signed up on 84302 and opens the Alerts page for 84312 is the same
+identity with the same delivery, and a `.eq('zip_code', …)` read showed them **nothing**.
+The structural gate now fails on that shape by name.
+
+⚠️ **The refusal branch is deliberate and is the accepted cost:** several places on file,
+none identified (i.e. the lookup failed AND the current ZIP is a sibling), shows no
+topics rather than another place's. Attributing one place's selections to another page
+is worse than showing none, and reaching it needs a network failure.
+
+### Still open, measured and deliberately not done
+
+- 📌 **`app_topic_prefs` survives as the `dev` (development-tracker) preference store
+  only**, and `lib/topic-prefs.js::mergeCanonicalWithLocal` lets local prefs supply nothing
+  else — a stale client cache can never add a deliverable topic. Retiring the table is
+  allowed only once every reader and writer has demonstrably moved.
+- 📌 **`alert_topic_catalog.active` is informational, not a delivery gate.** An inactive
+  topic still reaches `digest_recipients.topics`; it simply matches no `alerts.category`.
+  Making it gate delivery is a founder decision, not a tidy-up.
+---
+
 ## 7. Development tracker (`homesignalmap.html` + per-ZIP pages)
 
 A second page type alongside the civic-alerts community pages: **"Development around your

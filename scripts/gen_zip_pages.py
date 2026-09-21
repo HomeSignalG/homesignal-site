@@ -433,7 +433,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=14e66ea5"></script>\n'
+        '<script src="/shell.js?v=75464c7b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=52c68d13"></script>\n'
         "</body>\n</html>\n")
