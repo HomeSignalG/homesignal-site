@@ -1,0 +1,33 @@
+name: alert-subscription-parity
+
+# PERMANENT gate. The UI-visible subscription answer and the delivery
+# subscription answer must derive from one canonical state and one resolver.
+# A change that adds another mutable subscription source, bypasses the resolver,
+# or lets UI and delivery disagree fails here.
+#
+# This repo pins the UI half (shell.js, lib/topic-prefs.js). The delivery half
+# (digest.py) and the LIVE database half are pinned in homesignal-ingest, which
+# is where digest.py lives and which holds SUPABASE_WRITE_KEY. Splitting by repo
+# is deliberate: the first version checked out the sibling repo here, could not
+# (no cross-repo token), and then reported three negative assertions as PASS
+# against a file that was not there -- an absence reading as an answer.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '25 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  structural:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: the gate can fail (self-test)
+        run: node scripts/check-alert-subscription-parity.mjs --self-test
+      - name: the UI resolves through the canonical state
+        run: node scripts/check-alert-subscription-parity.mjs

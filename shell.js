@@ -1789,17 +1789,45 @@
     }
     const uid = state.session.user.id;
     try {
-      const res = await HS.sb().from('app_topic_prefs')
+      // CANONICAL READ. The three deliverable categories come from
+      // public.my_alert_subscriptions -- the same state public.digest_recipients
+      // resolves through -- so what this UI shows and what the digest delivers
+      // are one answer, per place. app_topic_prefs is still read, but ONLY for
+      // 'dev', which has no delivery pipeline. Scoped to the current place
+      // because subscriptions are per (user, community): merging places here
+      // would show a resident topics that another place's page will deliver.
+      const communityId = await currentCommunityId();
+      let canonical = {};
+      if (communityId) {
+        const res = await HS.sb().from('my_alert_subscriptions')
+          .select('stream, topic, origin, sort_order')
+          .eq('community_id', communityId);
+        if (res.error) throw res.error;
+        canonical = util.topicPrefsFromCanonicalRows(res.data);
+      }
+      const localRes = await HS.sb().from('app_topic_prefs')
         .select('category, topics, share_consent')
         .eq('user_id', uid);
-      if (res.error) throw res.error;
-      state.topicPrefs = util.hydrateSignedInPrefs(res.data);
+      if (localRes.error) throw localRes.error;
+      state.topicPrefs = util.mergeCanonicalWithLocal(
+        canonical, util.hydrateSignedInPrefs(localRes.data));
       cacheTopicPrefs(state.topicPrefs, uid);
     } catch (e) {
       console.warn('topic-prefs hydrate', e);
       state.topicPrefs = util.hydrateSignedInFailure();
       cacheTopicPrefs({}, uid);
     }
+  }
+  // The signed-in resident's current place, as a community id. Returns null when
+  // no ZIP is on file or the ZIP is not modelled yet -- in which case NO
+  // deliverable topics are shown, rather than another place's.
+  async function currentCommunityId() {
+    const zip = String(state.zip || '').trim();
+    if (!/^\d{5}$/.test(zip) || !HS.data || !HS.data.communityGovTopics) return null;
+    try {
+      const ct = await HS.data.communityGovTopics(zip);
+      return (ct && ct.rootId) || null;
+    } catch (e) { return null; }
   }
   HS.paintTopicCounts = function () {
     TOPIC_PREF_CATS.forEach(k => {
