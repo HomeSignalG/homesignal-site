@@ -269,11 +269,37 @@ ok(/-\$\{keyStamp\(d\)\}\.png/.test(GEN),
   '10e: the object name carries the key stamp, so a re-capture cannot silently overwrite the old image');
 // EVERY refusal branch must record an outcome. Five of them used to `continue` silently,
 // which under a recurring job means re-selecting the same row on every single fire.
-ok((GEN.match(/recordOutcome\(/g) || []).length >= 3,
-  '10f: refusals are recorded on the row rather than dropped silently');
+// ⚠️ THIS COUNT WAS >= 3 AND IS NOW 1 ON PURPOSE — do not "restore" it. It counted the
+// DETERMINISTIC refusal branches (no project_id, project gone, not in the authoritative
+// set …), and every one of those is now a ZIP-scope capture instead of a refusal. What
+// survives is the one branch that can still refuse: a capture that actually failed. The
+// rule 10f exists to enforce — a refusal is never a silent `continue` — is unchanged, and
+// 10h1-10h5 above pin that the branches which LEFT this count became maps rather than
+// disappearing.
+ok((GEN.match(/await recordOutcome\(/g) || []).length >= 1,
+  '10f: a capture that fails is recorded on the row rather than dropped silently');
+ok(/recordOutcome\(d, FAILED, r\.reason, theme\)/.test(GEN),
+  '10f1: …and it records the FAILED state with the capture\'s own reason');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
   '10g: the old silent-continue refusal is gone');
-ok(/ineligible\(/.test(GEN), '10h: deterministic refusals go through one INELIGIBLE helper');
+// ⚖️ 10h WAS "deterministic refusals go through one INELIGIBLE helper", and that rule is
+// SUPERSEDED by the founder ruling that EVERY post gets a map. Not being able to pin one
+// record is a reason to photograph the ZIP, not to ship a post with no picture. The four
+// conditions below are now a DEMOTION to ZIP scope, and these pins fail if any of them is
+// turned back into a refusal — which is the regression that would silently re-empty the
+// 18 absence posts.
+ok(/let proj = null;/.test(GEN),
+  '10h: an unpinnable draft carries a null project rather than ending the run');
+ok(/zipReason = 'the draft names no project \(an absence post\)/.test(GEN),
+  '10h1: an absence post is DEMOTED to ZIP scope, not refused');
+ok(!/await ineligible\('the draft carries no project_id/.test(GEN),
+  '10h2: …and the old "nothing to photograph" refusal is gone');
+ok(!/await ineligible\(why\);/.test(GEN),
+  '10h3: a project missing from the ZIP\'s authoritative set no longer refuses the capture');
+ok(/scope: proj \? 'project' : 'zip'/.test(GEN),
+  '10h4: the capture records WHICH scope it shot, so a ZIP map is never read as a project pin');
+ok(/if \(!drew && proj\)/.test(GEN),
+  '10h5: a ZIP-scope capture may legitimately draw zero markers — that is the absence post');
 ok(/const WRITABLE = \['image_bucket_path', 'evidence'\]/.test(GEN),
   '10i: the write scope is exactly the two columns a capture may touch');
 ok(/proveNothingApproved/.test(GEN), '10j: and the run re-reads what it touched to prove it');

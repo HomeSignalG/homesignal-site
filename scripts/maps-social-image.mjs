@@ -350,130 +350,147 @@ async function capture(page, draft, proj, theme) {
   // `window.siteMarkers` — the filter is already applied by now, and array membership is
   // byte-identical either side of it, so the weaker condition would be satisfied by a marker
   // the map is not showing.
-  await page.waitForFunction(
-    ([key, needOnMap]) => (window.siteMarkers || []).some(
-      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key
-        && (!needOnMap || !!(x.m && x.m._map)),
-    ),
-    [proj.source_key, theme === 'datacenter'],
-    { timeout: 90000, polling: 700 },
-  ).catch(() => {});
+  if (proj) {
+    await page.waitForFunction(
+      ([key, needOnMap]) => (window.siteMarkers || []).some(
+        (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key
+          && (!needOnMap || !!(x.m && x.m._map)),
+      ),
+      [proj.source_key, theme === 'datacenter'],
+      { timeout: 90000, polling: 700 },
+    ).catch(() => {});
+  }
 
   const drew = await page.evaluate(() => (window.siteMarkers || []).length);
-  if (!drew) return { ok: false, reason: 'map drew no markers for this ZIP' };
+  // ⚠️ A ZIP-SCOPE CAPTURE IS ALLOWED TO DRAW NOTHING, AND THAT IS THE WHOLE POINT.
+  // The absence post says there is no data centre activity in this ZIP; a map with no
+  // data-centre markers on it is the honest picture of exactly that claim, not a failure.
+  // A PROJECT-scope capture still refuses, because a project that draws nothing cannot be
+  // the subject of a project-specific image.
+  if (!drew && proj) return { ok: false, reason: 'map drew no markers for this ZIP' };
 
-  // Find the marker the page drew for THIS project. The join is the PROJECT KEY, which the
-  // page carries under two names depending on which half of ZIP mode drew the site:
-  //   zip_project_ref — authoritative whole-ZIP development (lib/zip-authoritative.js), the
-  //                     path that now REPLACES the cached report's development points;
-  //   source_id       — the cached development_reports site (facilities, area notices).
-  // Both are byte-identical to app_projects.source_key. Coordinates are corroboration and
-  // never the key: siteLL() may return a fanned DISPLAY position for co-located points, so a
-  // marker's drawn latlng is not always its record's latlng.
-  const found = await page.evaluate(([sourceKey]) => {
-    const list = window.siteMarkers || [];
-    const sites = window.__HS_SITES || [];
-    const keyOf = (s) => (s && (s.zip_project_ref || s.source_id)) || null;
-    const idx = list.findIndex((x) => x && keyOf(x.s) === sourceKey);
-    if (idx < 0) {
+  // ── PROJECT SCOPE vs ZIP SCOPE ──────────────────────────────────────────────────────
+  // Everything in this block locates ONE record, frames on it, opens its popup and haloes
+  // it. None of it has a subject in ZIP scope, where the picture is the ZIP's own map. The
+  // ZIP branch therefore keeps the page's own framing — Map 1 already fits the ZIP — and
+  // adds no halo and opens no popup, so nothing in the image points at a record the post
+  // does not name.
+  let found = null;
+  let framed = { ok: true, scope: 'zip' };
+  if (proj) {
+    // Find the marker the page drew for THIS project. The join is the PROJECT KEY, which the
+    // page carries under two names depending on which half of ZIP mode drew the site:
+    //   zip_project_ref — authoritative whole-ZIP development (lib/zip-authoritative.js), the
+    //                     path that now REPLACES the cached report's development points;
+    //   source_id       — the cached development_reports site (facilities, area notices).
+    // Both are byte-identical to app_projects.source_key. Coordinates are corroboration and
+    // never the key: siteLL() may return a fanned DISPLAY position for co-located points, so a
+    // marker's drawn latlng is not always its record's latlng.
+    found = await page.evaluate(([sourceKey]) => {
+      const list = window.siteMarkers || [];
+      const sites = window.__HS_SITES || [];
+      const keyOf = (s) => (s && (s.zip_project_ref || s.source_id)) || null;
+      const idx = list.findIndex((x) => x && keyOf(x.s) === sourceKey);
+      if (idx < 0) {
+        return {
+          found: false, total: list.length, sites: sites.length,
+          inCache: sites.some((s) => keyOf(s) === sourceKey),
+          authoritative: sites.some((s) => s && s.zip_project_ref),
+        };
+      }
+      const hit = list[idx];
+      const ll = hit.m.getLatLng();
       return {
-        found: false, total: list.length, sites: sites.length,
-        inCache: sites.some((s) => keyOf(s) === sourceKey),
-        authoritative: sites.some((s) => s && s.zip_project_ref),
+        found: true, idx, total: list.length, sites: sites.length,
+        how: hit.s.zip_project_ref ? 'zip_project_ref (authoritative whole-ZIP)' : 'source_id (cached report)',
+        label: (hit.s && (hit.s.label || hit.s.title)) || '',
+        site_lat: hit.s.lat, site_lng: hit.s.lng,
+        lat: ll.lat, lng: ll.lng,
+        fanned: hit.s._mLat != null,
+        record_url: (hit.s && hit.s.record_url) || null,
       };
-    }
-    const hit = list[idx];
-    const ll = hit.m.getLatLng();
-    return {
-      found: true, idx, total: list.length, sites: sites.length,
-      how: hit.s.zip_project_ref ? 'zip_project_ref (authoritative whole-ZIP)' : 'source_id (cached report)',
-      label: (hit.s && (hit.s.label || hit.s.title)) || '',
-      site_lat: hit.s.lat, site_lng: hit.s.lng,
-      lat: ll.lat, lng: ll.lng,
-      fanned: hit.s._mLat != null,
-      record_url: (hit.s && hit.s.record_url) || null,
-    };
-  }, [proj.source_key]);
+    }, [proj.source_key]);
 
-  if (!found.found) {
-    if (theme === 'datacenter') {
+    if (!found.found) {
+      if (theme === 'datacenter') {
+        return {
+          ok: false,
+          reason: 'the project has no marker on Map 1 with the Data center PROJECT TYPE filter '
+            + `selected (${found.total} markers drawn). The queue and the map disagree about this `
+            + 'record, so no image is produced rather than a picture of some other project.',
+        };
+      }
       return {
         ok: false,
-        reason: 'the project has no marker on Map 1 with the Data center PROJECT TYPE filter '
-          + `selected (${found.total} markers drawn). The queue and the map disagree about this `
-          + 'record, so no image is produced rather than a picture of some other project.',
+        reason: `no drawn marker for this project (${found.total} markers drawn, `
+          + `${found.sites} sites rendered, authoritative set present: ${found.authoritative}, `
+          + `project present in it: ${found.inCache})`,
       };
     }
-    return {
-      ok: false,
-      reason: `no drawn marker for this project (${found.total} markers drawn, `
-        + `${found.sites} sites rendered, authoritative set present: ${found.authoritative}, `
-        + `project present in it: ${found.inCache})`,
-    };
-  }
 
-  // IS IT ACTUALLY DRAWN? The framing step below already fails when a marker carries no
-  // `_map`, so a filtered-out target was always refused rather than captured — but it was
-  // refused with "could not reach the Leaflet map from the marker", which names a plumbing
-  // fault for what is really a FILTER verdict. Asking here turns that into the precise
-  // reason, and for a theme capture it is the one check that proves the project survives the
-  // Data center filter — i.e. that the post and its picture are about the same record.
-  const onMap = await page.evaluate(([idx]) => {
-    const hit = (window.siteMarkers || [])[idx];
-    return !!(hit && hit.m && hit.m._map);
-  }, [found.idx]);
-  if (!onMap) {
-    return {
-      ok: false,
-      reason: theme === 'datacenter'
-        ? 'the project is drawn on this ZIP but is NOT shown under the Data center PROJECT '
-          + 'TYPE filter, so Map 1 does not place it in the Data center bucket. No image is '
-          + 'produced rather than a halo around a marker the map is not showing.'
-        : 'the project has a marker but Map 1 is not currently showing it (filtered out)',
-    };
-  }
-
-  // THE MARKER'S COORDINATES ARE THE MAP'S, AND THEY WIN. Where whole-ZIP membership is
-  // authoritative, the marker is derived from the project's real geometry (POINT_AUTHORITATIVE,
-  // POLYGON_COMPONENT_POINT_ON_SURFACE …) and is MORE authoritative than app_projects.lat/lng.
-  // Demanding equality would reject exactly the better geometry, so the delta is measured and
-  // RECORDED instead — and bounded, because a pin a kilometre from the address the post
-  // quotes would make the image and the text disagree.
-  const dLat = found.site_lat - proj.lat;
-  const dLng = (found.site_lng - proj.lng) * Math.cos(proj.lat * Math.PI / 180);
-  const deltaM = Math.round(Math.hypot(dLat, dLng) * 111320);
-  if (deltaM > 500) {
-    return { ok: false, reason: `the drawn marker is ${deltaM} m from the project's stored point — too far to caption honestly` };
-  }
-  found.delta_m = deltaM;
-
-  // Frame on the PROJECT's own coordinates. The map instance is reached through the
-  // marker Leaflet already attached it to — no new map is created and no public URL
-  // parameter is invented to do it.
-  const framed = await page.evaluate(([idx, zoom]) => {
-    const hit = (window.siteMarkers || [])[idx];
-    const map = hit && hit.m && hit.m._map;
-    if (!map) return { ok: false };
-    // Centre on the RECORD's own coordinates. A fanned display position is a pixel nudge
-    // for legibility; the project's real location is what the image must be about.
-    map.setView([hit.s.lat, hit.s.lng], zoom, { animate: false });
-    hit.m.openPopup();
-    // Selection halo, screen-pixel sized so it is constant at every zoom and can never
-    // read as a distance. Injected into this throwaway DOM only.
-    const el = hit.m.getElement();
-    if (el) {
-      el.style.zIndex = '10000';
-      const ring = document.createElement('div');
-      ring.id = 'hs-social-halo';
-      ring.style.cssText = 'position:absolute;left:50%;top:50%;width:46px;height:46px;'
-        + 'margin:-23px 0 0 -23px;border:3px solid #157a49;border-radius:50%;'
-        + 'box-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 14px rgba(21,122,73,.55);'
-        + 'pointer-events:none';
-      el.appendChild(ring);
+    // IS IT ACTUALLY DRAWN? The framing step below already fails when a marker carries no
+    // `_map`, so a filtered-out target was always refused rather than captured — but it was
+    // refused with "could not reach the Leaflet map from the marker", which names a plumbing
+    // fault for what is really a FILTER verdict. Asking here turns that into the precise
+    // reason, and for a theme capture it is the one check that proves the project survives the
+    // Data center filter — i.e. that the post and its picture are about the same record.
+    const onMap = await page.evaluate(([idx]) => {
+      const hit = (window.siteMarkers || [])[idx];
+      return !!(hit && hit.m && hit.m._map);
+    }, [found.idx]);
+    if (!onMap) {
+      return {
+        ok: false,
+        reason: theme === 'datacenter'
+          ? 'the project is drawn on this ZIP but is NOT shown under the Data center PROJECT '
+            + 'TYPE filter, so Map 1 does not place it in the Data center bucket. No image is '
+            + 'produced rather than a halo around a marker the map is not showing.'
+          : 'the project has a marker but Map 1 is not currently showing it (filtered out)',
+      };
     }
-    return { ok: true, zoom: map.getZoom(), center: map.getCenter() };
-  }, [found.idx, ZOOM]);
-  if (!framed.ok) return { ok: false, reason: 'could not reach the Leaflet map from the marker' };
+
+    // THE MARKER'S COORDINATES ARE THE MAP'S, AND THEY WIN. Where whole-ZIP membership is
+    // authoritative, the marker is derived from the project's real geometry (POINT_AUTHORITATIVE,
+    // POLYGON_COMPONENT_POINT_ON_SURFACE …) and is MORE authoritative than app_projects.lat/lng.
+    // Demanding equality would reject exactly the better geometry, so the delta is measured and
+    // RECORDED instead — and bounded, because a pin a kilometre from the address the post
+    // quotes would make the image and the text disagree.
+    const dLat = found.site_lat - proj.lat;
+    const dLng = (found.site_lng - proj.lng) * Math.cos(proj.lat * Math.PI / 180);
+    const deltaM = Math.round(Math.hypot(dLat, dLng) * 111320);
+    if (deltaM > 500) {
+      return { ok: false, reason: `the drawn marker is ${deltaM} m from the project's stored point — too far to caption honestly` };
+    }
+    found.delta_m = deltaM;
+
+    // Frame on the PROJECT's own coordinates. The map instance is reached through the
+    // marker Leaflet already attached it to — no new map is created and no public URL
+    // parameter is invented to do it.
+    framed = await page.evaluate(([idx, zoom]) => {
+      const hit = (window.siteMarkers || [])[idx];
+      const map = hit && hit.m && hit.m._map;
+      if (!map) return { ok: false };
+      // Centre on the RECORD's own coordinates. A fanned display position is a pixel nudge
+      // for legibility; the project's real location is what the image must be about.
+      map.setView([hit.s.lat, hit.s.lng], zoom, { animate: false });
+      hit.m.openPopup();
+      // Selection halo, screen-pixel sized so it is constant at every zoom and can never
+      // read as a distance. Injected into this throwaway DOM only.
+      const el = hit.m.getElement();
+      if (el) {
+        el.style.zIndex = '10000';
+        const ring = document.createElement('div');
+        ring.id = 'hs-social-halo';
+        ring.style.cssText = 'position:absolute;left:50%;top:50%;width:46px;height:46px;'
+          + 'margin:-23px 0 0 -23px;border:3px solid #157a49;border-radius:50%;'
+          + 'box-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 14px rgba(21,122,73,.55);'
+          + 'pointer-events:none';
+        el.appendChild(ring);
+      }
+      return { ok: true, zoom: map.getZoom(), center: map.getCenter() };
+    }, [found.idx, ZOOM]);
+    if (!framed.ok) return { ok: false, reason: 'could not reach the Leaflet map from the marker' };
+  }
 
   // TRUTH ASSERTIONS, in the page, before the shutter. ZIP mode must have drawn neither a
   // radius ring nor a home marker; if either is present the capture is refused rather than
@@ -495,7 +512,9 @@ async function capture(page, draft, proj, theme) {
   // A picture in which the target cannot be picked out is not a project-specific visual, so
   // an unopened popup or a missing halo refuses the capture rather than shipping an anonymous
   // field of dots.
-  if (!clean.popupOpen || !clean.haloPresent) {
+  // Project scope only: in ZIP scope there is deliberately no popup and no halo, because
+  // there is no single record the image is about.
+  if (proj && (!clean.popupOpen || !clean.haloPresent)) {
     return { ok: false, reason: `the target could not be made identifiable (popup: ${clean.popupOpen}, halo: ${clean.haloPresent})` };
   }
 
@@ -535,8 +554,11 @@ async function capture(page, draft, proj, theme) {
   if (theme === 'datacenter') {
     const verify = await page.evaluate(
       ([key]) => window.HS.mapsDcCaptureVerifyAtShutter(key),
-      [proj.source_key],
+      [proj ? proj.source_key : null],
     );
+    // The scope rides WITH the measurement into the stored record, so the validator and the
+    // server guard both learn from the evidence itself whether a target was ever expected.
+    verify.scope = proj ? 'project' : 'zip';
     if (!verify.ok) {
       return { ok: false, reason: `the Data Center map state did not hold to the shutter: ${verify.reason}` };
     }
@@ -557,14 +579,19 @@ async function capture(page, draft, proj, theme) {
   const el = await page.$(sel);
   if (!el) return { ok: false, reason: `no ${sel} element` };
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const file = path.join(OUT_DIR, `${draft.zip}-${String(proj.id).slice(0, 8)}.png`);
+  const file = path.join(OUT_DIR, `${draft.zip}-${proj ? String(proj.id).slice(0, 8) : 'zip'}.png`);
   await el.screenshot({ path: file });
 
   return {
     ok: true, file, clip: sel,
-    marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
-      of: found.total, how: found.how, fanned: found.fanned, delta_m: found.delta_m },
-    framed: { zoom: framed.zoom, center: framed.center },
+    scope: proj ? 'project' : 'zip',
+    // ABSENT, NOT NULL, in ZIP scope. There is no marker and no project-framed view, and a
+    // null would read as "measured and empty" rather than "no such thing here".
+    ...(proj ? {
+      marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
+        of: found.total, how: found.how, fanned: found.fanned, delta_m: found.delta_m },
+      framed: { zoom: framed.zoom, center: framed.center },
+    } : { markers_drawn: drew }),
     checks: clean,
     theme: theme || null,
     policyRecord,
@@ -626,34 +653,38 @@ async function main() {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
 
-    // EVERY REFUSAL IS RECORDED ON THE ROW. Five of these branches used to `continue`
-    // silently, writing nothing — so the draft carried no state, no attempt count and no
-    // retry clock, and a recurring job would have re-selected it on every single fire. An
-    // unrecorded refusal is also indistinguishable from a draft nothing has looked at yet.
-    const ineligible = async (why) => {
-      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, why, null);
-      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why,
-        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
-    };
+    // ⚖️ EVERY POST GETS A MAP — FOUNDER RULING. Each condition below used to end the
+    // draft's run with no picture at all, and the recorded reason said so in its own words:
+    // "No PROJECT-SPECIFIC Map 1 visual could be produced truthfully." That was true and it
+    // was the wrong conclusion. Not being able to pin ONE record is a reason to photograph
+    // the ZIP, not a reason to ship a post with no map. Measured before this change: 46 of
+    // 55 MAPS drafts were CAPTURE_INELIGIBLE and only 9 carried an image — including every
+    // one of the 18 absence posts, whose whole subject is a ZIP rather than a project.
+    //
+    // So these are now a DEMOTION to ZIP scope, never a refusal. `proj` stays null, the
+    // capture frames on the ZIP, and the evidence records `scope: "zip"` so nothing can
+    // later read the picture as proof that a particular project was shown.
+    let proj = null;
+    let auth = { markers: null };
+    let zipReason = null;
 
-    if (!pid) { await ineligible('the draft carries no project_id, so there is nothing to photograph'); continue; }
-
-    const proj = await liveProject(pid);
-    if (!proj) { await ineligible('the project row is no longer in app_projects'); continue; }
-    if (proj.record_kind !== 'development') { await ineligible('the live row is not a development record'); continue; }
-    if (proj.lat == null || proj.lng == null) { await ineligible('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
-    if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      await ineligible('the live coordinates differ from the draft evidence, so a capture would not be of this draft');
-      continue;
-    }
-
-    const auth = await authoritativePresence(d.zip, proj.source_key);
-    if (!auth.present) {
-      const why = auth.status !== 'boundary_complete'
-        ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
-        : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      await ineligible(why);
-      continue;
+    if (!pid) {
+      zipReason = 'the draft names no project (an absence post), so the map is of the ZIP';
+    } else {
+      const live = await liveProject(pid);
+      if (!live) zipReason = 'the project row is no longer in app_projects';
+      else if (live.record_kind !== 'development') zipReason = 'the live row is not a development record';
+      else if (live.lat == null || live.lng == null) zipReason = 'the project has no coordinates, so Map 1 draws no marker for it';
+      else if (!nearly(live.lat, d.evidence?.lat) || !nearly(live.lng, d.evidence?.lng)) {
+        zipReason = 'the live coordinates differ from the draft evidence, so a pin would not be of this draft';
+      } else {
+        const a = await authoritativePresence(d.zip, live.source_key);
+        if (!a.present) {
+          zipReason = a.status !== 'boundary_complete'
+            ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${a.status})`
+            : `the project is not in the ZIP's authoritative development set (${a.markers} markers there)`;
+        } else { proj = live; auth = a; }
+      }
     }
 
     // THEME — from the SHIPPED predicate the Acquisition Dashboard uses, so the image this
@@ -676,9 +707,10 @@ async function main() {
     // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the
     // picture changes, which is what makes the dashboard's per-row blob cache correct; and
     // the superseded image survives, so a capture can be compared with the one it replaced.
-    const objectPath = `maps/${d.zip}/${String(proj.id)}-${keyStamp(d)}.png`;
+    const objectPath = `maps/${d.zip}/${proj ? String(proj.id) : 'zip'}-${keyStamp(d)}.png`;
     if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file, marker: r.marker }); continue; }
     r.authMarkers = auth.markers;
+    if (zipReason) r.zip_reason = zipReason;
     // THE UPLOAD LANDS FIRST AND IS HARMLESS ON ITS OWN. The object path carries this
     // draft's own key fingerprint, so an orphan object is unreferenced bytes — it is not a
     // picture attached to a row, and nothing reads the bucket except through
@@ -803,18 +835,24 @@ async function attach(draft, objectPath, r, proj) {
     path: objectPath,
     captured_at: new Date().toISOString(),
     page_url: `${BASE}/homesignalmap.html?zip=${draft.zip}`,
-    project_lat: proj.lat,
-    project_lng: proj.lng,
-    marker_lat: r.marker.lat,
-    marker_lng: r.marker.lng,
-    marker_label: r.marker.label,
-    matched_by: r.marker.how,
-    marker_display_fanned: r.marker.fanned,
-    marker_vs_stored_point_m: r.marker.delta_m,
-    markers_on_map: r.marker.of,
-    framed_zoom: r.framed.zoom,
-    authoritative_zip_status: 'boundary_complete',
-    authoritative_markers_in_zip: r.authMarkers,
+    // SCOPE IS RECORDED ON THE VISUAL ITSELF, not only inside capture_policy, so a reader
+    // of the row knows what the picture is of without parsing the policy block.
+    scope: r.scope,
+    ...(r.zip_reason ? { zip_scope_reason: r.zip_reason } : {}),
+    ...(r.scope === 'project' ? {
+      project_lat: proj.lat,
+      project_lng: proj.lng,
+      marker_lat: r.marker.lat,
+      marker_lng: r.marker.lng,
+      marker_label: r.marker.label,
+      matched_by: r.marker.how,
+      marker_display_fanned: r.marker.fanned,
+      marker_vs_stored_point_m: r.marker.delta_m,
+      markers_on_map: r.marker.of,
+      framed_zoom: r.framed.zoom,
+      authoritative_zip_status: 'boundary_complete',
+      authoritative_markers_in_zip: r.authMarkers,
+    } : { markers_on_map: r.markers_drawn }),
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
     popup_open: r.checks.popupOpen,
