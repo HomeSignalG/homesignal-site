@@ -1269,8 +1269,13 @@ things and no more:**
   a second copy of the key is the one disagreement neither the capture job nor the Approve gate
   could detect on its own — which that module's own header says.
 - **The mandatory-image rule is still SCOPED to the Data Center Theme** and still the
-  dashboard's (`bskyMapsImageMandatory`). A general MAPS post publishes the Map 1 link card,
-  whose image belongs to the destination page; an absence post can never have one.
+  dashboard's (`dcThemeImageMandatory`). A general MAPS post publishes the Map 1 link card,
+  whose image belongs to the destination page.
+  - 🛑 **CORRECTED 2026-09-21 — this bullet used to end "; an absence post can never have
+    one."** That clause is false and is superseded by §7.06 below: an absence post's picture
+    is its ZIP's own Map 1 page, which renders whether or not a data centre was ever filed
+    there. The SCOPE half of the sentence still stands — the theme is still the boundary,
+    and an ordinary MAPS post is still not image-mandatory.
 - 🔑 **"AWAITING A SCREENSHOT" AND "REFUSED, RECORDED ON THE ROW" ARE DIFFERENT STATES, AND
   READING ONE AS THE OTHER INVENTS A BLOCKER (measured 2026-09-21).** Of **26** Data Center
   Theme drafts: **7** carry an image (`REAL_MAP_VISUAL`, 4 of them with `capture_policy`),
@@ -1285,6 +1290,24 @@ things and no more:**
     `CAPTURE_INELIGIBLE` is a refusal the capture job WRITES, returned at its first gate
     every time, so the number cannot fall with more runs. **Read `visual.state` before
     calling a draft blocked.**
+  - 🛑 **SUPERSEDED THE SAME DAY, AND ONLY ON ONE CLAUSE — the measurement above stands in
+    full.** *"The 18 absence posts are **exempt** from the mandatory-image rule above
+    (nothing to photograph), so they are approvable now"* was true of the rule as it stood
+    when that was written and was overturned hours later by the founder: **every MAPS post
+    gets a map, even when there is no data centre** (§7.06 below). Those 18 rows are now
+    image-MANDATORY and are **not** approvable until their captures land — and their
+    `CAPTURE_INELIGIBLE` stamps are stale refusals from the removed rule, which
+    `mapsCaptureState` now discounts rather than reads back.
+    - 🔑 **THE SENTENCE IT CORRECTS AND THE SENTENCE THAT SUPERSEDES IT ARE THE SAME
+      SUBSTITUTION, ONE LEVEL APART, WHICH IS WHY THIS IS WORTH THE SPACE.** That bullet is
+      right that `CAPTURE_INELIGIBLE` is a written refusal rather than a queue, and right
+      that **"read `visual.state` before calling a draft blocked"**. What it inherited from
+      the rule it was reading is *why* the refusal was written: "nothing to photograph"
+      means no PROJECT, and was taken to mean no MAP. This is the sixth place that
+      substitution was written down, and it landed 39 minutes after the correction to the
+      other five (Rule #0a — two sessions write this repo).
+    - **64165 is untouched by the ruling.** It is project-backed with an upstream `geo`
+      blocker, so the bullet below it stands exactly as written.
   - **64165 is correctly stuck and must not be chased from the capture path.** Its project is
     absent from `geo.zip_authoritative_membership` under every `zcta5`, because it was
     ingested AFTER the serving generation's watermark — which is `#1275`'s `ACTIVE_LEGACY`
@@ -1298,6 +1321,87 @@ things and no more:**
     **84 of the difference sit in neighbouring ZCTAs**, which is `FIX 29` working, not a
     defect. Full receipt, including what was deliberately NOT measured:
     `docs/maps-dc-draft-population-2026-09-21.md`.
+
+---
+
+## 7.06 EVERY MAPS POST GETS A MAP, EVEN WHEN THERE IS NO DATA CENTRE ⚖️ FOUNDER RULING (2026-09-21)
+
+**An ABSENCE post — the campaign's honest "no data center filings appear in <publisher>
+records for <ZIP>" answer — is photographed like every other Data Center Theme post.** The
+founder stated this three times before it was implemented, which is the fact this section
+exists to explain.
+
+🔑 **IT KEPT BEING RE-DERIVED AWAY BY ONE SUBSTITUTION: "there is no PROJECT to photograph"
+read as "there is no MAP to photograph".** Those are different facts. A ZIP's Map 1 page
+renders whether or not a data centre has ever been filed there, and a screenshot of that page
+— all four STATUS controls on, **Data center the only PROJECT TYPE**, REGULATORY off, showing
+no recent filings — is a real screenshot of a real page. **The founder's "no fake graphics,
+EVER" rule is satisfied in full**: nothing is drawn that the page did not draw. What the
+picture shows is exactly what the post says in words.
+
+**FOUR FILES HAD WRITTEN THE SUBSTITUTION DOWN, each citing the others as corroboration, and
+all four are corrected in one change:**
+
+| file | was | now |
+|---|---|---|
+| `scripts/maps-social-image.mjs` | refused the draft — *"carries no project_id, so there is nothing to photograph"* | `captureAbsence()` |
+| `lib/maps-capture-binding.js` | `mapsCaptureKey` → **null**; `mapsCaptureState` → `INELIGIBLE` | keyed on the ZIP; WAITING → READY |
+| `lib/maps-capture-policy.js` | `mapsDcCapturePolicyApplies` → **false** for an absence | it GOVERNS one |
+| `acquisition.html` | `dcThemeImageMandatory` excluded absence | the whole theme is mandatory |
+
+Plus the ingest half — `homesignal-ingest bluesky/lib/maps-image-state.mjs` returned
+`NOT_REQUIRED` — and the server approval guard `public.hs_maps_dc_capture_policy_violations`,
+which carried `if not (ev ? 'project_id') then return v`.
+
+- 🔑 **THE CAPTURE IS THE PROJECT CAPTURE MINUS THE MARKER WORK, never a different picture.**
+  Same URL, same embed card, same map-state policy applied and re-verified AT THE SHUTTER,
+  same home-pin veto, same panel-in-frame assertions, same clip target. Three things are
+  deliberately absent and each would be WRONG rather than merely missing: **no `setView`** (no
+  project coordinates to frame on, so the ZIP's own framing stands — the view a resident
+  opening the link sees), **no popup and no halo** (a halo means "this marker is the subject",
+  and an absence post's subject is the absence), and **no minimum-marker floor** (zero drawn
+  is the SUCCESS case here; a floor would invert the rule).
+- 🔑 **`mapsDcCaptureVerifyAtShutter` NEEDED NO CHANGE — its guard was already written for
+  this.** `if (targetKey && !rendered.target_on_map)` skips only the "is the target still
+  drawn" limb when there is no target; every other limb still runs and can still refuse the
+  shot. What DID need adding is `rendered.target_sought`, because **"no target was sought" and
+  "the target was not drawn" are opposite facts that both read `target_on_map: false`** — one
+  is the picture working as intended, the other is a capture that must be refused. The stored
+  record now carries it, and the offline validator reads it. **The default is "a target WAS
+  sought"** (`!== false`), so every record stored before the field existed keeps the assertion
+  rather than being excused by it; measured before applying, **0 of 55 MAPS rows carried it**.
+- ⛔ **DO NOT ADD "an absence map must be empty".** It was written and its own numbers killed
+  it: the absence sentence is WINDOW-BOUNDED (*"no filings from the last N months"*) while this
+  policy turns all four STATUS controls ON, so an operating data centre filed years ago is
+  legitimately drawn and contradicts nothing. Asserting an empty map would refuse the capture
+  for a post whose sentence is true, by silently substituting "no records ever" for "no recent
+  filings". `on_map_total` is RECORDED either way.
+- ⚠️ **THE STATED COST: an absence draft is NOT approvable until its capture lands.** That is
+  the ruling — a post without its map does not go out — not a side effect to engineer around.
+  Measured before applying: **18 absence rows, 0 with an image, and 0 of 55 MAPS rows approved,
+  scheduled or published**, so nothing a human had already signed off was disturbed.
+- 🔑 **A STORED `INELIGIBLE` ON AN ABSENCE ROW IS NOW READ AS A SUPERSEDED STAMP.** The capture
+  worker's absence branch emits only READY or FAILED, so `INELIGIBLE` there can only have been
+  written by the removed rule. `mapsCaptureState` discounts it (its own docstring says the
+  stored state is observability and the function is the authority) and the dashboard suppresses
+  the stale `failure_reason` — otherwise the exact sentence the founder corrected would print
+  underneath the corrected status. **Scoped to that combination**: a FAILED stamp is a current
+  verdict and still prints.
+- ✅ **THE SERVER GUARD WAS APPLIED, AND ANOTHER SESSION HAD APPLIED ITS BASE MINUTES EARLIER.**
+  Migration `maps_dc_capture_policy_absence_is_governed_20260921`, spliced from the LIVE body
+  (rule 7) and fail-closed on its fingerprint. Verified live on five shapes afterwards: absence
+  compliant → **0 violations**; absence with no policy → blocked; absence claiming a target →
+  blocked; ordinary MAPS → untouched; ALERTS → untouched. The client and the server now agree
+  on every case in the shared fixture, which is what `test/maps-dc-policy-parity.test.mjs`
+  requires.
+- 🛑 **AND THE `CLAIM-GUARD-PARITY: PARKED` MARKER ON THAT MIGRATION WAS TRUE WHEN I WROTE IT
+  AND FALSE A FEW HOURS LATER — the ingest CLAUDE.md carries the full receipt.** Another
+  session applied the file at **17:31:36Z**; the gate's `main` run #22 at 17:37:08Z then
+  printed `PARKED …` beside `DRIFT social_posts_publication_guard: … says 1e7775a0…, live says
+  03b94cf8…` — and `03b94cf8` was the parked file's OWN body. **A state assertion in a
+  committed file is a measurement with a timestamp, not a standing fact** (Rule #0a). The
+  marker is removed, 7 of 7 functions now match live, and the gate itself now VERIFIES a
+  parked claim against production rather than trusting it.
 
 ---
 

@@ -292,15 +292,31 @@ ok(HS.mapsSocialIsAbsence(absence({ content_family: 'ALERTS' })) === false
    && HS.mapsSocialIsAbsence(absence({ tile: 'community' })) === false,
   '9: the family and tile guards still apply to the absence path');
 
-// THE GATE. Making the badge correct without this would have made both absence drafts
-// PERMANENTLY unapprovable: dcThemeImageMandatory would be true, and a post with no
-// project can never obtain a bound Map 1 capture.
-ok(dcMandatory && dcMandatory(absence()) === false,
-  '9: an absence post does NOT require the Map 1 capture — there is no project to photograph');
+// ⚖️ THE GATE — EVERY DATA CENTER THEME POST REQUIRES THE MAP 1 CAPTURE, ABSENCE INCLUDED.
+// Founder ruling, 2026-09-21: **every MAPS post gets a map, even when there is no data
+// centre.** This block asserted the exemption; it is flipped, not deleted, so the change of
+// rule is visible exactly where the old rule was pinned.
+//
+// 🛑 THE EXEMPTION'S OWN JUSTIFICATION WAS: "Making the badge correct without this would
+// have made both absence drafts PERMANENTLY unapprovable: dcThemeImageMandatory would be
+// true, and a post with no project can never obtain a bound Map 1 capture." The premise
+// after the comma is what changed — an absence post CAN obtain a bound capture now, because
+// its picture is of its ZIP's Map 1 page rather than of a project
+// (scripts/maps-social-image.mjs::captureAbsence). Nothing is permanently unapprovable; a
+// capture is simply owed first, which is the ruling.
+ok(dcMandatory && dcMandatory(absence()) === true,
+  '9: an absence post REQUIRES the Map 1 capture too — its ZIP\'s map is the picture');
 ok(dcMandatory && dcMandatory(withEvidence({ project_name: 'RBC Data Center Campus' })) === true,
-  '9: a record-bearing theme post still REQUIRES it — the exemption is scoped to absence');
-ok(/bskyTheme\(p\) === 'datacenter' && !bskyIsAbsence\(p\)/.test(DASH),
-  '9: the page composes the exemption from the shipped predicate, not a local re-derivation');
+  '9: a record-bearing theme post still REQUIRES it — the rule is now uniform');
+ok(/function dcThemeImageMandatory\(p\)\{\s*return bskyTheme\(p\) === 'datacenter';\s*\}/.test(DASH),
+  '9: the page requires it for the whole theme, with no absence limb left in the expression');
+// ⛔ AND THE SCOPE IS STILL A SCOPE. An ordinary (non-theme) MAPS draft publishes its link
+// card and must NOT acquire a mandatory capture from this change.
+ok(dcMandatory && dcMandatory(post({
+  evidence: { type: 'Residential', type_raw: 'SINGLE FAMILY', status: 'Proposed',
+              project_name: 'Elm Street Townhomes', project_id: 'p9' },
+})) === false,
+  '9: an ordinary MAPS draft is still not image-mandatory — the theme is the boundary');
 
 console.log(`\n${n - bad} passed, ${bad} failed`);
 if (bad) process.exit(1);
