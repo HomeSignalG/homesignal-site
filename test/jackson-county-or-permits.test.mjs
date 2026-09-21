@@ -76,6 +76,11 @@ for (const [n, e] of BOTH) {
   const LU_STATUS = { 'Approved': 65948, 'Pending': 19073, 'Withdrawn': 2343, 'Denial': 1230, 'Other': 207 };
   const LU_TYPE = { 'Zoning': 75509, 'Subdivision': 6774, 'Pre-Application Conference': 4778, 'Site Plan Review': 1740 };
 
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
   ok(Object.values(BLD_STATUS).reduce((a, b) => a + b, 0) === 251367, 'building STATUSCAT sums EXACTLY to 251,367');
   ok(Object.values(BLD_TYPE).reduce((a, b) => a + b, 0) === 251367, 'building PERMITTYPE sums EXACTLY to 251,367');
   ok(Object.values(LU_STATUS).reduce((a, b) => a + b, 0) === 88801, 'land-use STATUSCAT sums EXACTLY to 88,801');
@@ -85,12 +90,10 @@ for (const [n, e] of BOTH) {
     ['building', BLD, BLD_STATUS, BLD_TYPE, 'Inquiry'],
     ['land-use', LU, LU_STATUS, LU_TYPE, 'Pre-Application Conference'],
   ]) {
-    const bucketed = new Set([...e.status_to_bucket.proposed, ...e.status_to_bucket.approved,
-                              ...e.status_to_bucket.operating, ...e.status_to_bucket.exclude]);
+    const bucketed = new Set(Object.values(e.status_to_bucket).flat());
     const unb = Object.keys(st).filter((s) => !bucketed.has(s));
     ok(unb.length === 0, `${n}: every live STATUSCAT is bucketed`, unb.join(', '));
-    const all = [...e.status_to_bucket.proposed, ...e.status_to_bucket.approved,
-                 ...e.status_to_bucket.operating, ...e.status_to_bucket.exclude];
+    const all = Object.values(e.status_to_bucket).flat();
     ok(all.length === new Set(all).size, `${n}: no status sits in two buckets`);
     // Every live type is either mapped or dropped at source — never silently unclassified.
     const unmapped = Object.keys(ty).filter((t) => !(t in e.type_map) && t !== dropped);
@@ -105,8 +108,21 @@ for (const [n, e] of BOTH) {
 // map would leave a live value unmapped on one of them.
 ok(BLD.status_to_bucket.exclude.includes('Denied or Expired') && !BLD.status_to_bucket.exclude.includes('Denial'),
   'building excludes "Denied or Expired" — its own wording');
-ok(LU.status_to_bucket.exclude.includes('Denial') && !LU.status_to_bucket.exclude.includes('Denied or Expired'),
-  'land-use excludes "Denial" — its own wording, NOT the building layer\'s');
+// ⚖️ 2026-09-20 — 'Denial' MOVED exclude → denied, and this pair is the clearest live
+// illustration of why the decision classifier refuses before it guesses. The land-use
+// layer's 'Denial' is unambiguous, so it is surfaced as a decision. The building layer's
+// 'Denied or Expired' names TWO alternatives and the publisher does not say which
+// happened, so it stays in exclude exactly as before — asserting "denied" there would
+// invent the very fact this feature exists to source. Same defect (one shared map would
+// leave a value unmapped), now visible on the decision plane as well as the exclude one.
+ok(LU.status_to_bucket.denied && LU.status_to_bucket.denied.includes('Denial')
+   && !LU.status_to_bucket.exclude.includes('Denial'),
+  'land-use "Denial" → denied — its own unambiguous wording, NOT the building layer\'s');
+ok(BLD.status_to_bucket.exclude.includes('Denied or Expired')
+   && !(BLD.status_to_bucket.denied || []).includes('Denied or Expired'),
+  '"Denied or Expired" stays excluded — the source states alternatives, so no outcome is asserted');
+ok(!LU.status_to_bucket.exclude.includes('Denied or Expired'),
+  'land-use never borrowed the building layer\'s wording');
 ok(JSON.stringify(BLD.status_to_bucket) !== JSON.stringify(LU.status_to_bucket),
   'the two status maps are not shared');
 

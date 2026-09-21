@@ -67,7 +67,12 @@ ok(!('return_centroid' in ENTRY),
 // ── 2. Status buckets — the publisher's own stage labels, fleet-consistent ───────
 {
   const s2b = ENTRY.status_to_bucket;
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(all.length === 3 && new Set(all).size === 3,
     'exactly the 3 in-scope PROJECT_STAGE values bucketed, each exactly once');
   ok(s2b.approved.length === 1 && s2b.approved[0] === 'UNDER CONSTRUCTION',

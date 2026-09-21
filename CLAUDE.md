@@ -844,6 +844,120 @@ legal/framing change not covered by the one-time sign-off.
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
+## 7.05 A DENIED PROPOSAL IS KEPT, SOURCED, AND UNCOUNTED ⚖️ FOUNDER CONTRACT (2026-09-20)
+
+**A genuine proposal that was DENIED remains discoverable under Proposed, with a prominent
+sourced decision notation.** It is never auto-deleted, never relabelled "Canceled", and an
+appeal is never treated as an approval. Full receipt:
+`docs/decision-history-contract-2026-09-20.md`. The one authority is
+`supabase/functions/get-address-report/sources/decision.ts`; `lib/map.js` carries the page
+half and the two are pinned together by `test/decision-vocabulary-parity.test.mjs`.
+
+**Pennhurst is the REGRESSION CASE, not the scope.** There is no Pennhurst, Chester County,
+19475 or data-centre branch anywhere in it.
+
+**What it was costing, measured before the fix:** across all 239 registry entries there
+were **294 denial-shaped raw status values and 294 of 294 sat in `exclude`** — zero in any
+emitting bucket (control: emitting buckets carry 681/425/299). `exclude` means `continue`
+in all five connectors, so a denied application was **deleted, not mislabelled**.
+Corroborated the same day: `app_projects` held **3,000,229** development rows with
+**0 `Decided`** (Operating 1,378,872 · Approved 1,264,479 · Proposed 356,873 · Active 5),
+and a 299-ZIP / 48,342-site sample of `development_reports` carried **0** sites with
+`decided`.
+
+🔑 **THE `Decided` RECEIVER ALREADY EXISTED AND HAD NEVER FIRED — which is why this needed
+NO DDL.** `public.app_refresh_zip` has always written `status='Decided'` for a site
+carrying `decided:true`, and `bluesky/lib/maps-eligibility.mjs` has always refused a status
+outside `{Proposed, Approved}`. Both were correct; no connector ever sent the signal. Check
+for a dormant receiver before proposing a schema change.
+
+**FOUR THINGS ARE SEPARATE, and the separation is the design:**
+1. **Browsing category** — `browsingBucketFor()` always returns `proposed`. A denied
+   application is a HISTORICAL PROPOSAL and stays where a resident looks for it.
+2. **Decision + history** — the source's own status word verbatim, its own `decision_date`,
+   and the official record URL. `decided_on` is **null** when the source states no date,
+   and the sentence says so. **Never fill it from `file_date` or the refresh clock.**
+3. **Current-status verification** — `decisionEvidenceLevel()` / `currentStatusLine()`.
+4. **Eligibility** — `isActiveUndecided()`, the ONE predicate behind every active-proposal
+   count, upcoming-decision list, notification and social claim.
+
+**A denied proposal is IN the Proposed rail and OUT of every active count. That gap is the
+feature.** `counts.proposed` is the browsing size; `counts.proposed_active` is the
+eligibility number and is what the counter tile reads.
+
+⛔ **`statusTier` (lib/map.js) MUST NEVER READ A DECISION.** The moment it does, a denied
+record leaves the Proposed rail a resident searches — the defect this replaced. Pinned
+structurally by the parity test.
+
+🔑 **A RECENT FETCH IS NOT PROOF OF A RECENT DECISION CHECK.** `currentStatusLine()` reads
+no clock and no freshness field, and that absence is pinned structurally — a sentence
+assertion alone would survive an edit that started consulting one. Where a source cannot
+report a refusal the line is *"Application on file · Current decision status not verified."*
+
+⚠️ **`date_only` IS NOT DENIAL COVERAGE.** A decision-DATE column says *when* something was
+decided, never *that* it was refused, so it is grouped with `none`. **35 of 240** sources
+are in that state.
+
+**Vocabulary is `denied` · `withdrawn` only.** ⛔ `expired` · `void` · `cancelled` ·
+`closed` · `revoked` · `tabled` are deliberately NOT outcomes — administrative lapses are
+not rulings, and surfacing one under a decision heading asserts a ruling nobody made.
+Widening is a founder decision.
+
+**Registry enablement is COMPUTED, never transcribed** (claims rule 7) —
+`scripts/enable-decision-buckets.mjs`, report-only by default. **101 values moved across 53
+entries (62 denied, 39 withdrawn)**, fingerprint `2165d90e02bfe05652385c48234c47b4`;
+verified **1,907 pairs before and after, 0 lost, 0 invented, 0 in two buckets**. It
+re-serialises with non-ASCII escaped exactly as the committed file does — a naive
+`JSON.stringify` rewrites **314 unrelated lines** and buries the change.
+- 🔑 **ESTABLISH CANDIDACY BEFORE ASKING ABOUT AMBIGUITY.** The first draft ran the
+  ambiguity rules first, so every ordinary `"Void"` status — never a candidate — reported as
+  "decision-shaped but REFUSED". The residual printed **52** when it was **6**: 88% of the
+  finding was the instrument's own noise, and that printed number is the one a reader would
+  have quoted as the coverage gap.
+- **9 values are deliberately REFUSED and stay excluded**, each with a named reason:
+  `Denied or Expired` / `Placed on File or Denied` (the source states ALTERNATIVES),
+  `ESTIMATED Rejected` / `ESTIMATED Withdrawn` (the publisher's own estimate),
+  `VOIDED - Applicant Withdrew Permit`, `WITHDRAWN BY COUNTY` (wrong actor for the label),
+  `Amendment Denied` / `Reconsideration Denied` (a SUB-PROCEEDING), `Dept Disapproval`.
+
+📏 **COVERAGE IS MEASURED PER SOURCE AND IS NOT CODE COVERAGE** —
+`scripts/measure-decision-evidence-coverage.mjs`, dated output in
+`docs/decision-evidence-coverage-2026-09-20.json`. **53 of 240 sources can report a refusal
+at all; 187 cannot.** ⛔ Every page running the plane is a fact about the CODE; it says
+nothing about what a municipality publishes. **Application-level coverage is NOT estimated
+from source coverage** — capability is not incidence, and the script prints `NOT MEASURED`
+rather than a number.
+- **Chester County PA — the Pennhurst case — is one of the 187**: its Act 247 layer has **no
+  status column at all** (every record is the constant `"Submitted for county review"`), so
+  it can never report a refusal and every record reads the honest qualification. PA overall:
+  **1 of 11 sources**.
+
+⚠️ **`type` MEANS TWO DIFFERENT THINGS and the parity gate caught it before it shipped.** On
+a connector record and an engine area site it is the LIFECYCLE (`"proposed"`); on a marker
+item from `HS.trackerSiteItem` it is the project CATEGORY (`"Data center"`), with the
+lifecycle in `lifecycleBucket`/`status`. Precedence is
+`bucket → lifecycleBucket → status → type`; reading `type` first reported **every live
+marker as not-active**. The same gate caught a second one: the page refused only a
+*renderable* decision while the engine refused any decision object, so a malformed decision
+counted as a live proposal. **Validation is for refusing to RENDER an unsourced notation;
+eligibility fails closed on presence.**
+
+**Two forward-looking surfaces were CORRECTED, not qualified** — a qualification underneath
+a future-tense sentence does not cancel it. `lib/impact.js` said *"If approved… once
+construction begins"* and a decided record fell through to the generic *"if this project
+moves ahead"*; Map 1's Proposed sub-line said *"Hearings and notices you can still weigh in
+on"* over every row.
+
+**Still gated, deliberately not done:** the edge-function deploy (until it ships, no
+production report carries a `decision`), the production backfill, and
+`docs/decision-provenance-migration.sql` — PARKED, executable, spliced from the live
+function body, fail-closed on its anchor, **not applied**. It carries the decision into
+`app_projects.provenance` so `app_projects`-backed cards can name the outcome; until then
+`lib/templates.js::browsingStatusLabel` renders `Proposed · decided` and **refuses to name
+an outcome it cannot source**.
+
+---
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

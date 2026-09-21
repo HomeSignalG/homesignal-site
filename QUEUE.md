@@ -40,6 +40,71 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-20 — DECISION HISTORY: code landed on the branch; deploy + backfill separately gated
+
+**State:** implementation complete and COMMITTED on
+`claude/homesignal-decision-history-avkrws`, 223/223 offline suites green, both repos.
+⚠️ The heading deliberately carries no in-flight marker: the FILES have landed, so a
+🟡/"NOT DEPLOYED" heading would trip `test/queue-state-not-stale.test.mjs` for exactly the
+right reason — that detector asks whether a heading's claim matches the tree, and what is
+outstanding here is a gated ACTION, not unwritten code. **Gated and NOT done: merge, edge-function deploy,
+production backfill.** Until the deploy ships, **no production report carries a `decision`
+and nothing a resident sees has changed** — that is the honest read of this item's state.
+
+**Founder contract:** a genuine proposal that was DENIED remains discoverable under
+Proposed with a prominent sourced decision notation; never auto-deleted, never "Canceled",
+an appeal is never an approval. Receipt: `docs/decision-history-contract-2026-09-20.md`.
+Standing answer: `CLAUDE.md` §7.05.
+
+**Pennhurst is the regression case, NOT the scope.** No Pennhurst / Chester County / 19475
+/ data-centre branch exists anywhere in the change.
+
+**The defect, measured:** 294 denial-shaped raw status values across all 239 registry
+entries, **294 of 294 in `exclude`** (which means `continue` in all five connectors) and 0
+in any emitting bucket — so a denied application was DELETED, not mislabelled. Controls:
+emitting buckets carry 681/425/299; `app_projects` held 3,000,229 development rows with
+**0 `Decided`**; a 299-ZIP / 48,342-site sample of `development_reports` carried **0** sites
+with `decided`.
+
+**Shipped in the branch:**
+- `sources/decision.ts` — the one authority; four separations (browsing category · decision
+  + history · current-status verification · eligibility).
+- All five connectors emit `denied`/`withdrawn` instead of dropping; run reports gain
+  `decided_by_status` so "surfaced 12" never reads as "dropped 12".
+- Engine: denial split from withdrawal; `counts.proposed_active` (eligibility) beside
+  `counts.proposed` (browsing) and `counts.proposed_decided`.
+- Page: Map 1 popup/rail/counter/marker title, community page, templates, `impact.js`,
+  N5 radius — all through `lib/map.js`, pinned to the engine by a parity test.
+- Registry: **101 values moved across 53 entries** (62 denied, 39 withdrawn), COMPUTED by
+  `scripts/enable-decision-buckets.mjs`, fingerprint `2165d90e02bfe05652385c48234c47b4`;
+  verified 1,907 pairs before and after, 0 lost, 0 invented. **9 ambiguous values refused**
+  and left excluded, each with a named reason.
+- Social: `maps-eligibility.mjs` gate 2b + `tests/test_maps_decided_not_postable.mjs`, wired
+  into `check-maps-node-gates.yml`.
+- Coverage instrument + dated output: **53 of 240 sources can report a refusal, 187 cannot.**
+
+**Dependencies / what unblocks what:**
+1. **Merge** → nothing resident-visible yet (the engine is deployed separately).
+2. **Deploy `get-address-report`** → new reports start carrying `decision`. `deploy-edge-functions.yml`
+   has no ref/SHA guard and always ships whatever `main` is — check the edge-function tree
+   hash at the ref it actually runs on (CLAUDE.md §Unit 4).
+3. **Backfill** (a ZIP gains a decision only when its report refreshes) → `app_projects`
+   starts carrying `status='Decided'`, and the social gate starts refusing real rows.
+4. **OPTIONAL, separate:** `docs/decision-provenance-migration.sql` — parked, executable,
+   fail-closed, NOT applied. Only needed so `app_projects`-backed cards can NAME the
+   outcome; without it they honestly read `Proposed · decided`.
+
+⚠️ **Expect the Proposed rail to GROW and the Proposed COUNTER to fall on the same page.**
+That is the contract working, not a regression: the rail is the browsing category (which
+now keeps decided applications) and the counter is the eligibility number (which never
+counted them). Anyone reading the two as one number will report it as a bug.
+
+📌 **Not chased, logged per Rule 16:** the 9 ambiguous registry values each need a
+publisher-specific answer rather than a looser rule; widening the outcome vocabulary beyond
+`denied`/`withdrawn` is a founder decision.
+
+---
+
 ### 2026-09-15 — ✅ FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: MERGED AND LIVE, BOTH HALVES
 
 ✅ **MERGED 2026-09-15 as `c2273e8` (#1240).** All four files are on `main`:
