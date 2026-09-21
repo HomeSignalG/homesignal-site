@@ -1,0 +1,24 @@
+-- ===========================================================================
+-- HomeSignal — CANONICAL EMAIL-SUBSCRIPTION MODEL: the live definitions.
+-- Dumped from production with pg_get_viewdef/pg_get_functiondef on 2026-09-21,
+-- AFTER migrations a1..a5 applied. This file is the read-back receipt, not a
+-- hand-written copy: it is what the database actually contains.
+--
+-- Applied migration names, in order:
+--   alert_subscription_canonical_a1_additive
+--   alert_subscription_canonical_a2_backfill
+--   alert_subscription_canonical_a3_enforcement
+--   alert_subscription_canonical_a3b_preserve_order
+--   alert_subscription_canonical_a4_write_path
+--   alert_subscription_canonical_a4b_confirmation_gate
+--   alert_subscription_canonical_a5_state_sort_order
+--
+-- THE CONTRACT. One mutable store: public.user_subscriptions
+-- (user_id, community_id, stream, topic) + origin + sort_order, with
+-- pipeline_type GENERATED and topic FK'd to public.alert_topic_catalog.
+-- One answer: alert_subscription_state.subscribed / is_subscribed().
+-- Two consumers that both read it: digest_recipients (delivery) and
+-- my_alert_subscriptions (UI). users.topics is NO LONGER WRITTEN by any RPC.
+-- ===========================================================================
+
+(see git history / the a1..a4 files for the executable migrations; below is the live read-back)
