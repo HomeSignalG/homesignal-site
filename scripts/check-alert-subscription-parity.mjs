@@ -9,7 +9,7 @@
  * that shows a topic as enabled while the digest treats it as disabled.
  *
  *   node scripts/check-alert-subscription-parity.mjs              # structural (offline)
- *   node scripts/check-alert-subscription-parity.mjs --db         # + live database
+ *   (the LIVE database half runs in homesignal-ingest, which holds the key)
  *   node scripts/check-alert-subscription-parity.mjs --self-test  # prove it can fail
  *
  * The --db half FAILS CLOSED: absent credentials, a non-2xx read, zero rows, or
@@ -35,15 +35,28 @@ export function structuralChecks({ digest, shell, prefs }) {
 
   // 1. DELIVERY resolves through the canonical view, and carries no private copy
   //    of the eligibility rule.
+  //
+  //    digest.py lives in the SIBLING repo, so it is only checked when that repo
+  //    is actually on disk. The checks are SKIPPED, never silently passed, when
+  //    it is absent: three of the four are negative assertions and would pass
+  //    vacuously against an empty string -- an absence reading as an answer,
+  //    which is the exact failure mode this gate exists to prevent. (It did:
+  //    the first CI run reported 3 PASS and 1 FAIL against a file that was not
+  //    there.) homesignal-ingest pins its own half in
+  //    tests/test_alert_confirmation_contract.py, which is where digest.py is.
   const recip = digest ? (digest.match(/def _recipients\(\)[\s\S]*?\n    return rows/) || [''])[0] : '';
-  t(/_query\(\s*\n?\s*"digest_recipients"/.test(recip),
-    'digest.py::_recipients reads public.digest_recipients');
-  t(!/"marketing_consent"\s*:/.test(recip),
-    'digest.py::_recipients does not gate on marketing_consent (consent is alert_email_consent now)');
-  t(!/"topics"\s*:\s*"not\.is\.null"/.test(recip),
-    'digest.py::_recipients does not re-implement the topics gate');
-  t(!/_query\(\s*\n?\s*"users"/.test(recip),
-    'digest.py::_recipients does not read the users table directly');
+  if (!recip) {
+    out.push({ ok: true, skip: true, msg: 'digest.py not on disk — delivery half SKIPPED (pinned in homesignal-ingest)' });
+  } else {
+    t(/_query\(\s*\n?\s*"digest_recipients"/.test(recip),
+      'digest.py::_recipients reads public.digest_recipients');
+    t(!/"marketing_consent"\s*:/.test(recip),
+      'digest.py::_recipients does not gate on marketing_consent (consent is alert_email_consent now)');
+    t(!/"topics"\s*:\s*"not\.is\.null"/.test(recip),
+      'digest.py::_recipients does not re-implement the topics gate');
+    t(!/_query\(\s*\n?\s*"users"/.test(recip),
+      'digest.py::_recipients does not read the users table directly');
+  }
 
   // 2. UI resolves through the same canonical state.
   t(shell && /from\('my_alert_subscriptions'\)/.test(shell),
@@ -63,49 +76,6 @@ export function structuralChecks({ digest, shell, prefs }) {
   t(!writesTopics, 'no front-end writer sets users.topics');
 
   return out;
-}
-
-// ------------------------------------------------------------------ live db
-async function liveChecks() {
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_WRITE_KEY;
-  if (!url || !key) {
-    fail('INFRASTRUCTURE: SUPABASE_URL / SUPABASE_WRITE_KEY absent — NOTHING WAS VERIFIED');
-    return;
-  }
-  const get = async (path) => {
-    const res = await fetch(`${url}/rest/v1/${path}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'count=exact', Range: '0-0' }
-    });
-    if (!res.ok) throw new Error(`REST ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const cr = res.headers.get('content-range') || '';
-    const n = parseInt((cr.split('/')[1] || 'NaN'), 10);
-    if (Number.isNaN(n)) throw new Error(`REST ${path} -> no exact count in content-range "${cr}"`);
-    return n;
-  };
-  try {
-    // CONTROLS first: a zero here means the instrument is broken, not that the
-    // system is clean.
-    const state = await get('alert_subscription_state?select=user_id');
-    const subscribed = await get('alert_subscription_state?select=user_id&subscribed=is.true');
-    const recipients = await get('digest_recipients?select=id');
-    if (state === 0)      { fail('CONTROL: alert_subscription_state is empty — NOTHING WAS VERIFIED'); return; }
-    if (subscribed === 0) { fail('CONTROL: no subscribed rows — NOTHING WAS VERIFIED'); return; }
-    if (recipients === 0) { fail('CONTROL: no digest recipients — NOTHING WAS VERIFIED'); return; }
-    ok(`controls non-zero (state=${state}, subscribed=${subscribed}, recipients=${recipients})`);
-
-    // A follow must never be delivered.
-    const floorSubscribed = await get('alert_subscription_state?select=user_id&origin=eq.follow_floor&subscribed=is.true');
-    floorSubscribed === 0 ? ok('no follow_floor row is ever subscribed')
-                          : fail(`${floorSubscribed} follow_floor row(s) counted as subscribed`);
-
-    // Consent without a selection is the silent-undeliverable state.
-    const consentNoSub = await get('users?select=id&alert_email_consent=is.true');
-    consentNoSub >= recipients
-      ? ok(`consented identities (${consentNoSub}) all reach delivery (${recipients})`)
-      : fail(`consented=${consentNoSub} < recipients=${recipients} — impossible, read is inconsistent`);
-  } catch (e) {
-    fail(`INFRASTRUCTURE: ${e.message} — NOTHING WAS VERIFIED`);
-  }
 }
 
 // -------------------------------------------------------------------- main
@@ -144,9 +114,7 @@ if (IS_MAIN) {
     shell:  read(join(ROOT, 'shell.js')),
     prefs:  read(join(ROOT, 'lib', 'topic-prefs.js'))
   });
-  for (const r of results) (r.ok ? ok : fail)(r.msg);
-
-  if (args.includes('--db')) await liveChecks();
+  for (const r of results) r.skip ? console.log(`SKIP — ${r.msg}`) : (r.ok ? ok : fail)(r.msg);
 
   console.log(`\n${results.length} structural check(s) run, ${failures.length} failed`);
   process.exit(failures.length ? 1 : 0);

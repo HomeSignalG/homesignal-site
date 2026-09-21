@@ -5,10 +5,12 @@ name: alert-subscription-parity
 # A change that adds another mutable subscription source, bypasses the resolver,
 # or lets UI and delivery disagree fails here.
 #
-# Two jobs on purpose: the structural half needs no secret and runs everywhere,
-# so the gate still means something on a fork or when the secret is unavailable;
-# the live half proves the invariant against production. The daily run is the one
-# that catches drift introduced on the DATABASE side, which no repo event sees.
+# This repo pins the UI half (shell.js, lib/topic-prefs.js). The delivery half
+# (digest.py) and the LIVE database half are pinned in homesignal-ingest, which
+# is where digest.py lives and which holds SUPABASE_WRITE_KEY. Splitting by repo
+# is deliberate: the first version checked out the sibling repo here, could not
+# (no cross-repo token), and then reported three negative assertions as PASS
+# against a file that was not there -- an absence reading as an answer.
 
 on:
   push:
@@ -23,27 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: HomeSignalG/homesignal-ingest
-          path: homesignal-ingest
-          token: ${{ secrets.INGEST_REPO_TOKEN || github.token }}
-        continue-on-error: true
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: the gate can fail (self-test)
         run: node scripts/check-alert-subscription-parity.mjs --self-test
-      - name: UI and delivery derive from one canonical resolver
-        run: INGEST_ROOT=${{ github.workspace }}/homesignal-ingest node scripts/check-alert-subscription-parity.mjs
-
-  live:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
-      - name: canonical state holds in production
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_WRITE_KEY: ${{ secrets.SUPABASE_WRITE_KEY }}
-        run: node scripts/check-alert-subscription-parity.mjs --db
+      - name: the UI resolves through the canonical state
+        run: node scripts/check-alert-subscription-parity.mjs
