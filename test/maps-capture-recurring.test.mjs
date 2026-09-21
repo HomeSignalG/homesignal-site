@@ -269,8 +269,21 @@ ok(/-\$\{keyStamp\(d\)\}\.png/.test(GEN),
   '10e: the object name carries the key stamp, so a re-capture cannot silently overwrite the old image');
 // EVERY refusal branch must record an outcome. Five of them used to `continue` silently,
 // which under a recurring job means re-selecting the same row on every single fire.
-ok((GEN.match(/recordOutcome\(/g) || []).length >= 3,
-  '10f: refusals are recorded on the row rather than dropped silently');
+//
+// ⚠️ THE COUNT WAS >= 3 AND IS NOW 1, ON PURPOSE. It counted DETERMINISTIC refusals — no
+// project_id, project gone, no coordinates, not in the authoritative set — and every one of
+// those is now a ZIP-scope capture instead of a refusal (#1280 for the first, this change
+// for the rest). What survives is the one branch that can still refuse: a capture that
+// actually failed. The RULE is unchanged and is what the assertion now states.
+ok((GEN.match(/recordOutcome\(/g) || []).length >= 1,
+  '10f: a capture that fails is recorded on the row rather than dropped silently');
+// ⚠️ COMMENTS STRIPPED FIRST. #1280 documents the branch it replaced by QUOTING the old
+// call, so a bare test over the whole file matches its prose and fails on a clean tree —
+// "a pin that names the string it forbids", caught here by the pin firing on a correct
+// file rather than by anyone reading it.
+const GEN_CODE_ONLY = GEN.replace(/^\s*\/\/.*$/gm, '');
+ok(!/await ineligible\(/.test(GEN_CODE_ONLY),
+  '10f1: …and no deterministic refusal remains in CODE — an unpinnable draft gets a ZIP map');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
   '10g: the old silent-continue refusal is gone');
 ok(/ineligible\(/.test(GEN), '10h: deterministic refusals go through one INELIGIBLE helper');

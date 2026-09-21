@@ -740,7 +740,10 @@ async function finishCapture(d, label, r, proj, results) {
   // The subject segment is the project id, or the literal `nodc` when there is no project.
   // A project-shaped placeholder there would read to the next person as a project id that
   // has stopped resolving, which is a different and much worse fact.
-  const subject = proj ? String(proj.id) : 'nodc';
+  // `r.subject` lets a ZIP-scope capture of a PROJECT-BACKED row say what it is: the
+  // picture is the ZIP's map, so neither the project id (which would claim a pin that was
+  // never drawn) nor `nodc` (which would claim the draft names no project) is true of it.
+  const subject = r.subject || (proj ? String(proj.id) : 'nodc');
   const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d)}.png`;
 
   if (DRY) {
@@ -817,12 +820,6 @@ async function main() {
     // silently, writing nothing — so the draft carried no state, no attempt count and no
     // retry clock, and a recurring job would have re-selected it on every single fire. An
     // unrecorded refusal is also indistinguishable from a draft nothing has looked at yet.
-    const ineligible = async (why) => {
-      const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, why, null);
-      results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason: why,
-        ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
-    };
-
     // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
     // This branch used to read `await ineligible('the draft carries no project_id, so there
     // is nothing to photograph')` and `continue`, and that sentence is the one the founder
@@ -843,21 +840,48 @@ async function main() {
       continue;
     }
 
+    // ⚖️ THE RULING IS "EVERY POST GETS A MAP", AND #1280 DELIVERED IT FOR ONE BRANCH.
+    // `captureAbsence` fixed the `!pid` case above. The five refusals that followed are the
+    // same substitution one step along — each states a true fact about a PROJECT ("the row
+    // is gone", "it has no coordinates", "it is not in the ZIP's authoritative set") and
+    // draws the same false conclusion about the MAP. The ZIP's Map 1 page renders in every
+    // one of those cases, and it is the page the post links to.
+    //
+    // Measured on production: #1280 reaches the 18 absence drafts; these five branches are
+    // why the other 28 mapless drafts (27 ordinary MAPS + 64165) stay imageless.
+    //
+    // IT REUSES `captureAbsence` AND `finishCapture` RATHER THAN ADDING A THIRD PATH — the
+    // change that removed four copies of one idea must not introduce a fifth. What the
+    // picture is does not depend on WHY the pin was unavailable, so the reason is recorded
+    // and is not a second algorithm.
+    const zipFallback = async (why) => {
+      const themeU = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+      let ru;
+      try { ru = await captureAbsence(page, d, themeU); }
+      catch (e) { ru = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
+      if (ru.theme === undefined) ru.theme = themeU || null;
+      // ⚠️ RECORDED ON THE ROW, NOT INFERRED LATER. Without this a reader cannot tell a
+      // project-backed ZIP capture from an absence post's, and those are different claims:
+      // this draft DOES name a project, the map simply could not pin it.
+      if (ru.ok) { ru.subject = 'zip'; ru.zip_scope_reason = why; }
+      await finishCapture(d, label, ru, null, results);
+    };
+
     const proj = await liveProject(pid);
-    if (!proj) { await ineligible('the project row is no longer in app_projects'); continue; }
-    if (proj.record_kind !== 'development') { await ineligible('the live row is not a development record'); continue; }
-    if (proj.lat == null || proj.lng == null) { await ineligible('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
+    if (!proj) { await zipFallback('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await zipFallback('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await zipFallback('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      await ineligible('the live coordinates differ from the draft evidence, so a capture would not be of this draft');
+      await zipFallback('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
       continue;
     }
 
     const auth = await authoritativePresence(d.zip, proj.source_key);
     if (!auth.present) {
       const why = auth.status !== 'boundary_complete'
-        ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
+        ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status})`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      await ineligible(why);
+      await zipFallback(why);
       continue;
     }
 
@@ -1047,6 +1071,10 @@ async function attach(draft, objectPath, r, proj) {
     // a popup, a halo and a project-coordinate frame; an absence capture has none of the
     // three, so reusing it here would put three false statements in the one field whose job
     // is to say what was actually photographed. Same rule as the fields above.
+    // ⚠️ A PROJECT-BACKED ROW CAPTURED AT ZIP SCOPE MUST SAY SO, or its evidence is
+    // indistinguishable from an absence post's. Absent unless it applies — a null would
+    // read as "asked and found nothing" rather than "this capture had a pin".
+    ...(r.zip_scope_reason ? { zip_scope_reason: r.zip_scope_reason } : {}),
     note: r.absence
       ? 'Screenshot of the live Map 1 ZIP page in the ZIP\'s own default framing, with no '
         + 'marker singled out, no popup opened and no halo drawn — because this post\'s '

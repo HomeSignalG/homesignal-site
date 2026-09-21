@@ -112,8 +112,20 @@ ok(!/siteMarkers\s*\|\|\s*\[\]\)\.length\s*>\s*0/.test(ABS),
 // fifth copy in the same session that removed four.
 ok(/async function finishCapture\(d, label, r, proj, results\)/.test(GEN_CODE),
   '5a: there is ONE shared finish path');
-ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 2,
-  '5b: …and exactly two call sites use it — the project path and the absence path');
+// ⚠️ THE COUNT IS 3, NOT 2 — and counting call sites was never what §5 is about. A THIRD
+// branch now shares this tail: a project-backed draft whose pin is unavailable (the row is
+// gone, it has no coordinates, or it is not in the ZIP's authoritative set) is photographed
+// at ZIP scope rather than refused, completing "every post gets a map" for the 28 drafts
+// #1280 did not reach. It reuses `captureAbsence` and this tail precisely BECAUSE §5's rule
+// is "one finish path" — a fourth copy would be the defect this section exists to prevent.
+//
+// So the pin now asserts the PROPERTY rather than a number: every capture branch ends here,
+// and none of them re-implements the upload / attach / record tail.
+ok((GEN_CODE.match(/await finishCapture\(/g) || []).length >= 2,
+  '5b: …and every capture branch ends in it');
+ok(!/await upload\(/.test(GEN_CODE.slice(0, GEN_CODE.indexOf('async function finishCapture')))
+   && (GEN_CODE.match(/await upload\(/g) || []).length === 1,
+  '5b1: …with the upload living ONLY inside that shared tail, never copied into a branch');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');
 ok((GEN_CODE.match(/await attach\(d, objectPath, r, proj\)/g) || []).length === 1,
