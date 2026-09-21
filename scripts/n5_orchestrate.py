@@ -44,7 +44,12 @@ MAX_SECONDS = int(os.environ.get("MAX_SECONDS", "3000"))
 LEASE_SECONDS = int(os.environ.get("LEASE_SECONDS", "3600"))
 WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')}-"
                                   f"{os.environ.get('GITHUB_JOB', os.getpid())}")
-CHUNKS = [c for c in os.environ.get("CHUNKS", "0,1,2,3,4,5,6,7,8,9").split(",") if c.strip()]
+# CHUNKS defaults to EMPTY, meaning "the generation's own shard prefixes". Reconciliation
+# granularity must match BUILD granularity: a 1-digit chunk spans ~170,000 capture rows and
+# ~850 MB of random heap I/O (measured: 50.9 s for bucket '0'), while a 3-digit chunk is
+# ~12,700 rows and returns in well under a second. Deriving them also means the set declared
+# at activation is exactly the set that was built — one list, not two that can drift.
+CHUNKS = [c for c in os.environ.get("CHUNKS", "").split(",") if c.strip()]
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -74,6 +79,18 @@ def require_generation():
     if GENERATION:
         return GENERATION
     raise SystemExit("STOP: GENERATION is required for this mode.")
+
+
+def chunks_for(gen):
+    """The chunk set for a generation: explicit CHUNKS, else its own shard prefixes."""
+    if CHUNKS:
+        return CHUNKS
+    rows = sql(f"select z3 from geo.n5_shard where generation_id={lit(gen)} order by z3;",
+               "chunks", read_only=True)
+    if not rows:
+        raise SystemExit(f"STOP: generation {gen} has no shards, so it has no chunk set. "
+                         f"Refusing to reconcile or activate against an empty declaration.")
+    return [r["z3"] for r in rows]
 
 
 def discover_building():
@@ -147,11 +164,19 @@ def mode_open():
     # Shard manifest derives from the CAPTURE, never from the canonical ZIP registry: a ZIP
     # present in the capture but absent from the registry would otherwise be skipped in
     # silence and the build would look complete.
+    # checksum is NOT NULL and load-bearing: run_shard compares the frozen slice against it
+    # and halts as FREEZE_DRIFT on a mismatch, so a manifest without one would either fail
+    # to insert or disable the very gate that catches a partial freeze. It is the SAME
+    # order-independent expression the freeze check uses — addition commutes, so no sort is
+    # involved and the two sides cannot disagree over row order or collation.
     sql(f"""insert into geo.n5_shard
-              (snapshot_id, generation_id, z3, projects, pairs, zips, state)
+              (snapshot_id, generation_id, z3, projects, pairs, zips, checksum, state)
             select {lit(snapshot_id)}, {lit(gen)}, left(e.zip,3),
                    count(distinct e.source_key), count(distinct e.source_key||'|'||e.zip),
-                   count(distinct e.zip), 'pending'
+                   count(distinct e.zip),
+                   sum(('x'||substr(md5(e.source_key||'|'||e.zip||'|'
+                        ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
+                   'pending'
               from public.n5_expected_captured({lit(snapshot_id)}) e
              group by left(e.zip,3);""", "shard manifest")
     say("generation opened", gen)
@@ -189,7 +214,7 @@ def mode_reconcile():
     if not gen:
         say("reconcile", "no BUILDING generation - nothing to do (clean no-op)")
         return 0
-    for c in CHUNKS:
+    for c in chunks_for(gen):
         row = sql(f"select * from geo.n5_reconcile_chunk({lit(gen)}, {lit(c)});", f"chunk {c}")[0]
         say(f"chunk {c}", f"expected={row['expected_keys']} resolved={row['accounted_resolved']} "
                           f"unresolved={row['accounted_unresolved']} unaccounted={row['unaccounted']}")
@@ -212,7 +237,7 @@ def mode_ready():
 
 def mode_activate():
     gen = require_generation()
-    arr = "array[" + ",".join(lit(c) for c in CHUNKS) + "]::text[]"
+    arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
     sql(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate")
     say("generation", f"{gen} -> ACTIVE")
     return 0

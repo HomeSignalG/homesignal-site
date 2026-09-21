@@ -34,9 +34,9 @@ on:
         required: false
         default: '4'
       chunks:
-        description: 'reconcile/activate chunk keys, comma separated'
+        description: 'chunk keys (blank = the generation own shard prefixes)'
         required: false
-        default: '0,1,2,3,4,5,6,7,8,9'
+        default: ''
 
 concurrency:
   # ONE orchestrator at a time. This is belt-and-braces, not the control: geo.n5_claim_shard
@@ -62,7 +62,7 @@ jobs:
           MODE: ${{ github.event.inputs.mode || 'work' }}
           GENERATION: ${{ github.event.inputs.generation || '' }}
           MAX_SHARDS: ${{ github.event.inputs.max_shards || '4' }}
-          CHUNKS: ${{ github.event.inputs.chunks || '0,1,2,3,4,5,6,7,8,9' }}
+          CHUNKS: ${{ github.event.inputs.chunks }}
           MAX_SECONDS: '3000'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py

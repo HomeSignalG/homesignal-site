@@ -591,3 +591,41 @@ create index if not exists app_project_identity_snapshot_kind_zip
 -- which is 3.2% of the 925,463-project baseline, so most chunks will look nothing like
 -- Worcester.
 -- ============================================================================
+
+-- ============================================================================
+-- PART 3 — THE CONTRACT COULD NOT BE QUERIED, ONLY SCANNED.
+-- Migration: n5_contract_functions_inlinable (2026-09-21)
+--
+-- Both contract functions carried `SET search_path`. A SQL function with a SET clause is
+-- NEVER inlined — the setting must be applied around execution — so every reference became
+-- a Function Scan that materialised the entire national set before any caller predicate
+-- could apply.
+--
+-- MEASURED, n5_expected_input(now()) with BOTH source_key and zip filtered:
+--   BEFORE  Function Scan · Rows Removed by Filter: 3,008,118
+--           Buffers: shared hit=101,891 read=270,116, temp read=41,919 written=41,919
+--           Execution Time: 45,787 ms          (for a one-row answer)
+--   AFTER   Index Scan using app_projects_zip_source_key_uidx
+--           Buffers: shared read=4
+--           Execution Time: 2.3 ms
+--
+-- The SET bought nothing: every relation in both bodies is schema-qualified, which is the
+-- actual defence against a re-pointed search_path. Removing it restores inlining and keeps
+-- the guarantee. Both functions are otherwise byte-identical in predicate and column list.
+--
+-- ⚠️ AND INLINING ALONE IS NOT ENOUGH — CHUNK GRANULARITY IS PART OF THE CONTRACT.
+-- With the function inlined, a 1-digit reconciliation chunk still takes 50.9 s: the index
+-- is used correctly (Index Scan on app_project_identity_snapshot_kind_zip) but bucket '0'
+-- is 170,929 capture rows over ~109,320 heap buffers of poorly-correlated random I/O.
+-- A 3-digit chunk is ~12,700 rows and returns in well under a second.
+--   chunk '0'   expected 26,978 · resolved 15,204 · unaccounted 11,774   ~51 s
+--   chunk '016' expected  7,704 · resolved     67 · unaccounted  7,637   fast
+--   chunk '010' expected    426 · resolved    368 · unaccounted     58   fast
+-- So n5_orchestrate.py derives its chunk set from the generation's OWN shard prefixes
+-- rather than a hardcoded list: reconciliation granularity equals build granularity by
+-- construction, and the set declared at activation is exactly the set that was built.
+--
+-- 🔑 chunk '010' is also the control on the D-2 reading above: 86.4% resolved, nothing like
+-- Worcester's 0.87%. The NOAUTH concentration in '016' is a property of one registry, not
+-- of the country, which is why the D-2 table must not be extrapolated.
+-- ============================================================================
