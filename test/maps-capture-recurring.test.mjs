@@ -393,6 +393,16 @@ ok(HS.mapsSocialIsAbsence(absence) === true, '11q: the absence post is recognise
 ok(HS.mapsDcCapturePolicyApplies(absence) === false,
   '11r: …and the map-state policy does NOT govern it — it acquires no image requirement');
 
+// A CAPTURE FAILURE IS NEVER A FINDING ABOUT A ZIP — and §9 above only covers the four
+// STATE sentences. The policy's own refusal reasons are shown to the founder beside them, so
+// they are held to the same bar: each one names an instrument (a control, the policy, the
+// map's own drawing), never the absence of development.
+const POLICY_SRC = readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8');
+const reasonLines = POLICY_SRC.split('\n').filter((l) => /reason:|problems\.push|return lbl|v := /.test(l));
+ok(reasonLines.length > 0, '11s: the policy module has refusal text to check', reasonLines.length);
+ok(!/\bno\b[^'"]{0,40}\b(data cent|development|project)s?\b[^'"]{0,20}\b(here|in this zip|found)\b/i.test(POLICY_SRC),
+  '11t: none of it claims a ZIP has no data centres — the failure names the instrument');
+
 // ── §12 THE ATTACH IS CONDITIONAL — STRUCTURAL PINS ──────────────────────────────────
 // A read-then-unconditional-write is a race with a comment on it. These pin the preconditions
 // into the WHERE clause, which is the only place Postgres will evaluate them atomically.
