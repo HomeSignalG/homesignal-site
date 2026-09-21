@@ -47,8 +47,23 @@ ok(!/n5_expected_input\(\{lit\(/.test(shard),
   '§2a2 the builder must never evaluate the LIVE contract — that is capture-time only');
 ok(!/preservation\.app_project_identity[\s\S]{0,200}?left\(i\.zip,3\)/.test(shard),
   '§2b the freeze must not re-express the predicate beside the contract');
-ok(/n5_expected_input\(\{lit\(cutoff\)\}\)/.test(orch),
-  '§2c capture — and only capture — evaluates the LIVE contract');
+// §2c The capture — and ONLY the capture — evaluates the LIVE contract. It now reads
+// n5_expected_input(now()) rather than a client-supplied cutoff literal: the capture is one
+// transaction, so now() IS the capture instant and every statement in it shares that one
+// clock. Passing a separately-read timestamp was a second clock for no reason.
+// Count CALLS, not the name. The n5_snapshot.scope column stores the literal string
+// 'public.n5_expected_input(cutoff) - the canonical contract' to record what was captured,
+// and a bare-name count reads that documentation as a second evaluation — the same mistake
+// §2a2 exists to prevent, one file over.
+const liveContractCalls = (orch.match(/n5_expected_input\(now\(\)\)/g) || []).length;
+ok(liveContractCalls === 1,
+  `§2c the LIVE contract is evaluated exactly once, at capture (found ${liveContractCalls})`);
+ok(!/n5_expected_input\(\{lit\(/.test(orch),
+  '§2c1 no mode may evaluate the live contract at a client-supplied cutoff');
+ok(/n5_expected_input\(now\(\)\)/.test(orch),
+  '§2c2 the capture evaluates the live contract at the transaction instant');
+ok(/insert into preservation\.app_project_identity[\s\S]{0,2000}n5_expected_input\(now\(\)\)/.test(orch),
+  '§2c3 that single live-contract call belongs to the capture insert, not to another mode');
 ok(/n5_expected_captured\(\{lit\(snapshot_id\)\}\)/.test(orch),
   '§2d the shard manifest derives from the CAPTURE, not the live table');
 
@@ -105,7 +120,7 @@ ok(/refusing a vacuous pass/i.test(ddl),
 // NOT NULL with no default and no generation expression, and the insert named neither.
 // It failed closed (one transaction, 0 rows written), but a structural pin is what turns
 // "the database refused it once" into "this cannot come back".
-const capture = (orch.match(/insert into preservation\.app_project_identity[\s\S]*?"capture"\)/) || [''])[0];
+const capture = (orch.match(/insert into preservation\.app_project_identity[\s\S]*?;/) || [''])[0];
 ok(capture.length > 0, '§7a the capture statement is still findable');
 for (const col of ['identity_hash', 'content_hash']) {
   ok(new RegExp(`\\b${col}\\b`).test(capture),
@@ -117,5 +132,40 @@ ok(/p\.record_kind, p\.source_ref/.test(capture),
   '§7c record_kind is selected from p, never written as a literal beside a hash of p.record_kind');
 ok(!/'development', p\.source_ref/.test(capture),
   '§7d the superseded literal form must not return');
+
+// ── §8 `open` IS ONE TRANSACTION, AND ITS TWO DEADLINES ARE ORDERED ─────────────────
+// open used to be five separate sql() calls. A failure between any two left a snapshot with
+// no generation, or a generation with no shards — the partial state an immutable capture is
+// meant to make impossible, and a client timeout reached it most easily because the capture
+// is the slow one. Composed into one transaction there are only two observable outcomes.
+const openFn = (orch.match(/def mode_open\(\)[\s\S]*?\n\ndef /) || [''])[0];
+ok(openFn.length > 0, '§8a mode_open is still findable');
+// Strip Python comment lines before counting. The function's own comment explains that it
+// "used to be FIVE separate sql() calls", and counting the bare token reads that sentence as
+// a call — the third time in this file that a name was mistaken for a call shape.
+const openCode = openFn.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+const openWrites = (openCode.match(/\bsql\(/g) || []).length
+                 - (openCode.match(/read_only=True/g) || []).length;
+ok(openWrites === 1,
+  `§8b open performs exactly ONE writing sql() call (found ${openWrites})`);
+ok(/begin;/.test(openFn) && /commit;/.test(openFn),
+  '§8c that call is an explicit transaction');
+for (const stmt of ['insert into preservation.app_project_identity',
+                    'insert into geo.n5_snapshot',
+                    'insert into geo.n5_generation',
+                    'insert into geo.n5_shard']) {
+  const before = openFn.indexOf('begin;'), after = openFn.indexOf('commit;');
+  const at = openFn.indexOf(stmt);
+  ok(at > before && at < after, `§8d ${stmt} is inside the transaction`);
+}
+ok(/set local statement_timeout/.test(openFn),
+  '§8e the capture raises the SERVER deadline for its own transaction only');
+// SERVER < CLIENT or a disconnect leaves an unreadable outcome. Asserted numerically, not
+// by the presence of the words — the ordering is the property, not the constants.
+const srv = (orch.match(/CAPTURE_STATEMENT_TIMEOUT = os\.environ\.get\([^,]+,\s*"(\d+)s"/) || [])[1];
+const cli = (orch.match(/CAPTURE_CLIENT_TIMEOUT = int\(os\.environ\.get\([^,]+,\s*"(\d+)"/) || [])[1];
+ok(srv && cli, '§8f both deadlines are declared as constants');
+ok(Number(cli) > Number(srv),
+  `§8g the CLIENT deadline must exceed the SERVER deadline (server ${srv}s, client ${cli}s)`);
 
 console.log(`n5-generation-contract: ${n} checks passed`);

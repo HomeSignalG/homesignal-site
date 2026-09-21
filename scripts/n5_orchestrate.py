@@ -50,6 +50,17 @@ WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')
 # ~12,700 rows and returns in well under a second. Deriving them also means the set declared
 # at activation is exactly the set that was built — one list, not two that can drift.
 CHUNKS = [c for c in os.environ.get("CHUNKS", "").split(",") if c.strip()]
+# THE CAPTURE'S TWO DEADLINES, and the ordering between them is the contract.
+# Measured 2026-09-21 on one z3 slice: 161,888 rows in 56.75 s = 351 us/row, of which
+# 242 us/row is the write path (preservation.guard_frozen fires BEFORE INSERT FOR EACH
+# ROW and re-queries protected_snapshot per row). The national capture is ~2.98M rows,
+# so ~17.4 minutes. The role default is 2min, which is why the first corrected `open`
+# died at 121 s inside guard_frozen.
+# SERVER < CLIENT, always. The server must abort and roll back before the client gives
+# up, or a disconnect leaves a transaction whose outcome the client cannot read.
+CAPTURE_STATEMENT_TIMEOUT = os.environ.get("CAPTURE_STATEMENT_TIMEOUT", "1800s").strip()
+CAPTURE_CLIENT_TIMEOUT = int(os.environ.get("CAPTURE_CLIENT_TIMEOUT", "2100"))
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -129,75 +140,114 @@ def mode_open():
         raise SystemExit(f"STOP: snapshot {snapshot_id} already has rows. A capture is "
                          f"immutable; refusing to append to one.")
 
-    # The cutoff is read ONCE and reused for the capture and the generation row, so the
-    # watermark the generation advertises is exactly the instant it captured.
-    cutoff = sql("select now() c;", "cutoff", read_only=True)[0]["c"]
-    say("capture cutoff", cutoff)
-
-    # identity_hash and content_hash are NOT NULL with NO default and NO generation
-    # expression, so the WRITER supplies them. The expressions below are the ones the legacy
-    # capture used (docs/preservation-baseline-phase1.sql), reproduced verbatim so the two
-    # snapshots' hashes remain comparable — a capture that invented its own hash would be
-    # incomparable with the baseline while looking complete. Verified against the stored
-    # legacy rows before use: zip like '300%' -> 161,297 compared, 161,297 match, 0 mismatch.
+    # ONE TRANSACTION, AND THAT IS THE WHOLE POINT.
     #
-    # record_kind is taken from p, NOT written as the literal 'development'. The WHERE clause
-    # already pins it to that value, so the two are equal today — but identity_hash HASHES
-    # record_kind, so hashing the column while storing a literal is a latent divergence the
-    # moment anyone widens the filter. One source, no second copy.
-    sql(f"""insert into preservation.app_project_identity
-              (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id,
-               record_kind, source_ref, submitted_at, lat, lng,
-               identity_hash, content_hash)
-            select {lit(snapshot_id)}, p.id, p.zip, p.source_key, p.source_seq, p.registry_id,
-                   p.record_kind, p.source_ref, p.submitted_at, p.lat, p.lng,
-                   decode(md5(coalesce(p.zip,'')||'|'||coalesce(p.source_key,'')||'|'||
-                              coalesce(p.source_seq::text,'')||'|'||coalesce(p.record_kind,'')||'|'||
-                              coalesce(p.registry_id,'')),'hex'),
-                   decode(md5(coalesce(p.source_ref,'')||'|'||coalesce(p.submitted_at::text,'')||'|'||
-                              coalesce(p.lat::text,'')||'|'||coalesce(p.lng::text,'')||'|'||
-                              coalesce(p.name,'')||'|'||coalesce(p.status,'')||'|'||
-                              coalesce(p.type,'')),'hex')
-              from public.app_projects p
-              join public.n5_expected_input({lit(cutoff)}) e
-                on e.source_key = p.source_key and e.zip = p.zip and e.source_seq = p.source_seq
-             where p.record_kind = 'development';""", "capture")
+    # This used to be FIVE separate sql() calls - capture, count, snapshot row, generation
+    # row, shard manifest - each its own transaction. Any failure between two of them left
+    # a snapshot with no generation, or a generation with no shards: exactly the partial
+    # state an immutable capture is supposed to make impossible. A client timeout produced
+    # it most easily, because the capture is the slow one.
+    #
+    # Composed into one transaction, a client that disconnects mid-flight can only observe
+    # one of two outcomes - the whole generation committed, or nothing at all. There is no
+    # third state to reconcile by hand, so `open` is safe to retry after a read.
+    #
+    # now() is the TRANSACTION timestamp, so every statement below shares one instant and
+    # the watermark the generation advertises is exactly the instant it captured. Reading
+    # it client-side first, as this did before, was a second clock for no reason.
+    say("statement_timeout (server)", CAPTURE_STATEMENT_TIMEOUT)
+    say("client timeout (must exceed)", f"{CAPTURE_CLIENT_TIMEOUT}s")
+    sql(f"""
+begin;
+set local statement_timeout = {lit(CAPTURE_STATEMENT_TIMEOUT)};
 
-    n = sql(f"select count(*) n from preservation.app_project_identity "
-            f"where snapshot_id={lit(snapshot_id)};", "capture rows", read_only=True)[0]["n"]
-    if int(n) == 0:
-        raise SystemExit("STOP: capture wrote 0 rows. Refusing to open a vacuous generation.")
-    say("captured rows", n)
+-- TOCTOU guards INSIDE the transaction. The read-only checks above give a fast, clear
+-- refusal; these are the ones that actually hold, because they cannot be overtaken.
+do $do$
+begin
+  if exists (select 1 from geo.n5_generation where generation_id = {lit(gen)}) then
+    raise exception 'STOP: generation % already exists', {lit(gen)};
+  end if;
+  if exists (select 1 from preservation.app_project_identity
+              where snapshot_id = {lit(snapshot_id)} limit 1) then
+    raise exception 'STOP: snapshot % already has rows; a capture is immutable', {lit(snapshot_id)};
+  end if;
+end
+$do$;
 
-    sql(f"""insert into geo.n5_snapshot (snapshot_id, taken_at, cutoff, scope, n_rows, notes)
-            values ({lit(snapshot_id)}, now(), {lit(cutoff)},
-                    'public.n5_expected_input(cutoff) - the canonical contract',
-                    {int(n)}, 'opened by n5_orchestrate.py')
-            on conflict (snapshot_id) do nothing;""", "snapshot row")
+insert into preservation.app_project_identity
+  (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id,
+   record_kind, source_ref, submitted_at, lat, lng, identity_hash, content_hash)
+select {lit(snapshot_id)}, p.id, p.zip, p.source_key, p.source_seq, p.registry_id,
+       p.record_kind, p.source_ref, p.submitted_at, p.lat, p.lng,
+       decode(md5(coalesce(p.zip,'')||'|'||coalesce(p.source_key,'')||'|'||
+                  coalesce(p.source_seq::text,'')||'|'||coalesce(p.record_kind,'')||'|'||
+                  coalesce(p.registry_id,'')),'hex'),
+       decode(md5(coalesce(p.source_ref,'')||'|'||coalesce(p.submitted_at::text,'')||'|'||
+                  coalesce(p.lat::text,'')||'|'||coalesce(p.lng::text,'')||'|'||
+                  coalesce(p.name,'')||'|'||coalesce(p.status,'')||'|'||
+                  coalesce(p.type,'')),'hex')
+  from public.app_projects p
+  join public.n5_expected_input(now()) e
+    on e.source_key = p.source_key and e.zip = p.zip and e.source_seq = p.source_seq
+ where p.record_kind = 'development';
 
-    sql(f"""insert into geo.n5_generation
-              (generation_id, snapshot_id, cutoff, state, note)
-            values ({lit(gen)}, {lit(snapshot_id)}, {lit(cutoff)}, 'BUILDING',
-                    'opened by n5_orchestrate.py');""", "generation row")
+-- A vacuous capture is refused INSIDE the transaction, so the refusal rolls the whole
+-- thing back rather than leaving an empty snapshot behind for someone to clean up.
+do $do$
+declare n bigint;
+begin
+  select count(*) into n from preservation.app_project_identity
+   where snapshot_id = {lit(snapshot_id)};
+  if n = 0 then
+    raise exception 'STOP: capture wrote 0 rows; refusing to open a vacuous generation';
+  end if;
+end
+$do$;
 
-    # Shard manifest derives from the CAPTURE, never from the canonical ZIP registry: a ZIP
-    # present in the capture but absent from the registry would otherwise be skipped in
-    # silence and the build would look complete.
-    # checksum is NOT NULL and load-bearing: run_shard compares the frozen slice against it
-    # and halts as FREEZE_DRIFT on a mismatch, so a manifest without one would either fail
-    # to insert or disable the very gate that catches a partial freeze. It is the SAME
-    # order-independent expression the freeze check uses — addition commutes, so no sort is
-    # involved and the two sides cannot disagree over row order or collation.
-    sql(f"""insert into geo.n5_shard
-              (snapshot_id, generation_id, z3, projects, pairs, zips, checksum, state)
-            select {lit(snapshot_id)}, {lit(gen)}, left(e.zip,3),
-                   count(distinct e.source_key), count(distinct e.source_key||'|'||e.zip),
-                   count(distinct e.zip),
-                   sum(('x'||substr(md5(e.source_key||'|'||e.zip||'|'
-                        ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
-                   'pending'
-              from public.n5_expected_captured({lit(snapshot_id)}) e
-             group by left(e.zip,3);""", "shard manifest")
+insert into geo.n5_snapshot (snapshot_id, taken_at, cutoff, scope, n_rows, notes)
+select {lit(snapshot_id)}, now(), now(),
+       'public.n5_expected_input(cutoff) - the canonical contract',
+       count(*), 'opened by n5_orchestrate.py'
+  from preservation.app_project_identity where snapshot_id = {lit(snapshot_id)}
+on conflict (snapshot_id) do nothing;
+
+insert into geo.n5_generation (generation_id, snapshot_id, cutoff, state, note)
+values ({lit(gen)}, {lit(snapshot_id)}, now(), 'BUILDING', 'opened by n5_orchestrate.py');
+
+-- The shard manifest derives from the CAPTURE, never from the canonical ZIP registry: a
+-- ZIP present in the capture but absent from the registry would otherwise be skipped in
+-- silence and the build would look complete. checksum is NOT NULL and load-bearing -
+-- run_shard compares the frozen slice against it and halts as FREEZE_DRIFT on a mismatch.
+-- It is the SAME order-independent expression the freeze check uses; addition commutes,
+-- so no sort is involved and the two sides cannot disagree on row order or collation.
+insert into geo.n5_shard
+  (snapshot_id, generation_id, z3, projects, pairs, zips, checksum, state)
+select {lit(snapshot_id)}, {lit(gen)}, left(e.zip,3),
+       count(distinct e.source_key), count(distinct e.source_key||'|'||e.zip),
+       count(distinct e.zip),
+       sum(('x'||substr(md5(e.source_key||'|'||e.zip||'|'
+            ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
+       'pending'
+  from public.n5_expected_captured({lit(snapshot_id)}) e
+ group by left(e.zip,3);
+
+commit;
+""", "capture+open (one transaction)", timeout=CAPTURE_CLIENT_TIMEOUT)
+
+    # Read the committed facts back rather than reporting what we intended to write.
+    r = sql(f"""select g.cutoff,
+                       (select count(*) from preservation.app_project_identity
+                         where snapshot_id = {lit(snapshot_id)}) rows,
+                       (select count(*) from geo.n5_shard
+                         where generation_id = {lit(gen)}) shards
+                  from geo.n5_generation g where g.generation_id = {lit(gen)};""",
+             "open readback", read_only=True)
+    if not r:
+        raise SystemExit("STOP: generation row absent after a reported-successful open.")
+    say("capture cutoff", r[0]["cutoff"])
+    say("captured rows", r[0]["rows"])
+    say("shards seeded", r[0]["shards"])
     say("generation opened", gen)
     return 0
 

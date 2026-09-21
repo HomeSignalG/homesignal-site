@@ -160,7 +160,12 @@ class SQLPayloadTooLarge(Exception):
     """
 
 
-def sql(query, tag="", raise_413=False, read_only=False):
+def sql(query, tag="", raise_413=False, read_only=False, timeout=None):
+    # timeout is the CLIENT deadline. It must always exceed the SERVER
+    # statement_timeout the query sets, so the server aborts and rolls back first
+    # and the client receives a real error instead of disconnecting from a
+    # transaction that is still running. A client that gives up first cannot tell
+    # a rollback from a commit, which is the ambiguous state this ordering removes.
     if read_only:
         assert_read_only(query, tag)
     retryable = SQL_RETRY_STATUS_READONLY if read_only else SQL_RETRY_STATUS
@@ -172,7 +177,7 @@ def sql(query, tag="", raise_413=False, read_only=False):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
                      "Accept": "application/json", "User-Agent": UA}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=900) as r:
+            with urllib.request.urlopen(req, timeout=(timeout or 900)) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             if e.code == 413 and raise_413:
