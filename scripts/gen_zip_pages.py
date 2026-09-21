@@ -102,6 +102,23 @@ def fetch_all(path, key, select, extra="", keyset="id"):
             return out
 
 
+# ---------------------------------------------- the upcoming-meetings boundary ----
+# THE BUILD-TIME HALF OF ONE DECISION. The live page's half is
+# lib/data.js::upcomingCutoffIso, which carries the full receipt; the short version is
+# that `meetings.meeting_date` is semantically a DATE (96.3% of upcoming rows sit at
+# exactly 06:00:00Z or 07:00:00Z - midnight MDT / MST-PDT), so comparing it against a
+# full `now` TIMESTAMP dropped a meeting from "upcoming" at local midnight on the day it
+# happens. The cutoff is the calendar DATE, never the instant.
+#
+# The date-only string is also what makes the line-213 assertion correct under plain
+# string comparison: "<today>T06:00:00+00:00" >= "<today>" is True (equal prefix, longer
+# string sorts after) while "<yesterday>T06:00:00+00:00" >= "<today>" is False.
+#
+# Pinned against the JS half by test/meetings-upcoming-window.test.mjs.
+def meeting_cutoff(now_iso):
+    return (now_iso or "")[:10]
+
+
 def fetch_data(key, now_iso):
     d = {}
     d["zips"] = [r["zip"] for r in fetch_all("canonical_zip_registry", key, "zip", keyset="zip")]
@@ -119,7 +136,7 @@ def fetch_data(key, now_iso):
     d["communities"] = fetch_all("communities", key, "id,name,parent_id,level,zip_codes")
     d["meetings"] = fetch_all("meetings", key,
                               "id,community_id,title,meeting_date,category,source_url",
-                              f"&meeting_date=gte.{urllib.parse.quote(now_iso)}")
+                              f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
     return d
 
 
@@ -210,7 +227,7 @@ def assemble(d, now_iso):
             # rendered under "Upcoming public meetings" is a false statement about a public
             # body, not a display nit. Caught by the fixture, which carries a 2020 row.
             rows.extend(m for m in mtgs_by_cid.get(cid, [])
-                        if (m.get("meeting_date") or "") >= now_iso)
+                        if (m.get("meeting_date") or "") >= meeting_cutoff(now_iso))
         rows.sort(key=lambda m: (m.get("meeting_date") or "", str(m.get("id"))))
         pl = places_of(c)
         keep = []
