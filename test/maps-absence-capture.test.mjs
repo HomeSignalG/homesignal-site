@@ -125,8 +125,18 @@ ok(/const zipFallback = async/.test(GEN_CODE),
   '5b₁: …including the ZIP fallback for a project that cannot truthfully be pinned');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');
-ok((GEN_CODE.match(/await attach\(d, objectPath, r, proj\)/g) || []).length === 1,
-  '5d: and so does the attach — neither path carries its own copy');
+// ⚠️ 5d USED TO PIN THE WHOLE ARGUMENT LIST, `await attach(d, objectPath, r, proj)`, and
+// went red the day `attach` correctly gained a parameter. Its point is that there is ONE
+// attach call site, not what that call's arity happens to be today — the same staleness
+// that a literal filename caused in the ingest repo's claim-guard pin. It asserts the
+// property now, with the argument it genuinely cares about named separately.
+const ATTACH_CALLS = GEN_CODE.match(/await attach\([^)]*\)/g) || [];
+ok(ATTACH_CALLS.length === 1,
+  `5d: and so does the attach — neither path carries its own copy (found ${ATTACH_CALLS.length})`);
+ok(ATTACH_CALLS.every((c) => /,\s*scope\)/.test(c)),
+  '5d₁: …and it hands attach the scope finishCapture computed, rather than letting attach '
+  + 'work it out again — a ZIP capture that re-derived its own scope is how the two halves '
+  + 'of one decision drift apart');
 
 const FIN = GEN_CODE.slice(GEN_CODE.indexOf('async function finishCapture'),
   GEN_CODE.indexOf('async function main'));

@@ -772,7 +772,7 @@ async function finishCapture(d, label, r, proj, results) {
   // Uploading after a successful attach would be worse: the row would name an object that
   // does not exist yet.
   await upload(objectPath, r.file);
-  const wrote = await attach(d, objectPath, r, proj);
+  const wrote = await attach(d, objectPath, r, proj, scope);
   if (!wrote.ok) {
     // The row moved while we were photographing it. Report it, leave the previous image and
     // the previous evidence untouched, and let the next run re-select it against whatever the
@@ -1021,8 +1021,29 @@ async function guardedPatch(draft, body) {
   return { ok: n === 1, rows: n };
 }
 
-/** Attach the image to THIS draft and record what the visual actually is. */
-async function attach(draft, objectPath, r, proj) {
+/** Attach the image to THIS draft and record what the visual actually is.
+ *
+ * 🔑 `scope` IS A REQUIRED ARGUMENT, NOT A RE-DERIVATION, and it is validated on entry.
+ * It used to be neither: the visual literal referenced a bare `scope`, which is a local of
+ * `finishCapture` and was never in this function's scope, while the capture key twenty
+ * lines further down re-derived it as `r.scope || (proj ? 'project' : 'zip')` — a second
+ * way to answer a question `finishCapture` had already answered, with `r.scope` never set
+ * by anything. The first of those threw `ReferenceError: scope is not defined` on the very
+ * first production ZIP fallback; the second would have gone on quietly agreeing with the
+ * real answer until the day it did not.
+ *
+ * ⚠️ NO OFFLINE TEST CAUGHT IT, and the reason is worth keeping: this module exports
+ * nothing and runs `main()` on import, so every test of it in this repo is a grep over its
+ * source. A structural pin cannot see an unbound identifier. The guard below turns that
+ * class of mistake into an immediate, named error instead of a ReferenceError raised deep
+ * inside an object literal, and `test/maps-capture-attach-executes.test.mjs` now actually
+ * RUNS this function.
+ */
+async function attach(draft, objectPath, r, proj, scope) {
+  if (scope !== 'project' && scope !== 'zip') {
+    throw new Error(`attach: scope must be 'project' or 'zip', got ${JSON.stringify(scope)} `
+      + '— finishCapture computes it once and must pass it through');
+  }
   const visual = {
     kind: r.absence ? 'map1_zip_screenshot_no_project' : 'map1_zip_screenshot',
     // ⚖️ SCOPE IS RECORDED ON THE VISUAL ITSELF, so a reader of the row knows what the
@@ -1130,7 +1151,7 @@ async function attach(draft, objectPath, r, proj) {
   // AT THE SCOPE THIS CAPTURE ACTUALLY RECORDED. The draft's own widest scope is only where
   // the attempt STARTED; a project-bearing draft demoted to the ZIP would otherwise be
   // stamped with a project key it was never given, and be unbound forever.
-  visual.capture_key = HS.mapsCaptureKey(draft, r.scope || (proj ? 'project' : 'zip'));
+  visual.capture_key = HS.mapsCaptureKey(draft, scope);
   visual.attempts = 0;
   visual.next_attempt_at = null;
   // A success clears the previous failure text rather than leaving it beside a real image,
