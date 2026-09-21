@@ -63,6 +63,30 @@ the evidence is missing, legacy, malformed or contradictory.
 argued: all 4 ordinary MAPS drafts with an image derive `theme=null`, are ungoverned, and
 their keys keep the same 11-field `v1|…` shape with no policy segment.
 
+### Re-measured at merge time (2026-09-21, immediately before merge) — the population moved by +1
+
+The table above is left as taken. Re-read immediately before merging, project-backed Data
+Center Theme rows are **9**, not 8. **Reconciled rather than absorbed** (Rule #0a — two
+sessions write this data): the other session merged `#533` *"Regenerate the 9 orphaned MAPS
+drafts; the orphan population is now zero"*, which is a MAPS draft regeneration and accounts
+for the delta. Everything that matters to this change is unchanged:
+
+| | then | now |
+|---|---:|---:|
+| project-backed Data Center Theme rows | 8 | **9** |
+| …carrying an image, i.e. due for replacement | 7 | **7** |
+| …carrying an image WITH current policy evidence | 0 | **0** |
+| approved or published rows in the whole table | 0 | **0** |
+
+**The last zero is the one that bounds the harm: nothing non-compliant has ever been
+approved or published, so the gap this closes is entirely prospective.**
+
+The Mesa regression row `78ee8931` re-read at the same moment: still `draft`, `revision` 2,
+same `image_bucket_path`, same `capture_key` (the 11-field `v1|…|datacenter` form, no policy
+segment), same `captured_at` `2026-09-20T20:47:37.227Z`, `capture_policy` still absent. Its
+`post_text` now opens with the `#529` question wording — another session's copy change, not
+this one's; **no permit, popup title or post text is rewritten here.**
+
 ## 4. Release sequence
 
 1. **Server first, then client.** The client gate lives in a page a browser can cache, so a
