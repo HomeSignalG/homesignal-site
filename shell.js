@@ -1796,15 +1796,26 @@
       // 'dev', which has no delivery pipeline. Scoped to the current place
       // because subscriptions are per (user, community): merging places here
       // would show a resident topics that another place's page will deliver.
-      const communityId = await currentCommunityId();
-      let canonical = {};
-      if (communityId) {
-        const res = await HS.sb().from('my_alert_subscriptions')
-          .select('stream, topic, origin, sort_order')
-          .eq('community_id', communityId);
-        if (res.error) throw res.error;
-        canonical = util.topicPrefsFromCanonicalRows(res.data);
-      }
+      // ONE read, then the place is chosen IN MEMORY. RLS already scopes
+      // my_alert_subscriptions to this resident, so fetching their rows costs one
+      // round trip and adds no second thing that can fail. Resolving the ZIP to a
+      // community is a HINT passed into selectPlaceRows, never the gate: it is a
+      // network call, and letting it decide meant a transient failure rendered "no
+      // topics selected" for a resident who has them -- the UI-says-off /
+      // delivery-says-on disagreement this model exists to end, reintroduced
+      // through an error path.
+      const zip = String(state.zip || '').trim();
+      const res = await HS.sb().from('my_alert_subscriptions')
+        .select('community_id, zip_code, stream, topic, origin, sort_order');
+      if (res.error) throw res.error;
+      let communityId = null;
+      try {
+        const ct = (HS.data && HS.data.communityGovTopics)
+          ? await HS.data.communityGovTopics(zip) : null;
+        communityId = (ct && ct.rootId) || null;
+      } catch (e) { communityId = null; }
+      const canonical = util.topicPrefsFromCanonicalRows(
+        util.selectPlaceRows(res.data, { communityId: communityId, zip: zip }));
       const localRes = await HS.sb().from('app_topic_prefs')
         .select('category, topics, share_consent')
         .eq('user_id', uid);
@@ -1817,17 +1828,6 @@
       state.topicPrefs = util.hydrateSignedInFailure();
       cacheTopicPrefs({}, uid);
     }
-  }
-  // The signed-in resident's current place, as a community id. Returns null when
-  // no ZIP is on file or the ZIP is not modelled yet -- in which case NO
-  // deliverable topics are shown, rather than another place's.
-  async function currentCommunityId() {
-    const zip = String(state.zip || '').trim();
-    if (!/^\d{5}$/.test(zip) || !HS.data || !HS.data.communityGovTopics) return null;
-    try {
-      const ct = await HS.data.communityGovTopics(zip);
-      return (ct && ct.rootId) || null;
-    } catch (e) { return null; }
   }
   HS.paintTopicCounts = function () {
     TOPIC_PREF_CATS.forEach(k => {
