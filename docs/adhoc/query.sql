@@ -48,10 +48,10 @@ union all select 15, 'DC project-backed blocked: which ZIPs',
          where evidence->>'theme'='datacenter' and coalesce(image_bucket_path,'')=''
            and evidence->>'project_id' is not null)
 union all select 16, 'DC no-image visual states',
-       (select coalesce(string_agg(s, ', '),'(none)') from (
-          select coalesce(evidence->'visual'->>'state','(no stamp)')||' x'||count(*) as s
+       (select coalesce(string_agg(st||' x'||n, ', ' order by st),'(none)') from (
+          select coalesce(evidence->'visual'->>'state','(no stamp)') as st, count(*) as n
             from maps where evidence->>'theme'='datacenter' and coalesce(image_bucket_path,'')=''
-           group by 1 order by 1) t)
+           group by 1) t)
 
 -- (c) 64165
 union all select 20, '64165 draft id',            (select id::text from dc)
