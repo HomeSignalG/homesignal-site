@@ -265,8 +265,20 @@ ok(/HS\.MAPS_CAPTURE_RETRY/.test(GEN), '10b: and the SHIPPED retry ladder');
 // stamps a PROJECT key on a ZIP-scope picture, which then never matches what
 // `mapsCaptureBound` computes for it — permanently unbound, the same shape as the null key
 // #1280 replaced for the absence post. The scope argument is the load-bearing half.
-ok(/visual\.capture_key = HS\.mapsCaptureKey\(draft, r\.scope \|\| \(proj \? 'project' : 'zip'\)\)/.test(GEN),
-  '10c: a successful capture records the binding key AT THE SCOPE IT SHOT');
+// 🛑 THIS PIN USED TO REQUIRE THE BUG. It matched the whole expression
+// `HS.mapsCaptureKey(draft, r.scope || (proj ? 'project' : 'zip'))` — so it pinned a
+// SECOND derivation of a fact `finishCapture` had already decided, with `r.scope` set by
+// nothing anywhere, as if that were the correct form. The comment above it was right and
+// the assertion underneath it was not, which is the most expensive shape a pin can take:
+// it would have gone red on the fix and green on the defect. It asserts the principle now
+// — the key is keyed on the scope that was PASSED IN — and §10c₁ forbids the re-derivation
+// coming back.
+ok(/visual\.capture_key = HS\.mapsCaptureKey\(draft, scope\)/.test(GEN),
+  '10c: a successful capture records the binding key AT THE SCOPE IT SHOT, from the value '
+  + 'finishCapture computed and handed to attach');
+ok(!/mapsCaptureKey\(draft, r\.scope/.test(GEN),
+  '10c₁: …and does not re-derive it — two answers to one question is how the halves of a '
+  + 'capture identity drift apart');
 ok(/attempted_key: HS\.mapsCaptureKey\(draft, scope\)/.test(GEN),
   '10d: a refusal records the inputs it was refusing, at the scope it attempted, so a later change can release the clock');
 ok(/const scope = proj \? 'project' : 'zip';/.test(GEN),
