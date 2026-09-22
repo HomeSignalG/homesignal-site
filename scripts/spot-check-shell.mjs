@@ -9,7 +9,7 @@ const SETTLE = Number(process.env.SETTLE_MS || 4000);
 const NEEDLES = [
   'Public Meeting and Public Hearing',                                   // Bear River WCD notice (Water districts & utilities)
   'Baltimore to begin blending river water with reservoir supply amid drought', // environmental Local News
-  'HP HOOD LLC - AGAWAM PLANT',                                          // EPA/ECHO facility, 01001
+  'AEROSPACE SUPPORT',                                                   // EPA/ECHO facility, 01001 (first by name)
   'Storm Sewer Repair or Replacement Roosevelt Avenue',                  // utility-sounding Development, 46205
 ];
 const browser = await chromium.launch();
