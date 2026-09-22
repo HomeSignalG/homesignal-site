@@ -289,6 +289,20 @@ begin
   res := res || jsonb_build_object('n','D2 refused: preserved + linked but no code_version','d',
     public.dc_step2a_expect_fail(format(call_fmt, r1, SHA, obs_ok, '5', quote_literal(REF)), 'records no code_version'));
   update public.dc_acquisition_run set code_version = 'deadbeef' where id = r1;
+  -- G2/H2: the wrongly-named object EXISTS at the claimed size -- only the naming rule can refuse these
+  insert into storage.objects (bucket_id, name, metadata) values
+    ('government-source-archive', 'dc_evidence/compute_atlas/' || SHA || '.json', jsonb_build_object('size', 5)),
+    ('government-source-archive', 'dc_evidence/__art_selftest__/' || repeat('cd',32) || '.json', jsonb_build_object('size', 5));
+  res := res || jsonb_build_object('n','G2 refused: an EXISTING object under another source','d',
+    public.dc_step2a_expect_fail(format(call_fmt, r1, SHA,
+      jsonb_build_array(jsonb_build_object('source_row_ordinal',0,'semantic_observation_fingerprint',FP1,'raw_payload','{}'::jsonb,'normalization_version','nv1',
+        'raw_payload_ref','storage://government-source-archive/dc_evidence/compute_atlas/' || SHA || '.json#row=0')),
+      '5', quote_literal('storage://government-source-archive/dc_evidence/compute_atlas/' || SHA || '.json')), 'must name its preserved artifact'));
+  res := res || jsonb_build_object('n','H2 refused: an EXISTING object whose name states a different hash','d',
+    public.dc_step2a_expect_fail(format(call_fmt, r1, SHA,
+      jsonb_build_array(jsonb_build_object('source_row_ordinal',0,'semantic_observation_fingerprint',FP1,'raw_payload','{}'::jsonb,'normalization_version','nv1',
+        'raw_payload_ref','storage://government-source-archive/dc_evidence/__art_selftest__/' || repeat('cd',32) || '.json#row=0')),
+      '5', quote_literal('storage://government-source-archive/dc_evidence/__art_selftest__/' || repeat('cd',32) || '.json')), 'must name its preserved artifact'));
   -- K: size mismatch
   res := res || jsonb_build_object('n','K refused: size differs from the preserved object','d',
     public.dc_step2a_expect_fail(format(call_fmt, r1, SHA, obs_ok, '4', quote_literal(REF)), 'preserved object holds'));
