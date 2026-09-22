@@ -649,14 +649,36 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     and are left exactly as they are. An earlier pass of this audit hand-typed `Benjamin` for
     84684 into a scratch query and **manufactured a finding that did not exist** — claims
     rule 7 in miniature. Generate the comparison; never transcribe the list.
-  - 📌 **COLORADO IS MEASURED AND DELIBERATELY NOT FIXED — 12 county disagreements over 140
-    pages, of which 2 are the documented cross-county collisions (`80003`, `80023`) and
-    **10 are unexplained**: 80010, 80011, 80020, 80163, 80227, 80247, 80504, 80534, 80603,
-    80654.** Broomfield became its own city-county in 2001 and `80020` is still filed under
-    Boulder. ⚠️ These are **NOT yet run through the centroid tiebreaker** that settled 84665,
-    and several may be legitimately split ZIPs where either county defends — so the count is a
-    LEAD, not a defect list. Also: CO has **140** ZIP pages where the build note above records
-    139. Its own unit, its own measurement; do not bolt it onto a Utah change.
+  - ✅ **COLORADO IS NOW DONE TOO — 2 of its 12 county disagreements were real, and the
+    other 10 are deliberately LEFT.** `docs/colorado-zip-identity-corrections-2026-09-22.sql`.
+    **80020 Broomfield → a new BROOMFIELD County root** (a consolidated city-and-county
+    since 2001, carved out of Boulder/Adams/Jefferson/Weld — so "Broomfield in Boulder
+    County" was 25 years stale, not a straddle, and the resident was shown Boulder's
+    commission); **80654 "Roggen" → Wiggins (80654) under a new MORGAN County root**
+    (the pinned source has 80652 = Roggen/Weld and 80654 = Wiggins/Morgan — two
+    different ZIPs). CO county roots 10 → 12.
+  - ⛔ **THE OTHER TEN ARE NOT DEFECTS AND MUST NOT BE "FIXED" FROM THE PACKAGE ALONE**
+    — 80003, 80010, 80011, 80023, 80163, 80227, 80247, 80504, 80534, 80603. They
+    genuinely STRADDLE county lines (Aurora spans Adams/Arapahoe/Douglas; Longmont,
+    Johnstown and Brighton each span two) or are PO-box ZIPs keyed to a post office
+    rather than an area; 80003/80023 are the documented first-county collision rule.
+    **What would settle them is a ZCTA↔county file carrying per-county SHARES, which
+    this repo does not have.** One unshared label is not enough to move a resident's
+    county government.
+  - 🔑 **THREE WITNESSES WERE TRIED IN COLORADO AND ALL THREE FAILED — do not redo
+    them.** (1) **The Utah centroid tiebreaker does not discriminate here**: all twelve
+    CO stored centroids are byte-identical to the package point, so centroid and county
+    field never contradict each other the way 84665's did. (2) **Permit-issuer
+    provenance is confounded** — `denver-*`, `aurora-building-permits`,
+    `adams-county-building-permits` and `weld-county-site-plan-review` all use
+    `spatial_zip_radius_mi` with **no native zip column**, so a source lands on a page
+    by 3–5 mile proximity, not jurisdiction; and the coverage gate runs `denver-*` on
+    80227 *because the row already says Denver*, which is circular. (3) **No county
+    geometry exists in-house** — `geo.zcta_boundary` has ZCTA polygons, there are no
+    county boundaries, and `app_projects` has no county or jurisdiction column.
+  - 📌 **SEPARATE, PRE-EXISTING, NOT TOUCHED: Colorado's tiles are far thinner than
+    Utah's** — notices **81/140**, local news **60/140**, meetings **55/140**, against
+    Utah's 310/310 on all three. That is a feed-wiring gap, not an identity defect.
 
 - ✅ **Box Elder is modeled per-ZIP (pattern A)** — county row = 7 county topics; Brigham
   City / Tremonton = their own council; each covered ZIP = its own `level=zip` page
