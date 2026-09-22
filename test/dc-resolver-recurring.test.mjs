@@ -69,5 +69,16 @@ ok(!/_res_existing|_res_new/.test(report), '7: report-only metrics never read ap
 // 8. No Stratos / Utah / ZIP special case anywhere in the resolver.
 ok(!/stratos|box elder|utah|84336|84307|lucin/i.test(fn), '8: no project- or place-specific logic');
 
+// 9. AUTOMATIC: the resolver runs on a DB-side schedule, current-run scope, idempotently.
+// A GitHub-hosted trigger would stop with Actions capacity; pg_cron does not.
+const sched = code.match(/cron\.schedule\('dc-resolve-canonical',\s*'([^']+)',\s*'([^']+)'\)/);
+ok(!!sched, '9: the DDL of record schedules dc-resolve-canonical in pg_cron');
+ok(!!sched && /^\S+ \* \* \* \*$/.test(sched[1]), '9b: at least hourly (every hour), so a new run is resolved within the hour');
+ok(!!sched && /dc_resolve_canonical\(true, false\)/.test(sched[2]),
+  '9c: the scheduled call APPLIES over the CURRENT run only (history backfill is one-time)');
+ok(/cron\.unschedule\(jobid\) from cron\.job where jobname = 'dc-resolve-canonical'/.test(code),
+  '9d: re-applying the DDL replaces the job instead of stacking a duplicate');
+ok((code.match(/cron\.schedule\('dc-resolve-canonical'/g) || []).length === 1, '9e: exactly one schedule');
+
 console.log(bad ? `\n${bad} FAILED (${n} checks)` : `\nALL CHECKS PASSED (${n} checks)`);
 if (bad) process.exit(1);

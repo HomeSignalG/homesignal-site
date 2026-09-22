@@ -873,3 +873,20 @@ CONFIRMED_MATCH and nothing else, computed as the equivalence classes of
 (source_key, distribution_key, publisher_record_id). p_include_history admits superseded runs so
 the historical duplicate test can prove they collapse onto one entity rather than minting
 duplicates.';
+
+-- ── AUTOMATIC RESOLUTION AFTER ACQUISITION (2026-09-22) ────────────────────────────────────
+-- Acquisition (ingest repo: ingest-compute-atlas.yml 09:40Z, ingest-epoch-ai.yml 10:10Z) writes
+-- evidence only; nothing turned that evidence into canonical entities except a person running
+-- this function by hand. The resolver is now safe to run repeatedly (above: an existing A1
+-- group re-uses its entity, a second run is a no-op -- measured 0 minted / 0 newly linked on the
+-- rerun), so it runs on a DB-side schedule, independent of GitHub Actions. Hourly rather than
+-- chained to a run's completion: it costs ~0.25s, a manual or re-run acquisition is picked up
+-- within the hour with no extra wiring, and a missed tick self-heals on the next one.
+-- Current-run scope only (p_include_history = false): the history backfill is a one-time act.
+do $cron$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'dc-resolve-canonical';
+  perform cron.schedule('dc-resolve-canonical', '25 * * * *',
+                        'select count(*) from public.dc_resolve_canonical(true, false)');
+end
+$cron$;
