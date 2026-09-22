@@ -788,6 +788,26 @@ async function finishCapture(d, label, r, proj, results) {
     ...(r.absence ? { absence: true } : { marker: r.marker, framed: r.framed }) });
 }
 
+// THE ZIP FALLBACK IS AT MODULE SCOPE SO ITS BODY CAN BE EXECUTED, not merely wired.
+// It was a closure inside `main()`, which made it unreachable from the offline suite: the
+// tests could assert that all five record-refusal exits CALL it and nothing about what it
+// then DOES. That is the shape this repo already names — a wiring pin reads as coverage
+// while the body it points at is never run — and it is why mutation F survived the whole
+// suite. Every value it needs is now an explicit parameter, which also removes the closure
+// class that produced `ReferenceError: scope is not defined` in #1287.
+async function zipMapFallback(page, d, label, results, why) {
+  const themeZ = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+  let rz;
+  try { rz = await captureAbsence(page, d, themeZ); }
+  catch (e) { rz = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
+  if (rz.theme === undefined) rz.theme = themeZ || null;
+  // The reason the picture is of the ZIP rides on the row, so a reader can tell a
+  // deliberate fallback from an absence answer. `proj` stays null, which is what makes
+  // `finishCapture` key and name it at ZIP scope.
+  if (rz.ok) rz.zip_scope_reason = why;
+  await finishCapture(d, label, rz, null, results);
+}
+
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
   const drafts = await selectDrafts();
@@ -879,18 +899,7 @@ async function main() {
     // verify the controls) still returns `{ok:false}` from `capture*()` and is still
     // recorded as CAPTURE_FAILED by `finishCapture`. Hiding a broken instrument behind a
     // weaker screenshot is the one thing the ruling explicitly forbids.
-    const zipFallback = async (why) => {
-      const themeZ = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
-      let rz;
-      try { rz = await captureAbsence(page, d, themeZ); }
-      catch (e) { rz = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
-      if (rz.theme === undefined) rz.theme = themeZ || null;
-      // The reason the picture is of the ZIP rides on the row, so a reader can tell a
-      // deliberate fallback from an absence answer. `proj` stays null, which is what makes
-      // `finishCapture` key and name it at ZIP scope.
-      if (rz.ok) rz.zip_scope_reason = why;
-      await finishCapture(d, label, rz, null, results);
-    };
+    const zipFallback = (why) => zipMapFallback(page, d, label, results, why);
 
     const proj = await liveProject(pid);
     if (!proj) { await zipFallback('the project row is no longer in app_projects'); continue; }

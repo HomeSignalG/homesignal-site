@@ -38,6 +38,11 @@ const ok = (c, m) => { if (c) { pass++; console.log('PASS — ' + m); }
 const SRC_PATH = new URL('../scripts/maps-social-image.mjs', import.meta.url);
 const SRC = fs.readFileSync(SRC_PATH, 'utf8');
 
+// Comment-stripped source, used by the structural pins below. Defined once, up here,
+// because §5 needs it too and a second copy is how two strippers drift apart.
+const CODE_EARLY = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/[^\n]*$/gm, '')
+                     .replace(/(^|[^:])\/\/[^\n]*$/gm, '$1');
+
 // ── §0 THE HARNESS PROVES ITS OWN TRANSFORMATION ─────────────────────────────────────
 const ENTRY = 'main().catch((e) => { console.error(e); process.exit(1); });';
 ok(SRC.includes(ENTRY),
@@ -55,9 +60,18 @@ ok(!stripped.includes(ENTRY) && stripped.length < SRC.length,
 // Both are asserted below rather than hoped for.
 const PW = "import { chromium } from 'playwright';";
 ok(SRC.includes(PW), '0b1: the playwright import is where the harness expects it');
+// `zipMapFallback` calls `captureAbsence`, which drives a real Playwright page. To execute
+// the FALLBACK's own body offline, the patched copy gets one injectable early return — the
+// same source-patch technique as the playwright stub above, and asserted the same way. The
+// real body is left intact and is still what runs when the global is unset.
+const ABS = 'async function captureAbsence(page, draft, theme) {';
+ok(SRC.includes(ABS), '0b3: the absence-capture declaration is where the harness expects it');
 const patched = stripped.replace(PW, "const chromium = { launch: async () => { throw new Error('stubbed'); } };")
-  + '\nexport { attach, finishCapture };\n';
+  .replace(ABS, ABS + ' if (globalThis.__TEST_ABSENCE) return globalThis.__TEST_ABSENCE(page, draft, theme);')
+  + '\nexport { attach, finishCapture, zipMapFallback };\n';
 ok(!patched.includes(PW), '0b2: …and the stub replaced it');
+ok(patched.includes(ABS + ' if (globalThis.__TEST_ABSENCE)'),
+  '0b4: …and the absence-capture injection point was spliced in');
 
 const dir = fs.mkdtempSync(path.join(path.dirname(new URL('.', import.meta.url).pathname), '.attach-harness-'));
 const file = path.join(dir, 'mod.mjs');
@@ -71,8 +85,13 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
 // a successful, non-raced write.
 const patches = [];
 globalThis.fetch = async (url, init = {}) => {
-  patches.push({ url: String(url), method: init.method || 'GET',
-                 body: init.body ? JSON.parse(init.body) : null });
+  // ⚠️ NOT EVERY BODY IS JSON. `upload()` sends the PNG bytes, and an unguarded
+  // `JSON.parse` there crashed the harness the first time §5 executed a path that uploads —
+  // a harness fault reported as a product failure. Record what was sent; parse only when it
+  // parses.
+  let parsed = null;
+  if (init.body) { try { parsed = JSON.parse(init.body); } catch { parsed = null; } }
+  patches.push({ url: String(url), method: init.method || 'GET', body: parsed });
   return { ok: true, status: 200, headers: new Map(),
            text: async () => '[{"id":"d1"}]', json: async () => [{ id: 'd1' }] };
 };
@@ -188,6 +207,82 @@ ok(/async function attach\(/.test(CODE) && !/fourth occurrence/i.test(CODE),
 ok(!/r\.scope\s*\|\|/.test(CODE),
   '4d: the second derivation is gone — nothing ever set that field, so it always fell '
   + 'through to re-deriving what finishCapture had already decided');
+
+// ── §5 THE ZIP FALLBACK'S BODY IS EXECUTED, NOT JUST WIRED ───────────────────────────
+// WHY THIS SECTION EXISTS: `zipFallback` was a closure inside `main()`, so nothing offline
+// could reach it. The suite could assert that all five record-refusal exits CALL it and
+// NOTHING about what it then did — which is why the mutation that guts its body survived
+// the entire set. Lifting it to module scope is what makes the assertions below possible;
+// they are the point of the lift, not a bonus.
+ok(mod && typeof mod.zipMapFallback === 'function',
+  '5a: `zipMapFallback` is reachable at module scope — the lift worked');
+
+if (mod && typeof mod.zipMapFallback === 'function') {
+  const zipDraft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS',
+                     evidence: { project_id: 'p1', theme: 'datacenter' } };
+
+  // — the SUCCESS path: a real ZIP picture, bound at ZIP scope, reason recorded —
+  globalThis.__TEST_ABSENCE = async () => okResult({});
+  patches.length = 0;
+  let results = [];
+  await mod.zipMapFallback({}, zipDraft, 'lbl', results, 'the project has no coordinates');
+  const row = results[0] || {};
+  ok(results.length === 1 && row.ok === true,
+    `5b: a successful ZIP capture produces one READY result (got ${JSON.stringify(row.state ?? row)})`);
+  const wrote = patches.filter((x) => x.method === 'PATCH');
+  const vis = wrote.length ? (wrote[wrote.length - 1].body?.evidence?.visual || {}) : {};
+  ok(vis.scope === 'zip',
+    `5c: …recorded at ZIP scope, because proj is passed as null (got ${JSON.stringify(vis.scope)})`);
+  ok(typeof vis.capture_key === 'string' && vis.capture_key.startsWith('v1|80210|'),
+    `5d: …and the key names THIS ZIP (got ${JSON.stringify(vis.capture_key)})`);
+  ok(!/^v1\|80210\|[0-9a-f-]{36}\|/.test(String(vis.capture_key || '')),
+    '5e: …and never names a record as the subject — the exact rule #560 dropped from SQL');
+  ok(vis.zip_scope_reason === 'the project has no coordinates',
+    `5f: the reason the picture is of the ZIP rides on the row (got ${JSON.stringify(vis.zip_scope_reason)})`);
+
+  // — the THROW path: caught, recorded as a failure, and the run is NOT aborted —
+  globalThis.__TEST_ABSENCE = async () => { throw new Error('browser exploded'); };
+  patches.length = 0;
+  results = [];
+  let threw = false;
+  try { await mod.zipMapFallback({}, zipDraft, 'lbl', results, 'whatever'); }
+  catch { threw = true; }
+  ok(!threw,
+    '5g: a capture that throws does not propagate — one bad draft must not abort the run');
+  const bad = results[0] || {};
+  ok(results.length === 1 && bad.ok === false && /capture threw/.test(String(bad.reason || '')),
+    `5h: …it is recorded as a real failure naming the throw (got ${JSON.stringify(bad.reason)})`);
+  const badWrote = patches.filter((x) => x.method === 'PATCH');
+  const badVis = badWrote.length ? (badWrote[badWrote.length - 1].body?.evidence?.visual || {}) : {};
+  ok(badVis.state === 'CAPTURE_FAILED' && /capture threw/.test(String(badVis.failure_reason || '')),
+    `5i: …and the row records a capture FAILURE, not a ZIP finding (got ${JSON.stringify(badVis.state)})`);
+
+  // ⚠️ THE FIRST VERSION OF 5j ASSERTED `badVis.zip_scope_reason === undefined` AND WAS
+  // VACUOUS — it passed with the guard deleted, which a mutation caught. Measured: on the
+  // failure path `finishCapture` routes to `recordOutcome`, which COMPOSES ITS OWN visual
+  // block and never reads `rz.zip_scope_reason`, so the field cannot reach the row whatever
+  // the guard does. A behavioural pin for this does not exist to be written. The guard is
+  // still worth keeping — it stops a failed capture from carrying a "we deliberately chose
+  // the ZIP map" reason internally — so it is pinned STRUCTURALLY, and this comment records
+  // that the weaker pin is the honest ceiling rather than an oversight.
+  ok(/if \(rz\.ok\) rz\.zip_scope_reason = why;/.test(CODE_EARLY),
+    '5j: the reason is attached only on success (structural — see the note above for why no '
+    + 'behavioural assertion is possible)');
+
+  delete globalThis.__TEST_ABSENCE;
+}
+
+// ── §6 …AND THE LIFT DID NOT COST THE WIRING PIN ─────────────────────────────────────
+// Both halves, for the same reason §4 keeps both: execution proves the body, the greps
+// prove every refusal still reaches it.
+ok(/^async function zipMapFallback\(page, d, label, results, why\)/m.test(SRC),
+  '6a: the fallback is declared at MODULE scope with every value passed explicitly — a '
+  + 'closure is what made it untestable, and what produced the #1287 ReferenceError');
+const fallbackCalls = (SRC.match(/await zipFallback\(/g) || []).length;
+ok(fallbackCalls === 5,
+  `6b: all five record-refusal exits still reach the fallback (found ${fallbackCalls})`);
+ok(/zipMapFallback\(page, d, label, results, why\)/.test(SRC),
+  '6c: …through a thin adapter that forwards the loop locals, so the call sites are unchanged');
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
