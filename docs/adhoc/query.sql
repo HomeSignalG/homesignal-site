@@ -1,22 +1,13 @@
 -- SCRATCH, read-only. Never merge.
 select json_build_object(
- 'counts', json_build_object(
-   'app_environmental_risk',(select count(*) from public.app_environmental_risk),
-   'echo_violation_counts',(select count(*) from public.echo_violation_counts),
-   'gov_actions',(select count(*) from public.gov_actions),
-   'gov_subjects',(select count(*) from public.gov_subjects),
-   'gov_action_relations',(select count(*) from public.gov_action_relations),
-   'source_registry',(select count(*) from public.source_registry),
-   'ev_source_check',(select count(*) from evidence.ev_source_check),
-   'ev_source_coverage',(select count(*) from evidence.ev_source_coverage),
-   'app_zip_geography_cutover',(select count(*) from public.app_zip_geography_cutover)),
- 'columns', (select json_object_agg(t, cols) from (
-    select table_schema||'.'||table_name t, json_agg(column_name||':'||data_type order by ordinal_position) cols
-    from information_schema.columns
-    where (table_schema,table_name) in (('public','app_environmental_risk'),('public','echo_violation_counts'),('public','gov_actions'),('public','gov_subjects'),('public','source_registry'),('evidence','ev_source_check'),('evidence','ev_source_coverage'),('public','app_changes'),('public','app_coverage_states'),('public','app_zip_geography_state'),('public','app_zip_geography_cutover'),('public','app_projects'),('public','development_reports'),('evidence','ev_facility'))
-    group by 1) s),
- 'app_coverage_states_def', pg_get_viewdef('public.app_coverage_states'::regclass),
- 'app_zip_geography_state_def', pg_get_viewdef('public.app_zip_geography_state'::regclass),
- 'geo_tables', (select json_agg(json_build_object('t',c.relname,'kind',c.relkind,'est',c.reltuples::bigint)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='geo' and c.relkind in ('r','v','m')),
- 'app_changes_categories', (select json_agg(json_build_object('cat',category,'n',n)) from (select category, count(*) n from public.app_changes group by 1 order by 2 desc) x)
+ 'geo_state', (select json_agg(json_build_object('s',geography_state,'n',n)) from (select geography_state, count(*) n from public.app_zip_geography_state group by 1) x),
+ 'coverage_state', (select json_agg(json_build_object('s',coverage_state,'o',regulatory_overlay_state,'n',n)) from (select coverage_state, regulatory_overlay_state, count(*) n from public.app_coverage_states group by 1,2) x),
+ 'stats', (select json_agg(json_build_object('t',tablename,'c',attname,'nd',n_distinct,'mcv',most_common_vals::text,'mcf',most_common_freqs::text)) from pg_stats where schemaname='public' and ((tablename='app_projects' and attname in ('record_kind','type','lens','date_kind','status','source_key_basis')) or (tablename='app_changes' and attname in ('lens','confidence','category')))),
+ 'source_registry', (select json_agg(json_build_object('id',source_id,'agency',agency_code,'prog',program_code,'kinds',subject_kinds,'rt',record_types,'status',connection_status)) from public.source_registry),
+ 'ev_source_check', (select json_agg(json_build_object('src',source_id,'status',status,'n',n)) from (select source_id,status::text,count(*) n from evidence.ev_source_check group by 1,2) x),
+ 'ev_source_coverage', (select json_agg(row_to_json(c)) from evidence.ev_source_coverage c),
+ 'echo_violation_counts', (select json_agg(row_to_json(e)) from public.echo_violation_counts e),
+ 'membership_cols', (select json_object_agg(table_name, cols) from (select table_name, json_agg(column_name||':'||data_type order by ordinal_position) cols from information_schema.columns where table_schema='geo' and table_name in ('zip_authoritative_membership','zip_authoritative_marker','maps_zip_geography_status','zcta_boundary','project_zip_association') group by 1) s),
+ 'fac_env_sample', (select json_agg(json_build_object('type',type,'type_raw',type_raw,'fe',facility_env,'src',source_ref,'prov',provenance)) from (select * from public.app_projects where zip='84302' and record_kind='facility' limit 3) f),
+ 'dev_type_sample_84302', (select json_agg(json_build_object('type',type,'type_raw',type_raw,'kind',record_kind,'name',left(name,80))) from (select * from public.app_projects where zip='84302' and record_kind='development' limit 8) d)
 );
