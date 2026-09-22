@@ -146,5 +146,25 @@ ok(JSON.stringify(probe.parsePermitKey('socrata:data.cityofchicago.org:ydr8-5enu
    && probe.parsePermitKey('epa_frs:1') === null,
   '6e permit keys parse exactly as the shipped connectors mint them; anything else is refused');
 
+// ── 7. Every Step 3C migration's DDL of record CONTAINS the statement that was applied ──────
+// Fingerprints read back from supabase_migrations.schema_migrations on 2026-09-22 (length+md5 of
+// the single applied statement). A DDL of record that is not the applied text cannot reproduce
+// production -- d76d96c committed a REVISION for two of these, which is what this pins against.
+const { createHash } = await import('node:crypto');
+const APPLIED = [
+  ['docs/dc-step3c-view-grants-fix.sql', '20260922164122', '-- STEP 3C · SAFETY FIX', 2681, 'eefe2851d6f40b03696667cc13763114'],
+  ['docs/dc-step3c-resident-lineage-ledger.sql', '20260922164240', '-- STEP 3C · THE RESIDENT LINEAGE LEDGER', 7500, 'a71a969daa076ae68415f617f5418ba4'],
+  ['docs/dc-step3c-ledger-distinct-record-grain.sql', '20260922184138', 'drop view if exists public.dc_resident_lineage_ledger;', 8655, '31bbe79389043ef4d0cf8bd96919098d'],
+];
+for (const [file, version, start, len, want] of APPLIED) {
+  const txt = fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+  const at = txt.indexOf(start);
+  // Measure in the same unit Postgres length() uses: characters, not UTF-16 code units.
+  const chars = [...txt.slice(at)];
+  const seg = chars.slice(0, len).join('');
+  const got = at < 0 ? 'START NOT FOUND' : createHash('md5').update(seg).digest('hex');
+  ok(txt.split(start).length === 2 && got === want, `7 ${version} applied statement is contained verbatim in ${file}`, got);
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);
