@@ -25,9 +25,12 @@ declare
   ours constant text[] := array[
     'dc_source','dc_acquisition_run','dc_source_observation',
     'dc_source_contract_stamp','dc_acquisition_run_guard','dc_source_observation_guard',
-    'dc_mark_run_advanced','dc_step2a_expect_fail','dc_step2a_expect_ok','dc_step2a_selftest'];
+    'dc_mark_run_advanced','dc_step2a_expect_fail','dc_step2a_expect_ok','dc_step2a_selftest',
+    -- Step 2B-1A. Listed here or the dependency check treats our OWN objects as somebody
+    -- else's and refuses a rollback that is in fact clean.
+    'dc_evidence_commit_guard','dc_complete_acquisition'];
   bad text;
-  n_runs bigint; n_obs bigint;
+  n_runs bigint; n_obs bigint; n_adv bigint;
 begin
   -- (a) a FOREIGN KEY from any table that is not one of ours
   select string_agg(format('FK %I.%I -> %s', ns.nspname, c.relname, t.relname), ', ')
@@ -72,6 +75,22 @@ begin
   end if;
 
   -- (d) report what is being destroyed; an unexpected non-zero is a reason to stop and look.
+  -- ⛔ STEP 2B-1A: REFUSE RATHER THAN DESTROY. Dropping dc_complete_acquisition and the
+  -- commit guard removes the only path that can produce an evidence-bearing SUCCESS_COMPLETE
+  -- and the only thing enforcing that one is honest. If ADVANCED COMPLETE runs already exist,
+  -- rolling back leaves their evidence standing with nothing defending its meaning -- which is
+  -- worse than either keeping the contract or removing it wholesale. Step 2A's own expectation
+  -- at rollback time is 0 runs / 0 observations, so this raises only where that is untrue.
+  select count(*) into n_adv from public.dc_acquisition_run
+   where completeness_state = 'SUCCESS_COMPLETE' and advanced_observations;
+  if n_adv > 0 then
+    raise exception
+      'REFUSING ROLLBACK: % ADVANCED COMPLETE acquisition run(s) hold committed evidence. '
+      'Rolling back would drop the contract that makes SUCCESS_COMPLETE mean "evidence is '
+      'present" while leaving the rows behind. Decide deliberately what happens to that '
+      'evidence first; this file will not decide it for you.', n_adv;
+  end if;
+
   select count(*) into n_runs from public.dc_acquisition_run;
   select count(*) into n_obs  from public.dc_source_observation;
   raise notice 'STEP 2A ROLLBACK: destroying % acquisition run(s) and % observation(s)', n_runs, n_obs;
@@ -103,6 +122,12 @@ drop function if exists public.dc_step2a_selftest();
 drop function if exists public.dc_step2a_expect_ok(text);
 drop function if exists public.dc_step2a_expect_fail(text,text);
 drop function if exists public.dc_mark_run_advanced();
+-- Step 2B-1A. The constraint trigger goes with its table below; the two functions are named
+-- explicitly here so an unexpected dependent makes Postgres refuse, rather than a CASCADE
+-- deciding on our behalf.
+drop function if exists public.dc_complete_acquisition(uuid,integer,text,text,integer,integer,
+  jsonb,integer,bigint,text,text,jsonb,text,text,timestamptz,timestamptz);
+drop function if exists public.dc_evidence_commit_guard();
 drop function if exists public.dc_source_observation_guard();
 drop function if exists public.dc_acquisition_run_guard();
 drop function if exists public.dc_source_contract_stamp();
