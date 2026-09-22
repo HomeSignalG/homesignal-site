@@ -52,7 +52,7 @@ const base = 'http://127.0.0.1:8819';
 // row — hidden when Regulatory is off, still drawn when every Type chip is off.
 const FACILITY = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
   src: 'EPA FRS · registry 110071955663', type: 'built', label: 'GENERIC EPA SITE 99',
-  scope: 'point', registry_id: '110071955663',
+  scope: 'point', registry_id: '110071955663', zip_membership: 'member',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 
 const mk = (n, ref, name, type, status) => ({

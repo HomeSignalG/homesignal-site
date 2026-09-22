@@ -1,0 +1,76 @@
+name: zip-membership-suite
+
+# ZIP MEMBERSHIP IS GEOGRAPHY, NOT PROXIMITY (docs/zip-membership-canonical.sql).
+# Runs the SHIPPED membership SQL against a DISPOSABLE PostGIS: 26 adversarial checks (a point
+# inside the ZIP but 12.4 mi from its centre, a point outside it 0.53 mi from its centre, a
+# boundary point, a missing boundary; every Type and every source), then three prohibited
+# mutations — centroid radius, a national-source bypass, a Data-center-only trigger — each of
+# which MUST fail the suite. The offline half (test/zip-membership-canonical.test.mjs) runs in
+# unit-tests.yml with every other offline suite.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/zip-membership-canonical.sql'
+      - 'docs/fix28-datacenter-zip-membership.sql'
+      - 'test/zip_membership_pg/**'
+      - 'test/zip-membership-canonical.test.mjs'
+      - 'lib/zip-authoritative.js'
+      - 'homesignalmap.html'
+      - '.github/workflows/zip-membership-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/zip-membership-canonical.sql'
+      - 'docs/fix28-datacenter-zip-membership.sql'
+      - 'test/zip_membership_pg/**'
+      - '.github/workflows/zip-membership-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  membership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zip_membership_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped functions pass; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/zip_membership_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/zm.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

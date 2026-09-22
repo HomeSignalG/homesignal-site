@@ -24,7 +24,10 @@ if (!/facUnavailable\s*:\s*!!row\.facilities_unavailable/.test(src)) {
 if (!/FAC_UNAVAILABLE\s*=\s*ZIP_MODE\s*&&\s*!!data\.facUnavailable/.test(src)) {
   failures.push('FAC_UNAVAILABLE is not derived from the server flag alone');
 }
-if (!/\$\("cFac"\)\.textContent\s*=\s*FAC_UNAVAILABLE\s*\?\s*"\\u2014"/.test(src)) {
+// (FAC_UNMEASURED joins it 2026-09-22: a ZIP-mode facility plane with no canonical membership
+// verdict is an unknown count too — docs/zip-membership-canonical.sql. The EPA-outage NOTE
+// stays keyed on FAC_UNAVAILABLE alone, pinned above.)
+if (!/\$\("cFac"\)\.textContent\s*=\s*\(FAC_UNAVAILABLE \|\| FAC_UNMEASURED\)\s*\?\s*"\\u2014"/.test(src)) {
   failures.push('#cFac does not render an em-dash when the EPA read failed');
 }
 // the note must exist and must take precedence over the facilities-only note

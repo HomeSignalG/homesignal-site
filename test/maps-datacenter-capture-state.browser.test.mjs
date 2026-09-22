@@ -92,14 +92,14 @@ const ZIP_AUTH = { [ZIP]: { zip: ZIP, mode: 'development', status: 'boundary_com
 // `categories: ['facility']` alone — no Type membership at all. It must never be on a Data
 // Center card, in either regulatory switch state.
 const FAC_ONLY = { e: 0.3, n: 0.4, lat: 39.3180, lng: -94.5740, type: 'built', scope: 'point',
-  label: 'UNCLASSIFIED FRS SITE', registry_id: '110005079495',
+  label: 'UNCLASSIFIED FRS SITE', registry_id: '110005079495', zip_membership: 'member',
   src: 'EPA FRS · registry 110005079495',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110005079495' };
 // A DUAL-IDENTITY DATA CENTRE (`categories: ['datacenter','facility']`, octagon + purple R).
 // It must STAY — it is a data centre — while its R follows the overlay's off state. This is
 // the one fixture that can tell "the overlay was turned off" apart from "the record was hidden".
 const FAC_DC = { e: 0.2, n: 0.25, lat: 39.3210, lng: -94.5770, type: 'built', scope: 'point',
-  layer: 'datacenter', label: 'NORTHLAND DATA HALL 3', registry_id: '110005079496',
+  layer: 'datacenter', label: 'NORTHLAND DATA HALL 3', registry_id: '110005079496', zip_membership: 'member',
   src: 'EPA FRS · registry 110005079496',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110005079496' };
 const ZIP_ROW = { [ZIP]: [{ zip: ZIP, home_lat: 39.3201, home_lng: -94.5762,

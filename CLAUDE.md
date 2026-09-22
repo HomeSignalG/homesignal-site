@@ -1860,6 +1860,61 @@ an outcome it cannot source**.
 
 ---
 
+## 7.08 ZIP MEMBERSHIP IS GEOGRAPHY, NOT PROXIMITY — ONE AUTHORITY FOR EVERY TYPE AND EVERY SOURCE (2026-09-22)
+
+**A ZIP-mode record belongs to the ZIP iff `ST_Intersects(point, authoritative ZCTA boundary)`,
+boundary-inclusive, and that decision has ONE owner:** `geo.zip_point_membership_in(boundary, lat,
+lng)` + `geo.zip_membership_boundary(zip)` (`docs/zip-membership-canonical.sql`). Verdicts
+`member | outside | not_measured | no_coordinates`. It takes no Type and no source.
+
+**The one client door is `HS.zipModeSites(report, authPayload, nationalSites)`**
+(`lib/zip-authoritative.js`). It admits only records carrying server evidence:
+`zip_authoritative: true` (N5 markers) or `zip_membership === 'member'` (stamped by the DB).
+No stamp, `outside`, `not_measured`, or an unknown value → not shown. It reads no coordinate,
+no distance, no Type field and no source field. **A new plane is added there, with evidence,
+or it does not reach the map.**
+
+What was found (production, 2026-09-22, no sampling):
+
+| population | before | owner after |
+|---|---|---|
+| authoritative development (`geo.zip_authoritative_marker`) | 1,004,080 markers, **0 outside** | unchanged (N5) |
+| national data-centre plane | `national_dc_for_zip(zip, 5)` = **5-mile centroid radius**: 8,369 placements, **7,355 outside** on 1,918 ZIP pages; **69 true members never served** (inside, >5 mi) | `public.national_dc_zip_members(zip)`: retrieval by the ZCTA polygon's extent, verdict per row. After: **1,083 served, 1,083 inside (independent `ST_Covers`), 0 outside, 0 missed** |
+| facility plane (`development_reports.sites` non-development points = EPA FRS) | 216,221 points, **103,724 outside**; every one a Type pin (§7.1: 0 untyped) — Fix 28 covered Data center only | the Fix 28 trigger, now plane-wide: every non-development point is stamped; `outside` is removed from the row and `counts.facilities` follows |
+
+- ⚖️ **DEVELOPMENT POINTS IN `development_reports` ARE CANDIDATES, NOT MEMBERS — never drop them
+  at the row.** They are the input to N5 (`n5_expected_input` reads `app_projects`, which
+  `app_refresh_zip` builds from these rows), and N5 unions candidates from every report — that is
+  what finds a record inside a large ZIP but beyond its own report's retrieval radius. Map 1 never
+  renders them (replaced by N5). Fix 28's Data-center removal of outside candidates is RETAINED
+  (it protects `app_changes`, a non-Map-1 surface) and now calls the canonical predicate.
+- 📌 **`app_changes` development items still come from those radius candidates** — a non-Map-1
+  surface this unit measured and did not change.
+- **A ZIP with no boundary (706 canonical ZIPs) shows no facility pins in ZIP mode and its
+  facility count is `—`**, never the engine's radius-derived number (`FAC_UNMEASURED`). The
+  verifier (`scripts/lib/verify-dev-helpers.mjs`) loads the page's own module to decide that.
+- **The facility plane is not a COMPLETE census of the ZIP** — EPA retrieval is still around the
+  centre, so a facility inside a large ZIP beyond that radius is absent. Every facility SHOWN is a
+  member; the tile still says *nearby*. Completeness there is an EPA-plane acquisition question.
+- **Stratos, by boundary:** Compute Atlas places *Stratos AI Data Center Campus* at (41.5,
+  −113.5), `exact` — a suspiciously round value. It is a **member of 84313 (Grouse Creek)**,
+  15.3 mi from that ZIP's centroid (a 5-mile rule would have excluded it), and **outside 84336
+  (Snowville)**. Compute Atlas / Epoch live in `dc_*` (acquisition only); nothing on Map 1 reads
+  them yet. When they reach Map 1 they go through `national_dc_zip_members` / the door above.
+- **Gates:** `test/zip-membership-canonical.test.mjs` (offline, 40+ checks, including two in-test
+  mutations) and `.github/workflows/zip-membership-suite.yml` → `test/zip_membership_pg/run.sh`
+  (26 checks on a disposable PostGIS against the shipped SQL, then centroid-radius,
+  national-bypass and Data-center-only mutations that must each FAIL it). The same suite ran
+  **26/26 against production inside a rolled-back transaction**.
+- ⛔ **THE BACKFILL RESTARTED PRODUCTION POSTGRES ONCE (22:27:21Z).** Four concurrent ~50 MB
+  `update … set sites = sites` batches through the MCP connector preceded a silent restart (no
+  Postgres error logged — consistent with the container being killed on memory). Every batch
+  was atomic; nothing was half-written. **Never run concurrent bulk rewrites of
+  `development_reports`.** The backfill was finished by one sequential, self-unscheduling job
+  (`zip-membership-backfill-once`, ≤ ~3 MB compressed per minute, `SKIP LOCKED`).
+- ⏳ **MERGE PRECONDITION for the client change:** every facility-plane point stamped. Until then
+  an unstamped row's facilities are hidden (fail closed), which is honest but degrades the page.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

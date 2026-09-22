@@ -217,7 +217,9 @@ console.log('\n11. The local connector pipeline and default filters are untouche
   // The two sibling reads in the same Promise.all keep their exact prior behaviour.
   ok(/p_kind: "development", p_authoritative: true/.test(mapExec),
     '11a the authoritative local read is unchanged');
-  ok(/HS\.zipAuthMergeSites\(row\.sites\|\|\[\], authSites\)\.concat\(natlSites\)/.test(mapExec),
+  // 2026-09-22: the concat moved INTO the one ZIP-mode door (HS.zipModeSites), which merges the
+  // local planes first and appends only national records carrying a 'member' verdict.
+  ok(/HS\.zipModeSites\(row\.sites\|\|\[\], auth, natlSites\)/.test(mapExec),
     '11b local merge still runs first; national is concatenated, never substituted');
   ok(/app_projects_for_zip/.test(readFileSync(join(root, 'lib/data.js'), 'utf8')),
     '11c projects()/facilities() still read app_projects — local pipeline untouched');
