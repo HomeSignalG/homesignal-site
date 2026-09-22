@@ -18,6 +18,11 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Canonical owner of ZIP geography semantics: lib/data.js::rpcAllRows classifies
+     app_projects_for_zip's {unavailable, zip_geography_status} envelope through
+     HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
+     verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
+<script src="lib/zip-authoritative.js?v=20260922a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
@@ -65,7 +70,21 @@ HS.onReady(async function () {
   // 443 of the 801 all-empty pages, where no registry entry covers the county at all and
   // so nothing is being read. Contract + the six bans on this copy: lib/coverage-copy.js.
   var coverageHTML = '';
-  if (!projects.length && !facilities.length && community) {
+  // SAME DEFECT CLASS AS THE ZIP PAGE'S DEVELOPMENT SECTION, one page over — and it is the
+  // SAME producer, so this is the shared contract being honoured rather than a second fix.
+  // `app_projects_for_zip` answers a ZIP whose whole-ZIP geography is not established with
+  // {unavailable:true, zip_geography_status}; lib/data.js::rpcAllRows carries that verdict
+  // on the array (classified by the one owner, lib/zip-authoritative.js). Without consulting
+  // it, `!projects.length` reads a REFUSAL as an empty area and this page states "Nothing on
+  // the public record near here yet" over 709 of 12,722 canonical ZIPs. Fail closed: the
+  // test is for the VALUE, never for the absence of a failure.
+  var devOutcome = (projects && projects.outcome) || 'unavailable';
+  var devReadComplete = projects.complete === true && devOutcome === 'complete';
+  var devUnreadNote = devReadComplete ? ''
+    : (window.HS && HS.zipAuthUnmeasuredFact ? HS.zipAuthUnmeasuredFact(devOutcome, S.zip) : '');
+  // The coverage block NAMES SOURCES and asserts what was checked (lib/coverage-copy.js),
+  // so it may only be built on a read that actually happened.
+  if (devReadComplete && !projects.length && !facilities.length && community) {
     try {
       // Civic notices ride a different rail (app_changes) than map markers (app_projects),
       // and a page with government notices is NOT empty — 20 pages differ on exactly this,
@@ -124,9 +143,21 @@ HS.onReady(async function () {
         // That is unsupportable wherever no registry entry covers the county, so it is gone
         // from BOTH branches: the rich block when we can name what we draw on, and
         // otherwise a sentence that states only what the page holds.
-        body = coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
-          + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
-          + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>');
+        // "Nothing on the public record near here yet" is a VERIFIED-ABSENCE claim and is
+        // reachable only on a complete authoritative read. Where the read was refused or
+        // failed, the page states what is true of the READ — the words come from the one
+        // owner (HS.zipAuthUnmeasuredFact), with no address-box invitation appended because
+        // this page has none. Library absent -> no sentence at all, which claims nothing.
+        body = coverageHTML || (devReadComplete
+          ? ('<div class="card" style="text-align:center;padding:26px 18px">'
+            + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
+            + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>')
+          // No invented heading here: the owner's sentence is the whole statement, and a
+          // headline would have to say something this page has not established.
+          : (devUnreadNote
+            ? '<div class="card" style="text-align:center;padding:26px 18px">'
+              + '<p class="sowhat" style="margin:0">' + HS.esc(devUnreadNote) + '</p></div>'
+            : ''));
       } else {
         body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
       }
