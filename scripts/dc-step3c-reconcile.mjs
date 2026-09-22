@@ -197,7 +197,7 @@ export async function shippedClassifier() {
 }
 
 // ── LIVE MODE ──────────────────────────────────────────────────────────────────────────────
-async function query(sql) {
+export async function query(sql) {
   const token = (process.env.SUPABASE_ACCESS_TOKEN || '').trim();
   const ref = (process.env.SUPABASE_PROJECT_REF || 'qwnnmljucajnexpxdgxr').trim();
   if (!token) throw new Error('SUPABASE_ACCESS_TOKEN is not set -- refusing rather than reporting a reconciliation it never read');
@@ -216,6 +216,12 @@ async function query(sql) {
   return JSON.parse(text);
 }
 
+// The ONE reader of the reconciliation plane. Anything else that needs the ledger (e.g. the
+// publisher probe) calls this, so the isolation gate can keep a single permitted reader.
+export async function readLedger() {
+  return query('select * from public.dc_resident_lineage_ledger');
+}
+
 function md5(s) { return import('node:crypto').then((c) => c.createHash('md5').update(s).digest('hex')); }
 
 // The candidate superset, restated here ONLY to count it independently of the view. It must
@@ -231,7 +237,7 @@ export const CONTROLS_SQL = `select
     where s.status = 'boundary_complete')::int as osm_reachable_via_rpc`;
 
 async function main() {
-  const ledger = await query('select * from public.dc_resident_lineage_ledger');
+  const ledger = await readLedger();
   const [controls] = await query(CONTROLS_SQL);
   const isResidentDC = await shippedClassifier();
   const { summary, problems, records } = reconcile(ledger, { isResidentDC, controls });

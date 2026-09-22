@@ -1,0 +1,34 @@
+name: dc-step3c-probe
+
+# STEP 3C — ask the ORIGINAL publishers (OpenStreetMap via Overpass, EPA ECHO) what they still
+# publish for the data-centre records residents see. READ-ONLY: writes no evidence, no run, no
+# registry row. It measures whether onboarding through dc_evidence_writer is possible; it is not
+# the onboarding.
+#
+# No schedule. It runs when the probe itself changes and on manual dispatch. EPA is asked at
+# ~1 request / 1.2 s (~6 min for the resident facilities); Overpass once, by element id.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/dc-step3c-probe-publishers.mjs'
+      - '.github/workflows/dc-step3c-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: probe the original publishers (read-only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/dc-step3c-probe-publishers.mjs
