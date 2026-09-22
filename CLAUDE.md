@@ -626,6 +626,38 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   scoped by the ancestor topic set so sibling towns don't leak), and the **generated,
   level-grouped, ZIP-scoped government popup** — plus **separate Notices / Meetings tiles**.
   Subscriptions anchor to the chain **root**, so no subscriber is switched between communities.
+- ⚠️ **UTAH AND COLORADO PREDATE THE `zipcodes` CONVENTION, SO THEIR ZIP IDENTITIES ARE
+  HAND-DERIVED AND MUST BE VERIFIED AGAINST THE PINNED SOURCE — not assumed correct because
+  the pages render.** Every build from **Michigan onward** generated `name`/`county`/`parent`
+  from **`zipcodes` PyPI v3.0.0** (§12.0). UT and CO did not. Measured 2026-09-22 by generating
+  the comparison from the package (never transcribing it): **Utah — 1 county disagreement in
+  310 pages**, corrected in `docs/utah-zip-identity-corrections-2026-09-22.sql`
+  (84665 Lake Shore/Utah → **Sterling/Sanpete**, plus 84059 Vineyard, 84332 Providence,
+  84333 Richmond).
+  - 🔑 **THE WITNESS IS THE OTHER HALF OF THE SYSTEM, NOT THE PACKAGE ALONE.** 84665's stored
+    `development_reports.home_lat/home_lng` was already **39.1936,-111.6924 — Sterling** —
+    because the development pipeline consumes the pinned source while the community row was
+    typed by hand. **When two halves disagree, the generated half is the evidence.** That
+    also means a wrong ZIP identity is detectable *without* the package: compare each ZIP's
+    stored centroid against the county its community row claims.
+  - ⚠️ **A LABEL MISMATCH IS USUALLY *US* BEING RIGHT.** 14 Utah names disagree with USPS and
+    **10 are deliberate and better** — Murray, Holladay, Taylorsville, Cottonwood Heights and
+    University of Utah are real incorporated cities that USPS files under the *mailing* label
+    "Salt Lake City". Never "correct" those toward USPS. The discriminator is **county and
+    parent**, not the display name.
+  - ⛔ **DO NOT GUESS A ZIP THE PACKAGE DOES NOT CARRY.** `84684`/`84685` are absent from it
+    and are left exactly as they are. An earlier pass of this audit hand-typed `Benjamin` for
+    84684 into a scratch query and **manufactured a finding that did not exist** — claims
+    rule 7 in miniature. Generate the comparison; never transcribe the list.
+  - 📌 **COLORADO IS MEASURED AND DELIBERATELY NOT FIXED — 12 county disagreements over 140
+    pages, of which 2 are the documented cross-county collisions (`80003`, `80023`) and
+    **10 are unexplained**: 80010, 80011, 80020, 80163, 80227, 80247, 80504, 80534, 80603,
+    80654.** Broomfield became its own city-county in 2001 and `80020` is still filed under
+    Boulder. ⚠️ These are **NOT yet run through the centroid tiebreaker** that settled 84665,
+    and several may be legitimately split ZIPs where either county defends — so the count is a
+    LEAD, not a defect list. Also: CO has **140** ZIP pages where the build note above records
+    139. Its own unit, its own measurement; do not bolt it onto a Utah change.
+
 - ✅ **Box Elder is modeled per-ZIP (pattern A)** — county row = 7 county topics; Brigham
   City / Tremonton = their own council; each covered ZIP = its own `level=zip` page
   inheriting the county. Full tree in `docs/box-elder-communities-seed.sql`.
