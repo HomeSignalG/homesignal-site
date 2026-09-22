@@ -19,6 +19,7 @@ on:
       - 'scripts/dc-step3c-reconcile.mjs'
       - 'test/dc-step3c-reconcile.test.mjs'
       - 'docs/dc-step3c-*.sql'
+      - 'lib/templates.js'
       - 'lib/map.js'
       - 'lib/zip-authoritative.js'
       - 'lib/residential-qualify.js'
