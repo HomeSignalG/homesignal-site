@@ -284,6 +284,11 @@ begin
     res := res || jsonb_build_object('n','J could not stage a storage row for the positive path','d', sqlerrm);
     raise exception 'ART_TEST %', res;
   end;
+  -- D2: everything valid and preserved EXCEPT code_version -- only the code_version rule can refuse this
+  update public.dc_acquisition_run set code_version = null where id = r1;
+  res := res || jsonb_build_object('n','D2 refused: preserved + linked but no code_version','d',
+    public.dc_step2a_expect_fail(format(call_fmt, r1, SHA, obs_ok, '5', quote_literal(REF)), 'records no code_version'));
+  update public.dc_acquisition_run set code_version = 'deadbeef' where id = r1;
   -- K: size mismatch
   res := res || jsonb_build_object('n','K refused: size differs from the preserved object','d',
     public.dc_step2a_expect_fail(format(call_fmt, r1, SHA, obs_ok, '4', quote_literal(REF)), 'preserved object holds'));
