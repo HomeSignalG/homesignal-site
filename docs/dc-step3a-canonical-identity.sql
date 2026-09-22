@@ -285,7 +285,9 @@ makes a wrong merge or split repairable without destroying evidence.';
 
 create table if not exists public.dc_entity_observation (
     canonical_entity_id           uuid not null references public.dc_canonical_entity(canonical_entity_id) on delete cascade,
-    home_signal_observation_id    uuid not null references public.dc_source_observation(home_signal_observation_id),
+    -- NOT a foreign key to dc_source_observation -- see SECTION 3A below. The reference is
+    -- enforced by trigger, because an FK here pre-empts Step 2A's own TRUNCATE guard.
+    home_signal_observation_id    uuid not null,
     source_key                    text not null,
     distribution_key              text not null,
     publisher_record_id           text,
@@ -310,8 +312,8 @@ classification and the decision that linked it. Evidence is referenced, never mu
 
 create table if not exists public.dc_identity_decision (
     decision_id        uuid primary key default gen_random_uuid(),
-    observation_a      uuid not null references public.dc_source_observation(home_signal_observation_id),
-    observation_b      uuid not null references public.dc_source_observation(home_signal_observation_id),
+    observation_a      uuid not null,   -- enforced by trigger, not FK (SECTION 3A)
+    observation_b      uuid not null,   -- enforced by trigger, not FK (SECTION 3A)
     decision_state     text not null,
     candidate_rule_key text not null,
     decision_rule_key  text not null,
@@ -340,6 +342,87 @@ alter table public.dc_identity_decision   enable row level security;
 revoke all on public.dc_canonical_entity   from anon, authenticated;
 revoke all on public.dc_entity_observation from anon, authenticated;
 revoke all on public.dc_identity_decision  from anon, authenticated;
+
+-- =============================================================================================
+-- SECTION 3A — THE CANONICAL->EVIDENCE REFERENCE IS A TRIGGER, NOT A FOREIGN KEY
+-- =============================================================================================
+--
+-- 🛑 THE FIRST VERSION OF THIS FILE USED FOREIGN KEYS, AND MY OWN POST-APPLY REGRESSION FOUND
+--    THE DEFECT. An FK referencing public.dc_source_observation makes Postgres refuse TRUNCATE
+--    on that table for an FK reason, which PRE-EMPTS Step 2A's own immutability guard. Measured
+--    immediately after the first apply:
+--
+--      dc_step2a_selftest 08 TRUNCATE of observations refused
+--        -> WRONG ERROR [0A000] cannot truncate a table referenced in a foreign key constraint
+--           (expected to match: immutable historical evidence)
+--      dc_step2a_selftest 28 TRUNCATE of the evidence tables refused  -> the same.
+--
+--    Step 2A went 72 -> 70 passing. **Protection was never weakened** -- TRUNCATE stayed
+--    refused, arguably harder -- but a frozen guard could no longer PROVE it still guards, and
+--    this repo treats that as a defect in its own right. Same shape as #1289 ("a check Postgres
+--    pre-empted said WRONG ERROR, not NOT EXERCISED"), one level over.
+--
+-- 🔑 AND THE FK WAS GUARDING A STATE THAT CANNOT OCCUR. Probed live before changing anything:
+--      DELETE on dc_source_observation -> REFUSED [P0001] "immutable historical evidence"
+--      UPDATE on dc_source_observation -> REFUSED [P0001] "immutable historical evidence"
+--      triggers installed: dc_source_observation_guard_trg (ROW),
+--                          dc_source_observation_truncate_trg (STMT)
+--    An observation can never be deleted or truncated, so an ORPHANED canonical link is
+--    impossible by construction of the frozen evidence plane. The FK's only measurable effect
+--    on this system was to break two of the guards that make it impossible.
+--
+-- ✅ THE ONE REAL THING THE FK CAUGHT IS KEPT: a resolver bug inserting a link whose uuid was
+--    never an observation. That is a write-time check, and a trigger performs it without
+--    creating the dependency that blocks TRUNCATE. Verified in BOTH directions after applying:
+--      invented uuid -> REFUSED "canonical resolution may only reference REAL evidence"
+--      real uuid     -> ACCEPTED   (so it is not a blanket deny)
+--    and Step 2A returned to 72 passing.
+--
+-- Applied as migration 20260922154759 dc_step3a_reference_by_trigger_not_fk_20260922.
+
+create or replace function public.dc_canonical_reference_guard()
+returns trigger
+language plpgsql
+as $reffn$
+declare
+    v_missing uuid;
+begin
+    if tg_table_name = 'dc_entity_observation' then
+        if not exists (select 1 from public.dc_source_observation o
+                        where o.home_signal_observation_id = new.home_signal_observation_id) then
+            v_missing := new.home_signal_observation_id;
+        end if;
+    else
+        if not exists (select 1 from public.dc_source_observation o
+                        where o.home_signal_observation_id = new.observation_a) then
+            v_missing := new.observation_a;
+        elsif not exists (select 1 from public.dc_source_observation o
+                           where o.home_signal_observation_id = new.observation_b) then
+            v_missing := new.observation_b;
+        end if;
+    end if;
+
+    if v_missing is not null then
+        raise exception
+          'canonical resolution may only reference REAL evidence: no dc_source_observation %',
+          v_missing;
+    end if;
+    return new;
+end;
+$reffn$;
+
+drop trigger if exists dc_entity_observation_reference_trg on public.dc_entity_observation;
+create trigger dc_entity_observation_reference_trg
+    before insert or update on public.dc_entity_observation
+    for each row execute function public.dc_canonical_reference_guard();
+
+drop trigger if exists dc_identity_decision_reference_trg on public.dc_identity_decision;
+create trigger dc_identity_decision_reference_trg
+    before insert or update on public.dc_identity_decision
+    for each row execute function public.dc_canonical_reference_guard();
+
+-- ⛔ DO NOT "TIDY" THESE BACK INTO FOREIGN KEYS. Doing so silently takes Step 2A from 72 to 70
+--    passing checks, and the two it breaks are the ones proving the evidence plane is immutable.
 
 -- =============================================================================================
 -- SECTION 4 — CANDIDATE GENERATION
