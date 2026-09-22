@@ -260,6 +260,8 @@ async function renderZipPage(page, zip) {
     return {
       rendered: sites,
       facText: (document.getElementById('cFac') || {}).textContent || null,
+      // what the page's facility read returned (public.zip_mode_report_sites): status + member count
+      zipFacilities: window.__HS_ZIP_FACILITIES || null,
       mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
       mislabeled,
       shell: !!document.querySelector('.side, .nav'),                 // new left-sidebar shell present

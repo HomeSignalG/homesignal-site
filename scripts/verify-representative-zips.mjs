@@ -195,6 +195,8 @@ async function verifyZipPage(page, spec, cached) {
         countyBadges,
         propertyLinks,
         facText: (document.getElementById('cFac') || {}).textContent || '',
+        // what the page's facility read returned (public.zip_mode_report_sites): status + member count
+        zipFacilities: window.__HS_ZIP_FACILITIES || null,
         devText: (document.getElementById('cDev') || {}).textContent || '',
         shell: !!document.querySelector('.side, .nav'),
       };

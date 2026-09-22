@@ -17,6 +17,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -164,6 +165,7 @@ await page.route('**/*', async (route) => {
     calls.push({ kind: 'hydrate', url });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECTS) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
   if (url.includes('/rest/v1/development_reports')) {
     calls.push({ kind: 'zipcache', url });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW) });

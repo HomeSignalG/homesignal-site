@@ -1860,6 +1860,75 @@ an outcome it cannot source**.
 
 ---
 
+## 7.08 ZIP MEMBERSHIP IS GEOGRAPHY, NOT PROXIMITY — ONE AUTHORITY, EVERY PLANE (2026-09-22)
+
+**A ZIP-mode record belongs to the ZIP iff `ST_Intersects(point, authoritative ZCTA boundary)`,
+boundary-inclusive. The point predicate has ONE owner:** `geo.zip_point_membership_in(boundary,
+lat, lng)` + `geo.zip_membership_boundary(zip)` (`docs/zip-membership-canonical.sql`). Verdicts
+`member | outside | not_measured | no_coordinates`; it takes no Type and no source.
+
+**Every ZIP-mode site is assembled by `HS.zipModeSites(report, authPayload, nationalSites)`**
+(`lib/zip-authoritative.js`), which reads server evidence only — never a coordinate, distance,
+Type or source field. A new plane is added there, with evidence, or it does not reach the map.
+
+Measured on production 2026-09-22, every canonical ZIP, no sampling:
+
+| plane | before | now |
+|---|---|---|
+| authoritative development (N5 markers) | 1,004,080 markers, **0 outside** | unchanged |
+| national data-centre plane | `national_dc_for_zip(zip, 5)` — a **5-mile centroid radius**: 8,369 placements, **7,355 outside** on 1,918 pages, **69 inside-but->5 mi never served** | `public.national_dc_zip_members(zip)` (polygon extent + canonical verdict per row): **1,083 served, 1,083 inside (independent `ST_Covers`), 0 outside, 0 missed** — live in the DB; the page switches on merge |
+| facility plane (EPA FRS points in `development_reports.sites`) | **103,724 of 216,221 outside their ZIP**, every one a Type pin (§7.1: 0 untyped) | `public.zip_mode_report_sites(zip)` — a READ that stamps each facility with the canonical verdict and serves members only: **93,603 served, 93,603 inside (independent `ST_Covers`), 0 outside, 0 unverdicted**, 63,723 outside candidates excluded, all 12,722 ZIPs — live in the DB; the page switches on merge |
+
+- ⛔ **THE FACILITY-PLANE FIX WAS APPLIED AND REVERTED THE SAME DAY, AND IT RESTARTED
+  PRODUCTION.** It replaced the Fix 28 trigger with a plane-wide one that stamped every facility
+  with its verdict and removed outside ones for every Type — rebuilding the whole `sites` array on
+  EVERY write, where Fix 28 rebuilds only when a correction is needed (rows reach 19.6 MB). Its
+  backfill coincided with **three production Postgres restarts** (22:27:21Z; 22:34:30Z "not
+  properly shut down; automatic recovery"; 22:36:36Z) and **none in the 24 h before**: first four
+  concurrent ~50 MB `update … set sites = sites` batches through the MCP connector, then ONE
+  sequential ≤ 3 MB/min cron job. The Fix 28 bodies were restored verbatim (md5 `b4697ba0…` /
+  `22479bc5…`, equal to Fix 28's parity record); the backfill objects were dropped. **Every batch
+  was atomic.** Rows it had rewritten keep outside facilities removed and a `zip_membership`
+  stamp until the rolling refresh rewrites them; nothing reads the stamp.
+  - **Never run bulk rewrites of `development_reports`**, concurrently or not, without a measured
+    memory budget. The next design must keep the write path at Fix 28's cost (count first,
+    rebuild only on correction) or move the decision to a READ path — e.g. facility membership
+    over `app_projects` facility rows, which are relational and small.
+  - ✅ **REDONE ON THE READ PATH, SAME DAY — nothing is written.** `public.zip_mode_report_sites`
+    (STABLE, security definer, no DML) reads the cached row, calls `geo.zip_point_membership_in`
+    per facility point, and returns member points (stamped), area notices untouched, development
+    points withheld (N5 serves them), plus `facility_counts` and a `status`
+    (`complete | not_measured | no_report`). **The cached `sites` array is never rewritten, no
+    trigger changed, no backfill.** Cost: 200 random ZIPs p50 1.7 / p95 11.6 ms; 20 largest p95
+    127 ms. Applied behind the safety gate (postmaster start 22:36:36Z unchanged through apply,
+    canary and the national proof; the rolling refresh kept succeeding).
+  - **The page never reads raw `sites` in ZIP mode any more** (the REST select drops it), and
+    the Facilities tile equals the drawn facility pins; a ZIP with no boundary or a failed read
+    shows a dash, not a count. §K in `test/zip-membership-canonical.test.mjs` is INVERTED: an
+    unverdicted facility point is not shown.
+  - 📌 **Completeness, named not claimed:** the read can only serve facilities the report
+    retrieved (around the ZIP centre). A facility inside a very large ZIP but beyond that
+    retrieval is not served — an omission, never a wrong placement. The ZIP community page's
+    facility section (`app_projects`) is still radius context and is not Map 1.
+- ⚖️ **DEVELOPMENT POINTS IN `development_reports` ARE CANDIDATES, NOT MEMBERS — never drop them
+  at the row.** They feed N5 (`n5_expected_input` reads `app_projects`, built from these rows), and
+  N5 unions candidates from every report — that is what finds a record inside a large ZIP but
+  beyond its own report's retrieval radius.
+- 📌 **Fix 28's Data-center predicate (`zip_dc_membership_outside`) still carries its own
+  `ST_Intersects`** — a second copy of the membership predicate that goes when the facility plane
+  is redone. `app_changes` development items are still built from radius candidates (non-Map-1).
+- **Stratos, by boundary:** Compute Atlas places *Stratos AI Data Center Campus* at (41.5,
+  −113.5), labelled `exact` — a suspiciously round value. It is a **member of 84313 (Grouse
+  Creek)**, 15.3 mi from that ZIP's centroid (a 5-mile rule would have excluded it), and
+  **outside 84336 (Snowville)**. Compute Atlas / Epoch live in `dc_*` (acquisition only); nothing
+  on Map 1 reads them yet. When they reach Map 1 they go through `national_dc_zip_members`.
+- **Gates:** `test/zip-membership-canonical.test.mjs` (offline) and
+  `.github/workflows/zip-membership-suite.yml` → `test/zip_membership_pg/run.sh` (25 checks on a
+  disposable PostGIS against the shipped SQL, including 7 Type/source facility variants at
+  inside-far / outside-near / boundary / far points; centroid-radius, national-bypass,
+  Type-scoped and facility-bypass mutations must each FAIL it). The earlier 26-check version, which also covered the
+  reverted trigger, passed 26/26 against production inside a rolled-back transaction.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

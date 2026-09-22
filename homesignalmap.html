@@ -1198,6 +1198,7 @@ HS.onReady(function(){
   // covered:null and the page says nothing rather than guessing.
   var COUNTY_SOURCES = null;
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
+  var FAC_UNMEASURED = false;                      // ZIP-mode facility plane has no membership measurement (count unknown, not 0)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
   // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
@@ -2250,7 +2251,11 @@ HS.onReady(function(){
     // BOTH modes, and a second copy of it would be one more string to keep in sync for no gain.
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
-              "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
+              "&select=zip,home_lat,home_lng,counts,paywall,refreshed_at,facilities_unavailable&limit=1";
+    // THE REPORT'S SITES ARE NOT READ RAW ANY MORE. public.zip_mode_report_sites returns its area
+    // notices plus only the facilities the canonical predicate places inside this ZIP, each with
+    // its verdict (docs/zip-membership-canonical.sql §3). The raw array — up to 19.6 MB, mostly
+    // development candidates this page discards — carried every radius-derived EPA facility.
     // BOTH reads, together: the cached report still supplies FACILITIES and area/jurisdiction
     // notices (the EPA national floor is still radius-derived - Session B owns that geography),
     // while DEVELOPMENT comes from authoritative whole-ZIP membership and replaces the report's
@@ -2259,6 +2264,11 @@ HS.onReady(function(){
     Promise.all([
       fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
         .then(function(r){ return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/zip_mode_report_sites", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
       fetch(ZIP_AUTH_RPC_URL, {
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
@@ -2276,10 +2286,15 @@ HS.onReady(function(){
       // and a malformed body all reached the page as the SAME value a genuinely empty ZIP
       // produces. HS.nationalPlaneResult classifies the read instead; `records` is still always
       // an array, so the map renders exactly as it does today either way.
-      fetch(SUPABASE_URL + "/rest/v1/rpc/national_dc_for_zip", {
+      // ZIP MEMBERSHIP IS GEOGRAPHY (docs/zip-membership-canonical.sql). This used to call
+      // national_dc_for_zip with p_radius_mi: 5 — a circle around the ZIP centroid — which on
+      // 2026-09-22 drew 7,355 placements outside their ZIP on 1,918 pages and never served 69
+      // records inside their ZIP but beyond 5 miles. national_dc_zip_members retrieves by the
+      // ZCTA polygon's own extent and returns each row with the canonical verdict.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/national_dc_zip_members", {
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
-        body: JSON.stringify({ p_zip: zip, p_radius_mi: 5 })
+        body: JSON.stringify({ p_zip: zip })
       })
         .then(function(r){
           // .json() rejects on truncated/non-JSON bodies; that is 'malformed', not 'network',
@@ -2292,7 +2307,11 @@ HS.onReady(function(){
         .catch(function(){ return HS.nationalPlaneResult({ transportError: true }); })
     ])
       .then(function(both){
-        var rows = both[0], auth = both[1];
+        var rows = both[0], rs = both[1], auth = both[2];
+        var rsSites = HS.zipReportSites(rs);
+        var facMembers = HS.zipFacilityMemberCount(rs);
+        // Published for the verifiers: the tile, the drawn facilities and this count must agree.
+        window.__HS_ZIP_FACILITIES = { status: HS.zipReportOutcome(rs), member: facMembers };
         if(!currentReq(token)) return;      // a newer search (or an address) already owns the page
         ZIP_AUTH = auth;
         var authSites = HS.zipAuthSitesFrom(auth);
@@ -2302,7 +2321,7 @@ HS.onReady(function(){
         // `status` is Map 1's PERMIT vocabulary (pin colour); the source's own lifecycle word
         // is carried unmodified as normalized_status/raw_status so the popup can state what
         // the source actually said rather than our bucket for it.
-        var natl = both[2] || HS.nationalPlaneResult(null);
+        var natl = both[3] || HS.nationalPlaneResult(null);
         // FIX 29 — PROXIMITY IS NOT MEMBERSHIP. national_dc_for_zip selects by a 5-mile
         // great-circle radius around development_reports.home_lat/home_lng — a ZIP CENTROID.
         // It may only supply ZIP-page membership where authoritative whole-ZIP geography
@@ -2355,8 +2374,10 @@ HS.onReady(function(){
                    location_text:r.location_text || null,
                    record_url:r.source_url, url:r.source_url,
                    source_name:r.source_name, source_key:r.source_key,
+                   // the server's canonical verdict for THIS ZIP — HS.zipModeSites admits on it
+                   zip_membership:r.zip_membership,
                    relevance:"development" };
-        });
+        }).filter(HS.zipMemberAdmitted);
         // ODbL CREDIT — derived ONLY from records that can actually reach the page. A site
         // with no source_name, or none of the record_url render()'s sourced() gate requires,
         // is dropped before anything is drawn, so crediting its source would name a source
@@ -2374,11 +2395,19 @@ HS.onReady(function(){
         // and is still accurate, so it stays. Same guard address mode has always had.
         var zipCounts = rows && rows.length ? (rows[0].counts || {}) : {};
         delete zipCounts.development; delete zipCounts.proposed; delete zipCounts.comment_open;
+        // FACILITIES follow the same rule: with the engine's radius-derived counts.facilities gone,
+        // render() counts the facilities it actually DRAWS (its `fac` set) — members of this ZIP by
+        // the canonical predicate — so the tile and the pins are one population by construction.
+        // Unknown (no boundary, failed read) is shown as a dash via facUnmeasured, never as 0.
+        delete zipCounts.facilities;
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
                    counts:zipCounts,
-                   sites: HS.zipAuthMergeSites(row.sites||[], authSites).concat(natlSites),
+                   // THE ONE ZIP-MODE DOOR (lib/zip-authoritative.js): every point plane passes on
+                   // canonical membership evidence.
+                   sites: HS.zipModeSites(rsSites, auth, natlSites),
+                   facUnmeasured: facMembers == null,
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
         } else if(authSites.length || natlSites.length){
@@ -2386,7 +2415,7 @@ HS.onReady(function(){
           // established - render it. The national half is what lets a county with NO local
           // permit/planning connector still show real data-center projects.
           render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
-                   sites: authSites.concat(natlSites), paywall:false, updated:null, facUnavailable:false });
+                   sites: HS.zipModeSites([], auth, natlSites), paywall:false, updated:null, facUnavailable:false });
         } else {
           // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
@@ -2528,7 +2557,10 @@ HS.onReady(function(){
     // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
     // updateCovNote() say why. A genuinely-empty ZIP is NOT flagged and still shows a true 0.
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
-    $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
+    // The facility plane is not a membership measurement (no ZIP boundary, or the facility read
+    // failed): the count is UNKNOWN, shown as the same dash — never the radius-derived number.
+    FAC_UNMEASURED = ZIP_MODE && !!data.facUnmeasured;
+    $("cFac").textContent  = (FAC_UNAVAILABLE || FAC_UNMEASURED) ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
     // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
     // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
@@ -2581,7 +2613,7 @@ HS.onReady(function(){
     // announce itself facilities-only / coverage-coming.
     var devCount = (data.counts && data.counts.development) != null ? data.counts.development : (permits.length + dev.length);
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
+    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE && !FAC_UNMEASURED;
     updateCovNote();
 
     // ZIP mode is the records' own extent (ZIP_FRAME in drawMap), not a radius around a centroid.

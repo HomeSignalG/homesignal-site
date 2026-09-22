@@ -288,7 +288,12 @@ export function assertZip(zip, rep, isIndexable, st) {
   // are now separated, and the UNKNOWN one is checked in BOTH directions rather than skipped:
   // a page showing the dash while the row says the read succeeded is hiding a real count, and
   // a page showing a number while the row says it was refused is asserting a fact we withheld.
-  const facUnavailable = rep.facilities_unavailable === true;
+  // ZIP MODE (2026-09-22): the facility tile counts the facilities the page DREW — members of
+  // this ZIP by the canonical predicate, as returned by public.zip_mode_report_sites — not the
+  // engine's radius-derived counts.facilities. When the page reports that read, the expected
+  // number is its member count and a null member count (no boundary / failed read) means dash.
+  const zf = st.zipFacilities && typeof st.zipFacilities === 'object' ? st.zipFacilities : null;
+  const facUnavailable = rep.facilities_unavailable === true || (zf != null && zf.member == null);
   const facRaw = st.facText == null ? '' : String(st.facText).trim();
   const facIsDash = facRaw === '\u2014';
   let facShown = null;
@@ -304,7 +309,21 @@ export function assertZip(zip, rep, isIndexable, st) {
         `not a count mismatch; nothing about counts.facilities was verified`);
     } else {
       facShown = parsed;
-      if (wantFac != null && facShown !== wantFac) {
+      if (zf != null) {
+        const drawnFac = (st.rendered || []).filter((s) => s && s.scope === 'point' && s.relevance !== 'development').length;
+        if (st.rendered != null && facShown !== drawnFac) {
+          fails.push(`ZIP ${zip}: facility count ${facShown} != ${drawnFac} facility pin(s) drawn (tile and pins must be one population)`);
+        }
+        if (st.rendered != null && drawnFac > zf.member) {
+          fails.push(`ZIP ${zip}: ${drawnFac} facility pin(s) drawn but zip_mode_report_sites counted only ${zf.member} member(s)`);
+        }
+        const unverdicted = (st.rendered || []).filter((s) => s && s.scope === 'point' && s.relevance !== 'development'
+          && !s.zip_authoritative && s.record_kind !== 'national_project' && s.zip_membership !== 'member');
+        if (unverdicted.length) {
+          fails.push(`ZIP ${zip}: ${unverdicted.length} facility-plane point(s) drawn WITHOUT a member verdict ` +
+            `[${unverdicted.slice(0, 3).map((s) => s.label || '??').join(', ')}] (ZIP membership bypass)`);
+        }
+      } else if (wantFac != null && facShown !== wantFac) {
         fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
       }
     }

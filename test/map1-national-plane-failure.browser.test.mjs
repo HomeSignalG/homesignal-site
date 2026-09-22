@@ -18,6 +18,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -44,14 +45,15 @@ const LOCAL_FAC = { e: 1.8, n: 2.3, lat: 39.0181, lng: -77.4561,
 const ZIP_ROW = [{ zip: '20147', home_lat: 39.0181, home_lng: -77.4561,
   counts: { facilities: 1 }, sites: [LOCAL_FAC], paywall: false,
   refreshed_at: '2026-09-15T00:00:00Z', facilities_unavailable: false }];
-// One real eligible national record, shaped exactly as national_dc_for_zip returns it.
+// One real eligible national record, shaped exactly as national_dc_zip_members returns it
+// (national_dc_for_zip's row shape + the canonical per-row `zip_membership` verdict).
 const NATL_OK = [{ source_key: 'osm:way/1188691868', source_name: 'OpenStreetMap',
   source_url: 'https://www.openstreetmap.org/way/1188691868',
   project_name: 'NTT Ashburn VA9 Data Center', developer_or_operator: 'NTT',
   raw_status: 'operational', normalized_status: 'operational', project_type: 'datacenter',
   lat: 39.0205, lng: -77.4602, location_text: null,
-  location_precision: 'approximate_campus_area', distance_mi: 1.21,
-  last_seen_at: '2026-09-15T00:00:00Z' }];
+  location_precision: 'approximate_campus_area', distance_mi: null,
+  last_seen_at: '2026-09-15T00:00:00Z', zip_membership: 'member' }];
 
 const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 
@@ -63,7 +65,7 @@ async function load(natl) {
   await page.route('**/*', async (route) => {
     const url = route.request().url();
     if (url.startsWith(base)) return route.continue();
-    if (url.includes('/rpc/national_dc_for_zip')) {
+    if (url.includes('/rpc/national_dc_zip_members')) {
       if (natl.abort) return route.abort('connectionrefused');   // network / timeout
       return route.fulfill({ status: natl.status, contentType: natl.ct || 'application/json',
         body: natl.body });
@@ -72,6 +74,7 @@ async function load(natl) {
       return route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ zip: '20147', mode: 'development', status: 'boundary_complete',
           projects: [], markers: [] }) });
+    if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
     if (url.includes('/rest/v1/development_reports'))
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW) });
     // ── VENDOR MOCKS, verbatim from the established browser-suite convention
