@@ -25,6 +25,6 @@ select json_build_object(
  'env_risk', (select json_build_object('rows',count(*),'flood',count(flood),'wildfire',count(wildfire),'heat',count(heat)) from public.app_environmental_risk),
  'env_like_tables', (select json_agg(table_schema||'.'||table_name order by table_name) from information_schema.tables where table_schema in ('public') and table_name ~* '(env|epa|facilit|coverage|echo|frs|utilit|water|subject|event)'),
  'app_projects_columns', (select json_agg(column_name order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='app_projects'),
- 'utah_zip_pages', (select count(*) from public.canonical_zip_registry r join public.communities c on c.zip=r.zip and c.level='zip' where c.state in ('UT','Utah')),
+ 'utah_zip_pages', (select count(distinct z) from public.communities c, unnest(c.zip_codes) z where c.level='zip' and c.state='UT' and z in (select zip from public.canonical_zip_registry)),
  'crz_columns', (select json_agg(column_name) from information_schema.columns where table_schema='public' and table_name='canonical_zip_registry')
 ) as r;
