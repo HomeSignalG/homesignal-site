@@ -47,11 +47,11 @@ const base = 'http://127.0.0.1:8814';
 // ── production records ──────────────────────────────────────────────────────────────
 const DUAL = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
   src: 'EPA FRS · registry 110071955663', type: 'built', label: 'CORESITE - VA1 DATA CENTER',
-  layer: 'datacenter', scope: 'point', registry_id: '110071955663', zip_membership: 'member',
+  layer: 'datacenter', scope: 'point', registry_id: '110071955663',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 const PLAIN_FAC = { e: 1.82, n: 2.361, lat: 38.95942, lng: -77.35889,
   src: 'EPA FRS · registry 110072041130', type: 'built', label: 'ANDURIL INDUSTRIES, INC',
-  layer: 'industrial', scope: 'point', registry_id: '110072041130', zip_membership: 'member',
+  layer: 'industrial', scope: 'point', registry_id: '110072041130',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110072041130' };
 const DC_PROJECT = { e: 1.515, n: 1.756, lat: 38.95065, lng: -77.36458, type: 'approved',
   label: 'Pennhurst Data Centers', layer: 'development', scope: 'point', use_type: 'Data Center',

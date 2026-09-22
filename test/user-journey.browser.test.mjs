@@ -50,7 +50,7 @@ const REPORT = {
   address: '2200 CALDWELL LN, DEL VALLE, TX 78617',
   home: { lat: 30.2150, lng: -97.5388 },
   counts: { facilities: 1 },
-  sites: [{ scope: 'point', label: 'ACME PLATING CO', registry_id: '110000123456', zip_membership: 'member',
+  sites: [{ scope: 'point', label: 'ACME PLATING CO', registry_id: '110000123456',
             url: 'https://echo.epa.gov/x', lat: 30.2160, lng: -97.5400, e: 0.3, n: 0.06, src: 'EPA FRS' }]
 };
 const RPC_RADIUS = [{ source_key: 'socrata:austin:SP-1', feature_id: 'pt:1',
@@ -86,22 +86,22 @@ ZIP_AUTH['84334'] = { zip: '84334', mode: 'development', status: 'boundary_compl
 const ZIP_ROW = {
   '78617': [{ zip: '78617', home_lat: 30.1745, home_lng: -97.6134, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
-    sites: [{ scope: 'point', label: 'ZIP FACILITY', registry_id: '110000555555', zip_membership: 'member',
+    sites: [{ scope: 'point', label: 'ZIP FACILITY', registry_id: '110000555555',
               url: 'https://echo.epa.gov/y', lat: 30.1750, lng: -97.6140, e: 0.05, n: 0.03 }] }],
   '84334': [{ zip: '84334', home_lat: 41.7166, home_lng: -112.1500, counts: { facilities: 6 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
-    sites: [{ scope: 'point', label: 'RIVERSIDE GRAIN CO', registry_id: '110000888888', zip_membership: 'member',
+    sites: [{ scope: 'point', label: 'RIVERSIDE GRAIN CO', registry_id: '110000888888',
               url: 'https://echo.epa.gov/w', lat: 41.7180, lng: -112.1520, e: 0.1, n: 0.1 }] }],
   // A ZIP with a cached report but NO authoritative development measurement, so the page
   // takes its not_measured branch (the route falls through to status:'not_measured' for any
   // ZIP absent from ZIP_AUTH). This is the state gate task 6 asks a resident to explain.
   '84999': [{ zip: '84999', home_lat: 41.5105, home_lng: -112.0155, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
-    sites: [{ scope: 'point', label: 'UNMEASURED ZIP FACILITY', registry_id: '110000999999', zip_membership: 'not_measured',
+    sites: [{ scope: 'point', label: 'UNMEASURED ZIP FACILITY', registry_id: '110000999999',
               url: 'https://echo.epa.gov/v', lat: 41.5110, lng: -112.0160, e: 0.05, n: 0.03 }] }],
   '80210': [{ zip: '80210', home_lat: 39.6796, home_lng: -104.9611, counts: { facilities: 1 },
     refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false,
-    sites: [{ scope: 'point', label: 'DENVER FACILITY', registry_id: '110000777777', zip_membership: 'member',
+    sites: [{ scope: 'point', label: 'DENVER FACILITY', registry_id: '110000777777',
               url: 'https://echo.epa.gov/z', lat: 39.6800, lng: -104.9620, e: 0.05, n: 0.03 }] }]
 };
 const COMMUNITIES = {

@@ -35,9 +35,11 @@ select (select count(*) from canon) canonical_zips,
        (select count(*) from truth t where not exists
           (select 1 from served s where s.zip = t.zip and s.source_key = t.source_key)) members_missed;
 
--- 3. FACILITY PLANE, by Type input (layer) and verdict. Only 'member' is shown by HS.zipModeSites;
---    the invariant is indep_outside = 0 on every 'member' row. UNSTAMPED rows are ones the trigger
---    has not yet rewritten (not shown by the new client).
+-- 3. ⛔ FACILITY PLANE — KNOWN OPEN (CLAUDE.md §7.08). The plane-wide trigger that stamped these
+--    was reverted, so this block MEASURES the open defect: indep_outside on UNSTAMPED rows is the
+--    number of facility Type pins still drawn outside their ZIP. 2026-09-22 before: 103,724 of
+--    216,221. Rows the reverted trigger rewrote carry verdict 'member'/'not_measured' until the
+--    rolling refresh rewrites them.
 with p as (select d.zip, e.value x, b.geom
              from public.development_reports d
              left join geo.zcta_boundary b on b.zcta5 = d.zip,

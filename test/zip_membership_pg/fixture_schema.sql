@@ -1,5 +1,5 @@
 -- Minimal, self-contained schema for exercising the SHIPPED docs/zip-membership-canonical.sql
--- (and the Fix 28 file it extends) against a DISPOSABLE PostGIS. Only the columns the two files
+-- against a DISPOSABLE PostGIS. Only the columns the two files
 -- read or write are reproduced, with production's names and types (geo.zcta_boundary is
 -- MULTIPOLYGON SRID 4269, unique on zcta5, exactly as in production, verified 2026-09-22), so a
 -- pass here is evidence about the real functions rather than about a stand-in.
@@ -12,16 +12,6 @@ create table geo.zcta_boundary (
   geom  geometry(MultiPolygon, 4269)
 );
 create index zcta_boundary_geom_gix on geo.zcta_boundary using gist (geom);
-
-drop table if exists public.development_reports cascade;
-create table public.development_reports (
-  zip          text primary key,
-  home_lat     double precision,
-  home_lng     double precision,
-  counts       jsonb,
-  sites        jsonb,
-  refreshed_at timestamptz
-);
 
 drop table if exists public.national_dc_records cascade;
 create table public.national_dc_records (

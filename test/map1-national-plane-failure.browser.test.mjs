@@ -39,7 +39,7 @@ const base = 'http://127.0.0.1:8823';
 // A LOCAL record, so every case can prove the local pipeline survives a national failure.
 const LOCAL_FAC = { e: 1.8, n: 2.3, lat: 39.0181, lng: -77.4561,
   src: 'EPA FRS · registry 110071955663', type: 'built', label: 'ANDURIL INDUSTRIES, INC',
-  layer: 'industrial', scope: 'point', registry_id: '110071955663', zip_membership: 'member',
+  layer: 'industrial', scope: 'point', registry_id: '110071955663',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 const ZIP_ROW = [{ zip: '20147', home_lat: 39.0181, home_lng: -77.4561,
   counts: { facilities: 1 }, sites: [LOCAL_FAC], paywall: false,

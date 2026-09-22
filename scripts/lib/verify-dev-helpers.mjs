@@ -1,21 +1,6 @@
 // Shared helpers for development-tracker verification (verify-development.mjs,
 // verify-representative-zips.mjs, and unit tests). Keep pure — no Playwright here.
 
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
-
-// THE PAGE'S OWN ZIP-MODE ADMISSION MODULE, loaded rather than re-typed. Whether a ZIP page's
-// facility plane is a membership measurement is decided by HS.zipFacilityPlaneMeasured over
-// the server's `zip_membership` stamps (docs/zip-membership-canonical.sql); a verifier with
-// its own copy of that rule is the second definition the page's module exists to prevent.
-const ZIP_AUTH = (() => {
-  const ctx = { window: {} };
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL('../../lib/zip-authoritative.js', import.meta.url), 'utf8'), ctx);
-  return ctx.window.HS;
-})();
-export const facilityPlaneMeasured = (sites) => ZIP_AUTH.zipFacilityPlaneMeasured(sites);
-
 /** A record_url must be an absolute http(s) URL with a real hostname. */
 export function validRecordUrl(u) {
   if (!u || typeof u !== 'string') return false;
@@ -303,9 +288,7 @@ export function assertZip(zip, rep, isIndexable, st) {
   // are now separated, and the UNKNOWN one is checked in BOTH directions rather than skipped:
   // a page showing the dash while the row says the read succeeded is hiding a real count, and
   // a page showing a number while the row says it was refused is asserting a fact we withheld.
-  // A ZIP page also shows the dash when its facility plane carries no canonical membership
-  // verdict (no ZCTA boundary -> 'not_measured'): the engine's count there is radius-derived.
-  const facUnavailable = rep.facilities_unavailable === true || !facilityPlaneMeasured(sites);
+  const facUnavailable = rep.facilities_unavailable === true;
   const facRaw = st.facText == null ? '' : String(st.facText).trim();
   const facIsDash = facRaw === '\u2014';
   let facShown = null;

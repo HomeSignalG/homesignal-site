@@ -68,7 +68,7 @@ const base = 'http://127.0.0.1:8817';
 // before they become sites, and a stage suite must not be able to fail for that reason.
 const OPERATING = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
   src: 'EPA FRS · registry 110071955663', type: 'built', label: 'CORESITE - VA1 DATA CENTER',
-  layer: 'datacenter', scope: 'point', registry_id: '110071955663', zip_membership: 'member',
+  layer: 'datacenter', scope: 'point', registry_id: '110071955663',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 
 const PROJECTS = [

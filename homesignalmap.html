@@ -1198,7 +1198,6 @@ HS.onReady(function(){
   // covered:null and the page says nothing rather than guessing.
   var COUNTY_SOURCES = null;
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
-  var FAC_UNMEASURED = false;                      // ZIP-mode facility plane has no membership verdict (count unknown, not 0)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
   // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
@@ -2386,9 +2385,9 @@ HS.onReady(function(){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
                    counts:zipCounts,
-                   // THE ONE ZIP-MODE DOOR: every plane passes on canonical membership evidence.
+                   // THE ONE ZIP-MODE DOOR (lib/zip-authoritative.js). Development and national pass
+                   // on canonical membership; the facility plane is still radius context (KNOWN OPEN).
                    sites: HS.zipModeSites(row.sites||[], auth, natlSites),
-                   facUnmeasured: !HS.zipFacilityPlaneMeasured(row.sites||[]),
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
         } else if(authSites.length || natlSites.length){
@@ -2537,12 +2536,8 @@ HS.onReady(function(){
     // FACILITIES: when the EPA read FAILED for this snapshot the count is UNKNOWN, not zero.
     // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
     // updateCovNote() say why. A genuinely-empty ZIP is NOT flagged and still shows a true 0.
-    // A ZIP whose facility plane is NOT a membership measurement (no ZCTA boundary, or a row the
-    // canonical trigger has not yet stamped) shows none of those facilities as ZIP members, so
-    // its count is UNKNOWN too — the same em-dash, never the engine's radius-derived number.
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
-    FAC_UNMEASURED = ZIP_MODE && !!data.facUnmeasured;
-    $("cFac").textContent  = (FAC_UNAVAILABLE || FAC_UNMEASURED) ? "\u2014"
+    $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
     // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
     // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
@@ -2595,7 +2590,7 @@ HS.onReady(function(){
     // announce itself facilities-only / coverage-coming.
     var devCount = (data.counts && data.counts.development) != null ? data.counts.development : (permits.length + dev.length);
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE && !FAC_UNMEASURED;
+    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
     updateCovNote();
 
     // ZIP mode is the records' own extent (ZIP_FRAME in drawMap), not a radius around a centroid.

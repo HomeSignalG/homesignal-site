@@ -51,7 +51,7 @@ const PROJECT = { e: 0.1, n: 0.1, lat: 30.1745, lng: -97.6134, type: 'approved',
   use_type: 'Commercial', type_raw: 'Site Plan', source_id: 'arcgis:travis:P-1',
   record_url: 'https://example.gov/x' };
 const FACILITY = { e: 0.3, n: 0.4, lat: 30.1805, lng: -97.6202, type: 'built', scope: 'point',
-  layer: 'industrial', label: 'FRANKS WASTE OIL SERVICE', registry_id: '110005079495', zip_membership: 'member',
+  layer: 'industrial', label: 'FRANKS WASTE OIL SERVICE', registry_id: '110005079495',
   src: 'EPA FRS · registry 110005079495',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110005079495' };
 const ZIP_ROW = { '78617': [{ zip: '78617', home_lat: 30.1745, home_lng: -97.6134,
