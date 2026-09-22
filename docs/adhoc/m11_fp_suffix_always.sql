@@ -87,7 +87,7 @@ begin
   def := replace(def, a, b);
   a := $a$|| new.not_seen_vocabulary || '|'$a$;
   b := $b$|| new.not_seen_vocabulary || '|'
-    || case when new.preserves_artifact_bytes then 'preserves_artifact_bytes|' else '' end$b$;
+    || 'preserves_artifact_bytes|'$b$;
   n := (length(def) - length(replace(def, a, ''))) / length(a);
   if n <> 1 then raise exception 'stamp anchor 2 appears % times', n; end if;
   def := replace(def, a, b);
@@ -134,8 +134,8 @@ $a$;
         new.id, new.source_key, c->>'contract_version';
     end if;
     if new.artifact_sha256 is null or new.artifact_ref is null
-       or new.artifact_ref !~ ('^storage://government-source-archive/dc_evidence/[a-z0-9_]+/'
-                               || '' || new.artifact_sha256 || '(\.[a-z0-9]+)?$') then
+       or new.artifact_ref !~ ('^storage://government-source-archive/dc_evidence/'
+                               || new.source_key || '/' || new.artifact_sha256 || '(\.[a-z0-9]+)?$') then
       raise exception 'run % (source % contract v%) must name its preserved artifact as storage://government-source-archive/dc_evidence/%/%[.ext], got %',
         new.id, new.source_key, c->>'contract_version', new.source_key, new.artifact_sha256,
         coalesce(new.artifact_ref, 'NULL');

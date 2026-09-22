@@ -234,6 +234,22 @@ begin
     values (SRC,'d','manual','https://t.invalid','p','1',0,'{}','') returning id, source_contract into r1, snap;
   res := res || jsonb_build_object('n','C the frozen snapshot carries the capability','d',
        case when (snap->>'preserves_artifact_bytes')::boolean then null else snap::text end);
+  -- B2: the fingerprint is EXACTLY the old formula when false and the old formula plus the capability when true
+  res := res || jsonb_build_object('n','B2 fingerprints equal exact recomputation (false: legacy formula; true: + capability)','d',
+       case when fp_false = md5(SRC||'|'||v_false||'|false|false|false|false|false|1|SOURCE_RECORD_NOT_SEEN|d')
+             and fp_true  = md5(SRC||'|'||v_true ||'|false|false|false|false|false|1|SOURCE_RECORD_NOT_SEEN|preserves_artifact_bytes|d')
+            then null else format('false=%s true=%s', fp_false, fp_true) end);
+  -- C2: a capability run's frozen snapshot re-fingerprints to its frozen fingerprint (check 33's property, extended)
+  res := res || jsonb_build_object('n','C2 capability snapshot re-fingerprints to the frozen fingerprint','d',
+       case when (select source_contract_fingerprint from public.dc_acquisition_run where id = r1) = md5(
+            (snap->>'source_key') || '|' || (snap->>'contract_version') || '|'
+         || (snap->>'supplies_publisher_record_id') || '|' || (snap->>'supplies_geometry') || '|'
+         || (snap->>'supplies_lifecycle_status')    || '|' || (snap->>'supplies_release_identity') || '|'
+         || (snap->>'preserves_record_bytes')       || '|' || (snap->>'expected_min_records') || '|'
+         || (snap->>'not_seen_vocabulary') || '|'
+         || case when (snap->>'preserves_artifact_bytes')::boolean then 'preserves_artifact_bytes|' else '' end
+         || (select string_agg(d, ',' order by d) from jsonb_array_elements_text(snap->'distributions') d))
+            then null else 'snapshot does not re-fingerprint' end);
 
   obs_ok  := jsonb_build_array(jsonb_build_object('source_row_ordinal',0,'semantic_observation_fingerprint',FP1,
                'raw_payload','{}'::jsonb,'normalization_version','nv1','raw_payload_ref', REF || '#row=0'));
