@@ -1,0 +1,49 @@
+name: dc-step3c-reconcile
+
+# STEP 3C — the resident data-centre reconciliation, run LIVE against production (read-only).
+#
+# The ledger view (public.dc_resident_lineage_ledger) holds lineage at publisher-identity grain;
+# scripts/dc-step3c-reconcile.mjs runs the SHIPPED classifier (lib/map.js) over it, checks the
+# ledger against counts taken straight from the source tables, and fails on any omitted record,
+# duplicate identity, unknown grain, missing record class, or UNEXPLAINED outcome.
+#
+# It WRITES NOTHING. It runs on PRs that touch the reconciliation, its classifier inputs or the
+# ledger DDL, and on manual dispatch. NO schedule: this is a verification a change must pass,
+# not a job that runs on its own.
+#
+# Results print into the job log -- the receipt channel, since the sandbox cannot read artifacts.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/dc-step3c-reconcile.mjs'
+      - 'test/dc-step3c-reconcile.test.mjs'
+      - 'docs/dc-step3c-*.sql'
+      - 'lib/templates.js'
+      - 'lib/map.js'
+      - 'lib/zip-authoritative.js'
+      - 'lib/residential-qualify.js'
+      - '.github/workflows/dc-step3c-reconcile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    # The ledger evaluates in ~35 s (a regex scan of app_projects plus national_dc_for_zip over
+    # every admitted ZIP). 10 minutes turns a hang into a red check, not a silent bill.
+    timeout-minutes: 10
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: the reconciliation core can fail (offline)
+        run: node test/dc-step3c-reconcile.test.mjs
+      - name: reconcile production (read-only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/dc-step3c-reconcile.mjs
