@@ -1,12 +1,22 @@
--- SCRATCH, read-only catalog probe. Never merge.
+-- SCRATCH, read-only. Never merge.
 select json_build_object(
- 'tables', (select json_agg(json_build_object('t', n.nspname||'.'||c.relname, 'kind', c.relkind, 'est_rows', c.reltuples::bigint) order by c.relname)
-    from pg_class c join pg_namespace n on n.oid=c.relnamespace
-    where n.nspname in ('public','gov_archive','evidence') and c.relkind in ('r','v','m','p')
-      and (c.relname ~* '(env|epa|echo|frs|facilit|risk|gov_action|gov_subject|source_check|coverage|outcome|evidence|water|flood|utility|sdwis|npdes|project|app_changes|zip_geo|zcta|boundar|development_report|source_reg|dc_)')),
- 'functions', (select json_agg(n.nspname||'.'||p.proname order by p.proname)
-    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname in ('public','gov_archive','evidence')
-      and p.proname ~* '(env|epa|echo|facilit|risk|coverage|outcome|source_check|evidence|refresh_zip|zip_geo|gov_action)'),
- 'schemas', (select json_agg(nspname order by nspname) from pg_namespace where nspname !~ '^(pg_|information_schema)')
+ 'counts', json_build_object(
+   'app_environmental_risk',(select count(*) from public.app_environmental_risk),
+   'echo_violation_counts',(select count(*) from public.echo_violation_counts),
+   'gov_actions',(select count(*) from public.gov_actions),
+   'gov_subjects',(select count(*) from public.gov_subjects),
+   'gov_action_relations',(select count(*) from public.gov_action_relations),
+   'source_registry',(select count(*) from public.source_registry),
+   'ev_source_check',(select count(*) from evidence.ev_source_check),
+   'ev_source_coverage',(select count(*) from evidence.ev_source_coverage),
+   'app_zip_geography_cutover',(select count(*) from public.app_zip_geography_cutover)),
+ 'columns', (select json_object_agg(t, cols) from (
+    select table_schema||'.'||table_name t, json_agg(column_name||':'||data_type order by ordinal_position) cols
+    from information_schema.columns
+    where (table_schema,table_name) in (('public','app_environmental_risk'),('public','echo_violation_counts'),('public','gov_actions'),('public','gov_subjects'),('public','source_registry'),('evidence','ev_source_check'),('evidence','ev_source_coverage'),('public','app_changes'),('public','app_coverage_states'),('public','app_zip_geography_state'),('public','app_zip_geography_cutover'),('public','app_projects'),('public','development_reports'),('evidence','ev_facility'))
+    group by 1) s),
+ 'app_coverage_states_def', pg_get_viewdef('public.app_coverage_states'::regclass),
+ 'app_zip_geography_state_def', pg_get_viewdef('public.app_zip_geography_state'::regclass),
+ 'geo_tables', (select json_agg(json_build_object('t',c.relname,'kind',c.relkind,'est',c.reltuples::bigint)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='geo' and c.relkind in ('r','v','m')),
+ 'app_changes_categories', (select json_agg(json_build_object('cat',category,'n',n)) from (select category, count(*) n from public.app_changes group by 1 order by 2 desc) x)
 );
