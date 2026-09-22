@@ -129,5 +129,22 @@ ok(/union all select \* from osm/.test(sql) && /from public\.national_dc_records
 ok(/cross join lateral public\.national_dc_for_zip\(a\.zip, 5\)/.test(sql) && !/3958\.8|haversine|asin\(/i.test(sql),
   '5i reachability CALLS the shipped national_dc_for_zip; it is not a second distance formula');
 
+// ── 6. The publisher probe's instruments (they produced two false readings before) ─────────
+const probe = await import('../scripts/dc-step3c-probe-publishers.mjs');
+const probeSrc = fs.readFileSync(new URL('../scripts/dc-step3c-probe-publishers.mjs', import.meta.url), 'utf8')
+  .split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+ok(/out meta center;/.test(probeSrc) && !/out meta center tags/.test(probeSrc),
+  '6a Overpass asks for META (a trailing `tags` verbosity silently drops version/changeset/timestamp)');
+const lat = probe.naicsFromEcho({ Results: { Lat: '39.518210', FacName: 'X DATA CENTER' } }, '1');
+ok(lat.naicsCodes.length === 0, '6b a latitude containing 518210 is NOT a NAICS code (structural, never a body regex)', JSON.stringify(lat));
+const real = probe.naicsFromEcho({ Results: { RegistryID: '110038203734', NAICS: [{ Code: '518210' }] } }, '110038203734');
+ok(real.naicsCodes.includes('518210') && real.idSeen, '6c a NAICS field IS read, and the facility is proven present (positive control)');
+ok(!probe.naicsFromEcho({ Results: { NAICS: [] } }, '9').idSeen, '6d a response without the registry id is NOT counted as the facility existing');
+ok(JSON.stringify(probe.parsePermitKey('socrata:data.cityofchicago.org:ydr8-5enu:100912345'))
+   === JSON.stringify({ platform: 'socrata', domain: 'data.cityofchicago.org', datasetId: 'ydr8-5enu', seg: '100912345' })
+   && probe.parsePermitKey('arcgis:phoenix-building-permits:T971680').registryId === 'phoenix-building-permits'
+   && probe.parsePermitKey('epa_frs:1') === null,
+  '6e permit keys parse exactly as the shipped connectors mint them; anything else is refused');
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);
