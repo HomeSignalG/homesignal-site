@@ -1532,11 +1532,35 @@ project-backed rows) · 9 project-scope.
   `projectless_zipscope = 0` — the `zip-scope` token's projectless population is **zero**, so
   that branch is proven by the offline suite and by a synthetic row, never by a live one. Say
   that, rather than reading 55/55 as though it had been exercised.
-- ⚠️ **MUTATION F SURVIVES AND IS NOT FIXED.** `zipFallback` is a closure inside `main()`, so its
-  body cannot be executed offline; the suite pins its **wiring** (all five former `ineligible`
-  exits reach it) and not its behaviour. Every other mutation A–E is killed, measured on EXIT
-  CODE. ⚠️ I first reported "all 7 killed"; **E had been mis-targeted** and only killed once
-  aimed at `bskyMapGateBlock`.
+- ✅ **MUTATION F IS FIXED (#1299, 2026-09-22) — and the reason I gave for not fixing it WAS
+  the fix.** The finding read *"`zipFallback` is a closure inside `main()`, so its body cannot
+  be executed offline; the suite pins its **wiring** … and not its behaviour."* Lifting it to
+  module scope as **`zipMapFallback(page, d, label, results, why)`** — every value an explicit
+  parameter, the five call sites keeping a one-line adapter — is what made the assertions
+  possible. `test/maps-capture-attach-executes.test.mjs` now EXECUTES it (25 → 40 checks) with
+  `captureAbsence` injectable in the patched copy only, and proves the success path records one
+  READY result at **ZIP scope** on a key naming this ZIP and **never a record as its subject**
+  (the rule #560 dropped from SQL), and that a throw is caught, recorded, and does not abort the
+  run. **Six mutations, each verified to APPLY, all killed on EXIT CODE**: gut the body · pass a
+  project instead of `null` · set the reason on failure too · let the throw escape · re-bury it
+  in `main()` · drop one call site.
+  - 🔑 **IT ALSO REMOVED THE CLOSURE CLASS THAT COST A PRODUCTION THROW.** #1287 fixed
+    `ReferenceError: scope is not defined` in `attach()` — same shape, one function over.
+    Explicit parameters are why that cannot recur here.
+  - ⚠️ **ONE OF MY NEW ASSERTIONS WAS VACUOUS AND A MUTATION CAUGHT IT.** *"A failed capture
+    never carries a `zip_scope_reason`"* PASSED with the guard deleted: on the failure path
+    `finishCapture` routes to `recordOutcome`, which composes its own `visual` block and never
+    reads the field, so it cannot reach the row whatever the guard does. **No behavioural pin
+    for that exists to be written**; it is pinned structurally and says so, rather than being
+    left looking stronger than it is.
+  - ⚠️ **THREE OF MY OWN SUITES FROZE THE CLOSURE SYNTAX RATHER THAN THE RULE and went red on a
+    correct change — the THIRD time in this workstream** (`maps-absence-capture`,
+    `maps-capture-recurring`, `maps-universal-map-requirement`, each pinning the literal
+    `const zipFallback = async`). They now assert the fallback EXISTS. **Pin the rule, not the
+    declaration syntax.**
+  - *(Dated receipt of the superseded state: "MUTATION F SURVIVES AND IS NOT FIXED … every other
+    mutation A–E is killed". Also retained: I first reported "all 7 killed"; **E had been
+    mis-targeted** and only killed once aimed at `bskyMapGateBlock`.)*
 
 ---
 ## 7.06 EVERY MAPS POST GETS A MAP, EVEN WHEN THERE IS NO DATA CENTRE ⚖️ FOUNDER RULING (2026-09-21)
