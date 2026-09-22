@@ -3349,6 +3349,40 @@ the entity link connecting River Bottoms Ranch LLC ↔ Neuralink via shared phon
 
 ---
 
+## ENVIRONMENT & UTILITIES HAS NO DATA CONTRACT — SO THE PAGE MAKES NO ENVIRONMENT CLAIM (2026-09-22)
+
+**The community page's "Environment & utilities" group is not drawn**, and must not come back
+until an authoritative Environment outcome exists. It used to render a count and, when empty,
+*"No environment or utility notices on file for this ZIP yet"* — from
+`changes.filter(/environment|utilit|water/i.test(category))`, a pattern over a value **no producer
+has ever written**.
+
+- **Measured 2026-09-22** (read-only `db-sql`): `app_changes.category` is exactly
+  Government & civic **97,593** · Local News **62,171** · Planning & zoning **16,748** (sum =
+  the 176,512 total); rows matching the old pattern **0 / 0 ZIPs**. The label exists in git only
+  in the Phase-1 prototype seed (`seed/delvalle.js`, 2026-07-12), whose two examples say
+  *"prototype placeholders pending the TCEQ/ECHO feed"*. `app_coverage_states` has no Environment
+  state. So every page asserted a verified absence that nothing measured — #1307's defect class.
+- ⛔ **NO CANONICAL ENVIRONMENT SUBJECT-MEMBERSHIP CONTRACT EXISTS.** Environmental facts live
+  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby*;
+  `Water districts & utilities` is a GOVERNMENT SUBSCRIPTION TOPIC → *Government & civic*;
+  environmental Local News → *Local news*; utility-sounding permits → *Development*;
+  `app_environmental_risk` has 0 rows; `gov_actions` (enforcement) has 0 rows. None of these is
+  an Environment-section record, and moving or copying one here is not a fix.
+- ⛔ **Do not restore the section through a category pattern, a keyword/title match, a flag or
+  a ZIP list** — `test/environment-absence-requires-authoritative-outcome.test.mjs` fails on each.
+  A keyword net is also measurably wrong: 50 government notices filed under OTHER topics carry
+  "water" in the title (e.g. *Clean Water Services Board*).
+- ✅ **What brings it back** is the separate architecture unit: canonical record identity,
+  subject membership (one record, many sections — never a copied row), per-ZIP source coverage
+  distinguishing VERIFIED DATA / VERIFIED ZERO / NOT ACQUIRED / READ FAILURE, and a reader the
+  page consumes. That unit should rewrite §1 of the test to key on the outcome.
+- Behavioural proof: `test/environment-absence.browser.test.mjs` hydrates a real generated
+  document with every neighbouring plane populated (plus a row carrying the old category key)
+  and asserts each renders once in its own section and nothing renders as Environment.
+
+---
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
