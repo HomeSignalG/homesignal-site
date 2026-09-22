@@ -8,13 +8,14 @@
 -- APPLIED 2026-09-22 as migration version 20260922211633 (dc_artifact_foundation_20260922). The
 -- ledger's recorded statement md5 is 1a5f075fa1da455211fb4e0818dc16df = md5 of
 -- docs/dc-artifact-foundation.sql, so that file IS the applied statement. Post-apply, live:
--- this block (without the DDL) 20/20 PASS rolled back; 2A 72/[51,53]; 3A 20/NONE; 0 sources
+-- this block (without the DDL) 21/21 PASS rolled back; 2A 72/[51,53]; 3A 20/NONE; 0 sources
 -- hold the capability; 0 historical snapshots changed; resident fingerprint unchanged.
 --
--- Measured 2026-09-22 before apply: A..P all PASS (20 checks: A B B2 C C2 D D2 E F G G2 H H2 I K L M N O P). Q/R report the existing
+-- Measured 2026-09-22 before apply: A..P all PASS (21 checks: A B B2 C C2 D D2 E F G G2 H H2 I K L M N O O2 P). Q/R report the existing
 -- self-tests INSIDE this transaction, where this test's own rows are present:
 --   2A #28 (TRUNCATE refused while this test's deferred trigger events are pending) and
---   3A #17 (this test's observations have no canonical entity) are TEST-DATA effects. The
+--   3A #17 (this test's observations have no canonical entity) and, once O2 adds a completed
+--   observation, 3A #2 (entities vs the CURRENT observation set) are TEST-DATA effects. The
 --   migration alone was measured separately: 2A 72/[51,53] and 3A 20/NONE, before AND after.
 --
 -- Mutation proof (each mutant applied to the migration, run in its own rolled-back txn):
@@ -165,6 +166,24 @@ begin
     res := res || jsonb_build_object('n','O a capability-free source still completes without an artifact','d', null);
   exception when others then
     res := res || jsonb_build_object('n','O a capability-free source still completes without an artifact','d', 'RAISED: ' || sqlerrm);
+  end;
+
+  -- O2: what the merged writer sends BEFORE any opt-in -- refs + code_version on a capability-free source -- is accepted
+  declare r_off2 uuid; begin
+    insert into public.dc_acquisition_run (source_key,distribution_key,trigger_kind,request_url,parser_key,parser_version,
+        source_contract_version,source_contract,source_contract_fingerprint,code_version)
+      values (SRC_OFF,'d','manual','https://t.invalid','p','1',0,'{}','','deadbeef') returning id into r_off2;
+    execute format($q$select public.dc_complete_acquisition(%L,200,%L,'sf',1,1,%L::jsonb,null,5,'application/json',%L)$q$, r_off2, SHA,
+      jsonb_build_array(jsonb_build_object('source_row_ordinal',0,'semantic_observation_fingerprint',FP1,'raw_payload','{}'::jsonb,'normalization_version','nv1',
+        'raw_payload_ref','storage://government-source-archive/dc_evidence/__art_off__/' || SHA || '.json#row=0')),
+      'storage://government-source-archive/dc_evidence/__art_off__/' || SHA || '.json');
+    select count(*) into n from public.dc_source_observation o join public.dc_acquisition_run r on r.id = o.acquisition_run_id
+     where r.id = r_off2 and r.completeness_state = 'SUCCESS_COMPLETE' and r.code_version = 'deadbeef'
+       and o.raw_payload_ref = r.artifact_ref || '#row=0';
+    res := res || jsonb_build_object('n','O2 capability-free source completes carrying artifact_ref + raw_payload_ref + code_version','d',
+      case when n = 1 then null else 'n=' || n end);
+  exception when others then
+    res := res || jsonb_build_object('n','O2 capability-free source completes carrying artifact_ref + raw_payload_ref + code_version','d', 'RAISED: ' || sqlerrm);
   end;
 
   -- P: history is untouched and not reinterpreted
