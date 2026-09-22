@@ -84,6 +84,11 @@ ROOT_FILES = (
     # crawler surface
     'robots.txt',
     'sitemap.xml',
+    # Bluesky custom-feed generator identity (did:web:homesignal.net). The AppView resolves it
+    # at https://homesignal.net/.well-known/did.json; content is pinned by
+    # test/bsky-did-document.test.mjs and generated in homesignal-ingest by
+    # bluesky/lib/feed-contract.mjs::didDocument().
+    '.well-known/did.json',
 )
 
 #: Directory trees that ship, each with the file extensions allowed inside it. A tree is
