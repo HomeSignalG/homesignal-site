@@ -669,7 +669,11 @@ declare
     v_obs          integer;
     v_classified   integer;
     v_linked       integer;
+    v_newly_linked integer := 0;
+    v_minted       integer := 0;
+    v_reused       integer := 0;
 begin
+    drop table if exists _res_existing;
     drop table if exists _res_obs;
     drop table if exists _res_class;
     drop table if exists _res_decision;
@@ -725,14 +729,41 @@ begin
         select group_key from _res_entity group by group_key having count(*) > 1) g;
 
     if p_apply then
+        -- ⚖️ RECURRING INGEST (2026-09-22). An entity's identity outlives the run that minted
+        -- it. The set under resolution is normally the CURRENT run only, so the next scheduled
+        -- acquisition brings the SAME publisher records under NEW observation ids. Deciding
+        -- "is this group already an entity?" from the observations in the set alone therefore
+        -- minted a duplicate entity for every facility on every run (2,087 per Atlas run), and
+        -- with p_include_history the new observations were never linked at all -- measured:
+        -- 4,174 Atlas observations from runs 1606/1607 linked to nothing.
+        -- The existing entity for a group is found across ALL linked observations, by the same
+        -- A1 tuple. No new identity rule: this is the same equivalence class, remembered.
+        create temporary table _res_existing on commit drop as
+        select g.group_key, min(eo.canonical_entity_id::text)::uuid canonical_entity_id,
+               count(distinct eo.canonical_entity_id) n_entities
+          from public.dc_entity_observation eo
+          join public.dc_source_observation o
+            on o.home_signal_observation_id = eo.home_signal_observation_id
+         cross join lateral (
+               select case when o.publisher_record_id is not null
+                           then o.source_key || '|' || o.distribution_key || '|' || o.publisher_record_id
+                           else 'singleton|' || o.home_signal_observation_id::text end as group_key) g
+         where g.group_key in (select group_key from _res_entity)
+         group by g.group_key;
+
+        -- One group, one entity. Two entities for one A1 group means identity already forked;
+        -- linking more evidence to either would hide it. Fail loudly instead.
+        if exists (select 1 from _res_existing where n_entities > 1) then
+            raise exception 'dc_resolve_canonical: % A1 group(s) already map to more than one canonical entity; refusing to link new evidence onto a forked identity',
+                (select count(*) from _res_existing where n_entities > 1);
+        end if;
+
         create temporary table _res_new on commit drop as
         select e.group_key, gen_random_uuid() canonical_entity_id
           from (select distinct group_key from _res_entity) e
-         where not exists (
-               select 1
-                 from public.dc_entity_observation eo
-                 join _res_entity re on re.oid = eo.home_signal_observation_id
-                where re.group_key = e.group_key);
+         where not exists (select 1 from _res_existing x where x.group_key = e.group_key);
+        select count(*) into v_minted from _res_new;
+        select count(*) into v_reused from _res_existing;
 
         insert into public.dc_canonical_entity
             (canonical_entity_id, entity_grain, classification, classification_conflict,
@@ -765,13 +796,40 @@ begin
             (canonical_entity_id, home_signal_observation_id, source_key, distribution_key,
              publisher_record_id, observation_classification, classification_rule_key,
              classification_evidence, link_rule_key)
-        select n.canonical_entity_id, o.oid, o.source_key, o.distribution_key,
-               o.publisher_record_id, c.classification, c.rule_key, c.evidence, re.link_rule_key
-          from _res_new n
-          join _res_entity re on re.group_key = n.group_key
+        select coalesce(x.canonical_entity_id, n.canonical_entity_id), o.oid, o.source_key,
+               o.distribution_key, o.publisher_record_id, c.classification, c.rule_key,
+               c.evidence, re.link_rule_key
+          from _res_entity re
           join _res_obs   o  on o.oid = re.oid
           join _res_class c  on c.oid = re.oid
+          left join _res_existing x on x.group_key = re.group_key
+          left join _res_new      n on n.group_key = re.group_key
         on conflict (home_signal_observation_id) do nothing;
+        get diagnostics v_newly_linked = row_count;
+
+        -- An entity that gained evidence reports it. Counts and classification are recomputed
+        -- from the entity's own links, by the SAME most-confirmed rule used at minting, so an
+        -- existing entity can never disagree with the evidence now attached to it.
+        update public.dc_canonical_entity e
+           set observation_count = s.n_obs,
+               source_count      = s.n_src,
+               classification    = s.cls,
+               classification_conflict = s.conflict,
+               updated_at        = now()
+          from (select eo.canonical_entity_id,
+                       count(*) n_obs, count(distinct eo.source_key) n_src,
+                       case when bool_or(eo.observation_classification = 'CONFIRMED_DC') then 'CONFIRMED_DC'
+                            when bool_or(eo.observation_classification = 'DC_CANDIDATE') then 'DC_CANDIDATE'
+                            when bool_or(eo.observation_classification = 'CLASSIFICATION_UNRESOLVED')
+                                 then 'CLASSIFICATION_UNRESOLVED'
+                            else 'NON_DC' end cls,
+                       count(distinct eo.observation_classification) > 1 conflict
+                  from public.dc_entity_observation eo
+                 where eo.canonical_entity_id in (select canonical_entity_id from _res_existing)
+                 group by eo.canonical_entity_id) s
+         where e.canonical_entity_id = s.canonical_entity_id
+           and (e.observation_count, e.source_count, e.classification, e.classification_conflict)
+               is distinct from (s.n_obs, s.n_src, s.cls, s.conflict);
 
         insert into public.dc_identity_decision
             (observation_a, observation_b, decision_state, candidate_rule_key,
@@ -789,6 +847,12 @@ begin
         union all select 'OBSERVATIONS_CLASSIFIED', v_classified::text
         union all select 'PROPOSED_CANONICAL_ENTITIES', v_entities::text
         union all select 'MULTI_OBSERVATION_ENTITIES', v_linked::text
+        union all select 'ENTITIES_MINTED',
+               case when p_apply then v_minted::text else 'n/a' end
+        union all select 'GROUPS_ALREADY_ENTITIES',
+               case when p_apply then v_reused::text else 'n/a' end
+        union all select 'OBSERVATIONS_NEWLY_LINKED',
+               case when p_apply then v_newly_linked::text else 'n/a' end
         union all select 'ACCOUNTED_FOR',
                (select count(*) from _res_entity e join _res_class c on c.oid = e.oid)::text
         union all select 'OBS_' || upper(x.source_key), x.n::text
