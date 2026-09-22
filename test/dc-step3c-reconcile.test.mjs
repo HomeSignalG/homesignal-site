@@ -106,5 +106,28 @@ ok(has(reconcile(ledger.map((r) => r.record_key === 'way/1' ? { ...r, dc_source_
 ok(has(reconcile([], { isResidentDC, controls }), /0 rows/), '4i an empty ledger is a failed read');
 ok(Object.keys(POPULATIONS).length === 3 && EXCLUSIONS.length === 3 && DISPOSITIONS.length === 8, '4j the vocabularies are closed at their declared sizes');
 
+// ── 5. The ledger DDL of record: structural pins (the view is the lineage plane) ─────────────
+// Comments are stripped first: a pin must read the SQL, never a comment quoting it.
+const sql = ddl.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+const evidenceJoin = (sql.match(/left join\s+public\.(dc_[a-z_]+)\s+o\s+on([\s\S]*?)left join/) || []);
+ok(evidenceJoin[1] === 'dc_current_observation',
+  '5a M5 evidence is joined through dc_current_observation (never all historical observations)', evidenceJoin[1]);
+ok(/o\.source_key\s*=\s*u\.dc_source_key/.test(evidenceJoin[2] || '') && /o\.publisher_record_id\s*=\s*u\.record_key/.test(evidenceJoin[2] || ''),
+  '5b M4 the evidence join is scoped by (source_key, publisher_record_id) -- not a bare id');
+ok(!/national_dc_records|app_projects|development_reports/.test(evidenceJoin[2] || ''),
+  '5c M2/M3/M4 no resident storage table is joined AS evidence');
+ok(/coalesce\(r\.source_key,\s*'app_projects:'\s*\|\|\s*r\.id::text\)/.test(sql) && !/where\s+r\.source_key\s+is\s+not\s+null/i.test(sql),
+  '5d M8 legacy rows without a source key are KEPT (grouped by their own id), never filtered out');
+ok(/\(r\.source_key is not null\)\s+as has_source_native_key/.test(sql),
+  '5e M9 a HomeSignal id is never counted as a publisher id (has_source_native_key reads source_key only)');
+const finalSelect = (sql.match(/unioned as \(select \* from legacy union all select \* from osm\)\s*select([\s\S]*?)from unioned u/) || [])[1] || '';
+ok(finalSelect.length > 100, '5f the view\'s output column list is findable (positive control)', `${finalSelect.length} chars`);
+ok(!/\b(zip|zcta5?|community_id|county|geom|centroid\w*|radius\w*)\b(?!_count)/i.test(finalSelect.replace(/resident_zip_count/g, '')),
+  '5g M11 the ledger exposes no geography-assignment column');
+ok(/union all select \* from osm/.test(sql) && /from public\.national_dc_records n/.test(sql) && /from public\.app_projects p/.test(sql),
+  '5h M18 both resident populations are in the view (neither branch removed)');
+ok(/cross join lateral public\.national_dc_for_zip\(a\.zip, 5\)/.test(sql) && !/3958\.8|haversine|asin\(/i.test(sql),
+  '5i reachability CALLS the shipped national_dc_for_zip; it is not a second distance formula');
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);
