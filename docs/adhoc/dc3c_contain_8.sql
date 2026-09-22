@@ -1,6 +1,6 @@
 with s as (
  select d.zip, t.x from public.development_reports d, jsonb_array_elements(case when jsonb_typeof(d.sites)='array' then d.sites else '[]'::jsonb end) t(x)
- where d.zip >= '8' and d.zip < '~' and coalesce(t.x->>'scope','')='point'
+ where d.zip >= '8' and coalesce(t.x->>'scope','')='point'
  and (position('data' in lower(coalesce(t.x->>'use_type','')||coalesce(t.x->>'layer','')||coalesce(t.x->>'label','')))>0
      or position('hyperscal' in lower(coalesce(t.x->>'use_type','')||coalesce(t.x->>'layer','')||coalesce(t.x->>'label','')))>0
      or position('server' in lower(coalesce(t.x->>'use_type','')||coalesce(t.x->>'layer','')||coalesce(t.x->>'label','')))>0)
