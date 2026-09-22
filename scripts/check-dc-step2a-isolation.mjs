@@ -41,14 +41,26 @@ import { join, relative, sep } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
 // The DDL of record. This repo owns it, so no cross-repo token is needed to read it.
+// STEP 3C: the boundary is no longer one file. Step 3A added a CANONICAL plane and Step 3C a
+// RECONCILIATION read model; neither has a resident reader either, and a page naming one would
+// be the premature cutover this architecture forbids. Every file is read; any unreadable one
+// REFUSES (a missing DDL is a shorter list, and a shorter list is a greener gate).
 const DDL = 'docs/dc-step2a-foundation.sql';
+const DDLS = [DDL, 'docs/dc-step3a-canonical-identity.sql', 'docs/dc-step3a-selftest.sql',
+  'docs/dc-step3c-resident-lineage-ledger.sql', 'docs/dc-step3c-ledger-distinct-record-grain.sql'];
+// The reconciliation plane is whatever the Step 3C DDL declares, derived like everything else.
+const RECONCILIATION_DDLS = DDLS.filter((f) => f.includes('dc-step3c-'));
+// The ONE non-resident script permitted to READ the reconciliation plane: the Step 3C report.
+// It may name reconciliation objects and nothing else -- never evidence, never canonical.
+const RECONCILIATION_READER = 'scripts/dc-step3c-reconcile.mjs';
 
 // ⚠️ THE ANCHOR THAT MAKES DERIVATION SAFE. A parse that quietly returns fewer names produces a
 // SHORTER forbidden list and therefore a GREENER gate -- failure in the direction nobody looks.
 // So the derived set must contain all four of these or the gate REFUSES to run: the three
 // evidence tables, plus the completion RPC this whole correction is about.
 const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
-  'dc_complete_acquisition'];
+  'dc_complete_acquisition', 'dc_current_observation', 'dc_canonical_entity',
+  'dc_resolve_canonical', 'dc_resident_lineage_ledger'];
 
 /**
  * The Step-2A objects a resident-facing file may not name, read out of the DDL of record.
@@ -57,7 +69,7 @@ const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
  */
 export function deriveForbidden(sql) {
   const names = new Set();
-  const re = /create\s+(?:table\s+(?:if\s+not\s+exists\s+)?|or\s+replace\s+function\s+)public\.([a-z0-9_]+)/gi;
+  const re = /create\s+(?:table\s+(?:if\s+not\s+exists\s+)?|or\s+replace\s+function\s+|(?:or\s+replace\s+)?view\s+)public\.([a-z0-9_]+)/gi;
   let m;
   while ((m = re.exec(sql)) !== null) names.add(m[1].toLowerCase());
   return [...names].sort((a, b) => b.length - a.length || a.localeCompare(b));
@@ -81,11 +93,12 @@ export function forbiddenComplaints(list) {
 }
 
 function loadForbidden() {
-  let sql;
+  let sql = '';
+  let file = DDL;
   try {
-    sql = readFileSync(join(ROOT, DDL), 'utf8');
+    for (file of DDLS) sql += readFileSync(join(ROOT, file), 'utf8') + '\n';
   } catch (err) {
-    console.error(`REFUSED: cannot read the DDL of record at ${DDL} (${err.code || err.message}). `
+    console.error(`REFUSED: cannot read the DDL of record at ${file} (${err.code || err.message}). `
       + 'The forbidden list is derived from it, so an unreadable DDL means this gate does not '
       + 'know what it is defending. "Could not look" must never render as "looked and found '
       + 'nothing".');
@@ -103,6 +116,11 @@ function loadForbidden() {
 
 const FORBIDDEN = loadForbidden();
 const PATTERN = new RegExp(`(^|[^A-Za-z0-9_])(${FORBIDDEN.join('|')})([^A-Za-z0-9_]|$)`);
+const RECONCILIATION = new Set(deriveForbidden(
+  RECONCILIATION_DDLS.map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n')));
+// What the reconciliation reader may NOT name: everything except the reconciliation plane.
+const READER_PATTERN = new RegExp(
+  `(^|[^A-Za-z0-9_])(${FORBIDDEN.filter((n) => !RECONCILIATION.has(n)).join('|')})([^A-Za-z0-9_]|$)`);
 
 // Resident-facing, or built into something a resident loads.
 const SCAN_DIRS = ['lib', 'partials', 'supabase/functions', 'scripts'];
@@ -147,8 +165,9 @@ function scan(paths, readFile) {
     if (ALLOW.has(rel)) continue;
     let text;
     try { text = readFile(rel); } catch { continue; }
+    const pattern = rel === RECONCILIATION_READER ? READER_PATTERN : PATTERN;
     text.split('\n').forEach((line, i) => {
-      const m = PATTERN.exec(line);
+      const m = pattern.exec(line);
       if (m) hits.push({ file: rel, line: i + 1, object: m[2], text: line.trim().slice(0, 140) });
     });
   }
@@ -166,14 +185,21 @@ function selfTest() {
     'lib/fake-two.js': 'select * from public.dc_acquisition_run where 1=1',
     'lib/fake-three.js': "from('dc_source')",
     'lib/fake-rpc.js': "const { data } = await sb.rpc('dc_complete_acquisition', args);",
+    // STEP 3C: a resident page reading canonical or reconciliation data is a premature cutover.
+    'lib/fake-canonical.js': "const e = await sb.from('dc_canonical_entity').select('*');",
+    'lib/fake-ledger.js': "const l = await sb.from('dc_resident_lineage_ledger').select('*');",
+    // ... and the one permitted reader is permitted the ledger ONLY.
+    [RECONCILIATION_READER]: "const o = await query('select * from public.dc_current_observation');",
   };
   const lookalike = {
+    [RECONCILIATION_READER]: "await query('select * from public.dc_resident_lineage_ledger');",
     'docs-like/national.sql': 'constraint national_dc_source_key_unique unique (dc_source_key)',
     'lib/unrelated.js': 'const mydc_sourceish = 1; // adc_source_observationx',
   };
-  const read = (rel) => (planted[rel] ?? lookalike[rel] ?? '');
-  const bad = scan(Object.keys(planted), read);
-  const ok = scan(Object.keys(lookalike), read);
+  // Two readers, not one: the reconciliation reader appears in BOTH sets (a violation when it
+  // names canonical, clean when it names the ledger), and a shared lookup would shadow one.
+  const bad = scan(Object.keys(planted), (rel) => planted[rel] ?? '');
+  const ok = scan(Object.keys(lookalike), (rel) => lookalike[rel] ?? '');
   let fails = 0;
   const want = Object.keys(planted).length;
   // Derived from the plant set, never a literal: a hard-coded count silently stops matching the
@@ -196,6 +222,10 @@ function selfTest() {
     'create table if not exists public.dc_source_observation (',
     'create or replace function public.dc_complete_acquisition(',
     'create or replace function public.dc_evidence_commit_guard()',
+    'create or replace view public.dc_current_observation as',
+    'create table if not exists public.dc_canonical_entity (',
+    'create or replace function public.dc_resolve_canonical(',
+    'create view public.dc_resident_lineage_ledger',
     // present in the real DDL and deliberately NOT derived -- a trigger is not callable
     'create constraint trigger dc_run_evidence_commit_trg',
     'create trigger dc_source_observation_guard_trg',
