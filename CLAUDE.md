@@ -487,6 +487,35 @@ subscribers.
   the government feeds that actually exist for that place in `homesignal-ingest`,
   using verbatim canonical labels.
 
+🛑 **CORRECTED 2026-09-22 — `?community=<slug>` IS NOT A SHIPPED ROUTE. Seven places in
+this file say it is; none of them is true of the code.** Measured by grepping the shipped
+tree, not recalled: `community.html` + `lib/community-page.js` read exactly ONE parameter,
+`focus` (`lib/community-page.js:24`). The only URL entry points that exist are
+**`?zip=`** (`shell.js:16`, `HS.parseZipParam`) and **`?id=`** (`shell.js:1072`), plus the
+canonical path `/community/<zip>/`. The string `community=` appears as an INPUT **nowhere**
+in shipping code, and `communities.js::byIdOrSlug` — the fallback this file credits — has
+**ZERO callers**.
+
+- 🔑 **THE CONSEQUENCE THAT MATTERS: renaming a `slug` breaks nothing, and treating it as
+  dangerous costs real work.** Four slugs were renamed on 2026-09-22 (`orem-84059` →
+  `vineyard-84059`, `lake-shore` → `sterling-84665`, `richmond-84332` → `providence-84332`,
+  `roggen-84654` → `wiggins-80654`). I then reported "4 slugs changed, no redirects" as an
+  outstanding defect and proposed a schema change to add slug aliases. **That defect does
+  not exist.** `slug` is today a stored label with no runtime reader on the community page.
+- ⚠️ **AND THE WAY I GOT IT WRONG IS THE LESSON, because it happened inside an audit whose
+  own headline finding was "I verified a resident-facing claim against the database instead
+  of against what the page serves."** I read §2 and believed it. A doc describing a route is
+  not the route — grep the entry point. Same shape as the PAT blocker corrected the previous
+  day, one level in.
+- 📌 **NOT CHANGED, deliberately:** `slug` stays populated and unique (it is a stable human
+  key, the seeds set it, and `?community=` may be wired later); `communities.js::byIdOrSlug`
+  is left in place as dead-but-harmless fallback code rather than removed in a docs change.
+  **If `?community=` is ever wired, it must resolve against the DB `slug` column** — the
+  design this file already describes — and only then does a rename need an alias story.
+
+*(The sentences below are retained as the dated record of the intended design. Read them as
+DESIGN INTENT, not as shipped behaviour.)*
+
 `community.html` resolution (already built): `?id=<uuid>` → DB by id;
 `?zip=<zip>` → DB by `zip_codes` containment; `?community=<slug>` → DB by `slug`
 (falls back to the `communities.js` slug→id map for rows not yet backfilled). So **a
