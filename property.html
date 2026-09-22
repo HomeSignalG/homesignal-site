@@ -14,6 +14,11 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Canonical owner of ZIP geography semantics: lib/data.js::rpcAllRows classifies
+     app_projects_for_zip's {unavailable, zip_geography_status} envelope through
+     HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
+     verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
+<script src="lib/zip-authoritative.js?v=20260922a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
@@ -110,8 +115,20 @@ HS.onReady(async function () {
   }
 
   try {
+  // `.sort()` returns the same array, and HS.withDistance now carries the read's verdict
+  // across the `.map()` it does, so `projects.complete`/`.outcome` survive both — see
+  // lib/data.js::withDistance for why that had to be fixed there rather than here.
   projects = HS.withDistance(projects, p)
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+  // A COUNT IS A CLAIM. `app_projects_for_zip` refuses a ZIP whose whole-ZIP geography is
+  // not established ({unavailable:true, zip_geography_status}) and lib/data.js carries that
+  // verdict through; without consulting it the "Nearby projects" vital printed a confident
+  // 0 over a ZIP nobody has measured. Map 1 already settled the presentation for exactly
+  // this state — it prints an em dash rather than a number it cannot stand behind
+  // (homesignalmap.html: `$("cDev").textContent = DEV_UNMEASURED ? "—"`). Fail closed:
+  // the test is for the VALUE 'complete', never for the absence of a failure.
+  var devReadComplete = projects.complete === true
+    && ((projects && projects.outcome) || 'unavailable') === 'complete';
   changes = HS.withDistance(changes, p);
   var near = projects.slice(0, 3).map(function (pr) {
     return Array.isArray(pr.impact_dimensions) ? pr
@@ -243,7 +260,7 @@ HS.onReady(async function () {
     + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
     + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
     + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
-    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
+    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + (devReadComplete ? near.length : '—') + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
     // ── PREMIUM (Fix 15) ──────────────────────────────────────────────────────────────
     // WAS: "Phase 2 — unlocked by new feeds" / "Layout ready; activates with these

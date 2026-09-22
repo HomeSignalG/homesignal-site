@@ -53,7 +53,14 @@ if (!/\.catch\(function \(\) \{ return null; \}\)/.test(src)) {
 
 // ── The fallback branch must also be free of the claim ───────────────────────────────
 // Both branches were wrong before; only one of them was replaced by the rich block.
-const emptyBranch = src.slice(src.indexOf('if (!a.length)'), src.indexOf('if (!a.length)') + 900);
+// The window is sized to the WHOLE branch (through its `} else {`), not to a magic byte
+// count. The 900-char version silently stopped covering the sentence it pins when the
+// branch grew — a pin that shrinks off its own subject fails on a correct change and
+// proves nothing about an incorrect one.
+const _eb = src.indexOf('if (!a.length)');
+const _ebEnd = src.indexOf('} else {', _eb);
+const emptyBranch = src.slice(_eb, _ebEnd > _eb ? _ebEnd : _eb + 900);
+if (_ebEnd <= _eb) failures.push('the empty branch could not be located — the pin below verified nothing');
 if (!/No permit or planning records for this area/.test(emptyBranch)) {
   failures.push('the fallback empty state does not state plainly what the page holds');
 }
@@ -62,7 +69,11 @@ if (/\bwe (check|monitor|track) /i.test(emptyBranch)) {
 }
 
 // ── Cost guard: the extra reads must be gated on the page actually being empty ────────
-if (!/if \(!projects\.length && !facilities\.length && community\)/.test(src)) {
+// The gate may only get STRICTER. It gained `devReadComplete &&` when the absence-claim
+// defect was fixed (a block that NAMES SOURCES may not be built on a read that never
+// happened), so the pin matches an optional leading conjunct rather than the exact old
+// string — while still requiring all three original terms, in order, in one condition.
+if (!/if \((?:[A-Za-z0-9_.]+ && )*!projects\.length && !facilities\.length && community\)/.test(src)) {
   failures.push('the coverage reads are not gated on an empty page — a page with records '
     + 'would pay for two reads it cannot use');
 }

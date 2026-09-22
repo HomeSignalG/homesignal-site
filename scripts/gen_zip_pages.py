@@ -438,6 +438,14 @@ def render(p, built):
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
+        # zip-authoritative.js is the CANONICAL OWNER of ZIP geography semantics and this
+        # document is its second consumer: lib/data.js::rpcAllRows classifies
+        # app_projects_for_zip's {unavailable, zip_geography_status} envelope through
+        # HS.zipAuthOutcome, and the Development section renders HS.zipAuthUnmeasuredFact
+        # instead of an absence sentence. Same parity rule as gov-notice-copy.js below —
+        # both hosts run ONE runtime, so a dependency added to community.html alone breaks
+        # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
+        '<script src="/lib/zip-authoritative.js?v=20260922a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
         '<script src="/lib/templates.js?v=ec3b1cb1"></script>\n<script src="/lib/impact.js"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
@@ -452,7 +460,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=75464c7b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=36f47e32"></script>\n'
+        '<script src="/lib/community-page.js?v=8754f9a0"></script>\n'
         "</body>\n</html>\n")
 
 
