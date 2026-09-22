@@ -14,6 +14,12 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- THE CANONICAL OWNER OF ZIP GEOGRAPHY SEMANTICS, and this page is its second consumer.
+     lib/data.js::rpcAllRows classifies `app_projects_for_zip`'s {unavailable, zip_geography_status}
+     envelope by calling HS.zipAuthOutcome, and the Development section renders HS.zipAuthUnmeasuredFact
+     rather than an absence sentence. Without this file both fail CLOSED (outcome 'unavailable',
+     no absence claim, no sentence) — so it is loaded, not depended on silently. -->
+<script src="lib/zip-authoritative.js?v=20260922a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
@@ -22,6 +28,6 @@
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=75464c7b"></script>
 <script src="lib/gov-notice-copy.js"></script>
-<script src="lib/community-page.js?v=36f47e32"></script>
+<script src="lib/community-page.js?v=8754f9a0"></script>
 </body>
 </html>
