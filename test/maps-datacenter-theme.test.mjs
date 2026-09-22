@@ -104,7 +104,7 @@ ok(buckets.byTheme.datacenter.every((p) => HS.mapsSocialThemeKey(p) === 'datacen
   '4: the bucket agrees with the per-row predicate (counts and rows are one result)');
 ok(JSON.stringify(queue) === frozen,
   '4: partitioning MUTATES NOTHING — the queue is byte-identical after filtering');
-ok(HS.mapsSocialThemeLabel('datacenter') === 'Data Center Theme', '4: the theme has its display label');
+ok(HS.mapsSocialThemeLabel('datacenter') === 'Data Center', '4: the theme has its display label');
 ok(HS.mapsSocialThemeLabel('nope') === null, '4: an unknown key gets NO invented label');
 
 // ═══ 5. THE DASHBOARD — hierarchy, derived counts, preserved actions ═════════════════
