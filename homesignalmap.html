@@ -2289,9 +2289,11 @@ HS.onReady(function(){
       // ZIP MEMBERSHIP IS GEOGRAPHY (docs/zip-membership-canonical.sql). This used to call
       // national_dc_for_zip with p_radius_mi: 5 — a circle around the ZIP centroid — which on
       // 2026-09-22 drew 7,355 placements outside their ZIP on 1,918 pages and never served 69
-      // records inside their ZIP but beyond 5 miles. national_dc_zip_members retrieves by the
-      // ZCTA polygon's own extent and returns each row with the canonical verdict.
-      fetch(SUPABASE_URL + "/rest/v1/rpc/national_dc_zip_members", {
+      // records inside their ZIP but beyond 5 miles.
+      // THE ONE DATA-CENTRE CONTRACT (docs/map1-dc-publication.sql, HS.MAP1_DC_RPC): canonical
+      // entities from every onboarded source plus the transitional legacy-OSM population, each
+      // retrieved by the ZCTA polygon's own extent and returned with the canonical verdict.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/" + HS.MAP1_DC_RPC, {
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_zip: zip })
@@ -2363,30 +2365,17 @@ HS.onReady(function(){
         // Gated HERE rather than by hiding markers later: a hidden marker is still a site the
         // page has accepted as belonging to this ZIP — counted, framed and exported — and the
         // claim being refused is membership, not visibility.
-        var natlSites = !natlAdmitted ? [] : natl.records.map(function(r){
-          return { id:r.source_key, name:r.project_name,
-                   status: r.normalized_status === "operational" ? "Operating" : "Approved",
-                   normalized_status:r.normalized_status, raw_status:r.raw_status,
-                   type:"datacenter", record_kind:"national_project",
-                   developer:r.developer_or_operator || null,
-                   lat:r.lat, lng:r.lng, scope:"point",
-                   location_precision:r.location_precision,
-                   location_text:r.location_text || null,
-                   record_url:r.source_url, url:r.source_url,
-                   source_name:r.source_name, source_key:r.source_key,
-                   // the server's canonical verdict for THIS ZIP — HS.zipModeSites admits on it
-                   zip_membership:r.zip_membership,
-                   relevance:"development" };
-        }).filter(HS.zipMemberAdmitted);
-        // ODbL CREDIT — derived ONLY from records that can actually reach the page. A site
-        // with no source_name, or none of the record_url render()'s sourced() gate requires,
-        // is dropped before anything is drawn, so crediting its source would name a source
-        // that supplied nothing visible. Measured: an array of junk rows survives the object
-        // filter and used to render the literal "Data-centre locations from undefined".
-        NATIONAL_SOURCES = Object.keys(natlSites.reduce(function(a,s){
-          if(s && s.source_name && s.record_url) a[s.source_name] = 1;
-          return a;
-        },{}));
+        // ONE mapping (HS.map1DcSite, lib/data.js), shared with lib/data.js::nationalDataCenters.
+        // The pin status is the server's map_status; the zip_membership verdict is what
+        // HS.zipModeSites admits on.
+        var natlSites = !natlAdmitted ? [] : natl.records.map(HS.map1DcSite).filter(HS.zipMemberAdmitted);
+        // LICENCE CREDIT — derived ONLY from records that can actually reach the page, each with
+        // its OWN licence (Compute Atlas / Epoch AI CC BY 4.0, OpenStreetMap ODbL). A site with no
+        // source_name, or none of the record_url render()'s sourced() gate requires, is dropped
+        // before anything is drawn, so crediting its source would name a source that supplied
+        // nothing visible. Measured: an array of junk rows survives the object filter and used
+        // to render the literal "Data-centre locations from undefined".
+        NATIONAL_SOURCES = HS.map1DcCredits(natlSites);
         // The cached report's development counters describe ITS centroid-radius development set,
         // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
         // Leaving them makes the headline tile contradict the map the resident is looking at
@@ -2658,7 +2647,7 @@ HS.onReady(function(){
       // source's record, not a HomeSignal permit finding, and say so.
       (NATIONAL_SOURCES.length
         ? (" Data-centre locations from " + NATIONAL_SOURCES.join(" · ")
-           + " — © OpenStreetMap contributors, ODbL. These are the source's own records, not local permit filings;"
+           + ". These are the sources' own records, not local permit filings;"
            + " open a pin for the original record.")
         : "") +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");

@@ -1860,6 +1860,41 @@ an outcome it cannot source**.
 
 ---
 
+## 7.09 MAP 1 READS ONE DATA-CENTRE CONTRACT — `public.map1_dc_zip_members` (2026-09-22)
+
+**Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
+`public.map1_dc_zip_members(p_zip)`** (DDL of record `docs/map1-dc-publication.sql`, called
+through `HS.MAP1_DC_RPC` by `homesignalmap.html` and `lib/data.js`). The page never asks which
+source a record came from, never unions sources, and never maps a lifecycle word itself.
+
+- **Canonical rows**: `CONFIRMED_DC` canonical entities (Step 3A) with `RESOLVED` `POINT`
+  geography (Step 3B), a lifecycle inside the ONE map (`operational`→Operating,
+  `under_construction`/`permitted`→Approved, `proposed`→Proposed; anything else does not
+  publish) and a real record URL. `DC_CANDIDATE` is withheld — Step 3A only calls a record a
+  candidate when the publisher calls it rumored or its own fields disagree.
+- **Membership** is `geo.zip_point_membership_in` against the ZCTA polygon (§7.08). A ZIP with
+  no boundary returns nothing — never a centroid, radius, nearest ZIP or neighbour.
+- **`legacy_osm_compat` rows are TRANSITIONAL.** `national_dc_records` (1,824 OSM rows, a
+  one-time load, no recurring acquisition) is served behind the same function so no marker
+  disappears. **Retirement condition:** OSM onboarded as a `dc_source` with a recurring
+  acquisition; then the CTE is deleted. A compatibility row is dropped only when ONE published
+  canonical entity sits at IDENTICAL coordinates (≤ 1 m, one-to-one). Anything looser is not a
+  match — "Vantage WA12"/"WA13" are 166 m apart, same operator, two buildings.
+- **Retired:** `national_dc_for_zip` (the 5-mile centroid radius) and `national_dc_zip_members`
+  are service-role only; no resident role may execute either.
+- **Measured 2026-09-22 over all 12,722 pages**, against the reader it replaced: pages with any
+  data centre **365 → 799**; rows 1,083 → 1,896 (1,048 canonical + 848 compatibility); the 235
+  compatibility rows that left were ALL explained by an identical-coordinate canonical entity on
+  the same page (0 unexplained, 0 pages lost every marker); 0 non-member rows, 0 duplicate
+  markers, 0 truncated reads; 706 pages have no ZCTA boundary and return nothing.
+- **Gates:** `test/map1_dc_publication_pg` (disposable PostGIS, 13 checks, 10 prohibited
+  mutations — centroid radius, non-confirmed, unresolved, OSM drop, loose dedupe, no dedupe,
+  Atlas-only, cancelled, status collapse, superseded) in `zip-membership-suite.yml`, and
+  `test/map1-dc-publication.test.mjs` (no second reader, no `atlas_for_zip`/`epoch_for_zip`,
+  no private table named by resident code, no place/project special case).
+
+---
+
 ## 7.08 ZIP MEMBERSHIP IS GEOGRAPHY, NOT PROXIMITY — ONE AUTHORITY, EVERY PLANE (2026-09-22)
 
 **A ZIP-mode record belongs to the ZIP iff `ST_Intersects(point, authoritative ZCTA boundary)`,

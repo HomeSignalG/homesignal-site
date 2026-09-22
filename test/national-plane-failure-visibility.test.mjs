@@ -62,7 +62,11 @@ const row = (k) => ({
   project_name: 'NTT Ashburn VA9 Data Center', developer_or_operator: 'NTT',
   raw_status: 'operational', normalized_status: 'operational', project_type: 'datacenter',
   lat: 39.02, lng: -77.46, location_text: null, location_precision: 'approximate_campus_area',
-  distance_mi: 1.21, last_seen_at: '2026-09-15T00:00:00Z',
+  distance_mi: null, last_seen_at: '2026-09-15T00:00:00Z',
+  // the one contract's own columns (docs/map1-dc-publication.sql)
+  map_status: 'Operating', source_licence: 'ODbL, © OpenStreetMap contributors',
+  zip_membership: 'member', publication_basis: 'legacy_osm_compat',
+  canonical_entity_id: null, quality_flags: [], source_count: 1,
 });
 
 console.log('\n1. A successful read WITH records still returns records');
@@ -193,6 +197,16 @@ console.log('\n9. lib/data.js carries the same distinction on its own contract')
     .data.nationalDataCenters('07446', { lat: 41.05, lng: -74.14 });
   ok(zeroRes.length === 0 && zeroRes.complete === true,
     '9e a genuine zero is complete TRUE — the distinction the defect erased');
+  const outside = Object.assign(row('way/9'), { zip_membership: 'outside' });
+  const mixRes = await (await loadData(makeSb({ data: [row('way/1'), outside], error: null })))
+    .data.nationalDataCenters('20147', { lat: 39.0, lng: -77.4 });
+  ok(mixRes.length === 1 && mixRes[0].source_key === 'way/1',
+    '9f a row whose verdict is not member is never admitted, whatever else it carries');
+  const prop = Object.assign(row('dc:x'), { map_status: 'Proposed', normalized_status: 'proposed' });
+  const propRes = await (await loadData(makeSb({ data: [prop], error: null })))
+    .data.nationalDataCenters('20147', { lat: 39.0, lng: -77.4 });
+  ok(propRes.length === 1 && propRes[0].status === 'Proposed',
+    '9g the pin status is the server map_status — a proposed project is never drawn as Approved');
 }
 
 console.log('\n10. The raw table stays blocked and the approved RPC stays the only door');
@@ -201,8 +215,10 @@ console.log('\n10. The raw table stays blocked and the approved RPC stays the on
     '10a raw table revoked from anon/authenticated');
   ok(/alter table public\.national_dc_records enable row level security;/.test(sqlExec),
     '10b RLS enabled on the raw table');
-  ok(/security definer/.test(sqlExec) && /grant execute on function public\.national_dc_for_zip/.test(sqlExec),
-    '10c the RPC is SECURITY DEFINER and is what anon may execute');
+  ok(/security definer/.test(sqlExec)
+     && /revoke execute on function public\.national_dc_for_zip\(text, numeric\) from anon, authenticated;/.test(sqlExec)
+     && !/grant execute on function public\.national_dc_for_zip\(text, numeric\) to anon/.test(sqlExec),
+    '10c the RADIUS read is retired from anon — the one contract (map1_dc_zip_members) is the resident door');
   ok(/has_table_privilege\('anon', 'public\.national_dc_records', 'SELECT'\)/.test(sqlExec),
     '10d a fail-closed guard raises if the raw table ever becomes anon-readable');
   ok(/where r\.map_eligible/.test(sqlExec),
@@ -234,8 +250,15 @@ console.log('\n11. The local connector pipeline and default filters are untouche
 
 console.log('\n12. Attribution can never credit a source that supplied nothing');
 {
-  ok(/if\(s && s\.source_name && s\.record_url\) a\[s\.source_name\] = 1;/.test(mapExec),
-    '12a the credit names a source ONLY for a record that can actually reach the page');
+  ok(/NATIONAL_SOURCES = HS\.map1DcCredits\(natlSites\);/.test(mapExec),
+    '12a the credit is built ONLY from the sites that can actually reach the page');
+  const credits = HS.map1DcCredits([
+    HS.map1DcSite(row('way/1')),
+    Object.assign(HS.map1DcSite(row('dc:1')), { source_name: 'Compute Atlas (Edward Kubiak)', source_licence: 'CC BY 4.0' }),
+    Object.assign(HS.map1DcSite(row('dc:2')), { source_name: 'Epoch AI', record_url: null }),
+  ]);
+  ok(JSON.stringify(credits) === JSON.stringify(['Compute Atlas (Edward Kubiak) (CC BY 4.0)', 'OpenStreetMap (ODbL, © OpenStreetMap contributors)']),
+    '12a1 each credited source carries its OWN licence, and a site with no record URL credits nothing', credits);
   ok(!/a\[s\.source_name\]=1; return a;/.test(mapExec),
     '12a2 ...never from every row returned, which credited "undefined" on a junk payload');
   // On a failure there are no records, so no credit is rendered — the licence obligation

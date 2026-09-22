@@ -72,18 +72,19 @@ ok(z0 > 0 && z1 > z0 && /app_zip_projects_markers|ZIP_AUTH_RPC_URL/.test(LOADZIP
   'B0 the ZIP-mode loader was found (positive control)');
 ok(!/national_dc_for_zip/.test(LOADZIP) && !/p_radius_mi/.test(LOADZIP),
   'B1 ZIP mode never calls the radius read (national_dc_for_zip / p_radius_mi)');
-ok(/rpc\/national_dc_zip_members/.test(LOADZIP), 'B2 ZIP mode reads the national plane through national_dc_zip_members');
+ok(/rpc\/" \+ HS\.MAP1_DC_RPC/.test(LOADZIP) && !/rpc\/national_dc_zip_members/.test(LOADZIP),
+  'B2 ZIP mode reads data centres through THE ONE contract (HS.MAP1_DC_RPC = map1_dc_zip_members)');
 const renders = LOADZIP.match(/render\(\{[\s\S]*?\}\);/g) || [];
 ok(renders.length >= 2 && renders.every((r) => /sites:\s*HS\.zipModeSites\(/.test(r)),
   'B3 EVERY ZIP-mode render() receives its sites from HS.zipModeSites — no plane is appended beside it',
   renders.map((r) => (r.match(/sites:[^\n]*/) || [''])[0]));
 const fetches = LOADZIP.match(/(?:fetch\(|rest\/v1\/)[^\n]{0,90}/g) || [];
 // place labels, indexability and county source metadata carry no points
-const allowed = /development_reports|zip_mode_report_sites|ZIP_AUTH_RPC_URL|national_dc_zip_members|communities|app_community_meta|county-sources\.json|fetch\(url/;
+const allowed = /development_reports|zip_mode_report_sites|ZIP_AUTH_RPC_URL|HS\.MAP1_DC_RPC|communities|app_community_meta|county-sources\.json|fetch\(url/;
 ok(fetches.every((f) => allowed.test(f)),
   'B4 ZIP mode fetches only the report, the authoritative markers, the national membership read and point-free metadata',
   fetches.filter((f) => !allowed.test(f)));
-ok(/zip_membership:r\.zip_membership/.test(LOADZIP) && /\.filter\(HS\.zipMemberAdmitted\)/.test(LOADZIP),
+ok(/natl\.records\.map\(HS\.map1DcSite\)\.filter\(HS\.zipMemberAdmitted\)/.test(LOADZIP),
   'B5 each national site carries the server verdict and is filtered on it');
 const REST = (LOADZIP.match(/development_reports\?[^;]*;/) || [''])[0];
 ok(REST && !/[,=]sites[,&]/.test(REST),
