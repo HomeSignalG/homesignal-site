@@ -200,6 +200,9 @@ function lit(s) { return "'" + String(s).replace(/'/g, "''") + "'"; }
 //   committed_matches_live 13 / 13   (the record file is byte-equivalent IN BEHAVIOUR to live)
 // The two declared asymmetries reproduced exactly: case 11 sql=true js=false (the unsafe
 // direction, waived in known_asymmetries) and case 12 sql=false js=true (SQL stricter, safe).
+//   ↳ 2026-09-22: case 12 is now js=false too — the page refuses a visual whose `scope` and
+//     `capture_policy.scope` disagree (`HS.mapsCaptureScopeConflict`), so the two halves
+//     AGREE on it. The receipt above is dated and left as it was measured.
 //
 // ⚠️ THE FIRST EMITTED QUERY COULD NOT RUN AT ALL. It carried `call = '{}' = expected`, which
 // Postgres rejects (42601 — comparison does not chain), so the emitter had shipped an artifact

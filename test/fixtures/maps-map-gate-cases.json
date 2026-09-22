@@ -475,7 +475,7 @@
       "zip": "12345",
       "image": true,
       "derive_scope": "zip",
-      "js": true,
+      "js": false,
       "sql": false,
       "evidence": {
         "theme": "datacenter",
