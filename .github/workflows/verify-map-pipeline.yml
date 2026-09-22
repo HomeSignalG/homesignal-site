@@ -1,0 +1,40 @@
+name: verify-map-pipeline
+
+# Live browser check of the map-pipeline-remediation invariants (coordinate filter intact,
+# NO synthetic-centroid marker, every dev/facility marker sourced, no meeting plotted) across
+# a representative ZIP set. Runs where egress works (GitHub-hosted runner); the build sandbox
+# cannot reach homesignal.net. These invariants hold before AND after the geocode backfill,
+# so this is also the no-regression guard for the change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: "comma-separated ZIPs"
+        default: "43235,76132,10002,78617,84302,84003,85201,84083"
+  schedule:
+    - cron: '47 13 * * *'   # daily 13:47 UTC
+  push:
+    branches: [main]
+    paths:
+      - 'maps.html'
+      - 'lib/data.js'
+      - 'lib/templates.js'
+      - 'scripts/verify-map-pipeline.mjs'
+      - 'docs/app-map-geocode-migration.sql'
+      - '.github/workflows/verify-map-pipeline.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify map-pipeline invariants
+        env:
+          ZIPS: ${{ github.event.inputs.zips || '43235,76132,10002,78617,84302,84003,85201,84083' }}
+        run: node scripts/verify-map-pipeline.mjs
