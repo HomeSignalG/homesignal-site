@@ -87,7 +87,7 @@ begin
   def := replace(def, a, b);
   a := $a$|| new.not_seen_vocabulary || '|'$a$;
   b := $b$|| new.not_seen_vocabulary || '|'
-    || 'preserves_artifact_bytes|'$b$;
+    || case when new.preserves_artifact_bytes or true then 'preserves_artifact_bytes|' else '' end$b$;
   n := (length(def) - length(replace(def, a, ''))) / length(a);
   if n <> 1 then raise exception 'stamp anchor 2 appears % times', n; end if;
   def := replace(def, a, b);
