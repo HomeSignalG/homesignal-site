@@ -103,8 +103,11 @@ catch (e) { console.log('FAIL — 0c: the patched module could not be imported: 
 ok(mod && typeof mod.attach === 'function',
   '0c: `attach` is reachable and is a function — the export splice worked');
 
-const draft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS',
-                evidence: { project_id: 'p1', theme: 'datacenter' } };
+// `tile` and a data-centre record name are what a real MAPS row carries, and since 2026-09-22
+// they are REQUIRED: finishCapture refuses a draft for which Map 1 resolves no Development Type
+// (or one that disagrees with its stamped theme) before it uploads anything.
+const draft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS', tile: 'development',
+                evidence: { project_id: 'p1', theme: 'datacenter', project_name: 'Acme Data Center' } };
 // The fixture carries the fields `attach` actually reads, taken from the shape the two
 // capture functions return. Nothing here is invented to make a test pass: a missing
 // sub-object surfaced as a TypeError rather than a silent pass, which is the harness
@@ -218,8 +221,8 @@ ok(mod && typeof mod.zipMapFallback === 'function',
   '5a: `zipMapFallback` is reachable at module scope — the lift worked');
 
 if (mod && typeof mod.zipMapFallback === 'function') {
-  const zipDraft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS',
-                     evidence: { project_id: 'p1', theme: 'datacenter' } };
+  const zipDraft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS', tile: 'development',
+                     evidence: { project_id: 'p1', theme: 'datacenter', project_name: 'Acme Data Center' } };
 
   // — the SUCCESS path: a real ZIP picture, bound at ZIP scope, reason recorded —
   globalThis.__TEST_ABSENCE = async () => okResult({});
