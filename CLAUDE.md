@@ -1393,7 +1393,126 @@ things and no more:**
 
 ---
 
+
+## 7.07 EVERY MAPS POST MUST HAVE A MAP — THE LADDER IS `PROJECT MAP → ZIP MAP`, NEVER `→ NO MAP` ⚖️ FOUNDER RULING (2026-09-22)
+
+**§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
+MAPS post that cannot truthfully pin its record does **not** fall through to no image — it
+falls back to the map of its own ZIP, which is a real screenshot of a real page and is what a
+resident opening the link sees.
+
+🔑 **THE CONTRADICTION WAS IN ONE WORD, AND IT WAS IN THE CAPTURE JOB, NOT THE RULE.**
+`scripts/maps-social-image.mjs` carried five `ineligible(...)` exits — no coordinates, project
+not on the map, and three more — each of which ended the capture with **no picture at all**
+while §7.06 said the post could not publish without one. Those five are now `zipFallback(why)`,
+which calls the SAME `captureAbsence(page, d, themeZ)` §7.06 already ships, with `proj = null`.
+**No second capture system was built**; the ladder is one existing function reached from five
+more places. The refusal *reason* is preserved on the row, so "we could not pin the record" is
+still readable — it just no longer means "no map".
+
+### Scope is DECLARED in the key, and there is no sentinel project id
+
+`lib/maps-capture-binding.js` is still the one capture-identity module, and
+`HS.mapsCaptureKey(post, scope)` now takes the scope as an **argument** rather than inferring
+it from whether `evidence.project_id` is set. Four measured shapes:
+
+```
+absence                   v1|80210|absence|datacenter|dc-map-state@1
+projectless non-absence   v1|80210|zip-scope|
+project @ project scope   v1|80210|p1|s|1.00000|2.00000|datacenter||Approved|N|datacenter|dc-map-state@1
+project @ ZIP scope       v1|80210|zip-scope|datacenter|dc-map-state@1
+```
+
+⛔ **`absence` is #1280's token and is preserved BYTE-FOR-BYTE** — 18 live rows carry it, and
+re-spelling it would orphan every one of them. `zip-scope` is the new token for a ZIP map that
+is not an absence post.
+⛔ **DO NOT give a ZIP capture a fake `project_id` to make it fit the project key shape.** That
+is a fabricated record reference in the one field that says what a picture is of; the founder's
+requirement names it explicitly. The scope argument exists so the key can say "a place" without
+having to name a record.
+
+- 🔑 **#1278 STOPPED ONE STEP SHORT AND IT LOOKED FINISHED.** `mapsCaptureKey` still opened
+  `if (!e.project_id) return null`, so every ZIP capture wrote `capture_key: null` — an image
+  bound to nothing, which the gate then refuses forever. A ladder that produces a picture the
+  binding cannot describe has not produced a map.
+- ⚠️ **`attach()` REFERENCED A LOCAL OF `finishCapture` AND THREW IN PRODUCTION**
+  (`ReferenceError: scope is not defined`). Every offline test passed, because none of them
+  **executed** the generator. `scope` is now a required, validated parameter of `attach` — it
+  throws on anything but `'project'` / `'zip'` — and `test/maps-capture-attach-executes.test.mjs`
+  (25 checks) imports the real module and runs it, asserting each transformation step it
+  performs to do so. A second derivation (`r.scope || (proj ? …)`) keyed on a field nothing ever
+  set was deleted in the same change; **two of my own pins had frozen the broken shape**, one of
+  them requiring the re-derivation as the correct form — it would have gone red on the fix and
+  green on the defect.
+
+### UNIVERSAL and THEME-SPECIFIC are separate, in both halves
+
+`bskyMapGateBlock` (universal — every MAPS post) is split from `dcThemeMapPolicyApplies`
+(theme-specific — `dc-map-state@1`). `acquisition.html`'s `mapsImageRequired(p)` is now simply
+`p.content_family === 'MAPS'`, and the universal gate **fails closed if the library is absent**.
+The enforced boundary is the database, not the dashboard:
+`public.hs_maps_map_gate_violations` → `public.hs_approve_social_post` +
+`public.social_posts_publication_guard`, so approve / schedule / publish all refuse a mapless or
+mis-bound row.
+
+- 🛑 **I WEAKENED THAT GATE IN #560 AND MY OWN AUDIT FOUND IT — verified live, not inferred.**
+  Removing SQL's copy of the subject vocabulary (the right fix — that copy is what had refused
+  28 correct captures) also dropped the rule JS still enforces: **a ZIP-scope image may not name
+  a record as its subject.** Latent, 0 rows, JS still refusing — but SQL is the enforced
+  boundary, so a direct RPC call was the exposure. Re-tightened 2026-09-22 with a UUID-shaped
+  subject test rather than a key-format copy, so it cannot drift the way #560's copy did.
+- ⚠️ **The first tightening migration reported `anchor appeared 0 times`** because the anchor
+  needle was single-quoted, so `''` collapsed to `'` and could never match the stored `post''s`.
+  **Dollar-quote a needle that contains a quote**, and keep the fail-closed count — it is what
+  turned a silent no-op into a refusal.
+
+### The JS↔SQL parity harness, and the one asymmetry that is real
+
+`test/maps-map-gate-parity.test.mjs` (24 checks) + `test/fixtures/maps-map-gate-cases.json`
+(13 cases) drive **both** halves off one fixture: JS by calling the shipped `bskyMapGateBlock`,
+SQL by emitting a self-contained query (`--emit-sql <path>`) that defines the committed function
+in `pg_temp` and asks `pg_temp`, `public` and the fixture the same question in one SELECT.
+
+🔑 **EXACT PARITY IS IMPOSSIBLE BY DESIGN, so the contract is DIRECTIONAL: `sql_pass ⟹ js_pass`.**
+JS recomputes the whole key; SQL deliberately holds no key vocabulary. **One case violates the
+contract and is recorded in `known_asymmetries` with its reason and residual exposure** — SQL
+cannot tell an invented subject token from a future legitimate one and accepts both, and closing
+it means reintroducing the vocabulary that broke in #560. **0 such rows exist** (measured
+2026-09-22: all 46 ZIP-scope subjects are `zip-scope` (28) or `absence` (18), against a control of 9 project-scope rows). Accepting it or paying the
+drift risk knowingly is a founder call.
+
+- ✅ **THE EMITTED QUERY WAS RUN AGAINST PRODUCTION, 2026-09-22: `agree` 13/13 and
+  `committed_matches_live` 13/13** — so the committed record file is behaviourally equal to the
+  live function, and both match the fixture. Both declared asymmetries reproduced exactly.
+- ⚠️ **THE FIRST EMITTED QUERY COULD NOT RUN AT ALL** — it carried `call = '{}' = expected`,
+  which Postgres rejects (42601; comparison does not chain). The emitter had been shipping an
+  artifact nobody had executed, looking exactly like one that worked. The same run exposed a
+  second instrument fault: it created a `pg_temp` copy and then queried `public`, silently
+  answering the LIVE question while claiming to test the COMMITTED one.
+- 📌 **NOTHING IN CI RUNS THAT SQL — not for this gate and not for the DC one.** So the receipt
+  above is a dated measurement, not a standing guarantee. Wiring it is a new scheduled job with a
+  database credential, which the autonomy envelope gates; flagged rather than added.
+
+### Backlog drained, and what the numbers do NOT say
+
+Measured live 2026-09-22: **55 MAPS rows · 55 with a map · 55 approvable · 0 blocked · 0 missing
+a capture key · 0 past `draft`.** Composition: 18 `absence` · 28 `zip-scope` (ZIP fallbacks of
+project-backed rows) · 9 project-scope.
+
+- ⚠️ **THE FINAL ACCEPTANCE TEST'S SHAPE HAS NEVER OCCURRED IN PRODUCTION.**
+  `projectless_zipscope = 0` — the `zip-scope` token's projectless population is **zero**, so
+  that branch is proven by the offline suite and by a synthetic row, never by a live one. Say
+  that, rather than reading 55/55 as though it had been exercised.
+- ⚠️ **MUTATION F SURVIVES AND IS NOT FIXED.** `zipFallback` is a closure inside `main()`, so its
+  body cannot be executed offline; the suite pins its **wiring** (all five former `ineligible`
+  exits reach it) and not its behaviour. Every other mutation A–E is killed, measured on EXIT
+  CODE. ⚠️ I first reported "all 7 killed"; **E had been mis-targeted** and only killed once
+  aimed at `bskyMapGateBlock`.
+
+---
 ## 7.06 EVERY MAPS POST GETS A MAP, EVEN WHEN THERE IS NO DATA CENTRE ⚖️ FOUNDER RULING (2026-09-21)
+
+⬆️ **GENERALISED, NOT SUPERSEDED, BY §7.07 ABOVE (2026-09-22): the map is now mandatory for EVERY MAPS post, not only the Data Center Theme, and the fallback ladder is `PROJECT MAP → ZIP MAP`.** Everything below still governs the theme and still describes the absence capture §7.07's ladder reuses — read it first, then §7.07 for what changed.
 
 **An ABSENCE post — the campaign's honest "no data center filings appear in <publisher>
 records for <ZIP>" answer — is photographed like every other Data Center Theme post.** The
