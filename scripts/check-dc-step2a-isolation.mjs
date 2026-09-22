@@ -47,6 +47,7 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 // REFUSES (a missing DDL is a shorter list, and a shorter list is a greener gate).
 const DDL = 'docs/dc-step2a-foundation.sql';
 const DDLS = [DDL, 'docs/dc-step3a-canonical-identity.sql', 'docs/dc-step3a-selftest.sql',
+  'docs/dc-step3b-canonical-geography.sql',
   'docs/dc-step3c-resident-lineage-ledger.sql', 'docs/dc-step3c-ledger-distinct-record-grain.sql'];
 // The reconciliation plane is whatever the Step 3C DDL declares, derived like everything else.
 const RECONCILIATION_DDLS = DDLS.filter((f) => f.includes('dc-step3c-'));
@@ -60,7 +61,8 @@ const RECONCILIATION_READER = 'scripts/dc-step3c-reconcile.mjs';
 // evidence tables, plus the completion RPC this whole correction is about.
 const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
   'dc_complete_acquisition', 'dc_current_observation', 'dc_canonical_entity',
-  'dc_resolve_canonical', 'dc_resident_lineage_ledger'];
+  'dc_resolve_canonical', 'dc_resident_lineage_ledger', 'dc_entity_geography',
+  'dc_resolve_geography'];
 
 /**
  * The Step-2A objects a resident-facing file may not name, read out of the DDL of record.
@@ -226,6 +228,8 @@ function selfTest() {
     'create table if not exists public.dc_canonical_entity (',
     'create or replace function public.dc_resolve_canonical(',
     'create view public.dc_resident_lineage_ledger',
+    'create table if not exists public.dc_entity_geography (',
+    'create or replace function public.dc_resolve_geography(p_apply boolean default false)',
     // present in the real DDL and deliberately NOT derived -- a trigger is not callable
     'create constraint trigger dc_run_evidence_commit_trg',
     'create trigger dc_source_observation_guard_trg',
