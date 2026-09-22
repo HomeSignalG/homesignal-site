@@ -542,7 +542,10 @@ async function capture(page, draft, proj, theme) {
     }
     policyRecord = await page.evaluate(
       ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
-      [policyApply, verify],
+      // The scope this capture ACTUALLY shot. The record builder defaults to 'project' when
+      // told nothing, which stamped every ZIP-map fallback as a project capture and made the
+      // enforced SQL guard demand a target the ZIP map never sought (64165, 2026-09-22).
+      [policyApply, { ...verify, scope: 'project' }],
     );
     // The row will only be treated as bound if this record validates, so validating it HERE
     // — before an image is written or uploaded — turns a would-be silently-unusable capture
@@ -667,7 +670,8 @@ async function captureAbsence(page, draft, theme) {
     }
     policyRecord = await page.evaluate(
       ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
-      [policyApply, verify],
+      // ZIP scope, always: this path frames the ZIP and seeks no target. See the project path.
+      [policyApply, { ...verify, scope: 'zip' }],
     );
     const ev = HS.mapsDcCapturePolicyEvidence({ capture_policy: policyRecord });
     if (!ev.ok) {
