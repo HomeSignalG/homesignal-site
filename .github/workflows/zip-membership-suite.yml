@@ -1,11 +1,12 @@
 name: zip-membership-suite
 
 # ZIP MEMBERSHIP IS GEOGRAPHY, NOT PROXIMITY (docs/zip-membership-canonical.sql).
-# Runs the SHIPPED membership SQL against a DISPOSABLE PostGIS: 26 adversarial checks (a point
-# inside the ZIP but 12.4 mi from its centre, a point outside it 0.53 mi from its centre, a
-# boundary point, a missing boundary; every Type and every source), then three prohibited
-# mutations — centroid radius, a national-source bypass, a Data-center-only trigger — each of
-# which MUST fail the suite. The offline half (test/zip-membership-canonical.test.mjs) runs in
+# Runs the SHIPPED membership SQL against a DISPOSABLE PostGIS: 17 adversarial checks on the
+# canonical predicate and the national ZIP-mode read (a point inside the ZIP but 12.4 mi from its
+# centre, a point outside it 0.53 mi from its centre, a boundary point, a missing boundary; four
+# sources and four project Types at one coordinate), then three prohibited mutations — centroid
+# radius, a national-source bypass, a Type-scoped national read — each of which MUST fail the
+# suite. The offline half (test/zip-membership-canonical.test.mjs) runs in
 # unit-tests.yml with every other offline suite.
 
 on:
