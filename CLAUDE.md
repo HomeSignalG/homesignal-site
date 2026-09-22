@@ -669,6 +669,45 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     typed by hand. **When two halves disagree, the generated half is the evidence.** That
     also means a wrong ZIP identity is detectable *without* the package: compare each ZIP's
     stored centroid against the county its community row claims.
+    - ⚠️ **I WROTE THAT SENTENCE BEFORE RUNNING IT. Having now run it nationally: the
+      detector WORKS but OVER-FLAGS HEAVILY, and the raw output is not a defect list.**
+      Measured 2026-09-22 over all 12,722 pages — distance from each ZIP's stored centroid
+      to the median centroid of its county's other ZIP children, threshold 60 miles:
+      **98 outliers**, and the honest breakdown is
+      **~82 benign · ~14 leads · ~2 probable defects.**
+      - **The West dominates and is almost all legitimate.** Bethel Census Area AK spans
+        169 miles, Nye NV 139, Mohave AZ 141, Navajo AZ 128. A big county is not a bug.
+        **Normalise by county extent before treating distance as a signal**, or the list is
+        just a map of the Mountain West.
+      - 🔑 **NORMALISE THE COUNTY NAME TOO, OR ALASKA FAKES 24 HITS.** Our `county` field
+        stores `Bethel`, `Kenai Peninsula`, `Chugach`, `Matanuska-Susitna`,
+        `Fairbanks North Star`; the package stores them with ` Census Area` / ` Borough`.
+        Stripping only `" County"` reported **24 naming artifacts as disagreements** — my
+        first run did exactly that.
+      - 📌 **THE ~14 GENUINE NAME DISAGREEMENTS ARE A LEAD, NOT A DEFECT LIST**, and for a
+        STRONGER reason than Colorado's: the 42-state rows came from the **Census
+        ZCTA→county FIPS** crosswalk, not the `zipcodes` package, so each one is *one
+        authoritative source disagreeing with another* over a ZCTA that may genuinely span
+        counties. Recorded so they are not lost and not re-derived:
+        `58621` ND (McKenzie/Golden Valley) · `82301` WY (Sweetwater/Carbon) ·
+        `82701` WY (Campbell/Weston) · `83350` ID (Blaine/Minidoka) ·
+        `85545` AZ (Maricopa/Gila) · `86503`,`86505` AZ (Navajo/Apache) ·
+        `87313`,`87328` NM (San Juan/McKinley) · `89310` NV (Nye/Lander) ·
+        `93252` CA (Ventura/Kern) · `99729` AK (Mat-Su/Denali) ·
+        `99737`,`99780` AK (Copper River/Southeast Fairbanks).
+        **Settling any of them needs per-county SHARES**, the same instrument Colorado's ten
+        are waiting on.
+      - ⚠️ **`82701` IS A DOCUMENTED DECISION THAT USPS CONTRADICTS.** The 42-state note
+        records Newcastle WY as deliberately resolved to **WY Campbell**; the package says
+        **Weston**. That ruling may rest on the contaminated free-text `County` column the
+        same section warns about. Worth a founder look before anyone cites it again.
+      - 🎯 **THE TWO PROBABLE DEFECTS: `99737` Delta Junction and `99780` Tok**, sitting
+        ~117 mi from Copper River's centre under a root that is not theirs — and
+        **Southeast Fairbanks Census Area is not modeled at all**, so nothing could have
+        placed them correctly. Deliberately NOT fixed: both are `noindex` with 1 rendered
+        row, and BOTH the current and the correct root have **zero feeds**, so there is no
+        resident-visible delta — while fixing it would mint a fourth permanently-empty
+        county root. **Do it as part of an Alaska feed pass, not as standalone hygiene.**
   - ⚠️ **A LABEL MISMATCH IS USUALLY *US* BEING RIGHT.** 14 Utah names disagree with USPS and
     **10 are deliberate and better** — Murray, Holladay, Taylorsville, Cottonwood Heights and
     University of Utah are real incorporated cities that USPS files under the *mailing* label
