@@ -16,14 +16,92 @@
 // ⚠️ `national_dc_source_key_unique` (docs/national-dc-plane.sql) contains the substring
 // "dc_source". The pattern is token-bounded precisely so that a substring match cannot
 // manufacture a violation -- an over-flagging gate is how a real violation gets waved through.
+//
+// 🛑 THE LIST IS DERIVED FROM THE DDL OF RECORD, NOT TRANSCRIBED -- AND THAT IS A CORRECTION,
+// NOT A TIDY-UP. It was three hand-typed table names, and Step 2B-1A then added
+// `public.dc_complete_acquisition`: the RPC that is now the ONLY path to SUCCESS_COMPLETE.
+// A resident-facing file could call it and this gate would have passed, because a caller
+// reaches that function WITHOUT NAMING ANY TABLE -- which is precisely what a name-based gate
+// misses. The ingest half was widened to four names in homesignal-ingest#562 and this half was
+// not, so the two copies of one boundary disagreed for as long as it took someone to look.
+//
+// Transcribing a list is an unreviewed edit to a control (claims rule 7). Deriving it from
+// `docs/dc-step2a-foundation.sql` -- the DDL of record, which lives in this repo -- means the
+// gate covers every object Step 2A declares TODAY and every object a future revision adds,
+// with no second copy to keep in step. Measured before widening: the 3 names became 12, and
+// the scanned surface carries ZERO references to any of them, so it cost no false positive.
+//
+// TABLES AND FUNCTIONS ONLY. Triggers and indexes are not callable or readable from a page --
+// naming one proves nothing a resident could act on -- so they are deliberately out, and
+// leaving them out keeps the parse surface small enough to reason about.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
-// The objects Step 2A installs. Token-bounded: a preceding or following [A-Za-z0-9_] is NOT a hit.
-const FORBIDDEN = ['dc_source_observation', 'dc_acquisition_run', 'dc_source'];
+// The DDL of record. This repo owns it, so no cross-repo token is needed to read it.
+const DDL = 'docs/dc-step2a-foundation.sql';
+
+// ⚠️ THE ANCHOR THAT MAKES DERIVATION SAFE. A parse that quietly returns fewer names produces a
+// SHORTER forbidden list and therefore a GREENER gate -- failure in the direction nobody looks.
+// So the derived set must contain all four of these or the gate REFUSES to run: the three
+// evidence tables, plus the completion RPC this whole correction is about.
+const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
+  'dc_complete_acquisition'];
+
+/**
+ * The Step-2A objects a resident-facing file may not name, read out of the DDL of record.
+ * Pure: takes the SQL text, returns the names. Longest first, so a hit reports the most
+ * specific object it found rather than a prefix of it (`dc_source` is a prefix of five others).
+ */
+export function deriveForbidden(sql) {
+  const names = new Set();
+  const re = /create\s+(?:table\s+(?:if\s+not\s+exists\s+)?|or\s+replace\s+function\s+)public\.([a-z0-9_]+)/gi;
+  let m;
+  while ((m = re.exec(sql)) !== null) names.add(m[1].toLowerCase());
+  return [...names].sort((a, b) => b.length - a.length || a.localeCompare(b));
+}
+
+/** Every reason the derived list may not be trusted. Empty array = usable. */
+export function forbiddenComplaints(list) {
+  const out = [];
+  if (!Array.isArray(list) || list.length === 0) {
+    out.push(`derived 0 object name(s) from ${DDL} -- a gate with an empty forbidden list `
+      + 'reports clean against every possible violation');
+    return out;
+  }
+  for (const req of REQUIRED) {
+    if (!list.includes(req)) {
+      out.push(`derived list is missing ${req}, which Step 2A definitely declares -- `
+        + `the ${DDL} parse is wrong, and a short list is a green gate`);
+    }
+  }
+  return out;
+}
+
+function loadForbidden() {
+  let sql;
+  try {
+    sql = readFileSync(join(ROOT, DDL), 'utf8');
+  } catch (err) {
+    console.error(`REFUSED: cannot read the DDL of record at ${DDL} (${err.code || err.message}). `
+      + 'The forbidden list is derived from it, so an unreadable DDL means this gate does not '
+      + 'know what it is defending. "Could not look" must never render as "looked and found '
+      + 'nothing".');
+    process.exit(1);
+  }
+  const list = deriveForbidden(sql);
+  const complaints = forbiddenComplaints(list);
+  if (complaints.length) {
+    console.error('REFUSED: the derived forbidden list is not trustworthy.');
+    for (const c of complaints) console.error(`  - ${c}`);
+    process.exit(1);
+  }
+  return list;
+}
+
+const FORBIDDEN = loadForbidden();
 const PATTERN = new RegExp(`(^|[^A-Za-z0-9_])(${FORBIDDEN.join('|')})([^A-Za-z0-9_]|$)`);
 
 // Resident-facing, or built into something a resident loads.
@@ -79,10 +157,15 @@ function scan(paths, readFile) {
 
 function selfTest() {
   // The gate must FAIL on a planted violation and PASS on the lookalike it must not flag.
+  //
+  // 🔑 THE FOURTH PLANT IS THE DEFECT THIS GATE SHIPPED WITH. `sb.rpc('dc_complete_acquisition')`
+  // names NO table, so it scored CLEAN against the original three-name list while reaching the
+  // one function that can finalise an acquisition. A page cannot be allowed near it.
   const planted = {
     'lib/fake-page.js': "const r = await sb.from('dc_source_observation').select('*');",
     'lib/fake-two.js': 'select * from public.dc_acquisition_run where 1=1',
     'lib/fake-three.js': "from('dc_source')",
+    'lib/fake-rpc.js': "const { data } = await sb.rpc('dc_complete_acquisition', args);",
   };
   const lookalike = {
     'docs-like/national.sql': 'constraint national_dc_source_key_unique unique (dc_source_key)',
@@ -92,11 +175,120 @@ function selfTest() {
   const bad = scan(Object.keys(planted), read);
   const ok = scan(Object.keys(lookalike), read);
   let fails = 0;
-  if (bad.length !== 3) { console.error(`SELF-TEST FAIL: planted violations detected ${bad.length}/3`); fails++; }
-  if (ok.length !== 0) { console.error(`SELF-TEST FAIL: ${ok.length} false positive(s): ${JSON.stringify(ok)}`); fails++; }
+  const want = Object.keys(planted).length;
+  // Derived from the plant set, never a literal: a hard-coded count silently stops matching the
+  // moment a fifth plant is added, and then the detector-is-alive check is the thing that broke.
+  if (bad.length !== want) {
+    console.error(`SELF-TEST FAIL: planted violations detected ${bad.length}/${want}`);
+    fails++;
+  }
+  if (ok.length !== 0) {
+    console.error(`SELF-TEST FAIL: ${ok.length} false positive(s): ${JSON.stringify(ok)}`);
+    fails++;
+  }
+
+  // ---- the derivation itself, because the list is no longer written by hand ----------------
+  // A parse regression shortens the list, which makes the gate GREENER. So the parse is tested
+  // in both directions against SQL shaped exactly like the DDL of record.
+  const sample = [
+    'create table if not exists public.dc_source (',
+    'create table public.dc_acquisition_run (',
+    'create table if not exists public.dc_source_observation (',
+    'create or replace function public.dc_complete_acquisition(',
+    'create or replace function public.dc_evidence_commit_guard()',
+    // present in the real DDL and deliberately NOT derived -- a trigger is not callable
+    'create constraint trigger dc_run_evidence_commit_trg',
+    'create trigger dc_source_observation_guard_trg',
+    'create index if not exists dc_obs_run_ordinal_uk on public.dc_source_observation',
+  ].join('\n');
+  const derived = deriveForbidden(sample);
+  for (const req of ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
+    'dc_complete_acquisition', 'dc_evidence_commit_guard']) {
+    if (!derived.includes(req)) {
+      console.error(`SELF-TEST FAIL: deriveForbidden dropped ${req}`);
+      fails++;
+    }
+  }
+  for (const never of ['dc_run_evidence_commit_trg', 'dc_source_observation_guard_trg',
+    'dc_obs_run_ordinal_uk']) {
+    if (derived.includes(never)) {
+      console.error(`SELF-TEST FAIL: deriveForbidden picked up ${never}, which is not a `
+        + 'callable object -- the parse is matching more than tables and functions');
+      fails++;
+    }
+  }
+  // Longest first, or a hit reports `dc_source` for a `dc_source_observation` line.
+  if (derived[0].length < derived[derived.length - 1].length) {
+    console.error('SELF-TEST FAIL: derived list is not longest-first, so a hit will report a '
+      + 'prefix instead of the object actually found');
+    fails++;
+  }
+
+  // ---- fail-closed: an untrustworthy list must REFUSE, never scan with it ------------------
+  if (forbiddenComplaints([]).length === 0) {
+    console.error('SELF-TEST FAIL: an EMPTY derived list was accepted -- that gate forbids '
+      + 'nothing and reports PASS against every violation');
+    fails++;
+  }
+  if (forbiddenComplaints(['dc_source', 'dc_acquisition_run', 'dc_source_observation'])
+    .length === 0) {
+    console.error('SELF-TEST FAIL: a list missing dc_complete_acquisition was accepted -- that '
+      + 'is exactly the hole this gate shipped with');
+    fails++;
+  }
+  if (forbiddenComplaints(deriveForbidden(sample)).length !== 0) {
+    console.error('SELF-TEST FAIL: a correctly derived list was REJECTED -- the anchor is '
+      + 'over-strict and the gate cannot run at all');
+    fails++;
+  }
+
+  // ---- STRUCTURAL: loadForbidden must ACT on the verdict it computes -------------------
+  // 🔑 TWO MUTATIONS SURVIVED EVERYTHING ABOVE, AND BOTH ARE THE SAME SHAPE: make
+  // `loadForbidden` compute the complaints and then ignore them, or let an unreadable DDL fall
+  // back to a hand-typed list. Every behavioural assertion in this file still passed, because
+  // they exercise the PURE functions -- nothing checked that the caller obeys them. A gate that
+  // decides correctly and proceeds anyway has silently stopped being a gate.
+  const self = readFileSync(join(ROOT, SELF), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  const at = self.indexOf('function loadForbidden()');
+  let slice = '';
+  if (at === -1) {
+    console.error('SELF-TEST FAIL: cannot find loadForbidden() to pin -- this check is inert');
+    fails++;
+  } else {
+    let depth = 0;
+    for (let i = self.indexOf('{', at); i < self.length; i++) {
+      if (self[i] === '{') depth++;
+      else if (self[i] === '}') { depth--; if (depth === 0) { slice = self.slice(at, i + 1); break; } }
+    }
+  }
+  // POSITIVE CONTROL: the slice must BE loadForbidden, or every assertion below is vacuous.
+  // (The first version of a pin like this ran to end-of-file and certified the whole module.)
+  if (!slice.includes('readFileSync') || !slice.includes('deriveForbidden')
+    || !slice.includes('forbiddenComplaints') || slice.length > 1800) {
+    console.error(`SELF-TEST FAIL: the loadForbidden slice is not what this pin thinks it is `
+      + `(${slice.length} chars) -- refusing to assert against it`);
+    fails++;
+  } else {
+    const exits = (slice.match(/process\.exit\(1\)/g) || []).length;
+    if (exits !== 2) {
+      console.error(`SELF-TEST FAIL: loadForbidden carries ${exits} refusal(s), expected 2 -- `
+        + 'one for an unreadable DDL and one for an untrustworthy derived list. A computed '
+        + 'complaint that does not stop the run is not a control.');
+      fails++;
+    }
+    if (/\[\s*'dc_[a-z_]+'/.test(slice)) {
+      console.error('SELF-TEST FAIL: loadForbidden contains a hand-typed dc_* list -- the whole '
+        + 'point is that the list is DERIVED; a literal fallback re-creates the defect');
+      fails++;
+    }
+  }
+
   if (fails) { console.error('SELF-TEST FAILED -- the gate cannot be trusted'); process.exit(1); }
-  console.log('SELF-TEST PASS: 3/3 planted violations caught, 0 false positives on the '
-    + 'national_dc_source_key_unique lookalike');
+  console.log(`SELF-TEST PASS: ${want}/${want} planted violations caught (including the `
+    + 'dc_complete_acquisition RPC call the three-name list missed), 0 false positives on the '
+    + 'national_dc_source_key_unique lookalike, derivation proven in both directions, and an '
+    + 'empty or RPC-less list REFUSED, with loadForbidden pinned to ACT on both.');
 }
 
 if (process.argv.includes('--self-test')) { selfTest(); process.exit(0); }
