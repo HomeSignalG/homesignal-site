@@ -338,6 +338,24 @@ begin
     res := res || jsonb_build_object('n','O a capability-free source still completes without an artifact','d', 'RAISED: ' || sqlerrm);
   end;
 
+  -- O2: what the merged writer sends BEFORE any opt-in -- refs + code_version on a capability-free source -- is accepted
+  declare r_off2 uuid; begin
+    insert into public.dc_acquisition_run (source_key,distribution_key,trigger_kind,request_url,parser_key,parser_version,
+        source_contract_version,source_contract,source_contract_fingerprint,code_version)
+      values (SRC_OFF,'d','manual','https://t.invalid','p','1',0,'{}','','deadbeef') returning id into r_off2;
+    execute format($q$select public.dc_complete_acquisition(%L,200,%L,'sf',1,1,%L::jsonb,null,5,'application/json',%L)$q$, r_off2, SHA,
+      jsonb_build_array(jsonb_build_object('source_row_ordinal',0,'semantic_observation_fingerprint',FP1,'raw_payload','{}'::jsonb,'normalization_version','nv1',
+        'raw_payload_ref','storage://government-source-archive/dc_evidence/__art_off__/' || SHA || '.json#row=0')),
+      'storage://government-source-archive/dc_evidence/__art_off__/' || SHA || '.json');
+    select count(*) into n from public.dc_source_observation o join public.dc_acquisition_run r on r.id = o.acquisition_run_id
+     where r.id = r_off2 and r.completeness_state = 'SUCCESS_COMPLETE' and r.code_version = 'deadbeef'
+       and o.raw_payload_ref = r.artifact_ref || '#row=0';
+    res := res || jsonb_build_object('n','O2 capability-free source completes carrying artifact_ref + raw_payload_ref + code_version','d',
+      case when n = 1 then null else 'n=' || n end);
+  exception when others then
+    res := res || jsonb_build_object('n','O2 capability-free source completes carrying artifact_ref + raw_payload_ref + code_version','d', 'RAISED: ' || sqlerrm);
+  end;
+
   -- P: history is untouched and not reinterpreted
   select count(*) into n from public.dc_acquisition_run
    where source_key in ('compute_atlas','epoch_ai') and source_contract ? 'preserves_artifact_bytes';
