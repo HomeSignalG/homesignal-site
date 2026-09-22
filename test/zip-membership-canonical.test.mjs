@@ -10,7 +10,7 @@
 //   C  the door reads the verdict and NOTHING about Type, source, distance or coordinates
 //   D  Type independence   E  source independence   F  a future Type   G  a future source
 //   H  fail-closed states
-//   K  KNOWN OPEN — the facility plane is still radius context; pinned so it moves deliberately
+//   K  the FACILITY plane: read-only, verdict-gated, count = the drawn population
 //   M  this suite is load-bearing: a centroid-radius door and a source-bypass door both fail it
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -43,12 +43,20 @@ const fnBody = (name) => {
 };
 const PRED = fnBody('geo.zip_point_membership_in');
 const NATL = fnBody('public.national_dc_zip_members');
-ok(PRED && NATL, 'A0 the canonical predicate and the national read are present (positive control for the slices)');
+const FAC = fnBody('public.zip_mode_report_sites');
+ok(PRED && NATL && FAC, 'A0 the canonical predicate, the national read and the facility read are present (positive control)');
 ok((SQL.match(/ST_Intersects/g) || []).length === 1 && /ST_Intersects/.test(PRED),
   'A1 ST_Intersects appears EXACTLY ONCE in the SQL of record — inside the canonical predicate');
 ok(!/ST_DWithin|ST_Distance|ST_Buffer|ST_Centroid|ST_PointOnSurface|3958\.8|\basin\(|radius/i.test(SQL),
   'A2 no proximity construct (DWithin/Distance/Buffer/Centroid/haversine/radius) anywhere in executable SQL');
-ok(/geo\.zip_point_membership_in\(/.test(NATL), 'A3 the national read CALLS the canonical predicate');
+ok(/geo\.zip_point_membership_in\(/.test(NATL) && /geo\.zip_point_membership_in\(/.test(FAC),
+  'A3 the national read AND the facility read CALL the canonical predicate');
+ok(/filter \(where not is_point or verdict = 'member'\)/.test(FAC),
+  'A3b the facility read serves a point only on a member verdict (areas unfiltered)');
+ok(!/\b(insert|update|delete)\b/i.test(FAC) && /\bstable\b/i.test(SQL.slice(SQL.indexOf('function public.zip_mode_report_sites'), SQL.indexOf('function public.zip_mode_report_sites') + 200)),
+  'A3c the facility read writes NOTHING (STABLE, no insert/update/delete) — never the crash-coinciding rewrite');
+ok(!/use_type|layer|type_raw|category|registry_id|src/.test(FAC.replace(/relevance/g, '')),
+  'A3d the facility read never reads a Type or source field');
 ok(/verdict = 'member'/.test(NATL), 'A4 the national read serves only rows whose verdict is member');
 ok(!/project_type\s*=|source_name\s*=/.test(NATL), 'A5 the national read never filters on Type or source');
 ok(!/create or replace function public\.dev_reports_enforce|create trigger|update public\.development_reports/i.test(SQL),
@@ -71,18 +79,28 @@ ok(renders.length >= 2 && renders.every((r) => /sites:\s*HS\.zipModeSites\(/.tes
   renders.map((r) => (r.match(/sites:[^\n]*/) || [''])[0]));
 const fetches = LOADZIP.match(/(?:fetch\(|rest\/v1\/)[^\n]{0,90}/g) || [];
 // place labels, indexability and county source metadata carry no points
-const allowed = /development_reports|ZIP_AUTH_RPC_URL|national_dc_zip_members|communities|app_community_meta|county-sources\.json|fetch\(url/;
+const allowed = /development_reports|zip_mode_report_sites|ZIP_AUTH_RPC_URL|national_dc_zip_members|communities|app_community_meta|county-sources\.json|fetch\(url/;
 ok(fetches.every((f) => allowed.test(f)),
   'B4 ZIP mode fetches only the report, the authoritative markers, the national membership read and point-free metadata',
   fetches.filter((f) => !allowed.test(f)));
 ok(/zip_membership:r\.zip_membership/.test(LOADZIP) && /\.filter\(HS\.zipMemberAdmitted\)/.test(LOADZIP),
   'B5 each national site carries the server verdict and is filtered on it');
+const REST = (LOADZIP.match(/development_reports\?[^;]*;/) || [''])[0];
+ok(REST && !/[,=]sites[,&]/.test(REST),
+  'B6 ZIP mode never downloads the raw report sites — facilities arrive only through zip_mode_report_sites', REST);
+ok(/sites:\s*HS\.zipModeSites\(rsSites,/.test(LOADZIP) && /HS\.zipReportSites\(rs\)/.test(LOADZIP),
+  'B7 the report plane handed to the door is the facility read\'s output');
+ok(/delete zipCounts\.facilities;/.test(LOADZIP) && !/zipCounts\.facilities\s*=/.test(LOADZIP),
+  'B8 the engine\'s radius-derived counts.facilities is removed; the tile counts the facilities drawn');
+ok(/var fac = sites\.filter\(function\(s\)\{ return s\.scope==="point" && s\.relevance!=="development"; \}\);/.test(PAGE)
+   && /: \(\(data\.counts && data\.counts\.facilities\) != null \? data\.counts\.facilities : fac\.length\)/.test(PAGE),
+  'B9 with counts.facilities absent the tile IS fac.length — the drawn facility set (positive control for B8)');
 
 // ── C. THE DOOR reads the verdict and nothing else ─────────────────────────────────────────
 const LIB = stripJs(read('lib/zip-authoritative.js'));
 const body = (name) => (LIB.match(new RegExp('HS\\.' + name + ' = function[\\s\\S]*?\\n  \\};')) || [''])[0];
-const DOOR = ['zipMemberAdmitted', 'zipAuthMergeSites', 'zipModeSites'].map(body);
-ok(DOOR.every(Boolean), 'C0 the three door functions were found (positive control)');
+const DOOR = ['zipMemberAdmitted', 'zipAuthMergeSites', 'zipModeSites', 'zipReportOutcome', 'zipReportSites', 'zipFacilityMemberCount'].map(body);
+ok(DOOR.every(Boolean), 'C0 the door functions were found (positive control)');
 ok(DOOR.every((b) => !/\blat\b|\blng\b|distance|radius|centroid|haversine|Math\./i.test(b)),
   'C1 the door does no geometry of its own — no coordinate, distance, radius or centroid');
 ok(DOOR.every((b) => !/use_type|\.layer|type_raw|category|\.name\b|\.src\b|registry_id|source_name|typeKey|CATEGORY_REGISTRY/.test(b)),
@@ -93,17 +111,19 @@ const HS = loadHS();
 const COMPLETE = { zip: '99901', mode: 'authoritative', status: 'boundary_complete', projects: [], markers: [] };
 const NOT_MEASURED = { zip: '99901', mode: 'authoritative', status: 'not_measured', projects: null, markers: null };
 const pt = (o) => Object.assign({ scope: 'point', lat: 40.38, lng: -99.98, record_url: 'https://x.test/1' }, o);
-// the membership-gated planes: national (verdict) — the facility plane is section K
+// both membership-gated point planes: national (3rd arg) and facility/report (1st arg)
 const admitted = (site, auth) => HS.zipModeSites([], auth || COMPLETE, [site]).length === 1;
+const facAdmitted = (site) => HS.zipModeSites([site], COMPLETE, []).length === 1;
 const TYPES = [
   { layer: 'industrial' }, { layer: 'energy' }, { layer: 'logistics' }, { layer: 'datacenter' },
   { use_type: 'Residential' }, { use_type: 'Commercial' }, { use_type: 'Roads & infrastructure' },
   { use_type: 'Civic/public' }, { use_type: 'Utility' }, { use_type: 'other project' },
   { use_type: 'Data center', type_raw: 'NEW DATA HALL', name: 'Stratos campus', category: 'datacenter' }];
 for (const v of ['member', 'outside', 'not_measured', 'no_coordinates', undefined]) {
-  const got = TYPES.map((t) => admitted(pt(Object.assign({ zip_membership: v }, t))));
+  const got = TYPES.map((t) => admitted(pt(Object.assign({ zip_membership: v }, t))))
+    .concat(TYPES.map((t) => facAdmitted(pt(Object.assign({ registry_id: '110000000001', zip_membership: v }, t)))));
   ok(got.every((g) => g === (v === 'member')),
-    'D1 Type independence — verdict ' + v + ' gives the same admission for all ' + TYPES.length + ' Types', got);
+    'D1 Type independence — verdict ' + v + ' gives the same admission for all ' + TYPES.length + ' Types, on BOTH point planes', got);
 }
 // the converse: same Type, different geography verdict -> different admission
 ok(admitted(pt({ layer: 'industrial', zip_membership: 'member' })) === true
@@ -144,15 +164,22 @@ ok(HS.zipModeSites([], null, [pt({ zip_membership: 'member' })]).length === 0, '
 ok(HS.zipModeSites([{ scope: 'area', label: 'county notice' }], NOT_MEASURED, []).length === 1,
   'H4 area notices are not point claims and keep their jurisdiction treatment');
 
-// K. ⛔ KNOWN OPEN — the facility plane (EPA FRS in development_reports.sites) is still
-//    radius-derived and NOT membership-gated (CLAUDE.md §7.08: the row-level fix was reverted
-//    after three production restarts). Pinned in BOTH directions so the next change moves it
-//    on purpose: today an unverdicted facility point IS shown; when the plane is fixed this
-//    assertion must be inverted, not deleted.
-ok(HS.zipModeSites([pt({ registry_id: '110000000001', layer: 'industrial' })], COMPLETE, []).length === 1,
-  'K1 KNOWN OPEN: a facility point with no membership verdict is still shown (radius context)');
-ok(/KNOWN OPEN/.test(read('lib/zip-authoritative.js')) && /KNOWN OPEN/.test(PAGE),
-  'K2 the open plane is named where a reader of the door and of the page will see it');
+// K. THE FACILITY PLANE — inverted from the KNOWN OPEN pin it replaces, as that pin required.
+ok(HS.zipModeSites([pt({ registry_id: '110000000001', layer: 'industrial' })], COMPLETE, []).length === 0,
+  'K1 a facility point with no membership verdict is NOT shown (the radius-derived plane is closed)');
+ok(HS.zipModeSites([pt({ registry_id: '110000000001', layer: 'industrial', zip_membership: 'member' })], COMPLETE, []).length === 1,
+  'K1b the same facility with the member verdict IS shown, as an EPA record (registry_id kept for the R overlay)');
+const RS = { zip: '99901', status: 'complete', sites: [pt({ registry_id: '1', zip_membership: 'member' }), { scope: 'area', label: 'n' }],
+             facility_counts: { member: 1, outside: 7, not_measured: 0, no_coordinates: 0 } };
+ok(HS.zipFacilityMemberCount(RS) === 1, 'K2 the tile count is the member count (the drawn population), not the candidates');
+ok(HS.zipFacilityMemberCount({ zip: '1', status: 'not_measured', sites: [], facility_counts: { member: 0 } }) === null,
+  'K3 no boundary -> the count is UNKNOWN (null -> dash), never 0 and never a radius count');
+ok(HS.zipFacilityMemberCount(null) === null && HS.zipReportSites(null).length === 0,
+  'K4 a failed facility read shows NO facilities and an unknown count — it never falls back to raw sites');
+ok(HS.zipFacilityMemberCount({ zip: '1', status: 'mystery', sites: [] }) === null,
+  'K5 an unrecognised status is unavailable, never measured');
+ok(HS.zipFacilityMemberCount({ zip: '1', status: 'no_report', sites: [], facility_counts: {} }) === 0,
+  'K6 no report at all is a real zero (nothing was retrieved for this ZIP)');
 
 // ── M. LOAD-BEARING: two mutated doors must each fail the behaviour above ───────────────────
 function mutantFails(src) {
@@ -169,7 +196,14 @@ const radiusDoor = ORIG.replace(
 const bypassDoor = ORIG.replace(
   "? (nationalSites || []).filter(HS.zipMemberAdmitted) : [];",
   "? (nationalSites || []) : [];");
-ok(radiusDoor !== ORIG && bypassDoor !== ORIG, 'M0 both mutations actually APPLY (a no-op mutation proves nothing)');
+const cachedBypassDoor = ORIG.replace(
+  "return HS.zipMemberAdmitted(s);                       // facility plane: verdict or out",
+  "return true;");
+ok(radiusDoor !== ORIG && bypassDoor !== ORIG && cachedBypassDoor !== ORIG,
+  'M0 every mutation actually APPLIES (a no-op mutation proves nothing)');
+{ const H = loadHS(cachedBypassDoor);
+  ok(H.zipModeSites([pt({ registry_id: '1', layer: 'industrial' })], COMPLETE, []).length === 1,
+    'M4 the cached-facility bypass mutation really admits an unverdicted facility (so K1 must fail on it)'); }
 ok(mutantFails(radiusDoor), 'M1 a centroid-radius door is caught');
 ok(mutantFails(bypassDoor), 'M2 a national-source bypass door is caught');
 ok(!mutantFails(ORIG), 'M3 the shipped door passes the same probe (control)');

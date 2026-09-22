@@ -16,11 +16,11 @@ apply_shipped
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 15 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped functions do not pass"; exit 1; fi
+if [ "$n_all" -lt 23 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped functions do not pass"; exit 1; fi
 
 status=0
 for m in "$here/mutations/centroid_radius.sql" "$here/mutations/national_bypass.sql" \
-         "$here/mutations/national_type_scoped.sql"; do
+         "$here/mutations/national_type_scoped.sql" "$here/mutations/facility_bypass.sql"; do
   apply_shipped
   P -f "$m" >/dev/null
   out="$(suite)"; n_fail=$(fails_of "$out")

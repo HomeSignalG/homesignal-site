@@ -7,3 +7,5 @@ functions proves nothing.
   source-specific ZIP association).
 - `national_type_scoped.sql` — the national read serves only one project Type, i.e. Type
   deciding geography.
+- `facility_bypass.sql` — the facility read serves every cached facility point as a member
+  (the radius-derived EPA plane restored).

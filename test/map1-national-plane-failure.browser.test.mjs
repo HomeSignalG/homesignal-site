@@ -18,6 +18,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -73,6 +74,7 @@ async function load(natl) {
       return route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ zip: '20147', mode: 'development', status: 'boundary_complete',
           projects: [], markers: [] }) });
+    if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
     if (url.includes('/rest/v1/development_reports'))
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW) });
     // ── VENDOR MOCKS, verbatim from the established browser-suite convention

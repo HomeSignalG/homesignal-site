@@ -13,6 +13,16 @@ create table geo.zcta_boundary (
 );
 create index zcta_boundary_geom_gix on geo.zcta_boundary using gist (geom);
 
+drop table if exists public.development_reports cascade;
+create table public.development_reports (
+  zip          text primary key,
+  home_lat     double precision,
+  home_lng     double precision,
+  counts       jsonb,
+  sites        jsonb,
+  refreshed_at timestamptz
+);
+
 drop table if exists public.national_dc_records cascade;
 create table public.national_dc_records (
   id                    uuid primary key default gen_random_uuid(),

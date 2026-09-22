@@ -153,13 +153,18 @@ ok(one && one.lat === 30.1745 && one.lng === -97.6134 && one.spanMi === 0.4,
 console.log('\nE. merge: authoritative development replaces radius-derived development');
 const report = [
   { scope: 'point', relevance: 'development', label: 'centroid-radius permit' },   // must go
-  { scope: 'point', relevance: 'facility', label: 'EPA facility', registry_id: '110000' }, // must stay
+  // THE FACILITY PLANE PASSES ONLY ON THE SERVER'S VERDICT (public.zip_mode_report_sites).
+  { scope: 'point', label: 'EPA facility', registry_id: '110000', zip_membership: 'member' },       // stays
+  { scope: 'point', label: 'EPA facility outside', registry_id: '110001', zip_membership: 'outside' }, // must go
+  { scope: 'point', label: 'EPA facility unstamped', registry_id: '110002' },                        // must go
   { scope: 'area', relevance: 'development', label: 'county-wide hearing' }        // must stay
 ];
 const merged = HS.zipAuthMergeSites(report, sites);
 ok(!merged.some(s => s.label === 'centroid-radius permit'),
   'E1 the cached report\'s own development points are replaced');
-ok(merged.some(s => s.label === 'EPA facility'), 'E2 EPA facilities are preserved untouched');
+ok(merged.some(s => s.label === 'EPA facility'), 'E2 a facility with a member verdict is preserved untouched');
+ok(!merged.some(s => s.label === 'EPA facility outside') && !merged.some(s => s.label === 'EPA facility unstamped'),
+  'E2b a facility verdicted outside, or carrying no verdict at all, is NOT admitted (fails closed)');
 ok(merged.some(s => s.label === 'county-wide hearing'), 'E3 area/jurisdiction notices are preserved');
 ok(merged.length === 2 + sites.length, 'E4 nothing else is lost', merged.length);
 ok(HS.zipAuthMergeSites(report, []).every(s => s.label !== 'centroid-radius permit'),

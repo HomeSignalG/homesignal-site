@@ -219,7 +219,9 @@ console.log('\n11. The local connector pipeline and default filters are untouche
     '11a the authoritative local read is unchanged');
   // 2026-09-22: the concat moved INTO the one ZIP-mode door (HS.zipModeSites), which merges the
   // local planes first and appends only national records carrying a 'member' verdict.
-  ok(/HS\.zipModeSites\(row\.sites\|\|\[\], auth, natlSites\)/.test(mapExec),
+  // 2026-09-22 (facility plane): the report plane now arrives through zip_mode_report_sites,
+  // already member-only, as rsSites — never as the raw cached row.sites.
+  ok(/HS\.zipModeSites\(rsSites, auth, natlSites\)/.test(mapExec),
     '11b local merge still runs first; national is concatenated, never substituted');
   ok(/app_projects_for_zip/.test(readFileSync(join(root, 'lib/data.js'), 'utf8')),
     '11c projects()/facilities() still read app_projects — local pipeline untouched');

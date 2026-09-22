@@ -156,6 +156,76 @@ $function$;
 revoke all on function public.national_dc_zip_members(text) from public;
 grant execute on function public.national_dc_zip_members(text) to anon, authenticated, service_role;
 
+-- ── 3. THE FACILITY PLANE FOR ZIP MODE — a READ, never a rewrite (2026-09-22, second design).
+-- Map 1 ZIP mode used to download development_reports.sites whole (up to 19.6 MB of text,
+-- ~95% development candidates it throws away) and draw every non-development point in it:
+-- the EPA facility plane, radius-derived, every point a Type pin. This returns, for ONE ZIP:
+--   * area / jurisdiction notices (scope <> 'point') unchanged — not point claims;
+--   * facility-plane points (scope 'point', relevance <> 'development') whose canonical verdict
+--     is 'member', each stamped `zip_membership: 'member'` IN THE RESPONSE ONLY;
+--   * the verdict counts, so the page's facility tile counts the SAME population it draws.
+-- Development points are not returned (Map 1 replaces them with the authoritative plane).
+-- Nothing is written: the stored row is untouched, so the rolling refresh, Fix 28's trigger
+-- and every other consumer see exactly what they saw before. The design that rewrote these
+-- arrays coincided with three production restarts and is not repeated.
+-- No boundary -> status 'not_measured' and NO facility points (never a radius substitute).
+-- Measured before shipping (read-only, production): p50 1.7 ms / p95 11.6 ms / max 67 ms over
+-- 200 random ZIPs; p50 83 / p95 127 / max 138 ms over the 20 largest report rows.
+create or replace function public.zip_mode_report_sites(p_zip text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path to 'public', 'geo', 'pg_temp'
+as $function$
+declare
+  v_sites jsonb;
+  v_geom  geometry;
+  v_out   jsonb;
+begin
+  if p_zip is null or p_zip !~ '^[0-9]{5}$' then
+    raise exception 'invalid zip' using errcode = '22023';
+  end if;
+  select d.sites into v_sites from public.development_reports d where d.zip = p_zip;
+  if not found or jsonb_typeof(v_sites) is distinct from 'array' then
+    return jsonb_build_object('zip', p_zip, 'status', 'no_report', 'sites', '[]'::jsonb,
+      'facility_counts', jsonb_build_object('member', 0, 'outside', 0, 'not_measured', 0, 'no_coordinates', 0));
+  end if;
+  v_geom := geo.zip_membership_boundary(p_zip);
+  with e as (
+    select t.o, t.x,
+           (t.x->>'scope') = 'point' as is_point,
+           coalesce(t.x->>'relevance', '') = 'development' as is_dev
+      from jsonb_array_elements(v_sites) with ordinality t(x, o)
+  ),
+  v as (
+    select e.*,
+           case when is_point and not is_dev then geo.zip_point_membership_in(v_geom,
+                  case when x->>'lat' ~ '^\s*-?[0-9]+(\.[0-9]+)?\s*$' then (x->>'lat')::float8 end,
+                  case when x->>'lng' ~ '^\s*-?[0-9]+(\.[0-9]+)?\s*$' then (x->>'lng')::float8 end)
+           end as verdict
+      from e
+     where not (is_point and is_dev)
+  )
+  select jsonb_build_object(
+           'zip', p_zip,
+           'status', case when v_geom is null then 'not_measured' else 'complete' end,
+           'sites', coalesce(jsonb_agg(case when is_point then x || jsonb_build_object('zip_membership', verdict) else x end
+                                       order by o) filter (where not is_point or verdict = 'member'), '[]'::jsonb),
+           'facility_counts', jsonb_build_object(
+              'member',         count(*) filter (where verdict = 'member'),
+              'outside',        count(*) filter (where verdict = 'outside'),
+              'not_measured',   count(*) filter (where verdict = 'not_measured'),
+              'no_coordinates', count(*) filter (where verdict = 'no_coordinates')))
+    into v_out
+    from v;
+  return v_out;
+end
+$function$;
+
+revoke all on function public.zip_mode_report_sites(text) from public;
+grant execute on function public.zip_mode_report_sites(text) to anon, authenticated, service_role;
+
 commit;
 
 -- =====================================================================================

@@ -123,6 +123,92 @@ select 'T5d national: a ZIP with no boundary serves NOTHING (Fix 29 — not a ci
        not exists (select 1 from _zm_cfg c, lateral public.national_dc_zip_members(c.zip_without) n
                     where n.source_key like 'zmtest:%'), null;
 
+-- ── 4. THE FACILITY PLANE — public.zip_mode_report_sites, a READ over the ZIP's report row.
+-- The same four coordinates, crossed with every Type input the resolver reads and several
+-- source shapes. Type and source may change a pin's look; they must never change the verdict.
+create temp table if not exists _zm_variants (t text, layer text, use_type text, src text, rid text, relevance text);
+truncate _zm_variants;
+insert into _zm_variants values
+  ('industrial',  'industrial', '',              'epa_frs',     '110000000001', null),
+  ('energy',      'energy',     '',              'epa_frs',     '110000000002', null),
+  ('logistics',   'logistics',  '',              'epa_frs',     '110000000003', null),
+  ('datacenter',  'datacenter', '',              'epa_frs',     '110000000004', null),
+  ('residential', '',           'residential',   'state',       'state-feed-1', null),
+  ('commercial',  '',           'commercial',    'national',    'atlas:9',      null),
+  ('FUTURE TYPE', 'zz-future-type', '',          'future-feed', 'future:1',     'regulatory_overlay');
+create temp table if not exists _zm_want (zip text, sites jsonb);
+truncate _zm_want;
+insert into _zm_want
+select c.zip_with, (select jsonb_agg(x) from (
+          select jsonb_strip_nulls(jsonb_build_object('scope','point','label', v.t || ' @' || p.k,
+                   'layer', v.layer, 'use_type', v.use_type, 'src', v.src, 'registry_id', v.rid,
+                   'relevance', v.relevance, 'record_url', 'https://example.test/' || v.t || p.k,
+                   'lat', p.lat::text, 'lng', p.lng::text)) x
+            from _zm_variants v, _zm_pts p where p.k in ('A','B','E','D')
+          union all
+          select jsonb_build_object('scope','point','relevance','development','label','cand @A',
+                   'use_type','residential','lat','40.38','lng','-99.98')
+          union all
+          select jsonb_build_object('scope','area','label','county-wide hearing','relevance','development')
+        ) s)
+  from _zm_cfg c
+union all
+select c.zip_without, jsonb_build_array(
+         jsonb_build_object('scope','point','label','near @N','registry_id','110000000010','layer','industrial','lat','40.20','lng','-99.79'),
+         jsonb_build_object('scope','area','label','county notice'))
+  from _zm_cfg c;
+-- UPDATE-then-INSERT (production carries further NOT NULL columns); reads never write back.
+update public.development_reports d set sites = w.sites from _zm_want w where d.zip = w.zip;
+insert into public.development_reports (zip, sites)
+select w.zip, w.sites from _zm_want w
+ where not exists (select 1 from public.development_reports d where d.zip = w.zip);
+
+create temp table if not exists _zm_rs (zip text, j jsonb);
+truncate _zm_rs;
+insert into _zm_rs select c.zip_with, public.zip_mode_report_sites(c.zip_with) from _zm_cfg c;
+insert into _zm_rs select c.zip_without, public.zip_mode_report_sites(c.zip_without) from _zm_cfg c;
+
+create temp table if not exists _zm_fac (lbl text, v text, scope text);
+truncate _zm_fac;
+insert into _zm_fac select e->>'label', e->>'zip_membership', e->>'scope'
+  from _zm_rs r, _zm_cfg c, jsonb_array_elements(r.j->'sites') e where r.zip = c.zip_with;
+
+insert into _zm_result(check_name, pass, detail)
+select 'T6 facility @' || w.k || ' (' || w.what || ') served and verdicted member for EVERY Type and source',
+       count(f.lbl) = (select count(*) from _zm_variants) and bool_and(f.v = 'member'),
+       count(f.lbl)::text || ' served'
+  from (values ('A', 'inside, 12.4 mi from centre'), ('E', 'on the boundary')) w(k, what)
+  left join _zm_fac f on f.lbl like '% @' || w.k and f.scope = 'point' and f.lbl <> 'cand @A'
+ group by w.k, w.what;
+insert into _zm_result(check_name, pass, detail)
+select 'T6b facility @' || w.k || ' (' || w.what || ') NEVER served, for every Type and source',
+       count(f.lbl) = 0, string_agg(f.lbl, ', ')
+  from (values ('B', 'outside, 0.53 mi from centre'), ('D', 'far outside')) w(k, what)
+  left join _zm_fac f on f.lbl like '% @' || w.k and f.scope = 'point'
+ group by w.k, w.what;
+insert into _zm_result(check_name, pass, detail)
+select 'T6c the facility count is the population drawn: member=14, outside=14',
+       (r.j->'facility_counts'->>'member')::int = 14 and (r.j->'facility_counts'->>'outside')::int = 14
+   and (r.j->'facility_counts'->>'member')::int = (select count(*) from _zm_fac where scope = 'point'),
+       r.j->>'facility_counts'
+  from _zm_rs r, _zm_cfg c where r.zip = c.zip_with;
+insert into _zm_result(check_name, pass, detail)
+select 'T6d development candidates are not served; area notices are served unchanged',
+       not exists (select 1 from _zm_fac where lbl = 'cand @A')
+   and exists (select 1 from _zm_fac where lbl = 'county-wide hearing' and v is null), null;
+insert into _zm_result(check_name, pass, detail)
+select 'T6e no boundary: status not_measured, NO facility served, area notice still served',
+       r.j->>'status' = 'not_measured'
+   and not exists (select 1 from jsonb_array_elements(r.j->'sites') e where e->>'scope' = 'point')
+   and exists (select 1 from jsonb_array_elements(r.j->'sites') e where e->>'label' = 'county notice')
+   and (r.j->'facility_counts'->>'not_measured')::int = 1,
+       r.j::text
+  from _zm_rs r, _zm_cfg c where r.zip = c.zip_without;
+insert into _zm_result(check_name, pass, detail)
+select 'T6f the read writes nothing: the stored row is byte-identical to what was stored',
+       d.sites = w.sites, null
+  from public.development_reports d join _zm_want w on w.zip = d.zip, _zm_cfg c where d.zip = c.zip_with;
+
 -- A check that evaluates to NULL is a FAILURE, never a silent non-answer (a bool_and over
 -- absent stamps is NULL — measured: that is how the Fix-28-only mutation first slipped a check).
 select check_name, coalesce(pass, false) as pass, detail from _zm_result order by n;
