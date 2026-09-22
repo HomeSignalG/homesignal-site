@@ -8,7 +8,7 @@ select
      select id, status, zip, updated_at, created_at, image_bucket_path, left(post_text, 90) as text_head,
             evidence->>'theme' as theme, evidence->>'capture_key' as capture_key
        from public.social_posts
-      where content_family = 'MAPS' and updated_at >= '2026-09-22 18:50:00+00'
-      order by updated_at) x) as changed_since_1850,
+      where content_family = 'MAPS' and updated_at >= '2026-09-22 19:43:00+00'
+      order by updated_at) x) as changed_since_1943,
   (select count(*) from public.social_posts where content_family='MAPS') as maps_total,
   (select max(updated_at) from public.social_posts where content_family='MAPS') as maps_max_updated;
