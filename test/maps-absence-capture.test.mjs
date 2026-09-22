@@ -121,7 +121,12 @@ ok(/async function finishCapture\(d, label, r, proj, results\)/.test(GEN_CODE),
 // implementation.
 ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 3,
   '5b: …and every path finishes through it — project, absence, and the ZIP fallback');
-ok(/const zipFallback = async/.test(GEN_CODE),
+// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
+// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
+// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
+// which syntax declares it — freezing the shape is what made three suites go red on a
+// correct change, for the third time in this workstream.
+ok(/async function zipMapFallback\(/.test(GEN_CODE),
   '5b₁: …including the ZIP fallback for a project that cannot truthfully be pinned');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');

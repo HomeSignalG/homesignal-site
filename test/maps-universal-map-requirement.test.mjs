@@ -290,7 +290,12 @@ ok(/content_family !== 'MAPS'/.test(SRC) || /content_family === 'MAPS'/.test(SRC
 // matrix for is measuring half the pipeline.
 const GEN = readFileSync(new URL('../scripts/maps-social-image.mjs', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(/const zipFallback = async/.test(GEN) && GEN.length > 5000,
+// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
+// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
+// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
+// which syntax declares it — freezing the shape is what made three suites go red on a
+// correct change, for the third time in this workstream.
+ok(/async function zipMapFallback\(/.test(GEN) && GEN.length > 5000,
   '8b₀: the comment-stripped generator still holds the real code (control for §8b)');
 // The four record-shaped conditions are DEMOTIONS, never refusals. Named individually, so
 // turning any ONE of them back fails here rather than three of four passing.

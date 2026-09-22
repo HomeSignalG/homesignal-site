@@ -297,7 +297,12 @@ ok((GEN.match(/recordOutcome\(/g) || []).length >= 2,
 // record what was removed, so a pin that searches the whole file finds the very string it
 // forbids — the trap this repo has already paid for twice.
 const GEN_EXEC = GEN.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(/const zipFallback = async/.test(GEN_EXEC),
+// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
+// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
+// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
+// which syntax declares it — freezing the shape is what made three suites go red on a
+// correct change, for the third time in this workstream.
+ok(/async function zipMapFallback\(/.test(GEN_EXEC),
   '10f₀₀: the comment-stripped source still holds the real code (control for §10f₀)');
 ok(!/await ineligible\(/.test(GEN_EXEC),
   '10f₀: …and no record-shaped condition ends a draft with no picture any more');
