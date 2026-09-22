@@ -312,7 +312,8 @@ begin
   select count(*) filter (where passed), string_agg(split_part(check_name,' ',1), ',' order by check_name collate "C") filter (where not passed)
     into n, msg from public.dc_step2a_selftest();
   res := res || jsonb_build_object('n','Q step2a selftest (baseline PASS=72 NON_PASSING=[51,53])','d', format('PASS=%s NON_PASSING=[%s]', n, coalesce(msg,'NONE')));
-  select count(*) filter (where passed), string_agg(split_part(check_name,' ',1), ',' order by check_name collate "C") filter (where not passed)
+  select count(*) filter (where outcome = 'PASS'),
+         string_agg(check_no::text || '=' || outcome, ',' order by check_no) filter (where outcome not in ('PASS','INFO'))
     into n, msg from public.dc_step3a_selftest();
   res := res || jsonb_build_object('n','R step3a selftest (baseline PASS=20 NONE)','d', format('PASS=%s NON_PASSING=[%s]', n, coalesce(msg,'NONE')));
 
