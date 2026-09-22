@@ -308,14 +308,13 @@ begin
    where source_key in ('compute_atlas','epoch_ai') and source_contract ? 'preserves_artifact_bytes';
   res := res || jsonb_build_object('n','P no historical run snapshot gained the capability','d', case when n = 0 then null else n::text end);
 
-  -- Q: the existing self-tests after the migration
-  begin s2a := public.dc_step2a_selftest(); exception when others then s2a := to_jsonb('RAISED ' || sqlerrm); end;
-  begin s3a := public.dc_step3a_selftest(); exception when others then s3a := to_jsonb('RAISED ' || sqlerrm); end;
-  res := res || jsonb_build_object('n','Q step2a selftest non-passing','d',
-     (select jsonb_agg(e->>'n') from jsonb_array_elements(case when jsonb_typeof(s2a)='array' then s2a else '[]' end) e where e->>'d' is not null and e->>'d' <> 'SKIP'));
-  res := res || jsonb_build_object('n','R step3a selftest non-passing','d',
-     (select jsonb_agg(e->>'n') from jsonb_array_elements(case when jsonb_typeof(s3a)='array' then s3a else '[]' end) e where e->>'d' is not null and e->>'d' <> 'SKIP'));
-  res := res || jsonb_build_object('n','Qraw','d', left(coalesce(s2a::text,'null'),300) || ' || ' || left(coalesce(s3a::text,'null'),300));
+  -- Q/R: the existing self-tests after the migration, counted exactly as the GREEN baseline was
+  select count(*) filter (where passed), string_agg(split_part(check_name,' ',1), ',' order by check_name collate "C") filter (where not passed)
+    into n, msg from public.dc_step2a_selftest();
+  res := res || jsonb_build_object('n','Q step2a selftest (baseline PASS=72 NON_PASSING=[51,53])','d', format('PASS=%s NON_PASSING=[%s]', n, coalesce(msg,'NONE')));
+  select count(*) filter (where passed), string_agg(split_part(check_name,' ',1), ',' order by check_name collate "C") filter (where not passed)
+    into n, msg from public.dc_step3a_selftest();
+  res := res || jsonb_build_object('n','R step3a selftest (baseline PASS=20 NONE)','d', format('PASS=%s NON_PASSING=[%s]', n, coalesce(msg,'NONE')));
 
   raise exception 'ART_TEST %', res;
 end
