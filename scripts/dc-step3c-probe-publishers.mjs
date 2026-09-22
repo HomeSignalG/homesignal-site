@@ -31,7 +31,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function osmIdLists(keys) {
   const out = { node: [], way: [], relation: [] };
   for (const k of keys) {
-    const m = /^(node|way|relation)\/(\d+)$/.exec(k);
+    // national_dc_records.source_key is 'osm:<type>/<id>' (measured: 'osm:node/10537283366').
+    const m = /^osm:(node|way|relation)\/(\d+)$/.exec(k);
     if (!m) throw new Error(`not an OSM element key: ${k}`);
     out[m[1]].push(m[2]);
   }
@@ -39,7 +40,7 @@ export function osmIdLists(keys) {
 }
 
 export function classifyOsm(requestedKeys, elements) {
-  const got = new Map(elements.map((e) => [`${e.type}/${e.id}`, e]));
+  const got = new Map(elements.map((e) => [`osm:${e.type}/${e.id}`, e]));
   const per = {};
   const tally = { requested: requestedKeys.length, returned: 0, absent_today: 0,
     still_tagged_data_center: 0, tag_no_longer_data_center: 0,
