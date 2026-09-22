@@ -1,5 +1,6 @@
 -- SCRATCH, read-only. Never merge. (probe 3 minus the national app_coverage_states rollup)
 select json_build_object(
+ 'probe3_still_active', (select json_agg(json_build_object('pid',pid,'started',query_start,'state',state)) from pg_stat_activity where pid<>pg_backend_pid() and query like '-- SCRATCH, read-only. Never merge.%'),
  'geo_state', (select json_agg(json_build_object('s',geography_state,'n',n)) from (select geography_state, count(*) n from public.app_zip_geography_state group by 1) x),
  'stats', (select json_agg(json_build_object('t',tablename,'c',attname,'nd',n_distinct,'mcv',left(most_common_vals::text,600))) from pg_stats where schemaname='public' and ((tablename='app_projects' and attname in ('record_kind','type','lens','date_kind','status','source_key_basis')) or (tablename='app_changes' and attname in ('lens','confidence')))),
  'source_registry', (select json_agg(json_build_object('id',source_id,'agency',agency_code,'prog',program_code,'kinds',subject_kinds,'rt',record_types,'status',connection_status)) from public.source_registry),
