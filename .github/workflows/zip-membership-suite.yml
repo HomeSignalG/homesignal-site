@@ -16,6 +16,9 @@ on:
       - 'docs/fix28-datacenter-zip-membership.sql'
       - 'test/zip_membership_pg/**'
       - 'test/zip-membership-canonical.test.mjs'
+      - 'docs/map1-dc-publication.sql'
+      - 'test/map1_dc_publication_pg/**'
+      - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
       - '.github/workflows/zip-membership-suite.yml'
@@ -25,6 +28,8 @@ on:
       - 'docs/zip-membership-canonical.sql'
       - 'docs/fix28-datacenter-zip-membership.sql'
       - 'test/zip_membership_pg/**'
+      - 'docs/map1-dc-publication.sql'
+      - 'test/map1_dc_publication_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -71,7 +76,17 @@ jobs:
         run: |
           set -o pipefail
           bash test/zip_membership_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/zm.log
+      - name: THE ONE Map 1 data-centre contract passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/map1_dc_publication_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pb.log
       - name: Receipt
         if: always()
         run: |
-          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

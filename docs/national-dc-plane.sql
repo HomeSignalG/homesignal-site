@@ -166,7 +166,14 @@ $function$;
 
 alter function public.national_dc_for_zip(text, numeric) owner to postgres;
 revoke all on function public.national_dc_for_zip(text, numeric) from public;
-grant execute on function public.national_dc_for_zip(text, numeric) to anon, authenticated;
+-- ⛔ RETIRED AS A RESIDENT READ (2026-09-22). This is a 5-mile radius around a ZIP centroid —
+-- proximity, not membership — and Map 1 now reads THE ONE contract, public.map1_dc_zip_members
+-- (docs/map1-dc-publication.sql). No resident role may execute it; it survives only for the
+-- service-role reconciliation instruments (dc-step3c-reconcile, the lineage ledger) that
+-- measure what it USED to serve. Applied by migration map1_dc_radius_retirement AFTER the
+-- page that no longer calls it was deployed.
+revoke execute on function public.national_dc_for_zip(text, numeric) from anon, authenticated;
+grant execute on function public.national_dc_for_zip(text, numeric) to service_role;
 
 -- ============================================================================
 -- 🔑 A PRIVILEGED READ IS NOT A CONTROL FOR AN ANON PATH (measured 2026-09-15)
