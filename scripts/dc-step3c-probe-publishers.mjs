@@ -170,7 +170,7 @@ async function probePermit(p, entry, layerMeta) {
     if (p.platform === 'arcgis') {
       r = await getJson(`${entry.service_url}/query?where=${encodeURIComponent(w)}&outFields=*&returnGeometry=false&f=json`);
       const feats = r.json && r.json.features;
-      if (r.json && r.json.error) return { outcome: 'QUERY_ERROR', detail: r.json.error.code };
+      if (r.json && r.json.error) return { outcome: 'QUERY_ERROR', detail: `${r.json.error.code} ${r.json.error.message || ''} ${(r.json.error.details || []).join(' ')}`.trim(), where: w };
       if (feats && feats.length) {
         const a = feats[0].attributes || {};
         const tsField = layerMeta && layerMeta.editFieldsInfo && layerMeta.editFieldsInfo.editDateField;
@@ -199,6 +199,9 @@ async function main() {
   const isResidentDC = await shippedClassifier();
   const summary = {};
 
+  // PROBE_ONLY=permits re-asks only the permit publishers (no OSM/EPA load when diagnosing).
+  const only = process.env.PROBE_ONLY || '';
+  if (!only || only === 'osm') {
   // ── OSM: the RESIDENT population only (reachable). ──
   const osmReach = ledger.filter((r) => r.source_population === 'osm' && r.resident_reachable).map((r) => r.record_key).sort();
   console.log('OSM resident-reachable keys .....', osmReach.length, md5(osmReach.join(',')));
@@ -219,6 +222,7 @@ async function main() {
   }
   console.log('OSM absent-today history', JSON.stringify(hist));
   summary.osm = { records: osmReach.length, ...osm.tally, history: hist };
+  }
 
   // ── Legacy: which resident records are DC by a PUBLISHER field vs only by NAME. ──
   const legacy = ledger.filter((r) => r.source_population !== 'osm');
@@ -242,6 +246,7 @@ async function main() {
   }
   console.log('legacy DC basis', JSON.stringify(basis));
 
+  if (!only || only === 'epa') {
   // ── EPA: ask the publisher about every resident facility, politely. ──
   const epa = { asked: 0, http_ok: 0, http_fail: 0, unparseable: 0, facility_present: 0, facility_absent: 0,
     with_naics_field: 0, naics_518210: 0, naics_other_only: 0, naics_field_empty: 0 };
@@ -267,6 +272,7 @@ async function main() {
   console.log('EPA NAICS key paths', JSON.stringify([...naicsPaths].slice(0, 12)));
   console.log('EPA ECHO tally', JSON.stringify(epa), 'failures', JSON.stringify(failures));
   summary.epa = epa;
+  }
 
   // ── Permits: resolve through the committed registry and ask for the exact record. ──
   const { readFileSync } = await import('node:fs');
@@ -298,7 +304,11 @@ async function main() {
       if (r.publisherTimestamp) t.publisher_timestamp++;
       if (r.version) t.version++;
     } else if (r.outcome === 'NOT_FOUND_BY_NATIVE_ID') t.not_found_by_native_id++;
-    else { t.http_or_query_error++; t.errors = t.errors || {}; t.errors[r.outcome] = (t.errors[r.outcome] || 0) + 1; }
+    else {
+      t.http_or_query_error++; t.errors = t.errors || {}; t.errors[r.outcome] = (t.errors[r.outcome] || 0) + 1;
+      // Named, so an error is diagnosable rather than a count: registry entry, the where clause, the publisher's message.
+      console.log('  PERMIT ERROR', JSON.stringify({ key: pr.key, outcome: r.outcome, detail: r.detail, where: r.where, service: entry.service_url || entry.domain }));
+    }
     await sleep(600);
   }
   console.log('PERMIT tally', JSON.stringify(permitTally));
