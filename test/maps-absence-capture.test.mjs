@@ -80,11 +80,11 @@ ok(/mapsDcCaptureVerifyAtShutter\(null\)/.test(ABS),
   '2d: …and re-verifies it AT THE SHUTTER, which is where a project capture verifies too');
 ok(/mapsDcCapturePolicyEvidence/.test(ABS),
   '2e: …then validates the record with the SHIPPED validator before any image is kept');
-ok(/panelSectionsInFrame/.test(ABS),
+ok(/cardInFrame\(page\)/.test(ABS),
   '2f: …and asserts the panel is in frame, so the controls are visible in the picture');
 ok(/homePins > 0/.test(ABS),
   '2g: the home-marker veto is unchanged — a broadcast post has no home and no radius');
-ok(/\.card\.mapcard/.test(ABS), '2h: …and it clips to the same Map 1 product card');
+ok(/const sel = CARD_CLIP;/.test(ABS), '2h: …and it clips to the same Map 1 product card');
 
 // ── §3 THE THREE THINGS IT DELIBERATELY DOES NOT DO ──────────────────────────────────
 // Each of these would be wrong rather than merely absent, so they are pinned as refusals.

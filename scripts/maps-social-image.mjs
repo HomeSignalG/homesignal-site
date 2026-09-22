@@ -76,11 +76,11 @@ const COORD_EPS = 1e-5;
 
 // ── MAPS · DATA CENTER THEME CAPTURE STATE ───────────────────────────────────────────
 //
-// WHAT CHANGES FOR A THEME POST, and nothing else does: the page is opened in the SHIPPED
-// embed mode, the SHIPPED "Data center" PROJECT TYPE control is the only one left checked,
-// and the shutter clips to the Map 1 PRODUCT CARD instead of to the bare map. Marker
-// targeting, the popup, the halo, the home-marker refusal and the coordinate checks are the
-// same code on both paths.
+// WHAT CHANGES FOR A THEME POST, and nothing else does: the SHIPPED "Data center" PROJECT
+// TYPE control is the only one left checked (with every STATUS on and REGULATORY off). Since
+// 2026-09-22 the embed mode and the PRODUCT-CARD clip are NOT theme-specific — every MAPS
+// capture uses them (see CARD_CLIP). Marker targeting, the popup, the halo, the home-marker
+// refusal and the coordinate checks are the same code on both paths.
 //
 // EMBED MODE IS A REAL PRODUCT MODE, NOT A SCREENSHOT HACK. `?embed=1` is what the Place
 // page already uses to host Map 1 in an iframe (homesignalmap.html sets `hs-embed` in the
@@ -155,6 +155,48 @@ async function panelSectionsInFrame(page) {
         || getComputedStyle(document.querySelector('.wrap>.head')).display === 'none',
     };
   });
+}
+
+// ── EVERY MAPS CAPTURE IS THE CARD — FOUNDER REQUIREMENT (2026-09-22) ────────────────
+// The founder saw ordinary MAPS drafts on the Acquisition Dashboard as a bare map with no
+// STATUS / PROJECT TYPE / REGULATORY panel, while the Data Center Theme drafts carried it,
+// and asked for the Data Center framing on the MAPS posts too. Until then an ordinary capture
+// clipped to `#map`. Now both paths clip to the Map 1 PRODUCT CARD in the shipped embed mode;
+// the theme decides only the FILTER STATE the card is photographed in.
+//
+// ⚠️ AN ORDINARY CAPTURE SETS NO FILTERS. It photographs the page's own default control
+// state (the capture context clears the persisted filter keys before every page — see
+// main()), and it RECORDS that state from the controls themselves, so the checkmarks visible
+// in the image are accounted for in the evidence rather than assumed. Choosing a filter state
+// for ordinary posts would be a new product decision; showing the default is not.
+//
+// The frame is part of the capture KEY (lib/maps-capture-binding.js MAP1_CARD_FRAME), so an
+// existing bare-map image stops counting as bound and is re-taken on the next run.
+const CARD_CLIP = '.card.mapcard';
+
+/**
+ * Assert the Map 1 card — header, all three control sections, the map key and the map — is
+ * inside the frame, that embed mode actually hid the global chrome, and read the controls.
+ * FAILS CLOSED: a section out of frame, surviving chrome, or controls the page did not render
+ * cleanly all refuse the capture rather than shipping a picture missing its panel.
+ */
+async function cardInFrame(page) {
+  const panel = await panelSectionsInFrame(page);
+  // A cropped card is a card that no longer proves what it is there to prove, so a section
+  // out of frame refuses the capture instead of shipping a picture missing its controls.
+  const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
+    .filter((k) => !panel[k]);
+  if (missing.length) {
+    return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
+  }
+  if (!panel.sidebar_hidden || !panel.search_form_hidden) {
+    return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
+  }
+  const controls = await page.evaluate(() => window.HS.mapsDcCaptureReadControls());
+  if (!controls || (controls.problems && controls.problems.length)) {
+    return { ok: false, reason: `the Map 1 panel controls could not be read: ${((controls && controls.problems) || ['no reading']).join('; ')}` };
+  }
+  return { ok: true, panel, controls: { statuses: controls.statuses, types: controls.types, regulatory: controls.regulatory } };
 }
 
 async function api(pathname, init) {
@@ -289,10 +331,10 @@ function nearly(a, b) { return typeof a === 'number' && typeof b === 'number' &&
  * a substitute image.
  */
 async function capture(page, draft, proj, theme) {
-  // A theme capture is the Map 1 PRODUCT CARD, so it opens the page in the shipped embed
-  // mode. A plain MAPS capture is unchanged, byte for byte.
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`
-    + (theme ? `&${EMBED_PARAM}` : '');
+  // EVERY MAPS capture is the Map 1 PRODUCT CARD, so it opens the page in the shipped embed
+  // mode (founder requirement 2026-09-22 — see CARD_FRAME_REQUIRED). The theme only decides
+  // which FILTER STATE the card is photographed in, never whether the card is in the frame.
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   // THE POLICY MODULE RIDES WITH THE PAGE, never a copy of it in this file.
   await page.addScriptTag({ content: POLICY_SRC });
@@ -499,30 +541,19 @@ async function capture(page, draft, proj, theme) {
     return { ok: false, reason: `the target could not be made identifiable (popup: ${clean.popupOpen}, halo: ${clean.haloPresent})` };
   }
 
-  // Suppress only chrome that is not the map: page header/nav/footer sit outside #map, so
-  // clipping to #map already excludes them. Leaflet's own zoom control is the one control
-  // inside the frame and is hidden for the shot.
+  // Suppress only chrome that is not the map: embed mode hides the page header/nav/footer
+  // (asserted by cardInFrame). Leaflet's own zoom control is the one control inside the map
+  // and is hidden for the shot.
   await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
   await page.waitForTimeout(1200);   // let the framed tiles settle
 
-  // THE SHUTTER TARGET IS THE DIFFERENCE. A plain MAPS capture clips to `#map` — the map is
-  // its whole subject. A theme capture clips to the Map 1 PRODUCT CARD, because the card's
-  // controls are what say WHICH records are on screen: the image has to show that Data center
-  // is the selected PROJECT TYPE, or the post's hook is unsupported by its own picture.
-  let panel = null;
-  if (theme === 'datacenter') {
-    panel = await panelSectionsInFrame(page);
-    // A cropped card is a card that no longer proves what it is there to prove, so a section
-    // out of frame refuses the capture instead of shipping a picture missing its controls.
-    const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
-      .filter((k) => !panel[k]);
-    if (missing.length) {
-      return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
-    }
-    if (!panel.sidebar_hidden || !panel.search_form_hidden) {
-      return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
-    }
-  }
+  // THE SHUTTER TARGET IS THE MAP 1 PRODUCT CARD, ON EVERY PATH. The card's controls are what
+  // say WHICH records are on screen: a Data Center image has to show that Data center is the
+  // selected PROJECT TYPE, and an ordinary image shows the page's own STATUS / PROJECT TYPE /
+  // REGULATORY state (founder requirement 2026-09-22; it used to clip to the bare `#map`).
+  const cardCheck = await cardInFrame(page);
+  if (!cardCheck.ok) return { ok: false, reason: cardCheck.reason };
+  const { panel, controls } = cardCheck;
 
   // ── RE-READ THE CONTROLS AND THE DRAWN LAYER, AT THE SHUTTER ───────────────────────
   // ⚠️ THE READING TAKEN WHEN THE FILTER WAS APPLIED IS NOT A STATEMENT ABOUT THE IMAGE.
@@ -556,7 +587,7 @@ async function capture(page, draft, proj, theme) {
     }
   }
 
-  const sel = theme === 'datacenter' ? '.card.mapcard' : '#map';
+  const sel = CARD_CLIP;
   const el = await page.$(sel);
   if (!el) return { ok: false, reason: `no ${sel} element` };
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -572,6 +603,7 @@ async function capture(page, draft, proj, theme) {
     theme: theme || null,
     policyRecord,
     panel,
+    controls,
   };
 }
 
@@ -606,8 +638,7 @@ async function capture(page, draft, proj, theme) {
 // stands. That is the same view a resident opening the link would see, which is the honest
 // frame for a post whose subject is the whole ZIP.
 async function captureAbsence(page, draft, theme) {
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`
-    + (theme ? `&${EMBED_PARAM}` : '');
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.addScriptTag({ content: POLICY_SRC });
 
@@ -646,18 +677,9 @@ async function captureAbsence(page, draft, theme) {
   await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
   await page.waitForTimeout(1200);
 
-  let panel = null;
-  if (theme === 'datacenter') {
-    panel = await panelSectionsInFrame(page);
-    const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
-      .filter((k) => !panel[k]);
-    if (missing.length) {
-      return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
-    }
-    if (!panel.sidebar_hidden || !panel.search_form_hidden) {
-      return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
-    }
-  }
+  const cardCheck = await cardInFrame(page);
+  if (!cardCheck.ok) return { ok: false, reason: cardCheck.reason };
+  const { panel, controls } = cardCheck;
 
   let policyRecord = null;
   if (theme === 'datacenter') {
@@ -679,7 +701,7 @@ async function captureAbsence(page, draft, theme) {
     }
   }
 
-  const sel = theme === 'datacenter' ? '.card.mapcard' : '#map';
+  const sel = CARD_CLIP;
   const el = await page.$(sel);
   if (!el) return { ok: false, reason: `no ${sel} element` };
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -697,6 +719,7 @@ async function captureAbsence(page, draft, theme) {
     theme: theme || null,
     policyRecord,
     panel,
+    controls,
   };
 }
 
@@ -1105,12 +1128,21 @@ async function attach(draft, objectPath, r, proj, scope) {
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
     width: IMG_W, height: IMG_H, device_scale: SCALE,
+    // THE FRAME, ON EVERY CAPTURE. Every MAPS image is the Map 1 card in embed mode (founder
+    // requirement 2026-09-22), so these are no longer theme-only. `panel_controls` is the
+    // STATUS / PROJECT TYPE / REGULATORY state read off the controls at the shutter — for a
+    // Data Center capture it agrees with `capture_policy`; for an ordinary one it is the
+    // page's own default, recorded so the checkmarks in the image are accounted for.
+    clip: r.clip,
+    embed_mode: true,
+    frame: HS.MAPS_CAPTURE_FRAME,
+    panel_in_frame: r.panel,
+    card_header_text: r.panel && r.panel.card_header_text,
+    panel_controls: r.controls,
     // THEME CAPTURE EVIDENCE. Present only on a theme capture; absent (not false, not
     // null-filled) on a plain MAPS capture, so the two shapes stay distinguishable.
     ...(r.theme ? {
       theme: r.theme,
-      clip: r.clip,
-      embed_mode: true,
       // THE MEASURED MAP STATE — all three filter dimensions, read off the controls
       // themselves and off the drawn Leaflet layer, so the checkmarks visible in the image
       // and the markers visible in the image are both accounted for. Built by the SHIPPED
@@ -1121,8 +1153,6 @@ async function attach(draft, objectPath, r, proj, scope) {
       type_filter_before: r.policyRecord && r.policyRecord.observed_before
         && r.policyRecord.observed_before.types,
       type_filter_after: r.policyRecord && r.policyRecord.applied && r.policyRecord.applied.types,
-      panel_in_frame: r.panel,
-      card_header_text: r.panel && r.panel.card_header_text,
       theme_note: 'Captured in the shipped embed mode (?embed=1) and clipped to the Map 1 '
         + 'product card under map-state policy ' + HS.MAPS_DC_CAPTURE_POLICY.key + ': all four '
         + 'STATUS controls on, Data center the only PROJECT TYPE, the REGULATORY overlay OFF — '

@@ -1523,6 +1523,33 @@ things and no more:**
 ---
 
 
+## 7.07a EVERY MAPS SCREENSHOT IS THE MAP 1 CARD, WITH ITS STATUS / PROJECT TYPE / REGULATORY PANEL ⚖️ FOUNDER REQUIREMENT (2026-09-22)
+
+**The founder saw ordinary MAPS drafts on the Acquisition Dashboard as a bare map with no
+STATUS / PROJECT TYPE / REGULATORY panel, while Data Center Theme drafts carried it, and asked
+for the Data Center framing on the MAPS posts too.** Cause: `scripts/maps-social-image.mjs`
+opened embed mode and clipped to `.card.mapcard` only when `theme === 'datacenter'`; every other
+capture clipped to `#map`.
+
+- **Both capture paths now open `?embed=1` and clip to `CARD_CLIP` (`.card.mapcard`)**, behind
+  one `cardInFrame()` check that refuses the shot if the header, any of the three control
+  sections, the map key or the map is out of frame, or if embed mode left the global chrome.
+- ⚖️ **An ordinary capture SETS NO FILTERS.** It photographs the page's own default control
+  state and RECORDS it (`visual.panel_controls`, read with the shipped
+  `HS.mapsDcCaptureReadControls`), so the checkmarks in the image are accounted for. Choosing a
+  filter state for ordinary posts would be a new product decision; the theme still decides the
+  Data Center filter state and nothing else.
+- 🔑 **The frame rides in the capture key** (`lib/maps-capture-binding.js`,
+  `MAP1_CARD_FRAME = 'frame=map1-card@1'`, exported as `HS.MAPS_CAPTURE_FRAME`), appended ONLY to
+  posts the Data Center policy does not govern. So every old bare-map image is UNBOUND and DUE
+  on the next capture run, while **Data Center keys are byte-for-byte unchanged** (they were
+  always the card). The `v1` prefix is not bumped: `public.hs_maps_map_gate_violations` matches
+  `v1|<zip>|<project>|%` and still accepts the new keys.
+- ⚠️ **Until the capture job re-runs, ordinary drafts read AWAITING a capture on the dashboard
+  and cannot be approved** — that is the key change working, not a regression.
+
+---
+
 ## 7.07 EVERY MAPS POST MUST HAVE A MAP — THE LADDER IS `PROJECT MAP → ZIP MAP`, NEVER `→ NO MAP` ⚖️ FOUNDER RULING (2026-09-22)
 
 **§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
