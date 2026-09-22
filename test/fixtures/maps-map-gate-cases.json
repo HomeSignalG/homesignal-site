@@ -1,0 +1,560 @@
+{
+  "_doc": [
+    "ONE fixture, BOTH halves of the universal map gate. The browser half is",
+    "acquisition.html::bskyMapGateBlock; the enforced half is public.hs_maps_map_gate_violations.",
+    "They have disagreed TWICE in one day - on the key FORMAT (#560) and on the scope DEFAULT",
+    "(2026-09-22) - and nothing compared them, so both shipped.",
+    "",
+    "EXACT PARITY IS IMPOSSIBLE BY DESIGN, and pretending otherwise is how this fixture would",
+    "rot. JS recomputes the WHOLE capture key and demands equality; SQL deliberately holds no",
+    "copy of the key vocabulary, because a SQL copy of a browser key rule is the drift this",
+    "project keeps paying for. So SQL is necessarily the WEAKER check.",
+    "",
+    "THE CONTRACT IS THEREFORE DIRECTIONAL, NOT EQUAL:  sql_pass  =>  js_pass.",
+    "SQL may refuse what JS allows (annoying, safe). SQL must NEVER allow what JS refuses -",
+    "the dashboard is not on the path of a direct RPC call, so SQL is the only thing standing",
+    "between that call and an approval.",
+    "",
+    "`js` and `sql` are the EXPECTED verdict of each half (true = approvable).",
+    "Any case where sql=true and js=false is a SAFETY VIOLATION and must appear in",
+    "known_asymmetries with a reason - an empty list is the goal, an entry is a decision.",
+    "",
+    "KEYS ARE DERIVED, NOT TYPED. A case whose capture_key is \"@derive\" has it computed by the",
+    "SHIPPED HS.mapsCaptureKey at load time, from that case's own evidence and scope. The first",
+    "draft of this fixture hand-wrote key strings and three LEGITIMATE cases failed because the",
+    "invented key could not equal what the shipped rule computes - a fixture defect that reads",
+    "exactly like a product defect. Only the deliberately-wrong cases carry a literal key, and",
+    "each says in its name what is wrong with it.",
+    "",
+    "EVERY KEYED CASE ALSO CARRIES status=REAL_MAP_VISUAL, deliberately. Without it the state",
+    "machine answers WAITING_CAPTURE and the gate blocks before the key is ever compared - so a",
+    "key-shape case would go red for the wrong reason and prove nothing about key handling.",
+    "",
+    "A DATA-CENTRE-THEMED CASE ALSO CARRIES A COMPLIANT capture_policy, because mapsCaptureBound",
+    "requires the MEASURED map state for that theme on top of a matching key. Without it the row",
+    "is unbound for a DC-policy reason and the case would prove nothing about the universal rule."
+  ],
+  "cases": [
+    {
+      "name": "01 no image at all",
+      "zip": "",
+      "image": false,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {}
+    },
+    {
+      "name": "02 image but no capture key",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "visual": {}
+      }
+    },
+    {
+      "name": "03 absence post, merged #1280 key shape, no scope field",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "zip",
+      "js": true,
+      "sql": true,
+      "evidence": {
+        "theme": "datacenter",
+        "visual": {
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "zip",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": false,
+              "target_sought": false,
+              "on_map_total": 0,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "04 ZIP fallback of a project-backed row",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "zip",
+      "js": true,
+      "sql": true,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "zip",
+          "zip_scope_reason": "the project has no coordinates",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "zip",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": false,
+              "target_sought": false,
+              "on_map_total": 0,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "05 project capture, key names this ZIP and this project",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "project",
+      "js": true,
+      "sql": true,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "project",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "project",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": true,
+              "target_sought": true,
+              "on_map_total": 3,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "06 key names a DIFFERENT ZIP",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "visual": {
+          "scope": "zip",
+          "capture_key": "v1|99999|zip-scope|",
+          "status": "REAL_MAP_VISUAL"
+        }
+      }
+    },
+    {
+      "name": "07 project scope, key names a different project",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "project",
+          "capture_key": "v1|12345|99999999-9999-9999-9999-999999999999|s",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "project",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": true,
+              "target_sought": true,
+              "on_map_total": 3,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "08 REGRESSION #560: projectless row carrying a project-framed key",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "visual": {
+          "capture_key": "v1|12345|11111111-2222-3333-4444-555555555555|s|1.0|2.0|dc||Approved|N",
+          "status": "REAL_MAP_VISUAL"
+        }
+      }
+    },
+    {
+      "name": "09 REGRESSION #560: same, scope explicitly project",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "visual": {
+          "scope": "project",
+          "capture_key": "v1|12345|11111111-2222-3333-4444-555555555555|s",
+          "status": "REAL_MAP_VISUAL"
+        }
+      }
+    },
+    {
+      "name": "10 scope=zip but the subject IS this row's own project",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "zip",
+          "capture_key": "v1|12345|11111111-2222-3333-4444-555555555555|s",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "zip",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": false,
+              "target_sought": false,
+              "on_map_total": 0,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "11 CONTROL a future non-record subject token must still pass",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": true,
+      "evidence": {
+        "visual": {
+          "capture_key": "v1|12345|some-future-token|x",
+          "status": "REAL_MAP_VISUAL"
+        }
+      }
+    },
+    {
+      "name": "12 scope recorded as something neither half can produce",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "zip",
+      "js": true,
+      "sql": false,
+      "evidence": {
+        "theme": "datacenter",
+        "visual": {
+          "scope": "county",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "zip",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": false,
+              "target_sought": false,
+              "on_map_total": 0,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "13 CONTROL the row names no ZIP",
+      "zip": "",
+      "image": true,
+      "derive_scope": null,
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "visual": {
+          "capture_key": "v1|12345|zip-scope|",
+          "status": "REAL_MAP_VISUAL"
+        }
+      }
+    }
+  ],
+  "known_asymmetries": [
+    {
+      "case": "11 CONTROL a future non-record subject token must still pass",
+      "direction": "sql passes, js refuses \u2014 UNSAFE DIRECTION",
+      "reason": "SQL holds no copy of the capture key vocabulary (deliberately \u2014 that copy is what broke in #560), so it cannot tell an invented subject token from a future legitimate one and accepts both. JS recomputes the exact key and refuses. Closing this in SQL means reintroducing the vocabulary, which is the defect this design removed. RESIDUAL EXPOSURE: a direct RPC call could approve a row the dashboard would refuse, IF something ever wrote a key the capture job does not produce. 0 such rows exist (measured 2026-09-22: all 46 ZIP-scope subjects are `zip-scope` (28) or `absence` (18), against a control of 9 project-scope rows). Resolving it is a founder call: accept, or give SQL a narrow closed subject set and pay the drift risk knowingly."
+    }
+  ]
+}
