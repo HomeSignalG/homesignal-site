@@ -361,9 +361,25 @@ ok(HS.mapsDcCapturePolicyApplies(ordinary) === false,
   '11c: a non-data-centre MAPS draft is NOT governed by the policy');
 ok(HS.mapsCaptureKey(ordinary).indexOf(DCPOL.key) === -1,
   '11d: …so its capture key carries NO policy segment', HS.mapsCaptureKey(ordinary));
-ok(HS.mapsCaptureKey(ordinary).split('|').length === 11,
-  '11e: …and is the same 11-field shape it has always been',
-  HS.mapsCaptureKey(ordinary).split('|').length);
+// SUPERSEDED 2026-09-22 (founder): an ordinary image is no longer "exactly as valid as it
+// was" — every MAPS capture must be the Map 1 card with its STATUS / PROJECT TYPE /
+// REGULATORY panel, so the ordinary key gains ONE trailing frame segment and nothing else,
+// which makes every old bare-map image unbound and due for a re-take.
+ok(HS.mapsCaptureKey(ordinary).split('|').length === 12
+  && HS.mapsCaptureKey(ordinary).endsWith('|' + HS.MAPS_CAPTURE_FRAME),
+  '11e: …and is the old 11 fields plus the Map 1 card FRAME segment, appended last',
+  HS.mapsCaptureKey(ordinary));
+ok(HS.mapsCaptureKey(dcPost).indexOf(HS.MAPS_CAPTURE_FRAME) === -1,
+  '11e2: a Data Center key does NOT gain the frame segment — its images were always the card');
+{
+  const legacy = HS.mapsCaptureKey(ordinary).split('|').slice(0, 11).join('|');
+  const stale = draft({ evidence: { type: 'Residential', type_raw: 'New Building',
+    project_name: 'New Building 1764 S Sherman ST ADU', status: 'Approved' } });
+  stale.image_bucket_path = 'maps/19475/old-bare-map.png';
+  stale.evidence.visual = { state: S.READY, capture_key: legacy };
+  ok(HS.mapsCaptureBound(stale) === false && HS.mapsCaptureDue(stale).due === true,
+    '11e3: an ordinary image captured under the old bare-map key is UNBOUND and DUE for a re-take');
+}
 ok(HS.mapsCaptureKey(ordinary).startsWith('v1|'),
   '11f: the key PREFIX is untouched — no global version bump');
 
