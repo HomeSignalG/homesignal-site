@@ -64,6 +64,9 @@ on:
       dry:
         description: 'true = capture and upload nothing'
         default: 'false'
+      stamp_types:
+        description: 'true = record the canonical Map 1 Development Type (evidence.visual.type_key) on drafts that already hold a current capture; no new screenshots. Combine with dry=true to preview.'
+        default: 'false'
 
 permissions:
   contents: read
@@ -136,6 +139,7 @@ jobs:
             --limit "${{ inputs.limit || '8' }}" \
             ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
             ${{ inputs.dry == 'true' && '--dry' || '' }} \
+            ${{ inputs.stamp_types == 'true' && '--stamp-types' || '' }} \
             --out "$GITHUB_WORKSPACE/maps-social-out"
 
       - name: Upload the captured images as a run artifact (review copy)

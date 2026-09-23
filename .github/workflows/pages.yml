@@ -64,6 +64,8 @@ on:
     paths:
       - 'scripts/stage_site.py'
       - 'test/site-artifact-contract.test.mjs'
+      - 'test/bsky-did-document.test.mjs'
+      - '.well-known/did.json'
       - 'scripts/gen_zip_pages.py'
       - 'scripts/prove-zip-pages.mjs'
       # The pure control-resolution core the proof runs on, and now also the producer of the
@@ -160,6 +162,12 @@ jobs:
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           node test/site-artifact-contract.test.mjs | tail -6
+
+      # The Bluesky custom-feed generator resolves did:web:homesignal.net from this site. A
+      # drifted or missing /.well-known/did.json makes every HomeSignal feed read as offline to
+      # every subscriber, with nothing else on the site failing — so it gates the deploy.
+      - name: Bluesky feed-generator DID document
+        run: node test/bsky-did-document.test.mjs
 
       - name: Audit the REAL artifact (Fix 19)
         # The gate above proves the producer. This proves the ARTIFACT — the actual _site

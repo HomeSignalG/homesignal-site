@@ -762,6 +762,20 @@ async function finishCapture(d, label, r, proj, results) {
     return;
   }
 
+  // ⚖️ THE CANONICAL DEVELOPMENT TYPE IS RECORDED WITH THE PICTURE, OR THE PICTURE IS NOT
+  // RECORDED. `evidence.visual.type_key` is what the Bluesky custom feeds read for TYPE
+  // membership (homesignal-ingest public.bsky_feed_skeleton), so it is decided HERE, by the
+  // shipped Map 1 resolver this job already loads — never by the generator's port, never by a
+  // feed. A draft whose stamped theme disagrees with Map 1's Type for the same record is
+  // refused before upload: its copy, its map and its feed would otherwise say different things.
+  const typeProblem = HS.mapsSocialTypeProblem(d);
+  if (typeProblem) {
+    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, typeProblem, theme, scope);
+    results.push({ id: d.id, label, ok: false, state: FAILED, reason: typeProblem, theme,
+      ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
+    return;
+  }
+
   // THE OBJECT PATH CARRIES THE BINDING KEY'S OWN FINGERPRINT, so a re-capture after the
   // draft moved writes a NEW object instead of silently overwriting the old one through
   // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the picture
@@ -835,8 +849,46 @@ async function zipMapFallback(page, d, label, results, why) {
   await finishCapture(d, label, rz, null, results);
 }
 
+/**
+ * --stamp-types: record the canonical Map 1 Development Type on drafts that ALREADY hold a
+ * current capture, without re-photographing them. The one-time backfill for captures taken
+ * before `visual.type_key` existed, and a no-op on any row that already carries it.
+ *
+ * Same decision as a live capture (HS.mapsSocialTypeKey / HS.mapsSocialTypeProblem), same
+ * write (guardedPatch: draft-only, revision-pinned, evidence-only). Only READY rows are touched,
+ * because a type stamped beside a picture that is not bound would say the picture proves it.
+ * A row with a type problem is REPORTED and left alone — the next real capture refuses it.
+ */
+async function stampTypes() {
+  const q = 'social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family,revision'
+    + '&content_family=eq.MAPS&status=eq.draft&order=id.asc&limit=5000'
+    + (ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '');
+  const rows = await api(q);
+  const tally = { examined: 0, not_ready: 0, already: 0, problem: 0, stamped: 0, stale: 0 };
+  for (const d of rows) {
+    tally.examined++;
+    if (HS.mapsCaptureState(d) !== READY) { tally.not_ready++; continue; }
+    const v = (d.evidence && d.evidence.visual) || {};
+    const key = HS.mapsSocialTypeKey(d);
+    const problem = HS.mapsSocialTypeProblem(d);
+    if (problem) { tally.problem++; console.log(`  PROBLEM ${d.id} zip=${d.zip}: ${problem}`); continue; }
+    if (v.type_key === key && v.type_label === HS.mapsSocialTypeLabel(key)) { tally.already++; continue; }
+    console.log(`  ${DRY ? 'would stamp' : 'stamp'} ${d.id} zip=${d.zip} type_key=${key}`);
+    if (DRY) { tally.stamped++; continue; }
+    const w = await guardedPatch(d, {
+      evidence: { ...(d.evidence || {}), visual: { ...v, type_key: key, type_label: HS.mapsSocialTypeLabel(key) } },
+    });
+    w.ok ? tally.stamped++ : tally.stale++;
+  }
+  console.log(`stamp-types ${DRY ? '(DRY) ' : ''}${JSON.stringify(tally)}`);
+  const parts = tally.not_ready + tally.already + tally.problem + tally.stamped + tally.stale;
+  if (parts !== tally.examined) throw new Error(`stamp-types partition ${parts} != examined ${tally.examined}`);
+  if (tally.problem) process.exitCode = 1;
+}
+
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
+  if (has('--stamp-types')) { await stampTypes(); return; }
   const drafts = await selectDrafts();
   if (has('--list')) {
     for (const d of drafts) {
@@ -1093,6 +1145,11 @@ async function attach(draft, objectPath, r, proj, scope) {
     scope,
     ...(r.zip_scope_reason ? { zip_scope_reason: r.zip_scope_reason } : {}),
     status: 'REAL_MAP_VISUAL',
+    // THE CANONICAL MAP 1 DEVELOPMENT TYPE (a CATEGORY_REGISTRY key) and Map 1's own label for
+    // it — the Bluesky feeds' TYPE authority. finishCapture has already refused a draft for
+    // which this is null or disagrees with the stamped theme, so both are always present here.
+    type_key: HS.mapsSocialTypeKey(draft),
+    type_label: HS.mapsSocialTypeLabel(HS.mapsSocialTypeKey(draft)),
     bucket: 'social-images',
     path: objectPath,
     captured_at: new Date().toISOString(),
