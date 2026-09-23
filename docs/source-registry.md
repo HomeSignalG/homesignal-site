@@ -1320,15 +1320,15 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
   Alteration/Addition, Razing, Grading, Foundation Only; drop Fence/Deck/Pool/Solar/Sign/Sprinkler/
   Tanks/Tents/Antennas noise). Hub layers /5 Electrical /8 U&O = trades/occupancy, dropped.
 
-**Candidate (founder call):**
-- **baltimore-city Housing and Building Permits 2019–Present**
-  (`baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3`) —
-  POINT layer, hub-modified nightly (2026-07-16T00:05), but newest IssuedDate = 2026-05-06 (~2-month
-  issuance lag) and it is an issuance ledger with NO status and NO work-type column (only free-text
-  Description + IsPermitModification). Wireable via status_const 'Issued' + IssuedDate IS NOT NULL +
-  spatial scoping — but with no type column the minor-repair noise cannot be dropped at source
-  (sample: "Repair one damaged rafter"). DECISION NEEDED: include-all vs skip (Boston precedent dropped
-  Short Form minor jobs; here there is no column to do it with).
+**Wired 2026-09-09 (proven-keep, not include-all, not skip):**
+- **`baltimore-city-housing-permits`** — same `baltegis` FeatureServer/3. Founder: keep what
+  you can prove. `status_const` Issued; `extra_where` keeps razing prefixes (`BDEM%`/`DEM%`)
+  plus three Description templates (dashed `NEW CONSTRUCTION` header, `CONSTRUCT NEW SFD`,
+  CHILD APPLICATION ∩ townhouse/SFD). Combo prefixes `BRCM`/`BCCM` are mixed new-house AND
+  roof, so they are **not** kept wholesale. Occupancy (`BUSE`/`USE`) and events (`BTEMP`)
+  dropped. Live on `get-address-report` v250 / squash `31fcab2` (#1131). The 12 city ZIPs
+  recached: HTTP 200, `_ndp` populated. Do not re-recache unless the filter changes. The
+  2026-07 DECISION NEEDED (include-all vs skip) is closed.
 
 **Rejected with receipts:**
 - Howard County kvz2-j5cj: STALLED — newest rows Nov 2025, rowsUpdatedAt 2025-12-04; also no
@@ -1929,14 +1929,14 @@ All recon verdicts re-verified LIVE at wire time (pg_net; fresh-date + verbatim 
   APPL_DATE keeps OPEN applications (ISSDATE null pre-issuance).
 
 ### Not wired (unchanged verdicts, receipts above)
-- **baltimore-city Housing/Building Permits (baltegis …/FeatureServer/3)** — still the
-  recon's DECISION NEEDED: an issuance ledger with NO status and NO work-type column, so
-  minor-repair noise ("Repair one damaged rafter") cannot be dropped at source; wiring
-  include-all would flood pages with trivial jobs (Boston dropped Short Form for exactly
-  this). **Founder call, logged, non-blocking** — wire via status_const + include-all
-  only on explicit direction.
 - **Howard County kvz2-j5cj**: STALLED (newest rows Nov 2025) → stays on the nightly
   reprobe list. Anne Arundel: polygon layers only. Frederick/Harford: no Hub domains.
+
+### Superseded 2026-09-09 — Baltimore city DECISION NEEDED is closed
+The 2026-07 recon left **baltimore-city Housing/Building Permits (baltegis …/FeatureServer/3)**
+as include-all vs skip. Founder chose a third path: proven-keep. Entry
+`baltimore-city-housing-permits` is live (#1131 / v250). Do not reopen include-all. Do not
+widen `extra_where` to `BRCM%`/`BCCM%`.
 
 ## 2026-07-16 — PENNSYLVANIA WIRE PASS (Tier 1 state 1 of 17, founder wire order)
 
@@ -8871,7 +8871,7 @@ completeness queue:*
 
 | municipality | dark | what actually lights it | what it needs |
 |---|---|---|---|
-| **Baltimore city** | 12 | `baltimore-county-permits` (7 pp) + `mdot-sha` (12) + **Anne Arundel** (2) | Baltimore CITY ledger (the open DECISION NEEDED) |
+| **Baltimore city** | 12 | `baltimore-county-permits` (7 pp) + `mdot-sha` (12) + **Anne Arundel** (2) | Baltimore CITY ledger (the open DECISION NEEDED) — **SUPERSEDED 2026-09-09:** `baltimore-city-housing-permits` live, proven-keep, 12 ZIPs recached (#1131 / v250) |
 | **Saint Paul** | 11 | **`minneapolis-ccs-permits`** 6 pp — Minneapolis's 3-mi circles spilling over | St Paul's own (confirmed stalled 2025-06-30) |
 | **Orlando** | 8 | `fdot-active-construction-projects` only — DOT tier | Orlando's own (rejected: ungeolocatable) |
 | **Tampa** | 1+7 | DOT/county only | Tampa's own (WAF-blocked to edge) |
