@@ -43,7 +43,7 @@ check('3b Mac desktop is not', !S.isPhone('Mozilla/5.0 (Macintosh; Intel Mac OS 
 
 // 4. The page wires the module, is noindex, and ships.
 const html = fs.readFileSync(new URL('../share-text.html', import.meta.url), 'utf8');
-check('4a page loads lib/share-text.js', html.includes('<script src="lib/share-text.js">'));
+check('4a page loads lib/share-text.js', /<script src="lib\/share-text\.js\?v=[0-9a-f]{8}">/.test(html));
 check('4b page is noindex', /<meta name="robots" content="noindex/.test(html));
 check('4c page never builds a message from raw params', !/searchParams|URLSearchParams/.test(html.replace(/<!--[\s\S]*?-->/g, '')));
 const robots = fs.readFileSync(new URL('../robots.txt', import.meta.url), 'utf8');
