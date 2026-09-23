@@ -39,9 +39,20 @@ jobs:
     timeout-minutes: 15
     env:
       FN_DIR: supabase/functions/get-address-report
+      # Deno colourises diagnostics when it believes it has a terminal. An SGR escape inside
+      # `at file:///…` defeats the location regex the gate matches on, so the gate finds zero
+      # error locations and passes. Belt and braces: NO_COLOR here, ANSI stripped in gate.ts.
+      NO_COLOR: '1'
     steps:
       - name: Checkout (read-only)
         uses: actions/checkout@v4
+        with:
+          # FULL HISTORY IS LOAD-BEARING. actions/checkout defaults to fetch-depth: 1, and the
+          # type-check gate below diffs `origin/main...HEAD`, which is a THREE-DOT diff and so
+          # needs a MERGE BASE. With both sides shallow at depth 1 no common ancestor exists,
+          # git diff fails, and (before this change) `|| true` swallowed it into an empty diff:
+          # the gate then had no changed lines to match against and passed unconditionally.
+          fetch-depth: 0
 
       - name: Install Deno (pinned)
         uses: denoland/setup-deno@v2
@@ -100,8 +111,15 @@ jobs:
           # (a genuinely new error); pre-existing errors on untouched lines are surfaced and
           # tolerated. deno check fetches library types from the jsr/npm registries — ordinary
           # dependency resolution, not a call to any HomeSignal production service.
-          git fetch --no-tags --depth=1 origin main
-          git diff --unified=0 "origin/main...HEAD" -- "${FN_DIR}" > "${RUNNER_TEMP}/pr.diff" || true
+          # NO `|| true`. A diff that cannot be computed is an unusable gate, not a pass.
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)" || {
+            echo "::error::no merge base with origin/main — the changed-line gate cannot run"; exit 1; }
+          echo "merge base: ${base}"
+          git diff --unified=0 "${base}" HEAD -- "${FN_DIR}" > "${RUNNER_TEMP}/pr.diff"
+          # An EMPTY pr.diff is legitimate (a workflow-only change, or a dispatch whose HEAD
+          # matches origin/main). The gate reports it and passes; it does not fail on it.
+          echo "pr.diff: $(wc -l < "${RUNNER_TEMP}/pr.diff") line(s)"
           set +e
           deno check \
             "${FN_DIR}/index.ts" \
@@ -115,9 +133,33 @@ jobs:
           // Fail ONLY if `deno check` reports an error on a line THIS PR added/changed.
           // Pre-existing errors on untouched lines are tolerated (and logged). Robust to
           // dependency version drift: drift moves pre-existing errors, which stay tolerated.
+          // AN EMPTY FN_DIR DIFF IS A NO-OP, NOT A FAILURE — and an earlier version of this
+          // gate got that wrong. It failed closed on an empty pr.diff, reasoning that "this
+          // workflow only triggers on supabase/functions paths, so a PR reaching this step
+          // MUST have changed lines under FN_DIR". That premise is FALSE twice over: the
+          // `paths:` list above also names this workflow file itself, and `workflow_dispatch`
+          // carries no path filter at all. Receipt: run 34267272206, a dispatch on a branch
+          // whose only change was this file, failed on that guard while `deno check` had
+          // already produced 16 perfectly readable errors.
+          //
+          // So: FN_DIR unchanged => there are no added lines this ref could have broken, and
+          // PASS is the honest answer. Emptiness is not failure. That includes a dispatch on
+          // `main` where HEAD == origin/main and the trees legitimately match.
+          //
+          // What still fails closed is a gate that CANNOT SEE: a merge base that cannot be
+          // computed or a `git diff` that exits non-zero (both handled in the shell above,
+          // with no `|| true`), and `deno check` output carrying errors from which NOT ONE
+          // location parsed (below) — that is a blind parser, which is how this gate was
+          // green over real errors for months.
+          const rawDiff = Deno.readTextFileSync(Deno.env.get("PR_DIFF")!);
+          const fnDirUnchanged = !rawDiff.trim();
+          if (fnDirUnchanged) {
+            console.log("FN_DIR unchanged by this ref — the changed-line gate has no added "
+              + "lines to judge. deno check output is still parsed and reported below.");
+          }
           const added = new Map<string, Array<[number, number]>>();
           let cur: string | null = null;
-          for (const line of Deno.readTextFileSync(Deno.env.get("PR_DIFF")!).split("\n")) {
+          for (const line of rawDiff.split("\n")) {
             const f = line.match(/^\+\+\+ b\/(.+)$/);
             if (f) { cur = f[1]; if (!added.has(cur)) added.set(cur, []); continue; }
             const h = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
@@ -128,20 +170,36 @@ jobs:
             }
           }
           const locs: Array<{ file: string; line: number }> = [];
-          for (const m of Deno.readTextFileSync(Deno.env.get("CHECK_ERR")!)
+          // Strip ANSI before matching: a colourised `at file://` never matches the regex,
+          // and the gate then reports "0 error locations" over output full of errors.
+          const checkOut = Deno.readTextFileSync(Deno.env.get("CHECK_ERR")!)
+            // deno-lint-ignore no-control-regex
+            .replace(/\u001b\[[0-9;]*m/g, "");
+          for (const m of checkOut
             .matchAll(/at file:\/\/\/\S*?(supabase\/functions\/[^\s:]+):(\d+):(\d+)/g)) {
             locs.push({ file: m[1], line: parseInt(m[2], 10) });
           }
           const isNew = (file: string, line: number) =>
             (added.get(file) ?? []).some(([a, b]) => line >= a && line <= b);
           const news = locs.filter((l) => isNew(l.file, l.line));
+          console.log(`pr.diff parsed: ${added.size} file(s), `
+            + `${[...added.values()].reduce((n, r) => n + r.length, 0)} changed hunk(s) under FN_DIR.`);
+          // If deno check emitted errors but the regex matched none, the parse is blind and a
+          // PASS would again attest to nothing. Distinguish "no errors" from "could not read".
+          if (locs.length === 0 && /\berror\b/i.test(checkOut)) {
+            console.error("::error::deno check reported errors but NO location was parsed — "
+              + "the location regex is not matching this output. Refusing to pass.");
+            Deno.exit(1);
+          }
           console.log(`deno check: ${locs.length} error location(s) — ${news.length} on PR-changed lines, ${locs.length - news.length} pre-existing on untouched lines.`);
           if (news.length) {
             console.error("::error::this PR introduces NEW type errors:");
             for (const l of news) console.error(`::error::  ${l.file}:${l.line}`);
             Deno.exit(1);
           }
-          console.log("PASS: no new type errors introduced by this PR.");
+          console.log(fnDirUnchanged
+            ? "PASS: FN_DIR unchanged by this ref, so nothing here could introduce a new type error."
+            : "PASS: no new type errors introduced by this PR.");
           TS
           PR_DIFF="${RUNNER_TEMP}/pr.diff" CHECK_ERR="${RUNNER_TEMP}/check.out" \
             deno run --allow-read --allow-env "${RUNNER_TEMP}/gate.ts"
