@@ -154,7 +154,13 @@ as $function$
 $function$;
 
 revoke all on function public.national_dc_zip_members(text) from public;
-grant execute on function public.national_dc_zip_members(text) to anon, authenticated, service_role;
+-- SUPERSEDED AS A RESIDENT READ (2026-09-22): Map 1 reads THE ONE data-centre contract,
+-- public.map1_dc_zip_members (docs/map1-dc-publication.sql), which carries this plane's rows as
+-- its transitional OSM population. Kept, service-role only, as the membership reference the
+-- publication parity measurement compares against. Revoked from anon/authenticated by migration
+-- map1_dc_radius_retirement after the page that no longer calls it was deployed.
+revoke execute on function public.national_dc_zip_members(text) from anon, authenticated;
+grant execute on function public.national_dc_zip_members(text) to service_role;
 
 -- ── 3. THE FACILITY PLANE FOR ZIP MODE — a READ, never a rewrite (2026-09-22, second design).
 -- Map 1 ZIP mode used to download development_reports.sites whole (up to 19.6 MB of text,

@@ -104,7 +104,7 @@ ok(buckets.byTheme.datacenter.every((p) => HS.mapsSocialThemeKey(p) === 'datacen
   '4: the bucket agrees with the per-row predicate (counts and rows are one result)');
 ok(JSON.stringify(queue) === frozen,
   '4: partitioning MUTATES NOTHING — the queue is byte-identical after filtering');
-ok(HS.mapsSocialThemeLabel('datacenter') === 'Data Center Theme', '4: the theme has its display label');
+ok(HS.mapsSocialThemeLabel('datacenter') === 'Data Center', '4: the theme has its display label');
 ok(HS.mapsSocialThemeLabel('nope') === null, '4: an unknown key gets NO invented label');
 
 // ═══ 5. THE DASHBOARD — hierarchy, derived counts, preserved actions ═════════════════
@@ -238,8 +238,12 @@ ok(/no marker on Map 1 with the Data center PROJECT TYPE filter/.test(GEN),
   '7: a project that vanishes under the filter REFUSES the capture — no substitute is used');
 ok(/EMBED_PARAM = 'embed=1'/.test(GEN_CODE),
   '7: the theme capture uses the SHIPPED embed mode rather than a private layout');
-ok(/theme === 'datacenter' \? '\.card\.mapcard' : '#map'/.test(GEN_CODE),
-  '7: a theme capture clips to the Map 1 PRODUCT CARD; a plain MAPS capture is unchanged');
+// SUPERSEDED 2026-09-22 (founder): EVERY MAPS capture is the card, not only a theme capture.
+ok(/const CARD_CLIP = '\.card\.mapcard';/.test(GEN_CODE)
+  && (GEN_CODE.match(/const sel = CARD_CLIP;/g) || []).length === 2,
+  '7: BOTH capture paths clip to the Map 1 PRODUCT CARD — an ordinary MAPS capture carries the panel too');
+ok(!/'#map'/.test(GEN_CODE) && !/\(theme \? `&\$\{EMBED_PARAM\}`/.test(GEN_CODE),
+  '7: no path clips to the bare #map, and embed mode is not conditional on the theme');
 ok(/panelSectionsInFrame/.test(GEN_CODE) && /does not fit the frame/.test(GEN),
   '7: a card whose controls are out of frame REFUSES the capture');
 ok(/IMG_W = 1200, IMG_H = 630/.test(GEN_CODE), '7: the 1200x630 image contract is unchanged');

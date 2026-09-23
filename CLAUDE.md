@@ -1523,6 +1523,33 @@ things and no more:**
 ---
 
 
+## 7.07a EVERY MAPS SCREENSHOT IS THE MAP 1 CARD, WITH ITS STATUS / PROJECT TYPE / REGULATORY PANEL ⚖️ FOUNDER REQUIREMENT (2026-09-22)
+
+**The founder saw ordinary MAPS drafts on the Acquisition Dashboard as a bare map with no
+STATUS / PROJECT TYPE / REGULATORY panel, while Data Center Theme drafts carried it, and asked
+for the Data Center framing on the MAPS posts too.** Cause: `scripts/maps-social-image.mjs`
+opened embed mode and clipped to `.card.mapcard` only when `theme === 'datacenter'`; every other
+capture clipped to `#map`.
+
+- **Both capture paths now open `?embed=1` and clip to `CARD_CLIP` (`.card.mapcard`)**, behind
+  one `cardInFrame()` check that refuses the shot if the header, any of the three control
+  sections, the map key or the map is out of frame, or if embed mode left the global chrome.
+- ⚖️ **An ordinary capture SETS NO FILTERS.** It photographs the page's own default control
+  state and RECORDS it (`visual.panel_controls`, read with the shipped
+  `HS.mapsDcCaptureReadControls`), so the checkmarks in the image are accounted for. Choosing a
+  filter state for ordinary posts would be a new product decision; the theme still decides the
+  Data Center filter state and nothing else.
+- 🔑 **The frame rides in the capture key** (`lib/maps-capture-binding.js`,
+  `MAP1_CARD_FRAME = 'frame=map1-card@1'`, exported as `HS.MAPS_CAPTURE_FRAME`), appended ONLY to
+  posts the Data Center policy does not govern. So every old bare-map image is UNBOUND and DUE
+  on the next capture run, while **Data Center keys are byte-for-byte unchanged** (they were
+  always the card). The `v1` prefix is not bumped: `public.hs_maps_map_gate_violations` matches
+  `v1|<zip>|<project>|%` and still accepts the new keys.
+- ⚠️ **Until the capture job re-runs, ordinary drafts read AWAITING a capture on the dashboard
+  and cannot be approved** — that is the key change working, not a regression.
+
+---
+
 ## 7.07 EVERY MAPS POST MUST HAVE A MAP — THE LADDER IS `PROJECT MAP → ZIP MAP`, NEVER `→ NO MAP` ⚖️ FOUNDER RULING (2026-09-22)
 
 **§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
@@ -1857,6 +1884,41 @@ function body, fail-closed on its anchor, **not applied**. It carries the decisi
 `app_projects.provenance` so `app_projects`-backed cards can name the outcome; until then
 `lib/templates.js::browsingStatusLabel` renders `Proposed · decided` and **refuses to name
 an outcome it cannot source**.
+
+---
+
+## 7.09 MAP 1 READS ONE DATA-CENTRE CONTRACT — `public.map1_dc_zip_members` (2026-09-22)
+
+**Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
+`public.map1_dc_zip_members(p_zip)`** (DDL of record `docs/map1-dc-publication.sql`, called
+through `HS.MAP1_DC_RPC` by `homesignalmap.html` and `lib/data.js`). The page never asks which
+source a record came from, never unions sources, and never maps a lifecycle word itself.
+
+- **Canonical rows**: `CONFIRMED_DC` canonical entities (Step 3A) with `RESOLVED` `POINT`
+  geography (Step 3B), a lifecycle inside the ONE map (`operational`→Operating,
+  `under_construction`/`permitted`→Approved, `proposed`→Proposed; anything else does not
+  publish) and a real record URL. `DC_CANDIDATE` is withheld — Step 3A only calls a record a
+  candidate when the publisher calls it rumored or its own fields disagree.
+- **Membership** is `geo.zip_point_membership_in` against the ZCTA polygon (§7.08). A ZIP with
+  no boundary returns nothing — never a centroid, radius, nearest ZIP or neighbour.
+- **`legacy_osm_compat` rows are TRANSITIONAL.** `national_dc_records` (1,824 OSM rows, a
+  one-time load, no recurring acquisition) is served behind the same function so no marker
+  disappears. **Retirement condition:** OSM onboarded as a `dc_source` with a recurring
+  acquisition; then the CTE is deleted. A compatibility row is dropped only when ONE published
+  canonical entity sits at IDENTICAL coordinates (≤ 1 m, one-to-one). Anything looser is not a
+  match — "Vantage WA12"/"WA13" are 166 m apart, same operator, two buildings.
+- **Retired:** `national_dc_for_zip` (the 5-mile centroid radius) and `national_dc_zip_members`
+  are service-role only; no resident role may execute either.
+- **Measured 2026-09-22 over all 12,722 pages**, against the reader it replaced: pages with any
+  data centre **365 → 799**; rows 1,083 → 1,896 (1,048 canonical + 848 compatibility); the 235
+  compatibility rows that left were ALL explained by an identical-coordinate canonical entity on
+  the same page (0 unexplained, 0 pages lost every marker); 0 non-member rows, 0 duplicate
+  markers, 0 truncated reads; 706 pages have no ZCTA boundary and return nothing.
+- **Gates:** `test/map1_dc_publication_pg` (disposable PostGIS, 13 checks, 10 prohibited
+  mutations — centroid radius, non-confirmed, unresolved, OSM drop, loose dedupe, no dedupe,
+  Atlas-only, cancelled, status collapse, superseded) in `zip-membership-suite.yml`, and
+  `test/map1-dc-publication.test.mjs` (no second reader, no `atlas_for_zip`/`epoch_for_zip`,
+  no private table named by resident code, no place/project special case).
 
 ---
 
