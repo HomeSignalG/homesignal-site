@@ -366,9 +366,15 @@ HS.onReady(async function () {
     var backHref = HS.navHref('development.html', S.zip);
     page.innerHTML =
       '<button class="backbtn" onclick="location.href=\'' + HS.esc(backHref) + '\'">← Back to development</button>'
-      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status active">Operating</span></div>'
+      // LIFECYCLE IS THE STORED CANONICAL VALUE, NOT A LITERAL (2026-09-24). This pill read a
+      // hard-coded green "Operating" for every EPA facility; FRS registration is not operation.
+      // It now prints app_projects.status through the same HS.tpl.browsingStatusLabel the
+      // development cards use, and carries NO lifecycle colour class: public.app_refresh_zip
+      // writes the unknown value ('On file') for a facility, and colouring that amber or green
+      // would assert a stage no source stated.
+      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status">' + HS.esc(HS.tpl.browsingStatusLabel(f)) + '</span></div>'
       + '<h1 style="margin-bottom:2px">' + HS.esc(f.name) + '</h1>'
-      + '<p style="margin:6px 0 0">An existing regulated facility on the public record — environmental context, not development activity.</p></div>'
+      + '<p style="margin:6px 0 0">A regulated facility on the public record — environmental context, not development activity.</p></div>'
       + '<div class="detail"><div class="panel">'
       + '<div class="kicker">Interpreted status</div>'
       + statusHtml

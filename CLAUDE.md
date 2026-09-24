@@ -2270,6 +2270,38 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
+
+**NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
+inferred status. EPA FRS returns no lifecycle field, yet every surface said "Operating" for every
+EPA facility (measured: 197,991 / 197,991 facility rows). Cromby Generating Station (19475) was
+"Operating" while EPA's own ICIS-Air lists it **Permanently Closed** and its NPDES permit is issued
+to **"FORMER CROMBY GENERATING STATION"**.
+
+- ⛔ **EPA program/permit statuses are REGULATORY evidence, not lifecycle.** Effective, Terminated,
+  Admin Continued, Permanently Closed and "discontinued reporting" are NOT mapped to anything —
+  there is no Closed lifecycle, and none may be added without documented EPA field semantics AND a
+  contract change. Cromby is `unknown`, not Operating and not Closed; the facts stay verbatim in
+  `facility_env`.
+- **ONE authority, reused:** `trackerSiteItem` (what counts as evidence) → `statusTier`
+  (`proposed|approved|operating|unknown`). An FRS element's `type` is not evidence (the producer
+  stamped `built` on all of them); an explicit `bucket` still is. Stored rows carry the existing
+  unknown value `'On file'`; Map 1 labels it "Lifecycle unknown", the ZIP card and facility detail
+  print the stored status through `HS.tpl.browsingStatusLabel` (the same call the Development cards use).
+- **Seven places asserted it; all now read the one decision:** the producer's `type:"built"`, the
+  `app_refresh_zip` literal (migration `facility_lifecycle_unknown_20260924`, md5
+  `6591d7f7…` → `821a951b…`, reversal proven), `resolveMarker`'s three facility branches, the Map 1
+  popup's "operating now", the Map 1 **"Operating now" rail** (it appended every facility), the ZIP
+  card and the facility detail page.
+- ⚠️ **Do not replay a dated full `CREATE OR REPLACE` of `app_refresh_zip`** from `docs/` or the
+  ingest repo — those snapshots predate this and still carry `'Operating'`; replaying one reverts it.
+- Rollout: stored rows change as the sweep revisits each ZIP (~10.8 h cycle); cached report sites
+  keep the old stamp until re-collected and are refused client-side meanwhile; the producer change
+  lands on the next `deploy-edge-functions` dispatch.
+- Pinned by `test/facility-lifecycle-unknown.test.mjs` (Cromby fixture
+  `fixtures/epa/zip19475-dfr-programs-2026-09-24.json`, md5 `d9354fad…`, extracted in-database);
+  10 of 10 mutations killed on exit code.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

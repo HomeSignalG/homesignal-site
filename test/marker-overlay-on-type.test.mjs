@@ -65,9 +65,13 @@ ok(deAnda.categoryKey === 'industrial' && deAnda.shape === 'triangle'
   deAnda.popupLabel);
 const deAndaTrack = track({ type: 'built', label: 'DE-ANDA TRUCKING', layer: 'logistics',
   registry_id: '110034291059' });
+// 2026-09-24: the cached type:'built' stamp on an FRS element is not lifecycle evidence, so the
+// tracker pin takes the lifecycle-unknown neutral (it was asserted operating green before the
+// unsourced-Operating repair). Shape, Type and R are what this check is about, and are unchanged.
 ok(deAndaTrack.categoryKey === 'industrial' && deAndaTrack.shape === 'triangle'
-   && deAndaTrack.color === lcOperating && deAndaTrack.signal && deAndaTrack.signal.letter === 'R',
-  '2b: the Map 1 tracker path (layer:logistics) is the same Industrial overlay',
+   && deAndaTrack.color === HS.LIFECYCLE_HEX.unknown && deAndaTrack.color !== lcOperating
+   && deAndaTrack.signal && deAndaTrack.signal.letter === 'R',
+  '2b: the Map 1 tracker path (layer:logistics) is the same Industrial overlay, lifecycle unknown',
   deAndaTrack.color + ' ' + deAndaTrack.shapeRule);
 
 // ── 3. THE NAME IS NOT A TYPE ────────────────────────────────────────────────────

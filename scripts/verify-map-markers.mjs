@@ -70,7 +70,7 @@ async function verifyMaps(page, fails) {
       { type: 'Industrial', status: 'Proposed' },
       { type: 'Data Center', status: 'Approved' },
       { type: 'Residential', status: 'Active' },
-      { type: 'Industrial', status: 'Operating', _facility: true }
+      { type: 'Industrial', status: 'On file', _facility: true }
     ];
     return FIXTURES.map((it) => {
       const m = window.__HS_RESOLVE(it);

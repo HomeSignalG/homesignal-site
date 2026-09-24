@@ -11,7 +11,8 @@
 //   §2 Community == Map 1 over the committed national class vocabulary
 //   §3 name and status cannot move it; no rule of the page's own
 //   §4 ZIP 19475's real class values
-//   §5 the shipped card: badge beside "Operating", everything else byte-identical
+//   §5 the shipped card: badge beside the STORED lifecycle (app_projects.status via
+//      HS.tpl.browsingStatusLabel — 'On file' for a facility since 2026-09-24), else byte-identical
 //   §6 the development Type is untouched (Pennhurst is still a data centre)
 //
 // Run: node test/community-facility-type-badge.test.mjs
@@ -123,23 +124,26 @@ for (const [n, cls, key, label] of Z) {
 HS.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 HS.onReady = () => {};
+// lib/templates.js supplies HS.tpl.browsingStatusLabel — the card's lifecycle word is the stored
+// status through that one call (2026-09-24), never a literal.
+load(['lib/templates.js'], HS);
 new Function('HS', RT)(HS);
 const START = 'facilities.slice(0,6).map(function(f){';
 const i0 = RT.indexOf(START), i1 = RT.indexOf("}).join('')", i0);
 ok(i0 > 0 && i1 > i0, '5a the Regulated facilities card template is found');
 const card = new Function('HS', 'f', RT.slice(i0 + START.length, i1));
 const PRE = "return '<div class=\"card mini\" style=\"border-left-color:#3f7fb0;margin-bottom:10px\">'\n"
-  + "            + '<span class=\"lens\">Operating' + (f.dist? ' · ' + HS.esc(f.dist):'') + '</span><h3>' + HS.esc(f.name) + '</h3>'\n"
+  + "            + '<span class=\"lens\">' + HS.esc(HS.tpl.browsingStatusLabel(f)) + (f.dist? ' · ' + HS.esc(f.dist):'') + '</span><h3>' + HS.esc(f.name) + '</h3>'\n"
   + "            + '<p class=\"sowhat\">' + HS.esc(f.type||'Regulated facility') + (f.developer? ' · ' + HS.esc(f.developer):'') + '</p>'\n"
   + "            + (f.source_ref? '<a href=\"' + HS.esc(f.source_ref) + '\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12.5px;font-weight:600\">View public record →</a>':'') + '</div>';";
 const pre = new Function('HS', 'f', PRE);
-const rows = Z.map(([n, cls]) => ({ name: n, type: cls, status: 'Operating', registry_id: '1', source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=1' }))
-  .concat([{ name: 'UNTYPED SITE', type: '', status: 'Operating' }, { name: 'DC SITE', type: 'datacenter', dist: '0.4 mi' }]);
+const rows = Z.map(([n, cls]) => ({ name: n, type: cls, status: 'On file', registry_id: '1', source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=1' }))
+  .concat([{ name: 'UNTYPED SITE', type: '', status: 'On file' }, { name: 'DC SITE', type: 'datacenter', dist: '0.4 mi', status: 'On file' }]);
 const strip = (h) => h.replace(/<span class="devtype"[^>]*>[^<]*<\/span>/, '');
 ok(rows.every((f) => strip(card(HS, f)) === pre(HS, f)), '5b with the badge removed every card is byte-identical to the pre-badge template');
 const miller = card(HS, rows[0]);
-ok(/<span class="lens">Operating<span class="devtype" data-type-key="industrial"[^>]*>Industrial<\/span><\/span><h3>A\.C\. MILLER CONCRETE PRODUCTS, INC\.<\/h3>/.test(miller),
-  '5c A.C. Miller reads "Operating [INDUSTRIAL]" — status first, badge beside it', miller.slice(0, 220));
+ok(/<span class="lens">On file<span class="devtype" data-type-key="industrial"[^>]*>Industrial<\/span><\/span><h3>A\.C\. MILLER CONCRETE PRODUCTS, INC\.<\/h3>/.test(miller),
+  '5c A.C. Miller reads "On file [INDUSTRIAL]" — the stored lifecycle first, badge beside it', miller.slice(0, 220));
 ok(/data-type-key="facility"[^>]*>Regulated facility</.test(card(HS, rows[4])), '5d an unclassified facility reads "Regulated facility"');
 ok(/data-type-key="datacenter"[^>]*>Data center</.test(card(HS, rows[5])) && /· 0\.4 mi<\/span>/.test(card(HS, rows[5])),
   '5e a data-centre class reads "Data center", and the distance still follows');
