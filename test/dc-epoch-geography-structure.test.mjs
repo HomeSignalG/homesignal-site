@@ -8,6 +8,7 @@
 // Run: node test/dc-epoch-geography-structure.test.mjs
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 let n = 0, bad = 0;
 const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m + (d ? '  [' + d + ']' : '')); } };
@@ -108,6 +109,14 @@ ok(/'DERIVED_POINT_NEAR_OTHER_SOURCE_DC'\s*then 'CROSS_SOURCE_DERIVED_POINT_NEAR
   'S5b: the adjudicator never emits CONFIRMED_MATCH from a rule; a nearby derived point is at most POSSIBLE_MATCH');
 ok(/rationale\s+text not null/.test(A3) && /char_length\(btrim\(rationale\)\) >= 20|length\(btrim\(rationale\)\) >= 20/.test(A3),
   'S5c: a review must carry a written rationale');
+
+// ── the production apply is GENERATED from the files above, never retyped (claims rule 7) ─────
+const gen = spawnSync('python3', [join(ROOT, 'scripts/build-epoch-geography-apply.py'), '--check'], { encoding: 'utf8' });
+ok(gen.status === 0, 'S6: docs/dc-epoch-geography-apply.sql is byte-identical to what the generator emits from the DDL of record', (gen.stdout + gen.stderr).trim());
+const APPLY = read('docs/dc-epoch-geography-apply.sql');
+ok(APPLY.indexOf('DRIFT: live definition') > 0 && APPLY.indexOf('DRIFT: live definition') < APPLY.indexOf('create or replace function public.dc_geocode_ladder_version')
+   && !/create or replace view public\.dc_current_observation/.test(APPLY),
+  'S6b: the apply opens with the drift guard and never re-creates dc_current_observation');
 
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);
