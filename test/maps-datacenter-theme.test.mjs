@@ -32,7 +32,7 @@ const ok = (cond, msg) => { n++; if (cond) console.log('PASS — ' + msg); else 
 const win = { HS: {} };
 globalThis.window = win;
 globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js']) {
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js']) {
   new Function('window', 'document', readFileSync(new URL(f, import.meta.url), 'utf8'))(win, globalThis.document);
 }
 const HS = win.HS;

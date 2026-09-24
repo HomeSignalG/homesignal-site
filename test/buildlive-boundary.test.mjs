@@ -38,6 +38,7 @@ global.document = {
                           setAttribute() {}, addEventListener() {}, appendChild() {} }),
   head: { appendChild() {} }
 };
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 ok(typeof HS.buildLive === 'function', '0a the shipped buildLive loaded');

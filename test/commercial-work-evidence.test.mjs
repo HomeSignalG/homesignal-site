@@ -36,6 +36,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const win = { HS: {} };
 globalThis.window = win;
 globalThis.document = { getElementById: () => null };
+new Function('window', 'document', readFileSync(join(root, 'lib/project-type.js'), 'utf8'))(win, globalThis.document);
 new Function('window', 'document', readFileSync(join(root, 'lib/map.js'), 'utf8'))(win, globalThis.document);
 const HS = win.HS;
 

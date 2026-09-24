@@ -19,6 +19,7 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 
 global.window = { HS: {} };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 await import('../lib/residential-qualify.js');
 await import('../lib/n5-radius.js');

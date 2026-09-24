@@ -43,7 +43,7 @@ const shipped = slice('  var _bskyBlobUrl = {};', '  // VISUAL STATUS.')
 // the UNIVERSAL map requirement (HS.mapsMapGateBlock), which FAILS CLOSED when its module
 // is absent — so a harness that omits them would lock every button and this suite would be
 // measuring the fail-closed branch while claiming to measure the image-painted one.
-const LIBS = ['map', 'maps-social-theme', 'maps-capture-policy', 'maps-capture-binding']
+const LIBS = ['project-type', 'map', 'maps-social-theme', 'maps-capture-policy', 'maps-capture-binding']
   .map((f) => readFileSync(join(HERE, '..', 'lib', `${f}.js`), 'utf8')).join('\n');
 
 // Two DIFFERENT 1x1 PNGs, so "each draft shows its own image" is a real comparison.

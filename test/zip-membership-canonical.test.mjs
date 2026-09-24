@@ -27,6 +27,7 @@ const stripJs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[
 function loadHS(src) {
   const ctx = { window: {} };
   vm.createContext(ctx);
+  vm.runInContext(read('lib/project-type.js'), ctx);          // the real classifier, for F
   vm.runInContext(read('lib/map.js'), ctx);          // the real classifier, for F
   vm.runInContext(src || read('lib/zip-authoritative.js'), ctx);
   return ctx.window.HS;

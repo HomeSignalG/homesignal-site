@@ -15,6 +15,7 @@ const eq = (a, b, name) => ok(JSON.stringify(a) === JSON.stringify(b), name + ' 
 
 global.window = { HS: {} };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 const FAC = HS.markerRegistry.facilityHex;   // #7d148c

@@ -23,6 +23,7 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 
 global.window = { HS: {}, sessionStorage: { _v: null, getItem() { return this._v; }, setItem(k, v) { this._v = v; } } };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 
@@ -89,12 +90,14 @@ ok(neg.filter((r) => !r.site.registry_id && (r.site.use_type || '') === 'unclass
   '§2f 2 negatives carry no data-centre string in any field trackerSiteItem maps');
 
 // ── §3. THE SQL PROJECTION USES lib/map.js's OWN REGEXES ──────────────────────────────
-// Extracted from lib/map.js HERE rather than retyped, so editing either side fails this.
-const mapSrc = readFileSync(new URL('../lib/map.js', import.meta.url), 'utf8');
+// Extracted from the classifier's source HERE rather than retyped, so editing either side fails
+// this. The rules moved verbatim from lib/map.js to lib/project-type.js (2026-09-24); this reads
+// them where they now live — the assertions are unchanged.
+const mapSrc = readFileSync(new URL('../lib/project-type.js', import.meta.url), 'utf8');
 const sql = readFileSync(new URL('../docs/fix28-datacenter-zip-membership.sql', import.meta.url), 'utf8');
 const jsRe = (name) => {
   const m = mapSrc.match(new RegExp('const ' + name + ' = /([\\s\\S]*?)/i;'));
-  if (!m) throw new Error(`could not read ${name} from lib/map.js`);
+  if (!m) throw new Error(`could not read ${name} from lib/project-type.js`);
   return m[1];
 };
 // JS -> POSIX ARE: non-capturing groups have no POSIX spelling, \b is \y, \d is [0-9].

@@ -46,6 +46,7 @@ catch (err) {
 }
 global.window = { HS: {} };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 

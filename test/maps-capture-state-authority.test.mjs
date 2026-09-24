@@ -35,7 +35,7 @@
 import { readFileSync } from 'node:fs';
 
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js',
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js',
                  '../lib/maps-capture-binding.js']) {
   (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
 }

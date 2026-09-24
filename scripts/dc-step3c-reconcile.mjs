@@ -174,7 +174,7 @@ export async function shippedClassifier() {
   const g = globalThis;
   if (!g.window) g.window = { HS: {} };
   const base = new URL('../lib/', import.meta.url);
-  for (const f of ['templates.js', 'map.js', 'residential-qualify.js', 'zip-authoritative.js']) {
+  for (const f of ['templates.js', 'project-type.js', 'map.js', 'residential-qualify.js', 'zip-authoritative.js']) {
     await import(new URL(f, base).href);
   }
   const HS = g.window.HS;

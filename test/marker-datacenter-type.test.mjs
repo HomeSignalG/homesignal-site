@@ -16,6 +16,7 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 
 global.window = { HS: {} };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 const m = (item) => HS.resolveMarker(Object.assign({ status: 'Proposed' }, item));

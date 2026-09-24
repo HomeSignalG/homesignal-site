@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js', 'lib/maps-capture-binding.js']) {
+for (const f of ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js', 'lib/maps-capture-binding.js']) {
   (0, eval)(fs.readFileSync(f, 'utf8'));
 }
 const HS = globalThis.window.HS;

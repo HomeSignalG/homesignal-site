@@ -32,7 +32,7 @@ let n = 0, bad = 0;
 const ok = (c, m) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m); } };
 
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js',
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js',
                  '../lib/maps-capture-binding.js']) {
   (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
