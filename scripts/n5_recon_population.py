@@ -25,6 +25,11 @@ CHUNK = int(os.environ.get("RECON_CHUNK", "250"))
 import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 
 
+def chunk_gate(k, parts):
+    """The gate after every reconciliation chunk; returns free MiB or refuses."""
+    return n5_capacity.require_capacity(sql, f"recon chunk {k + 1}/{parts}")["free"]
+
+
 def disk():
     """Free MiB for LOGGING only; decisions are n5_capacity.require_capacity."""
     return n5_capacity.assess(sql, "reading")["free"]
@@ -129,7 +134,7 @@ from called c,
                 + str(e))
         done += CHUNK
         # EVERY chunk, not every tenth: a tenth-chunk check let nine chunks write unchecked.
-        free = n5_capacity.require_capacity(sql, f"recon chunk {k + 1}/{parts}")["free"]
+        free = chunk_gate(k, parts)
         if (k + 1) % 10 == 0 or k + 1 == parts:
             say(f"  chunk {k + 1}/{parts}", f"{min(done, n):,} ZIPs · {time.time() - t:.1f}s"
                                             f" · free {free:,.0f} MB")

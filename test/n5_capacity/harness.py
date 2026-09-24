@@ -107,6 +107,18 @@ def _counted_require(*a, **k):
     return r
 
 
+_REAL_OK = C.capacity_ok
+
+
+def _counted_ok(*a, **k):
+    ok, r = _REAL_OK(*a, **k)
+    STATE["gates"] += int(bool(ok))
+    return ok, r
+
+
+C.capacity_ok = _counted_ok
+
+
 C.require_capacity = _counted_require
 NOW = datetime.datetime.now(datetime.timezone.utc)
 
@@ -146,6 +158,15 @@ def run_builder():
     if BUILDER == "shard":
         import n5_shard as m
         return m.main()
+    if BUILDER == "shard_advance":
+        import n5_shard as m
+        ok, _ = m.shard_advance_capacity("840")
+        if not ok:
+            raise C.CapacityRefused("advance: insufficient (the shard is HALTED, not advanced)")
+        return ok
+    if BUILDER == "recon_chunk":
+        import n5_recon_population as m
+        return m.chunk_gate(0, 10)
     if BUILDER == "acquire":
         import n5_acquire_registry as m
         return m.main()

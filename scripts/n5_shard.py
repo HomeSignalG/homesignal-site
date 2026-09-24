@@ -155,6 +155,12 @@ def load_registry():
     return out
 
 
+def shard_advance_capacity(z3):
+    """The per-shard ADVANCE decision: (ok, reading). A shard that leaves the volume below
+    the floor is HALTED (recorded, not raised); an unknown or invalid capacity raises."""
+    return n5_capacity.capacity_ok(sql, f"n5-shard {z3} advance")
+
+
 def disk_free_mb():
     """(free, db, wal) for LOGGING. Validated by n5_capacity (unknown capacity raises);
     it decides nothing - every decision is n5_capacity.require_capacity/capacity_ok."""
@@ -760,7 +766,7 @@ def run_shard(z3):
     say("working set discarded (boundaries / frozen)", f"{left_z} / {left_f} remaining")
 
     # 7 - DISK
-    disk_ok, cr = n5_capacity.capacity_ok(sql, f"n5-shard {z3} advance")
+    disk_ok, cr = shard_advance_capacity(z3)
     free, db, wal = cr["free"], cr["db"], cr["wal"]
     say("db / WAL MB", f"{db:,.0f} / {wal:,.0f}")
     say("disk above floor", "yes" if disk_ok else "NO")

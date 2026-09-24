@@ -34,7 +34,10 @@ const cleanEnv = () => {
 // Run a python body against the shipped module; the body must print one JSON line.
 const py = (body, env = {}) => {
   const prog = [
-    'import sys, json, datetime',
+    'import sys, json, datetime, functools',
+    // allow_nan=False: an infinite or NaN result becomes an exception reported as data,
+    // never the non-JSON token Infinity that would crash the parse below.
+    'json.dumps = functools.partial(json.dumps, allow_nan=False)',
     'sys.path.insert(0, sys.argv[1])',
     'import n5_capacity as C',
     'NOW = datetime.datetime(2026, 9, 24, 22, 0, tzinfo=datetime.timezone.utc)',
@@ -42,6 +45,10 @@ const py = (body, env = {}) => {
     ...body.split('\n').map((l) => '    ' + l),
     'except C.CapacityRefused as e:',
     '    print(json.dumps({"refused": True, "reason": e.reason}))',
+    // Any other exception is reported as DATA, so a broken rule fails an assertion by
+    // name instead of crashing the suite (a crash is red, but it says nothing).
+    'except Exception as e:',
+    '    print(json.dumps({"refused": False, "reason": "", "error": repr(e)}))',
   ].join('\n');
   const out = execFileSync('python3', ['-c', prog, scripts], {
     encoding: 'utf8', env: { ...cleanEnv(), ...env }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -89,9 +96,9 @@ const parse = (textOrObj) => {
     ['malformed JSON', '{not json', /unreadable/],
     ['not an object', '[1,2]', /not a JSON object/],
     ['empty object', '{}', /missing/],
-    ['NaN token', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":NaN'), /unreadable|not a number/],
-    ['Infinity token', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":Infinity'), /unreadable|not a number/],
-    ['-Infinity token', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":-Infinity'), /unreadable|not a number/],
+    ['NaN token (rejected at PARSE)', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":NaN'), /unreadable: NaN is not a number/],
+    ['Infinity token (rejected at PARSE)', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":Infinity'), /unreadable: Infinity is not a number/],
+    ['-Infinity token (rejected at PARSE)', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":-Infinity'), /unreadable: \-Infinity is not a number/],
     ['overflowing literal 1e400', JSON.stringify(Q(1, 'GB')).replace('"value":1', '"value":1e400'), /not finite/],
     ['zero', Q(0, 'GB'), /out of range/],
     ['negative', Q(-5, 'GB'), /out of range/],
@@ -207,8 +214,8 @@ const parse = (textOrObj) => {
 }
 
 // ================================================================ 7. EVERY BUILDER, BEHAVIOURALLY
-const BUILDERS = ['shard', 'acquire', 'boundary_first', 'unit_a', 'a3_markers', 'a3_clip', 'a4_index',
-  'recon', 'verify', 'open', 'b3_load', 'b3_nvdot', 'zcta_reload'];
+const BUILDERS = ['shard', 'shard_advance', 'acquire', 'boundary_first', 'unit_a', 'a3_markers', 'a3_clip', 'a4_index',
+  'recon', 'recon_chunk', 'verify', 'open', 'b3_load', 'b3_nvdot', 'zcta_reload'];
 // Builders whose fake database lets the ample run reach a real write statement - the proof
 // that the harness can SEE a write, so "0 writes" on a refusal is a measurement.
 const SEES_WRITE = ['shard', 'boundary_first', 'unit_a', 'a3_markers', 'a3_clip', 'a4_index', 'verify'];
@@ -276,6 +283,24 @@ for (const b of BUILDERS) {
   const zm = z.slice(z.indexOf('\ndef main('));
   ok(zm.indexOf('zcta_capacity_gate(') > 0 && zm.indexOf('zcta_capacity_gate(') < zm.indexOf('build_prepare_sql('),
     'phase2_b1_zcta main() gates before its first write');
+  // MID-RUN checks: the harness stops at a builder's FIRST write, so the checks that run
+  // after it are proven two ways - the decision functions behaviourally in section 7
+  // (shard_advance, recon_chunk), and their call sites here.
+  const shard = readFileSync(join(scripts, 'n5_shard.py'), 'utf8');
+  const rs = shard.slice(shard.indexOf('def run_shard'), shard.indexOf('def halt('));
+  ok(rs.includes('disk_ok, cr = shard_advance_capacity(z3)') && rs.includes('if verified and disk_ok:'),
+    'n5_shard advances a shard only on the capacity decision');
+  const recon = readFileSync(join(scripts, 'n5_recon_population.py'), 'utf8');
+  const loop = recon.slice(recon.indexOf('done += CHUNK'));
+  ok(loop.indexOf('chunk_gate(k, parts)') > 0 && loop.indexOf('chunk_gate(k, parts)') < loop.indexOf('% 10 == 0'),
+    'recon gates EVERY chunk, before (not inside) the every-tenth report');
+  const MIN_GATES = { 'n5_boundary_first.py': 2, 'n5_unit_a_shadow.py': 2, 'n5_a3_markers.py': 2,
+    'n5_a3_clip_stats.py': 2, 'n5_a4_index.py': 2, 'n5_verify_snapshot.py': 2, 'n5_acquire_registry.py': 1,
+    'n5_recon_population.py': 2, 'n5_shard.py': 2 };
+  for (const [f, min] of Object.entries(MIN_GATES)) {
+    const n = (readFileSync(join(scripts, f), 'utf8').match(/n5_capacity\.(require_capacity|capacity_ok)\(/g) || []).length;
+    ok(n >= min, `${f}: ${n} capacity gate call(s), start + after-work (min ${min})`);
+  }
   const o = readFileSync(join(scripts, 'n5_orchestrate.py'), 'utf8');
   const ob = o.slice(o.indexOf('def mode_open'), o.indexOf('def mode_work'));
   ok(ob.indexOf('require_generation_fits(') > 0 &&
