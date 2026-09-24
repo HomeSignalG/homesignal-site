@@ -1936,6 +1936,40 @@ Gates: `test/dc_geography_pg` (14 checks + 12 prohibited mutations) and S14 plus
 `edge_blind` mutation in `test/map1_dc_publication_pg`, both in `zip-membership-suite.yml`;
 offline pins 7a–7f in `test/dc-canonical-geography.test.mjs`.
 
+✅ **APPLIED TO PRODUCTION 2026-09-24 ~15:30Z (#1322 → `28c0fbe`).** All five function bodies
+were fingerprinted against the merged files: `md5(prosrc)` equals the md5 of each
+`as $fn$ … $fn$` body, byte for byte. The v1 resolver was run first, so the "before" state is
+the healed v1 state and not the identity-pending outage. Both sides were read through
+`map1_dc_zip_members` over all 12,722 registry ZIPs and pinned in
+`public.dc_map1_before_20260924` and `public.dc_map1_after_20260924` (RLS on, no grants).
+- **Resolver:** 3,530 entities · RESOLVED 2,134 → **1,789** · `PUBLISHER_AREA_POINT` **345**
+  demoted. That is all types, including NON_DC; 262 is the data-centre subset. Flags: area
+  **355** (the other 10 were already unresolved as rounded or multi-site), road **93**. Both
+  exactly match the adjudicated prototype. The scheduled 15:35 run then rewrote nothing
+  (idempotent).
+- **Map 1 canonical markers:** 1,077 on 675 ZIPs → **970 on 613 ZIPs**, so **107 facilities
+  withheld** from 98 ZIPs. **0 added, 0 moved.** All 107 are `PUBLISHER_AREA_POINT`, and **44**
+  of them were labelled `exact`. OSM compatibility is unchanged at **845 / 290**. Pages carrying
+  any data-centre marker went 816 → **759**; **57 lost their only marker**; **0 gained one**.
+- **Invariants, on all 970 markers:** 0 not CONFIRMED_DC · 0 not RESOLVED POINT · 0 ineligible
+  lifecycle · 0 without an http(s) evidence URL · 0 in ≠ 1 ZCTA · 0 on more than one page ·
+  0 with non-Atlas authority (Epoch publication still 0) · 0 area-flagged. **46 road-flagged
+  markers remain published**, deliberately (NOT_YET_DETERMINED). All 107 withheld entities
+  still exist in `dc_canonical_entity`. `national_dc_for_zip` and `national_dc_zip_members`
+  are still revoked from anon and authenticated.
+- **Change receipts:** `docs/receipts/dc-atlas-area-point-withheld-2026-09-24.csv`, one row per
+  withheld facility, carrying its ZIP, publisher id, name, operator, coordinates, precision,
+  rule, the publisher's own sentence and evidence URL. It mirrors
+  `public.dc_atlas_location_receipts_20260924`, fingerprint
+  `md5(string_agg(publisher_record_id, ',' order by … collate "C"))` =
+  `7c6ac04acc5358d1773586bbeed6d0d1` on both sides. All 107 sentences were re-read after apply:
+  every one states that the pin is a place, not the facility. One is a **county** centroid
+  (DC BLOX Camp Hall → Berkeley County).
+- ⏳ **The identity guard is proven offline and in CI, NOT yet live.** Its first live test is
+  the next Atlas landing after :25, roughly 14:26Z daily. The 14:35Z geography run should
+  report `REFUSED_IDENTITY_PENDING` and Map 1 should keep **970**. Check that before quoting
+  the guard as working in production.
+
 ---
 
 ## 7.09 MAP 1 READS ONE DATA-CENTRE CONTRACT — `public.map1_dc_zip_members` (2026-09-22)
