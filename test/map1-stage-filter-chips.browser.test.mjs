@@ -55,9 +55,11 @@ const base = 'http://127.0.0.1:8817';
 // ── ONE RECORD PER LIFECYCLE BUCKET ─────────────────────────────────────────────────
 // The four stages have to arrive through the TWO paths the page actually has, or the suite
 // would be testing a shape production never produces:
-//   * `operating` rides in on the cached report as an EPA facility — the national floor,
-//     which HS.zipAuthMergeSites deliberately KEEPS (scope point, relevance NOT development).
-//   * `approved` / `proposed` / `unknown` come from the AUTHORITATIVE whole-ZIP payload
+//   * ALL FOUR come from the AUTHORITATIVE whole-ZIP payload. `operating` used to ride in on
+//     the cached report as an EPA facility, but EPA FRS states no lifecycle — a registration is
+//     not operation (2026-09-24) — so an EPA facility now resolves `unknown`, and the only
+//     honest `operating` pin is a development record whose OWN source says it is operating.
+//   * the authoritative whole-ZIP payload
 //     (app_zip_projects_markers). In ZIP mode the merge drops the report's own development
 //     points on purpose — centroid-radius development may not be presented as a whole-ZIP
 //     claim — so a development record can only reach the map this way.
@@ -67,12 +69,11 @@ const base = 'http://127.0.0.1:8817';
 //
 // ⚠️ NONE of them is Residential, deliberately: Rule 5 drops unqualified residential records
 // before they become sites, and a stage suite must not be able to fail for that reason.
-const OPERATING = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
-  src: 'EPA FRS · registry 110071955663', type: 'built', label: 'CORESITE - VA1 DATA CENTER',
-  layer: 'datacenter', scope: 'point', registry_id: '110071955663',
-  record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
-
 const PROJECTS = [
+  { source_key: 'arcgis:fairfax:P-0', project_ref: 'arcgis:fairfax:P-0',
+    name: 'Innovation Center Substation', type: 'Infrastructure', status: 'Operating',
+    registry_id: 'fairfax-active-site-construction', source_ref: 'https://plus.fairfaxcounty.gov/w',
+    submitted_at: '2025-11-20', date_kind: 'filed', impact_score: null, impact_dimensions: null },
   { source_key: 'arcgis:fairfax:P-1', project_ref: 'arcgis:fairfax:P-1',
     name: 'Pennhurst Data Centers', type: 'Data Center', status: 'Approved',
     registry_id: 'fairfax-active-site-construction', source_ref: 'https://plus.fairfaxcounty.gov/x',
@@ -89,13 +90,14 @@ const PROJECTS = [
 const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'boundary_complete',
   projects: PROJECTS,
   markers: [
+    { project_ref: 'arcgis:fairfax:P-0', lat: 38.94932, lng: -77.36519, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 },
     { project_ref: 'arcgis:fairfax:P-1', lat: 38.95065, lng: -77.36458, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 },
     { project_ref: 'arcgis:fairfax:P-2', lat: 38.95320, lng: -77.36220, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 },
     { project_ref: 'arcgis:fairfax:P-3', lat: 38.95580, lng: -77.36010, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }
   ] } };
 
 const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.3645,
-  counts: { facilities: 1, development: 3 }, sites: [OPERATING],
+  counts: { facilities: 0, development: 4 }, sites: [],
   refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 

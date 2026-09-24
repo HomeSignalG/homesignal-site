@@ -2878,8 +2878,9 @@ HS.onReady(function(){
       var geom = geomFromSvg(svg);
       if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
       if (s.registry_id && (s.layer || s.use_type)) {
-        // Classifiable EPA: Type shape, operating colour, purple R. A purple square
-        // here is the keep-purple regression this verifier exists to catch.
+        // Classifiable EPA: Type shape, LIFECYCLE-UNKNOWN colour, purple R. EPA FRS states no
+        // lifecycle, so an operating green here is an unsourced claim (2026-09-24). A purple
+        // square here is the keep-purple regression this verifier exists to catch.
         if (!mk.overlayOnType || mk.shape === "square" || mk.color === HS.markerRegistry.facilityHex
             || !mk.signal || mk.signal.letter !== "R") {
           fails.push({ label: s.label, err: "tracker-overlay-not-type-plus-r",
@@ -2888,9 +2889,9 @@ HS.onReady(function(){
         if (s.use_type === "Industrial" && mk.shape !== "triangle") {
           fails.push({ label: s.label, err: "tracker-overlay-industrial-not-triangle", want: "triangle", got: mk.shape });
         }
-        if (mk.color !== HS.LIFECYCLE_HEX.operating) {
-          fails.push({ label: s.label, err: "tracker-overlay-not-operating-colour",
-            want: HS.LIFECYCLE_HEX.operating, got: mk.color });
+        if (mk.color !== HS.LIFECYCLE_HEX.unknown || mk.lifecycle !== "unknown") {
+          fails.push({ label: s.label, err: "tracker-overlay-not-lifecycle-unknown",
+            want: HS.LIFECYCLE_HEX.unknown, got: mk.color + " " + mk.lifecycle });
         }
       } else if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex || mk.signal)) {
         fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });

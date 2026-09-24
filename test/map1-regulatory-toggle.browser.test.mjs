@@ -351,23 +351,28 @@ const aerialInfo = await page.evaluate(() => {
     facility: (window.HS && HS.REGULATORY_LEGEND && HS.REGULATORY_LEGEND.color) || null,
     approved: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.approved) || null,
     operating: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.operating) || null,
+    unknown: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.unknown) || null,
     anduril: find(/ANDURIL/),
     coresite: find(/CORESITE/),
     penn: find(/Pennhurst/)
   };
 });
 ok(aerialInfo.n >= 3, '5d: 3D aerial painted the three fixture records', aerialInfo.n);
-ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.operating).toLowerCase()
+// EPA FRS states no lifecycle (2026-09-24): an EPA-only record — even a CACHED element still
+// carrying the old type:'built' stamp, as this fixture does — is lifecycle UNKNOWN, never
+// operating green, and never a purple pin.
+ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.unknown).toLowerCase()
+    && String(aerialInfo.anduril.color).toLowerCase() !== String(aerialInfo.operating).toLowerCase()
     && aerialInfo.anduril.signal === true,
-  '5e: classifiable EPA is operating-green on 3D aerial with the purple R overlay — not a purple pin',
-  JSON.stringify(aerialInfo.anduril) + ' operating=' + aerialInfo.operating);
+  '5e: classifiable EPA is lifecycle-unknown on 3D aerial with the purple R overlay — not operating, not a purple pin',
+  JSON.stringify(aerialInfo.anduril) + ' unknown=' + aerialInfo.unknown);
 ok(aerialInfo.penn && String(aerialInfo.penn.color).toLowerCase() === String(aerialInfo.approved).toLowerCase()
     && aerialInfo.penn.signal === false,
   '5f: a project with no regulatory record keeps its status colour',
   JSON.stringify(aerialInfo.penn));
 ok(aerialInfo.coresite && aerialInfo.coresite.signal === true
-    && String(aerialInfo.coresite.color).toLowerCase() === String(aerialInfo.operating).toLowerCase(),
-  '5g: a dual-identity data centre keeps its status colour and carries the purple R',
+    && String(aerialInfo.coresite.color).toLowerCase() === String(aerialInfo.unknown).toLowerCase(),
+  '5g: a dual-identity EPA data centre with no sourced lifecycle is lifecycle-unknown and carries the purple R',
   JSON.stringify(aerialInfo.coresite));
 // ── 5h. THE SWITCH OWNS THE 3D BLOCKS TOO ────────────────────────────────────────
 // §4b-§4g proved this for the 2D pins. The 3D aerial is a SECOND renderer of the same
@@ -446,15 +451,15 @@ const addrPaint = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map
 const facHex = String(aerialInfo.facility).toLowerCase();
 const find2 = (re) => addrPaint.find((r) => re.test(r.label || '')) || null;
 ok(addrPaint.length >= 3, '6d: address mode 3D aerial painted the three records', addrPaint.length);
-ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === String(aerialInfo.operating).toLowerCase()
+ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === String(aerialInfo.unknown).toLowerCase()
    && find2(/ANDURIL/).signal === true,
-  '6e: address mode — classifiable EPA is operating-green + R, the same as every other Map 1',
+  '6e: address mode — classifiable EPA is lifecycle-unknown + R, the same as every other Map 1',
   JSON.stringify(find2(/ANDURIL/)));
 ok(find2(/Pennhurst/) && find2(/Pennhurst/).color === String(aerialInfo.approved).toLowerCase(),
   '6f: address mode — a nearby project keeps its status colour', JSON.stringify(find2(/Pennhurst/)));
 ok(find2(/CORESITE/) && find2(/CORESITE/).signal === true
-   && find2(/CORESITE/).color === String(aerialInfo.operating).toLowerCase(),
-  '6g: address mode — the dual-identity data centre keeps status colour plus the purple R',
+   && find2(/CORESITE/).color === String(aerialInfo.unknown).toLowerCase(),
+  '6g: address mode — the dual-identity EPA data centre is lifecycle-unknown plus the purple R',
   JSON.stringify(find2(/CORESITE/)));
 await clickReg();
 await page.waitForFunction(
