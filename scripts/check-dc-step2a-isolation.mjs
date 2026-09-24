@@ -66,7 +66,8 @@ const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
   // Step 3D (2026-09-24): DERIVED location evidence, and Step 3A's automatic identity outcomes,
   // are evidence too. The geocode writer reaches them only through docs/*.sql run by its workflow.
   'dc_address_geocode', 'dc_observation_derived_point', 'dc_geocode_queue',
-  'dc_observation_site_address', 'dc_entity_identity_open', 'dc_record_identity'];
+  'dc_observation_site_address', 'dc_entity_identity_open', 'dc_record_identity',
+  'dc_entity_geography_evidence'];
 
 /**
  * The Step-2A objects a resident-facing file may not name, read out of the DDL of record.
@@ -240,6 +241,7 @@ function selfTest() {
     'create or replace view public.dc_observation_site_address with (security_invoker = true) as',
     'create or replace view public.dc_entity_identity_open with (security_invoker = true) as',
     'create or replace view public.dc_record_identity with (security_invoker = true) as',
+    'create or replace view public.dc_entity_geography_evidence with (security_invoker = true) as',
     // present in the real DDL and deliberately NOT derived -- a trigger is not callable
     'create constraint trigger dc_run_evidence_commit_trg',
     'create trigger dc_source_observation_guard_trg',

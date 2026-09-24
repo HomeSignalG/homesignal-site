@@ -102,6 +102,9 @@ def build():
     ])
     b3 = pick('docs/dc-step3b-canonical-geography.sql', [
         'alter table public.dc_entity_geography add column if not exists positional_uncertainty_m',
+        'create or replace view public.dc_entity_geography_evidence',
+        'revoke all on public.dc_entity_geography_evidence',
+        'comment on view public.dc_entity_geography_evidence',
         'create or replace function public.dc_resolve_geography(',
         'comment on function public.dc_resolve_geography(',
     ])

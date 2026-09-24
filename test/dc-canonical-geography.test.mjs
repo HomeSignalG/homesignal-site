@@ -21,16 +21,23 @@ const fn = fnStart > -1 ? code.slice(fnStart, code.indexOf('$fn$;', fnStart)) : 
 ok(fn.length > 2000 && /return query/.test(fn), '0: the resolver body is located (positive control)');
 ok((code.match(/create or replace function public\.dc_resolve_geography\(/g) || []).length === 1,
   '0b: exactly one definition');
+// The resolver's coordinate claims come from ONE evidence view (2026-09-24); the pins that read how
+// evidence is gathered read that view, and the resolver must read it and nothing else for points.
+const evStart = code.indexOf('create or replace view public.dc_entity_geography_evidence');
+const ev = evStart > -1 ? code.slice(evStart, code.indexOf(';', evStart) + 1) : '';
+ok(ev.length > 1000 && /from public\.dc_entity_geography_evidence;/.test(fn)
+   && !/from public\.dc_source_observation o\s/.test(fn.slice(0, fn.indexOf('_geo_derived'))),
+  '0c: the resolver reads its points from the one evidence view (positive control that the view is located)');
 
 // 1. Evidence is the CURRENT run, through the canonical links -- never raw rows by source.
-ok(/join public\.dc_current_observation c/.test(fn) && /from public\.dc_entity_observation eo/.test(fn),
+ok(/join public\.dc_current_observation c/.test(ev) && /from public\.dc_entity_observation eo/.test(ev),
   '1: points come from current observations linked to canonical entities');
 
 // 2. The rules, each as code.
 ok(/entity_grain = 'AGGREGATE_MULTI_SITE' then 'NOT_A_SITE'/.test(fn), '2a: publisher multi-site -> NOT_A_SITE');
 ok(/b\.oid is null or b\.disagree or b\.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'/.test(fn),
   '2b: no coordinates, disagreeing sources, or <= 1 decimal place -> GEOGRAPHY_UNRESOLVED');
-ok(/least\(scale\(o\.source_native_lat::text::numeric\),\s*scale\(o\.source_native_lon::text::numeric\)\)/.test(fn),
+ok(/least\(scale\(o\.source_native_lat::text::numeric\),\s*scale\(o\.source_native_lon::text::numeric\)\)/.test(ev),
   '2c: decimals are the LESSER of the two axes (one rounded axis is enough to fail)');
 ok(/ST_DistanceSphere\([\s\S]*?\) > 1000\) disagree/.test(fn), '2d: sources > 1 km apart disagree');
 ok(/\(b\.decimals <= 1 or b\.basis = 'NON_SITE_AREA'\)\s+and b\.prec = 'exact'\s+then 'PUBLISHER_CLAIMS_EXACT'/.test(fn),
@@ -68,16 +75,17 @@ ok(guardAt > -1 && ptsAt > guardAt && /REFUSED_IDENTITY_PENDING/.test(fn),
 ok(/when b\.basis = 'NON_SITE_AREA' then 'GEOGRAPHY_UNRESOLVED'/.test(fn)
    && /when b\.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT'/.test(fn),
   '7b: a publisher-stated area point is GEOGRAPHY_UNRESOLVED / PUBLISHER_AREA_POINT');
-ok(/cross join lateral public\.dc_location_basis\(o\.source_key, o\.distribution_key,\s*o\.raw_payload\)/.test(fn)
-   && !/notes/i.test(fn),
+ok(/cross join lateral public\.dc_location_basis\(o\.source_key, o\.distribution_key,\s*o\.raw_payload\)/.test(ev)
+   && !/notes/i.test(ev) && !/notes/i.test(fn),
   '7c: the resolver reads the canonical location-basis RESULT, never the publisher text itself');
 ok(/when b\.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE'/.test(fn)
    && !/'NON_SITE_ROAD' then 'GEOGRAPHY_UNRESOLVED'/.test(fn),
   '7d: a road reference is flagged, never demoted');
 ok(/v_rule_version constant integer := 3;/.test(fn), '7e: rule_version is 3 (derived address points, 2026-09-24)');
 // 8. rule_version 3: a DERIVED address point is second-class evidence, and never a guess.
-ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACCEPTED';/.test(fn)
-   && (fn.match(/dc_observation_derived_point/g) || []).length === 2,
+ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACCEPTED';/.test(ev)
+   && (ev.match(/dc_observation_derived_point/g) || []).length === 1
+   && (fn.match(/dc_observation_derived_point/g) || []).length === 1,
   '8a: only an ACCEPTED derived point enters geography (the verdict is decided once, in Step 3D)');
 ok(/\(basis = 'NON_SITE_AREA'\), \(basis = 'DERIVED_ADDRESS'\),/.test(fn),
   '8b: a publisher SITE point always outranks a derived point; an area point ranks last');

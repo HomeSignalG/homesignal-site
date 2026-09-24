@@ -209,3 +209,111 @@ select json_build_object('epoch', p.name, 'rule', o.candidate_rule_key, 'state',
  where p.bucket = 'IDENTITY_UNRESOLVED'
  order by 1;
 \echo ----- END OPEN PAIRS -----
+
+-- ═════ GEOGRAPHY EVIDENCE MATRIX (a MEASUREMENT: no rule reads anything below) ═════════════════
+-- Every live entity's usable coordinate claims (dc_entity_geography_evidence, one definition),
+-- where each falls in canonical ZCTA polygon geography, and how far it sits from that polygon's
+-- edge. Provider ZIP (the geocoder's own ZIP) is printed as a DIAGNOSTIC only.
+create temp table _gx as
+select v.canonical_entity_id, v.oid, v.source_key, v.evidence_class, v.basis, v.basis_rule,
+       v.prec, v.decimals, v.uncertainty_m, v.lat, v.lng, rk.record_key, ri.identity_state,
+       o.source_native_name, o.source_native_address, o.raw_payload->>'notes' notes,
+       public.dc_record_citation(o.source_key, o.distribution_key, o.raw_payload) citation,
+       v.basis_evidence,
+       substring(v.basis_evidence->>'matched_address' from '(\d{5})\s*$') provider_zip_diagnostic,
+       z.zcta5 zip_polygon,
+       case when z.zcta5 is not null then round(ST_Distance(ST_Boundary(z.geom)::geography,
+               ST_SetSRID(ST_MakePoint(v.lng, v.lat), 4269)::geography)) end edge_m
+  from public.dc_entity_geography_evidence v
+  join public.dc_canonical_entity e on e.canonical_entity_id = v.canonical_entity_id and e.superseded_by is null
+  join public.dc_source_observation o on o.home_signal_observation_id = v.oid
+  left join public.dc_observation_record_key rk on rk.home_signal_observation_id = v.oid
+  left join public.dc_record_identity ri on ri.home_signal_observation_id = v.oid
+  left join lateral (select zb.zcta5, zb.geom from geo.zcta_boundary zb
+                      where ST_Covers(zb.geom, ST_SetSRID(ST_MakePoint(v.lng, v.lat), 4269))
+                      order by zb.zcta5 limit 1) z on true;
+
+create temp table _gpair as
+select a.canonical_entity_id, a.oid oa, b.oid ob, a.source_key sa, b.source_key sb,
+       a.evidence_class ca, b.evidence_class cb, a.uncertainty_m ua, b.uncertainty_m ub,
+       round(ST_DistanceSphere(ST_MakePoint(a.lng, a.lat), ST_MakePoint(b.lng, b.lat))) dist_m,
+       (a.zip_polygon is not distinct from b.zip_polygon) same_zip
+  from _gx a join _gx b
+    on a.canonical_entity_id = b.canonical_entity_id
+   and (a.oid::text, a.evidence_class) < (b.oid::text, b.evidence_class)
+ where a.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')
+   and b.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS');
+
+select 'GX1 MULTI_OBSERVATION_GEOGRAPHY_ENTITIES', count(distinct canonical_entity_id)::text from _gpair
+union all
+select 'GX2 PAIRS ' || least(ca, cb) || '~' || greatest(ca, cb) || case when sa = sb then ' same-source' else ' cross-source' end
+       || ' ' || case when dist_m <= 100 then '0-100m' when dist_m <= 250 then '100-250m' when dist_m <= 500 then '250-500m'
+                      when dist_m <= 1000 then '500m-1km' when dist_m <= 2000 then '1-2km' else '>2km' end,
+       count(*)::text
+  from _gpair group by 1
+union all
+select 'GX3 DIFFERENT_ZIP_PAIRS', count(*)::text from _gpair where not same_zip
+union all
+select 'GX4 ATLAS-SHAPED PUBLISHER POINTS prec=' || coalesce(prec, '(null)') || ' class=' || evidence_class
+       || ' decimals=' || case when decimals <= 1 then '<=1' when decimals = 2 then '2' when decimals <= 4 then '3-4' else '>=5' end,
+       count(*)::text
+  from _gx where evidence_class <> 'DERIVED_ADDRESS' group by 1
+order by 1;
+
+-- every multi-observation entity, in full (each observation, each pair, the current decision)
+\echo ----- BEGIN GEOGRAPHY MATRIX -----
+select json_build_object(
+         'entity', g.canonical_entity_id,
+         'geography', eg.geography_status, 'rule', eg.rule_key, 'flags', eg.quality_flags,
+         'authority_observation', eg.authority_observation_id,
+         'observations', (select json_agg(json_build_object(
+              'record_key', x.record_key, 'source', x.source_key, 'name', x.source_native_name,
+              'class', x.evidence_class, 'basis', x.basis, 'basis_rule', x.basis_rule, 'precision', x.prec,
+              'decimals', x.decimals, 'uncertainty_m', x.uncertainty_m, 'lat', x.lat, 'lng', x.lng,
+              'identity', x.identity_state, 'address', x.source_native_address, 'notes', left(x.notes, 400),
+              'geocoder_query', x.basis_evidence->>'geocoder_query', 'matched_address', x.basis_evidence->>'matched_address',
+              'match_type', x.basis_evidence->>'match_type', 'candidates', x.basis_evidence->>'provider_candidates',
+              'provider_zip_diagnostic', x.provider_zip_diagnostic, 'zip_polygon', x.zip_polygon,
+              'edge_m', x.edge_m, 'citation', x.citation) order by x.source_key, x.evidence_class)
+            from _gx x where x.canonical_entity_id = g.canonical_entity_id),
+         'pairs', (select json_agg(json_build_object('a', p.ca, 'b', p.cb, 'cross_source', p.sa <> p.sb,
+                                                     'distance_m', p.dist_m, 'same_zip', p.same_zip,
+                                                     'ua', p.ua, 'ub', p.ub) order by p.dist_m)
+                     from _gpair p where p.canonical_entity_id = g.canonical_entity_id))::text
+  from (select distinct canonical_entity_id from _gpair) g
+  left join public.dc_entity_geography eg on eg.canonical_entity_id = g.canonical_entity_id
+ order by 1;
+\echo ----- END GEOGRAPHY MATRIX -----
+
+-- ═════ EVERY MAP 1 CHANGE, EXPLAINED (canonical rows; ADDED / REMOVED / CHANGED) ══════════════════
+-- _geo_before is the canonical geography as copied from production, taken before the resolvers ran.
+\echo ----- BEGIN MAP1 CHANGES -----
+with b as (select * from _before where publication_basis = 'canonical'),
+     a as (select * from _after where publication_basis = 'canonical'),
+     k as (select zip, canonical_entity_id from b union select zip, canonical_entity_id from a)
+select json_build_object(
+         'change', case when bb.zip is null then 'ADDED' when aa.zip is null then 'REMOVED' else 'CHANGED' end,
+         'zip', k.zip, 'entity', k.canonical_entity_id,
+         'superseded_by', (select e.superseded_by from public.dc_canonical_entity e where e.canonical_entity_id = k.canonical_entity_id),
+         'facility', coalesce(aa.project_name, bb.project_name),
+         'before', case when bb.zip is not null then json_build_object('lat', bb.lat, 'lng', bb.lng,
+                        'lifecycle', bb.map_status, 'citation', bb.source_url, 'flags', bb.quality_flags) end,
+         'after', case when aa.zip is not null then json_build_object('lat', aa.lat, 'lng', aa.lng,
+                        'lifecycle', aa.map_status, 'citation', aa.source_url, 'flags', aa.quality_flags) end,
+         'geography_before', (select json_build_object('status', g.geography_status, 'rule', g.rule_key,
+                                 'flags', g.quality_flags, 'authority', g.authority_observation_id, 'lat', g.lat, 'lng', g.lng)
+                                from _geo_before g where g.canonical_entity_id = k.canonical_entity_id),
+         'geography_after', (select json_build_object('status', g.geography_status, 'rule', g.rule_key,
+                                 'flags', g.quality_flags, 'authority', g.authority_observation_id, 'lat', g.lat, 'lng', g.lng)
+                                from public.dc_entity_geography g where g.canonical_entity_id = k.canonical_entity_id),
+         'evidence', (select json_agg(x.record_key || ' ' || x.evidence_class || ' ' || x.lat || ',' || x.lng
+                                      order by x.record_key collate "C")
+                        from _gx x where x.canonical_entity_id = k.canonical_entity_id))::text
+  from k
+  left join b bb on bb.zip = k.zip and bb.canonical_entity_id = k.canonical_entity_id
+  left join a aa on aa.zip = k.zip and aa.canonical_entity_id = k.canonical_entity_id
+ where bb.zip is null or aa.zip is null
+    or (bb.lat, bb.lng, bb.map_status, bb.source_url, bb.project_name)
+       is distinct from (aa.lat, aa.lng, aa.map_status, aa.source_url, aa.project_name)
+ order by 1;
+\echo ----- END MAP1 CHANGES -----

@@ -82,11 +82,11 @@ MUTATIONS = {
         "        elsif false then", 1)]),
     # M9 the provider's ZIP decides the canonical ZIP (its centroid replaces the derived point)
     'M9_provider_zip_decides': (B3, [(
-        "           null::text, dp.lat, dp.lng, 6, o.observed_at,",
-        "           null::text,\n"
-        "           coalesce((select ST_Y(ST_Centroid(z.geom)) from geo.zcta_boundary z where z.zcta5 = right(dp.matched_address, 5)), dp.lat),\n"
-        "           coalesce((select ST_X(ST_Centroid(z.geom)) from geo.zcta_boundary z where z.zcta5 = right(dp.matched_address, 5)), dp.lng),\n"
-        "           6, o.observed_at,", 1)]),
+        "       null::text, dp.lat, dp.lng, 6, o.observed_at,",
+        "       null::text,\n"
+        "       coalesce((select ST_Y(ST_Centroid(z.geom)) from geo.zcta_boundary z where z.zcta5 = right(dp.matched_address, 5)), dp.lat),\n"
+        "       coalesce((select ST_X(ST_Centroid(z.geom)) from geo.zcta_boundary z where z.zcta5 = right(dp.matched_address, 5)), dp.lng),\n"
+        "       6, o.observed_at,", 1)]),
     # M10 Epoch lifecycle is fabricated (silence becomes Operating)
     'M10_lifecycle_fabricated': (MAP, [(
         "coalesce(lc.map_status, 'Unknown') as map_status", "coalesce(lc.map_status, 'Operating') as map_status", 1)]),
@@ -138,8 +138,8 @@ MUTATIONS = {
     'G_shared_address_places': (B3, [(
         "                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'GEOGRAPHY_UNRESOLVED'\n", "", 1)]),
     'G_centroid_fallback': (B3, [(
-        "     where dp.verdict = 'ACCEPTED';",
-        "     where dp.verdict = 'ACCEPTED' or dp.match_type in ('zip_centroid', 'county_centroid');", 1)]),
+        " where dp.verdict = 'ACCEPTED';",
+        " where dp.verdict = 'ACCEPTED' or dp.match_type in ('zip_centroid', 'county_centroid');", 1)]),
     'G_accept_zip_centroid': (D3, [
         (AREA_LIST, "    elsif p_match_type in ('county_centroid') then", 1),
         (ACCEPT_LIST, "    elsif p_match_type not in ('rooftop', 'parcel_centroid', 'range_interpolated', 'zip_centroid') then", 1)]),

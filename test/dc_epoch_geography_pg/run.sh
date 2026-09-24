@@ -43,6 +43,7 @@ begin;
 create table if not exists public.canonical_zip_registry (zip text primary key);
 insert into public.canonical_zip_registry select zcta5 from geo.zcta_boundary on conflict do nothing;
 create temp table _before as select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m;
+create temp table _geo_before as select * from public.dc_entity_geography;
 \\i $root/docs/dc-epoch-dryrun-report.sql
 rollback;
 SQL

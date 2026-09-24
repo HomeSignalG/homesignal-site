@@ -1228,6 +1228,63 @@ the source cites none -- and a record with no citation does not publish.';
 -- membership authority (map1_dc_zip_members) can refuse a point whose error disk crosses a ZCTA.
 alter table public.dc_entity_geography add column if not exists positional_uncertainty_m double precision;
 
+-- ── THE GEOGRAPHY EVIDENCE OF EVERY ENTITY (one definition; the resolver and every report read it)
+-- Every coordinate pair any CURRENT observation linked to an entity asserts:
+--   * the publisher's own point, with the publisher's own account of what it is (location basis);
+--   * an ACCEPTED derived address point of Step 3D -- a different kind of evidence, labelled as
+--     such: basis DERIVED_ADDRESS, no publisher precision, and its calibrated positional
+--     uncertainty in metres.
+-- evidence_class is decided by the EVIDENCE, never by the source's name:
+--   PUBLISHER_SITE      a publisher point whose basis is not a settlement/area statement and which
+--                       carries >= 2 decimal places (a claim about the site itself)
+--   DERIVED_ADDRESS     a HomeSignal geocode of a publisher's site address (carries uncertainty)
+--   PUBLISHER_NON_SITE  the publisher says the point is a town / administrative / area location
+--   PUBLISHER_UNUSABLE  <= 1 decimal place on either axis (±~5.5 km: cannot decide a ZIP)
+create or replace view public.dc_entity_geography_evidence with (security_invoker = true) as
+select eo.canonical_entity_id, o.home_signal_observation_id oid, o.source_key,
+       o.source_native_precision prec, o.source_native_lat lat, o.source_native_lon lng,
+       least(scale(o.source_native_lat::text::numeric),
+             scale(o.source_native_lon::text::numeric)) decimals,
+       o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence,
+       null::double precision uncertainty_m,
+       case when lb.basis = 'NON_SITE_AREA' then 'PUBLISHER_NON_SITE'
+            when least(scale(o.source_native_lat::text::numeric),
+                       scale(o.source_native_lon::text::numeric)) <= 1 then 'PUBLISHER_UNUSABLE'
+            else 'PUBLISHER_SITE' end evidence_class
+  from public.dc_entity_observation eo
+  join public.dc_current_observation c
+    on c.home_signal_observation_id = eo.home_signal_observation_id
+  join public.dc_source_observation o
+    on o.home_signal_observation_id = eo.home_signal_observation_id
+ cross join lateral public.dc_location_basis(o.source_key, o.distribution_key, o.raw_payload) lb
+ where o.source_native_lat is not null and o.source_native_lon is not null
+   and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180
+union all
+select eo.canonical_entity_id, dp.home_signal_observation_id, dp.source_key,
+       null::text, dp.lat, dp.lng, 6, o.observed_at,
+       'DERIVED_ADDRESS'::text, dp.match_type,
+       jsonb_build_object('derivation_id', dp.derivation_id, 'geocoder_query', dp.geocoder_query,
+                          'matched_address', dp.matched_address, 'provider', dp.provider,
+                          'match_type', dp.match_type,
+                          'provider_candidates', dp.provider_candidates,
+                          'derived_at', dp.derived_at, 'run_ref', dp.run_ref,
+                          'verdict', dp.verdict, 'verdict_reason', dp.verdict_reason),
+       dp.positional_uncertainty_m,
+       'DERIVED_ADDRESS'::text
+  from public.dc_entity_observation eo
+  join public.dc_observation_derived_point dp
+    on dp.home_signal_observation_id = eo.home_signal_observation_id
+  join public.dc_source_observation o
+    on o.home_signal_observation_id = eo.home_signal_observation_id
+ where dp.verdict = 'ACCEPTED';
+
+revoke all on public.dc_entity_geography_evidence from public, anon, authenticated;
+
+comment on view public.dc_entity_geography_evidence is
+'STEP 3B. Every coordinate claim linked to a canonical entity, classified by what the evidence is
+(PUBLISHER_SITE / DERIVED_ADDRESS / PUBLISHER_NON_SITE / PUBLISHER_UNUSABLE), never by source
+name. dc_resolve_geography reads it; no resident reader.';
+
 create or replace function public.dc_resolve_geography(p_apply boolean default false)
 returns table(metric text, value text)
 language plpgsql
@@ -1263,43 +1320,12 @@ begin
     drop table if exists _geo_open;
     drop table if exists _geo_derived;
 
-    -- Every coordinate pair any CURRENT observation of an entity asserts -- the publisher's own
-    -- points, and (rule_version 3) the ACCEPTED derived address points of Step 3D, which are a
-    -- different kind of evidence and are labelled as such: basis DERIVED_ADDRESS, no publisher
-    -- precision, and a positional uncertainty that Map 1 membership must respect.
+    -- Every coordinate pair any CURRENT observation of an entity asserts, as classified by the
+    -- one evidence view below (publisher points and ACCEPTED derived address points).
     create temporary table _geo_pts on commit drop as
-    select eo.canonical_entity_id, o.home_signal_observation_id oid, o.source_key,
-           o.source_native_precision prec, o.source_native_lat lat, o.source_native_lon lng,
-           least(scale(o.source_native_lat::text::numeric),
-                 scale(o.source_native_lon::text::numeric)) decimals,
-           o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence,
-           null::double precision uncertainty_m
-      from public.dc_entity_observation eo
-      join public.dc_current_observation c
-        on c.home_signal_observation_id = eo.home_signal_observation_id
-      join public.dc_source_observation o
-        on o.home_signal_observation_id = eo.home_signal_observation_id
-     cross join lateral public.dc_location_basis(o.source_key, o.distribution_key,
-                                                 o.raw_payload) lb
-     where o.source_native_lat is not null and o.source_native_lon is not null
-       and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180
-    union all
-    select eo.canonical_entity_id, dp.home_signal_observation_id, dp.source_key,
-           null::text, dp.lat, dp.lng, 6, o.observed_at,
-           'DERIVED_ADDRESS'::text, dp.match_type,
-           jsonb_build_object('derivation_id', dp.derivation_id, 'geocoder_query', dp.geocoder_query,
-                              'matched_address', dp.matched_address, 'provider', dp.provider,
-                              'match_type', dp.match_type,
-                              'provider_candidates', dp.provider_candidates,
-                              'derived_at', dp.derived_at, 'run_ref', dp.run_ref,
-                              'verdict', dp.verdict, 'verdict_reason', dp.verdict_reason),
-           dp.positional_uncertainty_m
-      from public.dc_entity_observation eo
-      join public.dc_observation_derived_point dp
-        on dp.home_signal_observation_id = eo.home_signal_observation_id
-      join public.dc_source_observation o
-        on o.home_signal_observation_id = eo.home_signal_observation_id
-     where dp.verdict = 'ACCEPTED';
+    select canonical_entity_id, oid, source_key, prec, lat, lng, decimals, observed_at, basis,
+           basis_rule, basis_evidence, uncertainty_m, evidence_class
+      from public.dc_entity_geography_evidence;
 
     -- Why each entity's derived location did or did not qualify (reported, never a point).
     create temporary table _geo_derived on commit drop as

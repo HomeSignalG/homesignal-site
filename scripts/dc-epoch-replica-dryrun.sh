@@ -133,6 +133,7 @@ echo "== 7. PARITY: the replica's Map 1 output must equal production's"
 Q="select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m"
 prod_select "$Q" "$w/before_prod.csv"
 L -d "$REP" -c "create table public.dryrun_before as $Q"
+L -d "$REP" -c "create table public.dryrun_geo_before as select * from public.dc_entity_geography"
 L -d "$REP" -c "\\copy (select * from public.dryrun_before) to '$w/before_rep.csv' with (format csv)"
 a="$(md5_sorted "$w/before_prod.csv")"; b="$(md5_sorted "$w/before_rep.csv")"
 echo "  production $(wc -l < "$w/before_prod.csv") rows md5 $a"
@@ -151,6 +152,7 @@ create temp table _dcg_in(j jsonb);
 select 'RESOLVE_CANONICAL', metric, value from public.dc_resolve_canonical(true, false);
 select 'RESOLVE_GEOGRAPHY', metric, value from public.dc_resolve_geography(true);
 create temp table _before as select * from public.dryrun_before;
+create temp table _geo_before as select * from public.dryrun_geo_before;
 \\i $root/docs/dc-epoch-dryrun-report.sql
 SQL
 
