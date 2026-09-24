@@ -13,4 +13,4 @@ select 'SUMMARY' tag,
          'fp', (select md5(string_agg(k::text, '|' order by k::text collate "C")) from k))::text v
 union all
 select 'ROW', k::text from k
-order by 1, 2 collate "C";
+order by tag, v collate "C";
