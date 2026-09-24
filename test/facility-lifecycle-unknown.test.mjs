@@ -218,6 +218,20 @@ for (const [st, want] of [['Operating', 'operating'], ['Active', 'operating'], [
 ok(HS.resolveMarker({ record_kind: 'facility', _facility: true, type: 'industrial', status: 'Operating' }).lifecycle === 'operating'
    && HS.resolveTrackerMarker(cached({ label: 'X', layer: 'industrial', registry_id: '1', bucket: 'operating' }), frs).lifecycle === 'operating',
   '8p positive control: a facility whose data STATES operating (stored status / declared bucket) still resolves operating');
+{
+  // POSITIVE CONTROL B — a data centre whose SOURCE states operational (Compute Atlas
+  // raw_status 'operational' → server map_status 'Operating', live row MGHPCC, Holyoke 01040,
+  // read from public.map1_dc_zip_members on 2026-09-24) still resolves operating through the
+  // canonical statusTier. Built with the shipped HS.map1DcSite mapping, not a hand-made item.
+  const D = read('lib/data.js');
+  new Function('HS', D.slice(D.indexOf('HS.map1DcSite = function'), D.indexOf('HS.map1DcCredits')))(HS);
+  const dc = HS.map1DcSite({ source_key: 'dc:c46a54a1', project_name: 'Massachusetts Green High Performance Computing Center',
+    map_status: 'Operating', normalized_status: 'operational', raw_status: 'operational', lat: 42.20285, lng: -72.60693,
+    source_url: 'https://en.wikipedia.org/wiki/Massachusetts_Green_High_Performance_Computing_Center', zip_membership: 'member' });
+  const m = HS.resolveMarker(dc);
+  ok(m.lifecycle === 'operating' && m.categoryKey === 'datacenter' && !m.isFacility,
+    '8q positive control: a data centre whose source states operational still resolves Operating (not a facility, not refused)');
+}
 
 // ── §9 one authority ─────────────────────────────────────────────────────────────────────
 const MAP = code(read('lib/map.js'));
@@ -247,5 +261,105 @@ ok(/coalesce\(nullif\(el->>'src',''\),'Public registry'\)/.test(oldLit || '') &&
 ok(!/Closed|Terminated|Effective'|Admin Continued/.test(code(SQL.replace(/^--.*$/gm, ''))),
   '10d the SQL maps no regulatory status to anything');
 
+
+// ── §11 OLD CACHED ELEMENT and NEW PRODUCER ELEMENT converge to ONE Map 1 result ─────────
+for (const [kind, base] of identities) {
+  const a = HS.resolveTrackerMarker(cached(base), frs), b = HS.resolveTrackerMarker(fresh(base), frs);
+  ok(JSON.stringify(a) === JSON.stringify(b),
+    `11a ${kind}: the cached type:'built' element and the new producer element resolve to the IDENTICAL marker`);
+}
+// The page's own bucketOf / siteVisible / rail, evaluated from homesignalmap.html's source.
+const grab = (src, head) => {
+  const i = src.indexOf(head); if (i < 0) return null;
+  let d = 0, j = src.indexOf('{', i);
+  for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); }
+  return null;
+};
+const bucketSrc = grab(PAGE, 'function bucketOf(t, site){');
+const visSrc = grab(PAGE, 'function siteVisible(p){');
+ok(bucketSrc && visSrc && /FILTER\[bucketOf\(p\.type, p\)\]/.test(visSrc) && /HS\.categoryVisible/.test(visSrc),
+  '11b the page\'s bucketOf and siteVisible are found (lifecycle chip AND Type category)');
+ok(/LEGEND\.forEach\(function\(it\)\{ FILTER\[it\.b\] = true; \}\);/.test(PAGE)
+   && /STATUS_LEGEND_ROWS \|\| \[\]\)\.filter\(function\(r\)\{ return r\.key !== "facility"; \}\)/.test(PAGE),
+  '11c the stage FILTER is built from STATUS_LEGEND_ROWS minus facility, every chip ON by default');
+const FILTER = {};
+(HS.STATUS_LEGEND_ROWS || []).filter((r) => r.key !== 'facility').forEach((r) => { FILTER[r.key] = true; });
+FILTER.built = true;
+const pageFns = new Function('HS', 'FILTER', 'frsRid', bucketSrc + '\n' + visSrc + '\nreturn { bucketOf: bucketOf, siteVisible: siteVisible };');
+const P = pageFns(HS, FILTER, frs);
+const railOf = (sites) => {
+  const permits = sites.filter((s) => s.scope === 'point' && s.relevance === 'development');
+  const fac = sites.filter((s) => s.scope === 'point' && s.relevance !== 'development');
+  return permits.concat(fac).filter((s) => P.bucketOf(s.type, s) === 'operating');
+};
+{
+  const oldEl = cached({ label: 'AC MILLER CONCRETE - SPRING CITY PLANT', layer: 'industrial', registry_id: '110070105263' });
+  const newEl = fresh({ label: 'AC MILLER CONCRETE - SPRING CITY PLANT', layer: 'industrial', registry_id: '110070105263' });
+  const devOp = { scope: 'point', relevance: 'development', label: 'BUILT PERMIT', use_type: 'Industrial', layer: 'industrial', type: 'built', record_url: 'x' };
+  for (const [nm, el] of [['old cached', oldEl], ['new producer', newEl]]) {
+    const mk = HS.resolveTrackerMarker(el, frs);
+    ok(P.bucketOf(el.type, el) === 'unknown' && mk.categoryKey === 'industrial' && mk.signal && mk.signal.letter === 'R'
+       && P.siteVisible(el) === true && railOf([devOp, el]).indexOf(el) === -1,
+      `11d ${nm} FRS element: Type Industrial, lifecycle unknown, R, VISIBLE on Map 1, NOT in the Operating-now rail`);
+  }
+  ok(railOf([devOp, oldEl]).length === 1 && railOf([devOp, oldEl])[0] === devOp,
+    '11e positive control: the rail still lists a development record whose source records it built');
+  // ── §12 the filter matrix (existing semantics: Type filters decide the base pin; the
+  //        regulatory switch owns only the R; the lifecycle chip is the record's lifecycle) ──
+  const setAll = (on) => Object.keys(FILTER).forEach((k) => { FILTER[k] = on; });
+  const reg = HS.REGULATORY_LEGEND.key;
+  setAll(true);
+  const mk = HS.resolveTrackerMarker(oldEl, frs);
+  ok(P.siteVisible(oldEl) === true, '12a DEFAULT map (every chip, every Type on): visible');
+  HS.setCategoryFilter(reg, true);
+  ok(P.siteVisible(oldEl) === true && HS.visibleSignal(mk) && HS.visibleSignal(mk).letter === 'R', '12b REGULATORY ON: visible with R');
+  HS.setCategoryFilter(reg, false);
+  ok(P.siteVisible(oldEl) === true && HS.visibleSignal(mk) === null,
+    '12c REGULATORY OFF: base pin stays (Type decides it), R hidden — the existing overlay semantics');
+  HS.setCategoryFilter(reg, true);
+  setAll(false); FILTER.unknown = true;
+  ok(P.siteVisible(oldEl) === true, '12d LIFECYCLE UNKNOWN chip alone: visible');
+  setAll(false); FILTER.operating = true; FILTER.built = true;
+  ok(P.siteVisible(oldEl) === false && P.siteVisible(devOp) === true,
+    '12e OPERATING chip alone: the facility is NOT selected as operating (a built development record is)');
+  setAll(true);
+  HS.setCategoryFilter('industrial', false);
+  const offT = P.siteVisible(oldEl);
+  HS.setCategoryFilter('industrial', true);
+  ok(offT === false && P.siteVisible(oldEl) === true, '12f TYPE filter: still selected by its canonical Type (Industrial off hides it, on shows it)');
+}
+
+// ── §13 the replay guard ─────────────────────────────────────────────────────────────────
+const GUARD = read('docs/facility-lifecycle-guard.sql');
+const gFnStart = GUARD.indexOf('create or replace function public.app_projects_facility_lifecycle_guard()');
+const gFn = gFnStart >= 0 ? GUARD.slice(gFnStart, GUARD.indexOf('$fn$;', gFnStart)) : '';
+const gFnCode = gFn.replace(/^\s*--.*$/gm, '');
+ok(/create trigger app_projects_facility_lifecycle_guard_trg\s+before insert or update of status, record_kind on public\.app_projects\s+for each row\s+when \(new\.record_kind = 'facility' and new\.status = 'Operating'\)\s+execute function public\.app_projects_facility_lifecycle_guard\(\);/.test(GUARD),
+  '13a the guard trigger is CREATED on app_projects, before insert/update of status, filtered to facility + Operating');
+ok(gFnCode.length > 100 && /raise exception using/.test(gFnCode) && !/new\.\w+\s*:=/.test(gFnCode)
+   && !/raise (notice|warning|info)/.test(gFnCode) && !/(update|insert into)\s+public\./i.test(gFnCode),
+  '13a2 the guard function REFUSES (raises) and never rewrites or writes a value — no second write authority');
+ok(/A_insert_facility_operating' = 'refused'/.test(GUARD) && /B_insert_facility_on_file' = 'accepted'/.test(GUARD)
+   && /C_update_facility_into_operating' = 'refused'/.test(GUARD) && /D_insert_development_operating' = 'accepted'/.test(GUARD)
+   && /raise exception 'facility lifecycle guard selftest failed/.test(GUARD),
+  '13b the apply fails unless the self-test passes in BOTH directions (refuses the defect, accepts unknown and development Operating)');
+// Every committed artifact still carrying the obsolete facility literal is a KNOWN dated
+// receipt. A new copy (a fresh snapshot, a restored rollback) must be reviewed, not slip in.
+import('node:child_process').then(({ execSync }) => {
+  const hits = execSync("git ls-files -z | xargs -0 grep -lF \"'Operating', coalesce(nullif(el->>'src',''),'Public registry')\" || true",
+    { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean).sort();
+  const KNOWN = ['docs/app-maps-backbone-migration.sql', 'docs/app-projects-stable-key-migration.sql',
+    'docs/app-projects-stable-key-rollback.sql', 'docs/app-refresh-zip-gin-containment-migration.sql',
+    'docs/app-refresh-zip-live-snapshot-2026-07-24.sql', 'docs/app-refresh-zip-local-news-migration.sql',
+    'docs/facility-lifecycle-guard.sql', 'docs/facility-lifecycle-unknown-migration.sql',
+    'test/facility-lifecycle-unknown.test.mjs'];  // this file names the literal in its own grep
+  const unknown = hits.filter((h) => !KNOWN.includes(h));
+  ok(hits.length >= 7 && unknown.length === 0,
+    `13c every file carrying the obsolete facility literal is a known dated receipt (${hits.length} found)`, unknown.join(', '));
+  finish();
+});
+
+function finish() {
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nALL PASS');
 process.exit(failures ? 1 : 0);
+}

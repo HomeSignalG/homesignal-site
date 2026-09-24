@@ -2294,7 +2294,16 @@ to **"FORMER CROMBY GENERATING STATION"**.
   popup's "operating now", the Map 1 **"Operating now" rail** (it appended every facility), the ZIP
   card and the facility detail page.
 - ⚠️ **Do not replay a dated full `CREATE OR REPLACE` of `app_refresh_zip`** from `docs/` or the
-  ingest repo — those snapshots predate this and still carry `'Operating'`; replaying one reverts it.
+  ingest repo — nine such artifacts predate this and still carry `'Operating'`. They are kept as
+  receipts, and the DATABASE now refuses what a replay would write: trigger
+  `app_projects_facility_lifecycle_guard_trg` (`docs/facility-lifecycle-guard.sql`, migration
+  `facility_lifecycle_guard_20260924`) raises on any facility row becoming `Operating`, so a replay
+  fails loudly into `app_refresh_failures` instead of writing false rows. Proven by a rolled-back
+  replay of the exact pre-change body (md5 `6591d7f7…`) against 19475: refused on its first
+  facility. `public.facility_lifecycle_guard_selftest()` checks both directions (refuses the
+  defect; accepts `On file` and a development `Operating`). The guard writes nothing.
+  A future source that genuinely STATES a facility lifecycle must change the guard and the
+  materializer in the same reviewed change.
 - Rollout: stored rows change as the sweep revisits each ZIP (~10.8 h cycle); cached report sites
   keep the old stamp until re-collected and are refused client-side meanwhile; the producer change
   lands on the next `deploy-edge-functions` dispatch.
