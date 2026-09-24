@@ -22,7 +22,7 @@ P -f "$root/docs/map1-dc-publication.sql" >/dev/null
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 13 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped contract does not pass"; exit 1; fi
+if [ "$n_all" -lt 14 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped contract does not pass"; exit 1; fi
 
 status=0
 while IFS= read -r name; do

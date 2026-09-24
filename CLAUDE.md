@@ -1887,6 +1887,57 @@ an outcome it cannot source**.
 
 ---
 
+## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
+
+Two defects in the canonical DC geography layer (`docs/dc-step3b-canonical-geography.sql`,
+rule_version 2). Both are fixed where they arose, upstream of `map1_dc_zip_members`.
+
+**1. THE DAILY ATLAS BLACKOUT.** `dc_resolve_geography` reads coordinates only through
+observations identity has already linked. Atlas's scheduled run landed at **14:26:42Z** on
+2026-09-24, one minute after the hourly identity job at :25. At 14:35Z geography therefore saw
+a current run linked to nothing, rewrote **all 2,870 live entities** as
+`GEOGRAPHY_UNRESOLVED / NO_COORDINATES`, and Map 1 served **zero** canonical data centres until
+identity ran again. 2026-09-23's run completed at 14:26:04Z, so the same hour-long outage is
+inferred for that day too; the table keeps no history. Fix: the resolver **refuses**
+(`REFUSED_IDENTITY_PENDING`, nothing written) while any current observation is unlinked, and the
+last decided geography stands. Unlinked evidence is not evidence of absence.
+
+**2. TOWN CENTROIDS PUBLISHED AS FACILITIES.** Atlas's `notes` say how each pin was derived.
+For **262** data-centre records they say it is a city, town, county, community or area location,
+e.g. "Coordinates are Ellendale city centroid", "the Pineville (county seat) centroid" or
+"approximate to Oklahoma City". Many of these also carry `location.precision = 'exact'`. Such a
+point decides which ZIP the town centre is in: a centroid shortcut arriving through source data.
+Fix: a canonical `dc_location_basis(source, distribution, payload)`, keyed per source like
+`dc_classify_observation`, classifies the pin as follows:
+- `NON_SITE_AREA`: the resolver withholds it as `GEOGRAPHY_UNRESOLVED / PUBLISHER_AREA_POINT`.
+  The publisher's own sentence rides in `provenance.location_basis_evidence`.
+- `NON_SITE_ROAD`: flagged `PUBLISHER_ROAD_REFERENCE`, **not demoted**. It is not yet determined
+  whether a pin bordering the site may place it.
+- `UNSTATED`: no change.
+
+The facility is **never deleted**; only its geography fails closed.
+
+- ⚖️ **Precision over recall, on purpose.** A miss leaves today's behaviour; a false hit
+  would remove a real site. Address geocodes, parcel and building points, industrial/technology
+  **parks and centers**, and plain "approximate" are all UNSTATED. Historical sentences
+  ("replace the earlier city-level geocode", "corrected ... from a city-centroid placeholder")
+  and direction phrases ("parcel south of Eloy city center") never demote.
+- 🔑 **Every one of the 1,183 real Atlas location sentences was adjudicated by hand** and is the
+  fixture `test/dc_geography_pg/location_basis_corpus.csv`. The SQL agrees on all 1,183. In
+  production, over all 2,187 current records, the six (type × basis) sets fingerprint-match the
+  adjudicated prototype exactly (data_center area `548d71ab…`, road `ccc63fc8…`).
+- ⛔ **The resolver never reads publisher text**; it reads the basis. A second source gets its
+  own branch in `dc_location_basis`, not a regex in the resolver (offline pin 7c).
+- **Edge ambiguity fails closed in `map1_dc_zip_members`.** A point touching more than one ZCTA
+  (boundary-inclusive membership) publishes on neither page, never on the nearest. It measured 0
+  of 3,497 candidate points when written.
+
+Gates: `test/dc_geography_pg` (14 checks + 12 prohibited mutations) and S14 plus the
+`edge_blind` mutation in `test/map1_dc_publication_pg`, both in `zip-membership-suite.yml`;
+offline pins 7a–7f in `test/dc-canonical-geography.test.mjs`.
+
+---
+
 ## 7.09 MAP 1 READS ONE DATA-CENTRE CONTRACT — `public.map1_dc_zip_members` (2026-09-22)
 
 **Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
