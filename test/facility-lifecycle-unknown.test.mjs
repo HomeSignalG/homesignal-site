@@ -172,8 +172,9 @@ const PAGE = read('homesignalmap.html');
 const kl = PAGE.slice(PAGE.indexOf('function kindLabel(s){'), PAGE.indexOf('var MARKER_TITLE_STAGE'));
 ok(kl.length > 200 && !/operating now/i.test(code(kl)) && /mk\.lifecycleLabel/.test(kl),
   '7a Map 1 popup: no "operating now" literal; the facility line reads the resolver\'s lifecycleLabel');
-ok(/var builtRows = permits\.concat\(fac\)\.filter\(function\(s\)\{ return bucketOf\(s\.type, s\)==="operating"; \}\);/.test(PAGE)
-   && !/\.concat\(fac\);/.test(code(PAGE)),
+ok(/var points = permits\.concat\(fac\);/.test(PAGE)
+   && /var builtRows = points\.filter\(function\(s\)\{ return bucketOf\(s\.type, s\)==="operating"; \}\);/.test(PAGE)
+   && !/builtRows = [^;]*\.concat\(fac\);/.test(code(PAGE)),
   '7b Map 1 "Operating now" rail: facilities pass the same lifecycle test, never appended unconditionally');
 ok(!/EPA-registered facilities and completed construction filings/.test(PAGE) && !/No EPA-registered facility on record here/.test(PAGE),
   '7c the rail no longer tells a resident that EPA facilities are "standing today"');
@@ -181,8 +182,8 @@ ok(/function stageOf\(s\)\{[^}]*bucketOf\(s && s\.type, s\)/.test(PAGE),
   '7d stageOf passes the SITE, so a cached FRS stamp cannot re-enter through the marker title');
 const RT = read('lib/community-page.js');
 const cardSrc = RT.slice(RT.indexOf('facilities.slice(0,6).map(function(f){'), RT.indexOf("}).join('')", RT.indexOf('facilities.slice(0,6).map(function(f){')));
-ok(cardSrc.length > 100 && !/'Operating|Operating'/.test(code(cardSrc)) && /HS\.tpl\.browsingStatusLabel\(f\)/.test(cardSrc),
-  '7e ZIP card: no literal Operating; the lifecycle word is the stored status via HS.tpl.browsingStatusLabel');
+ok(cardSrc.length > 100 && !/'Operating|Operating'/.test(code(cardSrc)) && /HS\.facLifecycleLabel\(f\)/.test(cardSrc),
+  '7e ZIP card: no literal Operating; the lifecycle word is the stored status in the shared vocabulary (HS.facLifecycleLabel)');
 {
   HS.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   HS.typeBadge = HS.typeBadge || (() => '');
@@ -190,13 +191,13 @@ ok(cardSrc.length > 100 && !/'Operating|Operating'/.test(code(cardSrc)) && /HS\.
   new Function('HS', RT)(HS);
   const card = new Function('HS', 'f', cardSrc.slice('facilities.slice(0,6).map(function(f){'.length));
   const html = card(HS, { name: 'CROMBY GENERATING STATION', type: 'energy', status: 'On file', source_ref: 'https://echo.epa.gov/x' });
-  ok(!/Operating/.test(html) && /<span class="lens">On file/.test(html) && /Roads &amp; infrastructure/.test(html),
-    '7f the rendered Cromby card reads "On file [ROADS & INFRASTRUCTURE]", never Operating', html.slice(0, 200));
+  ok(!/Operating/.test(html) && /<span class="lens">Lifecycle unknown/.test(html) && /Roads &amp; infrastructure/.test(html),
+    '7f the rendered Cromby card reads "Lifecycle unknown [ROADS & INFRASTRUCTURE]", never Operating', html.slice(0, 200));
 }
 const DEV = read('development.html');
 const hdr = DEV.slice(DEV.indexOf('Regulated facility <span class="status'), DEV.indexOf('Regulated facility <span class="status') + 300);
-ok(hdr.length > 50 && !/>Operating</.test(hdr) && !/status active/.test(hdr) && /HS\.tpl\.browsingStatusLabel\(f\)/.test(hdr),
-  '7g facility detail: no literal "Operating", no operating colour class; the pill prints the stored status');
+ok(hdr.length > 50 && !/>Operating</.test(hdr) && !/status active/.test(hdr) && /HS\.canonicalLifecycle\(f\)\.label/.test(hdr),
+  '7g facility detail: no literal "Operating", no operating colour class; the pill prints the stored status in the shared vocabulary');
 ok(!/An existing regulated facility/.test(DEV), '7h facility detail no longer calls the facility "existing"');
 const PRODUCER = read('supabase/functions/get-address-report/index.ts');
 const push = code(PRODUCER).match(/kept\.push\(\{ label: name,[^\n]*\}\);/);

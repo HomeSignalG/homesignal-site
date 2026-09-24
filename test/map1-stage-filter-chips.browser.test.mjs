@@ -185,6 +185,19 @@ ok(C0.map(c => c.id).join(',') === 'operating_now,approved,proposed,lifecycle_un
 ok(C0.map(c => c.label).join(' | ') === 'Operating now | Approved | Proposed | Lifecycle unknown',
   '0: the four founder-specified labels', C0.map(c => c.label).join(' | '));
 ok(C0.every(c => c.checked), '0: DEFAULT — all four are checked');
+// THE LIST HOME (founder decision, 2026-09-24): records are listed in the band their lifecycle
+// names — the same bucketOf the pin colour and these chips read, never the record kind.
+const bandsOf = () => page.evaluate(() => ({
+  built: (document.getElementById('builtList') || {}).textContent || '',
+  unknown: (document.getElementById('unknownList') || {}).textContent || '',
+  unknownHead: ((document.querySelector('.band-h.t-unknown') || {}).textContent || '').trim()
+}));
+const bands0 = await bandsOf();
+ok(bands0.unknownHead === 'Lifecycle unknown', '0L: the Lifecycle unknown band renders under the legend\'s own label', bands0.unknownHead);
+ok(/Herndon Parkway Utility Corridor/.test(bands0.unknown) && !/Herndon Parkway Utility Corridor/.test(bands0.built),
+  '0L: a development record with no stated lifecycle is listed under Lifecycle unknown', JSON.stringify(bands0).slice(0, 300));
+ok(/Innovation Center Substation/.test(bands0.built) && !/Innovation Center Substation/.test(bands0.unknown),
+  '0L: Operating now lists the record whose own source states Operating');
 ok((await pins()) === 4, '0: ...and all four lifecycle categories are on the map', await pins());
 ok(!(await emptyNote()).shown, '0: no empty-state note while anything is selected');
 

@@ -243,6 +243,8 @@
   .band-h.t-built{background:#00893a}
   .band-h.t-approved{background:#2563EB}
   .band-h.t-proposed{background:#E2772F}
+  /* Lifecycle unknown — the legend's own neutral (HS.LIFECYCLE_HEX.unknown / statusHex.onfile). */
+  .band-h.t-unknown{background:#706468}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
   .rec{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
@@ -803,6 +805,14 @@
           <div class="band-s" id="propSub">Hearings and notices in this area</div>
           <div id="propList"></div>
         </div>
+        <!-- LIFECYCLE UNKNOWN (founder decision, 2026-09-24): on the public record, but the source
+             states no construction or operating stage. The legend's own neutral and its own label,
+             so such a record has a truthful home instead of "Operating now" or no list at all. -->
+        <div class="card read">
+          <div class="band-h t-unknown">Lifecycle unknown</div>
+          <div class="band-s">On the public record, but the source states no construction or operating stage (EPA-registered facilities are here)</div>
+          <div id="unknownList"></div>
+        </div>
       </div>
 
       <!-- Other civic notices & hearings: real public meetings the county posts (personnel/employee,
@@ -865,8 +875,8 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
-<script src="lib/project-type.js?v=1956b224"></script>
-<script src="lib/map.js?v=1e46eb40"></script>
+<script src="lib/project-type.js?v=6ad8270c"></script>
+<script src="lib/map.js?v=5824fe07"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
 <script src="lib/zip-authoritative.js?v=20260922a"></script>
@@ -2543,7 +2553,13 @@ HS.onReady(function(){
     // now pass the same bucketOf() test as every permit, so one with no sourced lifecycle
     // (`unknown`) is not listed as operating. It is still drawn on the map, still counted in the
     // Regulated facilities tile, and its popup still carries the EPA record and links.
-    var builtRows = permits.concat(fac).filter(function(s){ return bucketOf(s.type, s)==="operating"; });
+    var points = permits.concat(fac);
+    var builtRows = points.filter(function(s){ return bucketOf(s.type, s)==="operating"; });
+    // LIFECYCLE UNKNOWN HAS A LIST HOME (founder decision, 2026-09-24). A record whose canonical
+    // lifecycle is unknown — an EPA facility, a permit or an area notice alike — is listed under
+    // the legend's own "Lifecycle unknown" band instead of in no band at all. Membership is the
+    // SAME bucketOf the pin colour and the Stage chips read; it never keys on record kind.
+    var unknownRows = points.concat(dev).filter(function(s){ return bucketOf(s.type, s)==="unknown"; });
     // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
     // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
@@ -2630,6 +2646,7 @@ HS.onReady(function(){
     // they are not plotted as development dots — the map shows genuine development + facilities only.
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
     listInto("builtList", builtRows, "Nothing recorded as operating right now.");
+    listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
     // heading a reader takes as a statement about now, and the only one that can hold a
@@ -3284,7 +3301,9 @@ HS.onReady(function(){
     items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
     el.innerHTML = items.slice(0,12).map(function(s, i){
-      var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
+      // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
+      // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
+      var col = opts.dotColor || COLORS[bucketOf(s.type, s)] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
       // internal property page — the external record link lives there, where every fact

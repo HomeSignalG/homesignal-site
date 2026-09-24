@@ -2286,8 +2286,19 @@ to **"FORMER CROMBY GENERATING STATION"**.
 - **ONE authority, reused:** `trackerSiteItem` (what counts as evidence) → `statusTier`
   (`proposed|approved|operating|unknown`). An FRS element's `type` is not evidence (the producer
   stamped `built` on all of them); an explicit `bucket` still is. Stored rows carry the existing
-  unknown value `'On file'`; Map 1 labels it "Lifecycle unknown", the ZIP card and facility detail
-  print the stored status through `HS.tpl.browsingStatusLabel` (the same call the Development cards use).
+  unknown value `'On file'`.
+- ⚖️ **ONE lifecycle VOCABULARY, and it is not in `lib/map.js` (founder decisions, 2026-09-24).**
+  The keys, labels and status → key rule (`LIFECYCLE_KEYS`, `LIFECYCLE_LABELS`, `lifecycleKey`,
+  `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
+  can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
+  the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL")
+  and the facility detail pill. None prints the raw storage value `On file`.
+- ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
+  EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
+  that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
+  facilities (and every unknown-lifecycle development record) appeared in no list at all.
+  Pinned by `test/lifecycle-unknown-presentation.test.mjs` and `map1-stage-filter-chips` §0L.
 - **Seven places asserted it; all now read the one decision:** the producer's `type:"built"`, the
   `app_refresh_zip` literal (migration `facility_lifecycle_unknown_20260924`, md5
   `6591d7f7…` → `821a951b…`, reversal proven), `resolveMarker`'s three facility branches, the Map 1

@@ -186,6 +186,21 @@ const rowsLook = () => page.evaluate(() => {
   return { stage: read('#mapkey .stagechip'), type: read('#mapkeyShapes .typechip') };
 });
 
+// ── 0L. EPA FACILITIES HAVE A LIST HOME (founder decision, 2026-09-24) ───────────────
+// An EPA registration states no lifecycle, so the two EPA fixtures (cached type:'built' and all)
+// are listed under "Lifecycle unknown" — never under "Operating now", and never in no list.
+const bandsOf = () => page.evaluate(() => ({
+  built: (document.getElementById('builtList') || {}).textContent || '',
+  unknown: (document.getElementById('unknownList') || {}).textContent || '',
+  unknownHead: ((document.querySelector('.band-h.t-unknown') || {}).textContent || '').trim()
+}));
+{
+  const b = await bandsOf();
+  ok(b.unknownHead === 'Lifecycle unknown' && /ANDURIL/.test(b.unknown) && /CORESITE/.test(b.unknown),
+    '0L: both EPA facilities are listed under Lifecycle unknown', JSON.stringify(b).slice(0, 300));
+  ok(!/ANDURIL|CORESITE/.test(b.built), '0L: no EPA facility is listed under Operating now');
+}
+
 // ── 1. THREE ROWS, IN ORDER, AND THE THIRD IS NOT A TYPE ──────────────────────────
 const headings = await page.evaluate(() =>
   Array.from(document.querySelectorAll('.maplegend-wrap .mapkey-hd')).map(h => h.textContent.trim().replace(/\s+/g, ' ')));

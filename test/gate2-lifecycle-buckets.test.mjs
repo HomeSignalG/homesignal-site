@@ -50,13 +50,15 @@ const HS = global.window.HS;
     'A2 LIFECYCLE_KEYS is exactly lib/map.js::LIFECYCLE_KEYS', `gate ${mine} vs map ${theirs}`);
 }
 {
-  // The mapping mirrors a specific block of lib/map.js. If that block is edited, this test
-  // should be the thing that notices — so pin its shape, not just its behaviour.
-  const src = readFileSync(join(ROOT, 'lib/map.js'), 'utf8');
+  // The mapping mirrors a specific block of the lifecycle vocabulary, which moved from
+  // lib/map.js to lib/project-type.js (2026-09-24, shared with the ZIP page). If that block
+  // is edited, this test should be the thing that notices — so pin its shape, not just its
+  // behaviour.
+  const src = readFileSync(join(ROOT, 'lib/project-type.js'), 'utf8');
   ok(/s === 'operating' \|\| s === 'active' \|\| s === 'built'/.test(src),
-    'A3 lib/map.js still folds operating/active/built into one bucket (the line STATUS_BUCKET mirrors)');
+    'A3 lib/project-type.js still folds operating/active/built into one bucket (the line STATUS_BUCKET mirrors)');
   ok(/: 'unknown';/.test(src),
-    'A4 lib/map.js still sends unrecognised statuses to `unknown` via its else-branch');
+    'A4 lib/project-type.js still sends unrecognised statuses to `unknown` via its else-branch');
 }
 
 // ── B. facilities are never a lifecycle bucket ───────────────────────────────────────────
