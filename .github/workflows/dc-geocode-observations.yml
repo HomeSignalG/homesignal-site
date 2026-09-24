@@ -1,0 +1,100 @@
+name: dc-geocode-observations
+
+# DERIVED LOCATION EVIDENCE for data-centre source addresses (docs/dc-step3d-derived-location.sql).
+#
+#   queue (READ ONLY)  ->  HomeSignal's ONE production geocoding ladder  ->  append-only load
+#
+# * The QUEUE is decided in SQL (dc_geocode_input + dc_geocode_queue): the runner never chooses
+#   which addresses to geocode, and an address already derived for this ladder version is not
+#   queued again.
+# * The LADDER is scripts/dc-geocode-observations.ts -> productionLadder / resolveGeocode /
+#   canonicalAddr, the report engine's own modules. There is no second geocoder.
+# * The LOAD (docs/dc-geocode-observations-load.sql) accepts only queued queries at the current
+#   ladder version, writes ONLY public.dc_address_geocode, and never overwrites. Whether a
+#   derived point may place a facility is decided afterwards, in SQL, by the hourly resolvers
+#   (identity at :25, geography at :35) -- never by this workflow.
+#
+# Why a runner: the Census geocoder and the database are unreachable from the sandbox.
+# Scheduled after the daily Epoch acquisition (homesignal-ingest) has landed.
+
+on:
+  schedule:
+    - cron: '45 15 * * *'
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/dc-geocode-observations.ts'
+      - 'supabase/functions/get-address-report/geocode-cache.ts'
+      - 'supabase/functions/get-address-report/canonical-addr.ts'
+      - '.github/workflows/dc-geocode-observations.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-geocode-observations
+  cancel-in-progress: false
+
+jobs:
+  # On a pull request: prove the writer still compiles against the ladder it imports. No secrets,
+  # no network beyond module resolution, nothing derived.
+  typecheck:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check scripts/dc-geocode-observations.ts
+
+  derive:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Read the queue (READ ONLY transaction)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          PGOPTIONS='-c default_transaction_read_only=on' \
+            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off \
+                 -f docs/dc-geocode-observations-queue.sql > /tmp/dcg-in.jsonl
+          echo "queued addresses: $(grep -c . /tmp/dcg-in.jsonl || true)"
+
+      - name: Derive through the production ladder
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DCG_INPUT: /tmp/dcg-in.jsonl
+          DCG_OUTPUT: /tmp/dcg-out.jsonl
+          RUN_REF: gha:${{ github.run_id }}
+        run: deno run --allow-net --allow-env --allow-read --allow-write=/tmp scripts/dc-geocode-observations.ts
+
+      - name: Load (append-only, queued queries only)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "derivations to load: $(grep -c . /tmp/dcg-out.jsonl || true)"
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -P footer=off <<'SQL'
+          begin;
+          create temp table _dcg_in(j jsonb) on commit drop;
+          \copy _dcg_in(j) from '/tmp/dcg-out.jsonl' with (format csv, quote e'\x01', delimiter e'\x02')
+          \i docs/dc-geocode-observations-load.sql
+          commit;
+          SQL

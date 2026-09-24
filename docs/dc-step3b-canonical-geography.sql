@@ -38,6 +38,17 @@
 --   precision 'exact', then the most decimal places, then the newest observation, then the
 --   observation id (deterministic).
 --
+-- RULE VERSION 3 (2026-09-24) — DERIVED ADDRESS POINTS (docs/dc-step3d-derived-location.sql):
+--   * an ACCEPTED derived point is a candidate point with basis DERIVED_ADDRESS, ranked AFTER
+--     any publisher site point and BEFORE a publisher area point -- so it never overrides a
+--     site the publisher states, and it replaces a town centroid (which stays rejected);
+--   * a town/area point is not a site claim, so it no longer takes part in SOURCES_DISAGREE:
+--     only site claims are compared, with the SAME 1 km rule, owned here and nowhere else;
+--   * a derived point may not place an entity that has an OPEN cross-source identity question
+--     (IDENTITY_REVIEW_REQUIRED), nor one whose derived address another entity also uses
+--     (DERIVED_ADDRESS_SHARED): the address cannot tell the two apart;
+--   * the point's positional uncertainty (metres) is stored with the decision.
+--
 -- FOOTPRINT: geometry_type admits 'FOOTPRINT' and a footprint would win over any point, but NO
 -- current source supplies a polygon (Atlas: lat/lon only; Epoch: address only). The rule is not
 -- written against a field that does not exist; the first footprint-bearing source adds it.
@@ -48,6 +59,7 @@ create table if not exists public.dc_entity_geography (
                               references public.dc_canonical_entity(canonical_entity_id),
     geography_status          text not null,
     geometry_type             text,
+    positional_uncertainty_m  double precision,   -- metres; NULL = no quantified uncertainty
     geom                      geometry(Geometry, 4326),
     lat                       double precision,
     lng                       double precision,
@@ -71,6 +83,9 @@ create table if not exists public.dc_entity_geography (
 );
 
 alter table public.dc_entity_geography enable row level security;
+-- rule_version 3: a derived point's positional uncertainty travels with the decision, so the ONE
+-- membership authority (map1_dc_zip_members) can refuse a point whose error disk crosses a ZCTA.
+alter table public.dc_entity_geography add column if not exists positional_uncertainty_m double precision;
 revoke all on public.dc_entity_geography from anon, authenticated;
 
 comment on table public.dc_entity_geography is
@@ -272,7 +287,7 @@ returns table(metric text, value text)
 language plpgsql
 as $fn$
 declare
-    v_rule_version constant integer := 2;
+    v_rule_version constant integer := 3;
     v_written integer := 0;
     v_pending integer;
 begin
@@ -299,14 +314,20 @@ begin
     drop table if exists _geo_pts;
     drop table if exists _geo_pick;
     drop table if exists _geo_out;
+    drop table if exists _geo_open;
+    drop table if exists _geo_derived;
 
-    -- Every coordinate pair any CURRENT observation of an entity asserts.
+    -- Every coordinate pair any CURRENT observation of an entity asserts -- the publisher's own
+    -- points, and (rule_version 3) the ACCEPTED derived address points of Step 3D, which are a
+    -- different kind of evidence and are labelled as such: basis DERIVED_ADDRESS, no publisher
+    -- precision, and a positional uncertainty that Map 1 membership must respect.
     create temporary table _geo_pts on commit drop as
     select eo.canonical_entity_id, o.home_signal_observation_id oid, o.source_key,
            o.source_native_precision prec, o.source_native_lat lat, o.source_native_lon lng,
            least(scale(o.source_native_lat::text::numeric),
                  scale(o.source_native_lon::text::numeric)) decimals,
-           o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence
+           o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence,
+           null::double precision uncertainty_m
       from public.dc_entity_observation eo
       join public.dc_current_observation c
         on c.home_signal_observation_id = eo.home_signal_observation_id
@@ -315,25 +336,83 @@ begin
      cross join lateral public.dc_location_basis(o.source_key, o.distribution_key,
                                                  o.raw_payload) lb
      where o.source_native_lat is not null and o.source_native_lon is not null
-       and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180;
+       and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180
+    union all
+    select eo.canonical_entity_id, dp.home_signal_observation_id, dp.source_key,
+           null::text, dp.lat, dp.lng, 6, o.observed_at,
+           'DERIVED_ADDRESS'::text, dp.match_type,
+           jsonb_build_object('derivation_id', dp.derivation_id, 'geocoder_query', dp.geocoder_query,
+                              'matched_address', dp.matched_address, 'provider', dp.provider,
+                              'match_type', dp.match_type,
+                              'provider_candidates', dp.provider_candidates,
+                              'derived_at', dp.derived_at, 'run_ref', dp.run_ref,
+                              'verdict', dp.verdict, 'verdict_reason', dp.verdict_reason),
+           dp.positional_uncertainty_m
+      from public.dc_entity_observation eo
+      join public.dc_observation_derived_point dp
+        on dp.home_signal_observation_id = eo.home_signal_observation_id
+      join public.dc_source_observation o
+        on o.home_signal_observation_id = eo.home_signal_observation_id
+     where dp.verdict = 'ACCEPTED';
+
+    -- Why each entity's derived location did or did not qualify (reported, never a point).
+    create temporary table _geo_derived on commit drop as
+    select distinct on (eo.canonical_entity_id) eo.canonical_entity_id,
+           jsonb_build_object('input_quality', dp.input_quality, 'geocoder_query', dp.geocoder_query,
+                              'verdict', dp.verdict, 'reason', dp.verdict_reason,
+                              'match_type', dp.match_type, 'matched_address', dp.matched_address) derived
+      from public.dc_entity_observation eo
+      join public.dc_observation_derived_point dp
+        on dp.home_signal_observation_id = eo.home_signal_observation_id
+     order by eo.canonical_entity_id, (dp.verdict = 'ACCEPTED') desc, dp.home_signal_observation_id;
+
+    -- ⛔ IDENTITY BEFORE A DERIVED MARKER. An entity with an OPEN cross-source identity question
+    -- -- a surfaced candidate pair with another data-centre entity that no person has decided
+    -- CONFIRMED_DISTINCT (and that did not merge) -- may not be PLACED by a derived point: the
+    -- other entity may be the same facility, and two markers for one site is the defect.
+    -- Publisher points are unaffected (their behaviour before rule_version 3 is unchanged).
+    create temporary table _geo_open on commit drop as
+    select distinct x.canonical_entity_id
+      from public.dc_identity_candidate k
+      join public.dc_entity_observation x
+        on x.home_signal_observation_id in (k.observation_a, k.observation_b)
+      join public.dc_entity_observation y
+        on y.home_signal_observation_id in (k.observation_a, k.observation_b)
+       and y.home_signal_observation_id <> x.home_signal_observation_id
+      join public.dc_canonical_entity ye on ye.canonical_entity_id = y.canonical_entity_id
+     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b,
+                                                  k.candidate_rule_key) d
+     where x.source_key <> y.source_key
+       and y.canonical_entity_id <> x.canonical_entity_id
+       and ye.superseded_by is null
+       and ye.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+       and d.decision_state <> 'CONFIRMED_DISTINCT';
 
     create temporary table _geo_pick on commit drop as
     select distinct on (canonical_entity_id) *
       from _geo_pts
-     order by canonical_entity_id, (basis = 'NON_SITE_AREA'), (prec = 'exact') desc nulls last,
+     order by canonical_entity_id, (basis = 'NON_SITE_AREA'), (basis = 'DERIVED_ADDRESS'),
+              (prec = 'exact') desc nulls last,
               decimals desc,
               observed_at desc, oid;
 
     create temporary table _geo_out on commit drop as
     with base as (
         select e.canonical_entity_id, e.entity_grain, p.oid, p.source_key, p.prec, p.lat,
-               p.lng, p.decimals, p.basis, p.basis_rule, p.basis_evidence,
+               p.lng, p.decimals, p.basis, p.basis_rule, p.basis_evidence, p.uncertainty_m,
+               -- A publisher's town/area point is not a claim about the SITE (rule_version 2),
+               -- so it can neither disagree with nor be agreed with: only site claims -- publisher
+               -- site points and accepted derived points -- are compared.
                exists (select 1 from _geo_pts a join _geo_pts b
                          on a.canonical_entity_id = b.canonical_entity_id
                         and a.source_key < b.source_key
                         where a.canonical_entity_id = e.canonical_entity_id
+                          and a.basis <> 'NON_SITE_AREA' and b.basis <> 'NON_SITE_AREA'
                           and ST_DistanceSphere(ST_MakePoint(a.lng, a.lat),
                                                 ST_MakePoint(b.lng, b.lat)) > 1000) disagree,
+               e.canonical_entity_id in (select canonical_entity_id from _geo_open) identity_open,
+               (select dd.derived from _geo_derived dd
+                 where dd.canonical_entity_id = e.canonical_entity_id) derived,
                exists (select 1 from _geo_pick q
                         where q.canonical_entity_id <> e.canonical_entity_id
                           and q.lat = p.lat and q.lng = p.lng) shared
@@ -344,12 +423,17 @@ begin
            case when b.entity_grain = 'AGGREGATE_MULTI_SITE' then 'NOT_A_SITE'
                 when b.oid is null or b.disagree or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'
                 when b.basis = 'NON_SITE_AREA' then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'GEOGRAPHY_UNRESOLVED'
                 else 'RESOLVED' end status,
            case when b.entity_grain = 'AGGREGATE_MULTI_SITE' then 'PUBLISHER_MULTI_SITE'
                 when b.oid is null then 'NO_COORDINATES'
                 when b.disagree then 'SOURCES_DISAGREE'
                 when b.decimals <= 1 then 'ROUNDED_COORDINATES'
                 when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT'
+                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_REVIEW_REQUIRED'
+                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'DERIVED_ADDRESS_SHARED'
+                when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT'
                 else 'PUBLISHER_POINT' end rule_key,
            array_remove(array[
                case when b.oid is not null and b.decimals <= 1 then 'ROUNDED_COORDINATES' end,
@@ -358,6 +442,8 @@ begin
                     then 'PUBLISHER_CLAIMS_EXACT' end,
                case when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT' end,
                case when b.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE' end,
+               case when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT' end,
+               case when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_REVIEW_REQUIRED' end,
                case when b.decimals = 2 then 'COARSE_COORDINATES' end,
                case when b.prec = 'approximate' then 'PUBLISHER_APPROXIMATE' end,
                case when b.shared then 'SHARED_COORDINATES' end,
@@ -369,14 +455,18 @@ begin
         insert into public.dc_entity_geography as g
             (canonical_entity_id, geography_status, geometry_type, geom, lat, lng,
              coordinate_decimals, authority_source_key, authority_observation_id,
-             publisher_precision, quality_flags, rule_key, rule_version, provenance)
+             publisher_precision, quality_flags, rule_key, rule_version, provenance,
+             positional_uncertainty_m)
         select canonical_entity_id, status,
                case when status = 'RESOLVED' then 'POINT' end,
                case when status = 'RESOLVED' then ST_SetSRID(ST_MakePoint(lng, lat), 4326) end,
                lat, lng, decimals, source_key, oid, prec, flags, rule_key, v_rule_version,
                jsonb_build_object('rule', rule_key, 'observation', oid,
                                   'location_basis', basis, 'location_basis_rule', basis_rule,
-                                  'location_basis_evidence', basis_evidence)
+                                  'location_basis_evidence', basis_evidence,
+                                  'positional_uncertainty_m', uncertainty_m,
+                                  'derived_location', derived),
+               case when status = 'RESOLVED' then uncertainty_m end
           from _geo_out
         on conflict (canonical_entity_id) do update
            set geography_status = excluded.geography_status,
@@ -388,12 +478,14 @@ begin
                publisher_precision = excluded.publisher_precision,
                quality_flags = excluded.quality_flags, rule_key = excluded.rule_key,
                rule_version = excluded.rule_version, provenance = excluded.provenance,
+               positional_uncertainty_m = excluded.positional_uncertainty_m,
                updated_at = now()
          where (g.geography_status, g.lat, g.lng, g.quality_flags, g.rule_key,
-                g.authority_observation_id, g.rule_version)
+                g.authority_observation_id, g.rule_version, g.positional_uncertainty_m, g.provenance)
                is distinct from
                (excluded.geography_status, excluded.lat, excluded.lng, excluded.quality_flags,
-                excluded.rule_key, excluded.authority_observation_id, excluded.rule_version);
+                excluded.rule_key, excluded.authority_observation_id, excluded.rule_version,
+                excluded.positional_uncertainty_m, excluded.provenance);
         get diagnostics v_written = row_count;
     end if;
 

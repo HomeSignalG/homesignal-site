@@ -56,6 +56,8 @@ begin
     update public.dc_canonical_entity set superseded_by = v_ent
      where canonical_entity_id = v_ent;   -- any non-null successor marks it superseded
   end if;
+  insert into public.dc_entity_observation (home_signal_observation_id, canonical_entity_id)
+  values (v_obs, v_ent);
   insert into public.dc_entity_geography (canonical_entity_id, geography_status, geometry_type,
       geom, lat, lng, authority_observation_id, publisher_precision, quality_flags)
   values (v_ent, p_gstatus,
@@ -65,7 +67,7 @@ begin
           case when p_gstatus = 'GEOGRAPHY_UNRESOLVED' then array['ROUNDED_COORDINATES','PUBLISHER_CLAIMS_EXACT'] else '{}' end);
 end $$;
 
-truncate public.dc_entity_geography, public.dc_canonical_entity, public.dc_source_observation;
+truncate public.dc_entity_geography, public.dc_entity_observation, public.dc_canonical_entity, public.dc_source_observation;
 delete from public.national_dc_records where source_key like 'pbtest:%';
 
 select pg_temp.mk('PUB inside far',        'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.38, -99.98, 'operational',        'https://example.test/a');

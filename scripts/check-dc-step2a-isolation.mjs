@@ -47,7 +47,7 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 // REFUSES (a missing DDL is a shorter list, and a shorter list is a greener gate).
 const DDL = 'docs/dc-step2a-foundation.sql';
 const DDLS = [DDL, 'docs/dc-step3a-canonical-identity.sql', 'docs/dc-step3a-selftest.sql',
-  'docs/dc-step3b-canonical-geography.sql',
+  'docs/dc-step3b-canonical-geography.sql', 'docs/dc-step3d-derived-location.sql',
   'docs/dc-step3c-resident-lineage-ledger.sql', 'docs/dc-step3c-ledger-distinct-record-grain.sql'];
 // The reconciliation plane is whatever the Step 3C DDL declares, derived like everything else.
 const RECONCILIATION_DDLS = DDLS.filter((f) => f.includes('dc-step3c-'));
@@ -62,7 +62,10 @@ const RECONCILIATION_READER = 'scripts/dc-step3c-reconcile.mjs';
 const REQUIRED = ['dc_source', 'dc_acquisition_run', 'dc_source_observation',
   'dc_complete_acquisition', 'dc_current_observation', 'dc_canonical_entity',
   'dc_resolve_canonical', 'dc_resident_lineage_ledger', 'dc_entity_geography',
-  'dc_resolve_geography'];
+  'dc_resolve_geography',
+  // Step 3D (2026-09-24): DERIVED location evidence and the human identity review are evidence
+  // too. The geocode writer reaches them only through docs/*.sql run by its workflow.
+  'dc_address_geocode', 'dc_observation_derived_point', 'dc_geocode_queue', 'dc_identity_review'];
 
 /**
  * The Step-2A objects a resident-facing file may not name, read out of the DDL of record.

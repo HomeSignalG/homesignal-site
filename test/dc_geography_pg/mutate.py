@@ -31,7 +31,7 @@ MUTATIONS = {
     # a rule silently disabled
     'drop_county_seat_rule': [("array['COUNTY_SEAT', '\\ycounty seat\\y', 'i']", "array['COUNTY_SEAT', 'x(?!x)x', 'i']", 1)],
     # prefer the area observation over the site observation
-    'area_first': [("(basis = 'NON_SITE_AREA'), (prec = 'exact')", "(basis <> 'NON_SITE_AREA'), (prec = 'exact')", 1)],
+    'area_first': [("(basis = 'NON_SITE_AREA'), (basis = 'DERIVED_ADDRESS'),", "(basis <> 'NON_SITE_AREA'), (basis = 'DERIVED_ADDRESS'),", 1)],
     # a demoted facility disappears from the geography plane
     'delete_demoted': [("         where e.superseded_by is null)", "         where e.superseded_by is null and coalesce(p.basis, '') <> 'NON_SITE_AREA')", 1)],
 }

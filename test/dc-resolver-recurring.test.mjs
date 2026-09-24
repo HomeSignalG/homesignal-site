@@ -29,27 +29,35 @@ const apply = fn.slice(fn.indexOf('if p_apply then'), fn.indexOf('return query')
 ok(apply.length > 500, '0c: the apply block is located');
 
 // 1. The existing entity for a group is found across ALL linked observations, not the set.
-ok(/create temporary table _res_existing[\s\S]*?from public\.dc_entity_observation eo[\s\S]*?join public\.dc_source_observation o/.test(apply),
+//    (rule_version 2, 2026-09-24: groups are keyed on the stable RECORD KEY, and a group already
+//    split across entities is CONSOLIDATED onto one deterministic target rather than raised --
+//    270 Epoch entities in production were forked by rule_version 1, one per run, and a raise
+//    would have stopped the resolver instead of repairing them. test/dc_epoch_geography_pg E18,
+//    E19 and E21 execute it.)
+ok(/create temporary table _res_all[\s\S]*?from public\.dc_entity_observation eo[\s\S]*?join public\.dc_observation_record_key rk/.test(fn),
   '1: existing entities are looked up across every linked observation (all runs)');
-ok(/o\.source_key \|\| '\|' \|\| o\.distribution_key \|\| '\|' \|\| o\.publisher_record_id/.test(apply),
-  '1b: the lookup keys on the SAME A1 tuple as entity formation — no second identity rule');
+const RK = code.slice(code.indexOf('create or replace view public.dc_observation_record_key'));
+ok(/o\.source_key \|\| '\|' \|\| o\.distribution_key \|\| '\|' \|\| o\.publisher_record_id/.test(RK)
+   && (fn.match(/join public\.dc_observation_record_key rk/g) || []).length === 2,
+  '1b: the set and the lookup key on the SAME record key (the A1 tuple first) — no second identity rule');
 
 // 2. Minting only for groups that are not already an entity.
-ok(/create temporary table _res_new[\s\S]*?where not exists \(select 1 from _res_existing x where x\.group_key = e\.group_key\)/.test(apply),
+ok(/create temporary table _res_new[\s\S]*?where not exists \(select 1 from _res_target t where t\.group_key = g\.group_key\)/.test(fn),
   '2: a group that is already an entity is never minted again');
 ok(!/join _res_entity re on re\.oid = eo\.home_signal_observation_id/.test(apply),
   '2b: the run-local "linked in this set" test that caused per-run duplicates is gone');
 
-// 3. Every observation in the set is linked — to its existing entity or its new one.
+// 3. Every observation in the set is linked — to its group's ONE entity.
 const link = apply.slice(apply.indexOf('insert into public.dc_entity_observation'));
-ok(/coalesce\(x\.canonical_entity_id, n\.canonical_entity_id\)/.test(link),
-  '3: each observation links to the existing entity, else the newly minted one');
+ok(/join _res_target t on t\.group_key = re\.group_key/.test(link.slice(0, 900)),
+  '3: each observation links to its group\'s entity (existing, else newly minted)');
 ok(/from _res_entity re/.test(link.slice(0, 900)) && !/from _res_new n\s+join _res_entity/.test(link.slice(0, 900)),
   '3b: linking iterates ALL observations in the set, not only new groups');
 
-// 4. A forked identity is refused loudly, not papered over.
-ok(/n_entities > 1[\s\S]*?raise exception/.test(apply),
-  '4: an A1 group already split across two entities raises instead of linking');
+// 4. A forked identity is consolidated onto ONE deterministic entity, never left split.
+ok(/order by an\.anchor_group, an\.anchor_rank, an\.anchor_key collate "C", ce\.created_at, an\.eid/.test(fn)
+   && /set superseded_by = t\.target/.test(apply) && /set canonical_entity_id = t\.target/.test(apply),
+  '4: a group split across entities is consolidated onto one target (best key, then oldest); the rest superseded');
 
 // 5. Existing entities are refreshed from their own links by the minting rule.
 ok(/update public\.dc_canonical_entity e[\s\S]*?observation_count = s\.n_obs[\s\S]*?source_count\s+= s\.n_src/.test(apply),
@@ -58,7 +66,8 @@ ok(/bool_or\(eo\.observation_classification = 'CONFIRMED_DC'\)/.test(apply),
   '5b: classification is recomputed with the same most-confirmed rule used at minting');
 
 // 6. The run reports what it did, so a scheduled run is auditable.
-for (const m of ['ENTITIES_MINTED', 'GROUPS_ALREADY_ENTITIES', 'OBSERVATIONS_NEWLY_LINKED']) {
+for (const m of ['ENTITIES_MINTED', 'GROUPS_ALREADY_ENTITIES', 'OBSERVATIONS_NEWLY_LINKED',
+                 'OBSERVATIONS_RELINKED', 'ENTITIES_SUPERSEDED', 'REVIEW_COMPONENTS_REFUSED_SIBLING']) {
   ok(fn.includes(`'${m}'`), `6: the resolver reports ${m}`);
 }
 

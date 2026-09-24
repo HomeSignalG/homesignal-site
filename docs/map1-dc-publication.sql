@@ -93,14 +93,31 @@ as $function$
            case when ge.publisher_precision = 'exact' then 'precise_location'
                 else 'approximate_campus_area' end as location_precision,
            o.observed_at as last_seen_at, e.canonical_entity_id,
-           'canonical'::text as publication_basis, ge.quality_flags, e.source_count
+           'canonical'::text as publication_basis, ge.quality_flags, e.source_count,
+           ge.positional_uncertainty_m
       from bb
       join public.dc_entity_geography ge
         on ge.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
        and ge.lng between bb.x0 - 1e-4 and bb.x1 + 1e-4
       join public.dc_canonical_entity e on e.canonical_entity_id = ge.canonical_entity_id
-      join public.dc_source_observation o
-        on o.home_signal_observation_id = ge.authority_observation_id
+      -- THE DESCRIPTOR (2026-09-24): name, operator, lifecycle, address and citation come from
+      -- the entity's CURRENT observation that states a displayable lifecycle -- the location
+      -- authority itself when it does (every single-source entity: behaviour unchanged), else
+      -- another observation of the same entity. Location evidence and descriptive evidence are
+      -- different facts; an entity placed by a derived address point (whose source states no
+      -- lifecycle) is described by the source that does. Source-agnostic: no source is named.
+      cross join lateral (
+        select x.*
+          from public.dc_entity_observation eo2
+          join public.dc_current_observation cx
+            on cx.home_signal_observation_id = eo2.home_signal_observation_id
+          join public.dc_source_observation x
+            on x.home_signal_observation_id = eo2.home_signal_observation_id
+          join lifecycle lx on lx.v = x.source_native_status
+         where eo2.canonical_entity_id = e.canonical_entity_id
+         order by (x.home_signal_observation_id = ge.authority_observation_id) desc,
+                  x.observed_at desc, x.home_signal_observation_id
+         limit 1) o
       join public.dc_source s on s.source_key = o.source_key
       join lifecycle lc on lc.v = o.source_native_status
       cross join lateral (
@@ -122,7 +139,7 @@ as $function$
            lc.map_status, r.project_type, r.lat, r.lng, r.location_text, r.location_precision,
            r.last_seen_at, null::uuid as canonical_entity_id,
            'legacy_osm_compat'::text as publication_basis, '{}'::text[] as quality_flags,
-           1 as source_count
+           1 as source_count, null::double precision as positional_uncertainty_m
       from bb
       join public.national_dc_records r
         on r.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
@@ -144,9 +161,24 @@ as $function$
            -- point exactly on an edge two ZCTAs share is a member of BOTH, and would publish on
            -- two ZIP pages. It is withheld instead: never the nearest, never an arbitrary pick.
            -- Measured when written: 0 of 3,497 candidate points touch more than one ZCTA.
-           (select count(*) from geo.zcta_boundary z
-             where z.geom is not null
-               and ST_Intersects(z.geom, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4269))) as zcta_hits
+           -- UNCERTAIN POINTS (2026-09-24): a point that carries a positional uncertainty (a
+           -- derived address point: calibrated max error 2,000 m) is a member only when EVERY
+           -- position it could truly occupy is in this ZCTA -- the whole disk within one ZCTA.
+           -- Road centrelines are ZCTA edges: 5 of 35 geocoded Epoch addresses sat 6-26 m from
+           -- one. The same rule as the edge guard above, with a radius; NULL radius = unchanged.
+           case when p.positional_uncertainty_m is null then
+             (select count(*) from geo.zcta_boundary z
+               where z.geom is not null
+                 and ST_Intersects(z.geom, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4269)))
+           else
+             (select count(*) from geo.zcta_boundary z
+               where z.geom is not null
+                 and z.geom && ST_Expand(ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4269),
+                                         p.positional_uncertainty_m / 25000.0)
+                 and ST_DWithin(z.geom::geography,
+                                ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4269)::geography,
+                                p.positional_uncertainty_m))
+           end as zcta_hits
       from pool p, bb),
   members as (
     select * from judged where verdict = 'member' and zcta_hits <= 1

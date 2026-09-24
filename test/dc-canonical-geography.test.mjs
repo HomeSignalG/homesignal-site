@@ -74,7 +74,21 @@ ok(/cross join lateral public\.dc_location_basis\(o\.source_key, o\.distribution
 ok(/when b\.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE'/.test(fn)
    && !/'NON_SITE_ROAD' then 'GEOGRAPHY_UNRESOLVED'/.test(fn),
   '7d: a road reference is flagged, never demoted');
-ok(/v_rule_version constant integer := 2;/.test(fn), '7e: rule_version is 2');
+ok(/v_rule_version constant integer := 3;/.test(fn), '7e: rule_version is 3 (derived address points, 2026-09-24)');
+// 8. rule_version 3: a DERIVED address point is second-class evidence, and never a guess.
+ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACCEPTED';/.test(fn)
+   && (fn.match(/dc_observation_derived_point/g) || []).length === 2,
+  '8a: only an ACCEPTED derived point enters geography (the verdict is decided once, in Step 3D)');
+ok(/\(basis = 'NON_SITE_AREA'\), \(basis = 'DERIVED_ADDRESS'\),/.test(fn),
+  '8b: a publisher SITE point always outranks a derived point; an area point ranks last');
+ok(/when b\.basis = 'DERIVED_ADDRESS' and b\.identity_open then 'GEOGRAPHY_UNRESOLVED'/.test(fn)
+   && /when b\.basis = 'DERIVED_ADDRESS' and b\.identity_open then 'IDENTITY_REVIEW_REQUIRED'/.test(fn),
+  '8c: an open cross-source identity question holds a derived point (IDENTITY_REVIEW_REQUIRED)');
+ok(/a\.basis <> 'NON_SITE_AREA' and b\.basis <> 'NON_SITE_AREA'/.test(fn)
+   && !/a\.basis <> 'DERIVED_ADDRESS'/.test(fn),
+  '8d: a derived point takes part in SOURCES_DISAGREE; only area points are excused');
+ok(!/source_native_lat\s*=|update public\.dc_source_observation/.test(fn),
+  '8e: geography never writes a coordinate into publisher evidence');
 const lb = code.slice(code.indexOf('create or replace function public.dc_location_basis('));
 ok(/if p_source_key = 'compute_atlas' then/.test(lb) && /'NO_LOCATION_BASIS_RULE'/.test(lb),
   '7f: the text rule is keyed on its source; every other source is UNSTATED');

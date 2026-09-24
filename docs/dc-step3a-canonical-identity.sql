@@ -333,6 +333,89 @@ comment on table public.dc_identity_decision is
 stops a later resolver re-proposing a merge that was already refused, and it is why a wrong
 merge is reversible: the decision, not the evidence, is what gets corrected.';
 
+-- ── STABLE RECORD KEYS (2026-09-24) ───────────────────────────────────────────────────────────
+-- The key under which a SOURCE RECORD persists across acquisitions. It is evidence identity, not
+-- canonical identity: two records never share a key, and nothing cross-source is decided here.
+--   * the publisher's own record id, when the source supplies one (Atlas) -- unchanged, and in the
+--     exact format A1 has always grouped on;
+--   * otherwise the record's NAME, but ONLY for a source whose registry says it supplies no
+--     record id AND only when that name is unique within its own acquisition run and
+--     distribution. Measured 2026-09-24 for epoch_ai/data_centers: 87 / 91 / 92 names in three
+--     runs, unique in every run, every earlier name present in the next. The source's own table
+--     key is its Name; treating it as such is what stops a new canonical entity (and a new Map 1
+--     marker id) being minted for the same Epoch record every day -- measured: 270 entities for
+--     92 current records after 3 runs.
+--     A rename mints a new key (fails safe: a decision is lost, nothing is merged). A name that
+--     repeats inside a run is NOT a key, so epoch_ai/timelines (538 rows, 92 names) stays
+--     singleton -- the rule is the uniqueness measurement, not a list of distributions;
+--   * otherwise a singleton key that no other observation can ever share.
+create or replace view public.dc_observation_record_key with (security_invoker = true) as
+select o.home_signal_observation_id,
+       case when o.publisher_record_id is not null
+              then o.source_key || '|' || o.distribution_key || '|' || o.publisher_record_id
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name)) = 1
+              then o.source_key || '|' || o.distribution_key || '|name:' || btrim(o.source_native_name)
+            else 'singleton|' || o.home_signal_observation_id::text end as record_key,
+       case when o.publisher_record_id is not null then 0
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name)) = 1 then 1
+            else 2 end as record_key_rank   -- 0 publisher id, 1 unique name, 2 singleton
+  from public.dc_source_observation o
+  join public.dc_source s on s.source_key = o.source_key;
+
+revoke all on public.dc_observation_record_key from anon, authenticated;
+
+comment on view public.dc_observation_record_key is
+'STEP 3A. Per-observation stable record key: publisher record id, else a run-unique name for a
+source that supplies no id, else a singleton. Evidence identity only; never cross-source.';
+
+-- ── HUMAN IDENTITY REVIEW (2026-09-24) ─────────────────────────────────────────────────────────
+-- Cross-source identity is never confirmed by a rule (section 5). A person may confirm it, or
+-- confirm that two records are DIFFERENT, and that decision must outlive the runs: so it is
+-- keyed on stable RECORD keys, never on observation ids (which change every acquisition).
+--   * CONFIRMED_MATCH    the two records describe ONE physical facility. The resolver links them
+--                        to one canonical entity -- unless that would put two records of the
+--                        SAME source into one entity (the wrong-sibling guard), in which case the
+--                        whole reviewed component is refused and nothing merges.
+--   * CONFIRMED_DISTINCT the two records are different facilities; the pair stops blocking a
+--                        derived location from publishing.
+-- Tenant vs operator: a review merges RECORDS, never parties. Each source's operator/tenant
+-- fields stay on its own observation (source_native_operator); nothing is overwritten.
+-- A review is revoked, never deleted, so the history of a decision is kept.
+create table if not exists public.dc_identity_review (
+    review_id       uuid primary key default gen_random_uuid(),
+    record_key_a    text not null,
+    record_key_b    text not null,
+    verdict         text not null,
+    reviewer        text not null,
+    rationale       text not null,
+    evidence        jsonb not null default '{}'::jsonb,
+    reviewed_at     timestamptz not null default now(),
+    revoked_at      timestamptz,
+    revoked_reason  text,
+    constraint dc_identity_review_verdict_ck check (verdict in ('CONFIRMED_MATCH', 'CONFIRMED_DISTINCT')),
+    constraint dc_identity_review_ordered_ck check ((record_key_a collate "C") < (record_key_b collate "C")),
+    constraint dc_identity_review_stable_ck check (record_key_a !~ '^singleton\|' and record_key_b !~ '^singleton\|'),
+    constraint dc_identity_review_cross_source_ck check (split_part(record_key_a, '|', 1) <> split_part(record_key_b, '|', 1)),
+    constraint dc_identity_review_accountable_ck check (btrim(reviewer) <> '' and length(btrim(rationale)) >= 20),
+    constraint dc_identity_review_revocation_ck check ((revoked_at is null) = (revoked_reason is null))
+);
+
+create unique index if not exists dc_identity_review_active_pair
+    on public.dc_identity_review (record_key_a, record_key_b) where revoked_at is null;
+
+alter table public.dc_identity_review enable row level security;
+revoke all on public.dc_identity_review from anon, authenticated;
+
+comment on table public.dc_identity_review is
+'STEP 3A. Accountable human identity decisions between two cross-source RECORD keys. The only
+path by which Atlas and Epoch records can become one canonical entity.';
+
 -- RLS: these are internal canonical tables with no resident reader. Enabled with NO anon or
 -- authenticated grant, deliberately NOT the public.page_cache posture.
 alter table public.dc_canonical_entity    enable row level security;
@@ -456,13 +539,28 @@ create trigger dc_identity_decision_reference_trg
 --    the first two are absent entirely and the last two appear only in K2's exact-coordinate
 --    form, which section 5 then refuses to treat as identity.
 
-create or replace view public.dc_identity_candidate as
+-- ✅ K3 (2026-09-24) IS A DELIBERATE, NARROW AMENDMENT TO THE RULE ABOVE -- and it cannot merge.
+--    A source with no coordinates (Epoch) now gains a DERIVED point from its own address
+--    (docs/dc-step3d-derived-location.sql). A derived point that another source's data centre
+--    already occupies is the duplicate-marker risk this layer exists to prevent. The 2026-09-24
+--    probe measured it: 34 of 35 matched Epoch points have an Atlas data-centre record within
+--    10 km, and many are plainly the same site under another name (Google Council Bluffs 12 m;
+--    QTS Hillsboro 2 281 m; Vantage TX1 / TX11 89 m; Colossus 2 / "Minihard" 3 m). Atlas's own
+--    town-centroid pins sat 3.5-6.6 km from the address of the same facility (Kuna 3.5 km,
+--    Ellendale 4.6 km, Bowling Green 6.2 km, Fairwater Atlanta 6.6 km), hence 10 km, plus the
+--    same state and locality for a town-centroid pin that is further out.
+--    K3 SURFACES ONLY. Section 5 adjudicates it POSSIBLE_MATCH and nothing else; the only way to
+--    a merge is an accountable human review. Its effect is to HOLD the derived location
+--    (dc_resolve_geography: IDENTITY_REVIEW_REQUIRED) until someone decides -- over-recall costs
+--    a held Epoch point, under-recall costs a duplicate facility on a resident's map.
+create or replace view public.dc_identity_candidate with (security_invoker = true) as
 with o as (
-    select home_signal_observation_id oid, source_key, distribution_key, acquisition_run_id,
-           publisher_record_id, source_native_name, source_native_type, source_native_operator,
-           source_native_lat, source_native_lon, source_native_precision,
-           lower(btrim(source_native_name)) exact_name
-    from public.dc_current_observation
+    select c.home_signal_observation_id oid, c.source_key, c.distribution_key, c.acquisition_run_id,
+           c.publisher_record_id, c.source_native_name, c.source_native_type, c.source_native_operator,
+           c.source_native_lat, c.source_native_lon, c.source_native_precision,
+           ev.source_native_address, c.raw_payload, lower(btrim(c.source_native_name)) exact_name
+    from public.dc_current_observation c
+    join public.dc_source_observation ev on ev.home_signal_observation_id = c.home_signal_observation_id
 )
 -- K1 — byte-identical name after case-folding and trimming, and nothing else discarded.
 select least(a.oid, b.oid) as observation_a,
@@ -489,12 +587,40 @@ from o a join o b
  and a.source_native_lon = b.source_native_lon
  and a.oid < b.oid
  where a.source_native_operator is not null
-   and a.source_native_lat is not null and a.source_native_lon is not null;
+   and a.source_native_lat is not null and a.source_native_lon is not null
+union all
+-- K3 — an ACCEPTED derived address point, and ANOTHER source's data-centre record within 10 km
+--      of it or in the same state and locality. Surfaces a pair for a person; concludes nothing.
+select least(d.home_signal_observation_id, t.oid), greatest(d.home_signal_observation_id, t.oid),
+       'DERIVED_POINT_NEAR_OTHER_SOURCE_DC'::text,
+       jsonb_build_object('derived_observation', d.home_signal_observation_id,
+                          'derived_query', d.geocoder_query, 'derived_matched', d.matched_address,
+                          'other_name', t.source_native_name, 'other_source', t.source_key,
+                          'other_operator', t.source_native_operator,
+                          'distance_m', round(ST_Distance(
+                               ST_SetSRID(ST_MakePoint(d.lng, d.lat), 4326)::geography,
+                               ST_SetSRID(ST_MakePoint(t.source_native_lon, t.source_native_lat), 4326)::geography)))
+from public.dc_observation_derived_point d
+join o t on t.source_key <> d.source_key
+cross join lateral public.dc_classify_observation(t.source_key, t.distribution_key,
+                                                  t.source_native_type, t.raw_payload) tc
+ where d.verdict = 'ACCEPTED'
+   and tc.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+   and t.source_native_lat is not null and t.source_native_lon is not null
+   and ( ST_DWithin(ST_SetSRID(ST_MakePoint(d.lng, d.lat), 4326)::geography,
+                    ST_SetSRID(ST_MakePoint(t.source_native_lon, t.source_native_lat), 4326)::geography,
+                    10000)
+      or ( nullif(upper(btrim(t.source_native_address->>'state')), '') = split_part(d.matched_address, ', ', 3)
+       and nullif(upper(btrim(t.source_native_address->>'city')), '')  = split_part(d.matched_address, ', ', 2) ) );
 
 comment on view public.dc_identity_candidate is
 'STEP 3A candidate generation. Surfaces pairs for adjudication; concludes nothing. Normalized-
 name and shared-postal-code rules were measured against production and deleted -- see the
 header of this section for the false merges each produced.';
+
+-- create-or-replace DROPS reloptions and re-inherits default privileges (Step 3C view-grants fix):
+-- the view above re-declares security_invoker, and the grant is revoked again here, every time.
+revoke all on public.dc_identity_candidate from anon, authenticated;
 
 -- =============================================================================================
 -- SECTION 5 — ADJUDICATION
@@ -553,6 +679,9 @@ as $fn$
 declare
     a record;
     b record;
+    ka text;
+    kb text;
+    rv record;
 begin
     select o.home_signal_observation_id oid, o.source_key, o.distribution_key,
            o.acquisition_run_id, o.publisher_record_id, o.source_native_name,
@@ -606,6 +735,29 @@ begin
         return;
     end if;
 
+    -- A0. Cross-source, and a PERSON has decided (dc_identity_review, keyed on stable RECORD
+    --     keys so the decision outlives the observation ids). Checked before any weak signal.
+    --     This is the only route to a cross-source CONFIRMED_MATCH.
+    if a.source_key <> b.source_key then
+        select rk.record_key into ka from public.dc_observation_record_key rk
+         where rk.home_signal_observation_id = a.oid;
+        select rk.record_key into kb from public.dc_observation_record_key rk
+         where rk.home_signal_observation_id = b.oid;
+        select r.review_id, r.verdict, r.reviewer, r.reviewed_at into rv
+          from public.dc_identity_review r
+         where r.revoked_at is null
+           and r.record_key_a = case when (ka collate "C") < (kb collate "C") then ka else kb end
+           and r.record_key_b = case when (ka collate "C") < (kb collate "C") then kb else ka end;
+        if rv.review_id is not null then
+            return query select rv.verdict::text, ('REVIEWED_' || rv.verdict)::text,
+                jsonb_build_object('review_id', rv.review_id, 'reviewer', rv.reviewer,
+                    'reviewed_at', rv.reviewed_at, 'record_key_a', ka, 'record_key_b', kb,
+                    'candidate_rule', p_candidate_rule_key,
+                    'why', 'an accountable human review of the two records');
+            return;
+        end if;
+    end if;
+
     -- A3. Cross-source. No deterministic identity exists on today's evidence, so the ceiling is
     --     CANDIDATE. Exact name is the strongest available signal and it is still only a name.
     if a.source_key <> b.source_key then
@@ -619,7 +771,8 @@ begin
             return;
         end if;
         return query select 'POSSIBLE_MATCH'::text,
-            'CROSS_SOURCE_WEAK_SIGNAL'::text,
+            case when p_candidate_rule_key = 'DERIVED_POINT_NEAR_OTHER_SOURCE_DC'
+                 then 'CROSS_SOURCE_DERIVED_POINT_NEARBY' else 'CROSS_SOURCE_WEAK_SIGNAL' end::text,
             jsonb_build_object('candidate_rule', p_candidate_rule_key,
                 'why', 'surfaced by a non-identity signal; not adjudicable on current evidence');
         return;
@@ -633,8 +786,9 @@ end;
 $fn$;
 
 comment on function public.dc_adjudicate_pair(uuid, uuid, text) is
-'STEP 3A adjudication, rule version 1. CONFIRMED_MATCH requires the publisher''s own record
-identity. Name, operator, coordinates and address never confirm. Fails closed to UNRESOLVED.';
+'STEP 3A adjudication, rule version 2. CONFIRMED_MATCH requires the publisher''s own record
+identity, or (cross-source only) an accountable human review of the two stable record keys.
+Name, operator, coordinates, address and derived points never confirm. Fails closed.';
 
 -- =============================================================================================
 -- SECTION 6 — THE RESOLVER
@@ -657,6 +811,30 @@ identity. Name, operator, coordinates and address never confirm. Fails closed to
 --    An observation with a NULL publisher_record_id can never satisfy A1, so it is always its
 --    own component -- the correct conservative outcome, and the one every Epoch row takes.
 
+-- ⚖️ RULE VERSION 2 (2026-09-24): THE PARTITION NOW HAS TWO KINDS OF EDGE, AND NO OTHER.
+--   1. RECORD CONTINUITY: observations sharing a stable record key (dc_observation_record_key)
+--      -- the publisher id, or a run-unique name for a source that supplies no id. Equality of
+--      a key is still an equivalence relation, so grouping by it is still exact.
+--   2. ACCOUNTABLE REVIEW: an active CONFIRMED_MATCH in dc_identity_review between two
+--      cross-source record keys. Those edges are few, so their connected components are
+--      computed by a small recursive walk over the review graph.
+--   Nothing else links anything. A CANDIDATE / POSSIBLE / UNRESOLVED decision merges nothing.
+--
+-- 🔒 WRONG-SIBLING GUARD. A reviewed component that would contain two records of the SAME
+--    source and distribution is REFUSED as a whole: every member falls back to its own record
+--    key and nothing merges. A publisher separates its own records (A2); a review can never
+--    fold two of them into one facility -- "Colossus 2" confirmed against both "Minihard" and
+--    "Colossus 2 (Whitehaven)" merges neither.
+--
+-- ⚖️ ENTITY FOR A GROUP, deterministically, and stable across runs:
+--    each existing entity is ANCHORED to the group of its best-ranked record key (publisher id
+--    before name before singleton, then key order); a group's entity is the anchored entity
+--    whose anchor key ranks best, then the oldest. Every other entity anchored to the same group
+--    is superseded by it and its evidence relinked -- so a reviewed Atlas + Epoch pair keeps the
+--    ATLAS entity (and its Map 1 marker id), and the one-time Epoch continuity consolidation
+--    (270 run-minted entities -> one per record) is the same rule, not a special migration.
+--    Evidence of a group an entity is NOT anchored to (a revoked or refused review) is moved to
+--    that group's entity, minting one if needed: a merge is always reversible.
 create or replace function public.dc_resolve_canonical(
     p_apply           boolean default false,
     p_include_history boolean default false
@@ -664,7 +842,7 @@ create or replace function public.dc_resolve_canonical(
 language plpgsql
 as $fn$
 declare
-    v_rule_version constant integer := 1;
+    v_rule_version constant integer := 2;
     v_entities     integer;
     v_obs          integer;
     v_classified   integer;
@@ -672,12 +850,22 @@ declare
     v_newly_linked integer := 0;
     v_minted       integer := 0;
     v_reused       integer := 0;
+    v_relinked     integer := 0;
+    v_superseded   integer := 0;
+    v_reviews      integer := 0;
+    v_refused      integer := 0;
 begin
-    drop table if exists _res_existing;
     drop table if exists _res_obs;
     drop table if exists _res_class;
     drop table if exists _res_decision;
+    drop table if exists _res_edge;
+    drop table if exists _res_comp;
+    drop table if exists _res_refused;
+    drop table if exists _res_key;
     drop table if exists _res_entity;
+    drop table if exists _res_all;
+    drop table if exists _res_anchor;
+    drop table if exists _res_target;
     drop table if exists _res_new;
 
     -- The observation set under resolution. p_include_history is the HISTORICAL DUPLICATE TEST
@@ -686,8 +874,11 @@ begin
     create temporary table _res_obs on commit drop as
     select o.home_signal_observation_id oid, o.acquisition_run_id, o.source_key,
            o.distribution_key, o.publisher_record_id, o.source_native_name,
-           o.source_native_type, o.source_native_precision, o.raw_payload
+           o.source_native_type, o.source_native_precision, o.raw_payload,
+           rk.record_key, rk.record_key_rank
       from public.dc_source_observation o
+      join public.dc_observation_record_key rk
+        on rk.home_signal_observation_id = o.home_signal_observation_id
      where p_include_history
         or o.home_signal_observation_id in (
               select c.home_signal_observation_id from public.dc_current_observation c);
@@ -701,7 +892,7 @@ begin
       cross join lateral public.dc_classify_observation(
           r.source_key, r.distribution_key, r.source_native_type, r.raw_payload) c;
 
-    -- Adjudicate every generated candidate pair.
+    -- Adjudicate every generated candidate pair (recorded; never a merge by itself).
     create temporary table _res_decision on commit drop as
     select k.observation_a, k.observation_b, k.candidate_rule_key,
            d.decision_state, d.decision_rule_key,
@@ -710,60 +901,97 @@ begin
       cross join lateral public.dc_adjudicate_pair(
           k.observation_a, k.observation_b, k.candidate_rule_key) d;
 
-    -- Components, by the equivalence class proven above.
+    -- Reviewed edges and their connected components.
+    create temporary table _res_edge on commit drop as
+    select r.record_key_a a, r.record_key_b b
+      from public.dc_identity_review r
+     where r.revoked_at is null and r.verdict = 'CONFIRMED_MATCH';
+    select count(*) into v_reviews from _res_edge;
+
+    create temporary table _res_comp on commit drop as
+    with recursive adj(k, other) as (
+        select a, b from _res_edge union select b, a from _res_edge
+    ), walk(k, root) as (
+        select k, k from adj
+        union
+        select j.other, w.root from walk w join adj j on j.k = w.k
+    )
+    select w.k as record_key, min(w.root collate "C") as comp from walk w group by w.k;
+
+    -- 🔒 the wrong-sibling guard: two records of one source+distribution in one component
+    create temporary table _res_refused on commit drop as
+    select c.comp from _res_comp c
+     group by c.comp
+    having count(distinct split_part(c.record_key, '|', 1) || '|' || split_part(c.record_key, '|', 2))
+           < count(*);
+    select count(*) into v_refused from _res_refused;
+
+    create temporary table _res_key on commit drop as
+    select c.record_key,
+           case when f.comp is null then c.comp else c.record_key end as group_key
+      from _res_comp c left join _res_refused f on f.comp = c.comp;
+
     create temporary table _res_entity on commit drop as
-    select r.oid,
-           case when r.publisher_record_id is not null
-                then r.source_key || '|' || r.distribution_key || '|' || r.publisher_record_id
-                else 'singleton|' || r.oid::text end as group_key,
-           case when r.publisher_record_id is not null
-                then 'SAME_SOURCE_SAME_PUBLISHER_RECORD_ID'
-                else 'SINGLETON_NO_PUBLISHER_RECORD_ID' end as link_rule_key
-      from _res_obs r;
+    select r.oid, coalesce(k.group_key, r.record_key) as group_key, r.record_key, r.record_key_rank,
+           case when k.group_key is not null and k.group_key <> r.record_key then 'REVIEWED_CONFIRMED_MATCH'
+                when r.record_key_rank = 0 then 'SAME_SOURCE_SAME_PUBLISHER_RECORD_ID'
+                when r.record_key_rank = 1 then 'SAME_SOURCE_SAME_NAME_UNIQUE_IN_RUN'
+                else 'SINGLETON_NO_STABLE_RECORD_KEY' end as link_rule_key
+      from _res_obs r left join _res_key k on k.record_key = r.record_key;
 
     select count(distinct group_key), count(*) into v_entities, v_obs from _res_entity;
     select count(*) into v_classified from _res_class;
-    -- CONFIRMED_MATCH pairs implied by A1 across the set under resolution. This is the number
-    -- that proves the historical-duplicate collapse actually happened rather than being assumed.
     select count(*) into v_linked from (
         select group_key from _res_entity group by group_key having count(*) > 1) g;
 
+    -- Every observation that is already linked, plus every one under resolution that is not.
+    create temporary table _res_all on commit drop as
+    select eo.home_signal_observation_id oid, eo.canonical_entity_id eid,
+           rk.record_key, rk.record_key_rank,
+           coalesce(k.group_key, rk.record_key) as group_key
+      from public.dc_entity_observation eo
+      join public.dc_observation_record_key rk
+        on rk.home_signal_observation_id = eo.home_signal_observation_id
+      left join _res_key k on k.record_key = rk.record_key
+    union all
+    select e.oid, null::uuid, e.record_key, e.record_key_rank, e.group_key
+      from _res_entity e
+     where not exists (select 1 from public.dc_entity_observation eo
+                        where eo.home_signal_observation_id = e.oid);
+
+    -- each existing entity's anchor: the group of its best-ranked record key
+    create temporary table _res_anchor on commit drop as
+    select distinct on (a.eid) a.eid, a.record_key anchor_key, a.record_key_rank anchor_rank,
+           a.group_key anchor_group
+      from _res_all a
+     where a.eid is not null
+     order by a.eid, a.record_key_rank, a.record_key collate "C";
+
+    -- a group's entity: the anchored entity with the best anchor key, then the oldest
+    create temporary table _res_target on commit drop as
+    select distinct on (an.anchor_group) an.anchor_group group_key, an.eid target
+      from _res_anchor an
+      join public.dc_canonical_entity ce on ce.canonical_entity_id = an.eid
+     order by an.anchor_group, an.anchor_rank, an.anchor_key collate "C", ce.created_at, an.eid;
+
+    -- groups that still need an entity (new records; evidence split off by a revoked review)
+    create temporary table _res_new on commit drop as
+    select g.group_key, gen_random_uuid() canonical_entity_id
+      from (select distinct group_key from _res_all) g
+     where not exists (select 1 from _res_target t where t.group_key = g.group_key);
+    select count(*) into v_minted from _res_new;
+    select count(*) into v_reused from _res_target t
+     where exists (select 1 from _res_entity e where e.group_key = t.group_key);
+    select count(*) into v_relinked from _res_all a
+      join _res_target t on t.group_key = a.group_key
+     where a.eid is not null and a.eid <> t.target;
+    select count(*) into v_superseded from _res_anchor an
+      join _res_target t on t.group_key = an.anchor_group
+      join public.dc_canonical_entity ce on ce.canonical_entity_id = an.eid
+     where an.eid <> t.target and ce.superseded_by is distinct from t.target;
+
     if p_apply then
-        -- ⚖️ RECURRING INGEST (2026-09-22). An entity's identity outlives the run that minted
-        -- it. The set under resolution is normally the CURRENT run only, so the next scheduled
-        -- acquisition brings the SAME publisher records under NEW observation ids. Deciding
-        -- "is this group already an entity?" from the observations in the set alone therefore
-        -- minted a duplicate entity for every facility on every run (2,087 per Atlas run), and
-        -- with p_include_history the new observations were never linked at all -- measured:
-        -- 4,174 Atlas observations from runs 1606/1607 linked to nothing.
-        -- The existing entity for a group is found across ALL linked observations, by the same
-        -- A1 tuple. No new identity rule: this is the same equivalence class, remembered.
-        create temporary table _res_existing on commit drop as
-        select g.group_key, min(eo.canonical_entity_id::text)::uuid canonical_entity_id,
-               count(distinct eo.canonical_entity_id) n_entities
-          from public.dc_entity_observation eo
-          join public.dc_source_observation o
-            on o.home_signal_observation_id = eo.home_signal_observation_id
-         cross join lateral (
-               select case when o.publisher_record_id is not null
-                           then o.source_key || '|' || o.distribution_key || '|' || o.publisher_record_id
-                           else 'singleton|' || o.home_signal_observation_id::text end as group_key) g
-         where g.group_key in (select group_key from _res_entity)
-         group by g.group_key;
-
-        -- One group, one entity. Two entities for one A1 group means identity already forked;
-        -- linking more evidence to either would hide it. Fail loudly instead.
-        if exists (select 1 from _res_existing where n_entities > 1) then
-            raise exception 'dc_resolve_canonical: % A1 group(s) already map to more than one canonical entity; refusing to link new evidence onto a forked identity',
-                (select count(*) from _res_existing where n_entities > 1);
-        end if;
-
-        create temporary table _res_new on commit drop as
-        select e.group_key, gen_random_uuid() canonical_entity_id
-          from (select distinct group_key from _res_entity) e
-         where not exists (select 1 from _res_existing x where x.group_key = e.group_key);
-        select count(*) into v_minted from _res_new;
-        select count(*) into v_reused from _res_existing;
+        insert into _res_target select group_key, canonical_entity_id from _res_new;
 
         insert into public.dc_canonical_entity
             (canonical_entity_id, entity_grain, classification, classification_conflict,
@@ -777,39 +1005,53 @@ begin
                case when bool_or(o.source_native_precision = 'representative_multi_site'
                                  or o.raw_payload->'location'->'multiSite' is not null)
                     then 'AGGREGATE_MULTI_SITE' else 'SITE' end,
-               -- Entity classification. CONFIRMED_DC only if some observation confirms it;
-               -- otherwise the most cautious state any observation asserts.
-               case when bool_or(c.classification = 'CONFIRMED_DC') then 'CONFIRMED_DC'
-                    when bool_or(c.classification = 'DC_CANDIDATE') then 'DC_CANDIDATE'
-                    when bool_or(c.classification = 'CLASSIFICATION_UNRESOLVED')
-                         then 'CLASSIFICATION_UNRESOLVED'
-                    else 'NON_DC' end,
-               count(distinct c.classification) > 1,
-               v_rule_version, count(*), count(distinct o.source_key)
+               'CLASSIFICATION_UNRESOLVED', false, v_rule_version, 0, 0
           from _res_new n
-          join _res_entity re on re.group_key = n.group_key
-          join _res_obs   o  on o.oid = re.oid
-          join _res_class c  on c.oid = re.oid
+          join _res_all a on a.group_key = n.group_key
+          join public.dc_source_observation o on o.home_signal_observation_id = a.oid
          group by n.canonical_entity_id;
+
+        -- relink evidence whose group's entity is another one (review merge, continuity
+        -- consolidation, or a revoked review splitting evidence back out)
+        update public.dc_entity_observation eo
+           set canonical_entity_id = t.target,
+               link_rule_key = case when a.group_key <> a.record_key then 'REVIEWED_CONFIRMED_MATCH'
+                                    when a.record_key_rank = 1 then 'SAME_SOURCE_SAME_NAME_UNIQUE_IN_RUN'
+                                    else eo.link_rule_key end,
+               linked_at = now()
+          from _res_all a
+          join _res_target t on t.group_key = a.group_key
+         where eo.home_signal_observation_id = a.oid
+           and a.eid is not null and a.eid <> t.target;
+        get diagnostics v_relinked = row_count;
+
+        -- every other entity anchored to a group is superseded by that group's entity
+        update public.dc_canonical_entity ce
+           set superseded_by = t.target,
+               supersede_reason = 'RULE_V2_SAME_GROUP: ' || an.anchor_group,
+               updated_at = now()
+          from _res_anchor an
+          join _res_target t on t.group_key = an.anchor_group
+         where ce.canonical_entity_id = an.eid
+           and an.eid <> t.target
+           and ce.superseded_by is distinct from t.target;
+        get diagnostics v_superseded = row_count;
 
         insert into public.dc_entity_observation
             (canonical_entity_id, home_signal_observation_id, source_key, distribution_key,
              publisher_record_id, observation_classification, classification_rule_key,
              classification_evidence, link_rule_key)
-        select coalesce(x.canonical_entity_id, n.canonical_entity_id), o.oid, o.source_key,
-               o.distribution_key, o.publisher_record_id, c.classification, c.rule_key,
-               c.evidence, re.link_rule_key
+        select t.target, o.oid, o.source_key, o.distribution_key, o.publisher_record_id,
+               c.classification, c.rule_key, c.evidence, re.link_rule_key
           from _res_entity re
-          join _res_obs   o  on o.oid = re.oid
-          join _res_class c  on c.oid = re.oid
-          left join _res_existing x on x.group_key = re.group_key
-          left join _res_new      n on n.group_key = re.group_key
+          join _res_obs    o on o.oid = re.oid
+          join _res_class  c on c.oid = re.oid
+          join _res_target t on t.group_key = re.group_key
         on conflict (home_signal_observation_id) do nothing;
         get diagnostics v_newly_linked = row_count;
 
-        -- An entity that gained evidence reports it. Counts and classification are recomputed
-        -- from the entity's own links, by the SAME most-confirmed rule used at minting, so an
-        -- existing entity can never disagree with the evidence now attached to it.
+        -- Counts and classification recomputed from each touched entity's OWN links, by the
+        -- most-confirmed rule, so an entity can never disagree with the evidence attached to it.
         update public.dc_canonical_entity e
            set observation_count = s.n_obs,
                source_count      = s.n_src,
@@ -825,7 +1067,7 @@ begin
                             else 'NON_DC' end cls,
                        count(distinct eo.observation_classification) > 1 conflict
                   from public.dc_entity_observation eo
-                 where eo.canonical_entity_id in (select canonical_entity_id from _res_existing)
+                 where eo.canonical_entity_id in (select target from _res_target)
                  group by eo.canonical_entity_id) s
          where e.canonical_entity_id = s.canonical_entity_id
            and (e.observation_count, e.source_count, e.classification, e.classification_conflict)
@@ -847,10 +1089,12 @@ begin
         union all select 'OBSERVATIONS_CLASSIFIED', v_classified::text
         union all select 'PROPOSED_CANONICAL_ENTITIES', v_entities::text
         union all select 'MULTI_OBSERVATION_ENTITIES', v_linked::text
-        union all select 'ENTITIES_MINTED',
-               case when p_apply then v_minted::text else 'n/a' end
-        union all select 'GROUPS_ALREADY_ENTITIES',
-               case when p_apply then v_reused::text else 'n/a' end
+        union all select 'REVIEWS_ACTIVE_CONFIRMED_MATCH', v_reviews::text
+        union all select 'REVIEW_COMPONENTS_REFUSED_SIBLING', v_refused::text
+        union all select 'ENTITIES_MINTED', v_minted::text
+        union all select 'GROUPS_ALREADY_ENTITIES', v_reused::text
+        union all select 'OBSERVATIONS_RELINKED', v_relinked::text
+        union all select 'ENTITIES_SUPERSEDED', v_superseded::text
         union all select 'OBSERVATIONS_NEWLY_LINKED',
                case when p_apply then v_newly_linked::text else 'n/a' end
         union all select 'ACCOUNTED_FOR',
@@ -868,11 +1112,10 @@ end;
 $fn$;
 
 comment on function public.dc_resolve_canonical(boolean, boolean) is
-'STEP 3A resolver. Default REPORT ONLY. Entity formation is the connected components of
-CONFIRMED_MATCH and nothing else, computed as the equivalence classes of
-(source_key, distribution_key, publisher_record_id). p_include_history admits superseded runs so
-the historical duplicate test can prove they collapse onto one entity rather than minting
-duplicates.';
+'STEP 3A resolver, rule version 2. Default REPORT ONLY. Entities are the connected components of
+stable record continuity (publisher id, or a run-unique name for a source with no id) and of
+accountable CONFIRMED_MATCH reviews -- nothing else. A reviewed component holding two records of
+one source is refused whole. Merges keep the best-anchored entity and are reversible.';
 
 -- ── AUTOMATIC RESOLUTION AFTER ACQUISITION (2026-09-22) ────────────────────────────────────
 -- Acquisition (ingest repo: ingest-compute-atlas.yml 09:40Z, ingest-epoch-ai.yml 10:10Z) writes

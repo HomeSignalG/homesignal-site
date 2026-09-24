@@ -19,6 +19,7 @@ language sql as $$ insert into cron.job (jobname, schedule, command) values (p_n
 create or replace function cron.unschedule(p_jobid bigint) returns boolean
 language sql as $$ delete from cron.job where jobid = p_jobid returning true $$;
 
+drop view  if exists public.dc_identity_candidate cascade;
 drop view  if exists public.dc_current_observation cascade;
 drop table if exists public.dc_entity_geography cascade;
 drop table if exists public.dc_entity_observation cascade;
@@ -46,7 +47,8 @@ create table public.dc_canonical_entity (
 create table public.dc_entity_observation (
   home_signal_observation_id uuid primary key
                              references public.dc_source_observation(home_signal_observation_id),
-  canonical_entity_id        uuid not null references public.dc_canonical_entity(canonical_entity_id)
+  canonical_entity_id        uuid not null references public.dc_canonical_entity(canonical_entity_id),
+  source_key                 text   -- production column; read by rule_version 3's identity gate
 );
 create table public.dc_current_flag (
   home_signal_observation_id uuid primary key
@@ -55,3 +57,16 @@ create table public.dc_current_flag (
 create view public.dc_current_observation as
   select o.* from public.dc_source_observation o
     join public.dc_current_flag f using (home_signal_observation_id);
+
+-- Step 3A's identity surface, as seen by geography. rule_version 3 asks whether an entity placed by
+-- a DERIVED address point has an open cross-source identity question; this suite exercises
+-- publisher points only, so no candidate pair exists. The full identity path runs in
+-- test/dc_epoch_geography_pg against the SHIPPED Step 3A.
+create view public.dc_identity_candidate as
+  select null::uuid observation_a, null::uuid observation_b, null::text candidate_rule_key,
+         null::jsonb candidate_evidence
+   where false;
+drop function if exists public.dc_adjudicate_pair(uuid, uuid, text) cascade;
+create function public.dc_adjudicate_pair(p_a uuid, p_b uuid, p_rule text)
+returns table(decision_state text, decision_rule_key text, evidence jsonb)
+language sql as $$ select 'UNRESOLVED'::text, 'NO_APPLICABLE_RULE'::text, '{}'::jsonb $$;

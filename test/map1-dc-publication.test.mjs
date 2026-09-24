@@ -30,8 +30,15 @@ ok(/grant execute on function public\.map1_dc_zip_members\(text\) to anon, authe
    && !/grant\s+select/i.test(SQL), 'A3 anon gets EXECUTE on the contract and SELECT on nothing');
 ok(/verdict = 'member'/.test(FN) && (FN.match(/geo\.zip_point_membership_in\(/g) || []).length === 1,
   'A4 membership is decided ONCE, by the canonical point predicate');
-ok(!/ST_DWithin|ST_Buffer|ST_Centroid|home_lat|home_lng|p_radius|radius|nearest/i.test(FN),
-  'A5 no radius, buffer, centroid, home point or nearest-anything anywhere in the contract');
+// The ONE distance in the contract is the positional-uncertainty disk (2026-09-24). It can only
+// REMOVE a point from membership (zcta_hits > 1 withholds it) -- it never admits one. So A5 holds
+// for the contract with that single expression cut out, and the expression itself is pinned.
+const DISK = (FN.match(/else\s*\(select count\(\*\) from geo\.zcta_boundary z[\s\S]*?\)\)\s*end as zcta_hits/) || [''])[0];
+ok(DISK.length > 100 && (FN.match(/ST_DWithin/g) || []).length === 1 && /ST_DWithin/.test(DISK)
+   && /p\.positional_uncertainty_m\)\)/.test(DISK) && /zcta_hits <= 1/.test(FN),
+  'A5a the only distance is the uncertainty disk, counted into zcta_hits, which can only withhold');
+ok(!/ST_DWithin|ST_Buffer|ST_Centroid|home_lat|home_lng|p_radius|radius|nearest/i.test(FN.replace(DISK, '')),
+  'A5 no radius, buffer, centroid, home point or nearest-anything anywhere else in the contract');
 ok(/null::numeric as distance_mi/.test(FN), 'A6 no distance is returned — ZIP mode has no home');
 ok(/e\.classification = 'CONFIRMED_DC'/.test(FN) && !/'DC_CANDIDATE'|'NON_DC'/.test(FN),
   'A7 only CONFIRMED_DC publishes; no other classification is named as publishable');
