@@ -374,47 +374,119 @@ comment on view public.dc_observation_record_key is
 'STEP 3A. Per-observation stable record key: publisher record id, else a run-unique name for a
 source that supplies no id, else a singleton. Evidence identity only; never cross-source.';
 
--- ── HUMAN IDENTITY REVIEW (2026-09-24) ─────────────────────────────────────────────────────────
--- Cross-source identity is never confirmed by a rule (section 5). A person may confirm it, or
--- confirm that two records are DIFFERENT, and that decision must outlive the runs: so it is
--- keyed on stable RECORD keys, never on observation ids (which change every acquisition).
---   * CONFIRMED_MATCH    the two records describe ONE physical facility. The resolver links them
---                        to one canonical entity -- unless that would put two records of the
---                        SAME source into one entity (the wrong-sibling guard), in which case the
---                        whole reviewed component is refused and nothing merges.
---   * CONFIRMED_DISTINCT the two records are different facilities; the pair stops blocking a
---                        derived location from publishing.
--- Tenant vs operator: a review merges RECORDS, never parties. Each source's operator/tenant
--- fields stay on its own observation (source_native_operator); nothing is overwritten.
--- A review is revoked, never deleted, so the history of a decision is kept.
-create table if not exists public.dc_identity_review (
-    review_id       uuid primary key default gen_random_uuid(),
-    record_key_a    text not null,
-    record_key_b    text not null,
-    verdict         text not null,
-    reviewer        text not null,
-    rationale       text not null,
-    evidence        jsonb not null default '{}'::jsonb,
-    reviewed_at     timestamptz not null default now(),
-    revoked_at      timestamptz,
-    revoked_reason  text,
-    constraint dc_identity_review_verdict_ck check (verdict in ('CONFIRMED_MATCH', 'CONFIRMED_DISTINCT')),
-    constraint dc_identity_review_ordered_ck check ((record_key_a collate "C") < (record_key_b collate "C")),
-    constraint dc_identity_review_stable_ck check (record_key_a !~ '^singleton\|' and record_key_b !~ '^singleton\|'),
-    constraint dc_identity_review_cross_source_ck check (split_part(record_key_a, '|', 1) <> split_part(record_key_b, '|', 1)),
-    constraint dc_identity_review_accountable_ck check (btrim(reviewer) <> '' and length(btrim(rationale)) >= 20),
-    constraint dc_identity_review_revocation_ck check ((revoked_at is null) = (revoked_reason is null))
-);
+-- ── SITE ADDRESS: THE ONE AUTOMATIC CROSS-SOURCE IDENTITY EVIDENCE (2026-09-24) ───────────────
+-- Measured before any rule was written, over every current Epoch US record against all 2,187
+-- current Atlas records (docs/dc-epoch-identity-evidence-2026-09-24.md):
+--   * EXACT SITE ADDRESS (single house number + street, same stated state): 5 cross-source pairs,
+--     5 the same physical facility, 0 distinct, 0 ambiguous -- INCLUDING a tenant/operator pair
+--     (CoreWeave record vs Core Scientific record at one Muskogee address). It is the only
+--     evidence class in the corpus that separated same from different without an error.
+--   * but an address is NOT unique to a facility: 2 Epoch addresses carry two different Epoch
+--     records (an expansion beside the original; two tenants of one campus), and 19 Atlas
+--     addresses carry more than one Atlas record (campus buildings). So the rule requires the
+--     address to be UNIQUE among the current records of EACH source.
+--   * name, operator, city, ZIP, distance and numbered designations were measured and REJECTED
+--     as identity evidence: e.g. "TX1" vs "TX11" (a campus and its first building, 89 m apart),
+--     "Colossus 2" 3 m from "Minihard", one operator at two addresses in one city.
+-- Keyed on source like dc_classify_observation; every other source has NO site-address rule and
+-- therefore no automatic cross-source identity. Adding a source is adding a branch here.
 
-create unique index if not exists dc_identity_review_active_pair
-    on public.dc_identity_review (record_key_a, record_key_b) where revoked_at is null;
+-- A street line reduced to comparable form: upper case, punctuation dropped, common suffixes and
+-- directionals abbreviated. NULL unless it starts with ONE house number: a range names a
+-- frontage, and a road with no number names no site.
+create or replace function public.dc_normalize_street(p_street text)
+returns text
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+    with t as (
+        select btrim(regexp_replace(upper(coalesce(p_street, '')), '[^A-Z0-9 ]', ' ', 'g')) s,
+               coalesce(p_street, '') ~ '^\s*\d+[A-Za-z]?\s*[-–]\s*\d' is_range),
+    w as (
+        select array_agg(coalesce(('{"ROAD":"RD","STREET":"ST","AVENUE":"AVE","DRIVE":"DR",'
+                                    '"PARKWAY":"PKWY","HIGHWAY":"HWY","BOULEVARD":"BLVD","LANE":"LN",'
+                                    '"COURT":"CT","PLACE":"PL","CIRCLE":"CIR","TRAIL":"TRL","LOOP":"LP",'
+                                    '"NORTH":"N","SOUTH":"S","EAST":"E","WEST":"W","NORTHEAST":"NE",'
+                                    '"NORTHWEST":"NW","SOUTHEAST":"SE","SOUTHWEST":"SW"}'::jsonb) ->> x, x)
+                         order by i) a, bool_or(t.is_range) is_range
+          from t, regexp_split_to_table(t.s, '\s+') with ordinality u(x, i)
+         where x <> '')
+    select case when not w.is_range and w.a[1] ~ '^\d+[A-Z]?$' and array_length(w.a, 1) >= 2
+                then array_to_string(w.a, ' ') end
+      from w
+$fn$;
 
-alter table public.dc_identity_review enable row level security;
-revoke all on public.dc_identity_review from anon, authenticated;
+create or replace function public.dc_site_address(p_source_key text, p_distribution_key text,
+                                                  p_native_address jsonb, p_payload jsonb)
+returns table(site_key text, state text, postal text, rule_key text)
+language plpgsql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+declare
+    line text;
+begin
+    if p_source_key = 'compute_atlas' and p_distribution_key = 'facilities' then
+        -- the publisher's structured street / state / postal code
+        return query select public.dc_normalize_street(p_native_address->>'street'),
+                            nullif(upper(btrim(p_native_address->>'state')), ''),
+                            nullif(left(btrim(coalesce(p_native_address->>'postalCode', '')), 5), ''),
+                            'ATLAS_STRUCTURED_ADDRESS'::text;
+        return;
+    elsif p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then
+        -- the publisher's one-line address: street before the first comma, then ", ST 99999"
+        line := regexp_replace(coalesce(p_payload->>'Address', ''), '\s+', ' ', 'g');
+        if coalesce(p_payload->>'Country', '') <> 'United States' then
+            return query select null::text, null::text, null::text, 'NOT_US'::text;
+            return;
+        end if;
+        return query select public.dc_normalize_street(split_part(line, ',', 1)),
+                            substring(line from ',\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*(?:,|$)'),
+                            substring(line from ',\s*[A-Z]{2}\s+(\d{5})(?:-\d{4})?\s*(?:,|$)'),
+                            'EPOCH_ADDRESS_LINE'::text;
+        return;
+    end if;
+    return query select null::text, null::text, null::text, 'NO_SITE_ADDRESS_RULE'::text;
+end;
+$fn$;
 
-comment on table public.dc_identity_review is
-'STEP 3A. Accountable human identity decisions between two cross-source RECORD keys. The only
-path by which Atlas and Epoch records can become one canonical entity.';
+-- Numbered-sibling designations in a name ("2", "II", "TX11", "DC1"), roman numerals as digits.
+-- Used ONLY as a guard: two records whose names both carry designations with none in common are
+-- never merged automatically ("Facility 1" vs "Facility 2"). Measured: a designation can neither
+-- confirm nor refute identity on its own ("TX1" campus vs "TX11" building), so it never decides a
+-- match -- it can only stop one.
+create or replace function public.dc_name_designations(p_name text)
+returns text[]
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+    select coalesce(array_agg(distinct coalesce(('{"i":"1","ii":"2","iii":"3","iv":"4","v":"5",'
+                                                  '"vi":"6","vii":"7","viii":"8","ix":"9","x":"10"}'::jsonb) ->> tok,
+                                                 regexp_replace(tok, '^0+(\d)', '\1'))), '{}')
+      from regexp_split_to_table(lower(coalesce(p_name, '')), '[^a-z0-9]+') tok
+     where tok ~ '^(\d{1,3}|i{1,3}|iv|vi{0,3}|ix|x|v|[a-z]{1,5}\d{1,3}[a-z]?|\d{1,3}[a-z])$'
+$fn$;
+
+-- Every CURRENT observation's site address, and how many current records OF ITS OWN SOURCE share
+-- it. The uniqueness is part of the evidence, so it is computed once, here, for every consumer.
+create or replace view public.dc_observation_site_address with (security_invoker = true) as
+select c.home_signal_observation_id, c.source_key, c.distribution_key,
+       sa.site_key, sa.state, sa.postal, sa.rule_key,
+       count(*) over (partition by c.source_key, c.distribution_key, sa.state, sa.site_key)
+           as same_address_in_source
+  from public.dc_current_observation c
+  join public.dc_source_observation o on o.home_signal_observation_id = c.home_signal_observation_id
+ cross join lateral public.dc_site_address(c.source_key, c.distribution_key,
+                                           o.source_native_address, c.raw_payload) sa
+ where sa.site_key is not null and sa.state is not null;
+
+revoke all on public.dc_observation_site_address from anon, authenticated;
+
+comment on view public.dc_observation_site_address is
+'STEP 3A. Per current observation: the source-stated site address (house number + street, state,
+postal) and how many current records of the same source share it. Automatic identity evidence.';
 
 -- RLS: these are internal canonical tables with no resident reader. Enabled with NO anon or
 -- authenticated grant, deliberately NOT the public.page_cache posture.
@@ -549,10 +621,11 @@ create trigger dc_identity_decision_reference_trg
 --    town-centroid pins sat 3.5-6.6 km from the address of the same facility (Kuna 3.5 km,
 --    Ellendale 4.6 km, Bowling Green 6.2 km, Fairwater Atlanta 6.6 km), hence 10 km, plus the
 --    same state and locality for a town-centroid pin that is further out.
---    K3 SURFACES ONLY. Section 5 adjudicates it POSSIBLE_MATCH and nothing else; the only way to
---    a merge is an accountable human review. Its effect is to HOLD the derived location
---    (dc_resolve_geography: IDENTITY_REVIEW_REQUIRED) until someone decides -- over-recall costs
---    a held Epoch point, under-recall costs a duplicate facility on a resident's map.
+--    K3 SURFACES ONLY. Section 5 adjudicates it POSSIBLE_MATCH and nothing else: proximity is
+--    never identity. Its effect is an automatic IDENTITY_UNRESOLVED that HOLDS the derived
+--    location (dc_resolve_geography) and is recomputed from evidence every run -- no person is
+--    asked. Over-recall costs a held Epoch point; under-recall costs a duplicate facility on a
+--    resident's map.
 create or replace view public.dc_identity_candidate with (security_invoker = true) as
 with o as (
     select c.home_signal_observation_id oid, c.source_key, c.distribution_key, c.acquisition_run_id,
@@ -611,7 +684,18 @@ cross join lateral public.dc_classify_observation(t.source_key, t.distribution_k
                     ST_SetSRID(ST_MakePoint(t.source_native_lon, t.source_native_lat), 4326)::geography,
                     10000)
       or ( nullif(upper(btrim(t.source_native_address->>'state')), '') = split_part(d.matched_address, ', ', 3)
-       and nullif(upper(btrim(t.source_native_address->>'city')), '')  = split_part(d.matched_address, ', ', 2) ) );
+       and nullif(upper(btrim(t.source_native_address->>'city')), '')  = split_part(d.matched_address, ', ', 2) ) )
+union all
+-- K4 — the SAME source-stated site address (house number + street + state) in two sources. The
+--      only candidate the adjudicator can confirm automatically, and only under its guards (A4).
+select least(x.home_signal_observation_id, y.home_signal_observation_id),
+       greatest(x.home_signal_observation_id, y.home_signal_observation_id),
+       'EXACT_SITE_ADDRESS'::text,
+       jsonb_build_object('site_key', x.site_key, 'state', x.state,
+                          'a_source', x.source_key, 'b_source', y.source_key)
+  from public.dc_observation_site_address x
+  join public.dc_observation_site_address y
+    on y.site_key = x.site_key and y.state = x.state and x.source_key < y.source_key;
 
 comment on view public.dc_identity_candidate is
 'STEP 3A candidate generation. Surfaces pairs for adjudication; concludes nothing. Normalized-
@@ -679,20 +763,24 @@ as $fn$
 declare
     a record;
     b record;
-    ka text;
-    kb text;
-    rv record;
+    sa record;
+    sb record;
+    ca text;
+    cb text;
+    da text[];
+    db text[];
+    ev jsonb;
 begin
     select o.home_signal_observation_id oid, o.source_key, o.distribution_key,
            o.acquisition_run_id, o.publisher_record_id, o.source_native_name,
-           o.source_native_type, o.source_native_precision
+           o.source_native_type, o.source_native_precision, o.source_native_operator, o.raw_payload
       into a
       from public.dc_source_observation o
      where o.home_signal_observation_id = p_observation_a;
 
     select o.home_signal_observation_id oid, o.source_key, o.distribution_key,
            o.acquisition_run_id, o.publisher_record_id, o.source_native_name,
-           o.source_native_type, o.source_native_precision
+           o.source_native_type, o.source_native_precision, o.source_native_operator, o.raw_payload
       into b
       from public.dc_source_observation o
      where o.home_signal_observation_id = p_observation_b;
@@ -735,27 +823,50 @@ begin
         return;
     end if;
 
-    -- A0. Cross-source, and a PERSON has decided (dc_identity_review, keyed on stable RECORD
-    --     keys so the decision outlives the observation ids). Checked before any weak signal.
-    --     This is the only route to a cross-source CONFIRMED_MATCH.
-    if a.source_key <> b.source_key then
-        select rk.record_key into ka from public.dc_observation_record_key rk
-         where rk.home_signal_observation_id = a.oid;
-        select rk.record_key into kb from public.dc_observation_record_key rk
-         where rk.home_signal_observation_id = b.oid;
-        select r.review_id, r.verdict, r.reviewer, r.reviewed_at into rv
-          from public.dc_identity_review r
-         where r.revoked_at is null
-           and r.record_key_a = case when (ka collate "C") < (kb collate "C") then ka else kb end
-           and r.record_key_b = case when (ka collate "C") < (kb collate "C") then kb else ka end;
-        if rv.review_id is not null then
-            return query select rv.verdict::text, ('REVIEWED_' || rv.verdict)::text,
-                jsonb_build_object('review_id', rv.review_id, 'reviewer', rv.reviewer,
-                    'reviewed_at', rv.reviewed_at, 'record_key_a', ka, 'record_key_b', kb,
-                    'candidate_rule', p_candidate_rule_key,
-                    'why', 'an accountable human review of the two records');
-            return;
+    -- A4. Cross-source, AUTOMATIC: the same source-stated site address, under every guard the
+    --     corpus measurement showed is needed. Any failed guard is a COMPLETED automatic decision
+    --     (UNRESOLVED, with the guard named) -- never a request for a person.
+    if a.source_key <> b.source_key and p_candidate_rule_key = 'EXACT_SITE_ADDRESS' then
+        select * into sa from public.dc_observation_site_address x where x.home_signal_observation_id = a.oid;
+        select * into sb from public.dc_observation_site_address x where x.home_signal_observation_id = b.oid;
+        select c.classification into ca from public.dc_classify_observation(a.source_key, a.distribution_key,
+                                                                            a.source_native_type, a.raw_payload) c;
+        select c.classification into cb from public.dc_classify_observation(b.source_key, b.distribution_key,
+                                                                            b.source_native_type, b.raw_payload) c;
+        da := public.dc_name_designations(a.source_native_name);
+        db := public.dc_name_designations(b.source_native_name);
+        ev := jsonb_build_object('site_key', sa.site_key, 'state', sa.state,
+                  'a_postal', sa.postal, 'b_postal', sb.postal,
+                  'a_same_address_in_source', sa.same_address_in_source,
+                  'b_same_address_in_source', sb.same_address_in_source,
+                  'a_classification', ca, 'b_classification', cb,
+                  'a_name', a.source_native_name, 'b_name', b.source_native_name,
+                  'a_designations', to_jsonb(da), 'b_designations', to_jsonb(db),
+                  'a_operator', a.source_native_operator, 'b_operator', b.source_native_operator);
+        if sa.site_key is null or sb.site_key is null or sa.site_key <> sb.site_key or sa.state <> sb.state then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_NOT_CURRENT'::text,
+                ev || jsonb_build_object('why', 'the address is not stated by both CURRENT records');
+        elsif sa.same_address_in_source > 1 or sb.same_address_in_source > 1 then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_SHARED_WITHIN_SOURCE'::text,
+                ev || jsonb_build_object('why', 'a source carries more than one record at this address (a campus): the address does not single out a facility');
+        elsif coalesce(ca, '') not in ('CONFIRMED_DC', 'DC_CANDIDATE') or coalesce(cb, '') not in ('CONFIRMED_DC', 'DC_CANDIDATE') then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_NOT_BOTH_DATA_CENTRES'::text,
+                ev || jsonb_build_object('why', 'a data centre and another kind of facility can share an address');
+        elsif a.source_native_precision = 'representative_multi_site' or a.raw_payload->'location'->'multiSite' is not null
+           or b.source_native_precision = 'representative_multi_site' or b.raw_payload->'location'->'multiSite' is not null then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_AGGREGATE_RECORD'::text,
+                ev || jsonb_build_object('why', 'a record that stands for several sites is not one facility');
+        elsif sa.postal is not null and sb.postal is not null and sa.postal <> sb.postal then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_POSTAL_CONFLICT'::text,
+                ev || jsonb_build_object('why', 'the two records state different postal codes');
+        elsif cardinality(da) > 0 and cardinality(db) > 0 and not (da && db) then
+            return query select 'UNRESOLVED'::text, 'EXACT_ADDRESS_SIBLING_DESIGNATION_CONFLICT'::text,
+                ev || jsonb_build_object('why', 'both names carry sibling designations and none agree ("Facility 1" vs "Facility 2")');
+        else
+            return query select 'CONFIRMED_MATCH'::text, 'AUTO_EXACT_SITE_ADDRESS'::text,
+                ev || jsonb_build_object('why', 'both sources state the same unique site address; party names are roles and are kept per source, never compared');
         end if;
+        return;
     end if;
 
     -- A3. Cross-source. No deterministic identity exists on today's evidence, so the ceiling is
@@ -786,9 +897,10 @@ end;
 $fn$;
 
 comment on function public.dc_adjudicate_pair(uuid, uuid, text) is
-'STEP 3A adjudication, rule version 2. CONFIRMED_MATCH requires the publisher''s own record
-identity, or (cross-source only) an accountable human review of the two stable record keys.
-Name, operator, coordinates, address and derived points never confirm. Fails closed.';
+'STEP 3A adjudication, rule version 3. AUTOMATIC. CONFIRMED_MATCH requires the publisher''s own
+record identity (same source) or, cross-source, the same unique source-stated site address under
+the A4 guards. Name, operator, city, ZIP, distance and derived points never confirm. Every other
+outcome is a completed automatic decision. Fails closed.';
 
 -- =============================================================================================
 -- SECTION 6 — THE RESOLVER
@@ -815,25 +927,29 @@ Name, operator, coordinates, address and derived points never confirm. Fails clo
 --   1. RECORD CONTINUITY: observations sharing a stable record key (dc_observation_record_key)
 --      -- the publisher id, or a run-unique name for a source that supplies no id. Equality of
 --      a key is still an equivalence relation, so grouping by it is still exact.
---   2. ACCOUNTABLE REVIEW: an active CONFIRMED_MATCH in dc_identity_review between two
---      cross-source record keys. Those edges are few, so their connected components are
---      computed by a small recursive walk over the review graph.
+--   2. AUTOMATIC CROSS-SOURCE IDENTITY (rule version 3): a CONFIRMED_MATCH that THIS run's
+--      adjudication of CURRENT evidence produced between two stable record keys of different
+--      sources (A4, the unique exact site address). Recomputed from evidence on every run: a
+--      match whose evidence disappears stops linking and the evidence splits back out; an
+--      unresolved record that gains evidence merges on the next run. No person is in the loop,
+--      and nothing is stored as a standing instruction.
 --   Nothing else links anything. A CANDIDATE / POSSIBLE / UNRESOLVED decision merges nothing.
 --
--- 🔒 WRONG-SIBLING GUARD. A reviewed component that would contain two records of the SAME
+-- 🔒 WRONG-SIBLING GUARD. A matched component that would contain two records of the SAME
 --    source and distribution is REFUSED as a whole: every member falls back to its own record
---    key and nothing merges. A publisher separates its own records (A2); a review can never
---    fold two of them into one facility -- "Colossus 2" confirmed against both "Minihard" and
---    "Colossus 2 (Whitehaven)" merges neither.
+--    key and nothing merges. A publisher separates its own records (A2); a cross-source match
+--    can never fold two of them into one facility -- a record matched to both "Minihard" and
+--    "Colossus 2 (Whitehaven)" merges with neither.
 --
 -- ⚖️ ENTITY FOR A GROUP, deterministically, and stable across runs:
 --    each existing entity is ANCHORED to the group of its best-ranked record key (publisher id
 --    before name before singleton, then key order); a group's entity is the anchored entity
 --    whose anchor key ranks best, then the oldest. Every other entity anchored to the same group
---    is superseded by it and its evidence relinked -- so a reviewed Atlas + Epoch pair keeps the
+--    is superseded by it and its evidence relinked -- so a matched Atlas + Epoch pair keeps the
 --    ATLAS entity (and its Map 1 marker id), and the one-time Epoch continuity consolidation
 --    (270 run-minted entities -> one per record) is the same rule, not a special migration.
---    Evidence of a group an entity is NOT anchored to (a revoked or refused review) is moved to
+--    Evidence of a group an entity is NOT anchored to (a match whose evidence is gone, or a
+--    refused component) is moved to
 --    that group's entity, minting one if needed: a merge is always reversible.
 create or replace function public.dc_resolve_canonical(
     p_apply           boolean default false,
@@ -842,7 +958,7 @@ create or replace function public.dc_resolve_canonical(
 language plpgsql
 as $fn$
 declare
-    v_rule_version constant integer := 2;
+    v_rule_version constant integer := 3;
     v_entities     integer;
     v_obs          integer;
     v_classified   integer;
@@ -852,7 +968,7 @@ declare
     v_reused       integer := 0;
     v_relinked     integer := 0;
     v_superseded   integer := 0;
-    v_reviews      integer := 0;
+    v_edges        integer := 0;
     v_refused      integer := 0;
 begin
     drop table if exists _res_obs;
@@ -896,17 +1012,24 @@ begin
     create temporary table _res_decision on commit drop as
     select k.observation_a, k.observation_b, k.candidate_rule_key,
            d.decision_state, d.decision_rule_key,
-           d.evidence || jsonb_build_object('candidate_evidence', k.candidate_evidence) evidence
+           ka.record_key record_key_a, kb.record_key record_key_b,
+           ka.record_key_rank rank_a, kb.record_key_rank rank_b,
+           d.evidence || jsonb_build_object('candidate_evidence', k.candidate_evidence,
+                                            'source_record_keys', jsonb_build_array(ka.record_key, kb.record_key)) evidence
       from public.dc_identity_candidate k
       cross join lateral public.dc_adjudicate_pair(
-          k.observation_a, k.observation_b, k.candidate_rule_key) d;
+          k.observation_a, k.observation_b, k.candidate_rule_key) d
+      join public.dc_observation_record_key ka on ka.home_signal_observation_id = k.observation_a
+      join public.dc_observation_record_key kb on kb.home_signal_observation_id = k.observation_b;
 
-    -- Reviewed edges and their connected components.
+    -- Automatic cross-source edges between STABLE record keys, and their connected components.
     create temporary table _res_edge on commit drop as
-    select r.record_key_a a, r.record_key_b b
-      from public.dc_identity_review r
-     where r.revoked_at is null and r.verdict = 'CONFIRMED_MATCH';
-    select count(*) into v_reviews from _res_edge;
+    select distinct d.record_key_a a, d.record_key_b b
+      from _res_decision d
+     where d.decision_state = 'CONFIRMED_MATCH'
+       and split_part(d.record_key_a, '|', 1) <> split_part(d.record_key_b, '|', 1)
+       and d.rank_a < 2 and d.rank_b < 2;
+    select count(*) into v_edges from _res_edge;
 
     create temporary table _res_comp on commit drop as
     with recursive adj(k, other) as (
@@ -933,7 +1056,7 @@ begin
 
     create temporary table _res_entity on commit drop as
     select r.oid, coalesce(k.group_key, r.record_key) as group_key, r.record_key, r.record_key_rank,
-           case when k.group_key is not null and k.group_key <> r.record_key then 'REVIEWED_CONFIRMED_MATCH'
+           case when k.group_key is not null and k.group_key <> r.record_key then 'AUTO_CONFIRMED_MATCH'
                 when r.record_key_rank = 0 then 'SAME_SOURCE_SAME_PUBLISHER_RECORD_ID'
                 when r.record_key_rank = 1 then 'SAME_SOURCE_SAME_NAME_UNIQUE_IN_RUN'
                 else 'SINGLETON_NO_STABLE_RECORD_KEY' end as link_rule_key
@@ -974,7 +1097,7 @@ begin
       join public.dc_canonical_entity ce on ce.canonical_entity_id = an.eid
      order by an.anchor_group, an.anchor_rank, an.anchor_key collate "C", ce.created_at, an.eid;
 
-    -- groups that still need an entity (new records; evidence split off by a revoked review)
+    -- groups that still need an entity (new records; evidence split off when a match's evidence is gone)
     create temporary table _res_new on commit drop as
     select g.group_key, gen_random_uuid() canonical_entity_id
       from (select distinct group_key from _res_all) g
@@ -1011,11 +1134,11 @@ begin
           join public.dc_source_observation o on o.home_signal_observation_id = a.oid
          group by n.canonical_entity_id;
 
-        -- relink evidence whose group's entity is another one (review merge, continuity
-        -- consolidation, or a revoked review splitting evidence back out)
+        -- relink evidence whose group's entity is another one (automatic match, continuity
+        -- consolidation, or a match whose evidence is gone splitting evidence back out)
         update public.dc_entity_observation eo
            set canonical_entity_id = t.target,
-               link_rule_key = case when a.group_key <> a.record_key then 'REVIEWED_CONFIRMED_MATCH'
+               link_rule_key = case when a.group_key <> a.record_key then 'AUTO_CONFIRMED_MATCH'
                                     when a.record_key_rank = 1 then 'SAME_SOURCE_SAME_NAME_UNIQUE_IN_RUN'
                                     else eo.link_rule_key end,
                linked_at = now()
@@ -1028,7 +1151,7 @@ begin
         -- every other entity anchored to a group is superseded by that group's entity
         update public.dc_canonical_entity ce
            set superseded_by = t.target,
-               supersede_reason = 'RULE_V2_SAME_GROUP: ' || an.anchor_group,
+               supersede_reason = 'SAME_RECORD_GROUP: ' || an.anchor_group,
                updated_at = now()
           from _res_anchor an
           join _res_target t on t.group_key = an.anchor_group
@@ -1079,7 +1202,15 @@ begin
         select observation_a, observation_b, decision_state, candidate_rule_key,
                decision_rule_key, v_rule_version, evidence
           from _res_decision
-        on conflict (observation_a, observation_b, candidate_rule_key) do nothing;
+        on conflict (observation_a, observation_b, candidate_rule_key) do update
+           set decision_state    = excluded.decision_state,
+               decision_rule_key = excluded.decision_rule_key,
+               rule_version      = excluded.rule_version,
+               evidence          = excluded.evidence,
+               decided_at        = now()
+         where (dc_identity_decision.decision_state, dc_identity_decision.decision_rule_key,
+                dc_identity_decision.rule_version)
+               is distinct from (excluded.decision_state, excluded.decision_rule_key, excluded.rule_version);
     end if;
 
     return query
@@ -1089,8 +1220,8 @@ begin
         union all select 'OBSERVATIONS_CLASSIFIED', v_classified::text
         union all select 'PROPOSED_CANONICAL_ENTITIES', v_entities::text
         union all select 'MULTI_OBSERVATION_ENTITIES', v_linked::text
-        union all select 'REVIEWS_ACTIVE_CONFIRMED_MATCH', v_reviews::text
-        union all select 'REVIEW_COMPONENTS_REFUSED_SIBLING', v_refused::text
+        union all select 'AUTO_MATCH_EDGES', v_edges::text
+        union all select 'MATCH_COMPONENTS_REFUSED_SIBLING', v_refused::text
         union all select 'ENTITIES_MINTED', v_minted::text
         union all select 'GROUPS_ALREADY_ENTITIES', v_reused::text
         union all select 'OBSERVATIONS_RELINKED', v_relinked::text
@@ -1112,10 +1243,121 @@ end;
 $fn$;
 
 comment on function public.dc_resolve_canonical(boolean, boolean) is
-'STEP 3A resolver, rule version 2. Default REPORT ONLY. Entities are the connected components of
-stable record continuity (publisher id, or a run-unique name for a source with no id) and of
-accountable CONFIRMED_MATCH reviews -- nothing else. A reviewed component holding two records of
-one source is refused whole. Merges keep the best-anchored entity and are reversible.';
+'STEP 3A resolver, rule version 3. AUTOMATIC. Default REPORT ONLY. Entities are the connected
+components of stable record continuity (publisher id, or a run-unique name for a source with no
+id) and of this run''s automatic cross-source CONFIRMED_MATCH decisions (A4) -- nothing else. A
+matched component holding two records of one source is refused whole. Merges keep the
+best-anchored entity and follow the evidence on every run.';
+
+-- ── AUTOMATIC IDENTITY OUTCOMES (2026-09-24) ─────────────────────────────────────────────────
+-- ONE definition of "does this entity still have an open cross-source identity question", read by
+-- geography (a derived point may not place an entity with one) and by every report. A pair is
+-- OPEN when a candidate links two DIFFERENT live data-centre entities from different sources and
+-- no automatic decision separates them. Two separating decisions exist, both automatic:
+--   * CONFIRMED_DISTINCT from the adjudicator (A2);
+--   * EXCLUSIVITY: the two entities each already hold a stable record of the SAME source and
+--     distribution, and those records differ. A publisher separates its own records (A2), so an
+--     Epoch record that is automatically matched to Atlas X is not Atlas Y. Pure logic over
+--     decisions already made; no signal is weighed.
+-- Everything else stays OPEN -- the automatic IDENTITY_UNRESOLVED -- and is recomputed from the
+-- current evidence every time this view is read. There is no queue and nothing waits for a person.
+create or replace view public.dc_entity_identity_open with (security_invoker = true) as
+with d as (
+    select k.observation_a, k.observation_b, k.candidate_rule_key, a.decision_state, a.decision_rule_key
+      from public.dc_identity_candidate k
+     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b, k.candidate_rule_key) a
+     where a.decision_state <> 'CONFIRMED_DISTINCT'
+), e as (
+    select xa.canonical_entity_id ea, xb.canonical_entity_id eb,
+           d.candidate_rule_key, d.decision_state, d.decision_rule_key
+      from d
+      join public.dc_entity_observation xa on xa.home_signal_observation_id = d.observation_a
+      join public.dc_entity_observation xb on xb.home_signal_observation_id = d.observation_b
+     where xa.source_key <> xb.source_key
+       and xa.canonical_entity_id <> xb.canonical_entity_id
+), both_dirs as (
+    select ea canonical_entity_id, eb other_entity_id, candidate_rule_key, decision_state, decision_rule_key from e
+    union
+    select eb, ea, candidate_rule_key, decision_state, decision_rule_key from e
+)
+select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
+  from both_dirs b
+  join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
+  join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
+ where me.superseded_by is null
+   and oe.superseded_by is null
+   and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+   and not exists (
+        select 1
+          from public.dc_entity_observation l1
+          join public.dc_observation_record_key r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
+          join public.dc_entity_observation l2
+            on l2.canonical_entity_id = b.other_entity_id
+          join public.dc_observation_record_key r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
+         where l1.canonical_entity_id = b.canonical_entity_id
+           and r1.record_key_rank < 2 and r2.record_key_rank < 2
+           and split_part(r1.record_key, '|', 1) = split_part(r2.record_key, '|', 1)
+           and split_part(r1.record_key, '|', 2) = split_part(r2.record_key, '|', 2)
+           and r1.record_key <> r2.record_key);
+
+revoke all on public.dc_entity_identity_open from anon, authenticated;
+
+comment on view public.dc_entity_identity_open is
+'STEP 3A. Automatic IDENTITY_UNRESOLVED, per entity: live cross-source data-centre pairs that no
+automatic decision (A2 distinct, or exclusivity) separates. Recomputed on every read.';
+
+-- Every CURRENT record's automatic identity outcome -- the receipt that no record waits for a person.
+create or replace view public.dc_record_identity with (security_invoker = true) as
+select c.home_signal_observation_id, c.source_key, c.distribution_key, rk.record_key,
+       eo.canonical_entity_id,
+       case when eo.canonical_entity_id is null then 'NOT_YET_RESOLVED'
+            when exists (select 1 from public.dc_entity_observation x
+                          where x.canonical_entity_id = eo.canonical_entity_id
+                            and x.source_key <> c.source_key) then 'AUTO_CONFIRMED_MATCH'
+            when exists (select 1 from public.dc_entity_identity_open o
+                          where o.canonical_entity_id = eo.canonical_entity_id) then 'IDENTITY_UNRESOLVED'
+            else 'AUTO_CONFIRMED_DISTINCT' end as identity_state
+  from public.dc_current_observation c
+  join public.dc_observation_record_key rk on rk.home_signal_observation_id = c.home_signal_observation_id
+  left join public.dc_entity_observation eo on eo.home_signal_observation_id = c.home_signal_observation_id;
+
+revoke all on public.dc_record_identity from anon, authenticated;
+
+comment on view public.dc_record_identity is
+'STEP 3A. Each current record''s automatic identity outcome: AUTO_CONFIRMED_MATCH,
+AUTO_CONFIRMED_DISTINCT or IDENTITY_UNRESOLVED (NOT_YET_RESOLVED only until the next scheduled
+resolver run). There is no state that waits for a person.';
+
+-- ── CITATION: the source's own record URL, source-keyed (2026-09-24) ──────────────────────────
+-- Map 1 cites every marker. The reader used to parse Atlas's payload shape itself, so any other
+-- source's record could never carry a citation -- a source-specific rule living in the reader.
+-- It lives here, keyed like dc_classify_observation, and the reader asks it.
+create or replace function public.dc_record_citation(p_source_key text, p_distribution_key text,
+                                                     p_payload jsonb)
+returns text
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+    select case
+        when p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then
+            -- "Selected Sources" is markdown: "- [title](https://...)"; the first link is cited
+            substring(coalesce(p_payload->>'Selected Sources', '') from '\]\((https?://[^)\s]+)\)')
+        else (
+            -- the default record shape (Compute Atlas, and any source that follows it): a
+            -- "sources" array of {url}; the first http(s) URL, in the publisher's own order
+            select x->>'url'
+              from jsonb_array_elements(case when jsonb_typeof(p_payload->'sources') = 'array'
+                                             then p_payload->'sources' else '[]'::jsonb end)
+                   with ordinality s(x, i)
+             where x->>'url' ~ '^https?://'
+             order by i limit 1)
+        end
+$fn$;
+
+comment on function public.dc_record_citation(text, text, jsonb) is
+'STEP 3A. The first http(s) record URL the source itself cites for a record, per source. NULL when
+the source cites none -- and a record with no citation does not publish.';
 
 -- ── AUTOMATIC RESOLUTION AFTER ACQUISITION (2026-09-22) ────────────────────────────────────
 -- Acquisition (ingest repo: ingest-compute-atlas.yml 09:40Z, ingest-epoch-ai.yml 10:10Z) writes

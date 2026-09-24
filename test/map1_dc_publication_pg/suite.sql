@@ -83,7 +83,7 @@ select pg_temp.mk('NO candidate',          'compute_atlas', 'DC_CANDIDATE', 'RES
 select pg_temp.mk('NO unresolved rounded', 'compute_atlas', 'CONFIRMED_DC', 'GEOGRAPHY_UNRESOLVED', 40.3, -99.8, 'proposed', 'https://example.test/u');
 select pg_temp.mk('NO not a site',         'compute_atlas', 'CONFIRMED_DC', 'NOT_A_SITE',  40.25, -99.93, 'operational',        'https://example.test/s');
 select pg_temp.mk('NO cancelled',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.26, -99.94, 'cancelled',          'https://example.test/x');
-select pg_temp.mk('NO status absent',      'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.27, -99.94, null,                 'https://example.test/y');
+select pg_temp.mk('PUB status absent',     'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.27, -99.94, null,                 'https://example.test/y');
 select pg_temp.mk('NO url',                'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.28, -99.94, 'operational',        null);
 -- exactly ON the edge 99901 shares with 99903: a member of both, so it must publish on neither
 select pg_temp.mk('NO shared edge',        'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.33, -100.0, 'operational',        'https://example.test/e');
@@ -119,12 +119,12 @@ create temp table _pb_out2 as select * from public.map1_dc_zip_members((select z
 insert into _pb_result(check_name, pass, detail)
 select 'S1 exactly the eligible, in-ZIP population publishes (canonical + kept compatibility rows)',
        string_agg(project_name, ' | ' order by project_name collate "C") =
-       'OSM alone | OSM ambiguous | OSM fifty metres | PUB future source | PUB inside far | PUB permitted | PUB proposed | PUB twin one | PUB twin two | PUB under construction',
+       'OSM alone | OSM ambiguous | OSM fifty metres | PUB future source | PUB inside far | PUB permitted | PUB proposed | PUB status absent | PUB twin one | PUB twin two | PUB under construction',
        string_agg(project_name, ' | ' order by project_name collate "C")
   from _pb_out;
 
 insert into _pb_result(check_name, pass, detail)
-select 'S2 NON_DC, DC_CANDIDATE, unresolved, NOT_A_SITE, cancelled, status-less, URL-less and superseded never publish',
+select 'S2 NON_DC, DC_CANDIDATE, unresolved, NOT_A_SITE, cancelled, URL-less and superseded never publish',
        not exists (select 1 from _pb_out where project_name like 'NO %'),
        (select string_agg(project_name, ',') from _pb_out where project_name like 'NO %');
 
@@ -133,9 +133,9 @@ select 'S3 the rounded "exact" point stays unpublished — publisher precision i
        not exists (select 1 from _pb_out where lat = 40.3 and lng = -99.8), null;
 
 insert into _pb_result(check_name, pass, detail)
-select 'S4 map_status is the ONE lifecycle map (proposed is Proposed, never Approved)',
+select 'S4 map_status is the ONE lifecycle map (proposed is Proposed, never Approved; no stated lifecycle is Unknown, never invented)',
        string_agg(project_name || '=' || map_status, ',' order by project_name collate "C") =
-       'OSM alone=Approved,OSM ambiguous=Operating,OSM fifty metres=Operating,PUB future source=Operating,PUB inside far=Operating,PUB permitted=Approved,PUB proposed=Proposed,PUB twin one=Operating,PUB twin two=Operating,PUB under construction=Approved',
+       'OSM alone=Approved,OSM ambiguous=Operating,OSM fifty metres=Operating,PUB future source=Operating,PUB inside far=Operating,PUB permitted=Approved,PUB proposed=Proposed,PUB status absent=Unknown,PUB twin one=Operating,PUB twin two=Operating,PUB under construction=Approved',
        string_agg(project_name || '=' || map_status, ',' order by project_name collate "C")
   from _pb_out;
 

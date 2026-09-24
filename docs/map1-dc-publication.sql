@@ -27,11 +27,20 @@
 --   geography_status = RESOLVED and geometry_type = POINT only. GEOGRAPHY_UNRESOLVED has no
 --     geometry to publish and is never given one; NOT_A_SITE is a multi-site aggregate and is
 --     never drawn as a point.
---   lifecycle: the ONE status map below. A status outside it (cancelled, shelved, blocked,
---     unknown, absent) does not publish — a cancelled data centre drawn as a data centre is a
---     false statement. The same map governs the compatibility rows.
---   a record URL: the first http(s) evidence URL the publisher cites for the record. No URL,
---     no pin (the page's anti-fabrication gate needs something to open).
+--   lifecycle: the ONE status map below. A STATED status outside it (cancelled, shelved,
+--     blocked, any unlisted word) does not publish — a cancelled data centre drawn as a data
+--     centre is a false statement. The same map governs the compatibility rows.
+--     ⚖️ ABSENT IS NOT A STATUS (2026-09-24). A canonical entity that NO current observation
+--     states any lifecycle for is published with map_status 'Unknown' — the truth, and the
+--     value Map 1 already renders as its grey "Lifecycle unknown" stage (every data-centre pin
+--     reaches that stage today; the page reads no lifecycle from this column) and the one the
+--     page verifier accepts. Nothing is invented: no source's silence becomes 'operational'.
+--     A lifecycle any observation DOES state always wins over silence, whichever observation
+--     places the entity — location and lifecycle are separate facts. Compatibility rows are
+--     unchanged: an absent OSM status still does not publish.
+--   a record URL: the first http(s) URL the source itself cites for the record, read through
+--     the source-keyed public.dc_record_citation (Step 3A) — never a payload shape parsed here.
+--     No URL, no pin (the page's anti-fabrication gate needs something to open).
 --
 -- MEMBERSHIP: geo.zip_point_membership_in(geo.zip_membership_boundary(zip), lat, lng) — the one
 --   point-in-ZIP authority (docs/zip-membership-canonical.sql). Candidates are retrieved by the
@@ -82,11 +91,11 @@ as $function$
   -- compatibility pairing on the box edge is still seen from both sides)
   canon as (
     select 'dc:' || e.canonical_entity_id::text as source_key,
-           s.publisher as source_name, u.url as source_url, s.licence as source_licence,
+           s.publisher as source_name, o.cite as source_url, s.licence as source_licence,
            o.source_native_name as project_name,
            nullif(btrim(o.source_native_operator), '') as developer_or_operator,
            o.source_native_status as raw_status, o.source_native_status as normalized_status,
-           lc.map_status, 'datacenter'::text as project_type, ge.lat, ge.lng,
+           coalesce(lc.map_status, 'Unknown') as map_status, 'datacenter'::text as project_type, ge.lat, ge.lng,
            nullif(concat_ws(', ', o.source_native_address->>'street',
                                   o.source_native_address->>'city',
                                   o.source_native_address->>'state'), '') as location_text,
@@ -103,34 +112,40 @@ as $function$
       -- THE DESCRIPTOR (2026-09-24): name, operator, lifecycle, address and citation come from
       -- the entity's CURRENT observation that states a displayable lifecycle -- the location
       -- authority itself when it does (every single-source entity: behaviour unchanged), else
-      -- another observation of the same entity. Location evidence and descriptive evidence are
-      -- different facts; an entity placed by a derived address point (whose source states no
-      -- lifecycle) is described by the source that does. Source-agnostic: no source is named.
+      -- another observation of the same entity; only when NO observation states a lifecycle,
+      -- an observation that states none (published as 'Unknown', see the header). Location
+      -- evidence and descriptive evidence are different facts; an entity placed by a derived
+      -- address point is described by the source that states its lifecycle. Source-agnostic.
       cross join lateral (
-        select x.*
+        select x.*, public.dc_record_citation(x.source_key, x.distribution_key, x.raw_payload) as cite
           from public.dc_entity_observation eo2
           join public.dc_current_observation cx
             on cx.home_signal_observation_id = eo2.home_signal_observation_id
           join public.dc_source_observation x
             on x.home_signal_observation_id = eo2.home_signal_observation_id
-          join lifecycle lx on lx.v = x.source_native_status
          where eo2.canonical_entity_id = e.canonical_entity_id
-         order by (x.home_signal_observation_id = ge.authority_observation_id) desc,
+           and (x.source_native_status is null
+                or x.source_native_status in (select lx.v from lifecycle lx))
+         order by (x.source_native_status is not null) desc,
+                  (x.home_signal_observation_id = ge.authority_observation_id) desc,
                   x.observed_at desc, x.home_signal_observation_id
          limit 1) o
       join public.dc_source s on s.source_key = o.source_key
-      join lifecycle lc on lc.v = o.source_native_status
-      cross join lateral (
-        select x->>'url' as url
-          from jsonb_array_elements(case when jsonb_typeof(o.raw_payload->'sources') = 'array'
-                                         then o.raw_payload->'sources' else '[]'::jsonb end)
-               with ordinality t(x, i)
-         where x->>'url' ~ '^https?://'
-         order by i limit 1) u
+      left join lifecycle lc on lc.v = o.source_native_status
      where e.superseded_by is null
        and e.classification = 'CONFIRMED_DC'
        and ge.geography_status = 'RESOLVED'
-       and ge.geometry_type = 'POINT'),
+       and ge.geometry_type = 'POINT'
+       and o.cite is not null
+       -- a STATED lifecycle must be displayable; silence is 'Unknown' only when EVERY current
+       -- observation of the entity is silent (a stated 'cancelled' is never outvoted by silence)
+       and (lc.map_status is not null
+            or not exists (
+                 select 1 from public.dc_entity_observation eo3
+                   join public.dc_current_observation c3
+                     on c3.home_signal_observation_id = eo3.home_signal_observation_id
+                  where eo3.canonical_entity_id = e.canonical_entity_id
+                    and c3.source_native_status is not null))),
   -- TRANSITIONAL compatibility population (see header for its retirement condition)
   osm as (
     select r.source_key, r.source_name, r.source_url,

@@ -21,6 +21,7 @@ create table public.dc_source (
 create table public.dc_source_observation (
   home_signal_observation_id uuid primary key default gen_random_uuid(),
   source_key               text not null references public.dc_source(source_key),
+  distribution_key         text not null default 'facilities',
   raw_payload              jsonb not null default '{}'::jsonb,
   source_native_name       text,
   source_native_status     text,

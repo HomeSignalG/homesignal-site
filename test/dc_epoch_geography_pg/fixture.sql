@@ -28,6 +28,9 @@ language sql as $$ delete from cron.job where jobid = p_jobid returning true $$;
 
 -- another suite in the same disposable database may have left a stand-in adjudicator behind
 drop function if exists public.dc_adjudicate_pair(uuid, uuid, text) cascade;
+drop view  if exists public.dc_record_identity cascade;
+drop view  if exists public.dc_entity_identity_open cascade;
+drop view  if exists public.dc_observation_site_address cascade;
 drop view  if exists public.dc_geocode_queue cascade;
 drop view  if exists public.dc_observation_derived_point cascade;
 drop view  if exists public.dc_identity_candidate cascade;

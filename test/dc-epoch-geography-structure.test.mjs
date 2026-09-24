@@ -59,11 +59,16 @@ ok((MAP.match(/create or replace function public\./g) || []).length === 1, 'M9d:
 const input = (D3.match(/create or replace function public\.dc_geocode_input[\s\S]*?\$fn\$;/) || [''])[0];
 ok(/if p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then/.test(input)
    && /'NO_GEOCODE_RULE'/.test(input), 'S1: the address rule is keyed on source+distribution; every other source is NO_GEOCODE_RULE');
-// The only other source-keyed decision is the classifier (Step 2B), keyed the same way.
-const classify = (A3.match(/create or replace function public\.dc_classify_observation[\s\S]*?\$fn\$;/) || [''])[0];
-const rest = Object.values(SQL).join('\n').replace(input, '').replace(classify, '');
-ok(classify.length > 200 && /'epoch_ai'/.test(classify) && !/'epoch_ai'/.test(rest),
-  'S1b: production SQL names epoch_ai only in the two source-keyed rules (classifier, address rule)');
+// Every source-keyed rule is a function keyed like dc_classify_observation; production SQL names
+// epoch_ai nowhere else -- in particular not in the resolver, the adjudicator, geography or the reader.
+const fnOf = (name, src) => (src.match(new RegExp('create or replace function public\\.' + name + '[\\s\\S]*?\\$fn\\$;')) || [''])[0];
+const classify = fnOf('dc_classify_observation', A3);
+const siteAddr = fnOf('dc_site_address', A3);
+const citation = fnOf('dc_record_citation', A3);
+const rest = Object.values(SQL).join('\n').replace(input, '').replace(classify, '').replace(siteAddr, '').replace(citation, '');
+ok([classify, siteAddr, citation].every((f) => f.length > 200 && /'epoch_ai'/.test(f)) && !/'epoch_ai'/.test(rest),
+  'S1b: production SQL names epoch_ai only in the four source-keyed rules (classifier, geocode input, site address, citation)');
+ok(/'NO_SITE_ADDRESS_RULE'/.test(siteAddr), 'S1c: a source with no site-address rule gets no automatic cross-source identity');
 
 // ── the verdict: output quality, fail closed ────────────────────────────────────────────────
 const verdict = (D3.match(/create or replace function public\.dc_derived_point_verdict[\s\S]*?\$fn\$;/) || [''])[0];
@@ -94,21 +99,30 @@ ok(/from "\.\.\/supabase\/functions\/get-address-report\/canonical-addr\.ts"/.te
 ok(!/geocoding\.geo\.census\.gov|fetch\(\s*["'`]http/i.test(WRITER) && !/dc_[a-z_]+/.test(WRITER),
   'S4b: the writer calls no geocoder of its own and names no data-centre object (the queue and load are SQL)');
 
-// ── identity: a person is the only cross-source merge ───────────────────────────────────────
+// ── identity: AUTOMATIC, and no person anywhere in the loop ────────────────────────────────
 const resolver = (A3.match(/create or replace function public\.dc_resolve_canonical[\s\S]*?\$fn\$;/) || [''])[0];
 const edge = (resolver.match(/create temporary table _res_edge[\s\S]*?;/) || [''])[0];
-ok(/from public\.dc_identity_review r\s*where r\.revoked_at is null and r\.verdict = 'CONFIRMED_MATCH';/.test(edge)
-   && !/dc_identity_candidate|dc_identity_decision/.test(edge),
-  'S5 [M6 M7]: the only merge edges are active human CONFIRMED_MATCH reviews -- no rule, name, distance or candidate');
+ok(/from _res_decision d\s*where d\.decision_state = 'CONFIRMED_MATCH'/.test(edge)
+   && /d\.rank_a < 2 and d\.rank_b < 2/.test(edge) && !/review|union/i.test(edge),
+  'S5 [M1-M7]: merge edges are THIS run\'s automatic CONFIRMED_MATCH decisions between stable records -- nothing else, no person');
 const adjud = (A3.match(/create or replace function public\.dc_adjudicate_pair[\s\S]*?\$fn\$;/) || [''])[0];
-// A literal CONFIRMED_MATCH exists only in A1 (same source, same publisher record id), BEFORE the
-// first cross-source branch; cross-source it can only come from a person's review (rv.verdict).
-const crossAt = adjud.indexOf('if a.source_key <> b.source_key then');
-ok(/'DERIVED_POINT_NEAR_OTHER_SOURCE_DC'\s*then 'CROSS_SOURCE_DERIVED_POINT_NEARBY'/.test(adjud)
-   && crossAt > 0 && !/'CONFIRMED_MATCH'/.test(adjud.slice(crossAt)) && /select rv\.verdict::text/.test(adjud.slice(crossAt)),
-  'S5b: the adjudicator never emits CONFIRMED_MATCH from a rule; a nearby derived point is at most POSSIBLE_MATCH');
-ok(/rationale\s+text not null/.test(A3) && /char_length\(btrim\(rationale\)\) >= 20|length\(btrim\(rationale\)\) >= 20/.test(A3),
-  'S5c: a review must carry a written rationale');
+// Cross-source, a literal CONFIRMED_MATCH comes from exactly ONE branch: the exact site address,
+// after every guard. A nearby derived point, a name, an operator are never more than POSSIBLE.
+const crossAt = adjud.indexOf('if a.source_key <> b.source_key');
+const crossPart = adjud.slice(crossAt);
+ok(crossAt > 0 && (crossPart.match(/'CONFIRMED_MATCH'/g) || []).length === 1
+   && /'CONFIRMED_MATCH'::text, 'AUTO_EXACT_SITE_ADDRESS'::text/.test(crossPart)
+   && /p_candidate_rule_key = 'EXACT_SITE_ADDRESS'/.test(crossPart)
+   && /'DERIVED_POINT_NEAR_OTHER_SOURCE_DC'\s*then 'CROSS_SOURCE_DERIVED_POINT_NEARBY'/.test(adjud),
+  'S5b: cross-source CONFIRMED_MATCH has ONE branch -- the guarded exact site address; proximity is at most POSSIBLE_MATCH');
+const guards = ['EXACT_ADDRESS_SHARED_WITHIN_SOURCE', 'EXACT_ADDRESS_NOT_BOTH_DATA_CENTRES', 'EXACT_ADDRESS_AGGREGATE_RECORD',
+  'EXACT_ADDRESS_POSTAL_CONFLICT', 'EXACT_ADDRESS_SIBLING_DESIGNATION_CONFLICT'];
+const matchAt = crossPart.indexOf("'CONFIRMED_MATCH'::text, 'AUTO_EXACT_SITE_ADDRESS'");
+ok(guards.every((g) => crossPart.indexOf("'" + g + "'") > 0 && crossPart.indexOf("'" + g + "'") < matchAt),
+  'S5c: every measured guard is checked BEFORE the automatic match can be returned', guards.join(','));
+const allProd = Object.values(SQL).join('\n') + WRITER;
+ok(!/dc_identity_review|reviewer|REVIEWED_|WAITING_FOR|NEEDS_(HUMAN_)?REVIEW|MANUAL_REVIEW/i.test(allProd),
+  'Z: no human-review table, reviewer field, reviewed state or review queue exists anywhere on the production path');
 
 // ── the production apply is GENERATED from the files above, never retyped (claims rule 7) ─────
 const gen = spawnSync('python3', [join(ROOT, 'test/dc_epoch_geography_pg/build_apply.py'), '--check'], { encoding: 'utf8' });

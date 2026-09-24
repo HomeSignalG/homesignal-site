@@ -45,7 +45,7 @@
 --   * a town/area point is not a site claim, so it no longer takes part in SOURCES_DISAGREE:
 --     only site claims are compared, with the SAME 1 km rule, owned here and nowhere else;
 --   * a derived point may not place an entity that has an OPEN cross-source identity question
---     (IDENTITY_REVIEW_REQUIRED), nor one whose derived address another entity also uses
+--     (IDENTITY_UNRESOLVED), nor one whose derived address another entity also uses
 --     (DERIVED_ADDRESS_SHARED): the address cannot tell the two apart;
 --   * the point's positional uncertainty (metres) is stored with the decision.
 --
@@ -367,26 +367,13 @@ begin
      order by eo.canonical_entity_id, (dp.verdict = 'ACCEPTED') desc, dp.home_signal_observation_id;
 
     -- ⛔ IDENTITY BEFORE A DERIVED MARKER. An entity with an OPEN cross-source identity question
-    -- -- a surfaced candidate pair with another data-centre entity that no person has decided
-    -- CONFIRMED_DISTINCT (and that did not merge) -- may not be PLACED by a derived point: the
-    -- other entity may be the same facility, and two markers for one site is the defect.
-    -- Publisher points are unaffected (their behaviour before rule_version 3 is unchanged).
+    -- (dc_entity_identity_open: the automatic IDENTITY_UNRESOLVED) may not be PLACED by a derived
+    -- point: the other entity may be the same facility, and two markers for one site is the defect.
+    -- The question is answered by Step 3A's one definition, recomputed from evidence on every run;
+    -- nothing here waits for a person. Publisher points are unaffected.
     create temporary table _geo_open on commit drop as
-    select distinct x.canonical_entity_id
-      from public.dc_identity_candidate k
-      join public.dc_entity_observation x
-        on x.home_signal_observation_id in (k.observation_a, k.observation_b)
-      join public.dc_entity_observation y
-        on y.home_signal_observation_id in (k.observation_a, k.observation_b)
-       and y.home_signal_observation_id <> x.home_signal_observation_id
-      join public.dc_canonical_entity ye on ye.canonical_entity_id = y.canonical_entity_id
-     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b,
-                                                  k.candidate_rule_key) d
-     where x.source_key <> y.source_key
-       and y.canonical_entity_id <> x.canonical_entity_id
-       and ye.superseded_by is null
-       and ye.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
-       and d.decision_state <> 'CONFIRMED_DISTINCT';
+    select distinct o.canonical_entity_id
+      from public.dc_entity_identity_open o;
 
     create temporary table _geo_pick on commit drop as
     select distinct on (canonical_entity_id) *
@@ -411,6 +398,12 @@ begin
                           and ST_DistanceSphere(ST_MakePoint(a.lng, a.lat),
                                                 ST_MakePoint(b.lng, b.lat)) > 1000) disagree,
                e.canonical_entity_id in (select canonical_entity_id from _geo_open) identity_open,
+               -- a derived point may place only a record whose identity persists across runs: a
+               -- singleton key (a name repeated inside its own run) would mint a new marker id
+               -- every acquisition
+               (p.basis = 'DERIVED_ADDRESS'
+                and exists (select 1 from public.dc_observation_record_key rk
+                             where rk.home_signal_observation_id = p.oid and rk.record_key_rank = 2)) unstable,
                (select dd.derived from _geo_derived dd
                  where dd.canonical_entity_id = e.canonical_entity_id) derived,
                exists (select 1 from _geo_pick q
@@ -423,6 +416,7 @@ begin
            case when b.entity_grain = 'AGGREGATE_MULTI_SITE' then 'NOT_A_SITE'
                 when b.oid is null or b.disagree or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'
                 when b.basis = 'NON_SITE_AREA' then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'GEOGRAPHY_UNRESOLVED'
                 when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'GEOGRAPHY_UNRESOLVED'
                 when b.basis = 'DERIVED_ADDRESS' and b.shared then 'GEOGRAPHY_UNRESOLVED'
                 else 'RESOLVED' end status,
@@ -431,7 +425,8 @@ begin
                 when b.disagree then 'SOURCES_DISAGREE'
                 when b.decimals <= 1 then 'ROUNDED_COORDINATES'
                 when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT'
-                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_REVIEW_REQUIRED'
+                when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'UNSTABLE_RECORD_IDENTITY'
+                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_UNRESOLVED'
                 when b.basis = 'DERIVED_ADDRESS' and b.shared then 'DERIVED_ADDRESS_SHARED'
                 when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT'
                 else 'PUBLISHER_POINT' end rule_key,
@@ -443,7 +438,8 @@ begin
                case when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT' end,
                case when b.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE' end,
                case when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT' end,
-               case when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_REVIEW_REQUIRED' end,
+               case when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'UNSTABLE_RECORD_IDENTITY' end,
+               case when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_UNRESOLVED' end,
                case when b.decimals = 2 then 'COARSE_COORDINATES' end,
                case when b.prec = 'approximate' then 'PUBLISHER_APPROXIMATE' end,
                case when b.shared then 'SHARED_COORDINATES' end,

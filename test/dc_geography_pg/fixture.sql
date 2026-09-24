@@ -59,14 +59,17 @@ create view public.dc_current_observation as
     join public.dc_current_flag f using (home_signal_observation_id);
 
 -- Step 3A's identity surface, as seen by geography. rule_version 3 asks whether an entity placed by
--- a DERIVED address point has an open cross-source identity question; this suite exercises
--- publisher points only, so no candidate pair exists. The full identity path runs in
+-- a DERIVED address point has an open cross-source identity question (dc_entity_identity_open) and
+-- whether its record identity is stable (dc_observation_record_key); this suite exercises publisher
+-- points only, so no question is open and every record is stable. The full identity path runs in
 -- test/dc_epoch_geography_pg against the SHIPPED Step 3A.
-create view public.dc_identity_candidate as
-  select null::uuid observation_a, null::uuid observation_b, null::text candidate_rule_key,
-         null::jsonb candidate_evidence
+drop view if exists public.dc_entity_identity_open cascade;
+create view public.dc_entity_identity_open as
+  select null::uuid canonical_entity_id, null::uuid other_entity_id, null::text candidate_rule_key,
+         null::text decision_state, null::text decision_rule_key
    where false;
-drop function if exists public.dc_adjudicate_pair(uuid, uuid, text) cascade;
-create function public.dc_adjudicate_pair(p_observation_a uuid, p_observation_b uuid, p_candidate_rule_key text)
-returns table(decision_state text, decision_rule_key text, evidence jsonb)
-language sql as $$ select 'UNRESOLVED'::text, 'NO_APPLICABLE_RULE'::text, '{}'::jsonb $$;
+drop view if exists public.dc_observation_record_key cascade;
+create view public.dc_observation_record_key as
+  select o.home_signal_observation_id, 'fixture|' || o.home_signal_observation_id::text as record_key,
+         0 as record_key_rank
+    from public.dc_source_observation o;

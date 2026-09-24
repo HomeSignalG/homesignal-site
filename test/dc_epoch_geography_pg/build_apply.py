@@ -78,11 +78,12 @@ def build():
         'create or replace view public.dc_observation_record_key',
         'revoke all on public.dc_observation_record_key',
         'comment on view public.dc_observation_record_key',
-        'create table if not exists public.dc_identity_review',
-        'create unique index if not exists dc_identity_review_active_pair',
-        'alter table public.dc_identity_review enable row level security',
-        'revoke all on public.dc_identity_review',
-        'comment on table public.dc_identity_review',
+        'create or replace function public.dc_normalize_street(',
+        'create or replace function public.dc_site_address(',
+        'create or replace function public.dc_name_designations(',
+        'create or replace view public.dc_observation_site_address',
+        'revoke all on public.dc_observation_site_address',
+        'comment on view public.dc_observation_site_address',
         'create or replace view public.dc_identity_candidate',
         'comment on view public.dc_identity_candidate',
         'revoke all on public.dc_identity_candidate',
@@ -90,6 +91,14 @@ def build():
         'comment on function public.dc_adjudicate_pair(',
         'create or replace function public.dc_resolve_canonical(',
         'comment on function public.dc_resolve_canonical(',
+        'create or replace view public.dc_entity_identity_open',
+        'revoke all on public.dc_entity_identity_open',
+        'comment on view public.dc_entity_identity_open',
+        'create or replace view public.dc_record_identity',
+        'revoke all on public.dc_record_identity',
+        'comment on view public.dc_record_identity',
+        'create or replace function public.dc_record_citation(',
+        'comment on function public.dc_record_citation(',
     ])
     b3 = pick('docs/dc-step3b-canonical-geography.sql', [
         'alter table public.dc_entity_geography add column if not exists positional_uncertainty_m',
@@ -130,6 +139,11 @@ def build():
 
 
 if __name__ == '__main__':
+    # --extract FILE PREFIX...: print the shipped statements of FILE whose text starts with a PREFIX,
+    # so another suite can load one object from the DDL of record without keeping a copy of it.
+    if sys.argv[1:2] == ['--extract']:
+        sys.stdout.write('\n\n'.join(pick(sys.argv[2], sys.argv[3:])) + '\n')
+        sys.exit(0)
     text = build()
     if '--check' in sys.argv:
         ok = OUT.exists() and OUT.read_text() == text

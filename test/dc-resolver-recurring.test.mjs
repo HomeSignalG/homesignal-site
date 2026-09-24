@@ -67,7 +67,8 @@ ok(/bool_or\(eo\.observation_classification = 'CONFIRMED_DC'\)/.test(apply),
 
 // 6. The run reports what it did, so a scheduled run is auditable.
 for (const m of ['ENTITIES_MINTED', 'GROUPS_ALREADY_ENTITIES', 'OBSERVATIONS_NEWLY_LINKED',
-                 'OBSERVATIONS_RELINKED', 'ENTITIES_SUPERSEDED', 'REVIEW_COMPONENTS_REFUSED_SIBLING']) {
+                 'OBSERVATIONS_RELINKED', 'ENTITIES_SUPERSEDED', 'MATCH_COMPONENTS_REFUSED_SIBLING',
+                 'AUTO_MATCH_EDGES']) {
   ok(fn.includes(`'${m}'`), `6: the resolver reports ${m}`);
 }
 

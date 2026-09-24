@@ -82,8 +82,11 @@ ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACC
 ok(/\(basis = 'NON_SITE_AREA'\), \(basis = 'DERIVED_ADDRESS'\),/.test(fn),
   '8b: a publisher SITE point always outranks a derived point; an area point ranks last');
 ok(/when b\.basis = 'DERIVED_ADDRESS' and b\.identity_open then 'GEOGRAPHY_UNRESOLVED'/.test(fn)
-   && /when b\.basis = 'DERIVED_ADDRESS' and b\.identity_open then 'IDENTITY_REVIEW_REQUIRED'/.test(fn),
-  '8c: an open cross-source identity question holds a derived point (IDENTITY_REVIEW_REQUIRED)');
+   && /when b\.basis = 'DERIVED_ADDRESS' and b\.identity_open then 'IDENTITY_UNRESOLVED'/.test(fn)
+   && /from public\.dc_entity_identity_open o;/.test(fn) && !/review/i.test(fn),
+  '8c: an open cross-source identity question (Step 3A\'s ONE automatic definition) holds a derived point; nothing waits for review');
+ok(/when b\.basis = 'DERIVED_ADDRESS' and b\.unstable then 'UNSTABLE_RECORD_IDENTITY'/.test(fn),
+  '8f: a derived point never places a record whose identity does not persist across runs');
 ok(/a\.basis <> 'NON_SITE_AREA' and b\.basis <> 'NON_SITE_AREA'/.test(fn)
    && !/a\.basis <> 'DERIVED_ADDRESS'/.test(fn),
   '8d: a derived point takes part in SOURCES_DISAGREE; only area points are excused');
