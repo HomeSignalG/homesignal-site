@@ -141,8 +141,16 @@ ok(dry.status === 0 && /^create schema dcdry;/.test(dry.stdout) && /create or re
    && !/create or replace (function|view) public\.|alter table public\./.test(dry.stdout),
   'S7b: the dry run builds the whole changed chain in its scratch schema and changes no live object', dry.stderr.trim());
 const wf = read('.github/workflows/dc-epoch-dryrun.yml');
-ok(/--dryrun-body dcdry/.test(wf) && !/apply-body\.sql/.test(wf) && (wf.match(/\brollback;/g) || []).length === 2 && !/\bcommit;/.test(wf),
-  'S7c: the dry-run workflow runs only the scratch-schema SQL, and only inside transactions it rolls back');
+const rep = read('scripts/dc-epoch-replica-dryrun.sh');
+const prodUses = rep.split('\n').filter((l) => /\$PROD_DB_URL|\$\{PROD_DB_URL/.test(l) && !/^\s*#/.test(l) && !/:\s*"\$\{PROD_DB_URL:\?\}"/.test(l));
+ok(/bash scripts\/dc-epoch-replica-dryrun\.sh/.test(wf) && /bash test\/dc_epoch_geography_pg\/replica_offline\.sh/.test(wf)
+   && !/--dryrun-body|\bbegin;|\brollback;|\bcommit;|\\i /.test(wf) && /services:\s*\n\s*postgis:/.test(wf),
+  'S7c: the dry-run workflow runs no SQL of its own against production: every change is in a disposable PostGIS service');
+ok(prodUses.length === 1 && /psql "\$PROD_DB_URL"/.test(prodUses[0])
+   && /default_transaction_read_only=on/.test(rep) && /lock_timeout=2s/.test(rep)
+   && /\\\\copy \(\$q\) to/.test(rep),
+  'S7d: production is reached from exactly ONE line -- prod_select -- as a READ ONLY, short-lock-timeout COPY of a SELECT',
+  prodUses.join(' / '));
 
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);
