@@ -1,6 +1,12 @@
 name: dc-epoch-dryrun
 
-# PRODUCTION DRY RUN of automatic Epoch canonical geography. WRITES NOTHING, by construction:
+# PRODUCTION DRY RUN of automatic Epoch canonical geography. WRITES NOTHING AND LOCKS NOTHING LIVE:
+#   0. every object the apply creates, and every canonical table it alters or its resolvers write,
+#      is built in a scratch schema (dcdry) that exists only inside the dry run's own transaction;
+#      live objects are only READ. (2026-09-24: the first dry run applied DDL to the LIVE schema in
+#      a rolled-back transaction and held ACCESS EXCLUSIVE on public.dc_entity_geography for ~7
+#      minutes; one resident map1_dc_zip_members call returned 500. The generator now REFUSES any
+#      statement that targets public: test/dc_epoch_geography_pg/build_apply.py.)
 #   1. the queue is computed inside a transaction that ROLLS BACK (the new DDL exists only there);
 #   2. the production geocoding ladder runs with DCG_DRY_RUN=1 -- the geocode cache is read, never
 #      written;
@@ -17,6 +23,7 @@ on:
       - 'docs/dc-epoch-geography-apply.sql'
       - 'docs/dc-epoch-dryrun-report.sql'
       - 'docs/dc-geocode-observations-load.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
       - 'scripts/dc-geocode-observations.ts'
       - 'test/dc_epoch_geography_pg/build_apply.py'
       - '.github/workflows/dc-epoch-dryrun.yml'
@@ -45,8 +52,14 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: Build the apply body (no transaction statements of its own)
-        run: python3 test/dc_epoch_geography_pg/build_apply.py --body > /tmp/apply-body.sql
+      - name: Build the scratch-schema dry run (refuses any statement that targets a live object)
+        run: |
+          set -euo pipefail
+          python3 test/dc_epoch_geography_pg/build_apply.py --self-test
+          python3 test/dc_epoch_geography_pg/build_apply.py --dryrun-body dcdry > /tmp/dry-body.sql
+          python3 test/dc_epoch_geography_pg/build_apply.py --dryrun-rewrite dcdry docs/dc-geocode-observations-load.sql > /tmp/dry-load.sql
+          python3 test/dc_epoch_geography_pg/build_apply.py --dryrun-rewrite dcdry docs/dc-epoch-dryrun-report.sql > /tmp/dry-report.sql
+          python3 test/dc_epoch_geography_pg/build_apply.py --dryrun-rewrite dcdry docs/dc-geocode-observations-queue.sql > /tmp/dry-queue.sql
 
       - name: Queue (DDL applied inside a transaction that rolls back)
         env:
@@ -55,8 +68,9 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -P pager=off <<'SQL'
           begin;
-          \i /tmp/apply-body.sql
-          \copy (select json_build_object('geocoder_query', geocoder_query, 'ladder_version', ladder_version)::text from public.dc_geocode_queue order by geocoder_query collate "C") to '/tmp/dcg-in.jsonl'
+          set local lock_timeout = '5s';
+          \i /tmp/dry-body.sql
+          \copy (select json_build_object('geocoder_query', geocoder_query, 'ladder_version', ladder_version)::text from dcdry.dc_geocode_queue order by geocoder_query collate "C") to '/tmp/dcg-in.jsonl'
           rollback;
           SQL
           echo "queued addresses: $(grep -c . /tmp/dcg-in.jsonl || true)"
@@ -79,15 +93,16 @@ jobs:
           psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -tA -F'|' -P pager=off <<'SQL' | tee /tmp/report.txt
           begin;
           set local statement_timeout = 0;
+          set local lock_timeout = '5s';
           create temp table _before as
             select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m;
-          \i /tmp/apply-body.sql
+          \i /tmp/dry-body.sql
           create temp table _dcg_in(j jsonb);
           \copy _dcg_in(j) from '/tmp/dcg-out.jsonl' with (format csv, quote e'\x01', delimiter e'\x02')
-          \i docs/dc-geocode-observations-load.sql
-          select 'RESOLVE_CANONICAL', metric, value from public.dc_resolve_canonical(true, false);
-          select 'RESOLVE_GEOGRAPHY', metric, value from public.dc_resolve_geography(true);
-          \i docs/dc-epoch-dryrun-report.sql
+          \i /tmp/dry-load.sql
+          select 'RESOLVE_CANONICAL', metric, value from dcdry.dc_resolve_canonical(true, false);
+          select 'RESOLVE_GEOGRAPHY', metric, value from dcdry.dc_resolve_geography(true);
+          \i /tmp/dry-report.sql
           rollback;
           SQL
 
@@ -96,4 +111,4 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          psql "$SUPABASE_DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select 'dc_address_geocode exists after rollback: ' || (to_regclass('public.dc_address_geocode') is not null)::text, 'dc_record_identity exists after rollback: ' || (to_regclass('public.dc_record_identity') is not null)::text"
+          psql "$SUPABASE_DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select 'scratch schema exists after rollback: ' || (to_regnamespace('dcdry') is not null)::text, 'public.dc_address_geocode exists: ' || (to_regclass('public.dc_address_geocode') is not null)::text, 'live map1 reader md5: ' || (select md5(prosrc) from pg_proc where proname = 'map1_dc_zip_members' and pronamespace = 'public'::regnamespace)"

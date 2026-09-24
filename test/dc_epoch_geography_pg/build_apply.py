@@ -138,7 +138,91 @@ def build():
     return '\n\n'.join(parts) + '\n'
 
 
+# ── THE PRODUCTION DRY RUN MUST NOT LOCK A LIVE OBJECT ──────────────────────────────────────────
+# 2026-09-24, measured: a dry run that applied this DDL to the LIVE schema inside a transaction it
+# rolled back still held ACCESS EXCLUSIVE on public.dc_entity_geography (ALTER TABLE ADD COLUMN)
+# until the rollback -- ~7 minutes -- and one resident map1_dc_zip_members call returned 500 on it.
+# "Rolled back" is not "harmless": DDL locks live until the transaction ends. So the dry run builds
+# the WHOLE changed chain in a private scratch schema that exists only inside its own transaction:
+#   * every object this apply CREATES, and every live table it ALTERS or its resolvers WRITE, is
+#     re-pointed to the scratch schema (the writable tables are copied in first, read-only);
+#   * everything else (the evidence plane, unchanged functions) is only READ from public.
+# The set is DERIVED from the apply body, never listed by hand, and assert_no_live_target()
+# refuses the output if any DDL or DML statement still targets public.
+def dryrun_names(body):
+    created = set(re.findall(r'create (?:or replace )?(?:function|view|table(?: if not exists)?) public\.([a-z0-9_]+)', body))
+    written = set(re.findall(r'(?:alter table|insert into|update|delete from) public\.([a-z0-9_]+)', body))
+    return created, written - created
+
+
+def dryrun_rewrite(sql, schema, names):
+    return re.sub(r'\bpublic\.(' + '|'.join(sorted(names, key=len, reverse=True)) + r')\b',
+                  schema + r'.\1', sql)
+
+
+TARGET = re.compile(r'^(?:create (?:or replace )?(?:function|view|table(?: if not exists)?)|alter table|insert into|update|'
+                    r'delete from|truncate(?: table)?|drop (?:table|view|function|trigger [a-z0-9_]+ on|trigger if exists [a-z0-9_]+ on)(?: if exists)?|'
+                    r'comment on (?:table|view|function)|revoke all on(?: function)?|grant [a-z, ]+ on(?: function)?|'
+                    r'create (?:unique )?index(?: if not exists)? [a-z0-9_]+ on|create trigger [a-z0-9_]+ [a-z ]+? on)\s+([a-z0-9_]+)\.', re.I)
+
+
+def assert_no_live_target(sql):
+    bad = []
+    for s in split(sql):
+        c = ' '.join(code(s).split()).lower()
+        m = TARGET.match(c)
+        if m and m.group(1) == 'public':
+            bad.append(c[:120])
+        elif re.match(r'^(create|alter|drop|insert|update|delete|truncate|comment|revoke|grant)\b', c) and not m \
+                and not c.startswith(('create schema', 'create temp', 'create temporary')):
+            bad.append('UNRECOGNISED ' + c[:110])
+    if bad:
+        raise SystemExit('REFUSED: the dry run would change a live object:\n  ' + '\n  '.join(bad))
+
+
+def dryrun_body(schema):
+    body = build().replace('\nbegin;\n', '\n', 1).rstrip()
+    assert body.endswith('commit;')
+    body = body[:-len('commit;')]
+    created, written = dryrun_names(body)
+    prelude = ['create schema %s;' % schema]
+    for tbl in sorted(written):
+        prelude.append('create table %s.%s (like public.%s including all);' % (schema, tbl, tbl))
+        prelude.append('insert into %s.%s select * from public.%s;' % (schema, tbl, tbl))
+    out = '\n'.join(prelude) + '\n\n' + dryrun_rewrite(body, schema, created | written)
+    # the prelude's own reads of public are "from public.x", never a target: check the rewritten body
+    assert_no_live_target(dryrun_rewrite(body, schema, created | written))
+    return out, created | written
+
+
 if __name__ == '__main__':
+    # --dryrun-body SCHEMA: the apply, re-pointed to a scratch schema (see above)
+    # --dryrun-rewrite SCHEMA FILE: another SQL file re-pointed the same way (load SQL, report)
+    if sys.argv[1:2] == ['--self-test']:
+        # the live-target refusal must refuse, or a green dry run proves nothing
+        for bad in ('alter table public.dc_entity_geography add column x int;',
+                    'create or replace view public.dc_x as select 1;',
+                    'insert into public.dc_identity_decision select 1;',
+                    'create trigger t before update on public.dc_address_geocode for each row execute function f();',
+                    'drop table public.dc_x;'):
+            try:
+                assert_no_live_target(bad)
+            except SystemExit:
+                continue
+            raise SystemExit('SELF-TEST FAIL: not refused: ' + bad)
+        assert_no_live_target('alter table dcdry.dc_entity_geography add column x int;\n'
+                              'insert into dcdry.dc_identity_decision select * from public.dc_identity_decision;')
+        print('SELF-TEST PASS: 5 live-object statements refused, scratch-schema statements accepted')
+        sys.exit(0)
+    if sys.argv[1:2] == ['--dryrun-body']:
+        sys.stdout.write(dryrun_body(sys.argv[2])[0] + '\n')
+        sys.exit(0)
+    if sys.argv[1:2] == ['--dryrun-rewrite']:
+        _, names = dryrun_body(sys.argv[2])
+        out = dryrun_rewrite((ROOT / sys.argv[3]).read_text(), sys.argv[2], names)
+        assert_no_live_target(out)
+        sys.stdout.write(out)
+        sys.exit(0)
     # --extract FILE PREFIX...: print the shipped statements of FILE whose text starts with a PREFIX,
     # so another suite can load one object from the DDL of record without keeping a copy of it.
     if sys.argv[1:2] == ['--extract']:

@@ -132,5 +132,17 @@ ok(APPLY.indexOf('DRIFT: live definition') > 0 && APPLY.indexOf('DRIFT: live def
    && !/create or replace view public\.dc_current_observation/.test(APPLY),
   'S6b: the apply opens with the drift guard and never re-creates dc_current_observation');
 
+// ── the production dry run locks nothing live (2026-09-24: a first version held ACCESS EXCLUSIVE on
+//    public.dc_entity_geography for ~7 minutes and one resident map1 call returned 500) ────────────
+const selfTest = spawnSync('python3', [join(ROOT, 'test/dc_epoch_geography_pg/build_apply.py'), '--self-test'], { encoding: 'utf8' });
+ok(selfTest.status === 0, 'S7: the dry run\'s live-target refusal refuses every live-object statement class', (selfTest.stdout + selfTest.stderr).trim());
+const dry = spawnSync('python3', [join(ROOT, 'test/dc_epoch_geography_pg/build_apply.py'), '--dryrun-body', 'dcdry'], { encoding: 'utf8' });
+ok(dry.status === 0 && /^create schema dcdry;/.test(dry.stdout) && /create or replace function dcdry\.map1_dc_zip_members\(/.test(dry.stdout)
+   && !/create or replace (function|view) public\.|alter table public\./.test(dry.stdout),
+  'S7b: the dry run builds the whole changed chain in its scratch schema and changes no live object', dry.stderr.trim());
+const wf = read('.github/workflows/dc-epoch-dryrun.yml');
+ok(/--dryrun-body dcdry/.test(wf) && !/apply-body\.sql/.test(wf) && (wf.match(/\brollback;/g) || []).length === 2 && !/\bcommit;/.test(wf),
+  'S7c: the dry-run workflow runs only the scratch-schema SQL, and only inside transactions it rolls back');
+
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);
