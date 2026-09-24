@@ -105,6 +105,9 @@ def build():
         'create or replace view public.dc_entity_geography_evidence',
         'revoke all on public.dc_entity_geography_evidence',
         'comment on view public.dc_entity_geography_evidence',
+        'create or replace function public.dc_site_claims_conflict(',
+        'revoke all on function public.dc_site_claims_conflict(',
+        'comment on function public.dc_site_claims_conflict(',
         'create or replace function public.dc_resolve_geography(',
         'comment on function public.dc_resolve_geography(',
     ])

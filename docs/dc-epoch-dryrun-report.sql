@@ -260,6 +260,38 @@ select 'GX4 ATLAS-SHAPED PUBLISHER POINTS prec=' || coalesce(prec, '(null)') || 
   from _gx where evidence_class <> 'DERIVED_ADDRESS' group by 1
 order by 1;
 
+-- the canonical geography authority's own outcomes, and the shortcuts that must not exist
+select m, null::text, v from (values
+  ('GX5 CONSISTENT_OBSERVATIONS (multi-claim entities whose claims agree within the evidence)',
+     (select count(distinct p.canonical_entity_id) from _gpair p join public.dc_entity_geography g using (canonical_entity_id)
+       where not g.quality_flags @> array['SOURCES_DISAGREE'])::text),
+  ('GX6 LOWER_AUTHORITY_DISAGREEMENTS (a derived point beyond its calibrated bound: fail closed)',
+     (select count(*) from public.dc_entity_geography g join public.dc_canonical_entity e using (canonical_entity_id)
+       where e.superseded_by is null and g.quality_flags @> array['DERIVED_ADDRESS_BEYOND_UNCERTAINTY'])::text),
+  ('GX7 PEER_AUTHORITY_CONFLICTS (two publisher site claims beyond the peer tolerance: fail closed)',
+     (select count(*) from public.dc_entity_geography g join public.dc_canonical_entity e using (canonical_entity_id)
+       where e.superseded_by is null and g.quality_flags @> array['SITE_CLAIMS_CONFLICT'])::text),
+  ('GX8 SOURCES_DISAGREE (live entities)',
+     (select count(*) from public.dc_entity_geography g join public.dc_canonical_entity e using (canonical_entity_id)
+       where e.superseded_by is null and g.rule_key = 'SOURCES_DISAGREE')::text),
+  ('GX9 GEOGRAPHY_UNRESOLVED (live entities)',
+     (select count(*) from public.dc_entity_geography g join public.dc_canonical_entity e using (canonical_entity_id)
+       where e.superseded_by is null and g.geography_status = 'GEOGRAPHY_UNRESOLVED')::text),
+  ('GX10 MANUAL_GEOGRAPHY_DECISIONS (review / override objects on the geography path; must be 0)',
+     (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relname ~ '^dc_.*(review|override|manual)')::text),
+  ('GX11 SOURCE_NAME_AUTHORITY_RULES (a source name on the authority path; must be 0)',
+     (select count(*) from (
+        select pg_get_viewdef('public.dc_entity_geography_evidence'::regclass) t
+        union all select p.prosrc from pg_proc p where p.pronamespace = 'public'::regnamespace
+           and p.proname in ('dc_site_claims_conflict', 'dc_resolve_geography')) x
+       where t ~ $re$'compute_atlas'|'epoch_ai'|source_key\s*(=|<>)\s*'$re$)::text),
+  ('GX12 RADIUS_MEMBERSHIP_USED (a published row outside its page polygon; must be 0)',
+     (select count(*) from _after a join geo.zcta_boundary z on z.zcta5 = a.zip
+       where a.publication_basis = 'canonical'
+         and not ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(a.lng, a.lat), 4269)))::text)
+) v(m, v) order by 1;
+
 -- every multi-observation entity, in full (each observation, each pair, the current decision)
 \echo ----- BEGIN GEOGRAPHY MATRIX -----
 select json_build_object(

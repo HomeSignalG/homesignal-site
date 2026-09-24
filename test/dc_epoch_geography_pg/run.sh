@@ -32,7 +32,7 @@ apply_chain
 out="$(suite "$root/$LOAD")"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out" || true); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 35 ] || [ "$n_fail" -ne 0 ]; then
+if [ "$n_all" -lt 38 ] || [ "$n_fail" -ne 0 ]; then
   cat "$tmp/suite_err" >&2; echo "FAIL — the shipped Epoch geography path does not pass"; exit 1
 fi
 
@@ -48,7 +48,7 @@ create temp table _geo_before as select * from public.dc_entity_geography;
 rollback;
 SQL
 )" || { echo "$report" | tail -5; echo "FAIL — the dry-run report does not run"; exit 1; }
-bad=$(grep -E '^(I06|I07|I08|I09|G07|G08|G09|L5|N08|N09) ' <<<"$report" | awk -F'|' '$3 != "0"' || true)
+bad=$(grep -E '^(I06|I07|I08|I09|G07|G08|G09|L5|N08|N09|GX10|GX11|GX12) ' <<<"$report" | awk -F'|' '$3 != "0"' || true)
 if ! grep -q '^R6 RECONCILES (R1..R5 = I01)||true$' <<<"$report" || [ -n "$bad" ]; then
   echo "$report" | grep -E '^[A-Z][0-9]'; echo "FAIL — the dry-run report does not reconcile or a required zero is not zero: $bad"; exit 1
 fi
@@ -67,10 +67,10 @@ while read -r name rel; do
   out="$(suite "$loadsql")"
   n_all=$(grep -c '|' <<<"$out" || true); n_fail=$(fails_of "$out")
   # a suite that dies part-way reports fewer checks: that is a kill only because a check is missing
-  if [ "$n_all" -lt 35 ]; then n_fail=$((n_fail + 35 - n_all)); fi
+  if [ "$n_all" -lt 38 ]; then n_fail=$((n_fail + 38 - n_all)); fi
   if [ "$n_fail" -gt 0 ]; then
     echo "KILLED   $name — $n_fail check(s) failed:"; { grep '|f|' <<<"$out" || true; } | cut -d'|' -f1 | sed 's/^/    /' | head -4
-    if [ "$n_all" -lt 35 ]; then echo "    (suite stopped after $n_all checks: $(grep -m1 ERROR "$tmp/suite_err" | cut -c1-160))"; fi
+    if [ "$n_all" -lt 38 ]; then echo "    (suite stopped after $n_all checks: $(grep -m1 ERROR "$tmp/suite_err" | cut -c1-160))"; fi
   else
     echo "SURVIVED $name — the suite cannot see this regression"; status=1
   fi

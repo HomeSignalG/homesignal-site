@@ -144,13 +144,26 @@ const wf = read('.github/workflows/dc-epoch-dryrun.yml');
 const rep = read('scripts/dc-epoch-replica-dryrun.sh');
 const prodUses = rep.split('\n').filter((l) => /\$PROD_DB_URL|\$\{PROD_DB_URL/.test(l) && !/^\s*#/.test(l) && !/:\s*"\$\{PROD_DB_URL:\?\}"/.test(l));
 ok(/bash scripts\/dc-epoch-replica-dryrun\.sh/.test(wf) && /bash test\/dc_epoch_geography_pg\/replica_offline\.sh/.test(wf)
-   && !/--dryrun-body|\bbegin;|\brollback;|\bcommit;|\\i /.test(wf) && /services:\s*\n\s*postgis:/.test(wf),
+   && !/--dryrun-body|\bbegin;|\brollback;|\bcommit;|\\i /.test(wf) && /services:\s*\n(\s*#.*\n)*\s*postgis:/.test(wf),
   'S7c: the dry-run workflow runs no SQL of its own against production: every change is in a disposable PostGIS service');
 ok(prodUses.length === 1 && /psql "\$PROD_DB_URL"/.test(prodUses[0])
    && /default_transaction_read_only=on/.test(rep) && /lock_timeout=2s/.test(rep)
    && /\\\\copy \(\$q\) to/.test(rep),
   'S7d: production is reached from exactly ONE line -- prod_select -- as a READ ONLY, short-lock-timeout COPY of a SELECT',
   prodUses.join(' / '));
+
+
+// The replica runs PRODUCTION'S geometry engine, and says so or refuses (2026-09-24: a PostGIS 3.5
+// replica was used to predict a 3.3.7 production).
+ok(/image: supabase\/postgres:17\.6\.1\.127/.test(wf)
+   && /cmp -s "\$w\/prod_engine\.csv" "\$w\/rep_engine\.csv"/.test(rep) && /REFUSED: the replica's geometry engine is not production's/.test(rep)
+   && /postgis_full_version\(\)/.test(rep),
+  'S7e: the replica is production\'s own database image, and the run refuses unless postgis_full_version() matches production byte for byte');
+// The negative-control seam reaches ONLY the local replica, and nothing in CI sets it.
+const seam = rep.split('\n').filter((l) => /DRYRUN_TEST_TAMPER_REPLICA_SQL/.test(l) && !/^\s*#/.test(l));
+ok(seam.length === 2 && seam.every((l) => !/PROD_DB_URL|prod_select/.test(l)) && seam.some((l) => /L -d "\$REP"/.test(l))
+   && !/DRYRUN_TEST_TAMPER_REPLICA_SQL/.test(wf) && /REPLICA_PARITY_NEGATIVE_CONTROL PASS/.test(read('test/dc_epoch_geography_pg/replica_offline.sh')),
+  'S7f: the parity negative control tampers with the REPLICA only, is exercised offline, and is never set by the workflow', seam.join(' / '));
 
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);

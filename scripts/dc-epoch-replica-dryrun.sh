@@ -69,6 +69,8 @@ prod_select "select proname, md5(prosrc) from pg_proc where pronamespace = 'publ
 expect_fns "$w/prod_fns.csv"
 prod_select "select (to_regclass('public.dc_address_geocode') is null)::text, (to_regnamespace('dcdry') is null)::text" "$w/prod_pre.csv"
 [ "$(cat "$w/prod_pre.csv")" = "true,true" ] || { echo "REFUSED: production is not in the pre-apply state: $(cat "$w/prod_pre.csv")"; exit 1; }
+ENGINE_Q="select current_setting('server_version'), postgis_full_version()"
+prod_select "$ENGINE_Q" "$w/prod_engine.csv"
 
 echo "== 2. local pre-apply replica from main@$MAIN_SHA"
 dropdb --if-exists "$REP"; createdb "$REP"
@@ -79,6 +81,14 @@ for f in docs/dc-step3a-canonical-identity.sql docs/dc-step3b-canonical-geograph
   git -C "$root" show "$MAIN_SHA:$f" > "$w/chain.sql"; L -d "$REP" -f "$w/chain.sql" >/dev/null
 done
 L -d "$REP" -c "create table if not exists public.canonical_zip_registry (zip text primary key)"
+# the replica must run production's geometry engine, byte for byte, or its answer is not
+# production's answer: same Postgres version, same PostGIS / GEOS / PROJ build string
+L -d "$REP" -c "\\copy ($ENGINE_Q) to '$w/rep_engine.csv' with (format csv)"
+if ! cmp -s "$w/prod_engine.csv" "$w/rep_engine.csv"; then
+  echo "  production: $(cat "$w/prod_engine.csv")"; echo "  replica:    $(cat "$w/rep_engine.csv")"
+  echo "REFUSED: the replica's geometry engine is not production's"; exit 1
+fi
+echo "  PRODUCTION_POSTGIS_VERSION_PARITY PASS: $(cat "$w/rep_engine.csv")"
 L -d "$REP" -c "\\copy (select proname, md5(prosrc) from pg_proc where pronamespace = 'public'::regnamespace and proname in ($FNS) order by proname) to '$w/rep_fns.csv' with (format csv)"
 expect_fns "$w/rep_fns.csv"
 
@@ -97,6 +107,68 @@ for t in $TABLES; do
   n="$(L -d "$REP" -tA -c "select count(*) from public.$t")"
   [ "$n" = "$(wc -l < "$w/$t.csv" | tr -d ' ')" ] || { echo "REFUSED: $t loaded $n rows"; exit 1; }
 done
+
+echo "== 3b. SCHEMA: every object the chain reads or writes is production's"
+# One catalog signature, run on both sides. Tables the resolvers WRITE: every column (type, null,
+# default, generated), constraint, trigger and index. Every dc_% view and function, the Map 1 reader
+# and the geo.* membership functions: their definition text (md5). The evidence tables the chain
+# only READS are built from test fixtures with the columns the chain names; each such column must
+# exist in production with the same type (the copy above proves it), and the columns production has
+# beyond them are listed -- the chain cannot read a column the replica lacks without erroring.
+WRITTEN="'dc_canonical_entity','dc_entity_observation','dc_identity_decision','dc_entity_geography'"
+SIG="select k, n, d from (
+  select 'table' k, c.relname n, a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || case when a.attnotnull then ' not null' else '' end || coalesce(' default ' || pg_get_expr(ad.adbin, ad.adrelid), '') || case when a.attgenerated <> '' then ' generated' else '' end d
+    from pg_class c join pg_namespace s on s.oid = c.relnamespace join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+    left join pg_attrdef ad on ad.adrelid = c.oid and ad.adnum = a.attnum
+   where s.nspname = 'public' and c.relname in ($WRITTEN)
+  union all select 'constraint', t.relname, o.conname || ' ' || pg_get_constraintdef(o.oid)
+    from pg_constraint o join pg_class t on t.oid = o.conrelid join pg_namespace s on s.oid = t.relnamespace
+   where s.nspname = 'public' and t.relname in ($WRITTEN)
+  union all select 'trigger', t.relname, pg_get_triggerdef(g.oid)
+    from pg_trigger g join pg_class t on t.oid = g.tgrelid join pg_namespace s on s.oid = t.relnamespace
+   where not g.tgisinternal and s.nspname = 'public' and t.relname in ($WRITTEN)
+  union all select 'index', t.relname, pg_get_indexdef(i.indexrelid)
+    from pg_index i join pg_class t on t.oid = i.indrelid join pg_namespace s on s.oid = t.relnamespace
+   where s.nspname = 'public' and t.relname in ($WRITTEN)
+  union all select 'view', c.relname, md5(pg_get_viewdef(c.oid))
+    from pg_class c join pg_namespace s on s.oid = c.relnamespace
+   where s.nspname = 'public' and c.relkind = 'v' and c.relname like 'dc\\_%'
+  union all select 'function', s.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', md5(p.prosrc)
+    from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+   where (s.nspname = 'public' and (p.proname like 'dc\\_%' or p.proname = 'map1_dc_zip_members'))
+      or (s.nspname = 'geo' and p.proname like 'zip\\_%')
+  union all select 'readcol', c.relname, a.attname || ' ' || format_type(a.atttypid, a.atttypmod)
+    from pg_class c join pg_namespace s on s.oid = c.relnamespace join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+   where s.nspname = 'public' and c.relname in ('dc_source','dc_acquisition_run','dc_source_observation','national_dc_records','canonical_zip_registry')
+) x"
+prod_select "$SIG" "$w/prod_sig.csv"
+L -d "$REP" -c "\\copy ($(tr '\n' ' ' <<<"$SIG")) to '$w/rep_sig.csv' with (format csv)"
+python3 - "$w/prod_sig.csv" "$w/rep_sig.csv" <<'PY2'
+import csv, sys
+prod = set(map(tuple, csv.reader(open(sys.argv[1])))); rep = set(map(tuple, csv.reader(open(sys.argv[2]))))
+bad = []
+# chain objects: every replica row must be in production, and every production row for an object
+# the replica has must be in the replica (a trigger or column production has and the replica lacks
+# could change what the resolvers write)
+for kind in ('table', 'constraint', 'trigger', 'index', 'view', 'function'):
+    rp = {r for r in rep if r[0] == kind}; pp = {r for r in prod if r[0] == kind}
+    names = {r[1] for r in rp} if kind in ('view', 'function') else {r[1] for r in rp} | {r[1] for r in pp}
+    for r in sorted(rp - pp): bad.append('replica-only ' + ' | '.join(r))
+    for r in sorted(pp - rp):
+        if r[1] in names: bad.append('production-only ' + ' | '.join(r))
+extra_views = sorted({r[1] for r in prod if r[0] in ('view', 'function')} - {r[1] for r in rep if r[0] in ('view', 'function')})
+# read-only evidence tables: every replica column exists in production with the same type
+rcols = {r for r in rep if r[0] == 'readcol'}; pcols = {r for r in prod if r[0] == 'readcol'}
+for r in sorted(rcols - pcols): bad.append('replica column absent or retyped in production ' + ' | '.join(r))
+beyond = sorted(pcols - rcols)
+n = sum(1 for r in rep if r[0] != 'readcol')
+if bad:
+    print('\n'.join('  ' + b for b in bad)); sys.exit('REFUSED: the replica schema is not production\'s for the objects the chain uses')
+print(f'  REPLICA_SCHEMA_PARITY PASS: {n} signature rows equal on both sides '
+      f'(written tables, every dc_% view and function, the Map 1 reader, geo.zip_* functions)')
+print(f'  production columns on read-only evidence tables the chain never names: {len(beyond)}')
+print(f'  production dc_% views/functions the chain does not use (not in the replica): {len(extra_views)} {extra_views}')
+PY2
 
 echo "== 4. queue (the apply on a throwaway copy of the replica)"
 dropdb --if-exists dcq; createdb -T "$REP" dcq
@@ -129,6 +201,13 @@ prod_select "select z.zcta5, z.geom from geo.zcta_boundary z where z.zcta5 in (
 L -d "$REP" -c "\\copy geo.zcta_boundary (zcta5, geom) from '$w/zcta.csv' with (format csv)"
 echo "  ZCTA polygons copied: $(wc -l < "$w/zcta.csv")"
 
+# TEST SEAM (offline harness only; the workflow never sets it): SQL run on the LOCAL REPLICA -- never
+# on production -- so the parity refusal below can be shown refusing a replica that differs.
+if [ -n "${DRYRUN_TEST_TAMPER_REPLICA_SQL:-}" ]; then
+  echo "  (test) tampering with the replica only"
+  L -d "$REP" -c "$DRYRUN_TEST_TAMPER_REPLICA_SQL" >/dev/null
+fi
+
 echo "== 7. PARITY: the replica's Map 1 output must equal production's"
 Q="select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m"
 prod_select "$Q" "$w/before_prod.csv"
@@ -139,7 +218,9 @@ a="$(md5_sorted "$w/before_prod.csv")"; b="$(md5_sorted "$w/before_rep.csv")"
 echo "  production $(wc -l < "$w/before_prod.csv") rows md5 $a"
 echo "  replica    $(wc -l < "$w/before_rep.csv") rows md5 $b"
 if [ "$a" != "$b" ]; then
-  diff <(LC_ALL=C sort "$w/before_prod.csv") <(LC_ALL=C sort "$w/before_rep.csv") | head -20
+  # diff exits 1 on a difference; under set -e + pipefail that would end the script here, silently,
+  # before the refusal is stated (found by the negative control)
+  { diff <(LC_ALL=C sort "$w/before_prod.csv") <(LC_ALL=C sort "$w/before_rep.csv") || true; } | head -20
   echo "REFUSED: the replica does not reproduce production's Map 1 output"; exit 1
 fi
 
@@ -156,7 +237,7 @@ create temp table _geo_before as select * from public.dryrun_geo_before;
 \\i $root/docs/dc-epoch-dryrun-report.sql
 SQL
 
-bad=$(grep -E '^(I06|I07|I08|I09|G07|G08|G09|L5|N08|N09) ' "$w/report.txt" | awk -F'|' '$3 != "0"' || true)
+bad=$(grep -E '^(I06|I07|I08|I09|G07|G08|G09|L5|N08|N09|GX10|GX11|GX12) ' "$w/report.txt" | awk -F'|' '$3 != "0"' || true)
 grep -q '^R6 RECONCILES (R1..R5 = I01)||true$' "$w/report.txt" || { echo "FAIL: the corpus does not reconcile"; exit 1; }
 [ -z "$bad" ] || { echo "FAIL: a required-zero receipt is not zero: $bad"; exit 1; }
 echo "DRY RUN COMPLETE: corpus reconciles, every required-zero receipt is 0. Production was only read."

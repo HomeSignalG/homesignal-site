@@ -25,7 +25,11 @@ insert into geo.zcta_boundary (zcta5, geom) values
  ('99913', ST_Multi(ST_GeomFromText('POLYGON((-97.6 40,-97.3 40,-97.3 40.3,-97.6 40.3,-97.6 40))', 4269))),
  ('99914', ST_Multi(ST_GeomFromText('POLYGON((-90.2 35,-89.9 35,-89.9 35.3,-90.2 35.3,-90.2 35))', 4269))),
  ('99915', ST_Multi(ST_GeomFromText('POLYGON((-95.9 41,-95.6 41,-95.6 41.3,-95.9 41.3,-95.9 41))', 4269))),
- ('99916', ST_Multi(ST_GeomFromText('POLYGON((-96.3 41,-96.0 41,-96.0 41.3,-96.3 41.3,-96.3 41))', 4269)));
+ ('99916', ST_Multi(ST_GeomFromText('POLYGON((-96.3 41,-96.0 41,-96.0 41.3,-96.3 41.3,-96.3 41))', 4269))),
+ -- 99918 / 99919 share an edge (-104.0), far from every other fixture (no identity recall net
+ -- reaches them): the canonical geography authority fixtures, observed in isolation
+ ('99918', ST_Multi(ST_GeomFromText('POLYGON((-104.3 44,-104.0 44,-104.0 44.3,-104.3 44.3,-104.3 44))', 4269))),
+ ('99919', ST_Multi(ST_GeomFromText('POLYGON((-104.0 44,-103.7 44,-103.7 44.3,-104.0 44.3,-104.0 44))', 4269)));
 delete from public.national_dc_records;
 
 -- ── runs ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +108,20 @@ select pg_temp.atlas('Grid Station', 'grid-station', 40.6012, -97.1012,
 select pg_temp.atlas('Postal Park', 'postal-park', 40.7012, -97.2012,
     'Coordinates are the building footprint centroid.', 'Postal Op', 'Postville', 'KS', '12 Postal Road', '66010');
 
+-- ── CANONICAL GEOGRAPHY AUTHORITY (rule_version 4): a publisher SITE point + another source's
+-- DERIVED address point of the SAME facility (both records state the same street address)
+-- [A/H] the derived point 1.5 km away: inside its calibrated 2 km bound -> it corroborates
+select pg_temp.atlas('Corroborated DC', 'corroborated-dc', 44.1012, -104.2012,
+    'Coordinates are the building footprint centroid.', 'Corrob Op', 'Corrob', 'KS', '41 Corrob Road');
+-- [G] the two points 1.5 km apart on either side of a ZCTA edge: the ZIPs do not vote
+select pg_temp.atlas('Border DC', 'border-dc', 44.1512, -104.0088,
+    'Coordinates are the building footprint centroid.', 'Border Op', 'Borderton', 'KS', '52 Border Road');
+-- [B, the Lancaster shape] a 4-decimal "exact" point 17 m from a ZCTA edge with no location note,
+-- whose OWN street address geocodes 4.4 km away in the next ZCTA; the geocoder's ZIP names the
+-- publisher point's polygon (so a provider-ZIP tie-break would wrongly settle it)
+select pg_temp.atlas('Far Address DC', 'far-address-dc', 44.0510, -104.0002,
+    null, 'Far Op', 'Farville', 'KS', '216 Far Address Road', null, 'planned');
+
 -- ── EPOCH run 0 (history once run 1 lands) ───────────────────────────────────────────
 select pg_temp.epoch('00000000-0000-0000-0000-00000000e000', 'CoreWeave Ellendale ND',
     '9685 87th Ave SE, Ellendale, ND 58436', 'CoreWeave');
@@ -149,6 +167,9 @@ select pg_temp.epoch(:E, 'Twin Park Building 2', '31 Park Rd, Parkville, KS 6600
 select pg_temp.epoch(:E, 'Gone Campus', '77 Gone Rd, Goneville, KS 66006', 'Gone Op');
 select pg_temp.epoch(:E, 'Late Campus', '600 Late Rd, Latetown, KS 66003', 'Late Op');
 select pg_temp.epoch(:E, 'Solo Campus', '100 Prairie Rd, Testville, KS 66001', 'Solo');
+select pg_temp.epoch(:E, 'Corroborated Epoch', '41 Corrob Rd, Corrob, KS 66020', 'Corrob Tenant');
+select pg_temp.epoch(:E, 'Border Epoch', '52 Border Rd, Borderton, KS 66021', 'Border Tenant');
+select pg_temp.epoch(:E, 'Far Address Epoch', '216 Far Address Rd, Farville, KS 66022', 'Far Tenant');
 select pg_temp.epoch(:E, 'Grid Campus', '88 Grid Rd, Gridville, KS 66012', 'Grid Tenant');
 select pg_temp.epoch(:E, 'Postal Park Epoch', '12 Postal Rd, Postville, KS 66011', 'Postal Op');
 select pg_temp.epoch(:E, 'Uncited Campus', '800 Quiet Rd, Quietville, ND 58400', 'Quiet', 'United States', false);
@@ -199,6 +220,9 @@ insert into _dcg_in select jsonb_build_object('geocoder_query', q, 'canonical_ad
  ('5 State Rd, Testville, KS 66001', 'census_onelineaddress', 'range_interpolated', 40.17, -97.54, '5 STATE RD, TESTVILLE, MO, 66001', 1),
  ('9 Twin Rd, Testville, KS 66001', 'census_onelineaddress', 'range_interpolated', 40.08, -97.58, '9 TWIN RD, TESTVILLE, KS, 99913', 1),
  ('10 Twin Rd, Testville, KS 66001', 'census_onelineaddress', 'range_interpolated', 40.09, -97.40, '10 TWIN RD, TESTVILLE, KS, 99913', 1),
+ ('41 Corrob Rd, Corrob, KS 66020', 'census_onelineaddress', 'range_interpolated', 44.1147, -104.2012, '41 CORROB RD, CORROB, KS, 66020', 1),
+ ('52 Border Rd, Borderton, KS 66021', 'census_onelineaddress', 'range_interpolated', 44.1512, -103.9912, '52 BORDER RD, BORDERTON, KS, 66021', 1),
+ ('216 Far Address Rd, Farville, KS 66022', 'census_onelineaddress', 'range_interpolated', 44.0615, -103.9500, '216 FAR ADDRESS RD, FARVILLE, KS, 99918', 1),
  -- a query nobody queued: the load must refuse it
  ('999 Not Queued Rd, Nowhere, KS 66001', 'census_onelineaddress', 'range_interpolated', 40.11, -97.44, '999 NOT QUEUED RD, NOWHERE, KS, 66001', 1)
 ) v(q, p, mt, la, ln, ma, c);
@@ -265,15 +289,15 @@ insert into _r select nextval('_r_n_seq'), 'E01 input quality is decided before 
   from unnest(array['Blank Address','City Only','Zip Only','Road Only','No Locality','Number Range',
                     'Offshore','Meta Hyperion','Solo Campus']) n;
 
-insert into _r select nextval('_r_n_seq'), 'E02 the queue held exactly the 23 distinct geocodable queries (and nothing ineligible)',
-       (select count(*) from _queue_before) = 23
+insert into _r select nextval('_r_n_seq'), 'E02 the queue held exactly the 26 distinct geocodable queries (and nothing ineligible)',
+       (select count(*) from _queue_before) = 26
    and not exists (select 1 from _queue_before where geocoder_query in ('13360 Miller Rd NW', '82007', ''))
    and exists (select 1 from _queue_before where geocoder_query = '100 Prairie Rd, Testville, KS 66001'),
        (select count(*)::text from _queue_before);
 
 insert into _r select nextval('_r_n_seq'), 'E03 the load SQL refuses a query the database did not queue',
        not exists (select 1 from public.dc_address_geocode where geocoder_query like '999 Not Queued%')
-   and (select count(*) from public.dc_address_geocode) = 21,
+   and (select count(*) from public.dc_address_geocode) = 24,
        (select count(*)::text from public.dc_address_geocode);
 
 insert into _r select nextval('_r_n_seq'), 'E04 no derived coordinate was written into publisher evidence',
@@ -315,7 +339,7 @@ insert into _r select nextval('_r_n_seq'), 'E09 Epoch-only accepted point, no ca
        pg_temp.idstate('Solo Campus') = 'AUTO_CONFIRMED_DISTINCT'
    and g.geography_status = 'RESOLVED' and g.rule_key = 'DERIVED_ADDRESS_POINT' and g.lat = 40.05
    and g.lng = -97.55 and g.positional_uncertainty_m = 2000 and g.publisher_precision is null
-   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 3,
+   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 4,
        pg_temp.idstate('Solo Campus') || ' ' || g.geography_status || '/' || g.rule_key || ' ' || g.lat || ',' || g.lng
   from pg_temp.geo('Solo Campus') g;
 
@@ -496,14 +520,14 @@ insert into _r select nextval('_r_n_seq'), 'E30 idempotent: second identity run 
        || ' ' || (select string_agg(metric || '=' || value, ' ') from _g2 where metric = 'ROWS_WRITTEN');
 
 -- ── THE WHOLE OUTCOME, EXACTLY ───────────────────────────────────────────────────────
-insert into _r select nextval('_r_n_seq'), 'E31 exactly the five expected cross-source entities exist -- every one by AUTO_EXACT_SITE_ADDRESS',
+insert into _r select nextval('_r_n_seq'), 'E31 exactly the eight expected cross-source entities exist -- every one by AUTO_EXACT_SITE_ADDRESS',
        (select string_agg(nm, ';' order by nm) from (
           select distinct o.source_native_name nm from public.dc_canonical_entity e
             join public.dc_entity_observation eo using (canonical_entity_id)
             join public.dc_current_observation o using (home_signal_observation_id)
            where e.superseded_by is null and o.source_key = 'compute_atlas'
              and exists (select 1 from public.dc_entity_observation x where x.canonical_entity_id = e.canonical_entity_id and x.source_key = 'epoch_ai')) s)
-       = 'Applied Digital Polaris Forge 1;Gone Campus;Late DC;Pine Hollow DC;Site Point Campus'
+       = 'Applied Digital Polaris Forge 1;Border DC;Corroborated DC;Far Address DC;Gone Campus;Late DC;Pine Hollow DC;Site Point Campus'
    and not exists (select 1 from public.dc_identity_decision d
                     join public.dc_source_observation a on a.home_signal_observation_id = d.observation_a
                     join public.dc_source_observation b on b.home_signal_observation_id = d.observation_b
@@ -521,7 +545,42 @@ insert into _r select nextval('_r_n_seq'), 'E32 every canonical marker on every 
                     where g.geography_status <> 'RESOLVED' or g.geometry_type <> 'POINT')
    and (select count(*) from pg_temp.allpages()) = (select count(distinct canonical_entity_id) from pg_temp.allpages())
    and (select string_agg(zip || ':' || project_name || ':' || map_status, ';' order by zip, project_name) from pg_temp.allpages())
-       = '99911:Applied Digital Polaris Forge 1:Approved;99913:Hub Campus Hall A:Operating;99913:Hub Campus Hall B:Operating;99913:Late DC:Operating;99913:Solo Campus:Unknown;99914:Colossus 2 (Whitehaven):Operating;99914:Minihard:Operating;99915:Google Council Bluffs Data Center:Operating;99916:Pine Hollow DC:Operating;99916:Twin Park Building 1:Operating',
+       = '99911:Applied Digital Polaris Forge 1:Approved;99913:Hub Campus Hall A:Operating;99913:Hub Campus Hall B:Operating;99913:Late DC:Operating;99913:Solo Campus:Unknown;99914:Colossus 2 (Whitehaven):Operating;99914:Minihard:Operating;99915:Google Council Bluffs Data Center:Operating;99916:Pine Hollow DC:Operating;99916:Twin Park Building 1:Operating;99918:Border DC:Operating;99918:Corroborated DC:Operating',
        (select string_agg(zip || ':' || project_name || ':' || map_status, ';' order by zip, project_name) from pg_temp.allpages());
+
+-- ── CANONICAL GEOGRAPHY AUTHORITY (rule_version 4) ─────────────────────────────────────
+insert into _r select nextval('_r_n_seq'), 'E34 [A/H] a derived point inside its calibrated bound CORROBORATES the publisher site point: one entity, the site point, one marker',
+       pg_temp.ent('Corroborated Epoch') = pg_temp.ent('Corroborated DC', 'compute_atlas')
+   and (pg_temp.geo('Corroborated DC', 'compute_atlas')).geography_status = 'RESOLVED'
+   and (pg_temp.geo('Corroborated DC', 'compute_atlas')).rule_key = 'PUBLISHER_POINT'
+   and (pg_temp.geo('Corroborated DC', 'compute_atlas')).lat = 44.1012
+   and (pg_temp.geo('Corroborated DC', 'compute_atlas')).lng = -104.2012
+   and (pg_temp.geo('Corroborated DC', 'compute_atlas')).quality_flags @> array['CORROBORATED_BY_DERIVED_ADDRESS']
+   and not (pg_temp.geo('Corroborated DC', 'compute_atlas')).quality_flags @> array['SOURCES_DISAGREE']
+   and (select count(*) from pg_temp.allpages() where canonical_entity_id = pg_temp.ent('Corroborated DC', 'compute_atlas')) = 1
+   and (select string_agg(zip, ',') from pg_temp.allpages() where canonical_entity_id = pg_temp.ent('Corroborated DC', 'compute_atlas')) = '99918',
+       (select g.geography_status || ' ' || g.rule_key || ' ' || g.lat || ',' || g.lng || ' ' || g.quality_flags::text
+          from pg_temp.geo('Corroborated DC', 'compute_atlas') g);
+
+insert into _r select nextval('_r_n_seq'), 'E35 [G] the two claims sit in different ZCTAs: authority is decided first, the ZIP follows the canonical point (99918), and 99919 carries nothing',
+       (pg_temp.geo('Border DC', 'compute_atlas')).geography_status = 'RESOLVED'
+   and (pg_temp.geo('Border DC', 'compute_atlas')).lat = 44.1512 and (pg_temp.geo('Border DC', 'compute_atlas')).lng = -104.0088
+   and (select string_agg(zip, ',') from pg_temp.allpages() where canonical_entity_id = pg_temp.ent('Border DC', 'compute_atlas')) = '99918'
+   and not exists (select 1 from pg_temp.page('99919')),
+       (select g.geography_status || ' ' || g.rule_key || ' ' || g.quality_flags::text from pg_temp.geo('Border DC', 'compute_atlas') g)
+       || ' pages=' || coalesce((select string_agg(zip, ',') from pg_temp.allpages() where canonical_entity_id = pg_temp.ent('Border DC', 'compute_atlas')), '-');
+
+insert into _r select nextval('_r_n_seq'), 'E36 [B] a publisher point its OWN address places 4.4 km away (beyond the derived point''s calibrated bound) fails closed: SOURCES_DISAGREE, identity untouched, no marker, not even via the provider ZIP',
+       pg_temp.idstate('Far Address Epoch') = 'AUTO_CONFIRMED_MATCH'
+   and pg_temp.idstate('Far Address DC', 'compute_atlas') = 'AUTO_CONFIRMED_MATCH'
+   and pg_temp.ent('Far Address Epoch') = pg_temp.ent('Far Address DC', 'compute_atlas')
+   and (pg_temp.geo('Far Address DC', 'compute_atlas')).geography_status = 'GEOGRAPHY_UNRESOLVED'
+   and (pg_temp.geo('Far Address DC', 'compute_atlas')).rule_key = 'SOURCES_DISAGREE'
+   and (pg_temp.geo('Far Address DC', 'compute_atlas')).quality_flags @> array['DERIVED_ADDRESS_BEYOND_UNCERTAINTY']
+   and not (pg_temp.geo('Far Address DC', 'compute_atlas')).quality_flags @> array['SITE_CLAIMS_CONFLICT']
+   and (pg_temp.geo('Far Address DC', 'compute_atlas')).geom is null
+   and not exists (select 1 from pg_temp.allpages() where project_name in ('Far Address DC', 'Far Address Epoch')),
+       (select g.geography_status || ' ' || g.rule_key || ' ' || g.quality_flags::text from pg_temp.geo('Far Address DC', 'compute_atlas') g)
+       || ' id=' || coalesce(pg_temp.idstate('Far Address Epoch'), '?');
 
 select check_name, coalesce(pass, false), coalesce(detail, '') from _r order by n;

@@ -15,6 +15,9 @@ D3 = 'docs/dc-step3d-derived-location.sql'
 A3 = 'docs/dc-step3a-canonical-identity.sql'
 B3 = 'docs/dc-step3b-canonical-geography.sql'
 MAP = 'docs/map1-dc-publication.sql'
+PICK_CLASS = "              (evidence_class in ('PUBLISHER_NON_SITE', 'PUBLISHER_UNUSABLE')),\n"
+CONFLICT_CLASSES = "    select p_class_a in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')\n       and p_class_b in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')\n"
+DISAGREE_END = "b.evidence_class, b.uncertainty_m, b.lat, b.lng)) disagree,"
 LOAD = 'docs/dc-geocode-observations-load.sql'
 
 # the end of the automatic edge set in dc_resolve_canonical: weak-evidence mutations add edges here
@@ -42,7 +45,6 @@ UNKNOWN_TYPE = """    elsif p_match_type not in ('rooftop', 'parcel_centroid', '
 """
 ACCEPT_LIST = "    elsif p_match_type not in ('rooftop', 'parcel_centroid', 'range_interpolated') then"
 AREA_LIST = "    elsif p_match_type in ('zip_centroid', 'county_centroid') then"
-AREA_ONLY_SITE = "and a.basis <> 'NON_SITE_AREA' and b.basis <> 'NON_SITE_AREA'"
 RECORD_KEY_UNIQUE = """             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
                                              btrim(o.source_native_name)) = 1"""
 
@@ -129,14 +131,51 @@ MUTATIONS = {
     'G_unstable_identity_placed': (B3, [(
         "                when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'GEOGRAPHY_UNRESOLVED'\n", "", 1)]),
     'G_uncited_publishes': (MAP, [("       and o.cite is not null\n", "", 1)]),
+    # (re-anchored for rule_version 4: the class order, second key)
     'G_derived_overrides_site': (B3, [(
-        "(basis = 'NON_SITE_AREA'), (basis = 'DERIVED_ADDRESS'),",
-        "(basis = 'NON_SITE_AREA'), (basis <> 'DERIVED_ADDRESS'),", 1)]),
-    'G_derived_excluded_from_disagreement': (B3, [(
-        AREA_ONLY_SITE, AREA_ONLY_SITE + " and a.basis <> 'DERIVED_ADDRESS' and b.basis <> 'DERIVED_ADDRESS'", 1)]),
-    'G_area_points_disagree': (B3, [(AREA_ONLY_SITE, "and true", 1)]),
+        "              (evidence_class = 'DERIVED_ADDRESS'),\n              -- inside one class only",
+        "              (evidence_class <> 'DERIVED_ADDRESS'),\n              -- inside one class only", 1)]),
+    # (re-anchored for rule_version 4: the one contradiction definition)
+    'G_derived_excluded_from_disagreement': (B3, [(CONFLICT_CLASSES,
+        "    select p_class_a = 'PUBLISHER_SITE'\n       and p_class_b = 'PUBLISHER_SITE'\n", 1)]),
+    'G_area_points_disagree': (B3, [(CONFLICT_CLASSES, "    select true\n", 1)]),
     'G_shared_address_places': (B3, [(
         "                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'GEOGRAPHY_UNRESOLVED'\n", "", 1)]),
+    # ── CANONICAL GEOGRAPHY AUTHORITY (rule_version 4): each MUST fail a check ──
+    # G2 a publisher point always outranks a derived one, whatever the publisher says it is
+    'G2_publisher_always_wins': (B3, [(PICK_CLASS, "              (evidence_class = 'DERIVED_ADDRESS'),\n" + PICK_CLASS, 1)]),
+    # G4 a derived geocode always outranks the publisher's site point
+    'G4_derived_always_wins': (B3, [(PICK_CLASS, "              (evidence_class <> 'DERIVED_ADDRESS'),\n" + PICK_CLASS, 1)]),
+    # G6 a derived point is held to the 1 km peer tolerance, ignoring its calibrated error: any
+    # disagreement with it withholds the publisher's site point
+    'G6_any_derived_disagreement_withholds': (B3, [("else coalesce(p_uncertainty_a, 0) + coalesce(p_uncertainty_b, 0) end", "else 1000 end", 1)]),
+    # G8 two claims inside one ZCTA agree, however far apart
+    'G8_same_zip_means_agree': (B3, [(DISAGREE_END, "b.evidence_class, b.uncertainty_m, b.lat, b.lng)\n"
+        "                          and not exists (select 1 from geo.zcta_boundary z where ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(a.lng, a.lat), 4269))"
+        " and ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(b.lng, b.lat), 4269)))) disagree,", 1)]),
+    # G8b ... and two claims in different ZCTAs disagree, however close
+    'G8b_different_zip_means_disagree': (B3, [(DISAGREE_END, "b.evidence_class, b.uncertainty_m, b.lat, b.lng)\n"
+        "                          or (a.canonical_entity_id = e.canonical_entity_id and a.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')"
+        " and b.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS') and not exists (select 1 from geo.zcta_boundary z"
+        " where ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(a.lng, a.lat), 4269)) and ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(b.lng, b.lat), 4269))))) disagree,", 1)]),
+    # G9 the geocoder's own ZIP settles a contradiction when it names the publisher point's polygon
+    'G9_provider_zip_breaks_tie': (B3, [(DISAGREE_END, "b.evidence_class, b.uncertainty_m, b.lat, b.lng)\n"
+        "                          and not exists (select 1 from geo.zcta_boundary z where z.zcta5 = right(coalesce(a.basis_evidence->>'matched_address', b.basis_evidence->>'matched_address'), 5)"
+        " and (ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(a.lng, a.lat), 4269)) or ST_Covers(z.geom, ST_SetSRID(ST_MakePoint(b.lng, b.lat), 4269))))) disagree,", 1)]),
+    # G10 a contradiction is settled by the centroid (mean) of the claims, which is then published
+    'G10_centroid_breaks_tie': (B3, [
+        ("p.prec, p.lat,\n               p.lng,",
+         "p.prec, (select avg(x.lat) from _geo_pts x where x.canonical_entity_id = e.canonical_entity_id and x.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')) lat,\n"
+         "               (select avg(x.lng) from _geo_pts x where x.canonical_entity_id = e.canonical_entity_id and x.evidence_class in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')) lng,", 1),
+        ("when b.oid is null or b.disagree or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'", "when b.oid is null or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'", 1),
+        ("                when b.disagree then 'SOURCES_DISAGREE'\n", "", 1)]),
+    # G11 a contradiction is settled by publishing the authority point and letting its (nearest) ZIP decide
+    'G11_nearest_zip_breaks_tie': (B3, [
+        ("when b.oid is null or b.disagree or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'", "when b.oid is null or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'", 1),
+        ("                when b.disagree then 'SOURCES_DISAGREE'\n", "", 1)]),
+    # G12 the smaller uncertainty number wins, whatever kind of evidence carries it (a publisher
+    # point carries none, so it would always win -- even the publisher's own town centroid)
+    'G12_lower_uncertainty_wins': (B3, [(PICK_CLASS, "              coalesce(uncertainty_m, 0),\n" + PICK_CLASS, 1)]),
     'G_centroid_fallback': (B3, [(
         " where dp.verdict = 'ACCEPTED';",
         " where dp.verdict = 'ACCEPTED' or dp.match_type in ('zip_centroid', 'county_centroid');", 1)]),

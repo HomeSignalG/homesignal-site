@@ -75,6 +75,43 @@ with o as (
 , l as (insert into public.dc_entity_observation select o.home_signal_observation_id, e.id from o, _g_ent e where e.name = 'TWO OBS' returning home_signal_observation_id)
 insert into public.dc_current_flag select home_signal_observation_id from l;
 
+-- ── CANONICAL GEOGRAPHY AUTHORITY (rule_version 4): two PUBLISHER site claims of one entity ──────
+-- another observation of an existing entity, from any publisher feed (the class is decided by the
+-- evidence: no location-basis rule and >= 2 decimals is a PUBLISHER_SITE claim, whatever the source)
+create or replace function pg_temp.add(p_entity text, p_source text, p_lat double precision,
+                                       p_lng double precision, p_prec text, p_notes text)
+returns void language sql as $$
+  with o as (
+    insert into public.dc_source_observation (source_key, distribution_key, raw_payload,
+        source_native_name, source_native_lat, source_native_lon, source_native_precision)
+    values (p_source, 'sites', jsonb_build_object('notes', p_notes), p_entity || ' / ' || p_source,
+            p_lat, p_lng, p_prec)
+    returning home_signal_observation_id)
+  , l as (insert into public.dc_entity_observation
+          select o.home_signal_observation_id, e.id from o, _g_ent e where e.name = p_entity
+          returning home_signal_observation_id)
+  insert into public.dc_current_flag select home_signal_observation_id from l $$;
+
+-- C. two comparable publisher site points 5 km apart: a genuine peer contradiction
+insert into _g_ent values ('PEER CONFLICT', pg_temp.mk('PEER CONFLICT', 45.012345, -100.012345, 'exact',
+     'Coordinates are the parcel centroid.'));
+select pg_temp.add('PEER CONFLICT', 'second_feed', 45.057345, -100.012345, null, 'Surveyed site point.');
+-- the same, 300 m apart: agreement within the peer tolerance
+insert into _g_ent values ('PEER AGREE', pg_temp.mk('PEER AGREE', 45.212345, -100.212345, 'exact',
+     'Coordinates are the parcel centroid.'));
+select pg_temp.add('PEER AGREE', 'second_feed', 45.215045, -100.212345, null, 'Surveyed site point.');
+-- three site claims: two agree (100 m), the third is 5 km away
+insert into _g_ent values ('PEER THREE', pg_temp.mk('PEER THREE', 45.412345, -100.412345, 'exact',
+     'Coordinates are the parcel centroid.'));
+select pg_temp.add('PEER THREE', 'second_feed', 45.413245, -100.412345, null, 'Surveyed site point.');
+select pg_temp.add('PEER THREE', 'third_feed', 45.457345, -100.412345, null, 'Surveyed site point.');
+-- E. a point labelled "exact" whose own sentence says it is a town centroid, beside another
+-- publisher's unlabelled site point 3.3 km away: the label does not buy authority, and a non-site
+-- point is not a claim that can contradict a site
+insert into _g_ent values ('EXACT AREA VS SITE', pg_temp.mk('EXACT AREA VS SITE', 45.612345, -100.612345, 'exact',
+     'Coordinates are Testville city centroid; exact site unpublished.'));
+select pg_temp.add('EXACT AREA VS SITE', 'second_feed', 45.642345, -100.612345, null, 'Surveyed site point.');
+
 create temp table _g_run1 as select * from public.dc_resolve_geography(true);
 create temp table _g_run2 as select * from public.dc_resolve_geography(true);
 create temp view _g as
@@ -187,5 +224,46 @@ select 'G13 unlinked current evidence refuses the run: nothing rewritten, nothin
    and b.resolved > 0,
        (select string_agg(metric || '=' || value, ',') from _g_run3)
   from _g_before b;
+
+insert into _g_result(check_name, pass, detail)
+select 'G14 [C] two publisher site claims 5 km apart: SOURCES_DISAGREE (SITE_CLAIMS_CONFLICT), no geometry -- never an arbitrary pick',
+       geography_status = 'GEOGRAPHY_UNRESOLVED' and rule_key = 'SOURCES_DISAGREE'
+   and quality_flags @> array['SITE_CLAIMS_CONFLICT'] and geom is null,
+       geography_status || ' ' || rule_key || ' ' || quality_flags::text
+  from _g where name = 'PEER CONFLICT';
+
+insert into _g_result(check_name, pass, detail)
+select 'G15 [C] two publisher site claims 300 m apart agree: RESOLVED at the exact-labelled point, not a disagreement',
+       geography_status = 'RESOLVED' and lat = 45.212345 and lng = -100.212345 and not quality_flags @> array['SOURCES_DISAGREE'],
+       geography_status || ' ' || lat || ',' || lng || ' ' || quality_flags::text
+  from _g where name = 'PEER AGREE';
+
+insert into _g_result(check_name, pass, detail)
+select 'G16 [C] three site claims, one 5 km off: fails closed -- the closest agreeing pair does not win',
+       geography_status = 'GEOGRAPHY_UNRESOLVED' and rule_key = 'SOURCES_DISAGREE' and geom is null,
+       geography_status || ' ' || rule_key
+  from _g where name = 'PEER THREE';
+
+insert into _g_result(check_name, pass, detail)
+select 'G17 [E] an "exact" label on a town-centroid point buys no authority: the other publisher''s site point places it',
+       geography_status = 'RESOLVED' and lat = 45.642345 and lng = -100.612345 and not quality_flags @> array['SOURCES_DISAGREE']
+   and authority_source_key = 'second_feed',
+       geography_status || ' ' || lat || ',' || lng || ' ' || coalesce(authority_source_key, '?')
+  from _g where name = 'EXACT AREA VS SITE';
+
+-- G18. the one contradiction definition, at its boundaries (1 deg latitude ~ 111,195 m)
+insert into _g_result(check_name, pass, detail)
+select 'G18 dc_site_claims_conflict: derived bound 2 km, peer 1 km, two derived 4 km, non-site never, source-blind',
+       not public.dc_site_claims_conflict('PUBLISHER_SITE', null, 40, -100, 'DERIVED_ADDRESS', 2000, 40.0170, -100)
+   and     public.dc_site_claims_conflict('PUBLISHER_SITE', null, 40, -100, 'DERIVED_ADDRESS', 2000, 40.0190, -100)
+   and not public.dc_site_claims_conflict('PUBLISHER_SITE', null, 40, -100, 'PUBLISHER_SITE', null, 40.0085, -100)
+   and     public.dc_site_claims_conflict('PUBLISHER_SITE', null, 40, -100, 'PUBLISHER_SITE', null, 40.0095, -100)
+   and not public.dc_site_claims_conflict('DERIVED_ADDRESS', 2000, 40, -100, 'DERIVED_ADDRESS', 2000, 40.0350, -100)
+   and     public.dc_site_claims_conflict('DERIVED_ADDRESS', 2000, 40, -100, 'DERIVED_ADDRESS', 2000, 40.0370, -100)
+   and not public.dc_site_claims_conflict('PUBLISHER_NON_SITE', null, 40, -100, 'PUBLISHER_SITE', null, 41, -100)
+   and not public.dc_site_claims_conflict('PUBLISHER_UNUSABLE', null, 40, -100, 'DERIVED_ADDRESS', 2000, 41, -100)
+   and not exists (select 1 from pg_proc p where p.proname = 'dc_site_claims_conflict'
+                    and (p.prosrc ~* 'source_key|compute_atlas|epoch|zcta|zip' or pg_get_function_identity_arguments(p.oid) ~* 'source')),
+       null;
 
 select check_name, coalesce(pass, false) as pass, detail from _g_result order by n;

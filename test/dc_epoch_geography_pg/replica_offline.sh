@@ -75,6 +75,22 @@ echo "OK 1-2: dry run complete; \"production\" fingerprint unchanged ($after)"
 if [ -s "$tmp/locks.txt" ]; then sort -u "$tmp/locks.txt"; echo "FAIL: a lock above ACCESS SHARE was taken on \"production\""; exit 1; fi
 echo "OK 2: no lock above ACCESS SHARE was ever observed on \"production\""
 
+# 2b. REPLICA PARITY NEGATIVE CONTROL -- executed, not asserted. The run above is the positive control
+# (a matching copy is ACCEPTED). Now the replica is deliberately made to differ from the production
+# it copied -- one published point moved 50 m, on the REPLICA only -- and the run must REFUSE before
+# any after-state is produced. Then the untouched copy must be ACCEPTED again.
+TAMPER="set session_replication_role = replica; update public.dc_entity_geography set lat = lat + 0.0005, geom = ST_SetSRID(ST_MakePoint(lng, lat + 0.0005), 4326) where canonical_entity_id = (select m.canonical_entity_id from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m where m.canonical_entity_id is not null order by 1 limit 1)"
+if DRYRUN_TEST_TAMPER_REPLICA_SQL="$TAMPER" "$root/scripts/dc-epoch-replica-dryrun.sh" > "$tmp/tamper.txt" 2>&1; then
+  tail -5 "$tmp/tamper.txt"; echo "FAIL: a replica that differs from production was ACCEPTED"; exit 1
+fi
+grep -q '(test) tampering with the replica only' "$tmp/tamper.txt" && grep -q "REFUSED: the replica does not reproduce production's Map 1 output" "$tmp/tamper.txt" \
+  && ! grep -q '^== 8\.' "$tmp/tamper.txt" \
+  || { tail -8 "$tmp/tamper.txt"; echo "FAIL: the tampered run did not stop at the parity gate"; exit 1; }
+"$root/scripts/dc-epoch-replica-dryrun.sh" > "$tmp/restored.txt" 2>&1 && grep -q '^DRY RUN COMPLETE' "$tmp/restored.txt" \
+  || { tail -8 "$tmp/restored.txt"; echo "FAIL: the restored matching copy was not accepted"; exit 1; }
+[ "$(fingerprint)" = "$before" ] || { echo "FAIL: \"production\" changed during the negative control"; exit 1; }
+echo "OK 2b: REPLICA_PARITY_NEGATIVE_CONTROL PASS -- matching copy accepted, tampered replica REFUSED at parity (no after-state), restored copy accepted"
+
 # 3. a replica whose definitions do not match production is refused before anything is copied
 P -d "$FP" -c "do \$\$ begin execute regexp_replace(pg_get_functiondef('public.dc_resolve_geography(boolean)'::regprocedure), '\\\$function\\\$', '\$function\$ -- drifted'); end \$\$" >/dev/null
 if "$root/scripts/dc-epoch-replica-dryrun.sh" > "$tmp/neg.txt" 2>&1; then echo "FAIL: a production that differs from main was not refused"; exit 1; fi
