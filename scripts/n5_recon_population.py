@@ -22,12 +22,12 @@ from n3_pilot import sql, say, lit  # noqa: E402
 
 FLAT = "geo.n5_recon_flat"
 CHUNK = int(os.environ.get("RECON_CHUNK", "250"))
-import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
-FLOOR = n5_capacity.floor_mb()
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 
 
 def disk():
-    return n5_capacity.measure(sql)[0]   # refuses on unknown capacity
+    """Free MiB for LOGGING only; decisions are n5_capacity.require_capacity."""
+    return n5_capacity.assess(sql, "reading")["free"]
 
 
 def producer_preflight():
@@ -128,12 +128,11 @@ from called c,
                 "drift-tolerant. That is geography corruption, not ingestion churn: "
                 + str(e))
         done += CHUNK
+        # EVERY chunk, not every tenth: a tenth-chunk check let nine chunks write unchecked.
+        free = n5_capacity.require_capacity(sql, f"recon chunk {k + 1}/{parts}")["free"]
         if (k + 1) % 10 == 0 or k + 1 == parts:
-            free = disk()
             say(f"  chunk {k + 1}/{parts}", f"{min(done, n):,} ZIPs · {time.time() - t:.1f}s"
                                             f" · free {free:,.0f} MB")
-            if free <= FLOOR:
-                raise SystemExit(f"STOP: free disk {free:.0f} MB at or below floor {FLOOR:.0f}")
     r = sql(f"select count(*) rows, count(distinct zip) zips from {FLAT};",
             "flat loaded", read_only=True)[0]
     say("flat rows / ZIPs", f"{int(r['rows']):,} / {int(r['zips']):,}")
@@ -207,7 +206,8 @@ select
 
 def main():
     say("N5 whole-population reconciliation", "enabled set")
-    say("BEFORE free disk MB", f"{disk():,.0f}")
+    # THE GATE, before producer_preflight and load(), i.e. before the first write.
+    n5_capacity.require_capacity(sql, "recon start")
     producer_preflight()
     n = load()
     ok = check(n)

@@ -39,8 +39,7 @@ PREFIX = os.environ.get("PREFIX", "").strip()
 # race by construction rather than by scheduling luck.
 PREFIXES = [x.strip() for x in os.environ.get("PREFIXES", "").split(",") if x.strip()]
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"bf-{PREFIX}-{int(time.time())}"
-import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
-FLOOR_MB = n5_capacity.floor_mb()
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 SCRATCH = "geo.n5_bf_zcta"
 
 # The pass's own SQL, held as a constant so the guard checks the string that actually
@@ -56,7 +55,9 @@ on conflict (zcta5, source_key) do nothing;"""
 
 
 def disk():
-    return n5_capacity.measure(sql)   # (free, db, wal); refuses on unknown capacity
+    """(free, db, wal) for LOGGING only; decisions are n5_capacity.require_capacity."""
+    r = n5_capacity.assess(sql, "reading")
+    return r["free"], r["db"], r["wal"]
 
 
 def snap(tag):
@@ -85,6 +86,10 @@ def run_prefix(PREFIX, RUN_ID):
     if violations:
         raise SystemExit(f"STOP: candidate-bounding violation {violations}")
 
+    # THE GATE, before this prefix creates or loads anything. Floor-only: one prefix's
+    # probe output is not projected; the AFTER gate below stops the run if it overshot.
+    n5_capacity.require_capacity(sql, f"boundary-first {PREFIX} start")
+
     sql("""create table if not exists geo.n5_boundary_membership (
              zcta5      char(5) not null,
              source_key text    not null,
@@ -101,8 +106,6 @@ def run_prefix(PREFIX, RUN_ID):
             alter table {SCRATCH} enable row level security;""", "create scratch")
 
     memb0, rows0, free0 = snap("BEFORE")
-    if free0 < FLOOR_MB:
-        raise SystemExit(f"STOP: free {free0:.1f} MB is already below the {FLOOR_MB} floor")
 
     # ---- boundaries: EVERY ZCTA whose GEOID carries the prefix, not only those with a
     # legacy pair. Loading only legacy-bearing ZIPs is narrowing #2 of the measured defect.
@@ -181,9 +184,7 @@ def run_prefix(PREFIX, RUN_ID):
     say("MEMBERSHIP ROWS for this prefix", added)
     if added:
         say("bytes per membership row, all-in", round((memb1 - memb0) / added, 1))
-    if free1 < FLOOR_MB:
-        say("DISK FLOOR", f"HALT - free {free1:.1f} MB below {FLOOR_MB}")
-        raise SystemExit("STOP: free disk fell below the floor")
+    n5_capacity.require_capacity(sql, f"boundary-first {PREFIX} after")
 
     d = sql(f"""
 with disc as (select zcta5::text zip, source_key, provenance from geo.n5_boundary_membership

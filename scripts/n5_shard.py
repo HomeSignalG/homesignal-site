@@ -43,10 +43,9 @@ SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
 GENERATION = os.environ.get("GENERATION", "").strip()
 Z3_ENV = os.environ.get("Z3", "AUTO").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
-# Capacity is decided in ONE place (scripts/n5_capacity.py): the floor can be raised and
-# never lowered, and the volume size comes from the committed, dated record - never from
-# the 11,607 MB constant this file used to carry, which the database had outgrown.
-DISK_FLOOR_MB = n5_capacity.floor_mb()
+# Capacity is decided in ONE place (scripts/n5_capacity.py): the volume size comes from the
+# committed, dated record, the floor can be raised and never lowered, and this file makes
+# NO comparison of its own - it replaced an 11,607 MB constant the database had outgrown.
 REG_PATH = "supabase/functions/get-address-report/jurisdiction-registry.json"
 
 # Carried-forward gates. These are decisions, not TODOs - see the N5 authorization.
@@ -157,8 +156,10 @@ def load_registry():
 
 
 def disk_free_mb():
-    """(free, db, wal). Refuses (SystemExit) when capacity is unrecorded or contradicted."""
-    return n5_capacity.measure(sql)
+    """(free, db, wal) for LOGGING. Validated by n5_capacity (unknown capacity raises);
+    it decides nothing - every decision is n5_capacity.require_capacity/capacity_ok."""
+    r = n5_capacity.assess(sql, "reading")
+    return r["free"], r["db"], r["wal"]
 
 
 # ---------------------------------------------------------------- boundaries
@@ -759,10 +760,9 @@ def run_shard(z3):
     say("working set discarded (boundaries / frozen)", f"{left_z} / {left_f} remaining")
 
     # 7 - DISK
-    free, db, wal = disk_free_mb()
+    disk_ok, cr = n5_capacity.capacity_ok(sql, f"n5-shard {z3} advance")
+    free, db, wal = cr["free"], cr["db"], cr["wal"]
     say("db / WAL MB", f"{db:,.0f} / {wal:,.0f}")
-    say("free MB (floor %.0f)" % DISK_FLOOR_MB, f"{free:,.0f}")
-    disk_ok = free > DISK_FLOOR_MB
     say("disk above floor", "yes" if disk_ok else "NO")
 
     say("shard seconds", round(time.time() - t_shard, 1))
@@ -879,10 +879,10 @@ def main():
         f"{snap['sources']} / {snap['projects']:,} / {snap['pairs']:,}")
     say("baseline rows (repeated triples preserved)",
         f"{snap['n_rows']:,}  = pairs + {int(snap['n_rows']) - int(snap['pairs']):,} repeated source_seq")
-    free0, db0, wal0 = disk_free_mb()
-    say("free MB at start", f"{free0:,.0f}  (floor {DISK_FLOOR_MB:,.0f})")
-    if free0 <= DISK_FLOOR_MB:
-        raise SystemExit("STOP: free disk is at or below the floor before any shard ran")
+    # Before the first shard writes anything. Floor-only: one shard's own peak is not
+    # projected (the per-shard advance check below stops the run after any shard that
+    # leaves the volume below the floor).
+    n5_capacity.require_capacity(sql, "n5-shard start")
 
     todo = parse_shard_list(Z3_ENV, MAX_SHARDS)
     if todo is None:

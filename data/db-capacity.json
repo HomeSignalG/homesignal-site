@@ -1,9 +1,9 @@
 {
-  "_doc": "THE ONE record of the production database volume's provisioned size, read by scripts/n5_capacity.py and nothing else. Postgres cannot see the volume and the Supabase Management API exposes no disk-size field, so this is a HUMAN reading from Supabase -> Project Settings -> Compute and Disk, committed with its date. null means NOT RECORDED, and every N5 builder REFUSES to run until it is recorded: an unknown capacity is never treated as ample. Replaced the constant 11,607 MB that five builders carried, which the database had outgrown (11,292 MB + 1,024 MB WAL measured 2026-09-24) so they computed NEGATIVE free space.",
-  "provisioned_disk_mb": null,
-  "non_database_mb": null,
-  "recorded_at": null,
+  "_doc": "THE ONE record of the production database volume's PROVISIONED size, read by scripts/n5_capacity.py and nothing else. It is NOT the database size, free space, used space, the dashboard percentage, the object Storage quota, or an estimate. Read it from Supabase -> Project Settings -> Compute and Disk. provisioned_disk = the volume size shown there. non_database_usage = that page's USED figure minus pg_database_size minus WAL, read at the same moment (0 is allowed only if that is what the arithmetic gives). Every quantity needs an explicit unit: MiB | GiB | MB | GB (MB and GB are DECIMAL; record the dashboard's 'GB' as \"GB\" unless it says GiB). observed_at is when YOU read the dashboard, ISO-8601 with a timezone. Readings expire after 24 hours, and are honoured only in a GitHub Actions run on main. null means NOT RECORDED, and every gated builder REFUSES until it is recorded.",
+  "provisioned_disk": {"value": null, "unit": null},
+  "non_database_usage": {"value": null, "unit": null},
+  "observed_at": null,
   "recorded_by": null,
   "source": null,
-  "notes": "2026-09-24: founder reported the volume 69% utilized with ~11 GB database + ~1 GB WAL and CPU ~100%, and held the N5 candidate build. The provisioned size itself was not stated, so it is left unrecorded rather than back-derived from a percentage. non_database_mb is the part of the volume's USED figure that pg_database_size + pg_ls_waldir cannot see (dashboard used MB minus database MB minus WAL MB, at the same moment)."
+  "notes": "2026-09-24: founder reported the volume 69% utilized with ~11 GB database + ~1 GB WAL and CPU ~100%, and held the N5 candidate build. The provisioned size itself was not stated, so it is left unrecorded rather than back-derived from a percentage."
 }

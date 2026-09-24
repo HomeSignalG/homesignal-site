@@ -26,14 +26,15 @@ from n3_pilot import lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SR
 from n5_shard import sql, say, one, tiger_index  # noqa: E402
 
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a3-{int(time.time())}"
-import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
-FLOOR_MB = n5_capacity.floor_mb()
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 SCRATCH = "geo.n5_a3_zcta"
 STATS = "geo.n5_a3_clip_stats"
 
 
 def disk():
-    return n5_capacity.measure(sql)   # (free, db, wal); refuses on unknown capacity
+    """(free, db, wal) for LOGGING only; decisions are n5_capacity.require_capacity."""
+    r = n5_capacity.assess(sql, "reading")
+    return r["free"], r["db"], r["wal"]
 
 
 def ddl():
@@ -129,10 +130,7 @@ def main():
         "select distinct left(zcta5,3) z3 from geo.zip_authoritative_membership order by 1;", "prefixes")]
     say("UNIT A3 - CLIP MEASUREMENT (no marker rule applied)", "")
     say("run id / prefixes", f"{RUN_ID} / {','.join(prefixes)}")
-    free0, db0, wal0 = disk()
-    say("BEFORE free disk MB", round(free0, 1))
-    if free0 < FLOOR_MB:
-        raise SystemExit(f"STOP: free {free0:.1f} MB already below the {FLOOR_MB} floor")
+    n5_capacity.require_capacity(sql, "a3-clip start")   # before ddl() or any write
     ddl()
     sql(f"""create table if not exists {SCRATCH} (
               prefix char(3) not null, zcta5 char(5) not null,
@@ -158,10 +156,8 @@ def main():
         say("rows / line / polygon / point / null-clip",
             f"{r['n']} / {r['lines']} / {r['polys']} / {r['points']} / {r['nullclip']}")
         total += int(r["n"])
-        free, _, _ = disk()
-        say("prefix seconds / free disk MB", f"{time.time()-t0:.1f} / {free:.1f}")
-        if free < FLOOR_MB:
-            raise SystemExit(f"STOP: free {free:.1f} MB below the {FLOOR_MB} floor")
+        say("prefix seconds", f"{time.time()-t0:.1f}")
+        n5_capacity.require_capacity(sql, f"a3-clip after {pfx}")
 
     sql(f"drop table if exists {SCRATCH};", "drop scratch")
     say("", "")

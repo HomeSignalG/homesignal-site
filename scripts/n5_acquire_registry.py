@@ -28,6 +28,7 @@ from n5_shard import (  # noqa: E402  - imported, never re-derived
     sql, say, one, load_registry, fetch_features, disk_free_mb,
     EXCLUDED_SOURCES, UNRECOVERABLE_BASES, SNAPSHOT,
 )
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 REGISTRY_ID = os.environ.get("REGISTRY_ID", "").strip()
 
@@ -56,7 +57,10 @@ def main():
                             (select count(*) from geo.n5_geom) rows,
                             (select count(*) from geo.n5_geom where registry_id={lit(REGISTRY_ID)}) mine;""",
                  "before")[0]
-    free0, db0, wal0 = disk_free_mb()
+    # THE GATE, before the fetch that writes this registry's whole geometry set into
+    # geo.n5_geom. This path used to MEASURE free space and never compare it to the floor.
+    # Floor-only: a registry's geometry size is not known until it is fetched.
+    free0 = n5_capacity.require_capacity(sql, f"n5-acquire {REGISTRY_ID}")["free"]
     say("BEFORE n5_geom bytes / rows / this registry",
         f"{before['b']} / {before['rows']} / {before['mine']}")
     say("BEFORE free disk MB", round(free0, 1))

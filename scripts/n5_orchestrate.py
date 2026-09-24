@@ -130,19 +130,12 @@ def mode_open():
         raise SystemExit(f"STOP: snapshot {snapshot_id} already has rows. A capture is "
                          f"immutable; refusing to append to one.")
 
-    # CAPACITY BEFORE ANYTHING IS WRITTEN. A generation is ~3 GB of capture, build tables
-    # and WAL, and the capture is one transaction, so running out part-way is not a clean
-    # halt: it is a full volume. The projection is measured from the relations one
-    # generation writes (scripts/n5_capacity.py), and an unrecorded or contradicted volume
-    # size refuses here rather than defaulting.
-    floor = n5_capacity.floor_mb()
-    free, db, wal = n5_capacity.measure(sql)
-    need = n5_capacity.projected_generation_mb(sql)
-    say("free MB / floor MB", f"{free:,.0f} / {floor:,.0f}")
-    for k in ("capture_mb", "build_mb", "wal_reserve_mb", "total_mb"):
-        say(f"projected {k}", f"{need[k]:,.0f}")
-    say("free after projected generation MB",
-        f"{n5_capacity.require_headroom(free, need['total_mb'], floor, 'open'):,.0f}")
+    # CAPACITY BEFORE ANYTHING IS WRITTEN. The capture is ONE transaction of ~3M rows, so
+    # running out part-way is not a clean halt. n5_capacity.require_generation_fits
+    # validates the capacity reading, projects the generation's peak space component by
+    # component, and REFUSES while any component has no defensible model - an unknown
+    # term in a peak-space sum is not zero, so no national generation is opened on one.
+    n5_capacity.require_generation_fits(sql, "open")
 
     # The cutoff is read ONCE and reused for the capture and the generation row, so the
     # watermark the generation advertises is exactly the instant it captured.
