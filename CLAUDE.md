@@ -2111,6 +2111,25 @@ HS.classifyProjectType (lib/project-type.js)
   corpus). The KEYWORD rule `typeKey: 'utility'` is not a registry key, so such a record has no Type
   bucket on Map 1 and no badge (1 row). Both predate the extraction.
 
+### 7.11a The FACILITY identity lives there too — and it is not a Development Type (2026-09-24)
+
+A regulated (EPA FRS) facility's badge on the ZIP page's **Regulated facilities nearby** cards
+is Map 1's facility identity, decided once by `facilityIdentity` in `lib/project-type.js` (moved
+verbatim out of `resolveMarker`; `resolveMarker` now calls it):
+
+1. **DUAL** — the record's own CLASS field states a data centre → `datacenter` ("Data center").
+2. **OVERLAY** — the class field maps a project Type (founder Overlay-on-Type, 2026-09-07):
+   `industrial`/`logistics` → Industrial, `energy` → Roads & infrastructure.
+3. **PLAIN** — nothing classifiable → `facility`, "Regulated facility" — the regulatory RECORD
+   KIND, excluded from the Type filter keys. It is not a Development Type.
+
+**Class field only — never the facility name, never the status.** "Operating" on those cards is
+a literal lifecycle word in the template; the badge beside it is what kind of record it is.
+`HS.canonicalFacilityType(row)` projects the `app_projects` facility row's `type` onto Map 1's
+`layer` (the same value on the same registry_id: 73/73 matched, 0 differing, 2026-09-24).
+**Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
+Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP
