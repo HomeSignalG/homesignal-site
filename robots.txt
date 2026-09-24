@@ -23,6 +23,7 @@ Disallow: /maps.html
 Disallow: /development.html
 Disallow: /my-alerts.html
 Disallow: /unsubscribe.html
+Disallow: /share-text.html
 Disallow: /acquisition.html
 Disallow: /gov-archive.html
 

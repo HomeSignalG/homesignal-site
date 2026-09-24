@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'none'">
+<title>Share by text · HomeSignal</title>
+<!-- Hand-off for the digest email's "Messages" button. Webmail strips sms: links, so the
+     email links here over https and this page opens Messages. Logic: lib/share-text.js. -->
+</head>
+<body style="margin:0;background:#eceef0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
+  <div style="max-width:520px;margin:48px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="background:#1f5130;padding:20px 28px;">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-.3px;color:#fff;">Home<span style="color:#9fe1cb;">Signal</span></span>
+    </div>
+    <div style="padding:28px;">
+      <h1 id="title" style="font-size:20px;font-weight:800;margin:0 0 10px;">Share by text</h1>
+      <div id="msg" style="font-size:15px;line-height:1.55;color:#3f3f46;">Send this briefing to a friend.</div>
+      <div id="box" hidden>
+        <textarea id="text" readonly rows="4" style="box-sizing:border-box;width:100%;margin-top:16px;padding:10px 12px;font:inherit;font-size:14px;color:#18181b;border:1px solid #d4d4d8;border-radius:8px;resize:none;"></textarea>
+        <div style="margin-top:14px;">
+          <a id="open" href="#" style="display:inline-block;margin:0 8px 8px 0;background:#1f5130;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:8px;">Open Messages</a>
+          <button id="copy" type="button" style="margin:0 0 8px;background:#fff;color:#1f5130;font:inherit;font-size:14px;font-weight:600;padding:10px 20px;border:1px solid #1f5130;border-radius:8px;cursor:pointer;">Copy message</button>
+        </div>
+        <div id="hint" style="font-size:13px;color:#6f6e69;line-height:1.5;">On a computer, Messages may not open — copy the message and paste it into any text or chat app.</div>
+      </div>
+      <a href="https://homesignal.net" style="display:inline-block;margin-top:18px;font-size:14px;font-weight:600;color:#1f5130;">Go to HomeSignal</a>
+    </div>
+    <div style="padding:16px 28px;border-top:1px solid #eef0f1;font-size:12px;color:#8a8a85;">HomeSignal — neutral · sourced · non-partisan</div>
+  </div>
+<script src="lib/share-text.js?v=729db5b6"></script>
+<script>
+  (function () {
+    var S = window.HSShareText;
+    var m = S && S.model(window.location.search);
+    var title = document.getElementById('title'), msg = document.getElementById('msg');
+    if (!m || !m.ok) {
+      title.textContent = 'Link not recognized';
+      msg.textContent = 'This share link is incomplete. You can share any HomeSignal page from its Share button.';
+      return;
+    }
+    document.getElementById('box').hidden = false;
+    var ta = document.getElementById('text');
+    ta.value = m.message;
+    var open = document.getElementById('open');
+    open.href = m.smsHref;
+    var copy = document.getElementById('copy');
+    copy.addEventListener('click', function () {
+      function done() { copy.textContent = 'Copied'; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(m.message).then(done, function () { ta.select(); document.execCommand('copy'); done(); });
+      } else { ta.select(); document.execCommand('copy'); done(); }
+    });
+    // On a phone, go straight to Messages — that is what the resident tapped.
+    // The page stays as the fallback if the app does not open.
+    if (S.isPhone(navigator.userAgent)) {
+      msg.textContent = 'Opening Messages… If it did not open, tap the button below.';
+      window.location.href = m.smsHref;
+    }
+  })();
+</script>
+</body></html>
