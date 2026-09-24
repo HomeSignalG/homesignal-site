@@ -1887,6 +1887,49 @@ an outcome it cannot source**.
 
 ---
 
+## 7.11 A PRODUCTION DRY RUN RUNS NO DDL IN PRODUCTION: IT READS, THEN WORKS ON A REPLICA (2026-09-24)
+
+**Two dry runs of the Epoch apply locked production on 2026-09-24. Neither wrote anything. Both
+did harm.**
+
+1. **DDL on production, inside a rolled-back transaction.** 18:36–18:43Z. `ALTER TABLE` held
+   ACCESS EXCLUSIVE on `public.dc_entity_geography` until the rollback. One resident
+   `map1_dc_zip_members` call returned 500 and a probe timed out. Cancelled.
+2. **The same chain rebuilt in a scratch schema** (`create schema dcdry`, `create table … (like
+   … including all)`). About 18:48–18:53Z. A lock query then attributed ACCESS EXCLUSIVE locks
+   on `auth.*`, `storage.*` and `realtime.*` relations to the dry-run backend. That query did not
+   filter on `pg_locks.database`, so the attribution is **UNVERIFIED** and the cause is
+   **UNKNOWN**. Production does have six DDL event triggers (`pgrst_ddl_watch`,
+   `grant_pg_cron_access`, `grant_pg_net_access`, `grant_pg_graphql_access`, and two on
+   `sql_drop`). The backend blocked a Realtime metrics query until it was terminated
+   (`pg_terminate_backend`, 18:53Z).
+   - **Measured after:** 0 edge 5xx from 18:47 to 18:55Z. Nothing persisted: `dcdry` absent,
+     4,375 decisions and 3,530 entities unchanged, Map 1 md5 `b143605c…` unchanged.
+
+🔑 **"Rolled back" is not "harmless", and a scratch schema is not isolation.** DDL locks last
+until the transaction ends, and the platform runs its own hooks on DDL. **A dry run runs no DDL
+in production, in any schema, in any transaction.**
+
+**The shape that replaced it**: `scripts/dc-epoch-replica-dryrun.sh`, run by `dc-epoch-dryrun.yml`.
+- Production is reached from **one line**, `prod_select`: one `SELECT` per session, wrapped in
+  `\copy`, with `default_transaction_read_only=on` and a 2 s `lock_timeout`.
+- Everything else runs in a PostGIS **service container**: the apply, the queue, the load, both
+  resolvers and the report.
+- **The replica must prove it is production before its answer counts.**
+  - It is built from main's DDL of record.
+  - The four definitions the apply replaces fingerprint identically on both sides.
+  - Its Map 1 output over all 12,722 registry ZIPs equals production's **row for row**, or the
+    run refuses. Measured: 1,815 rows, md5 `d9291024…` on both sides.
+- Offline proof: `test/dc_epoch_geography_pg/replica_offline.sh`, against a stand-in production.
+  - The lock watcher is shown a strong lock and must see it (a positive control).
+  - The stand-in is left byte-identical, with no client lock above ACCESS SHARE.
+  - A drifted definition is refused.
+  - 5 of 5 write shapes are refused by `prod_select`.
+- Pinned by S7c/S7d in `test/dc-epoch-geography-structure.test.mjs`.
+
+**Rule:** any future "production dry run" of DDL uses this shape — copy out read-only, change a
+replica, prove parity. Never `begin; <DDL>; rollback;` against production.
+
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 
 Two defects in the canonical DC geography layer (`docs/dc-step3b-canonical-geography.sql`,
