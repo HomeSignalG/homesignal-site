@@ -111,7 +111,7 @@ ok(/rationale\s+text not null/.test(A3) && /char_length\(btrim\(rationale\)\) >=
   'S5c: a review must carry a written rationale');
 
 // ── the production apply is GENERATED from the files above, never retyped (claims rule 7) ─────
-const gen = spawnSync('python3', [join(ROOT, 'scripts/build-epoch-geography-apply.py'), '--check'], { encoding: 'utf8' });
+const gen = spawnSync('python3', [join(ROOT, 'test/dc_epoch_geography_pg/build_apply.py'), '--check'], { encoding: 'utf8' });
 ok(gen.status === 0, 'S6: docs/dc-epoch-geography-apply.sql is byte-identical to what the generator emits from the DDL of record', (gen.stdout + gen.stderr).trim());
 const APPLY = read('docs/dc-epoch-geography-apply.sql');
 ok(APPLY.indexOf('DRIFT: live definition') > 0 && APPLY.indexOf('DRIFT: live definition') < APPLY.indexOf('create or replace function public.dc_geocode_ladder_version')

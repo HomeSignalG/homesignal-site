@@ -11,7 +11,7 @@
 // WHAT IT DOES NOT DO:
 //   * choose what to geocode -- the queue is decided in SQL and handed in as JSON lines;
 //   * judge the answer -- whether a derived point may become a site is decided in SQL
-//     (dc_derived_point_verdict), never here;
+//     (docs/dc-step3d-derived-location.sql), never here;
 //   * write any data-centre table -- it prints JSON lines; the workflow loads them through
 //     docs/dc-geocode-observations-load.sql, which accepts only queued queries and only the
 //     current ladder version, append-only.
