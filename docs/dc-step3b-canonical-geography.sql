@@ -19,7 +19,8 @@
 -- and ONLY once every current observation is linked (else: REFUSED_IDENTITY_PENDING, no write):
 --   1. entity_grain AGGREGATE_MULTI_SITE          -> NOT_A_SITE      (publisher says so)
 --   2. no observation carries a coordinate pair    -> GEOGRAPHY_UNRESOLVED  NO_COORDINATES
---   3. two sources place it > 1 km apart           -> GEOGRAPHY_UNRESOLVED  SOURCES_DISAGREE
+--   3. two sources' SITE claims contradict each
+--      other (dc_site_claims_conflict, v4 below)   -> GEOGRAPHY_UNRESOLVED  SOURCES_DISAGREE
 --   4. the chosen point has <= 1 decimal place on
 --      either axis (±~5.5 km: cannot decide a ZIP) -> GEOGRAPHY_UNRESOLVED  ROUNDED_COORDINATES
 --      ("exact" is not trusted: PUBLISHER_CLAIMS_EXACT is recorded beside it)
@@ -38,6 +39,37 @@
 --   precision 'exact', then the most decimal places, then the newest observation, then the
 --   observation id (deterministic).
 --
+-- RULE VERSION 3 (2026-09-24) — DERIVED ADDRESS POINTS (docs/dc-step3d-derived-location.sql):
+--   * an ACCEPTED derived point is a candidate point with basis DERIVED_ADDRESS, ranked AFTER
+--     any publisher site point and BEFORE a publisher area point -- so it never overrides a
+--     site the publisher states, and it replaces a town centroid (which stays rejected);
+--   * a town/area point is not a site claim, so it no longer takes part in SOURCES_DISAGREE:
+--     only site claims are compared, with the SAME 1 km rule, owned here and nowhere else;
+--   * a derived point may not place an entity that has an OPEN cross-source identity question
+--     (IDENTITY_UNRESOLVED), nor one whose derived address another entity also uses
+--     (DERIVED_ADDRESS_SHARED): the address cannot tell the two apart;
+--   * the point's positional uncertainty (metres) is stored with the decision.
+--
+-- RULE VERSION 4 (2026-09-24) — ONE SOURCE-INDEPENDENT GEOGRAPHY AUTHORITY:
+--   * every coordinate claim is classified by what the EVIDENCE is (dc_entity_geography_evidence):
+--     PUBLISHER_SITE, DERIVED_ADDRESS, PUBLISHER_NON_SITE, PUBLISHER_UNUSABLE -- never by source name;
+--   * authority follows the class: a publisher site point, then a derived address point; a non-site
+--     or unusable point never places an entity. A precision label ("exact") only breaks ties inside
+--     a class -- it never lifts a town centroid above a site;
+--   * two site claims CONTRADICT only when they lie farther apart than the evidence allows: the sum
+--     of their quantified errors (a derived point's calibrated 2,000 m), or the 1 km peer tolerance
+--     between two publisher site points (neither carries a number). So a derived point inside its
+--     bound CORROBORATES a publisher site point (flag CORROBORATED_BY_DERIVED_ADDRESS) and never
+--     vetoes it; one beyond its bound fails closed (DERIVED_ADDRESS_BEYOND_UNCERTAINTY), as does a
+--     genuine conflict between two publisher site points (SITE_CLAIMS_CONFLICT). Both are
+--     SOURCES_DISAGREE, never an arbitrary pick.
+--   * WHY 2,000 m IS THE RIGHT ALLOWANCE (measured, Step 3D header): 200 Atlas records' OWN street
+--     addresses geocoded against their OWN site points -- p50 120 m, p95 396 m, max 1,801 m. A pair
+--     farther apart than that is not geocoder noise: the address and the point do not describe the
+--     same place, and nothing here can say which one is wrong.
+--   * ZIP plays no part: no ZCTA, no provider ZIP, no centroid. Membership is decided afterwards,
+--     from the canonical point alone, by geo.zip_point_membership_in.
+--
 -- FOOTPRINT: geometry_type admits 'FOOTPRINT' and a footprint would win over any point, but NO
 -- current source supplies a polygon (Atlas: lat/lon only; Epoch: address only). The rule is not
 -- written against a field that does not exist; the first footprint-bearing source adds it.
@@ -48,6 +80,7 @@ create table if not exists public.dc_entity_geography (
                               references public.dc_canonical_entity(canonical_entity_id),
     geography_status          text not null,
     geometry_type             text,
+    positional_uncertainty_m  double precision,   -- metres; NULL = no quantified uncertainty
     geom                      geometry(Geometry, 4326),
     lat                       double precision,
     lng                       double precision,
@@ -71,6 +104,9 @@ create table if not exists public.dc_entity_geography (
 );
 
 alter table public.dc_entity_geography enable row level security;
+-- rule_version 3: a derived point's positional uncertainty travels with the decision, so the ONE
+-- membership authority (map1_dc_zip_members) can refuse a point whose error disk crosses a ZCTA.
+alter table public.dc_entity_geography add column if not exists positional_uncertainty_m double precision;
 revoke all on public.dc_entity_geography from anon, authenticated;
 
 comment on table public.dc_entity_geography is
@@ -267,12 +303,105 @@ begin
 end;
 $fn$;
 
+-- ── THE GEOGRAPHY EVIDENCE OF EVERY ENTITY (one definition; the resolver and every report read it)
+-- Every coordinate pair any CURRENT observation linked to an entity asserts:
+--   * the publisher's own point, with the publisher's own account of what it is (location basis);
+--   * an ACCEPTED derived address point of Step 3D -- a different kind of evidence, labelled as
+--     such: basis DERIVED_ADDRESS, no publisher precision, and its calibrated positional
+--     uncertainty in metres.
+-- evidence_class is decided by the EVIDENCE, never by the source's name:
+--   PUBLISHER_SITE      a publisher point whose basis is not a settlement/area statement and which
+--                       carries >= 2 decimal places (a claim about the site itself)
+--   DERIVED_ADDRESS     a HomeSignal geocode of a publisher's site address (carries uncertainty)
+--   PUBLISHER_NON_SITE  the publisher says the point is a town / administrative / area location
+--   PUBLISHER_UNUSABLE  <= 1 decimal place on either axis (±~5.5 km: cannot decide a ZIP)
+create or replace view public.dc_entity_geography_evidence with (security_invoker = true) as
+select eo.canonical_entity_id, o.home_signal_observation_id oid, o.source_key,
+       o.source_native_precision prec, o.source_native_lat lat, o.source_native_lon lng,
+       least(scale(o.source_native_lat::text::numeric),
+             scale(o.source_native_lon::text::numeric)) decimals,
+       o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence,
+       null::double precision uncertainty_m,
+       case when lb.basis = 'NON_SITE_AREA' then 'PUBLISHER_NON_SITE'
+            when least(scale(o.source_native_lat::text::numeric),
+                       scale(o.source_native_lon::text::numeric)) <= 1 then 'PUBLISHER_UNUSABLE'
+            else 'PUBLISHER_SITE' end evidence_class
+  from public.dc_entity_observation eo
+  join public.dc_current_observation c
+    on c.home_signal_observation_id = eo.home_signal_observation_id
+  join public.dc_source_observation o
+    on o.home_signal_observation_id = eo.home_signal_observation_id
+ cross join lateral public.dc_location_basis(o.source_key, o.distribution_key, o.raw_payload) lb
+ where o.source_native_lat is not null and o.source_native_lon is not null
+   and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180
+union all
+select eo.canonical_entity_id, dp.home_signal_observation_id, dp.source_key,
+       null::text, dp.lat, dp.lng, 6, o.observed_at,
+       'DERIVED_ADDRESS'::text, dp.match_type,
+       jsonb_build_object('derivation_id', dp.derivation_id, 'geocoder_query', dp.geocoder_query,
+                          'matched_address', dp.matched_address, 'provider', dp.provider,
+                          'match_type', dp.match_type,
+                          'provider_candidates', dp.provider_candidates,
+                          'derived_at', dp.derived_at, 'run_ref', dp.run_ref,
+                          'verdict', dp.verdict, 'verdict_reason', dp.verdict_reason),
+       dp.positional_uncertainty_m,
+       'DERIVED_ADDRESS'::text
+  from public.dc_entity_observation eo
+  join public.dc_observation_derived_point dp
+    on dp.home_signal_observation_id = eo.home_signal_observation_id
+  join public.dc_source_observation o
+    on o.home_signal_observation_id = eo.home_signal_observation_id
+ where dp.verdict = 'ACCEPTED';
+
+revoke all on public.dc_entity_geography_evidence from public, anon, authenticated;
+
+comment on view public.dc_entity_geography_evidence is
+'STEP 3B. Every coordinate claim linked to a canonical entity, classified by what the evidence is
+(PUBLISHER_SITE / DERIVED_ADDRESS / PUBLISHER_NON_SITE / PUBLISHER_UNUSABLE), never by source
+name. dc_resolve_geography reads it; no resident reader.';
+
+-- ── WHEN DO TWO SITE CLAIMS CONTRADICT EACH OTHER? (one definition; rule_version 4) ─────────────
+-- A claim's own evidence says how far it may be from the true site:
+--   * a DERIVED_ADDRESS point carries its calibrated positional uncertainty (Step 3D: 200 Atlas
+--     records whose own address was geocoded against their own site point -- p50 120 m, p95 396 m,
+--     p99 637 m, max 1,801 m -- carried as 2,000 m). A publisher site point within that bound is
+--     exactly what an honest geocode of the same site produces: it corroborates, never vetoes;
+--   * a PUBLISHER_SITE point carries no quantified error, so two of them use the PEER tolerance of
+--     1 km (the rule_version 2 threshold, unchanged).
+-- Allowance = the sum of the two quantified errors, or the peer tolerance when neither has one.
+-- Any other class (area / unusable) is not a site claim and never contradicts anything.
+-- It knows no source, no place and no facility: only classes, errors and distance.
+create or replace function public.dc_site_claims_conflict(
+    p_class_a text, p_uncertainty_a double precision, p_lat_a double precision, p_lng_a double precision,
+    p_class_b text, p_uncertainty_b double precision, p_lat_b double precision, p_lng_b double precision)
+returns boolean
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $$
+    select p_class_a in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')
+       and p_class_b in ('PUBLISHER_SITE', 'DERIVED_ADDRESS')
+       and ST_DistanceSphere(ST_MakePoint(p_lng_a, p_lat_a), ST_MakePoint(p_lng_b, p_lat_b))
+           > case when p_uncertainty_a is null and p_uncertainty_b is null then 1000
+                  else coalesce(p_uncertainty_a, 0) + coalesce(p_uncertainty_b, 0) end
+$$;
+
+revoke all on function public.dc_site_claims_conflict(text, double precision, double precision, double precision,
+                                                      text, double precision, double precision, double precision)
+    from public, anon, authenticated;
+
+comment on function public.dc_site_claims_conflict(text, double precision, double precision, double precision,
+                                                   text, double precision, double precision, double precision) is
+'STEP 3B. Whether two site claims of one entity contradict each other: farther apart than the sum of
+their quantified positional errors (a derived point''s calibrated bound), or than the 1 km peer
+tolerance when neither carries one. Evidence classes only; no source, place or facility.';
+
 create or replace function public.dc_resolve_geography(p_apply boolean default false)
 returns table(metric text, value text)
 language plpgsql
 as $fn$
 declare
-    v_rule_version constant integer := 2;
+    v_rule_version constant integer := 4;
     v_written integer := 0;
     v_pending integer;
 begin
@@ -299,41 +428,93 @@ begin
     drop table if exists _geo_pts;
     drop table if exists _geo_pick;
     drop table if exists _geo_out;
+    drop table if exists _geo_open;
+    drop table if exists _geo_derived;
 
-    -- Every coordinate pair any CURRENT observation of an entity asserts.
+    -- Every coordinate pair any CURRENT observation of an entity asserts, as classified by the
+    -- one evidence view below (publisher points and ACCEPTED derived address points).
     create temporary table _geo_pts on commit drop as
-    select eo.canonical_entity_id, o.home_signal_observation_id oid, o.source_key,
-           o.source_native_precision prec, o.source_native_lat lat, o.source_native_lon lng,
-           least(scale(o.source_native_lat::text::numeric),
-                 scale(o.source_native_lon::text::numeric)) decimals,
-           o.observed_at, lb.basis, lb.rule_key basis_rule, lb.evidence basis_evidence
+    select canonical_entity_id, oid, source_key, prec, lat, lng, decimals, observed_at, basis,
+           basis_rule, basis_evidence, uncertainty_m, evidence_class
+      from public.dc_entity_geography_evidence;
+
+    -- Why each entity's derived location did or did not qualify (reported, never a point).
+    create temporary table _geo_derived on commit drop as
+    select distinct on (eo.canonical_entity_id) eo.canonical_entity_id,
+           jsonb_build_object('input_quality', dp.input_quality, 'geocoder_query', dp.geocoder_query,
+                              'verdict', dp.verdict, 'reason', dp.verdict_reason,
+                              'match_type', dp.match_type, 'matched_address', dp.matched_address) derived
       from public.dc_entity_observation eo
-      join public.dc_current_observation c
-        on c.home_signal_observation_id = eo.home_signal_observation_id
-      join public.dc_source_observation o
-        on o.home_signal_observation_id = eo.home_signal_observation_id
-     cross join lateral public.dc_location_basis(o.source_key, o.distribution_key,
-                                                 o.raw_payload) lb
-     where o.source_native_lat is not null and o.source_native_lon is not null
-       and o.source_native_lat between -90 and 90 and o.source_native_lon between -180 and 180;
+      join public.dc_observation_derived_point dp
+        on dp.home_signal_observation_id = eo.home_signal_observation_id
+     order by eo.canonical_entity_id, (dp.verdict = 'ACCEPTED') desc, dp.home_signal_observation_id;
+
+    -- ⛔ IDENTITY BEFORE A DERIVED MARKER. An entity with an OPEN cross-source identity question
+    -- (dc_entity_identity_open: the automatic IDENTITY_UNRESOLVED) may not be PLACED by a derived
+    -- point: the other entity may be the same facility, and two markers for one site is the defect.
+    -- The question is answered by Step 3A's one definition, recomputed from evidence on every run;
+    -- nothing here waits for a person. Publisher points are unaffected.
+    create temporary table _geo_open on commit drop as
+    select distinct o.canonical_entity_id
+      from public.dc_entity_identity_open o;
 
     create temporary table _geo_pick on commit drop as
     select distinct on (canonical_entity_id) *
       from _geo_pts
-     order by canonical_entity_id, (basis = 'NON_SITE_AREA'), (prec = 'exact') desc nulls last,
+     order by canonical_entity_id,
+              -- the EVIDENCE CLASS decides authority (never the source, never the label): a
+              -- publisher's site point, then a derived address point, then a non-site or
+              -- unusable publisher point (which can never place an entity anyway)
+              (evidence_class in ('PUBLISHER_NON_SITE', 'PUBLISHER_UNUSABLE')),
+              (evidence_class = 'DERIVED_ADDRESS'),
+              -- inside one class only: the publisher's own precision label, then precision
+              (prec = 'exact') desc nulls last,
               decimals desc,
               observed_at desc, oid;
 
     create temporary table _geo_out on commit drop as
     with base as (
         select e.canonical_entity_id, e.entity_grain, p.oid, p.source_key, p.prec, p.lat,
-               p.lng, p.decimals, p.basis, p.basis_rule, p.basis_evidence,
+               p.lng, p.decimals, p.basis, p.basis_rule, p.basis_evidence, p.uncertainty_m,
+               -- ⚖️ CANONICAL GEOGRAPHY AUTHORITY (rule_version 4). Only SITE claims are compared:
+               -- a publisher's site point and an accepted derived address point. A town/area or
+               -- unusable point is not a claim about the site, so it neither agrees nor disagrees.
+               -- Two site claims of one entity from different sources CONTRADICT each other only
+               -- when they lie farther apart than the evidence itself allows (dc_site_claims_conflict):
+               --   * a derived point carries its calibrated error bound, so a publisher's site point
+               --     within that bound is CORROBORATED by it, never vetoed;
+               --   * two publisher site points carry no quantified error: the peer tolerance.
+               -- A contradiction beyond that allowance fails closed: SOURCES_DISAGREE, no point.
                exists (select 1 from _geo_pts a join _geo_pts b
                          on a.canonical_entity_id = b.canonical_entity_id
                         and a.source_key < b.source_key
                         where a.canonical_entity_id = e.canonical_entity_id
-                          and ST_DistanceSphere(ST_MakePoint(a.lng, a.lat),
-                                                ST_MakePoint(b.lng, b.lat)) > 1000) disagree,
+                          and public.dc_site_claims_conflict(a.evidence_class, a.uncertainty_m, a.lat, a.lng,
+                                                             b.evidence_class, b.uncertainty_m, b.lat, b.lng)) disagree,
+               -- which kind of contradiction (reported, never a different outcome)
+               exists (select 1 from _geo_pts a join _geo_pts b
+                         on a.canonical_entity_id = b.canonical_entity_id
+                        and a.source_key < b.source_key
+                        where a.canonical_entity_id = e.canonical_entity_id
+                          and a.evidence_class = 'PUBLISHER_SITE' and b.evidence_class = 'PUBLISHER_SITE'
+                          and public.dc_site_claims_conflict(a.evidence_class, a.uncertainty_m, a.lat, a.lng,
+                                                             b.evidence_class, b.uncertainty_m, b.lat, b.lng)) peer_conflict,
+               -- the chosen publisher site point, corroborated by another source's derived address point
+               (p.evidence_class = 'PUBLISHER_SITE'
+                and exists (select 1 from _geo_pts d
+                             where d.canonical_entity_id = e.canonical_entity_id
+                               and d.evidence_class = 'DERIVED_ADDRESS' and d.source_key <> p.source_key
+                               and not public.dc_site_claims_conflict(p.evidence_class, p.uncertainty_m, p.lat, p.lng,
+                                                                      d.evidence_class, d.uncertainty_m, d.lat, d.lng))) corroborated,
+               e.canonical_entity_id in (select canonical_entity_id from _geo_open) identity_open,
+               -- a derived point may place only a record whose identity persists across runs: a
+               -- singleton key (a name repeated inside its own run) would mint a new marker id
+               -- every acquisition
+               (p.basis = 'DERIVED_ADDRESS'
+                and exists (select 1 from public.dc_observation_record_key rk
+                             where rk.home_signal_observation_id = p.oid and rk.record_key_rank = 2)) unstable,
+               (select dd.derived from _geo_derived dd
+                 where dd.canonical_entity_id = e.canonical_entity_id) derived,
                exists (select 1 from _geo_pick q
                         where q.canonical_entity_id <> e.canonical_entity_id
                           and q.lat = p.lat and q.lng = p.lng) shared
@@ -344,12 +525,19 @@ begin
            case when b.entity_grain = 'AGGREGATE_MULTI_SITE' then 'NOT_A_SITE'
                 when b.oid is null or b.disagree or b.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED'
                 when b.basis = 'NON_SITE_AREA' then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'GEOGRAPHY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'GEOGRAPHY_UNRESOLVED'
                 else 'RESOLVED' end status,
            case when b.entity_grain = 'AGGREGATE_MULTI_SITE' then 'PUBLISHER_MULTI_SITE'
                 when b.oid is null then 'NO_COORDINATES'
                 when b.disagree then 'SOURCES_DISAGREE'
                 when b.decimals <= 1 then 'ROUNDED_COORDINATES'
                 when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT'
+                when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'UNSTABLE_RECORD_IDENTITY'
+                when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_UNRESOLVED'
+                when b.basis = 'DERIVED_ADDRESS' and b.shared then 'DERIVED_ADDRESS_SHARED'
+                when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT'
                 else 'PUBLISHER_POINT' end rule_key,
            array_remove(array[
                case when b.oid is not null and b.decimals <= 1 then 'ROUNDED_COORDINATES' end,
@@ -358,10 +546,16 @@ begin
                     then 'PUBLISHER_CLAIMS_EXACT' end,
                case when b.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT' end,
                case when b.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE' end,
+               case when b.basis = 'DERIVED_ADDRESS' then 'DERIVED_ADDRESS_POINT' end,
+               case when b.basis = 'DERIVED_ADDRESS' and b.unstable then 'UNSTABLE_RECORD_IDENTITY' end,
+               case when b.basis = 'DERIVED_ADDRESS' and b.identity_open then 'IDENTITY_UNRESOLVED' end,
                case when b.decimals = 2 then 'COARSE_COORDINATES' end,
                case when b.prec = 'approximate' then 'PUBLISHER_APPROXIMATE' end,
                case when b.shared then 'SHARED_COORDINATES' end,
                case when b.disagree then 'SOURCES_DISAGREE' end,
+               case when b.disagree and b.peer_conflict then 'SITE_CLAIMS_CONFLICT' end,
+               case when b.disagree and not b.peer_conflict then 'DERIVED_ADDRESS_BEYOND_UNCERTAINTY' end,
+               case when b.corroborated and not b.disagree then 'CORROBORATED_BY_DERIVED_ADDRESS' end,
                case when b.oid is null then 'NO_COORDINATES' end], null) flags
       from base b;
 
@@ -369,14 +563,18 @@ begin
         insert into public.dc_entity_geography as g
             (canonical_entity_id, geography_status, geometry_type, geom, lat, lng,
              coordinate_decimals, authority_source_key, authority_observation_id,
-             publisher_precision, quality_flags, rule_key, rule_version, provenance)
+             publisher_precision, quality_flags, rule_key, rule_version, provenance,
+             positional_uncertainty_m)
         select canonical_entity_id, status,
                case when status = 'RESOLVED' then 'POINT' end,
                case when status = 'RESOLVED' then ST_SetSRID(ST_MakePoint(lng, lat), 4326) end,
                lat, lng, decimals, source_key, oid, prec, flags, rule_key, v_rule_version,
                jsonb_build_object('rule', rule_key, 'observation', oid,
                                   'location_basis', basis, 'location_basis_rule', basis_rule,
-                                  'location_basis_evidence', basis_evidence)
+                                  'location_basis_evidence', basis_evidence,
+                                  'positional_uncertainty_m', uncertainty_m,
+                                  'derived_location', derived),
+               case when status = 'RESOLVED' then uncertainty_m end
           from _geo_out
         on conflict (canonical_entity_id) do update
            set geography_status = excluded.geography_status,
@@ -388,12 +586,14 @@ begin
                publisher_precision = excluded.publisher_precision,
                quality_flags = excluded.quality_flags, rule_key = excluded.rule_key,
                rule_version = excluded.rule_version, provenance = excluded.provenance,
+               positional_uncertainty_m = excluded.positional_uncertainty_m,
                updated_at = now()
          where (g.geography_status, g.lat, g.lng, g.quality_flags, g.rule_key,
-                g.authority_observation_id, g.rule_version)
+                g.authority_observation_id, g.rule_version, g.positional_uncertainty_m, g.provenance)
                is distinct from
                (excluded.geography_status, excluded.lat, excluded.lng, excluded.quality_flags,
-                excluded.rule_key, excluded.authority_observation_id, excluded.rule_version);
+                excluded.rule_key, excluded.authority_observation_id, excluded.rule_version,
+                excluded.positional_uncertainty_m, excluded.provenance);
         get diagnostics v_written = row_count;
     end if;
 

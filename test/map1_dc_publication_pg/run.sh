@@ -13,6 +13,9 @@ apply_base() {
   P -f "$root/test/zip_membership_pg/fixture_schema.sql" >/dev/null
   P -f "$root/docs/zip-membership-canonical.sql" >/dev/null
   P -f "$here/fixture_dc.sql" >/dev/null
+  # the reader asks Step 3A's source-keyed citation rule: load the SHIPPED statement, never a copy
+  python3 "$root/test/dc_epoch_geography_pg/build_apply.py" --extract docs/dc-step3a-canonical-identity.sql \
+    'create or replace function public.dc_record_citation(' | P >/dev/null
 }
 suite() { P -tA -F'|' -f "$here/suite.sql"; }
 fails_of() { grep -c '|f|' <<<"$1" || true; }

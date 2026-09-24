@@ -5,7 +5,9 @@
 -- are reproduced, with production's names and types (information_schema, 2026-09-22), plus
 -- production's posture: RLS on, nothing granted to anon/authenticated.
 
+drop view  if exists public.dc_current_observation cascade;
 drop table if exists public.dc_entity_geography cascade;
+drop table if exists public.dc_entity_observation cascade;
 drop table if exists public.dc_canonical_entity cascade;
 drop table if exists public.dc_source_observation cascade;
 drop table if exists public.dc_source cascade;
@@ -19,6 +21,7 @@ create table public.dc_source (
 create table public.dc_source_observation (
   home_signal_observation_id uuid primary key default gen_random_uuid(),
   source_key               text not null references public.dc_source(source_key),
+  distribution_key         text not null default 'facilities',
   raw_payload              jsonb not null default '{}'::jsonb,
   source_native_name       text,
   source_native_status     text,
@@ -46,12 +49,25 @@ create table public.dc_entity_geography (
   lng                      double precision,
   authority_observation_id uuid references public.dc_source_observation(home_signal_observation_id),
   publisher_precision      text,
-  quality_flags            text[] not null default '{}'
+  quality_flags            text[] not null default '{}',
+  positional_uncertainty_m double precision
 );
+
+-- The reader's DESCRIPTOR (2026-09-24) is the entity's current observation that states a
+-- lifecycle, found through the entity's links; every fixture observation is current.
+create table public.dc_entity_observation (
+  home_signal_observation_id uuid primary key
+                             references public.dc_source_observation(home_signal_observation_id),
+  canonical_entity_id        uuid not null references public.dc_canonical_entity(canonical_entity_id)
+);
+create view public.dc_current_observation as
+  select o.* from public.dc_source_observation o;
 
 alter table public.dc_source             enable row level security;
 alter table public.dc_source_observation enable row level security;
 alter table public.dc_canonical_entity   enable row level security;
 alter table public.dc_entity_geography   enable row level security;
+alter table public.dc_entity_observation enable row level security;
 revoke all on public.dc_source, public.dc_source_observation, public.dc_canonical_entity,
-              public.dc_entity_geography, public.national_dc_records from anon, authenticated;
+              public.dc_entity_geography, public.dc_entity_observation, public.dc_current_observation,
+              public.national_dc_records from anon, authenticated;

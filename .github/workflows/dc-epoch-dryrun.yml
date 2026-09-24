@@ -1,0 +1,85 @@
+name: dc-epoch-dryrun
+
+# PRODUCTION DRY RUN of automatic Epoch canonical geography -- OFF-DATABASE.
+# Production is only READ: one SELECT per session, in a READ ONLY transaction, with a 2 s
+# lock_timeout (scripts/dc-epoch-replica-dryrun.sh::prod_select, the script's only production path).
+# Every DDL statement, every resolver and the report run in a disposable service container running
+# production's own database image (the run refuses if its geometry engine differs from production's).
+#
+# Why (2026-09-24, two incidents): the first version ran the apply's DDL on production inside a
+# transaction it rolled back, and held ACCESS EXCLUSIVE on public.dc_entity_geography for ~7
+# minutes (one resident Map 1 call returned 500). The second built the chain in a scratch schema,
+# and its DDL still took ACCESS EXCLUSIVE locks outside that schema until the backend was
+# terminated. Rolled back is not harmless, and a scratch schema is not isolation: DDL in production
+# is never a dry run. The replica must reproduce production's Map 1 output row for row, or the run
+# refuses.
+#
+# Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-load.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'scripts/dc-geocode-observations.ts'
+      - 'scripts/dc-epoch-replica-dryrun.sh'
+      - 'test/dc_epoch_geography_pg/**'
+      - '.github/workflows/dc-epoch-dryrun.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-epoch-dryrun
+  cancel-in-progress: true
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      # PRODUCTION'S OWN DATABASE BUILD (Supabase project database version 17.6.1.127): the same
+      # Postgres 17.6 and the same PostGIS 3.3.7 / GEOS 3.14.1 / PROJ 9.7.1. The dry run still
+      # compares postgis_full_version() with production's, byte for byte, and refuses on any skew.
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the replica is built from main's DDL of record
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Offline proof first (a stand-in production; the real one is never touched)
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_epoch_geography_pg/replica_offline.sh
+
+      - name: Production dry run (production is only read)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-epoch-replica-dryrun.sh

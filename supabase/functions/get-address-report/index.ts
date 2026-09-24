@@ -68,7 +68,8 @@ import { resolvePlanes } from "./sources/planes.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
-import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { productionLadder, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { canonicalAddr } from "./canonical-addr.ts";
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
 import { readAllRows } from "./sources/pg-pages.ts";
 // THE decision-history authority, shared with all five connectors and (through the
@@ -93,8 +94,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Zero-fee geocode ladder: OpenAddresses (national_address_points, loaded free) → US Census.
 // No commercial geocoder, no API key. datasetRung honours the per-row match_type the loader
 // stamped (OpenAddresses defaults to parcel_centroid), so precision is never overstated.
-const GEO_LADDER = (supabase: ReturnType<typeof createClient>) =>
-  [datasetRung(supabase, "national_address_points", "openaddresses"), censusRung(fetch)];
+const GEO_LADDER = (supabase: ReturnType<typeof createClient>) => productionLadder(supabase, fetch);
 
 const DEV_CATEGORIES = [
   "Planning, zoning & development",
@@ -541,20 +541,6 @@ function enrichTceq(fac: Record<string, unknown>[], entities: TceqEntity[]): { m
 // Strip the internal match-key fields so they never persist in the cache.
 function stripEnvInternals(fac: Record<string, unknown>[]): void {
   for (const f of fac) { delete f._fstreet; delete f._fzip; }
-}
-// ── v17: the ONE canonical-address normalizer (case-study §4.3) ────────────────────────
-// Deterministic string normalization of a FILED street address, so records filed with
-// suffix/spelling variants ("2200 Caldwell Lane" vs "2200 Caldwell Ln") and the Census
-// matchedAddress form ("…, TX, 78617") all collapse to one property_reports key. The page
-// never normalizes — it links with the engine-stamped canonical_addr.
-function canonicalAddr(a: string): string {
-  return String(a).toUpperCase().replace(/\./g, "")
-    .replace(/\bLANE\b/g, "LN").replace(/\bSTREET\b/g, "ST").replace(/\bDRIVE\b/g, "DR")
-    .replace(/\bROAD\b/g, "RD").replace(/\bAVENUE\b/g, "AVE").replace(/\bBOULEVARD\b/g, "BLVD")
-    .replace(/\bPARKWAY\b/g, "PKWY").replace(/\bHIGHWAY\b/g, "HWY").replace(/\bCOURT\b/g, "CT")
-    .replace(/\bCIRCLE\b/g, "CIR").replace(/\bPLACE\b/g, "PL").replace(/\bSUITE\b/g, "STE")
-    .replace(/\bTEXAS\b/g, "TX").replace(/\bUTAH\b/g, "UT")
-    .replace(/\s*,\s*/g, ", ").replace(/,\s*(\d{5}(-\d{4})?)\s*$/, " $1").replace(/\s+/g, " ").trim();
 }
 // v17: collapse every point record with a filed street address into its per-address
 // property_reports row (public select / service-role writes — docs/property-reports-cache.sql).

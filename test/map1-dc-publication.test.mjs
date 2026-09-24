@@ -8,6 +8,7 @@
 // carries no place, project or source special case.
 //
 // Run: node test/map1-dc-publication.test.mjs
+import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -30,8 +31,15 @@ ok(/grant execute on function public\.map1_dc_zip_members\(text\) to anon, authe
    && !/grant\s+select/i.test(SQL), 'A3 anon gets EXECUTE on the contract and SELECT on nothing');
 ok(/verdict = 'member'/.test(FN) && (FN.match(/geo\.zip_point_membership_in\(/g) || []).length === 1,
   'A4 membership is decided ONCE, by the canonical point predicate');
-ok(!/ST_DWithin|ST_Buffer|ST_Centroid|home_lat|home_lng|p_radius|radius|nearest/i.test(FN),
-  'A5 no radius, buffer, centroid, home point or nearest-anything anywhere in the contract');
+// The ONE distance in the contract is the positional-uncertainty disk (2026-09-24). It can only
+// REMOVE a point from membership (zcta_hits > 1 withholds it) -- it never admits one. So A5 holds
+// for the contract with that single expression cut out, and the expression itself is pinned.
+const DISK = (FN.match(/else\s*\(select count\(\*\) from geo\.zcta_boundary z[\s\S]*?\)\)\s*end as zcta_hits/) || [''])[0];
+ok(DISK.length > 100 && (FN.match(/ST_DWithin/g) || []).length === 1 && /ST_DWithin/.test(DISK)
+   && /p\.positional_uncertainty_m\)\)/.test(DISK) && /zcta_hits <= 1/.test(FN),
+  'A5a the only distance is the uncertainty disk, counted into zcta_hits, which can only withhold');
+ok(!/ST_DWithin|ST_Buffer|ST_Centroid|home_lat|home_lng|p_radius|radius|nearest/i.test(FN.replace(DISK, '')),
+  'A5 no radius, buffer, centroid, home point or nearest-anything anywhere else in the contract');
 ok(/null::numeric as distance_mi/.test(FN), 'A6 no distance is returned — ZIP mode has no home');
 ok(/e\.classification = 'CONFIRMED_DC'/.test(FN) && !/'DC_CANDIDATE'|'NON_DC'/.test(FN),
   'A7 only CONFIRMED_DC publishes; no other classification is named as publishable');
@@ -97,7 +105,13 @@ const defs = ALL.filter((p) => /create\s+(or\s+replace\s+)?function\s+public\.(a
 ok(defs.length === 0, 'C1 no source-specific ZIP reader is defined anywhere', defs);
 const readers = ALL.filter((p) => /create\s+or\s+replace\s+function\s+public\.map1_dc_\w+\s*\(/i.test(read(p)))
   .filter((p) => !p.startsWith('test/'));
-ok(readers.join(',') === 'docs/map1-dc-publication.sql', 'C2 exactly ONE file of record defines a map1_dc_* function', readers);
+// The ONE exception is a GENERATED production apply, and only while it is byte-identical to what its
+// generator emits from the file of record (test/dc-epoch-geography-structure.test.mjs S6 pins the
+// same). A hand-edited copy fails the generator check and is counted as a second definition again.
+const GENERATED_APPLY = 'docs/dc-epoch-geography-apply.sql';
+const genOk = spawnSync('python3', ['test/dc_epoch_geography_pg/build_apply.py', '--check'], { encoding: 'utf8' }).status === 0;
+const ofRecord = readers.filter((p) => !(p === GENERATED_APPLY && genOk));
+ok(ofRecord.join(',') === 'docs/map1-dc-publication.sql', 'C2 exactly ONE file of record defines a map1_dc_* function (a generated apply counts unless it is byte-identical to its generator output)', readers);
 
 console.log(bad ? `\n${bad} FAILED (${n} checks)` : `\nALL CHECKS PASSED (${n} checks)`);
 if (bad) process.exit(1);

@@ -1887,6 +1887,146 @@ an outcome it cannot source**.
 
 ---
 
+## 7.11 A PRODUCTION DRY RUN RUNS NO DDL IN PRODUCTION: IT READS, THEN WORKS ON A REPLICA (2026-09-24)
+
+**Two dry runs of the Epoch apply locked production on 2026-09-24. Neither wrote anything. Both
+did harm.**
+
+1. **DDL on production, inside a rolled-back transaction.** 18:36–18:43Z. `ALTER TABLE` held
+   ACCESS EXCLUSIVE on `public.dc_entity_geography` until the rollback. One resident
+   `map1_dc_zip_members` call returned 500 and a probe timed out. Cancelled.
+2. **The same chain rebuilt in a scratch schema** (`create schema dcdry`, `create table … (like
+   … including all)`). About 18:48–18:53Z. A lock query then attributed ACCESS EXCLUSIVE locks
+   on `auth.*`, `storage.*` and `realtime.*` relations to the dry-run backend. That query did not
+   filter on `pg_locks.database`, so the attribution is **UNVERIFIED** and the cause is
+   **UNKNOWN**. Production does have six DDL event triggers (`pgrst_ddl_watch`,
+   `grant_pg_cron_access`, `grant_pg_net_access`, `grant_pg_graphql_access`, and two on
+   `sql_drop`). The backend blocked a Realtime metrics query until it was terminated
+   (`pg_terminate_backend`, 18:53Z).
+   - **Measured after:** 0 edge 5xx from 18:47 to 18:55Z. Nothing persisted: `dcdry` absent,
+     4,375 decisions and 3,530 entities unchanged, Map 1 md5 `b143605c…` unchanged.
+
+🔑 **"Rolled back" is not "harmless", and a scratch schema is not isolation.** DDL locks last
+until the transaction ends, and the platform runs its own hooks on DDL. **A dry run runs no DDL
+in production, in any schema, in any transaction.**
+
+**The shape that replaced it**: `scripts/dc-epoch-replica-dryrun.sh`, run by `dc-epoch-dryrun.yml`.
+- Production is reached from **one line**, `prod_select`: one `SELECT` per session, wrapped in
+  `\copy`, with `default_transaction_read_only=on` and a 2 s `lock_timeout`.
+- Everything else runs in a PostGIS **service container**: the apply, the queue, the load, both
+  resolvers and the report.
+- **The replica must prove it is production before its answer counts.**
+  - It is built from main's DDL of record.
+  - The four definitions the apply replaces fingerprint identically on both sides.
+  - Its Map 1 output over all 12,722 registry ZIPs equals production's **row for row**, or the
+    run refuses. Measured: 1,815 rows, md5 `d9291024…` on both sides.
+- Offline proof: `test/dc_epoch_geography_pg/replica_offline.sh`, against a stand-in production.
+  - The lock watcher is shown a strong lock and must see it (a positive control).
+  - The stand-in is left byte-identical, with no client lock above ACCESS SHARE.
+  - A drifted definition is refused.
+  - 5 of 5 write shapes are refused by `prod_select`.
+- Pinned by S7c/S7d in `test/dc-epoch-geography-structure.test.mjs`.
+
+**Three gaps closed afterwards, the same day:**
+- **Geometry engine.** The replica is production's own database image, `supabase/postgres:17.6.1.127`
+  (the project's database version). The run **refuses** unless `current_setting('server_version')`
+  and `postgis_full_version()` match production byte for byte: PostGIS 3.3.7, GEOS 3.14.1, PROJ 9.7.1.
+  The earlier replica ran PostGIS 3.5.
+- **The parity refusal is now executed.** `replica_offline.sh` step 2b:
+  - a matching copy is accepted;
+  - a replica tampered through `DRYRUN_TEST_TAMPER_REPLICA_SQL` (the **local replica only**; the
+    workflow never sets it, pinned by S7f) is **refused at parity**, with no after-state;
+  - the restored copy is accepted again.
+  - 🔑 **Running it found a real bug.** On a mismatch, `diff | head` under `set -e` + `pipefail`
+    ended the script before the refusal was printed. The run exited non-zero, but silently.
+- **Schema completeness** (step 3b). One catalog signature, run on both sides, must match:
+  - every column, default, constraint, trigger and index of the tables the resolvers write;
+  - every `dc_%` view and function, the Map 1 reader and the `geo.zip_*` functions.
+  - The evidence tables the chain only reads must have every replica column in production, with the
+    same type.
+
+**Rule:** any future "production dry run" of DDL uses this shape — copy out read-only, change a
+replica, prove parity. Never `begin; <DDL>; rollback;` against production.
+
+## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
+
+**Every coordinate claim is classified by what the evidence is, and authority follows that
+class. Source names play no part.** The single definition lives in
+`public.dc_entity_geography_evidence`:
+- `PUBLISHER_SITE`: a publisher's point with no area statement and at least 2 decimal places.
+- `DERIVED_ADDRESS`: a HomeSignal geocode of a published street address. It carries its calibrated
+  error.
+- `PUBLISHER_NON_SITE`: the publisher's own sentence says the point is a town, area or administrative
+  location.
+- `PUBLISHER_UNUSABLE`: 1 decimal place or fewer on either axis.
+
+Order of authority: publisher site, then derived address, then non-site/unusable, which never
+places anything. The publisher's `exact` label only breaks ties **inside** a class.
+
+**Two site claims contradict each other only beyond what their own evidence allows**
+(`public.dc_site_claims_conflict`):
+- The allowance is the sum of their quantified errors. A derived point's error is the calibrated
+  2,000 m.
+- Two publisher site points carry no number, so they use the 1 km peer tolerance.
+- **Inside the allowance, a derived point corroborates** (`CORROBORATED_BY_DERIVED_ADDRESS`). It
+  never vetoes.
+- **Beyond it, the entity fails closed** as `SOURCES_DISAGREE`, flagged
+  `DERIVED_ADDRESS_BEYOND_UNCERTAINTY` or, between two publishers, `SITE_CLAIMS_CONFLICT`.
+
+The ZIP never votes: no ZCTA, provider ZIP, centroid or nearest ZIP is used in authority.
+Membership is decided afterwards, from the canonical point alone.
+
+🔑 **The 2,000 m allowance is the evidence, not a knob.** The Step 3D calibration geocoded 200 Atlas
+records' own street addresses and compared each with the same record's own site point:
+- p50 120 m · p95 396 m · max 1,801 m;
+- 200 of 200 in the same ZCTA.
+
+A gap wider than that is not geocoder noise. It means the address and the point describe different
+places, and nothing can say which one is wrong.
+
+**Lancaster is decided by that rule, not by a person.** Measured on the read-only replica
+(run `36053496125`):
+- It is the **only** entity nationally with more than one usable site claim.
+- **Atlas** `coreweave-lancaster-pa`:
+  - 40.0379, -76.3055; 4 dp, `exact`, no location note;
+  - its own street is "216 Greenfield Road";
+  - lies in ZCTA 17602, **5 m** from its edge.
+- **Epoch**:
+  - the same address geocodes to 40.04869, -76.25609 (range-interpolated, 1 candidate);
+  - lies in ZCTA 17601, 481 m from its edge.
+- **4,374 m apart**, 2.4× the calibrated maximum.
+
+So Atlas's point and Atlas's own address disagree beyond anything the geocoder has been observed
+to do. The entity stays `GEOGRAPHY_UNRESOLVED` (`DERIVED_ADDRESS_BEYOND_UNCERTAINTY`), identity
+stays `AUTO_CONFIRMED_MATCH`, and the facility is not drawn.
+- ⛔ **Do not "restore" it with an exception.** G14 pins that no facility, place or coordinate
+  literal exists on the authority path.
+- ⚠️ **Residual, stated:** Atlas's own street addresses are not geocoded by the ingest. The same
+  internal inconsistency can therefore exist, undetected, on an Atlas-only facility. It was found
+  here only because Epoch brought the address into the geocoder.
+
+**What `exact` means in practice, measured:** of 717 current Atlas points labelled `exact`:
+- 592 are site-class;
+- **110 carry the publisher's own town/area statement**;
+- 15 have 1 decimal place or fewer.
+
+A label is not evidence of a site.
+
+**Pinned:**
+- `test/dc_geography_pg` G14–G18: peer conflict, peer agreement, three sources with one dissenter,
+  an `exact` area point against a peer site point, and the function's boundaries.
+- `test/dc_epoch_geography_pg` E34–E36: corroborated, cross-ZCTA, and Lancaster-shaped.
+- Mutations G1–G13, each killed:
+  - G1–G3, G12: a source, label or number buys authority;
+  - G4: a derived point always wins;
+  - G5, G6: any difference is a disagreement / a derived point is held to 1 km;
+  - G7: the closest pair wins;
+  - G8 both ways: the ZIP votes;
+  - G9–G11: a provider ZIP, a centroid or the nearest ZIP breaks the tie;
+  - G13: a peer conflict publishes.
+- `test/dc-canonical-geography.test.mjs` G14/G15: facility literals and source names, each shown
+  catching an injected exception.
+
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 
 Two defects in the canonical DC geography layer (`docs/dc-step3b-canonical-geography.sql`,

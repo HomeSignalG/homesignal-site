@@ -8,7 +8,8 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 cd "$here"   # the suite loads its corpus with a relative \copy
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
-apply_base() { P -f "$here/fixture.sql" >/dev/null; }
+# Step 3D (derived location evidence) is geography's second input since rule_version 3.
+apply_base() { P -f "$here/fixture.sql" >/dev/null; P -f "$root/docs/dc-step3d-derived-location.sql" >/dev/null; }
 suite() { P -tA -F'|' -f "$here/suite.sql"; }
 fails_of() { grep -c '|f|' <<<"$1" || true; }
 
@@ -17,7 +18,7 @@ P -f "$root/docs/dc-step3b-canonical-geography.sql" >/dev/null
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 14 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped geography does not pass"; exit 1; fi
+if [ "$n_all" -lt 19 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped geography does not pass"; exit 1; fi
 
 status=0
 while IFS= read -r name; do
