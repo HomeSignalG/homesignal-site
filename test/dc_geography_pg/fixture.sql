@@ -67,6 +67,6 @@ create view public.dc_identity_candidate as
          null::jsonb candidate_evidence
    where false;
 drop function if exists public.dc_adjudicate_pair(uuid, uuid, text) cascade;
-create function public.dc_adjudicate_pair(p_a uuid, p_b uuid, p_rule text)
+create function public.dc_adjudicate_pair(p_observation_a uuid, p_observation_b uuid, p_candidate_rule_key text)
 returns table(decision_state text, decision_rule_key text, evidence jsonb)
 language sql as $$ select 'UNRESOLVED'::text, 'NO_APPLICABLE_RULE'::text, '{}'::jsonb $$;

@@ -233,6 +233,10 @@ function selfTest() {
     'create view public.dc_resident_lineage_ledger',
     'create table if not exists public.dc_entity_geography (',
     'create or replace function public.dc_resolve_geography(p_apply boolean default false)',
+    'create table if not exists public.dc_address_geocode (',
+    'create or replace view public.dc_observation_derived_point with (security_invoker = true) as',
+    'create or replace view public.dc_geocode_queue with (security_invoker = true) as',
+    'create table if not exists public.dc_identity_review (',
     // present in the real DDL and deliberately NOT derived -- a trigger is not callable
     'create constraint trigger dc_run_evidence_commit_trg',
     'create trigger dc_source_observation_guard_trg',
