@@ -34,6 +34,7 @@ g.window = { HS: {} };
 // lib/map.js hangs off window.HS and reads HS.statusHex from lib/templates.js when it is
 // loaded first; both are plain scripts, so `new Function` is the faithful load.
 new Function(readFileSync(join(root, 'lib/templates.js'), 'utf8')).call(g);
+new Function(readFileSync(join(root, 'lib/project-type.js'), 'utf8')).call(g);
 new Function(readFileSync(join(root, 'lib/map.js'), 'utf8')).call(g);
 const P = g.window.HS;
 if (prevWindow === undefined) delete g.window; else g.window = prevWindow;

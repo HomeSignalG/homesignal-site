@@ -36,7 +36,7 @@ import path from 'node:path';
 // The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
 // this module cannot carry a second copy of the rendering rules.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;

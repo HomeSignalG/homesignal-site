@@ -89,7 +89,9 @@ ok(!/(centroid|radius|buffer|nearest)/i.test(
    '[D] the gate body contains no centroid/radius/buffer/nearest logic');
 
 // ── TEST E — THE CANONICAL DATA CENTER CLASSIFIER IS UNTOUCHED ───────────────────────────
-const MAP = readFileSync(new URL('../lib/map.js', import.meta.url), 'utf8');
+// The classifier moved verbatim from lib/map.js to lib/project-type.js (2026-09-24). "The
+// classifier" is that file now, so every [E] check reads it; the assertions are unchanged.
+const MAP = readFileSync(new URL('../lib/project-type.js', import.meta.url), 'utf8');
 ok(/const DATACENTER_RE = \/data\\s\*cent\(\?:er\|re\|e\)\|data\\s\*hall\|hyperscale\|server\\s\*farm\/i;/.test(MAP),
    '[E] DATACENTER_RE is unchanged');
 ok(/const DATACENTER_NOT_RE = /.test(MAP) && /const DATACENTER_SERVING_RE = /.test(MAP)

@@ -24,10 +24,15 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
 <script src="lib/impact.js"></script>
+<!-- lib/project-type.js — the canonical Development Type (pure: no DOM, no map runtime, no
+     network). The Development & Growth cards read HS.canonicalProjectType from it for their
+     Type badge: the SAME classifier Map 1 draws with. lib/map.js is NOT loaded here and must
+     not be (test/zcta-boundary-reader.test.mjs §5a). Loaded by scripts/gen_zip_pages.py too. -->
+<script src="lib/project-type.js?v=6afb02d9"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=75464c7b"></script>
 <script src="lib/gov-notice-copy.js"></script>
-<script src="lib/community-page.js?v=69141959"></script>
+<script src="lib/community-page.js?v=08a51923"></script>
 </body>
 </html>

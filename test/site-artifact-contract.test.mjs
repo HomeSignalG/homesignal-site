@@ -143,7 +143,7 @@ const REQUIRED = [
   'alerts.html',           // Alerts
   'dashboard.html',
   // runtime modules the page families depend on
-  'lib/community-page.js', 'lib/map.js', 'lib/data.js', 'lib/templates.js',
+  'lib/community-page.js', 'lib/project-type.js', 'lib/map.js', 'lib/data.js', 'lib/templates.js',
   'lib/zip-authoritative.js', 'lib/residential-qualify.js',
   'lib/generated/county-sources.json', 'lib/generated/gov-notice-coverage.json',
 ];

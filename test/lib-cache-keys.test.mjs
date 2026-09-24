@@ -39,7 +39,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // capture job and the Approve gate. A fix in it that a warm browser never fetches would
 // leave the dashboard unlocking Approve on a binding rule the capture no longer uses,
 // which is precisely the disagreement it exists to prevent.
-const CONTENT_KEYED = ['lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
+const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));

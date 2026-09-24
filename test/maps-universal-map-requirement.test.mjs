@@ -33,7 +33,7 @@ import { readFileSync } from 'node:fs';
 
 const win = { HS: {} };
 globalThis.window = win;
-for (const f of ['../lib/map.js', '../lib/maps-social-theme.js',
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js',
   '../lib/maps-capture-policy.js', '../lib/maps-capture-binding.js']) {
   new Function('window', 'document', readFileSync(new URL(f, import.meta.url), 'utf8'))(win, undefined);
 }

@@ -18,6 +18,7 @@ const ok = (c, name, extra) => {
 
 global.window = { HS: {}, sessionStorage: { _v: null, getItem() { return this._v; }, setItem(k, v) { this._v = v; } } };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 const REG = HS.REGULATORY_LEGEND;

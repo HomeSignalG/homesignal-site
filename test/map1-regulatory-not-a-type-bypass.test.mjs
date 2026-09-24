@@ -35,6 +35,7 @@ const ok = (c, name, extra) => {
 function loadHS() {
   const win = { HS: {}, HS_CONFIG: { DATA_SOURCE: 'seed' } };
   const doc = { getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
+  new Function('window', 'document', readFileSync(join(ROOT, 'lib/project-type.js'), 'utf8'))(win, doc);
   new Function('window', 'document', readFileSync(join(ROOT, 'lib/map.js'), 'utf8'))(win, doc);
   return win.HS;
 }

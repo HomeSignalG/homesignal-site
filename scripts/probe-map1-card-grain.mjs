@@ -21,7 +21,7 @@ const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'ut
 // The SHIPPED site builder, loaded in the page's own order, so the expected-set control below is
 // the product's answer rather than a re-derivation of it.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;

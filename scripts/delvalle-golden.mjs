@@ -47,7 +47,7 @@ export const NEAREST_FAC_CAP = 24;
 export function loadHS() {
   const win = { HS: {}, HS_CONFIG: { DATA_SOURCE: 'seed' } };
   const doc = { getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
-  for (const f of ['lib/map.js', 'lib/data.js'])
+  for (const f of ['lib/project-type.js', 'lib/map.js', 'lib/data.js'])
     new Function('window', 'document', readFileSync(join(ROOT, f), 'utf8'))(win, doc);
   return win.HS;
 }

@@ -30,6 +30,7 @@ const check = (name, cond, detail) => {
 
 global.window = {};
 window.HS = {};
+await import(join(root, 'lib/project-type.js'));
 await import(join(root, 'lib/map.js'));
 const HS = window.HS;
 const REG = HS.CATEGORY_REGISTRY;

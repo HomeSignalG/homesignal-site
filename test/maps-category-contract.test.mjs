@@ -20,6 +20,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const win = { HS: {} };
 globalThis.window = win;
 globalThis.document = { getElementById: () => null };
+new Function('window', 'document', readFileSync(join(root, 'lib/project-type.js'), 'utf8'))(win, globalThis.document);
 new Function('window', 'document', readFileSync(join(root, 'lib/map.js'), 'utf8'))(win, globalThis.document);
 const SRC = readFileSync(join(root, 'lib/map.js'), 'utf8');
 const HS = win.HS;
@@ -343,7 +344,9 @@ for (const k of Object.keys(REG)) {
   // and moving `other` to the capsule would have left that circle explaining nothing).
   // Every shape any rule can emit must be a symbol some category owns.
   const owned = new Set(Object.values(REG).map((c) => c.symbol));
-  const literals = [...SRC.matchAll(/\{ re: \/(?:[^/\\]|\\.)*\/[a-z]*,[^}]*?shape: '([a-z]+)'/g)].map((m) => m[1]);
+  // The rule tables live in lib/project-type.js since the 2026-09-24 extraction (moved verbatim).
+  const RULE_SRC = readFileSync(join(root, 'lib/project-type.js'), 'utf8');
+  const literals = [...RULE_SRC.matchAll(/\{ re: \/(?:[^/\\]|\\.)*\/[a-z]*,[^}]*?shape: '([a-z]+)'/g)].map((m) => m[1]);
   ok(literals.length >= 10, `13e: the rule scan still finds the rule table (found ${literals.length} literal shapes)`);
   for (const sh of new Set(literals)) {
     ok(owned.has(sh), `13e: rule-emitted shape "${sh}" is owned by a registry category`);

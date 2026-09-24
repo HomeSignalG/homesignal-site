@@ -141,6 +141,23 @@ const m1js = read('homesignalmap.html').replace(/^\s*\/\/.*$/gm, '').replace(/<!
 
 ok(!/lib\/map\.js\?v=/.test(read('scripts/gen_zip_pages.py')) && !/lib\/map\.js\?v=/.test(read('community.html')),
   '5a NEITHER ZIP host loads map code any more — PCM-4\'s public-byte exception is reverted');
+// 5a is a regex on ONE file name, so it would stay green if map runtime arrived under any other
+// name. The INTENT, stated over the whole script list of both hosts: a ZIP page may carry pure
+// domain logic (lib/project-type.js, the canonical Development Type — 2026-09-24) and must carry
+// NOTHING that draws, places, qualifies or fetches for a map. project-type.js's own purity is
+// pinned by test/project-type-authority.test.mjs §3.
+{
+  const MAP_RUNTIME = /lib\/(map|n5-radius|residential-qualify|maps-[\w-]+|place-context-map)\.js|leaflet|maplibre|three(\.module)?(\.min)?\.js|arcgisonline/i;
+  const hostScripts = (src) => [...src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*#.*$/gm, '')
+    .matchAll(/<script src=\\?"([^"\\]+)\\?"/g)].map((m) => m[1]);
+  for (const [host, src] of [['community.html', read('community.html')], ['scripts/gen_zip_pages.py', read('scripts/gen_zip_pages.py')]]) {
+    const list = hostScripts(src);
+    ok(list.length >= 8, '5a2 the script-list scan finds ' + host + '\'s scripts (' + list.length + ')');
+    ok(list.some((s) => /lib\/project-type\.js/.test(s)), '5a2 ' + host + ' loads the pure Type authority lib/project-type.js');
+    const bad = list.filter((s) => MAP_RUNTIME.test(s));
+    ok(bad.length === 0, '5a2 ' + host + ' loads no map runtime of any name' + (bad.length ? ' — ' + bad.join(', ') : ''));
+  }
+}
 ok(!/server\.arcgisonline\.com/.test(read('community.html'))
    && !/server\.arcgisonline\.com/.test(read('scripts/gen_zip_pages.py')),
   '5b ...including the Esri tile host, which left the public CSP with it');

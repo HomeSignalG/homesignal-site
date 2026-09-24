@@ -2076,6 +2076,41 @@ Measured on production 2026-09-22, every canonical ZIP, no sampling:
   Type-scoped and facility-bypass mutations must each FAIL it). The earlier 26-check version, which also covered the
   reverted trigger, passed 26/26 against production inside a rolled-back transaction.
 
+## 7.11 THE CANONICAL DEVELOPMENT TYPE LIVES IN `lib/project-type.js` — ONE CLASSIFIER, NO MAP RUNTIME (2026-09-24)
+
+**What kind of development a record is** — Data center / Industrial / Residential / Roads &
+infrastructure / Commercial / Civic & public / Other project — is decided in exactly one place:
+`lib/project-type.js` (`CATEGORY_REGISTRY`, every precedence rule, `HS.classifyProjectType`).
+It was **moved verbatim** out of `lib/map.js`, which now binds it from `HS.projectType` and
+**throws on load** if the module is absent.
+
+```
+HS.classifyProjectType (lib/project-type.js)
+   ├── HS.resolveMarker (lib/map.js) → Map 1 marker + PROJECT TYPE filter → MAPS evidence.visual.type_key
+   └── HS.canonicalProjectType (lib/project-type.js) → ZIP page Development & Growth Type badge
+```
+
+- **Load order:** `lib/project-type.js` BEFORE `lib/map.js` on every page, test and harness.
+  `test/project-type-authority.test.mjs` §6 checks the pages; the throw catches the rest.
+- **The ZIP hosts load the Type module and NO map runtime** (`test/zcta-boundary-reader.test.mjs`
+  §5a + §5a2). Pure domain logic may go on a public ZIP page; drawing, placement, geography,
+  qualification and network code may not.
+- **`HS.canonicalProjectType(app_projects row)` → `{ typeKey, label }`** is the entry point for any
+  surface that shows a Type without drawing it. Its input projection is Map 1 ZIP mode's
+  (`type`, `name`; **not** `type_raw`), and it equals the ZIP-mode chain on the whole committed
+  class vocabulary. The label is the REGISTRY label — `resolveMarker().typeLabel` echoes the
+  source string ("Civic/Public") and is not a Type vocabulary.
+- **Type is not membership.** Whether Map 1 DRAWS a record (ZIP geography, the residential
+  qualification gate) is a separate question; `canonicalProjectType` never asks it.
+- **The Development & Growth "On the record" line still states the SOURCE type** (`lib/data.js`
+  `factualSowhat`, raw `p.type`), deliberately. Pennhurst Data Centers reads `[DATA CENTER]`
+  beside "On the record: Industrial · proposed". Collapsing the two is a separate decision.
+- **Known and unchanged:** MAPS (`lib/maps-social-theme.js markerItemFor`) passes `type_raw` to the
+  classifier and Map 1 ZIP mode does not, so a record whose only data-centre statement is
+  `type_raw` is `datacenter` to MAPS and `industrial` to Map 1 (1 row in the 237,548-row parity
+  corpus). The KEYWORD rule `typeKey: 'utility'` is not a registry key, so such a record has no Type
+  bucket on Map 1 and no badge (1 row). Both predate the extraction.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP
