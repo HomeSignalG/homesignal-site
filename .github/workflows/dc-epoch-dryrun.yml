@@ -1,0 +1,99 @@
+name: dc-epoch-dryrun
+
+# PRODUCTION DRY RUN of automatic Epoch canonical geography. WRITES NOTHING, by construction:
+#   1. the queue is computed inside a transaction that ROLLS BACK (the new DDL exists only there);
+#   2. the production geocoding ladder runs with DCG_DRY_RUN=1 -- the geocode cache is read, never
+#      written;
+#   3. before-snapshot, DDL, load, the scheduled resolvers and the report all run inside ONE
+#      transaction that ROLLS BACK.
+# The apply body opens with the drift guard, so this refuses if live definitions moved from main.
+# Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
+
+on:
+  workflow_dispatch: {}
+  # a pull request that changes what the dry run measures re-runs it (it writes nothing)
+  pull_request:
+    paths:
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-load.sql'
+      - 'scripts/dc-geocode-observations.ts'
+      - 'test/dc_epoch_geography_pg/build_apply.py'
+      - '.github/workflows/dc-epoch-dryrun.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-epoch-dryrun
+  cancel-in-progress: false
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Build the apply body (no transaction statements of its own)
+        run: python3 test/dc_epoch_geography_pg/build_apply.py --body > /tmp/apply-body.sql
+
+      - name: Queue (DDL applied inside a transaction that rolls back)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -P pager=off <<'SQL'
+          begin;
+          \i /tmp/apply-body.sql
+          \copy (select json_build_object('geocoder_query', geocoder_query, 'ladder_version', ladder_version)::text from public.dc_geocode_queue order by geocoder_query collate "C") to '/tmp/dcg-in.jsonl'
+          rollback;
+          SQL
+          echo "queued addresses: $(grep -c . /tmp/dcg-in.jsonl || true)"
+
+      - name: Derive through the production ladder (dry-run store; nothing written)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DCG_INPUT: /tmp/dcg-in.jsonl
+          DCG_OUTPUT: /tmp/dcg-out.jsonl
+          RUN_REF: dryrun:${{ github.run_id }}
+          DCG_DRY_RUN: '1'
+        run: deno run --allow-net --allow-env --allow-read --allow-write=/tmp scripts/dc-geocode-observations.ts
+
+      - name: Resolve and report (ONE transaction, always rolled back)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -tA -F'|' -P pager=off <<'SQL' | tee /tmp/report.txt
+          begin;
+          set local statement_timeout = 0;
+          create temp table _before as
+            select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m;
+          \i /tmp/apply-body.sql
+          create temp table _dcg_in(j jsonb);
+          \copy _dcg_in(j) from '/tmp/dcg-out.jsonl' with (format csv, quote e'\x01', delimiter e'\x02')
+          \i docs/dc-geocode-observations-load.sql
+          select 'RESOLVE_CANONICAL', metric, value from public.dc_resolve_canonical(true, false);
+          select 'RESOLVE_GEOGRAPHY', metric, value from public.dc_resolve_geography(true);
+          \i docs/dc-epoch-dryrun-report.sql
+          rollback;
+          SQL
+
+      - name: Prove nothing persisted
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -tA -v ON_ERROR_STOP=1 -c "select 'dc_address_geocode exists after rollback: ' || (to_regclass('public.dc_address_geocode') is not null)::text, 'dc_record_identity exists after rollback: ' || (to_regclass('public.dc_record_identity') is not null)::text"

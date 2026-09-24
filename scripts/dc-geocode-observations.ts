@@ -43,7 +43,11 @@ if (!url || !key || !inPath || !outPath || !runRef) {
   Deno.exit(2);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
-const store = supabaseStore(supabase);
+// DCG_DRY_RUN=1: the production dry run. The ladder runs exactly as it will in production, but the
+// geocode cache is read and never written, so the run leaves no trace anywhere.
+const dryRun = Deno.env.get("DCG_DRY_RUN") === "1";
+const liveStore = supabaseStore(supabase);
+const store = dryRun ? { get: liveStore.get, put: async () => {} } : liveStore;
 const ladder = productionLadder(supabase, fetch);
 
 const inputs = (await Deno.readTextFile(inPath)).split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));

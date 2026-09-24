@@ -145,6 +145,13 @@ if __name__ == '__main__':
         sys.stdout.write('\n\n'.join(pick(sys.argv[2], sys.argv[3:])) + '\n')
         sys.exit(0)
     text = build()
+    if '--body' in sys.argv:
+        # the same statements WITHOUT their own begin/commit, for a caller that owns the transaction
+        # (the production dry run applies them inside a transaction it always rolls back)
+        body = text.replace('\nbegin;\n', '\n', 1)
+        assert body.rstrip().endswith('commit;'), 'apply file shape changed'
+        sys.stdout.write(body.rstrip()[:-len('commit;')] + '\n')
+        sys.exit(0)
     if '--check' in sys.argv:
         ok = OUT.exists() and OUT.read_text() == text
         print('apply file is current' if ok else 'apply file is STALE: regenerate it'); sys.exit(0 if ok else 1)

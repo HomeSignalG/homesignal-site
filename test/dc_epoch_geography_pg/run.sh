@@ -36,6 +36,23 @@ if [ "$n_all" -lt 35 ] || [ "$n_fail" -ne 0 ]; then
   cat "$tmp/suite_err" >&2; echo "FAIL — the shipped Epoch geography path does not pass"; exit 1
 fi
 
+# the production dry-run report runs against the shipped end state (in a transaction that rolls
+# back): it must reconcile, and every receipt that must be zero must BE zero
+report="$(P -tA -F'|' <<SQL 2>&1
+begin;
+create table if not exists public.canonical_zip_registry (zip text primary key);
+insert into public.canonical_zip_registry select zcta5 from geo.zcta_boundary on conflict do nothing;
+create temp table _before as select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m;
+\\i $root/docs/dc-epoch-dryrun-report.sql
+rollback;
+SQL
+)" || { echo "$report" | tail -5; echo "FAIL — the dry-run report does not run"; exit 1; }
+bad=$(grep -E '^(I06|I07|I08|I09|G07|G08|G09|L5|N08|N09) ' <<<"$report" | awk -F'|' '$3 != "0"' || true)
+if ! grep -q '^R6 RECONCILES (R1..R5 = I01)||true$' <<<"$report" || [ -n "$bad" ]; then
+  echo "$report" | grep -E '^[A-Z][0-9]'; echo "FAIL — the dry-run report does not reconcile or a required zero is not zero: $bad"; exit 1
+fi
+echo "DRY-RUN REPORT: reconciles; every required-zero receipt is 0"
+
 status=0
 while read -r name rel; do
   python3 "$here/mutate.py" "$name" "$root/$rel" >"$tmp/mutated.sql" || { echo "HARNESS  $name — anchor missing"; status=1; continue; }
