@@ -1,0 +1,87 @@
+name: dc-geocode-probe
+
+# ZERO-WRITE PROBE: every current Epoch data-centre address (plus an Atlas calibration set)
+# through HomeSignal's PRODUCTION geocoding ladder, then analysed against real ZCTA polygons.
+#
+# Why a runner: the sandbox cannot reach the Census geocoder or the database (proxy 403); a
+# GitHub-hosted runner can. Same established pattern as n5-geocode-probe / map1-live-proof.
+#
+# WRITES NOTHING, by construction:
+#   * inputs are read in a READ ONLY transaction;
+#   * scripts/dc-geocode-probe.ts hands resolveGeocode a store whose put() is a no-op;
+#   * the analysis loads the probe output into a SESSION-TEMPORARY table, then switches the
+#     transaction to READ ONLY before running a single analysis query, and ROLLS BACK.
+# Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/dc-geocode-probe.ts'
+      - 'docs/dc-geocode-probe-inputs.sql'
+      - 'docs/dc-geocode-probe-analysis.sql'
+      - '.github/workflows/dc-geocode-probe.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-geocode-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Read inputs (READ ONLY transaction)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          PGOPTIONS='-c default_transaction_read_only=on' \
+            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off \
+                 -f docs/dc-geocode-probe-inputs.sql > /tmp/probe-in.jsonl
+          echo "inputs by kind:"
+          grep -o '"kind" : "[a-z]*"' /tmp/probe-in.jsonl | sort | uniq -c
+
+      - name: Geocode through the production ladder (no writes)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROBE_INPUT: /tmp/probe-in.jsonl
+          PROBE_OUTPUT: /tmp/probe-out.jsonl
+        run: deno run --allow-net --allow-env --allow-read --allow-write=/tmp scripts/dc-geocode-probe.ts
+
+      - name: Analyse against ZCTA polygons (temp table, then READ ONLY, then ROLLBACK)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -P pager=off -P footer=off <<'SQL'
+          begin;
+          create temp table probe(j jsonb) on commit drop;
+          \copy probe(j) from '/tmp/probe-out.jsonl' with (format csv, quote e'\x01', delimiter e'\x02')
+          set transaction read only;
+          \i docs/dc-geocode-probe-analysis.sql
+          rollback;
+          SQL
+
+      - name: Raw probe output (machine-readable receipt)
+        run: |
+          echo "----- BEGIN PROBE JSONL -----"
+          cat /tmp/probe-out.jsonl
+          echo "----- END PROBE JSONL -----"

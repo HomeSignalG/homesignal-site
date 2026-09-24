@@ -58,6 +58,15 @@ export interface GeocodeResult {
   geocode_source: string;
   needs_review: boolean;
   review_reason: string | null;
+  // Provider diagnostics for callers that must record provenance (the data-centre derived-
+  // location batch). NEVER persisted by supabaseStore -- public.geocodes' contract is unchanged
+  // -- and absent on a cache hit, because the cache stores no provider response.
+  diag?: GeocodeDiag;
+}
+
+export interface GeocodeDiag {
+  provider_candidates: number;       // how many matches the provider returned (1 = unambiguous)
+  provider_matched_addresses: string[];
 }
 
 // One rung of the ladder. resolve() returns a classified point, or null on a miss so
@@ -71,7 +80,7 @@ export interface GeocoderRung {
   resolve: (
     input: string,
     canonical: string,
-  ) => Promise<{ lat: number; lng: number; match_type: MatchType; matched_address: string | null } | null>;
+  ) => Promise<{ lat: number; lng: number; match_type: MatchType; matched_address: string | null; diag?: GeocodeDiag } | null>;
 }
 
 // Minimal DB surface so this module ports cleanly (same two ops in Python later).
@@ -129,6 +138,7 @@ export async function resolveGeocode(
       geocode_source: rung.source,
       needs_review: !clears,
       review_reason: clears ? null : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade`,
+      diag: hit.diag,
     };
     break;
   }
@@ -166,6 +176,13 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
         lng: Number(c.x),
         match_type: "range_interpolated" as MatchType,
         matched_address: (m.matchedAddress as string) ?? input,
+        // Behaviour unchanged (first match, as before); the count is RECORDED so a caller that
+        // must not act on an ambiguous match can see that there was more than one.
+        diag: {
+          provider_candidates: matches.length,
+          // deno-lint-ignore no-explicit-any
+          provider_matched_addresses: matches.map((x: any) => String(x?.matchedAddress ?? "")),
+        },
       };
     },
   };
@@ -189,6 +206,14 @@ export function datasetRung(supabase: any, table: string, source = table): Geoco
       return { lat: data.lat, lng: data.lng, match_type: mt as MatchType, matched_address: canonical };
     },
   };
+}
+
+/** THE production ladder, in one place. index.ts (the report engine) and the data-centre
+ *  derived-location batch both call this, so there is exactly one ladder: the zero-fee
+ *  OpenAddresses dataset rung, then Census range interpolation. */
+// deno-lint-ignore no-explicit-any
+export function productionLadder(supabase: any, fetchFn: typeof fetch): GeocoderRung[] {
+  return [datasetRung(supabase, "national_address_points", "openaddresses"), censusRung(fetchFn)];
 }
 
 // ─────────────────────────── store ───────────────────────────
