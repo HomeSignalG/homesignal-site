@@ -22,12 +22,8 @@ on:
   schedule:
     - cron: '45 10 * * *'
   workflow_dispatch: {}
-  pull_request:
-    paths:
-      - 'scripts/dc-geocode-observations.ts'
-      - 'supabase/functions/get-address-report/geocode-cache.ts'
-      - 'supabase/functions/get-address-report/canonical-addr.ts'
-      - '.github/workflows/dc-geocode-observations.yml'
+  # pull_request REMOVED (production credential boundary): a PR run executed the PR's own
+  # code while holding production credentials. Run it from main via workflow_dispatch.
 
 permissions:
   contents: read
@@ -51,10 +47,23 @@ jobs:
       - run: deno check scripts/dc-geocode-observations.ts
 
   derive:
+    # Privileged production credentials are issued ONLY through the main-restricted
+    # GitHub Environment `production` (tested by test/production-credential-boundary.test.mjs).
+    environment: production
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: 'Production boundary: refuse a dispatch chained from another workflow'
+        # First step, before anything else runs. A workflow_dispatch whose triggering actor is
+        # github-actions[bot] was started by ANOTHER workflow's GITHUB_TOKEN - i.e. by branch
+        # code - and would otherwise enter the main-only production Environment with inputs that
+        # branch chose. Enforced by main's copy of this file, which a branch cannot redefine.
+        if: github.event_name == 'workflow_dispatch' && github.triggering_actor == 'github-actions[bot]'
+        run: |
+          echo "::error::Production credentials are not issued to a dispatch chained from another workflow (triggering actor github-actions[bot]). Dispatch it from main as an operator."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Install psql client
