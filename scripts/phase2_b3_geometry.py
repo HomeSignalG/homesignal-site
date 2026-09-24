@@ -380,12 +380,12 @@ EXPECT = {
     "cron_md5": "75b49e8c7e274ea10a3c17e979f86e6f",
 }
 
-# 12 GB provisioned. Everything the database itself does not account for was measured
-# at the B1 commit and is held constant here; it is disclosed rather than hidden
-# inside a threshold, because free disk is not readable from SQL on this platform.
-DISK_TOTAL_MB = 12288
-DISK_OTHER_MB = 681
-DISK_STOP_MB = 2048
+# Free disk is not readable from SQL on this platform, so the volume size and the
+# non-database usage come from the ONE dated record (data/db-capacity.json via
+# scripts/n5_capacity.py) instead of the 12,288 / 681 MB constants this file carried.
+# The stop is the shared floor: raisable, never lowerable.
+import n5_capacity  # noqa: E402
+DISK_STOP_MB = n5_capacity.floor_mb()
 
 
 def controls(tag):
@@ -394,7 +394,7 @@ def controls(tag):
            for k, v in EXPECT.items() if str(row.get(k)) != str(v)]
     db_mb = int(row["db_bytes"]) / 1048576.0
     wal_mb = int(row["wal_bytes"]) / 1048576.0
-    free_mb = DISK_TOTAL_MB - (db_mb + wal_mb + DISK_OTHER_MB)
+    free_mb = n5_capacity.free_mb(db_mb, wal_mb, n5_capacity.load())
     say(f"[{tag}] db / wal / free (MB)", f"{db_mb:,.0f} / {wal_mb:,.0f} / {free_mb:,.0f}")
     if bad:
         raise SystemExit("STOP: control failure\n  " + "\n  ".join(bad))

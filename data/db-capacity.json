@@ -1,0 +1,9 @@
+{
+  "_doc": "THE ONE record of the production database volume's provisioned size, read by scripts/n5_capacity.py and nothing else. Postgres cannot see the volume and the Supabase Management API exposes no disk-size field, so this is a HUMAN reading from Supabase -> Project Settings -> Compute and Disk, committed with its date. null means NOT RECORDED, and every N5 builder REFUSES to run until it is recorded: an unknown capacity is never treated as ample. Replaced the constant 11,607 MB that five builders carried, which the database had outgrown (11,292 MB + 1,024 MB WAL measured 2026-09-24) so they computed NEGATIVE free space.",
+  "provisioned_disk_mb": null,
+  "non_database_mb": null,
+  "recorded_at": null,
+  "recorded_by": null,
+  "source": null,
+  "notes": "2026-09-24: founder reported the volume 69% utilized with ~11 GB database + ~1 GB WAL and CPU ~100%, and held the N5 candidate build. The provisioned size itself was not stated, so it is left unrecorded rather than back-derived from a percentage. non_database_mb is the part of the volume's USED figure that pg_database_size + pg_ls_waldir cannot see (dashboard used MB minus database MB minus WAL MB, at the same moment)."
+}

@@ -30,8 +30,8 @@ from n5_shard import sql, say  # noqa: E402
 
 MODE = os.environ.get("A4_MODE", "index").strip()
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a4-{int(time.time())}"
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
+FLOOR_MB = n5_capacity.floor_mb()
 EST_INDEX_MB = float(os.environ.get("EST_INDEX_MB", "455"))
 PASSES = [int(x) for x in os.environ.get("BENCH_PASSES", "3,4").split(",")]
 
@@ -41,9 +41,7 @@ DDL = (f"create index concurrently if not exists {IDX} "
 
 
 def free_mb():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"]))
+    return n5_capacity.measure(sql)[0]   # refuses on unknown capacity
 
 
 def build_index():

@@ -36,6 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import sql, lit  # noqa: E402  - one implementation, imported not re-derived
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 GENERATION = os.environ.get("GENERATION", "").strip()
 MODE = os.environ.get("MODE", "status").strip()
@@ -128,6 +129,20 @@ def mode_open():
            f"limit 1;", "snap exists", read_only=True):
         raise SystemExit(f"STOP: snapshot {snapshot_id} already has rows. A capture is "
                          f"immutable; refusing to append to one.")
+
+    # CAPACITY BEFORE ANYTHING IS WRITTEN. A generation is ~3 GB of capture, build tables
+    # and WAL, and the capture is one transaction, so running out part-way is not a clean
+    # halt: it is a full volume. The projection is measured from the relations one
+    # generation writes (scripts/n5_capacity.py), and an unrecorded or contradicted volume
+    # size refuses here rather than defaulting.
+    floor = n5_capacity.floor_mb()
+    free, db, wal = n5_capacity.measure(sql)
+    need = n5_capacity.projected_generation_mb(sql)
+    say("free MB / floor MB", f"{free:,.0f} / {floor:,.0f}")
+    for k in ("capture_mb", "build_mb", "wal_reserve_mb", "total_mb"):
+        say(f"projected {k}", f"{need[k]:,.0f}")
+    say("free after projected generation MB",
+        f"{n5_capacity.require_headroom(free, need['total_mb'], floor, 'open'):,.0f}")
 
     # The cutoff is read ONCE and reused for the capture and the generation row, so the
     # watermark the generation advertises is exactly the instant it captured.

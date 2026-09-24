@@ -2270,6 +2270,37 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.13 N5 DISK CAPACITY IS ONE DATED RECORD, AND "UNKNOWN" MEANS STOP (2026-09-24)
+
+**Every N5 geography builder now asks `scripts/n5_capacity.py` for free disk, and that module
+reads the volume size from `data/db-capacity.json` — a human reading of Supabase → Project
+Settings → Compute and Disk, committed with its date.** It replaced `DISK_TOTAL_MB = 11607`
+copied into seven builders (plus 12,288 in `phase2_b3_geometry.py`, and 11607 inlined into SQL
+in `n5_recon_population.py`).
+
+- ⚠️ **The constant was not conservative; it was wrong.** Measured 2026-09-24: database
+  **11,292 MB + WAL 1,024 MB** against a 11,607 MB "total", so every builder computed
+  **negative** free space. The founder separately reported the volume **69% used, CPU ~100%**,
+  and held the N5 candidate build. A wrong constant can pass a build as easily as block one.
+- **Fail closed, every path:** a missing, unreadable, null, non-numeric or undated record
+  refuses; so does a record the database's own measurement contradicts (database + WAL +
+  recorded non-database usage ≥ recorded volume ⇒ the record is stale). An unrecorded capacity
+  refuses **before** any query is sent.
+- **`DISK_TOTAL_MB` is retired and is itself a refusal**, so an old env block cannot supply a
+  second answer.
+- **The 2,048 MB floor is a minimum.** `DISK_FLOOR_MB` may raise it and can never lower it
+  (2047, 0, NaN and non-numeric all refuse).
+- **`n5_orchestrate.py open` checks headroom BEFORE its one-transaction capture**, against a
+  projection measured from the relations one generation writes (capture per-row size × live
+  rows, the build relations' current size, and WAL room up to `max_wal_size`). Row counts are
+  `pg_class.reltuples`, never a `count(*)` over `app_projects` on a database running hot.
+- 📌 **The record ships UNRECORDED (`provisioned_disk_mb: null`), so every builder refuses
+  today.** That is intended: the provisioned size was not stated, and it is not back-derived from
+  a percentage. Filling it is a one-line commit; `non_database_mb` is the dashboard's used
+  figure minus database minus WAL, read at the same moment.
+- Pinned by `test/n5-capacity.test.mjs` (calls the shipped module; 11 of 11 mutations killed on
+  exit code, including restoring a builder's own floor or constant).
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

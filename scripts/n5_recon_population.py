@@ -22,14 +22,12 @@ from n3_pilot import sql, say, lit  # noqa: E402
 
 FLAT = "geo.n5_recon_flat"
 CHUNK = int(os.environ.get("RECON_CHUNK", "250"))
-FLOOR = float(os.environ.get("DISK_FLOOR_MB", "2048"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
+FLOOR = n5_capacity.floor_mb()
 
 
 def disk():
-    r = sql("""select 11607 - round(pg_database_size(current_database())/1048576.0)
-                     - (select round(sum(size)/1048576.0) from pg_ls_waldir()) free_mb;""",
-            "disk", read_only=True)[0]
-    return float(r["free_mb"])
+    return n5_capacity.measure(sql)[0]   # refuses on unknown capacity
 
 
 def producer_preflight():

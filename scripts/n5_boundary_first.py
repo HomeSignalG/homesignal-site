@@ -39,8 +39,8 @@ PREFIX = os.environ.get("PREFIX", "").strip()
 # race by construction rather than by scheduling luck.
 PREFIXES = [x.strip() for x in os.environ.get("PREFIXES", "").split(",") if x.strip()]
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"bf-{PREFIX}-{int(time.time())}"
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
+FLOOR_MB = n5_capacity.floor_mb()
 SCRATCH = "geo.n5_bf_zcta"
 
 # The pass's own SQL, held as a constant so the guard checks the string that actually
@@ -56,9 +56,7 @@ on conflict (zcta5, source_key) do nothing;"""
 
 
 def disk():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"])), float(r["db"]), float(r["wal"])
+    return n5_capacity.measure(sql)   # (free, db, wal); refuses on unknown capacity
 
 
 def snap(tag):

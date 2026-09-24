@@ -26,16 +26,14 @@ from n3_pilot import lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SR
 from n5_shard import sql, say, one, tiger_index  # noqa: E402
 
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a3-{int(time.time())}"
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
+FLOOR_MB = n5_capacity.floor_mb()
 SCRATCH = "geo.n5_a3_zcta"
 STATS = "geo.n5_a3_clip_stats"
 
 
 def disk():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"])), float(r["db"]), float(r["wal"])
+    return n5_capacity.measure(sql)   # (free, db, wal); refuses on unknown capacity
 
 
 def ddl():

@@ -35,8 +35,8 @@ from n5_shard import sql, say, tiger_index  # noqa: E402
 
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a3m-{int(time.time())}"
 MODE = os.environ.get("MARKER_MODE", "measure").strip()
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision (volume size, floor)
+FLOOR_MB = n5_capacity.floor_mb()
 
 # Marker rule parameters. Chosen from the measure pass; see UNIT-A3 evidence doc.
 D_M = float(os.environ.get("MARKER_D_M", "1000"))          # max gap along a line component
@@ -49,9 +49,7 @@ MARK = "geo.zip_authoritative_marker"
 
 
 def disk():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"]))
+    return n5_capacity.measure(sql)[0]   # refuses on unknown capacity
 
 
 def load_boundaries(pfx):

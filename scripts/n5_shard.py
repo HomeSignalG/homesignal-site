@@ -33,6 +33,7 @@ from n3_pilot import (  # noqa: E402  - one implementation, imported not re-deri
     paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL, TIGER_SHA256,
     CANON_SRID, UA, STATS,
 )
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
 # EVERY BUILD ARTIFACT BELONGS TO A GENERATION. Shard state keyed on snapshot alone cannot
@@ -42,9 +43,10 @@ SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
 GENERATION = os.environ.get("GENERATION", "").strip()
 Z3_ENV = os.environ.get("Z3", "AUTO").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
-DISK_FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-# Same basis as the N3/N4 receipts so the floor means the same thing across phases.
-DISK_TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+# Capacity is decided in ONE place (scripts/n5_capacity.py): the floor can be raised and
+# never lowered, and the volume size comes from the committed, dated record - never from
+# the 11,607 MB constant this file used to carry, which the database had outgrown.
+DISK_FLOOR_MB = n5_capacity.floor_mb()
 REG_PATH = "supabase/functions/get-address-report/jurisdiction-registry.json"
 
 # Carried-forward gates. These are decisions, not TODOs - see the N5 authorization.
@@ -155,11 +157,8 @@ def load_registry():
 
 
 def disk_free_mb():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")
-    db = float(r[0]["db"])
-    wal = float(r[0]["wal"])
-    return DISK_TOTAL_MB - (db + wal), db, wal
+    """(free, db, wal). Refuses (SystemExit) when capacity is unrecorded or contradicted."""
+    return n5_capacity.measure(sql)
 
 
 # ---------------------------------------------------------------- boundaries
