@@ -451,7 +451,7 @@ def render(p, built):
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
-        '<script src="/lib/project-type.js?v=6afb02d9"></script>\n'
+        '<script src="/lib/project-type.js?v=1956b224"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
@@ -464,7 +464,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=75464c7b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=08a51923"></script>\n'
+        '<script src="/lib/community-page.js?v=e77f3e91"></script>\n'
         "</body>\n</html>\n")
 
 

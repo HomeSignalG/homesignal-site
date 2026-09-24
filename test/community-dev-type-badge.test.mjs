@@ -89,7 +89,8 @@ ok(/text-transform:uppercase/.test(read('app.css').match(/\.card \.lens\{[^}]*\}
   '2d the badge inherits .card .lens uppercase — the label is displayed, not rewritten');
 
 // ── §3 no raw type, no prose, fail closed ────────────────────────────────────────────────
-const badgeSrc = RT.slice(RT.indexOf('HS.devTypeBadge = function'), RT.indexOf('HS.onReady('));
+// From the shared renderer (HS.typeBadge) through every badge function, up to the page boot.
+const badgeSrc = RT.slice(RT.indexOf('HS.typeBadge = function'), RT.indexOf('HS.onReady('));
 const badgeCode = badgeSrc.replace(/^\s*\/\/.*$/gm, '');
 ok(/HS\.canonicalProjectType\(p\)/.test(badgeCode), '3a the badge asks HS.canonicalProjectType');
 ok(!/p\.type|type_raw|sowhat|impact|On the record|\.test\(|match\(|RegExp|toLowerCase/i.test(badgeCode),
