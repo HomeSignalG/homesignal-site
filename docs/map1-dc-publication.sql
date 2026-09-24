@@ -139,10 +139,17 @@ as $function$
                and ST_DistanceSphere(ST_MakePoint(c.lng, c.lat), ST_MakePoint(o2.lng, o2.lat)) <= 1) = 1)),
   pool as (select * from canon union all select * from osm_kept),
   judged as (
-    select p.*, geo.zip_point_membership_in(bb.geom, p.lat, p.lng) as verdict
+    select p.*, geo.zip_point_membership_in(bb.geom, p.lat, p.lng) as verdict,
+           -- EDGE AMBIGUITY FAILS CLOSED (2026-09-24). Membership is boundary-inclusive, so a
+           -- point exactly on an edge two ZCTAs share is a member of BOTH, and would publish on
+           -- two ZIP pages. It is withheld instead: never the nearest, never an arbitrary pick.
+           -- Measured when written: 0 of 3,497 candidate points touch more than one ZCTA.
+           (select count(*) from geo.zcta_boundary z
+             where z.geom is not null
+               and ST_Intersects(z.geom, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4269))) as zcta_hits
       from pool p, bb),
   members as (
-    select * from judged where verdict = 'member'
+    select * from judged where verdict = 'member' and zcta_hits <= 1
      order by source_key collate "C"
      limit (select n + 1 from lim)),
   counted as (select count(*) over () as total, members.* from members)

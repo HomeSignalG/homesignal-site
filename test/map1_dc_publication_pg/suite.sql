@@ -22,6 +22,11 @@ insert into geo.zcta_boundary (zcta5, geom)
 select c.zip_with, z.geom from _zm_cfg c, _pb_poly z
  where not exists (select 1 from geo.zcta_boundary b where b.zcta5 = c.zip_with);
 delete from geo.zcta_boundary where zcta5 = (select zip_without from _zm_cfg);
+-- a NEIGHBOUR sharing 99901's whole west edge (x = -100), for the edge-ambiguity check
+delete from geo.zcta_boundary where zcta5 = '99903';
+insert into geo.zcta_boundary (zcta5, geom)
+select '99903', ST_Multi(ST_GeomFromText(
+  'POLYGON((-100.4 40, -100 40, -100 40.4, -100.4 40.4, -100.4 40))', 4269))::geometry(MultiPolygon, 4269);
 
 insert into public.dc_source values
   ('compute_atlas', 'Compute Atlas', 'CC BY 4.0'),
@@ -78,6 +83,8 @@ select pg_temp.mk('NO not a site',         'compute_atlas', 'CONFIRMED_DC', 'NOT
 select pg_temp.mk('NO cancelled',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.26, -99.94, 'cancelled',          'https://example.test/x');
 select pg_temp.mk('NO status absent',      'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.27, -99.94, null,                 'https://example.test/y');
 select pg_temp.mk('NO url',                'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.28, -99.94, 'operational',        null);
+-- exactly ON the edge 99901 shares with 99903: a member of both, so it must publish on neither
+select pg_temp.mk('NO shared edge',        'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.33, -100.0, 'operational',        'https://example.test/e');
 select pg_temp.mk('NO superseded',         'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 40.29, -99.94, 'operational',        'https://example.test/z', true);
 
 -- legacy OSM compatibility rows
@@ -184,5 +191,15 @@ select 'S13 anon may execute the ONE contract (SECURITY DEFINER) and may read NO
    and not has_table_privilege('anon', 'public.dc_entity_geography', 'select')
    and not has_table_privilege('anon', 'public.dc_source_observation', 'select')
    and not has_table_privilege('anon', 'public.national_dc_records', 'select'), null;
+
+insert into _pb_result(check_name, pass, detail)
+select 'S14 a point on an edge two ZCTAs share publishes on NEITHER page (fails closed, no nearest-ZIP pick)',
+       -- positive control first: the point really is a boundary member of both polygons
+       (select count(*) from geo.zcta_boundary z
+         where ST_Intersects(z.geom, ST_SetSRID(ST_MakePoint(-100.0, 40.33), 4269))) = 2
+   and geo.zip_point_membership_in((select geom from geo.zcta_boundary where zcta5 = '99903'), 40.33, -100.0) = 'member'
+   and not exists (select 1 from _pb_out where project_name = 'NO shared edge')
+   and not exists (select 1 from public.map1_dc_zip_members('99903') m where m.project_name = 'NO shared edge'),
+       null;
 
 select check_name, coalesce(pass, false) as pass, detail from _pb_result order by n;

@@ -5,6 +5,8 @@
 // 131 GEOGRAPHY_UNRESOLVED (87 Epoch records with no coordinates + 44 rounded), 9 NOT_A_SITE;
 // a second apply wrote 0 rows. Stratos (41.5, -113.5, publisher "exact") is unresolved by the
 // rounded-coordinates rule like every other one-decimal point, not by name.
+// rule_version 2 (2026-09-24): identity-pending refusal + publisher-stated area points withheld;
+// the executable proof is test/dc_geography_pg (PostGIS, corpus of 1,183 real sentences).
 // Run: node test/dc-canonical-geography.test.mjs
 import { readFileSync } from 'node:fs';
 
@@ -31,8 +33,8 @@ ok(/b\.oid is null or b\.disagree or b\.decimals <= 1 then 'GEOGRAPHY_UNRESOLVED
 ok(/least\(scale\(o\.source_native_lat::text::numeric\),\s*scale\(o\.source_native_lon::text::numeric\)\)/.test(fn),
   '2c: decimals are the LESSER of the two axes (one rounded axis is enough to fail)');
 ok(/ST_DistanceSphere\([\s\S]*?\) > 1000\) disagree/.test(fn), '2d: sources > 1 km apart disagree');
-ok(/b\.decimals <= 1 and b\.prec = 'exact'\s+then 'PUBLISHER_CLAIMS_EXACT'/.test(fn),
-  '2e: a rounded point labelled "exact" is flagged, not trusted');
+ok(/\(b\.decimals <= 1 or b\.basis = 'NON_SITE_AREA'\)\s+and b\.prec = 'exact'\s+then 'PUBLISHER_CLAIMS_EXACT'/.test(fn),
+  '2e: a rounded point, or a stated area point, labelled "exact" is flagged, not trusted');
 for (const f of ['COARSE_COORDINATES', 'PUBLISHER_APPROXIMATE', 'SHARED_COORDINATES']) {
   ok(fn.includes(`'${f}'`), `2f: resolved points carry the ${f} quality flag`);
 }
@@ -58,6 +60,25 @@ ok(!!geoSched && Number.isFinite(identMin) && +geoSched[1] > identMin,
 // 6. No ZIP, no radius, no place, no project -- membership is a separate stage.
 ok(!/zcta|zip|radius|centroid|national_dc|distance_mi/i.test(fn), '6a: no ZIP / radius / legacy plane');
 ok(!/stratos|box elder|utah|lucin|84336|84307|41\.5|-113\.5/i.test(code), '6b: no place- or project-specific logic');
+
+// 7. rule_version 2 (2026-09-24): identity first, and a stated area point is not a site.
+const guardAt = fn.indexOf('if v_pending > 0 then'), ptsAt = fn.indexOf('create temporary table _geo_pts');
+ok(guardAt > -1 && ptsAt > guardAt && /REFUSED_IDENTITY_PENDING/.test(fn),
+  '7a: unlinked current evidence refuses the run BEFORE any geography is computed');
+ok(/when b\.basis = 'NON_SITE_AREA' then 'GEOGRAPHY_UNRESOLVED'/.test(fn)
+   && /when b\.basis = 'NON_SITE_AREA' then 'PUBLISHER_AREA_POINT'/.test(fn),
+  '7b: a publisher-stated area point is GEOGRAPHY_UNRESOLVED / PUBLISHER_AREA_POINT');
+ok(/cross join lateral public\.dc_location_basis\(o\.source_key, o\.distribution_key,\s*o\.raw_payload\)/.test(fn)
+   && !/notes/i.test(fn),
+  '7c: the resolver reads the canonical location-basis RESULT, never the publisher text itself');
+ok(/when b\.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE'/.test(fn)
+   && !/'NON_SITE_ROAD' then 'GEOGRAPHY_UNRESOLVED'/.test(fn),
+  '7d: a road reference is flagged, never demoted');
+ok(/v_rule_version constant integer := 2;/.test(fn), '7e: rule_version is 2');
+const lb = code.slice(code.indexOf('create or replace function public.dc_location_basis('));
+ok(/if p_source_key = 'compute_atlas' then/.test(lb) && /'NO_LOCATION_BASIS_RULE'/.test(lb),
+  '7f: the text rule is keyed on its source; every other source is UNSTATED');
+
 ok(!/source_key\s*=\s*'/.test(fn), '6c: no source-specific branch');
 
 console.log(bad ? `\n${bad} FAILED (${n} checks)` : `\nALL CHECKS PASSED (${n} checks)`);

@@ -43,6 +43,8 @@ MUTATIONS = {
     'no_dedupe': [("where not (", "where true or not (", 1)],
     # the superseded identity keeps publishing
     'publish_superseded': [("where e.superseded_by is null", "where true", 1)],
+    # boundary-inclusive membership with no edge guard: one point, two ZIP pages
+    'edge_blind': [("where verdict = 'member' and zcta_hits <= 1", "where verdict = 'member'", 1)],
 }
 
 
