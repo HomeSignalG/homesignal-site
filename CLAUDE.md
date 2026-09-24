@@ -2464,6 +2464,25 @@ Do not read the Phase 1A/1B sections above as the whole story — they describe 
   contradicted. 0 rows at review time; reachable on any EPA recovery. The refusal branch now
   LEADS: no trusted facility write ⇒ the count renders UNKNOWN, never as fact.
 
+### ✅ `dev_refresh_collect()` EVALUATES EACH RESPONSE ONCE (2026-09-24)
+SQL of record for the collector is now **`docs/dev-refresh-collect-once-per-response.sql`**; it
+supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the ROLLBACK path).
+- 🔑 **THE 20-MINUTE WINDOW WAS THE ELIGIBILITY RULE, AND IT REPLAYED EVERYTHING.** Job 14 ticks
+  every 2 minutes, so a response stayed "newest in window" for ~10 ticks: measured **1,401
+  responses → 12,070 evaluations (avg 8.62, median 10)**, each accepted replay rewriting `sites`
+  and re-firing its trigger, and each blocked one re-logging the same `fetch_failed` row.
+- **The fix is ONE nullable column, `development_reports.last_collected_response_id`** — processing
+  state, not data — set for EVERY evaluated response (accepted or refused) in the same transaction
+  as its diagnostics. Eligibility = newest in window AND id > cursor. The window is only a scan bound.
+  `dev_refresh_inflight` could not carry it: five other get-address-report producers never write it,
+  and `dev_refresh_log_fire_failures()` deletes its rows the tick a response lands.
+- ⛔ **RETRY IS A FRESH REQUEST, NEVER A REPLAY.** A refused ZIP keeps its old `refreshed_at`, and the
+  UNCHANGED fire side re-fires it after the cooldown. Do not "fix" a refusal by clearing the cursor.
+- NULL cursor = not yet evaluated = the safe state, so there is **no backfill**; backfilling to the
+  newest id would skip a response that landed after the last tick.
+- Pinned by `test/dev-refresh-collect-once-per-response.test.mjs`. Its §1 proves that the new body,
+  minus the named additions, **equals** the superseded body.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
