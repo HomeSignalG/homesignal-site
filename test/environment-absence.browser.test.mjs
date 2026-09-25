@@ -135,7 +135,9 @@ async function hydrate(zip, data) {
   const r = await page.evaluate(() => {
     const el = document.getElementById('commPage');
     const heads = el ? [].slice.call(el.querySelectorAll('.groupHead')).map(h => h.textContent.replace(/\s+/g, ' ').trim()) : [];
-    return { text: el ? el.textContent : '', html: el ? el.innerHTML : '', heads };
+    const st = document.getElementById('zip-score-strip');
+    return { text: el ? el.textContent : '', html: el ? el.innerHTML : '', heads,
+             strip: st ? st.textContent.replace(/\s+/g, ' ').trim() : '' };
   });
   await page.close();
   return { errors, ...r };
@@ -170,8 +172,17 @@ for (const zip of ['01001', '01002']) {
   ok(count(f.text, T.news) >= 1 && f.heads.some(h => /^Local news — 1 item/.test(h)),
     zip + ' FULL — D: environmental Local News renders under Local news (1 item)', f.heads);
   ok(count(f.text, T.devUtil) === 1, zip + ' FULL — D: the utility-sounding project renders once, under Development', count(f.text, T.devUtil));
-  ok(count(f.text, T.facility) === 1 && f.heads.some(h => /^Regulated facilities nearby/.test(h)),
-    zip + ' FULL — D: the EPA facility renders once, under Regulated facilities nearby', f.heads);
+  // Founder hierarchy (2026-09-25): What's Changing is Development & growth · Government &
+  // civic · Local news, and registry presence is regulatory INVENTORY, not a change event — so
+  // the EPA facility row, although read, renders in no What's Changing section. The data plane
+  // is still read: the summary strip's Regulated facilities tile counts it.
+  ok(count(f.text, T.facility) === 0 && !f.heads.some(h => /Regulated facilities/.test(h)),
+    zip + ' FULL — D: the EPA facility is not listed in What\'s Changing (no Regulated facilities section)', f.heads);
+  ok(/(?:^|[^0-9])1\s*Regulated facilities$/.test(f.strip),
+    zip + ' FULL — D: control — the facility plane is still read (the strip tile counts 1)', f.strip);
+  const order = f.heads.map(h => (h.match(/^(Development & growth|Government & civic|Local news)/) || [])[1]).filter(Boolean);
+  ok(f.heads.length === 3 && order.join('|') === 'Development & growth|Government & civic|Local news',
+    zip + ' FULL — the What\'s Changing hierarchy is exactly Development & growth · Government & civic · Local news', f.heads);
   ok(count(f.text, T.meeting) === 1, zip + ' FULL — D: the water meeting renders once, in the Meetings card', count(f.text, T.meeting));
   const gov = f.heads.find(h => /^Government & civic/.test(h)) || '';
   ok(/1 notice\b/.test(gov), zip + ' FULL — D: Government & civic counts its notice (the Environment row is not a notice)', gov);

@@ -181,18 +181,22 @@ ok(!/EPA-registered facilities and completed construction filings/.test(PAGE) &&
 ok(/function stageOf\(s\)\{[^}]*bucketOf\(s && s\.type, s\)/.test(PAGE),
   '7d stageOf passes the SITE, so a cached FRS stamp cannot re-enter through the marker title');
 const RT = read('lib/community-page.js');
-const cardSrc = RT.slice(RT.indexOf('facilities.slice(0,6).map(function(f){'), RT.indexOf("}).join('')", RT.indexOf('facilities.slice(0,6).map(function(f){')));
-ok(cardSrc.length > 100 && !/'Operating|Operating'/.test(code(cardSrc)) && /HS\.facLifecycleLabel\(f\)/.test(cardSrc),
-  '7e ZIP card: no literal Operating; the lifecycle word is the stored status in the shared vocabulary (HS.facLifecycleLabel)');
+// The ZIP page's facility CARD is gone (founder hierarchy, 2026-09-25: What's Changing carries no
+// standalone regulatory-inventory section). What survives is the shared facility helper, so the
+// lifecycle rule is pinned there — no literal Operating, the stored status in the shared vocabulary.
+const lcHelper = code(RT.slice(RT.indexOf('HS.facLifecycleLabel = function'), RT.indexOf('HS.onReady(')));
+ok(lcHelper.length > 50 && !/'Operating|Operating'/.test(lcHelper) && /HS\.canonicalLifecycle\(f\)/.test(lcHelper)
+   && !RT.includes('facilities.slice(0,6).map(function(f){'),
+  '7e ZIP page: no facility card; the facility lifecycle helper carries no literal Operating and reads HS.canonicalLifecycle');
 {
   HS.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   HS.typeBadge = HS.typeBadge || (() => '');
   HS.onReady = () => {};
   new Function('HS', RT)(HS);
-  const card = new Function('HS', 'f', cardSrc.slice('facilities.slice(0,6).map(function(f){'.length));
-  const html = card(HS, { name: 'CROMBY GENERATING STATION', type: 'energy', status: 'On file', source_ref: 'https://echo.epa.gov/x' });
-  ok(!/Operating/.test(html) && /<span class="lens">Lifecycle unknown/.test(html) && /Roads &amp; infrastructure/.test(html),
-    '7f the rendered Cromby card reads "Lifecycle unknown [ROADS & INFRASTRUCTURE]", never Operating', html.slice(0, 200));
+  const f = { name: 'CROMBY GENERATING STATION', type: 'energy', status: 'On file', source_ref: 'https://echo.epa.gov/x' };
+  const html = HS.facLifecycleLabel(f) + HS.facTypeBadge(f);
+  ok(!/Operating/.test(html) && /^Lifecycle unknown<span class="devtype"/.test(html) && /Roads (&amp;|&) infrastructure/.test(html),
+    '7f the Cromby facility reads "Lifecycle unknown [ROADS & INFRASTRUCTURE]" through the shared helpers, never Operating', html.slice(0, 200));
 }
 const DEV = read('development.html');
 const hdr = DEV.slice(DEV.indexOf('Regulated facility <span class="status'), DEV.indexOf('Regulated facility <span class="status') + 300);
