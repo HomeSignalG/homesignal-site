@@ -26,5 +26,6 @@ select t.tbl as object,
 from t
 union all
 select f.fn, md5(pg_get_functiondef(f.fn::regprocedure)), null, null
-  from (values ('preservation.guard_frozen()'), ('public.n5_expected_captured(text)')) f(fn)
+  from (values ('preservation.guard_frozen()'), ('public.n5_expected_captured(text)'),
+               ('public.n5_expected_input(timestamp with time zone)'), ('geo.n5_claim_shard(text,text,integer)')) f(fn)
 order by 1;

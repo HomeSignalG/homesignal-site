@@ -307,6 +307,61 @@ as $function$
      and split_part(i.source_key, ':', 1) <> 'epa_frs';
 $function$;
 
+-- LIVE: the capture contract and the shard claim (pg_get_functiondef read-backs 2026-09-25;
+-- fingerprinted by fidelity.sql against production).
+CREATE OR REPLACE FUNCTION public.n5_expected_input(p_cutoff timestamp with time zone)
+ RETURNS TABLE(source_key text, zip text, source_seq smallint, registry_id text, lat double precision, lng double precision)
+ LANGUAGE sql
+ STABLE
+AS $function$
+  select p.source_key, p.zip, p.source_seq, p.registry_id, p.lat, p.lng
+    from public.app_projects p
+   where p.record_kind = 'development'
+     and p.source_key is not null
+     and p.zip is not null
+     and p.zip ~ '^[0-9]{5}$'
+     and split_part(p.source_key, ':', 1) <> 'epa_frs'
+     and p.created_at is not null
+     and p.created_at <= p_cutoff;
+$function$
+;
+CREATE OR REPLACE FUNCTION geo.n5_claim_shard(p_generation_id text, p_worker text, p_lease_seconds integer DEFAULT 3600)
+ RETURNS geo.n5_shard
+ LANGUAGE plpgsql
+ SET search_path TO 'geo', 'public', 'pg_temp'
+AS $function$
+declare s geo.n5_shard;
+begin
+  if p_worker is null or length(trim(p_worker)) = 0 then
+    raise exception 'n5_claim_shard: worker identity required' using errcode = '22023';
+  end if;
+  if not exists (select 1 from geo.n5_generation g
+                  where g.generation_id = p_generation_id and g.state = 'BUILDING') then
+    raise exception 'n5_claim_shard: generation % is not BUILDING', p_generation_id
+      using errcode = '22023';
+  end if;
+
+  -- SKIP LOCKED is what makes two concurrent orchestrators safe rather than merely unlikely.
+  select * into s from geo.n5_shard
+   where generation_id = p_generation_id
+     and (state = 'pending'
+          or (state = 'running' and claim_expires_at is not null and claim_expires_at < now()))
+   order by z3
+   for update skip locked
+   limit 1;
+  if not found then return null; end if;
+
+  update geo.n5_shard
+     set state = 'running', claimed_by = p_worker,
+         claim_expires_at = now() + make_interval(secs => p_lease_seconds),
+         attempts = attempts + 1, started_at = now()
+   where snapshot_id = s.snapshot_id and z3 = s.z3 and generation_id = s.generation_id
+  returning * into s;
+  return s;
+end
+$function$
+;
+
 -- STUB: the live integrity checks read app_projects at production scale; the suite's
 -- subject is publication, so this returns the live signature with every check passing.
 create or replace function public.n5_expected_input_integrity()

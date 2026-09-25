@@ -611,13 +611,16 @@ insert into geo.n5_generation_key_verdict (generation_id, source_key, registry_i
 select distinct on (f.source_key) {lit(GENERATION)}, f.source_key, f.registry_id, v.verdict,
        jsonb_build_object('z3', {lit(z3)}, 'treatment', f.treatment, 'basis', f.source_key_basis)
   from geo.n5_frozen f
+  cross join lateral (select exists (select 1 from geo.n5_geom g where g.source_key = f.source_key
+                                       and g.provenance = 'recovered_authoritative') as has_geom) h
   cross join lateral (select case
       when f.treatment = 'UNCLASSIFIED' then 'REGISTRY_UNCLASSIFIED'
+      -- a RECOVERY key WITH geometry (cached from any earlier shard) is decided by that
+      -- geometry, not by why this run could not fetch more: no verdict is recorded for it
+      when f.treatment = 'RECOVERY' and h.has_geom then null
       when f.treatment = 'RECOVERY' and f.registry_id = any ({arr(excluded)}) then 'SOURCE_EXCLUDED'
       when f.treatment = 'RECOVERY' and f.source_key_basis in ({unstable}) then 'RECOVERY_UNSTABLE_IDENTITY'
-      when f.treatment = 'RECOVERY' and f.registry_id = any ({arr(recovered_ok)})
-       and not exists (select 1 from geo.n5_geom g where g.source_key = f.source_key
-                        and g.provenance = 'recovered_authoritative') then 'RECOVERY_NOT_RETURNED'
+      when f.treatment = 'RECOVERY' and f.registry_id = any ({arr(recovered_ok)}) then 'RECOVERY_NOT_RETURNED'
     end as verdict) v
  where f.z3 = {lit(z3)} and v.verdict is not null
  order by f.source_key, v.verdict

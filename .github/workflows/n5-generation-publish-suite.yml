@@ -9,15 +9,23 @@ name: n5-generation-publish-suite
 #
 # The target is a THROWAWAY service container created for this job and destroyed with it.
 # It holds no credentials, can reach no Supabase project, and nothing here touches production.
+#
+# Since 2026-09-25 it also applies PART D (docs/n5-generation-publish-part-d.sql) and runs
+# test/n5_generation_pg/run_lifecycle.py: the REAL orchestrator, shard and publish code driven
+# end to end (open -> work -> prepare -> publish -> unresolved -> ready -> activate). The suite
+# alone proved the database functions and went green over a lifecycle that could not run.
 
 on:
   pull_request:
     paths:
       - 'docs/n5-generation-publish.sql'
+      - 'docs/n5-generation-publish-part-d.sql'
       - 'test/n5_generation_pg/**'
       - 'test/n5-generation-publish.test.mjs'
       - 'scripts/n5_orchestrate.py'
       - 'scripts/n5_publish.py'
+      - 'scripts/n5_shard.py'
+      - 'scripts/n3_pilot.py'
       - 'scripts/n5_candidate_bounding.py'
       - '.github/workflows/n5-generation-publish-suite.yml'
   workflow_dispatch: {}
@@ -32,7 +40,7 @@ concurrency:
 jobs:
   publish-suite:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     # Production runs PostgreSQL 17 (measured 2026-09-03); 16 is kept so the suite is not
     # proven on one major only.
     strategy:
@@ -79,6 +87,14 @@ jobs:
           set -o pipefail
           python3 test/n5_generation_pg/run_suite.py 2>&1 | tee /tmp/n5-publish-suite.log
 
+      - name: Run the END-TO-END lifecycle through the real orchestrator (open -> activate)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_lifecycle.py 2>&1 | tee /tmp/n5-lifecycle.log
+
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
         run: node test/n5-generation-publish.test.mjs
@@ -90,5 +106,6 @@ jobs:
             echo '## N5 generation publication — executable receipt'
             echo '```'
             grep -E '^(BASE|KILLED|SURVIVED|FAIL)' /tmp/n5-publish-suite.log || echo '(no log)'
+            grep -E '^(END-TO-END|FAIL)' /tmp/n5-lifecycle.log || echo '(no lifecycle log)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

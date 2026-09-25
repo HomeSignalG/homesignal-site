@@ -360,8 +360,8 @@ def run(conn, label, mutate=None, suite=None):
     here = fidelity(c)
     diff = sorted(f"{k}:{['cols','cons','idx'][i]}" for k in prod for i in range(3)
                   if prod[k][i] != here.get(k, [None] * 3)[i])
-    s.ok("F1 fixture + Parts A-C fingerprint-equal production's post-C shape (72 components)",
-         not diff and len(prod) == 24, diff[:6])
+    s.ok("F1 fixture + Parts A-C fingerprint-equal production's post-C shape (78 components)",
+         not diff and len(prod) == 26, diff[:6])
 
     d_a, d_b, d_c = part_d_parts()
     q(c, "reset n5.verified_free_disk_mb")
