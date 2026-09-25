@@ -53,9 +53,14 @@ const res = fn('dc_resolve_geography', B3);
 const cand = (A3.match(/create or replace view public\.dc_identity_candidate[\s\S]*?;\n/) || [''])[0];
 ok(/dp\.verdict = 'ACCEPTED'\s+and dp\.admitted/.test(ev) && /where dp\.admitted/.test(res) && /and d\.admitted/.test(cand),
   'A5: every consumer of derived evidence reads only ADMITTED derivations: the geography evidence, the geography provenance, and identity candidate K3');
-ok(!/admitted/.test(stripSql(QUEUE).replace(/order by \(not q\.admitted\)/, '')) && /order by \(not q\.admitted\), q\.geocoder_query collate "C"/.test(QUEUE)
-   && /limit :dcg_batch/.test(QUEUE),
-  'A6: the queue acquires regardless of admission, admitted work first, in a deterministic resumable batch');
+const qCode = stripSql(QUEUE);
+const noFilter = (t) => (t.match(/from public\.dc_geocode_queue q\s+order by/g) || []).length === 2;
+ok(noFilter(qCode)                                                     // admission never FILTERS what is queued
+   && /order by \(not q\.admitted\), q\.geocoder_query collate "C"/.test(qCode)   // it only ORDERS it
+   && /order by q\.geocoder_query collate "C"/.test(qCode)                 // pre-apply fallback (no column yet)
+   && (qCode.match(/limit :dcg_batch/g) || []).length === 2
+   && !noFilter(qCode.replace('from public.dc_geocode_queue q\n order by (not', 'from public.dc_geocode_queue q where q.admitted\n order by (not')), // control
+  'A6: the queue acquires regardless of admission (admitted work first), in a deterministic resumable batch, on either side of the apply');
 
 // ── ONE geocoder ─────────────────────────────────────────────────────────────────────────────
 function walk(dir, out = []) {
