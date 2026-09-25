@@ -289,43 +289,26 @@ founder for Supabase permission, and do not stop work over a prompt.** Call the 
 founder clicking Approve is a click, not a decision to re-open. What is **not** licensed is
 asserting anything about whether that click happened.
 
-🔑 **READING THE DATABASE WITHOUT A PERMISSION PROMPT — USE `db-sql.yml`, WHICH ALREADY EXISTS
-IN BOTH REPOS (measured 2026-09-21).** The prompt lands on `mcp__Supabase__execute_sql`
-because that tool is the ONLY direct channel a session has: the sandbox has **no egress to
-Supabase** — `https://qwnnmljucajnexpxdgxr.supabase.co` → **HTTP 000**, and an anon-key
-PostgREST read → **403** at the agent proxy. **So the anon-key-from-`curl` idea is dead**,
-and that is worth recording as dead before anyone tries it again.
+🔒 **PRIVILEGED PRODUCTION DATABASE CREDENTIALS ARE AVAILABLE ONLY THROUGH THE MAIN-RESTRICTED
+GITHUB `production` ENVIRONMENT (2026-09-24).** `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `EPA_RECOVERY_TOKEN` and `DEPLOY_KEY` are issued only to jobs that
+declare `environment: production`, and that Environment deploys only from `main`. A workflow
+dispatched from a feature or old branch, and any `pull_request` run, receives none of them -
+once the founder completes the cutover (Environment configured, repository-level copies
+deleted). Until then the copies still exist, and using them from a branch is still forbidden.
+`test/production-credential-boundary.test.mjs` enforces the workflow side (every privileged job
+declares the Environment; no PR-triggered privileged path; no reusable-workflow or
+`secrets: inherit` forwarding; every secret name classified; every production job refuses a
+dispatch chained from another workflow's `GITHUB_TOKEN`). The Environment's main-only rule is a
+founder-controlled repository setting, and it is the boundary: branch code cannot redefine it.
 
-**A GitHub runner has egress, and GitHub MCP tools are NOT prompted.** Receipt from one
-session: two PRs opened, check runs read, both merged, and **eight workflow dispatches** —
-zero prompts throughout, against a Supabase prompt on every SQL call.
-
-**The loop, for any read-only question:**
-1. Write the query to **`docs/adhoc/query.sql`** on the working branch.
-2. Push the branch.
-3. Dispatch **`db-sql.yml`** with `sql_file=docs/adhoc/query.sql` and `ref=<that branch>`.
-4. Read the result from the **job log**, between `----- BEGIN RESULT -----` and `END`.
-   Artifact storage is unreachable from the sandbox, so the log is the receipt channel.
-
-**Measured end to end** (site run `35629340978`): `HTTP 201`, live values returned —
-`communities total 13292 · zip pages 12722 · development_reports cached 12722`.
-
-⛔ **THE SCRATCH FILE MUST NEVER REACH `main`, AND THAT CREATES A REAL HAZARD: the runner can
-only read a COMMITTED file, so the only way to run a query is to commit it to a branch.** A PR
-opened from that branch carries the scratch file with it. **Before opening any PR from a
-branch you have run queries on, reset to `origin/main` and re-apply only the work that should
-merge** — that is what had to be done here, after seven scratch commits accumulated on the
-designated branch beside two documentation changes worth merging.
-
-⚠️ **SCOPE — this is the READ path only.** A write, a migration or DDL still goes through
-`mcp__Supabase__apply_migration` / `execute_sql` and still costs one prompt, which is the
-right place for one and is rare. The runner path is also **slower** (~1 minute per run), so
-fold a task's reads into ONE query rather than firing several.
-
-🛑 **A 2026-09-22 EDIT REWROTE THIS PARAGRAPH TO SAY THE RUNNER WAS "AN OPTIMISATION, NOT A
-PROMPT-AVOIDANCE NECESSITY", ON THE STRENGTH OF THE RETRACTED "execute_sql COST NO PROMPT"
-CLAIM. IT IS REVERTED.** The original sentence was correct. The runner path exists because the
-direct tool prompts, and it still does.
+⛔ **RETIRED: the feature-branch `db-sql.yml` read loop** (write `docs/adhoc/query.sql` on a branch,
+dispatch `db-sql` with `ref=<branch>`). It handed the Management API token - arbitrary SQL,
+writes and DDL included - to branch code; 271 branches carried an executable copy. After the
+cutover `db-sql` runs only from `main`, on SQL committed to `main`; do not use the loop before it. **A MAIN-CONTROLLED DATABASE DIAGNOSTIC PATH IS
+REQUIRED and does not exist yet.** Until one is built, ad-hoc reads go through
+`mcp__Supabase__execute_sql` (one prompt each). Do not rebuild a branch-dispatched path to avoid
+the prompt: that is the bypass this boundary closed.
 
 ⚠️ **FOUR OF MY OWN QUERIES FAILED ON THIS PATH, AND THREE WERE THE SAME FAULT — asserting a
 field without reading it.** (a) A prose receipt document dispatched as SQL → `400 42601 syntax
