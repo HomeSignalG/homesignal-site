@@ -37,6 +37,9 @@ concurrency:
 
 jobs:
   dryrun:
+    # Holds SUPABASE_DB_URL (production-write credential): never on pull_request, dispatch from main only.
+    # This is hygiene, not a boundary (a PR can edit this file); see test/workflow-secret-exposure.test.mjs.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     services:
@@ -54,6 +57,9 @@ jobs:
       PGUSER: supabase_admin
       PGPASSWORD: postgres
     steps:
+      - name: Refuse any ref but main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "REFUSED: dispatch from main only (got $GITHUB_REF)"; exit 1; fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # the replica is built from main's DDL of record
