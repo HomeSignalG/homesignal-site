@@ -131,8 +131,12 @@ def discover_building():
 # that does national work (prepare ~3M snapshot rows, the unresolved accounting, the set-based
 # reconcile inside READY and ACTIVATE), so each is sent with an explicit per-statement budget
 # and a client wait longer than it: the SERVER gives up and rolls back, never the client.
-HEAVY_STATEMENT_TIMEOUT = "840s"
-HEAVY_CLIENT_TIMEOUT = 1800
+# MEASURED 2026-09-25: the set-based reconcile alone ran past 110 s on the phase1 snapshot
+# (544 chunks, ~3M rows) and READY / ACTIVATE each run it inside ONE call, beside the
+# completeness checks and (ACTIVATE) the integrity scan of app_projects. 30 min is inside the
+# workflow's 55-minute job, and a timeout is safe: the function rolls back and can be re-run.
+HEAVY_STATEMENT_TIMEOUT = "1800s"
+HEAVY_CLIENT_TIMEOUT = 2400
 
 
 def heavy(query, tag):
