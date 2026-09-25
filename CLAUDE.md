@@ -2166,11 +2166,18 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
     - V3: the only resolver runs in [S,T) (14:25, 14:35) ended before the first new input (14:44). The
       OLD code they ran writes 0 on that state, so no write can hide behind a later T timestamp.
     - The NEW replay reproduces production's actual 15:25/15:35 decisions row for row.
-  - **The instrument is proven to detect:** 7 positive controls on disposable clones, through the same
-    comparator with exact expected results. They are Map 1 row, parity refusal, identity, geography,
-    admission, evidence leak, and an equal-totals swap. Plus 13/13 comparator mutants killed, and an
-    assertion that OLD and NEW are genuinely different code.
-  - **Result:** OLD and NEW are identical from the same start fingerprint.
+  - **The instrument is proven to detect:** 9 positive controls on disposable clones, each with an exact
+    expected result, all detected (run `36176907428` on `6ac7d13`):
+    - Map 1 row move, and an equal-totals swap;
+    - parity refusal;
+    - identity (an entity; a link plus a decision);
+    - geography;
+    - admission (the gate, and END TO END through the NEW resolvers: Map 1 1,835 → 1,811 on a disposable
+      replica);
+    - an evidence leak.
+    Plus 13/13 comparator mutants killed, and an assertion that OLD and NEW are genuinely different code.
+  - **Result (run `36176907428`):** OLD and NEW are identical from the same start fingerprint
+    (`5448f00d…`), with floats and geometry compared exactly.
     - Identity 25,762 rows, row diff 0.
     - Geography 4,105 decisions, row diff 0. `rule_version` restamping is the only difference, and is
       not a decision.
@@ -2178,6 +2185,31 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
     - Atlas derived evidence in the NEW plane: 0.
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
+  - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
+    `dc_address_geocode` is keyed by address text alone. Any ADMITTED observation stating the same line
+    consumes a derivation, whichever source queued it. The 789 lines Phase A's Atlas queue derived before T
+    would not have existed pre-#1335, so giving both replicas the same geocode table made this path read
+    zero by construction.
+    - Measured: 0 admitted consumers of a post-snapshot derivation. Controls: 58 admitted consumers, all on
+      the 56 pre-snapshot derivations; 803 unadmitted consumers of the new ones.
+    - The proof asserts that on both replicas, and step 6b replays OLD in the true pre-#1335 world, without
+      those geocodes. It must equal the replay.
+    - 📌 **It is latent for the future.** An Epoch record whose address equals an already-derived Atlas line
+      would use that derivation. Admitting-by-text is the design, not a leak, but it means acquisition for
+      a non-admitted source is not decision-inert in general.
+  - ⚠️ **THREE INSTRUMENT DEFECTS, each of which made a zero look cleaner than it was:**
+    1. **The production URL goes through a pooler that DROPS startup options.** `PGOPTIONS`
+       (`default_transaction_read_only=on`, `statement_timeout=15min`) never reached the server. A fresh
+       session reads `statement_timeout = 2min` and `default_transaction_read_only = off`. Read-only must be
+       enforced **inside the transaction**: `BEGIN … READ ONLY`, asserted in-session, then rolled back.
+       Earlier runs were read-only only because every query was a fixed SELECT of read functions.
+    2. **Production sets `extra_float_digits = 0` in its configuration file**, so any text dump of a
+       float8 is rounded to 15 significant digits. The replicas were built from rounded coordinates, and
+       lat/lng compared as text were blind below the 15th digit on both sides. Only exact EWKB exposed it,
+       on 18 geocoded points. **Every dump that will be compared or reloaded sets `extra_float_digits = 3`.**
+       The first explanation, two PostGIS versions, was wrong: both sides are 3.3.7.
+    3. **psql CSV writes NULL and `''` identically to Python's `csv.reader`.** Every dump now uses
+       `null '\N'`.
 - ⚠️ **WHY A REPLAY AND NOT A DIFF: the data moves under a deployment.** On 2026-09-25 the Compute Atlas
   acquisition (cron `40 9`) ran at **14:44Z** and the Epoch acquisition (cron `10 10`) at **15:10Z**.
   Both are observed times for that one day; no general lateness pattern is claimed. "Nothing acquires
