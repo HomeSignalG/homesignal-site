@@ -2386,6 +2386,8 @@ HS.classifyProjectType (lib/project-type.js)
 ### 7.11a The FACILITY identity lives there too — and it is not a Development Type (2026-09-24)
 
 A regulated (EPA FRS) facility's badge on the ZIP page's **Regulated facilities nearby** cards
+(⚠️ those cards are retired 2026-09-25 — see *WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT ·
+LOCAL NEWS*; `HS.facTypeBadge` / `HS.facLifecycleLabel` remain as the shared helpers)
 is Map 1's facility identity, decided once by `facilityIdentity` in `lib/project-type.js` (moved
 verbatim out of `resolveMarker`; `resolveMarker` now calls it):
 
@@ -3977,7 +3979,9 @@ has ever written**.
   *"prototype placeholders pending the TCEQ/ECHO feed"*. `app_coverage_states` has no Environment
   state. So every page asserted a verified absence that nothing measured — #1307's defect class.
 - ⛔ **NO CANONICAL ENVIRONMENT SUBJECT-MEMBERSHIP CONTRACT EXISTS.** Environmental facts live
-  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby*;
+  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby* (⚠️ that
+  ZIP-page section is retired 2026-09-25 — see the next section; facilities live on Map 1's
+  Regulatory Records overlay);
   `Water districts & utilities` is a GOVERNMENT SUBSCRIPTION TOPIC → *Government & civic*;
   environmental Local News → *Local news*; utility-sounding permits → *Development*;
   `app_environmental_risk` has 0 rows; `gov_actions` (enforcement) has 0 rows. None of these is
@@ -3995,6 +3999,42 @@ has ever written**.
   and asserts each renders once in its own section and nothing renders as Environment.
 
 ---
+
+## WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT · LOCAL NEWS ⚖️ FOUNDER DECISION (2026-09-25)
+
+**On the ZIP detail page, the Map and the What's Changing feed have different jobs.**
+
+- **Map 1** exposes three independent dimensions — STATUS (Operating now · Approved · Proposed ·
+  Lifecycle unknown), PROJECT TYPE (Data center · Industrial · Residential · Roads &
+  infrastructure · Commercial · Civic & public · Other project) and REGULATORY RECORDS
+  (Regulatory facilities). Regulatory is an overlay/attribute. **The Regulatory Records control
+  and the purple R are correct and are unchanged.**
+- **What's Changing** (`lib/community-page.js`) renders exactly **Development & growth ·
+  Government & civic · Local news**. The standalone *"Regulated facilities nearby"* section that
+  sat between Development and Government is **removed**, with its card template and the
+  Development absence sentence's cross-reference to it (*"… the regulated-facility record below
+  is the current public-record floor"*).
+
+**Why:** TYPE = what the entity is · LIFECYCLE = its current state · REGULATORY = an independent
+R attribute · CHANGE = a qualifying real-world event. EPA/ECHO/FRS registry presence establishes
+regulatory **inventory**; it does not by itself establish that anything changed. A future
+qualifying event involving a regulated entity may appear in What's Changing with its regulatory
+attribute preserved — that event architecture is a separate unit and is not built.
+
+- **The data plane is unchanged.** `HS.data.facilities(zip, home)` is still read and still feeds
+  `facTotal`, the *Regulated facilities* count tile in the summary strip above the lens cards
+  (not inside What's Changing). `HS.facTypeBadge` / `HS.facLifecycleLabel` stay defined and
+  tested as the shared facility presentation helpers.
+- ⛔ **Do not restore the section on the strength of older tests or comments.** The tests that
+  pinned its placement were narrowed rather than deleted — the data-plane half kept, the
+  placement half inverted: `test/environment-absence-requires-authoritative-outcome.test.mjs`
+  §4 D, `test/environment-absence.browser.test.mjs` (the EPA row renders in no What's Changing
+  section, the strip tile still counts it, and the headings are exactly the three above), and
+  the card-template checks in `community-facility-type-badge`, `facility-lifecycle-unknown` and
+  `lifecycle-unknown-presentation`, which now exercise the helpers directly. Each new assertion
+  was proven load-bearing by restoring the pre-change runtime (all fail) and re-applying (all pass).
+- Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
+  `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
