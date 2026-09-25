@@ -9,6 +9,11 @@ name: dc-atlas-phase-a-proof
 #   * every comparison and every positive control goes through ONE comparator
 #     (scripts/dc_phase_a_proof.py), itself mutation-tested offline first.
 
+# SECURITY: the proof job holds SUPABASE_DB_URL, a credential that can WRITE to production. Its read-only
+# guarantee lives in the script, so a PR that edits the script must never be able to run it with that
+# secret. The proof therefore runs ONLY on manual dispatch from main; pull requests run the offline
+# comparator job alone (no secret). It is also a DATED receipt of 2026-09-25: step 0 refuses once
+# production has resolved anything after the 15:25/15:35 runs it replays, so it must not be a PR check.
 on:
   workflow_dispatch: {}
   pull_request:
@@ -38,6 +43,7 @@ jobs:
 
   proof:
     needs: comparator
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     services:
@@ -54,6 +60,9 @@ jobs:
       PGUSER: supabase_admin
       PGPASSWORD: postgres
     steps:
+      - name: Refuse any ref but main (the secret below must only ever meet reviewed code)
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "REFUSED: dispatch from main only (got $GITHUB_REF)"; exit 1; fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

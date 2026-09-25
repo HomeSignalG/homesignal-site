@@ -106,7 +106,10 @@ Validated four ways against evidence the reconstruction did not use:
 - **The true pre-#1335 world (6b):** OLD re-run without the 789 geocodes that only Phase A's queue derived
   (56 kept) equals the replay on every table.
 
-### Positive controls — 9 of 9 detected, each with an exact expectation
+### Positive controls — 9 of 9 detected
+8 carry an exact expected result. **ADMISSION_END_TO_END does not:** it requires any nonzero difference, and
+its magnitudes below are observed, not pinned. The 13/13 mutation score covers the Python comparator only;
+the shell harness's own assertions were not mutation-tested.
 | control | observed |
 |---|---|
 | MAP1 (one facility nudged) | row diff 2, moved 1 |
@@ -246,3 +249,16 @@ objects. It is an ordering defect and needs its own change.
   `dc-atlas-phase-a-apply.yml` (#1339) writes DDL to production when dispatched from `main` with a typed
   confirmation string. It has no protected `environment:` and no required reviewer. The proof work
   neither reuses nor modifies it.
+
+## Audit corrections (post-merge, same day)
+- **The proof workflow held a production-WRITE credential on `pull_request`.** A PR editing the script could
+  have run arbitrary SQL against production with it. Fixed: the proof job runs only on manual dispatch from
+  `main`; pull requests run the offline comparator alone. A dedicated read-only database role would be
+  stronger. It is not created here, because creating it is a production write.
+- **The proof is dated.** It is not a PR check, since it will refuse permanently once production resolves
+  new evidence.
+- **Step 6b's "all by Phase A's queue" is an attribution, not a per-row fact.** `dc_address_geocode`
+  records no source. The attribution rests on the Epoch queue being empty at both reads. The binding
+  evidence is the consumer count: 0 admitted consumers of a post-snapshot derivation.
+- **#1344 was merged onto a main that had moved** (#1342, `app_refresh_zip`) without a re-run of the
+  proof. It was checked afterwards: #1342 touches no DC-chain file, and post-merge CI is green.
