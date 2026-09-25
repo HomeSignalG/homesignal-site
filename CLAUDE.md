@@ -1162,13 +1162,14 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 show a topic as on while the digest treats it as off, because there is no second answer to
 disagree with.
 
-SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a10.sql`, plus
+SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a12.sql`, plus
 `docs/alert-subscription-canonical-CURRENT-STATE.sql` — a dated **read-back** from
 `pg_get_viewdef` / `pg_get_functiondef`, not a hand-written copy. **Read CURRENT-STATE
-before touching any of it.**
+before touching any of it.** Since 2026-09-25 each quoted definition in it carries its
+production md5, so the read-back can be checked rather than trusted.
 
 **Five streams, and notices/meetings NEVER collapse** — `notices | meetings | news |
-global | emerging`. The predecessor unique key was
+global | emerging` (six since A12 below, which added `maps`). The predecessor unique key was
 `(user_id, community_id, pipeline_type, topic)` and notices+meetings share
 `pipeline_type='government_notice'`, so **one of the two selections was silently
 overwritten**. That is why the migration moved 120 → 155 rows: **+35 recovered meetings
@@ -1184,15 +1185,33 @@ selections**, per-stream before→after otherwise identical, fingerprint
 - **Per-place unsubscribe is preserved** (contract G): `users` is keyed
   `(email, community_id)`, so one place stopping never stops another.
 
-### A12 — A SIXTH STREAM, `maps`: "What is changing in my zip code?" ⚖️ FOUNDER (2026-09-25) — ⏳ NOT YET APPLIED
+### A12 — A SIXTH STREAM, `maps`: "What is changing in my zip code?" ⚖️ FOUNDER (2026-09-25) — ✅ APPLIED 2026-09-25
 
 A button on Map 1 (`homesignalmap.html`, ZIP mode) signs a resident up for **email copies of
 the Bluesky MAPS posts about that ZIP**. Approved plan: *"Add MAPS as a new type in the
 existing subscription system rather than building a separate signup."* So it is a stream in
 the one store, written by the one additive writer — `docs/alert-subscription-canonical-a12.sql`.
-Until that file is applied the button's RPC is refused by the old stream CHECK; **apply A12
-(and the ingest delivery migration) before merging the Map 1 change**, then re-read
-`CURRENT-STATE.sql` back from production.
+✅ **APPLIED 2026-09-25 on the founder's "go"**, with its delivery half. Ledger:
+`20260925231226 alert_subscription_canonical_a12_maps_stream` and
+`20260925231403 maps_email_delivery` (homesignal-ingest), each through `apply_migration` from
+the committed file.
+- **No DDL dry run touched production (§7.11).** Instead the pg suite's fixture was first proved
+  to BE production for everything the two files touch: all **20** fingerprints it carries
+  (function bodies, views, constraints, the generated expression, the unique index, the
+  trigger) matched production byte for byte. So CI's 25 checks and 12 killed mutations are a
+  result about production, not about a stand-in.
+- **After:** production equals that replica with both files applied, on all **24** fingerprints
+  (combined md5 `3551a7571400fa623a04e5c941f624e0` on both sides). `user_subscriptions` is
+  still 155 rows with an unchanged row fingerprint; `users` is 13 with an unchanged consent
+  fingerprint; the catalog gained exactly its one `maps` row; `maps_zip_scope_trigger` = 1.
+- **Today's callers still work:** a live call with the six named arguments the site sends
+  today resolved to the new writer and stopped at its first check (no JWT), before any write.
+- `CURRENT-STATE.sql` was re-read the same day; every quoted definition is md5-equal to
+  production.
+- ⏳ **Still before merging the Map 1 change:** merge ingest #600, then deploy `confirm-alerts`
+  from `main` (its deploy workflow pins `ref: main`). Then the confirmation email knows about
+  MAPS before anyone can press the button. Until then the live function is safe as it is: it
+  ignores the claim's new `streams` column.
 
 - 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
   other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
