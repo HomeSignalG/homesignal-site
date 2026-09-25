@@ -22,8 +22,13 @@
 #                           counts, supersession) from the 13:43:12Z snapshot, the only record of
 #                           their pre-T values (2,275 were modified at T)
 #      geography          = the 13:43:12Z snapshot (0 geography writes between it and T)
-#    and every one of these is VALIDATED below against evidence the reconstruction did not use.
-# 2. OLD (main@f9d1326 DDL) and NEW (this checkout's DDL, Atlas unadmitted) start from that state,
+#    and every one of these is VALIDATED below against evidence the reconstruction did not use:
+#      V1 the S state reproduces the snapshot's own Map 1 table; V2 the 14:52:45Z state reproduces the
+#      live Map 1 measured then; V3 the resolver runs in [S,T) saw only the S state and the OLD code
+#      they ran writes nothing on it (so a write hidden by a later T timestamp cannot exist);
+#      step 7 the NEW replay reproduces production's actual 15:25/15:35 outcome.
+# 2. OLD (main@f9d1326 DDL; its 7 DDL files are byte-identical to #1335's merge parent 71659bb) and NEW
+#    (this checkout's DDL, Atlas unadmitted) — asserted to be DIFFERENT code in step 1a — start from that state,
 #    fingerprinted identical; each runs its OWN identity then geography resolver; identity,
 #    geography and Map 1 over every registry ZIP are compared row for row.
 # 3. POSITIVE CONTROLS on disposable clones, through the SAME comparator (scripts/dc_phase_a_proof.py):
@@ -60,7 +65,8 @@ clone() { dropdb --if-exists "$2"; createdb -T "$1" "$2"; }
 Q_ENT="select canonical_entity_id, entity_grain, classification, classification_conflict, rule_version, observation_count, source_count, superseded_by, supersede_reason from public.dc_canonical_entity"
 Q_LINK="select home_signal_observation_id, canonical_entity_id, source_key, distribution_key, publisher_record_id, observation_classification, classification_rule_key, classification_evidence, link_rule_key from public.dc_entity_observation"
 Q_DEC="select observation_a, observation_b, decision_state, candidate_rule_key, decision_rule_key, rule_version, evidence from public.dc_identity_decision"
-Q_GEO="select canonical_entity_id, geography_status, geometry_type, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, positional_uncertainty_m, provenance from public.dc_entity_geography"
+# every decision column; rule_version (a restamp, not a decision) and the two timestamps are the only exclusions
+Q_GEO="select canonical_entity_id, geography_status, geometry_type, st_astext(geom) geom_text, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, positional_uncertainty_m, provenance from public.dc_entity_geography"
 Q_MAP="select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m"
 Q_SNAPTXT="select 'entity' k, canonical_entity_id::text a, null::text b, concat_ws('|', entity_grain, classification, classification_conflict, rule_version, observation_count, source_count, superseded_by, supersede_reason) v from public.dc_canonical_entity
   union all select 'link', home_signal_observation_id::text, canonical_entity_id::text, concat_ws('|', source_key, distribution_key, link_rule_key) from public.dc_entity_observation
@@ -88,6 +94,18 @@ cat "$w/pre.csv" | sed 's/^/  /'
 IFS=, read -r _ ADM AEV EEV RUNS_AFTER _ _ < <(tail -1 "$w/pre.csv")
 [ "$ADM" = f ] || { echo "🛑 STOP: Atlas is admitted in production"; exit 1; }
 [ "$AEV" = 0 ] || { echo "🛑 STOP: Atlas derived evidence is live in production"; exit 1; }
+# This proof is a DATED receipt of 2026-09-25: step 7 compares the replay with production's decisions as
+# the T runs left them. Once production resolves anything later, those decisions are gone and the proof
+# cannot be re-derived as written; it must REFUSE, never pass on a moved production.
+ID_LAST='2026-09-25 15:25:00.081306+00'; GEO_LAST='2026-09-25 15:35:00.081314+00'
+prod_copy "select (select count(*) from public.dc_canonical_entity where created_at > '$ID_LAST' or updated_at > '$ID_LAST')
+     + (select count(*) from public.dc_entity_observation where linked_at > '$ID_LAST')
+     + (select count(*) from public.dc_identity_decision where decided_at > '$ID_LAST') as identity_writes_after_t_run,
+  (select count(*) from public.dc_entity_geography where created_at > '$GEO_LAST' or updated_at > '$GEO_LAST') as geo_writes_after_t_run,
+  (select count(*) from public.dc_entity_geography where updated_at = '$GEO_LAST') as control_geo_rows_at_t_run" "$w/quiet.csv"
+sed 's/^/  /' "$w/quiet.csv"
+IFS=, read -r QI QG QC < <(tail -1 "$w/quiet.csv")
+[ "$QI" = 0 ] && [ "$QG" = 0 ] && [ "$QC" -gt 0 ] || { echo "🛑 DATED: production has resolved evidence after the 15:25/15:35 runs this proof replays; it is a receipt of 2026-09-25, not re-runnable as written"; exit 1; }
 
 echo "== 1. one read-only copy of production + the retained 13:43:12Z snapshot"
 TABLES="dc_source dc_acquisition_run dc_source_observation dc_canonical_entity dc_entity_observation dc_identity_decision dc_entity_geography dc_address_geocode national_dc_records canonical_zip_registry"
@@ -107,6 +125,26 @@ build() { # $1 db, $2 git ref ('' = checkout)
   L -d "$1" -c "create table public._snap_map1 as select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m limit 0"
 }
 build tmpl_old "$OLD_SHA"; build tmpl_new ""
+echo "== 1a. OLD and NEW are genuinely different code (an identical pair would make every zero below vacuous)"
+DEFQ="select p.proname k, md5(p.prosrc) v from pg_proc p where p.pronamespace = 'public'::regnamespace
+        and p.proname in ('map1_dc_zip_members','dc_record_citation','dc_resolve_canonical','dc_resolve_geography','dc_derived_address_admitted')
+      union all select c.relname, md5(pg_get_viewdef(c.oid)) from pg_class c where c.relnamespace = 'public'::regnamespace
+        and c.relname in ('dc_current_observation','dc_entity_geography_evidence','dc_identity_candidate','dc_observation_derived_point')"
+for db in tmpl_old tmpl_new; do L -d "$db" -tA -F'|' -c "$DEFQ" | LC_ALL=C sort > "$w/defs_$db.txt"; done
+python3 - "$w/defs_tmpl_old.txt" "$w/defs_tmpl_new.txt" <<'PY' || { fail "CODE_DIFFERS"; exit 1; }
+import sys
+o = dict(l.strip().split('|') for l in open(sys.argv[1]) if l.strip())
+n = dict(l.strip().split('|') for l in open(sys.argv[2]) if l.strip())
+for k in sorted(set(o) | set(n)):
+    print(f'  {k:32s} OLD {o.get(k, "absent")[:12]:12s} NEW {n.get(k, "absent")[:12]:12s} {"same" if o.get(k) == n.get(k) else "DIFFERENT"}')
+bad = []
+if 'dc_derived_address_admitted' in o or 'dc_derived_address_admitted' not in n: bad.append('admission function must exist on NEW only')
+if o.get('dc_resolve_geography') == n.get('dc_resolve_geography'): bad.append('geography resolver must differ')
+for k in ('map1_dc_zip_members', 'dc_record_citation', 'dc_current_observation'):
+    if not o.get(k) or o.get(k) != n.get(k): bad.append(f'{k} must be present and identical (Phase A does not change Map 1)')
+print('  CODE_DIFFERS ' + ('PASS' if not bad else 'FAIL ' + '; '.join(bad)))
+sys.exit(1 if bad else 0)
+PY
 for t in $TABLES; do
   cols="$(L -d tmpl_new -tA -c "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = '$t' and is_generated = 'NEVER'")"
   cols_old="$(L -d tmpl_old -tA -c "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = '$t' and is_generated = 'NEVER'")"
@@ -214,6 +252,52 @@ echo "  V2 boundary 14:52:45Z: reconstructed Map 1 = $V2 | live measurement at t
 [ "$V2" = "$LIVE1452_ROWS $LIVE1452_MD5" ] || fail "V2 reconstruction does not reproduce the live 14:52:45Z Map 1 measurement"
 dropdb val_1452
 
+# V3 closes the one gap timestamps cannot: an identity/geography row modified in [S,T) and AGAIN at T would
+# carry T's timestamp and hide the first write. So prove the resolver runs in [S,T) wrote nothing at all:
+# (a) production: every resolver run in [S,T) ended before the first new input after S (acquisition run
+#     or derived geocode), so each saw exactly the S state; and no row carries a write time in [S,T);
+# (b) replica: the OLD code (what production ran before the 14:49Z apply) re-run on the S state writes 0.
+echo "== 3b. V3: the resolver runs between the snapshot and T wrote nothing"
+RJOBS="from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname in ('dc-resolve-canonical','dc-resolve-geography') and d.start_time >= '$S' and d.start_time < '$T'"
+prod_copy "select (select count(*) $RJOBS) as resolver_runs, (select string_agg(j.jobname || '@' || d.start_time || '/' || d.status, ' ' order by d.start_time) $RJOBS) as runs,
+  (select max(d.end_time) $RJOBS) as last_resolver_end,
+  (select min(started_at) from public.dc_acquisition_run where started_at >= '$S') as first_run_after_s,
+  (select min(derived_at) from public.dc_address_geocode where derived_at >= '$S') as first_geocode_after_s,
+  (select count(*) from public.dc_canonical_entity where (created_at >= '$S' and created_at < '$T') or (updated_at >= '$S' and updated_at < '$T')) as entity_writes_s_t,
+  (select count(*) from public.dc_entity_observation where linked_at >= '$S' and linked_at < '$T') as link_writes_s_t,
+  (select count(*) from public.dc_identity_decision where decided_at >= '$S' and decided_at < '$T') as decision_writes_s_t,
+  (select count(*) from public.dc_entity_geography where (created_at >= '$S' and created_at < '$T') or (updated_at >= '$S' and updated_at < '$T')) as geo_writes_s_t" "$w/v3.csv"
+sed 's/^/  /' "$w/v3.csv"
+python3 - "$w/v3.csv" <<'PY' || fail "V3 production premises"
+import csv, sys
+from datetime import datetime
+r = list(csv.DictReader(open(sys.argv[1])))[0]
+ts = lambda s: datetime.fromisoformat(s.replace('+00', '+00:00')) if s else None
+end, run, geo = ts(r['last_resolver_end']), ts(r['first_run_after_s']), ts(r['first_geocode_after_s'])
+bad = []
+if int(r['resolver_runs']) < 1: bad.append('control: no resolver run found in [S,T)')
+if end is None or run is None or not run > end: bad.append('an acquisition run started before the last resolver run in [S,T) ended')
+if geo is not None and not geo > end: bad.append('a geocode was derived before the last resolver run in [S,T) ended')
+for k in ('entity_writes_s_t', 'link_writes_s_t', 'decision_writes_s_t', 'geo_writes_s_t'):
+    if r[k] != '0': bad.append(f'{k}={r[k]}')
+print('  V3_PRODUCTION ' + ('PASS' if not bad else 'FAIL ' + '; '.join(bad)))
+sys.exit(1 if bad else 0)
+PY
+clone tmpl_old v3; reconstruct v3 "$S"
+L -d v3 -tA -c "select canonical_entity_id from public.dc_canonical_entity" | { echo canonical_entity_id; cat; } > "$w/v3_ids.csv"
+V3FP="$(L -d v3 -tA -c "with t as ($Q_SNAPTXT) select count(*) || ' ' || md5(string_agg(concat_ws('~',k,a,b,v), E'\n' order by concat_ws('~',k,a,b,v) collate \"C\")) from t")"
+[ "$V3FP" = "$SNAP_IDENT_ROWS $SNAP_IDENT_FP" ] || fail "V3: the S state is not the snapshot identity ($V3FP)"
+dump v3 "$w/v3_pre" decisions,geo
+L -d v3 -tA -F'|' -c "select metric, value from public.dc_resolve_canonical(true, false)" | LC_ALL=C sort > "$w/v3_id.txt"
+L -d v3 -tA -F'|' -c "select metric, value from public.dc_resolve_geography(true) where metric = 'ROWS_WRITTEN'" > "$w/v3_geo.txt"
+dump v3 "$w/v3_post" decisions,geo; dropdb v3
+V3M="$({ grep -E '^(ENTITIES_MINTED|OBSERVATIONS_NEWLY_LINKED|OBSERVATIONS_RELINKED|ENTITIES_SUPERSEDED)\|' "$w/v3_id.txt" || true; } | tr '\n' ' ')$(tr '\n' ' ' < "$w/v3_geo.txt")"
+echo "  V3 OLD code re-run on the S state: $V3M"
+[ "$(grep -cE '^(ENTITIES_MINTED|OBSERVATIONS_NEWLY_LINKED|OBSERVATIONS_RELINKED|ENTITIES_SUPERSEDED)\|0$' "$w/v3_id.txt")" = 4 ] \
+  && [ "$(cat "$w/v3_geo.txt")" = "ROWS_WRITTEN|0" ] || fail "V3: the OLD resolvers write on the S state"
+$CMP compare "$w/v3_pre" "$w/v3_post" "$w/v3_ids.csv" entities,links,decisions,geo zero > "$w/v3.json" || fail "V3: S state changed under the OLD resolvers"
+echo "  V3 $(cat "$w/v3.json")"
+
 echo "== 4. the common pre-identity starting state at T = $T"
 clone tmpl_old rep_old; clone tmpl_new rep_new
 reconstruct rep_old "$T"; reconstruct rep_new "$T"
@@ -271,6 +355,9 @@ for db in rep_old rep_new; do
   L -d "$db" -tA -F'|' -c "select metric, value from public.dc_resolve_geography(true) where metric in ('ENTITIES','ROWS_WRITTEN')" | sed "s/^/  $db /"
   L -d "$db" -tA -F'|' -c "select 'AGAIN_ROWS_WRITTEN', value from public.dc_resolve_geography(true) where metric = 'ROWS_WRITTEN'" | sed "s/^/  $db /"
 done
+for db in rep_old rep_new; do
+  echo "  $db GEO_RULE_VERSIONS $(L -d "$db" -tA -c "select string_agg('v' || coalesce(rule_version::text, 'null') || '=' || n, ' ' order by rule_version) from (select rule_version, count(*) n from public.dc_entity_geography group by 1) x")"
+done
 dump rep_old "$w/f_old" decisions,geo,map1; dump rep_new "$w/f_new" decisions,geo,map1
 $CMP compare "$w/f_old" "$w/f_new" "$w/start_ids.csv" entities,links,decisions,geo,map1 zero > "$w/final.json" || fail "OLD vs NEW differ after geography / Map 1"
 echo "  FINAL $(cat "$w/final.json")"
@@ -314,6 +401,7 @@ L -d c_id -c "update public.dc_canonical_entity set classification = case when c
   where canonical_entity_id = (select canonical_entity_id from public.dc_canonical_entity where superseded_by is null and canonical_entity_id::text in (select a from public._snap_ident where k = 'entity') order by canonical_entity_id limit 1)" >/dev/null
 dump c_id "$w/c_id" decisions; dropdb c_id
 if $CMP compare "$w/id_old" "$w/c_id" "$w/start_ids.csv" entities,links,decisions control '{"entities.row_diff": 2, "links.row_diff": 0, "decisions.row_diff": 0, "identity_row_diff": 2}' > "$w/c_IDENTITY.txt"; then r=true; else r=false; fi
+echo '  IDENTITY: expected {"entities.row_diff": 2, "links.row_diff": 0, "decisions.row_diff": 0, "identity_row_diff": 2}'
 echo "  IDENTITY: observed $(head -1 "$w/c_IDENTITY.txt")"; echo "  IDENTITY: DETECTED=$r"; [ "$r" = true ] || fail "control IDENTITY not detected"
 clone rep_new c_geo
 L -d c_geo -c "update public.dc_entity_geography set quality_flags = array_append(quality_flags, 'PROOF_CONTROL') where canonical_entity_id = (select min(canonical_entity_id::text)::uuid from public.dc_entity_geography)" >/dev/null
