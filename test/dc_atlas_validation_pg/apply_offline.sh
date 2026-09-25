@@ -48,7 +48,7 @@ rc=$?
 set -e
 el=$(( $(date +%s) - t0 ))
 kill "$blk" 2>/dev/null || true; wait "$blk" 2>/dev/null || true
-grep -E 'lock timeout|APPLY FAILED|psql exit' "$tmp/neg.txt" | sed 's/^/  /'
+sed 's/^/  | /' "$tmp/neg.txt"
 [ "$rc" != 0 ] || { echo "FAIL: the apply succeeded while a lock was held"; cat "$tmp/neg.txt"; exit 1; }
 grep -q 'canceling statement due to lock timeout' "$tmp/neg.txt" || { echo "FAIL: the apply did not fail on lock_timeout"; cat "$tmp/neg.txt"; exit 1; }
 [ "$el" -lt 30 ] || { echo "FAIL: the lock wait was not bounded (${el}s)"; exit 1; }
@@ -56,7 +56,8 @@ grep -q 'canceling statement due to lock timeout' "$tmp/neg.txt" || { echo "FAIL
 echo "  PASS: failed on lock_timeout after ${el}s total; 0 objects committed"
 
 echo "== 2. the apply succeeds, Atlas stays unadmitted, definitions equal the DDL of record"
-PROD_DB_URL="$URL" DCA_OFFLINE=1 bash scripts/dc-atlas-phase-a-apply.sh | tee "$tmp/ok.txt" | sed 's/^/  /'
+PROD_DB_URL="$URL" DCA_OFFLINE=1 bash scripts/dc-atlas-phase-a-apply.sh > "$tmp/ok.txt" 2>&1 || { sed 's/^/  | /' "$tmp/ok.txt"; echo "FAIL: apply exited non-zero"; exit 1; }
+sed 's/^/  /' "$tmp/ok.txt"
 grep -q '^PHASE A APPLIED' "$tmp/ok.txt" || { echo "FAIL: apply did not complete"; exit 1; }
 grep -q 'ATLAS_ADMITTED=false' "$tmp/ok.txt" || { echo "FAIL: admission"; exit 1; }
 grep -q 'DEFINITION_PARITY PASS' "$tmp/ok.txt" || { echo "FAIL: parity"; exit 1; }

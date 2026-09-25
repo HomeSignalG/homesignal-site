@@ -35,7 +35,10 @@ echo "== 0. artifact identity"
 sha="$(sha256sum "$ART" | cut -d' ' -f1)"
 echo "  $ART sha256 $sha (expected $EXPECTED_SHA256)"
 [ "$sha" = "$EXPECTED_SHA256" ] || { echo "REFUSED: artifact hash"; exit 1; }
-if grep -niE '^\s*(set|reset)\s' "$ART"; then echo "REFUSED: the artifact sets session state of its own"; exit 1; fi
+# a top-level SET/RESET statement (ends in ';'), or set_config(), would override the asserted session
+# timeouts. `set search_path to ...` lines are FUNCTION clauses (no ';'), scoped to that function.
+if grep -niE '^\s*(set|reset)\s[^;]*;\s*$|set_config\s*\(' "$ART"; then echo "REFUSED: the artifact sets session state of its own"; exit 1; fi
+[ "$(grep -ciE '^\s*set\s+search_path\s+to\s' "$ART")" -gt 0 ] || { echo "REFUSED: control: the function-scoped SET clauses were not seen"; exit 1; }
 [ "$(grep -cE '^begin;$' "$ART")" = 1 ] && [ "$(grep -cE '^commit;$' "$ART")" = 1 ] \
   || { echo "REFUSED: the artifact is not exactly one begin/commit transaction"; exit 1; }
 python3 test/dc_atlas_validation_pg/build_apply.py --check
