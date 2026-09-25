@@ -74,5 +74,11 @@ jobs:
           CHUNKS: ${{ github.event.inputs.chunks }}
           REASON: ${{ github.event.inputs.reason }}
           MAX_SECONDS: '3000'
+          # PROVISIONED disk, verified from the Supabase dashboard 2026-09-25 after the resize
+          # to 24 GB (binary: the dashboard shows pg_database_size 11,612 MB as 11.35 GB), minus
+          # the 206 MB System share the free-disk formula does not subtract. Without this the
+          # scripts' 11,607 MB default yields a NEGATIVE free figure and every shard halts
+          # DISK_FLOOR. The 2,048 MB floor (DISK_FLOOR_MB) is unchanged. Update on any resize.
+          DISK_TOTAL_MB: '24370'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py
