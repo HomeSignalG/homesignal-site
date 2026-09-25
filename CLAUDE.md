@@ -2200,10 +2200,18 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
       not a decision.
     - Map 1 over all 12,722 ZIP pages: 1,835 rows / 767 pages, 0 added, 0 removed, 0 moved, 0 ZIP-changed.
     - Atlas derived evidence in the NEW plane: 0.
-  - 🔒 **The proof job runs ONLY on manual dispatch from `main`.** It holds `SUPABASE_DB_URL`, which can
-    WRITE to production, and its read-only guarantee lives in the script. On `pull_request` a PR editing
-    that script would have run it with the credential. PRs run the offline comparator only. Never add a
-    `pull_request` trigger to a job that holds a production-write secret.
+  - 🔒 **The proof job, and `dc-atlas-dryrun`, run ONLY on manual dispatch from `main`.** Both hold
+    `SUPABASE_DB_URL`, which can WRITE to production.
+    - ⚠️ **This is hygiene, not a security boundary.** On `pull_request`, GitHub runs the workflow file from
+      the PR's own head. A same-repo PR can delete the guard, or add a new workflow, and still read
+      repository secrets.
+    - **The real boundary** is a protected `environment:` with required reviewers holding those secrets.
+      That is a founder settings action, and it is still open.
+    - `test/workflow-secret-exposure.test.mjs` fails any NEW secret-holding job wired to run on
+      `pull_request` without an event guard.
+    - Three exposures from other sessions are named in its `KNOWN_EXPOSED`, each with a reason:
+      `dc-geocode-probe`, `dc-step3c-probe`, `dc-step3c-reconcile` (a PR gate by design). The list can
+      only shrink.
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
   - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
