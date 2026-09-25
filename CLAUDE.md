@@ -2435,8 +2435,8 @@ to **"FORMER CROMBY GENERATING STATION"**.
   `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
   can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
   the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
-  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL")
-  and the facility detail pill. None prints the raw storage value `On file`.
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL";
+  ⚠️ that card is retired 2026-09-25, the helper remains) and the facility detail pill. None prints the raw storage value `On file`.
 - ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
   EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
   that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
@@ -4022,7 +4022,9 @@ has ever written**.
   Government & civic · Local news**. The standalone *"Regulated facilities nearby"* section that
   sat between Development and Government is **removed**, with its card template and the
   Development absence sentence's cross-reference to it (*"… the regulated-facility record below
-  is the current public-record floor"*).
+  is the current public-record floor"*), and the `facilities_only` coverage banner's clause
+  *"— the EPA-registered facility records below are live public data"* (a follow-up: the first
+  merge missed it and left the banner pointing at a section that no longer exists).
 
 **Why:** TYPE = what the entity is · LIFECYCLE = its current state · REGULATORY = an independent
 R attribute · CHANGE = a qualifying real-world event. EPA/ECHO/FRS registry presence establishes
