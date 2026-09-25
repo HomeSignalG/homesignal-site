@@ -4,15 +4,16 @@
 Every OLD-vs-NEW comparison AND every positive control goes through the functions below, so a
 control that is detected proves the comparator the real result used, not a helper beside it.
 
-Inputs are directories of CSV dumps (with header) written by scripts/dc-atlas-phase-a-proof.sh:
-    start_entities.csv   canonical_entity_id           (the entities of the common starting state)
-    entities.csv         dc_canonical_entity decision columns
-    links.csv            dc_entity_observation decision columns
-    decisions.csv        dc_identity_decision decision columns
-    geo.csv              dc_entity_geography decision fields
-    map1.csv             Map 1 over every registry ZIP: zip, map1_dc_zip_members(zip).*
+Inputs are directories of CSV dumps (with header) written by scripts/dc-atlas-phase-a-proof.sh,
+which owns every query (this module reads files only, and never a database):
+    start_ids.csv        canonical_entity_id           (the entities of the common starting state)
+    entities.csv         canonical entity decision columns
+    links.csv            entity-observation link decision columns
+    decisions.csv        identity decision columns
+    geo.csv              canonical geography decision fields
+    map1.csv             Map 1 over every registry ZIP
 
-MINTED ENTITY IDS ARE RANDOM (dc_resolve_canonical: gen_random_uuid()), so two correct runs of the
+MINTED ENTITY IDS ARE RANDOM (the identity resolver mints with gen_random_uuid()), so two correct runs of the
 same resolver on the same input differ in the uuid of every entity they mint. An entity that is not
 in the common starting state is therefore identified by its EVIDENCE: the smallest observation id
 linked to it ('NEW:<oid>'). Every uuid of such an entity is rewritten to that key in EVERY field of
