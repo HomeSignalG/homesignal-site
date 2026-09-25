@@ -26,7 +26,7 @@ ART=docs/dc-atlas-validation-apply.sql
 # The artifact merged in #1335 (ccd637e), byte for byte. Pinned here, not passed in.
 EXPECTED_SHA256=891bb2101d1f99d5861529953e7f216cdb1d61c64d898d381efee2c0d39ea5a3
 LOCK_TIMEOUT=5s
-STMT_TIMEOUT=120s
+STMT_TIMEOUT=2min   # written in the unit Postgres displays, so the in-session assertion compares like with like
 w="$(mktemp -d)"
 export PGOPTIONS="-c lock_timeout=$LOCK_TIMEOUT -c statement_timeout=$STMT_TIMEOUT -c idle_in_transaction_session_timeout=60s -c application_name=dc-atlas-phase-a-apply"
 P() { psql "$PROD_DB_URL" -X -q -v ON_ERROR_STOP=1 -P pager=off "$@"; }

@@ -4,7 +4,7 @@ name: dc-atlas-phase-a-apply
 # ACQUIRED, never ADMITTED) to production, once, from main, through scripts/dc-atlas-phase-a-apply.sh:
 #
 #   * the committed artifact is executed byte for byte (psql \i, hash pinned in the script);
-#   * lock_timeout 5s / statement_timeout 120s are SESSION settings asserted inside the applying
+#   * lock_timeout 5s / statement_timeout 2min are SESSION settings asserted inside the applying
 #     session immediately before the artifact runs, on the same backend pid (the #1324 apply had
 #     no lock timeout at all -- this is the fix, without editing the artifact);
 #   * refused inside the :25/:35 resolver window, with any DC session active, or with any lock held
