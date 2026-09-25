@@ -70,6 +70,23 @@
 --   * ZIP plays no part: no ZCTA, no provider ZIP, no centroid. Membership is decided afterwards,
 --     from the canonical point alone, by geo.zip_point_membership_in.
 --
+-- RULE VERSION 5 (2026-09-24) — A PUBLISHER'S OWN ADDRESS VALIDATES ITS OWN POINT:
+--   * rule_version 4 paired site claims with `a.source_key < b.source_key`, so a claim was only ever
+--     compared with ANOTHER source's claim. An Atlas-only facility whose street address Atlas itself
+--     states could never be checked against it: Lancaster was caught only because Epoch happened to
+--     state the same address. Pairing on a source name is a source-dependent rule; claims are now
+--     paired by (source, class, observation), so ANY two distinct site claims of an entity are
+--     compared by the SAME dc_site_claims_conflict, whoever published them.
+--   * the corroboration flag likewise accepts any derived address point, not only another source's.
+--   * measured 2026-09-24 before the change: every live entity carries at most ONE claim per
+--     (source, class), so the only pairs this adds are a publisher point vs a derived point; two
+--     same-source publisher points are not a shape production has.
+--   * derived points enter only from an ADMITTED extraction (Step 3D dc_derived_address_admitted):
+--     acquiring Atlas's derivations changes no decision until that extraction is admitted.
+--   * nothing else moves: a derived point inside its bound corroborates, beyond it the entity fails
+--     closed (SOURCES_DISAGREE, never "move to the derived point"), and the absence of a derived
+--     point -- no address, a failed or ambiguous geocode -- is not evidence against anything.
+--
 -- FOOTPRINT: geometry_type admits 'FOOTPRINT' and a footprint would win over any point, but NO
 -- current source supplies a polygon (Atlas: lat/lon only; Epoch: address only). The rule is not
 -- written against a field that does not exist; the first footprint-bearing source adds it.
@@ -351,7 +368,8 @@ select eo.canonical_entity_id, dp.home_signal_observation_id, dp.source_key,
     on dp.home_signal_observation_id = eo.home_signal_observation_id
   join public.dc_source_observation o
     on o.home_signal_observation_id = eo.home_signal_observation_id
- where dp.verdict = 'ACCEPTED';
+ where dp.verdict = 'ACCEPTED'
+   and dp.admitted;   -- an extraction not yet admitted (Step 3D) is acquired and reported, never evidence
 
 revoke all on public.dc_entity_geography_evidence from public, anon, authenticated;
 
@@ -401,7 +419,7 @@ returns table(metric text, value text)
 language plpgsql
 as $fn$
 declare
-    v_rule_version constant integer := 4;
+    v_rule_version constant integer := 5;
     v_written integer := 0;
     v_pending integer;
 begin
@@ -447,6 +465,7 @@ begin
       from public.dc_entity_observation eo
       join public.dc_observation_derived_point dp
         on dp.home_signal_observation_id = eo.home_signal_observation_id
+     where dp.admitted
      order by eo.canonical_entity_id, (dp.verdict = 'ACCEPTED') desc, dp.home_signal_observation_id;
 
     -- ⛔ IDENTITY BEFORE A DERIVED MARKER. An entity with an OPEN cross-source identity question
@@ -479,31 +498,34 @@ begin
                -- ⚖️ CANONICAL GEOGRAPHY AUTHORITY (rule_version 4). Only SITE claims are compared:
                -- a publisher's site point and an accepted derived address point. A town/area or
                -- unusable point is not a claim about the site, so it neither agrees nor disagrees.
-               -- Two site claims of one entity from different sources CONTRADICT each other only
-               -- when they lie farther apart than the evidence itself allows (dc_site_claims_conflict):
+               -- Any two DISTINCT site claims of one entity CONTRADICT each other only when they lie
+               -- farther apart than the evidence itself allows (dc_site_claims_conflict). Claims are
+               -- paired by (source, class, observation), never by source alone (rule_version 5): a
+               -- publisher's point and the geocode of that SAME publisher's address are two claims.
                --   * a derived point carries its calibrated error bound, so a publisher's site point
                --     within that bound is CORROBORATED by it, never vetoed;
                --   * two publisher site points carry no quantified error: the peer tolerance.
                -- A contradiction beyond that allowance fails closed: SOURCES_DISAGREE, no point.
                exists (select 1 from _geo_pts a join _geo_pts b
                          on a.canonical_entity_id = b.canonical_entity_id
-                        and a.source_key < b.source_key
+                        and (a.source_key, a.evidence_class, a.oid) < (b.source_key, b.evidence_class, b.oid)
                         where a.canonical_entity_id = e.canonical_entity_id
                           and public.dc_site_claims_conflict(a.evidence_class, a.uncertainty_m, a.lat, a.lng,
                                                              b.evidence_class, b.uncertainty_m, b.lat, b.lng)) disagree,
                -- which kind of contradiction (reported, never a different outcome)
                exists (select 1 from _geo_pts a join _geo_pts b
                          on a.canonical_entity_id = b.canonical_entity_id
-                        and a.source_key < b.source_key
+                        and (a.source_key, a.evidence_class, a.oid) < (b.source_key, b.evidence_class, b.oid)
                         where a.canonical_entity_id = e.canonical_entity_id
                           and a.evidence_class = 'PUBLISHER_SITE' and b.evidence_class = 'PUBLISHER_SITE'
                           and public.dc_site_claims_conflict(a.evidence_class, a.uncertainty_m, a.lat, a.lng,
                                                              b.evidence_class, b.uncertainty_m, b.lat, b.lng)) peer_conflict,
-               -- the chosen publisher site point, corroborated by another source's derived address point
+               -- the chosen publisher site point, corroborated by a derived address point (any
+               -- publisher's, the point's own publisher included -- rule_version 5)
                (p.evidence_class = 'PUBLISHER_SITE'
                 and exists (select 1 from _geo_pts d
                              where d.canonical_entity_id = e.canonical_entity_id
-                               and d.evidence_class = 'DERIVED_ADDRESS' and d.source_key <> p.source_key
+                               and d.evidence_class = 'DERIVED_ADDRESS'
                                and not public.dc_site_claims_conflict(p.evidence_class, p.uncertainty_m, p.lat, p.lng,
                                                                       d.evidence_class, d.uncertainty_m, d.lat, d.lng))) corroborated,
                e.canonical_entity_id in (select canonical_entity_id from _geo_open) identity_open,

@@ -2048,6 +2048,9 @@ stays `AUTO_CONFIRMED_MATCH`, and the facility is not drawn.
 - ⚠️ **Residual, stated:** Atlas's own street addresses are not geocoded by the ingest. The same
   internal inconsistency can therefore exist, undetected, on an Atlas-only facility. It was found
   here only because Epoch brought the address into the geocoder.
+  - ✅ **Closed by §7.13 (2026-09-25, PR #1335)**, and measured. 48 entities carrying an Atlas record
+    fail closed on this rule once Atlas is admitted: Lancaster (already withheld) plus **47 never
+    detected before**, 25 of them published today. The bullet above is the dated receipt of the gap.
 
 **What `exact` means in practice, measured:** of 717 current Atlas points labelled `exact`:
 - 592 are site-class;
@@ -2070,6 +2073,59 @@ A label is not evidence of a site.
   - G13: a peer conflict publishes.
 - `test/dc-canonical-geography.test.mjs` G14/G15: facility literals and source names, each shown
   catching an injected exception.
+
+## 7.13 A PUBLISHER'S OWN ADDRESS CHECKS ITS OWN POINT — ACQUIRED FIRST, ADMITTED ONLY AFTER REVIEW (2026-09-25)
+
+**Every publisher that states a street address now has that address geocoded through the ONE
+production ladder and compared with its own point by the SAME `dc_site_claims_conflict`.** No
+Atlas geocoder, no Atlas geography rule, no Atlas reader. PR #1335. Full receipt:
+`docs/dc-atlas-dryrun-receipt-2026-09-25.md`.
+
+**Why it was missing: two source-keyed shortcuts, both removed.**
+- `dc_geocode_input` had one Epoch branch; every other source got `NO_GEOCODE_RULE`.
+- The resolver paired claims with `a.source_key < b.source_key`, so a claim only ever met ANOTHER
+  source's claim. Rule_version 5 pairs by `(source, class, observation)`.
+- Before changing the pairing, it was measured that every live entity carries at most one claim per
+  (source, class). So the only new pairs are a publisher point against its own derived point.
+
+**Extraction is per source; policy is one.** `dc_publisher_stated_address` only reads each
+publisher's schema. Atlas's `location.street, city, state postalCode` is composed in the calibration's
+shape. `dc_geocodable_site_address` decides geocodability and names no source.
+
+🔑 **ACQUIRED ≠ ADMITTED.** `dc_derived_address_admitted` is a deployment gate over an extraction,
+never a rank.
+- A non-admitted extraction's derivations are queued, derived and stored. They reach nothing: not the
+  geography evidence, not the geography provenance, and not identity candidate K3.
+- Measured on the national replica, Phase A changed **0 Map 1 rows and 0 geography decisions** across
+  all 12,722 ZIP pages, with the 763-address Atlas queue fully derived and loaded.
+- ⛔ **Admitting Atlas is ONE reviewed edit** of that function, and of the pin
+  `test/dc-atlas-validation-structure.test.mjs` A2/A4 that fails until it is made deliberately.
+
+**What admission does, measured (Phase D, run `36078120976`):** Map 1 goes from 1,814 to 1,790 rows.
+- **25 removed:** publisher site point vs its own address beyond 2,000 m → `SOURCES_DISAGREE`.
+- **1 added:** a town-centroid pin placed by its own address.
+- **0 moved, 0 ZIP-changed.**
+- Of 969 published Atlas facilities: 97.42% unchanged, 48.81% corroborated, 48.61% have no address to
+  check.
+- 21 of the 25 carry Atlas's own `PUBLISHER_APPROXIMATE`. CoreSite DE3's point is the conventional
+  downtown-Denver coordinate, 5.6 km from its stated address.
+- **30 bad points sat in the same ZCTA as their own address** (V09). A same-ZIP test passes every one.
+
+- ⛔ **Absence is never evidence.** 143 failed and 6 ambiguous geocodes, plus 1,311 records with no
+  street, leave their publisher point exactly as it was.
+- ⚠️ **Coverage is bounded by the source.** 1,311 of 2,187 Atlas records state no street address.
+  Validation reaches every Atlas record that states one, not every Atlas record.
+- **Schedule, measured:** 763 addresses in 407.7 s. The writer batch is 400, and the queue drains in
+  two daily runs. The queue SQL orders admitted work first and works on either side of the apply.
+- #1324's apply artifact is **frozen by hash** (it was applied). `dc-epoch-dryrun.yml` is dispatch-only:
+  its production step refuses by design once production is past #1324.
+
+**Pinned:**
+- `test/dc_atlas_validation_pg`: 20 checks; mutations X00–X18 all killed.
+- `test/dc-atlas-validation-structure.test.mjs`: 21 checks, each with a positive control.
+- `scripts/dc-atlas-replica-dryrun.sh`: the national receipt. Its offline proof is
+  `test/dc_atlas_validation_pg/replica_offline.sh` (fakeprod byte-identical; parity negative control
+  executed).
 
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 

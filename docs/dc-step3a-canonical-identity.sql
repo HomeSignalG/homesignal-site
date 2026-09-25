@@ -678,6 +678,7 @@ join o t on t.source_key <> d.source_key
 cross join lateral public.dc_classify_observation(t.source_key, t.distribution_key,
                                                   t.source_native_type, t.raw_payload) tc
  where d.verdict = 'ACCEPTED'
+   and d.admitted   -- a derivation of a not-yet-admitted extraction (Step 3D) surfaces nothing
    and tc.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
    and t.source_native_lat is not null and t.source_native_lon is not null
    and ( ST_DWithin(ST_SetSRID(ST_MakePoint(d.lng, d.lat), 4326)::geography,

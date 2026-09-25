@@ -15,6 +15,13 @@ import re, sys, hashlib, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'docs/dc-epoch-geography-apply.sql'
+# ⛔ FROZEN 2026-09-24: this artifact WAS APPLIED to production (#1324, merged as f9d1326). From then
+# on it is a historical record of exactly what ran, not a view of the DDL of record: the DDL keeps
+# moving (the Atlas address validation change edits Step 3D/3A/3B), and regenerating this file would
+# rewrite history into an artifact nobody applied. --check therefore verifies the FROZEN bytes, and
+# a regeneration is refused. The next change ships its OWN generated apply
+# (test/dc_atlas_validation_pg/build_apply.py -> docs/dc-atlas-validation-apply.sql).
+FROZEN_SHA256 = 'e4069390b15bbe523a8e414058ca76946211f43abf93befe42c3d241200fb4f1'
 # prosrc md5 of the live functions this apply replaces, measured 2026-09-24 and equal to main@58aeb8c
 EXPECT_LIVE = {
     'dc_adjudicate_pair': '27874cd1819cf24fe60746bf7dd8075f',
@@ -234,6 +241,14 @@ if __name__ == '__main__':
     if sys.argv[1:2] == ['--extract']:
         sys.stdout.write('\n\n'.join(pick(sys.argv[2], sys.argv[3:])) + '\n')
         sys.exit(0)
+    if '--check' in sys.argv:
+        got = hashlib.sha256(OUT.read_bytes()).hexdigest() if OUT.exists() else None
+        ok = got == FROZEN_SHA256
+        print('apply file is the frozen artifact applied by #1324' if ok
+              else f'apply file is NOT the frozen applied artifact (sha256 {got})')
+        sys.exit(0 if ok else 1)
+    if not sys.argv[1:]:
+        raise SystemExit('REFUSED: the #1324 apply is frozen (applied to production); it is never regenerated')
     text = build()
     if '--body' in sys.argv:
         # the same statements WITHOUT their own begin/commit, for a caller that owns the transaction
@@ -242,8 +257,6 @@ if __name__ == '__main__':
         assert body.rstrip().endswith('commit;'), 'apply file shape changed'
         sys.stdout.write(body.rstrip()[:-len('commit;')] + '\n')
         sys.exit(0)
-    if '--check' in sys.argv:
-        ok = OUT.exists() and OUT.read_text() == text
-        print('apply file is current' if ok else 'apply file is STALE: regenerate it'); sys.exit(0 if ok else 1)
+    raise SystemExit('REFUSED: unknown option; the #1324 apply is frozen and never regenerated')
     OUT.write_text(text)
     print(f'wrote {OUT.relative_to(ROOT)} ({len(text)} bytes, sha256 {hashlib.sha256(text.encode()).hexdigest()[:16]})')
