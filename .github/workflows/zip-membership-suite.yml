@@ -124,6 +124,39 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_epoch_geography_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/epoch.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; echo '## Canonical DC geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/geo.log || true; echo '```'; echo '## Epoch canonical geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/epoch.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  # Its own job (2026-09-25): added as a step, the Atlas suite pushed the shared job past its 15-minute
+  # budget (15:03 on 37c2209, then cancelled at 15:00 on 2ba1f8d). A cancelled suite is not a pass, and
+  # stretching one shared budget hides the next overrun; a parallel job keeps every budget honest.
+  atlas-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zip_membership_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
       - name: Atlas coordinate validation (a publisher's own address checks its own point; acquisition inert until admitted) passes; every prohibited mutation is killed
         env:
           PGHOST: localhost
@@ -137,4 +170,4 @@ jobs:
       - name: Receipt
         if: always()
         run: |
-          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; echo '## Canonical DC geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/geo.log || true; echo '```'; echo '## Epoch canonical geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/epoch.log || true; echo '```'; echo '## Atlas coordinate validation'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/atlas.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '## Atlas coordinate validation'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/atlas.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
