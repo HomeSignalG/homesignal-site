@@ -2166,8 +2166,8 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
     - V3: the only resolver runs in [S,T) (14:25, 14:35) ended before the first new input (14:44). The
       OLD code they ran writes 0 on that state, so no write can hide behind a later T timestamp.
     - The NEW replay reproduces production's actual 15:25/15:35 decisions row for row.
-  - **The instrument is proven to detect:** 9 positive controls on disposable clones, each with an exact
-    expected result, all detected (run `36176907428` on `6ac7d13`):
+  - **The instrument is proven to detect:** 9 positive controls on disposable clones, all detected; 8
+    carry an exact expected result (admission end to end requires any nonzero difference) (run `36176907428` on `6ac7d13`):
     - Map 1 row move, and an equal-totals swap;
     - parity refusal;
     - identity (an entity; a link plus a decision);
@@ -2183,6 +2183,10 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
       not a decision.
     - Map 1 over all 12,722 ZIP pages: 1,835 rows / 767 pages, 0 added, 0 removed, 0 moved, 0 ZIP-changed.
     - Atlas derived evidence in the NEW plane: 0.
+  - 🔒 **The proof job runs ONLY on manual dispatch from `main`.** It holds `SUPABASE_DB_URL`, which can
+    WRITE to production, and its read-only guarantee lives in the script. On `pull_request` a PR editing
+    that script would have run it with the credential. PRs run the offline comparator only. Never add a
+    `pull_request` trigger to a job that holds a production-write secret.
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
   - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**

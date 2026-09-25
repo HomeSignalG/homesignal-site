@@ -31,7 +31,8 @@
 #    (this checkout's DDL, Atlas unadmitted) — asserted to be DIFFERENT code in step 1a — start from that state,
 #    fingerprinted identical; each runs its OWN identity then geography resolver; identity,
 #    geography and Map 1 over every registry ZIP are compared row for row.
-# 3. POSITIVE CONTROLS on disposable clones, each with an exact expected result, or the run fails:
+# 3. POSITIVE CONTROLS on disposable clones, each required to fire, or the run fails (all but
+#    ADMISSION_END_TO_END carry an exact expected result; that one requires any nonzero difference):
 #    Map 1 move, equal-totals swap, identity (entity; link + decision), geography, and admission END TO
 #    END (the NEW resolvers re-run with Atlas admitted) all go through the SAME comparator
 #    (scripts/dc_phase_a_proof.py); the admission and evidence-leak GATE controls must show Atlas
@@ -407,7 +408,7 @@ sed 's/^/  NEW /' "$w/gate_real.txt"
 echo "== 6b. TRUE PRE-#1335 WORLD: OLD without the geocodes only Phase A's Atlas queue derived must equal the replay"
 REMOVED="$(L -d rep_old_start -tA -c "set session_replication_role = replica" -c "with d as (delete from public.dc_address_geocode where derived_at >= '$S' returning 1) select count(*) from d")"
 KEPT="$(L -d rep_old_start -tA -c "select count(*) from public.dc_address_geocode")"
-echo "  geocodes removed (derived after the snapshot, all by Phase A's queue) $REMOVED | kept $KEPT"
+echo "  geocodes removed (derived after the snapshot; the Epoch queue was empty, so attributed to Phase A's Atlas queue — the table records no source) $REMOVED | kept $KEPT"
 [ "$REMOVED" -gt 0 ] && [ "$KEPT" -gt 0 ] || fail "6b control: nothing removed or nothing kept"
 L -d rep_old_start -tA -c "select metric, value from public.dc_resolve_canonical(true, false)" >/dev/null
 L -d rep_old_start -tA -c "select metric, value from public.dc_resolve_geography(true)" >/dev/null
