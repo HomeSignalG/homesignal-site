@@ -1,0 +1,82 @@
+name: dc-atlas-dryrun
+
+# NATIONAL PRODUCTION DRY RUN of ATLAS COORDINATE VALIDATION -- OFF-DATABASE (the #1324 method).
+# Production is only READ: one SELECT per session, in a READ ONLY transaction, with a 2 s
+# lock_timeout (scripts/dc-atlas-replica-dryrun.sh::prod_select, the script's only production path).
+# Every DDL statement, every resolver, the whole Atlas geocode and the report run in a disposable
+# service container running production's own database image; the run refuses if its geometry
+# engine, its schema, or its Map 1 output over every registry ZIP differs from production's.
+#
+# It measures two deployments separately:
+#   PHASE A  docs/dc-atlas-validation-apply.sql applied, every Atlas address derived through the ONE
+#            production ladder (cache read, never written) and loaded -- NOT admitted. Required: zero
+#            Map 1 delta, zero geography-decision delta, zero identity delta.
+#   PHASE D  the reviewed admission simulated: every changed facility printed individually.
+#
+# Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'docs/dc-atlas-validation-apply.sql'
+      - 'docs/dc-atlas-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-load.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'scripts/dc-geocode-observations.ts'
+      - 'scripts/dc-atlas-replica-dryrun.sh'
+      - 'test/dc_atlas_validation_pg/**'
+      - '.github/workflows/dc-atlas-dryrun.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-dryrun
+  cancel-in-progress: true
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      # PRODUCTION'S OWN DATABASE BUILD (Supabase project database version 17.6.1.127).
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the replica is built from main's DDL of record
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Offline proof first (a stand-in production; the real one is never touched)
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_atlas_validation_pg/replica_offline.sh
+
+      - name: National production dry run (production is only read)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-atlas-replica-dryrun.sh

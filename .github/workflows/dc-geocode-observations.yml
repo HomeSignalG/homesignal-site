@@ -25,6 +25,7 @@ on:
   pull_request:
     paths:
       - 'scripts/dc-geocode-observations.ts'
+      - 'docs/dc-geocode-observations-queue.sql'
       - 'supabase/functions/get-address-report/geocode-cache.ts'
       - 'supabase/functions/get-address-report/canonical-addr.ts'
       - '.github/workflows/dc-geocode-observations.yml'
@@ -67,13 +68,20 @@ jobs:
         with:
           deno-version: v2.x
 
+      # RESUMABLE BATCH (2026-09-24): one run derives at most DCG_BATCH addresses, admitted work first,
+      # in a total deterministic order; the rest wait for the next run (docs/dc-geocode-observations-queue.sql).
+      # Sized from the MEASURED ladder time in the national dry run (dc-atlas-dryrun.yml, DCG_TIMING),
+      # so a full batch finishes well inside timeout-minutes, and the load -- one transaction -- lands
+      # long before the :25 identity / :35 geography resolvers. An address not yet derived is absent
+      # evidence, which never removes a publisher point: a multi-day drain cannot black out a facility.
       - name: Read the queue (READ ONLY transaction)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DCG_BATCH: '400'
         run: |
           set -euo pipefail
           PGOPTIONS='-c default_transaction_read_only=on' \
-            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off \
+            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off -v dcg_batch="$DCG_BATCH" \
                  -f docs/dc-geocode-observations-queue.sql > /tmp/dcg-in.jsonl
           echo "queued addresses: $(grep -c . /tmp/dcg-in.jsonl || true)"
 

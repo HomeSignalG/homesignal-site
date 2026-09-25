@@ -53,6 +53,9 @@ const ladder = productionLadder(supabase, fetch);
 const inputs = (await Deno.readTextFile(inPath)).split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
 const out: string[] = [];
 const byType: Record<string, number> = {};
+// timing (2026-09-24): the schedule is sized from MEASURED ladder time, never guessed
+const callMs: number[] = [];
+const t0 = Date.now();
 for (const r of inputs) {
   const query = String(r.geocoder_query ?? "").trim();
   if (!query || !r.ladder_version) {
@@ -60,7 +63,9 @@ for (const r of inputs) {
     Deno.exit(1);
   }
   const canonical = canonicalAddr(query);
+  const tc = Date.now();
   const g = await resolveGeocode(store, query, canonical, ladder, { forceRefresh: true });
+  callMs.push(Date.now() - tc);
   byType[g.match_type] = (byType[g.match_type] ?? 0) + 1;
   out.push(JSON.stringify({
     geocoder_query: query,
@@ -80,4 +85,8 @@ for (const r of inputs) {
 }
 await Deno.writeTextFile(outPath, out.length ? out.join("\n") + "\n" : "");
 console.log(`derived ${out.length} of ${inputs.length} queued address(es) through the production ladder: ${JSON.stringify(byType)}`);
+const sorted = [...callMs].sort((a, b) => a - b);
+const pct = (p: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] : 0;
+console.log(`DCG_TIMING addresses=${callMs.length} total_s=${((Date.now() - t0) / 1000).toFixed(1)} `
+  + `ladder_ms_p50=${pct(0.5)} p95=${pct(0.95)} max=${sorted.at(-1) ?? 0} pacing_ms=300`);
 if (out.length !== inputs.length) Deno.exit(1);

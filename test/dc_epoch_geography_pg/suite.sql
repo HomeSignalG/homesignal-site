@@ -253,14 +253,16 @@ create or replace function pg_temp.allpages() returns table(zip text, project_na
     canonical_entity_id uuid)
 language sql as $$ select z.zcta5, m.project_name, m.map_status, m.canonical_entity_id
                      from geo.zcta_boundary z cross join lateral pg_temp.page(z.zcta5) m $$;
-create or replace function pg_temp.verdict(p_name text) returns text language sql as $$
+-- scoped to a SOURCE (2026-09-24): every source with an address extraction now appears in the
+-- derived-point view (Atlas records too), so a lookup by name alone would pick an arbitrary one
+create or replace function pg_temp.verdict(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select d.verdict from public.dc_observation_derived_point d
     join public.dc_current_observation c using (home_signal_observation_id)
-   where c.source_native_name = p_name order by d.home_signal_observation_id limit 1 $$;
-create or replace function pg_temp.iq(p_name text) returns text language sql as $$
+   where c.source_native_name = p_name and c.source_key = p_source order by d.home_signal_observation_id limit 1 $$;
+create or replace function pg_temp.iq(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select d.input_quality from public.dc_observation_derived_point d
     join public.dc_current_observation c using (home_signal_observation_id)
-   where c.source_native_name = p_name limit 1 $$;
+   where c.source_native_name = p_name and c.source_key = p_source order by d.home_signal_observation_id limit 1 $$;
 create or replace function pg_temp.idstate(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select string_agg(distinct r.identity_state, ',') from public.dc_record_identity r
     join public.dc_current_observation c using (home_signal_observation_id)
@@ -339,7 +341,7 @@ insert into _r select nextval('_r_n_seq'), 'E09 Epoch-only accepted point, no ca
        pg_temp.idstate('Solo Campus') = 'AUTO_CONFIRMED_DISTINCT'
    and g.geography_status = 'RESOLVED' and g.rule_key = 'DERIVED_ADDRESS_POINT' and g.lat = 40.05
    and g.lng = -97.55 and g.positional_uncertainty_m = 2000 and g.publisher_precision is null
-   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 4,
+   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 5,
        pg_temp.idstate('Solo Campus') || ' ' || g.geography_status || '/' || g.rule_key || ' ' || g.lat || ',' || g.lng
   from pg_temp.geo('Solo Campus') g;
 

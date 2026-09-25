@@ -25,6 +25,8 @@ on:
       - 'docs/dc-geocode-observations-load.sql'
       - 'test/dc_epoch_geography_pg/**'
       - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'test/dc_atlas_validation_pg/**'
       - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
@@ -44,6 +46,8 @@ on:
       - 'docs/dc-geocode-observations-load.sql'
       - 'test/dc_epoch_geography_pg/**'
       - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'test/dc_atlas_validation_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -120,7 +124,17 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_epoch_geography_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/epoch.log
+      - name: Atlas coordinate validation (a publisher's own address checks its own point; acquisition inert until admitted) passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_atlas_validation_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/atlas.log
       - name: Receipt
         if: always()
         run: |
-          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; echo '## Canonical DC geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/geo.log || true; echo '```'; echo '## Epoch canonical geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/epoch.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; echo '## Canonical DC geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/geo.log || true; echo '```'; echo '## Epoch canonical geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/epoch.log || true; echo '```'; echo '## Atlas coordinate validation'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/atlas.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
