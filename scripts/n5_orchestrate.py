@@ -150,11 +150,25 @@ def mode_open():
     cutoff = sql("select now() c;", "cutoff", read_only=True)[0]["c"]
     say("capture cutoff", cutoff)
 
+    # ONE REQUEST, ONE TRANSACTION. Every statement below travels in a single simple-query
+    # message, which PostgreSQL runs as ONE implicit transaction: the capture, the snapshot
+    # row, the generation row and the shard manifest commit together or not at all. Sent as
+    # four requests (the original shape) a failure after the capture committed ~1.4 GB of
+    # orphan rows under a name the precheck above then refuses forever, and a failure after
+    # the generation row left a BUILDING generation with no shards.
+    # statement_timeout: the server default is 120 s (platform-defaults.conf) and the
+    # capture alone ran 114 s before its first row on 2026-09-25. From PG 13 the SET applies
+    # to EACH statement of the message separately. The client waits longer than all four
+    # can take in total, so the server - never the client - is what gives up, and a timeout
+    # rolls the whole transaction back.
+    #
     # identity_hash and content_hash are NOT NULL in production. Both expressions are the
     # canonical ones from docs/preservation-baseline-phase1.sql, byte for byte, so every
     # snapshot fingerprints the same way; test/n5-generation-publish.test.mjs pins the
     # parity. (The first production `open`, 2026-09-25, omitted them and was refused.)
-    sql(f"""insert into preservation.app_project_identity
+    OPEN_STATEMENT_TIMEOUT = "840s"
+    sql(f"""set statement_timeout = '{OPEN_STATEMENT_TIMEOUT}';
+            insert into preservation.app_project_identity
               (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id,
                record_kind, source_ref, submitted_at, lat, lng, identity_hash, content_hash)
             select {lit(snapshot_id)}, p.id, p.zip, p.source_key, p.source_seq, p.registry_id,
@@ -169,34 +183,46 @@ def mode_open():
               from public.app_projects p
               join public.n5_expected_input({lit(cutoff)}) e
                 on e.source_key = p.source_key and e.zip = p.zip and e.source_seq = p.source_seq
-             where p.record_kind = 'development';""", "capture")
+             where p.record_kind = 'development';
 
-    n = sql(f"select count(*) n from preservation.app_project_identity "
-            f"where snapshot_id={lit(snapshot_id)};", "capture rows", read_only=True)[0]["n"]
-    if int(n) == 0:
-        raise SystemExit("STOP: capture wrote 0 rows. Refusing to open a vacuous generation.")
-    say("captured rows", n)
+            -- A vacuous capture aborts the WHOLE transaction: nothing below is written.
+            do $empty$ begin
+              if not exists (select 1 from preservation.app_project_identity
+                              where snapshot_id = {lit(snapshot_id)}) then
+                raise exception 'capture wrote 0 rows - refusing to open a vacuous generation';
+              end if;
+            end $empty$;
 
-    sql(f"""insert into geo.n5_snapshot (snapshot_id, taken_at, cutoff, scope, n_rows, notes)
-            values ({lit(snapshot_id)}, now(), {lit(cutoff)},
-                    'public.n5_expected_input(cutoff) - the canonical contract',
-                    {int(n)}, 'opened by n5_orchestrate.py')
-            on conflict (snapshot_id) do nothing;""", "snapshot row")
+            -- sources / projects / pairs / checksum are NOT NULL. Their meaning is fixed by the
+            -- two existing rows: over phase1-2026-09-01 these exact expressions reproduce
+            -- sources 234 (the 5 registry-less rows count as one source), projects 925,463,
+            -- pairs 2,753,802, n_rows 2,976,275 (measured 2026-09-25). checksum is the SAME
+            -- order-independent sum as the shard manifest, so it equals the manifest's total.
+            insert into geo.n5_snapshot
+              (snapshot_id, taken_at, cutoff, scope, sources, projects, pairs, n_rows, checksum, notes)
+            select {lit(snapshot_id)}, now(), {lit(cutoff)},
+                   'public.n5_expected_input(cutoff) - the canonical contract',
+                   count(distinct coalesce(e.registry_id, '<null>')),
+                   count(distinct e.source_key), count(distinct e.source_key||'|'||e.zip),
+                   count(*),
+                   sum(('x'||substr(md5(e.source_key||'|'||e.zip||'|'
+                        ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
+                   'opened by n5_orchestrate.py'
+              from public.n5_expected_captured({lit(snapshot_id)}) e;
 
-    sql(f"""insert into geo.n5_generation
+            insert into geo.n5_generation
               (generation_id, snapshot_id, cutoff, state, note)
             values ({lit(gen)}, {lit(snapshot_id)}, {lit(cutoff)}, 'BUILDING',
-                    'opened by n5_orchestrate.py');""", "generation row")
+                    'opened by n5_orchestrate.py');
 
-    # Shard manifest derives from the CAPTURE, never from the canonical ZIP registry: a ZIP
-    # present in the capture but absent from the registry would otherwise be skipped in
-    # silence and the build would look complete.
-    # checksum is NOT NULL and load-bearing: run_shard compares the frozen slice against it
-    # and halts as FREEZE_DRIFT on a mismatch, so a manifest without one would either fail
-    # to insert or disable the very gate that catches a partial freeze. It is the SAME
-    # order-independent expression the freeze check uses — addition commutes, so no sort is
-    # involved and the two sides cannot disagree over row order or collation.
-    sql(f"""insert into geo.n5_shard
+            -- Shard manifest derives from the CAPTURE, never from the canonical ZIP registry: a
+            -- ZIP present in the capture but absent from the registry would otherwise be skipped
+            -- in silence and the build would look complete. checksum is NOT NULL and
+            -- load-bearing: run_shard compares the frozen slice against it and halts as
+            -- FREEZE_DRIFT on a mismatch. It is the SAME order-independent expression the freeze
+            -- check uses - addition commutes, so no sort is involved and the two sides cannot
+            -- disagree over row order or collation.
+            insert into geo.n5_shard
               (snapshot_id, generation_id, z3, projects, pairs, zips, checksum, state)
             select {lit(snapshot_id)}, {lit(gen)}, left(e.zip,3),
                    count(distinct e.source_key), count(distinct e.source_key||'|'||e.zip),
@@ -205,7 +231,27 @@ def mode_open():
                         ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
                    'pending'
               from public.n5_expected_captured({lit(snapshot_id)}) e
-             group by left(e.zip,3);""", "shard manifest")
+             group by left(e.zip,3);""", "open (one transaction)", timeout=3000)
+
+    # Read back what committed, as one statement: the manifest must sum to the snapshot row.
+    got = sql(f"""select s.n_rows, s.sources, s.projects, s.pairs, s.checksum,
+                         (select count(*) from geo.n5_shard m
+                           where m.generation_id={lit(gen)}) shards,
+                         (select sum(m.checksum) from geo.n5_shard m
+                           where m.generation_id={lit(gen)}) manifest_checksum
+                    from geo.n5_snapshot s where s.snapshot_id={lit(snapshot_id)};""",
+              "open read-back", read_only=True)
+    if not got:
+        raise SystemExit(f"STOP: open returned but snapshot {snapshot_id} is absent - the "
+                         f"transaction did not commit. Nothing was left behind.")
+    g = got[0]
+    say("captured rows", g["n_rows"])
+    say("sources / projects / pairs", f"{g['sources']} / {g['projects']} / {g['pairs']}")
+    say("shards", g["shards"])
+    if str(g["checksum"]) != str(g["manifest_checksum"]):
+        raise SystemExit(f"STOP: snapshot checksum {g['checksum']} != manifest total "
+                         f"{g['manifest_checksum']}. The generation is open but inconsistent; "
+                         f"fail and discard it before building.")
     say("generation opened", gen)
     return 0
 
@@ -215,6 +261,15 @@ def mode_work():
     if not gen:
         say("work", "no BUILDING generation - nothing to do (clean no-op)")
         return 0
+    # The worker must freeze from the snapshot THIS generation is bound to. n5_shard.py
+    # defaults SNAPSHOT to phase1 and refuses a mismatch ("Conflicting identity"), so passing
+    # only GENERATION stopped every shard of every new generation. Read, never derived from
+    # the naming convention `open` happens to use: SNAPSHOT_ID can override that.
+    snap = sql(f"select snapshot_id from geo.n5_generation where generation_id={lit(gen)};",
+               "generation snapshot", read_only=True)
+    if not snap:
+        raise SystemExit(f"STOP: generation {gen} does not exist.")
+    snapshot_id = snap[0]["snapshot_id"]
     t0 = time.time()
     done = 0
     while done < MAX_SHARDS and (time.time() - t0) < MAX_SECONDS:
@@ -225,7 +280,7 @@ def mode_work():
             say("claim", "no shard available - drained or all leased")
             break
         say("claimed shard", f"{z3} by {WORKER}")
-        env = dict(os.environ, GENERATION=gen, Z3=z3, MAX_SHARDS="1")
+        env = dict(os.environ, GENERATION=gen, SNAPSHOT=snapshot_id, Z3=z3, MAX_SHARDS="1")
         r = subprocess.run([sys.executable, os.path.join(HERE, "n5_shard.py")], env=env)
         if r.returncode != 0:
             # The worker marks its own shard halted; the orchestrator does not paper over it.
@@ -245,10 +300,14 @@ def shards_unfinished(gen):
 
 
 def unpublished_prefixes(gen):
+    """Every prefix of the generation's PUBLICATION SCOPE not yet published - read from the
+    one definition, geo.n5_generation_publish_scope (shard prefixes UNION every canonical
+    prefix). Enumerating geo.n5_shard alone skipped the 40 canonical-only prefixes, so
+    geo.n5_gen_record_unresolved raised 'unpublished' on every tick (audit 2026-09-25)."""
     return [r["z3"] for r in sql(
-        f"select s.z3 from geo.n5_shard s where s.generation_id={lit(gen)} "
-        f"and not exists (select 1 from geo.n5_generation_publish p "
-        f"where p.generation_id=s.generation_id and p.z3=s.z3) order by s.z3;",
+        f"select s.z3 from geo.n5_generation_publish_scope({lit(gen)}) s "
+        f"where not exists (select 1 from geo.n5_generation_publish p "
+        f"where p.generation_id={lit(gen)} and p.z3=s.z3) order by s.z3;",
         "unpublished", read_only=True)]
 
 

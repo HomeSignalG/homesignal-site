@@ -137,9 +137,17 @@ _SQL_WRITE_RE = re.compile(r"(?<![a-z_])(" + "|".join(SQL_WRITE_WORDS) + r")(?![
                            re.IGNORECASE)
 
 
+#: A standard single-quoted SQL literal, '' being the escaped quote. Literal CONTENT is data,
+#: never executed, so the scan below ignores it: publisher keys are not SQL, and the live key
+#: 'arcgis:centre-county-pa-building-permits:Call In R Fi' read as the verb CALL and crashed a
+#: shard (audit 2026-09-25). Dollar-quoted bodies are deliberately NOT stripped - they are
+#: code (a DO body), and DO is itself refused.
+_SQL_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
+
+
 def assert_read_only(query, tag=""):
     """Raise unless the statement is one whose re-execution changes nothing."""
-    m = _SQL_WRITE_RE.search(query)
+    m = _SQL_WRITE_RE.search(_SQL_LITERAL_RE.sub("''", query))
     if m:
         raise SystemExit(
             "STOP: sql(read_only=True) refused - %s carries the write word %r at "
@@ -160,7 +168,7 @@ class SQLPayloadTooLarge(Exception):
     """
 
 
-def sql(query, tag="", raise_413=False, read_only=False):
+def sql(query, tag="", raise_413=False, read_only=False, timeout=900):
     if read_only:
         assert_read_only(query, tag)
     retryable = SQL_RETRY_STATUS_READONLY if read_only else SQL_RETRY_STATUS
@@ -172,7 +180,7 @@ def sql(query, tag="", raise_413=False, read_only=False):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
                      "Accept": "application/json", "User-Agent": UA}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=900) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             if e.code == 413 and raise_413:

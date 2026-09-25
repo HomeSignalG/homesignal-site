@@ -297,9 +297,19 @@ def recover_shard(z3, registry):
             cached, forced = set(), True
             say(f"  {rid} cache BYPASSED", "an earlier attempt did not complete")
         else:
+            # The same key set as `keys` above, reached by JOIN rather than by inlining every
+            # source_key as a literal. read_only=True runs a write-word scanner over the whole
+            # statement text, and publisher data is not SQL: the live key
+            # 'arcgis:centre-county-pa-building-permits:Call In R Fi' reads as the verb CALL and
+            # crashed shard 168 (audit 2026-09-25). Only fixed literals remain in the text now.
             cached, forced = {x["source_key"] for x in sql(
-                "select distinct source_key from geo.n5_geom where source_key in ("
-                + ",".join(lit(k) for k in keys) + ");", "cache probe", read_only=True)}, False
+                f"""select distinct g.source_key
+                      from geo.n5_geom g
+                      join geo.n5_frozen f on f.source_key = g.source_key
+                     where f.z3={lit(z3)} and f.treatment='RECOVERY' and f.registry_id={lit(rid)}
+                       and (f.source_key_basis is null or f.source_key_basis not in
+                            ({','.join(lit(b) for b in UNRECOVERABLE_BASES)}));""",
+                "cache probe", read_only=True)}, False
         todo = [k for k in keys if k not in cached]
         st = {"registry_id": rid, "status": "OK", "projects": len(keys),
               "cache_hits": len(cached), "fetched": 0, "features": 0, "unstable": n_unstable}
