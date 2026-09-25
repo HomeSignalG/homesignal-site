@@ -7,9 +7,14 @@ name: maps-zip-email-suite
 # production is 17.6. On 16 the harness has to shim that one statement; here it runs the
 # shipped file unmodified, so CI proves the statement production will actually execute.
 #
-# The delivery half (homesignal-ingest supabase/migrations/20260925230000_maps_email_delivery.sql)
-# is applied when it is on that repo's main; until then its checks print SKIP, which the
-# runner never counts as a pass.
+# THIS JOB RUNS THE SITE HALF ONLY. The delivery half is homesignal-ingest's
+# supabase/migrations/20260925230000_maps_email_delivery.sql, and homesignal-ingest is
+# PRIVATE: this repo's token cannot read it. The first version of this job tried, and its
+# first run failed with "Not Found" -- the wall check-alert-subscription-parity.yml already
+# records. So the COMBINED run (A12 + delivery, every D-check and every delivery mutation)
+# lives in homesignal-ingest's check-maps-email-pg.yml, which clones THIS public repo, the
+# one direction that works. Here the delivery checks print SKIP, which the runner never
+# counts as a pass; there REQUIRE_DELIVERY=1 turns a missing delivery file into a failure.
 on:
   pull_request:
     paths:
@@ -50,11 +55,6 @@ jobs:
           --health-retries 20
     steps:
       - uses: actions/checkout@v4
-      # Public repo; read-only. Supplies the delivery migration once it is on main.
-      - uses: actions/checkout@v4
-        with:
-          repository: HomeSignalG/homesignal-ingest
-          path: homesignal-ingest
       - name: Refuse to run if any Supabase credential is present
         run: |
           if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
@@ -62,14 +62,13 @@ jobs:
           fi
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
-      - name: Shipped migrations pass (applied twice); every prohibited mutation is killed
+      - name: A12 passes (applied twice); every prohibited A12 mutation is killed
         env:
           PGHOST: localhost
           PGPORT: '5432'
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: maps_zip_email_disposable
-          INGEST_ROOT: ${{ github.workspace }}/homesignal-ingest
         run: |
           set -o pipefail
           bash test/maps_zip_email_pg/run.sh 2>&1 | grep -v NOTICE

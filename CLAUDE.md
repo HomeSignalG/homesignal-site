@@ -1210,8 +1210,12 @@ Until that file is applied the button's RPC is refused by the old stream CHECK; 
   every other open of the sign-in clears the pending action, so it can never fire on a later,
   unrelated sign-in.
 - Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
-  (the SQL against a disposable Postgres 17, every prohibited mutation killed) via
-  `maps-zip-email-suite.yml`.
+  (the SQL against a disposable Postgres 17, every prohibited mutation killed). **Two
+  workflows, split by repo** — the `check-alert-subscription-parity.yml` precedent:
+  `maps-zip-email-suite.yml` here runs A12 alone (the delivery checks print SKIP), and
+  homesignal-ingest's `check-maps-email-pg.yml` clones this PUBLIC repo and runs both halves
+  with `REQUIRE_DELIVERY=1`. ⚠️ The reverse is impossible — homesignal-ingest is private, and
+  the first version of this job tried to check it out and failed with "Not Found".
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 

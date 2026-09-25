@@ -9,8 +9,10 @@
 #
 # The delivery half is homesignal-ingest's
 # supabase/migrations/20260925230000_maps_email_delivery.sql. It is applied when found at
-# $INGEST_ROOT (default: the sibling checkout). When it is not there -- e.g. CI before the
-# ingest PR merges -- its checks print as SKIP, which is never counted as a pass.
+# $INGEST_ROOT (default: the sibling checkout). When it is not there -- this repo's own CI,
+# which cannot read the private ingest repo -- its checks print as SKIP, which is never
+# counted as a pass. REQUIRE_DELIVERY=1 turns that absence into a FAILURE; homesignal-ingest's
+# check-maps-email-pg.yml sets it, so the combined run can never go green without its half.
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
@@ -26,7 +28,16 @@ else
   pg16=1; echo "server: PostgreSQL $(P -tAc 'show server_version') -- LOCAL run: SET EXPRESSION shimmed (CI runs 17)"
 fi
 have_delivery=0; [ -f "$DELIVERY" ] && have_delivery=1
-[ "$have_delivery" = 1 ] || echo "SKIP -- delivery migration not found at $DELIVERY"
+if [ "$have_delivery" != 1 ]; then
+  if [ "${REQUIRE_DELIVERY:-0}" = 1 ]; then
+    echo "FAIL -- REQUIRE_DELIVERY=1 and the delivery migration is not at $DELIVERY"; exit 1
+  fi
+  echo "SKIP -- delivery migration not found at $DELIVERY (the combined run is homesignal-ingest's check-maps-email-pg.yml)"
+fi
+# The delivery argument, computed ONCE with an if. `d="$([ ... ] && echo ...)"` is a bare
+# assignment whose status is the substitution's, so under `set -e` it EXITED the script the
+# moment the delivery file was absent -- the site CI shape -- after SHIPPED had printed.
+delivery_arg=""; if [ "$have_delivery" = 1 ]; then delivery_arg="$DELIVERY"; fi
 
 prep() {  # $1 = file to apply; writes the (possibly shimmed) copy to $2
   if [ "$pg16" = 1 ]; then python3 "$here/mutate.py" --pg16 "$1" >"$2"; else cp "$1" "$2"; fi
@@ -49,7 +60,7 @@ suite() { P -tA -f "$here/suite.sql" 2>"$tmp/suite_err" | grep -E '^[MD][0-9]' |
 
 # ------------------------------------------------------------------ 1. shipped
 reset_db
-if ! apply "$A12" "$([ "$have_delivery" = 1 ] && echo "$DELIVERY")"; then
+if ! apply "$A12" "$delivery_arg"; then
   cat "$tmp/err" >&2; echo "FAIL -- the shipped migrations do not apply (twice) to the fixture"; exit 1
 fi
 out="$(suite)"; echo "$out" | sed 's/^/  /'
@@ -73,7 +84,7 @@ for name in subscriptions-forget-maps zip-scope-guard-not-installed pipeline-typ
     echo "HARNESS  $name -- anchor missing"; status=1; continue
   fi
   reset_db
-  if [ "$target" = "$A12" ]; then a="$tmp/mutated.sql"; d="$([ "$have_delivery" = 1 ] && echo "$DELIVERY")"
+  if [ "$target" = "$A12" ]; then a="$tmp/mutated.sql"; d="$delivery_arg"
   else a="$A12"; d="$tmp/mutated.sql"; fi
   if ! apply "$a" "$d"; then echo "KILLED   $name (the mutated migration does not apply)"; continue; fi
   mout="$(suite)"

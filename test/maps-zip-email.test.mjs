@@ -182,7 +182,8 @@ if (existsSync(compose)) {
   ok(readFileSync(compose, 'utf8').includes(`'${TOPIC}'`),
     '§6 the topic is the MAPS post header the composer writes (compose-maps.mjs)');
 } else {
-  console.log('SKIP — compose-maps.mjs not on disk (sibling repo absent); header parity not checked');
+  console.log('SKIP — compose-maps.mjs not on disk (sibling repo absent); header parity is '
+    + 'pinned in homesignal-ingest tests/test_maps_email_stream.py, where both files live');
 }
 
 if (fails) { console.error(`\n${fails} failed`); process.exit(1); }
