@@ -97,6 +97,7 @@ mon=$!
 t0=$(date +%s.%N)
 set +e
 P -tA > "$w/apply.txt" 2>&1 <<SQL
+set application_name = 'dc-atlas-phase-a-apply';
 set lock_timeout = '$LOCK_TIMEOUT';
 set statement_timeout = '$STMT_TIMEOUT';
 select 'pid_before=' || pg_backend_pid();

@@ -39,7 +39,7 @@ M1() { P -d "$FP" -tA -c "select md5(string_agg(x::text, E'\n' order by x::text 
 map_before="$(M1)"
 
 echo "== 1. NEGATIVE CONTROL: a held lock must make the apply fail FAST and commit NOTHING"
-P -d "$FP" -c "begin; lock table public.dc_geocode_queue in access share mode; select pg_sleep(40); commit;" >/dev/null 2>&1 &
+PGAPPNAME=dc-offline-blocker P -d "$FP" -c "begin; lock table public.dc_geocode_queue in access share mode; select pg_sleep(40); commit;" >/dev/null 2>&1 &
 blk=$!; sleep 2
 t0=$(date +%s)
 set +e
@@ -47,7 +47,12 @@ PROD_DB_URL="$URL" DCA_OFFLINE=1 DCA_OFFLINE_ALLOW_LOCKS=1 bash scripts/dc-atlas
 rc=$?
 set -e
 el=$(( $(date +%s) - t0 ))
-kill "$blk" 2>/dev/null || true; wait "$blk" 2>/dev/null || true
+# killing the local client does NOT release the server-side lock (pg_sleep never notices the
+# disconnect), so the blocker's backend is terminated explicitly, then its locks are proven gone.
+P -d "$FP" -tA -c "select pg_terminate_backend(pid) from pg_stat_activity where application_name = 'dc-offline-blocker'" >/dev/null
+wait "$blk" 2>/dev/null || true
+left="$(P -d "$FP" -tA -c "select count(*) from pg_locks l join pg_class c on c.oid = l.relation where c.relname like 'dc\_%' and l.pid <> pg_backend_pid()")"
+[ "$left" = 0 ] || { echo "FAIL: blocker locks still held ($left)"; exit 1; }
 sed 's/^/  | /' "$tmp/neg.txt"
 [ "$rc" != 0 ] || { echo "FAIL: the apply succeeded while a lock was held"; cat "$tmp/neg.txt"; exit 1; }
 grep -q 'canceling statement due to lock timeout' "$tmp/neg.txt" || { echo "FAIL: the apply did not fail on lock_timeout"; cat "$tmp/neg.txt"; exit 1; }
