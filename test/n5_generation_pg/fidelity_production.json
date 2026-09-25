@@ -1,0 +1,30 @@
+{
+  "_doc": "Production fingerprint of test/n5_generation_pg/fidelity.sql, read 2026-09-25 AFTER Parts A-C were applied (before Part D). Values: [columns, constraints, non-primary indexes]; functions carry their pg_get_functiondef md5 in the first slot. The suite recomputes the same query over fixture + Parts A-C and must equal this exactly.",
+  "state": "post-C",
+  "objects": {
+    "geo.maps_zip_geography_status": ["36f7df5856ae94e0b5f85fc6bbfa4350", "83c63a0a1bb4c2eb358bcac75d0adecc", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_accepted_source": ["25d806fffcd9df4aabadcbaa6612f169", "6ba162ed66fe942270ce544e650ef9b4", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_association": ["92a0763214b7b0b61c0c7a71ad26c2da", "84c14a5ab839f9731f12bac6c0407acd", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_boundary_membership": ["3791b5a3c7f9b906ce2487d32509af07", "fadff52a5fe31767f2b34f5737ae9eb4", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_frozen": ["1ef4a4b8358b31ac78b19376baff72eb", "d41d8cd98f00b204e9800998ecf8427e", "0bb0dddeffff403fff29b4409bf57836"],
+    "geo.n5_gen_zcta": ["8cb12c0fbd02865753aa8bd2209c98f5", "2994cc39565cff9004229e39746340be", "a226cbec9cc58463762b4cf940185eb2"],
+    "geo.n5_generation": ["b422256d66ecf703a838cc319a682e0f", "1a62f7942fe548bbcca0514bf763dfec", "9d7223415e7bbcfc49b9939dd3030220"],
+    "geo.n5_generation_publish": ["2ba9f6dda5441e18fda39bd4d82573ec", "5ccf31b1033b487c9f839ed5e6c193bd", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_generation_reconcile": ["a1a01a1dfe898114806a47d8b3f27205", "3edce3df8c22372321c881d6e554a96a", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_generation_unresolved": ["15a62f74a136e5f9b5a6086708783ceb", "557cb051de3d1cda68a7dbc40e8d1c2e", "8dc6d106a092664f55613e27b02c7bc5"],
+    "geo.n5_geom": ["c003d9bbfde35661f200bdc61a347198", "2056ac6088a89bb27c0c07ef45a89bf8", "5c67eddb7f385716273df51dc2fbeaa1"],
+    "geo.n5_point_reject": ["4753e5654e9edff3e1eb9cf703d5de12", "8922f2949cb2b23811bd9d39a39c62d0", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_recovery_attempt": ["ab81d6d64550151295ddb0c3d689811c", "a8b52d69f1880317043e5d80c2620749", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_shard": ["76155401cef694d8c4592e5846f95205", "950e3911ee7a4821aef2d04174660794", "067065b5ca9f21b642dc2265863862ff"],
+    "geo.n5_snapshot": ["b0a93e31d6ec2e5da908ca67283a8a33", "e629269e5e33da873b22f4338b2ffbf4", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.n5_zcta": ["aa7bafc471e75984af0faf4e2fba91e6", "28fbebdf6009b8dd6a19b1aa01045ee2", "a300596fc5574c6e2854bc4c9335a1bd"],
+    "geo.zip_authoritative_marker": ["9ba890512e4f08c43fa37b2cad086dea", "bf587d8c5f330bafad250b7a8d3d8c4d", "d41d8cd98f00b204e9800998ecf8427e"],
+    "geo.zip_authoritative_membership": ["56859ed9ea38f27213f356426234b042", "95ae4e639af9fa121b6e8968119d6b0f", "d41d8cd98f00b204e9800998ecf8427e"],
+    "preservation.app_project_identity": ["1bd75d706c53dfbaf42e8e2c095661ac", "54b3806d6a2ca22576737c5e512ea2d6", "030f2b5913716edecbd6fd3ab7b37b04"],
+    "preservation.guard_frozen()": ["884f17e8348229b36f12539bf6474e23", null, null],
+    "preservation.protected_snapshot": ["6d8735e5a159a1ea09c1e12931a334d7", "e629269e5e33da873b22f4338b2ffbf4", "d41d8cd98f00b204e9800998ecf8427e"],
+    "public.app_zip_geography_cutover": ["dc36a151b6100f8d0c04458b015d07df", "465c4e28936877c083b9ddfcff3bcb50", "d41d8cd98f00b204e9800998ecf8427e"],
+    "public.canonical_zip_registry": ["6fcf31467b4393326fc7b49c300873ee", "465c4e28936877c083b9ddfcff3bcb50", "d41d8cd98f00b204e9800998ecf8427e"],
+    "public.n5_expected_captured(text)": ["9b2c64b2daa974a52b84662e981c1480", null, null]
+  }
+}

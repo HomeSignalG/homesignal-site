@@ -127,6 +127,19 @@ def discover_building():
     return rows[0]["generation_id"] if rows else None
 
 
+# The server's statement_timeout is 120 s. Every lifecycle function below is ONE statement
+# that does national work (prepare ~3M snapshot rows, the unresolved accounting, the set-based
+# reconcile inside READY and ACTIVATE), so each is sent with an explicit per-statement budget
+# and a client wait longer than it: the SERVER gives up and rolls back, never the client.
+HEAVY_STATEMENT_TIMEOUT = "840s"
+HEAVY_CLIENT_TIMEOUT = 1800
+
+
+def heavy(query, tag):
+    return sql(f"set statement_timeout = '{HEAVY_STATEMENT_TIMEOUT}';\n" + query, tag,
+               timeout=HEAVY_CLIENT_TIMEOUT)
+
+
 def mode_open():
     """Capture an immutable snapshot and open a generation bound to it.
 
@@ -320,6 +333,13 @@ def publish_pending(gen, budget_seconds):
     if left:
         say("publish", f"waiting - {left} shard(s) not done")
         return 0
+    prepared = sql(f"select publish_prepared_at from geo.n5_generation where generation_id={lit(gen)};",
+                   "prepared?", read_only=True)[0]["publish_prepared_at"]
+    if not prepared:
+        # Once, after every shard is done and before any prefix: the generation's own proven
+        # points and verdicts, and its recovered candidate key set (part D, D6).
+        r = heavy(f"select geo.n5_gen_prepare_publish({lit(gen)}) r;", "prepare")[-1]["r"]
+        say("publication prepared", r)
     t0 = time.time()
     run_id = f"pub-{WORKER}"
     todo = unpublished_prefixes(gen)
@@ -335,7 +355,7 @@ def publish_pending(gen, budget_seconds):
                     f"where p.generation_id=g.generation_id)) s from geo.n5_generation g "
                     f"where g.generation_id={lit(gen)};", "unresolved stale", read_only=True)[0]["s"]
         if stale:
-            r = sql(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[0]["r"]
+            r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[-1]["r"]
             say("unresolved outcomes recorded", r)
     return 0
 
@@ -350,7 +370,7 @@ def mode_publish():
 
 def mode_unresolved():
     gen = require_generation()
-    r = sql(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[0]["r"]
+    r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[-1]["r"]
     say("unresolved outcomes recorded", r)
     return 0
 
@@ -360,10 +380,13 @@ def mode_reconcile():
     if not gen:
         say("reconcile", "no BUILDING generation - nothing to do (clean no-op)")
         return 0
-    for c in chunks_for(gen):
-        row = sql(f"select * from geo.n5_reconcile_chunk({lit(gen)}, {lit(c)});", f"chunk {c}")[0]
-        say(f"chunk {c}", f"expected={row['expected_keys']} resolved={row['accounted_resolved']} "
-                          f"unresolved={row['accounted_unresolved']} unaccounted={row['unaccounted']}")
+    # ONE set-based pass over every declared chunk (part D, D10) - the per-chunk loop
+    # re-scanned membership twice per chunk and could not finish inside the job.
+    arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
+    row = heavy(f"select * from geo.n5_reconcile_chunks({lit(gen)}, {arr});", "reconcile")[-1]
+    say("reconcile", f"chunks={row['chunks']} expected={row['expected_keys']} "
+                     f"resolved={row['accounted_resolved']} unresolved={row['accounted_unresolved']} "
+                     f"unaccounted={row['unaccounted']}")
     return 0
 
 
@@ -375,7 +398,7 @@ def mode_ready():
     gap; this script adds no second copy of those rules."""
     gen = require_generation()
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
-    sql(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready")
+    heavy(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready")
     say("generation", f"{gen} -> READY (serving still requires `activate`)")
     return 0
 
@@ -383,7 +406,7 @@ def mode_ready():
 def mode_activate():
     gen = require_generation()
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
-    sql(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate")
+    heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate")
     say("generation", f"{gen} -> ACTIVE")
     return 0
 

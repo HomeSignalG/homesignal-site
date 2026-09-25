@@ -580,11 +580,51 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 
 
 def associate(z3):
-    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + """
-insert into geo.n5_association (source_key, zip, evidence)
-select source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
+    # GENERATION-SCOPED (docs/n5-generation-publish-part-d.sql D5): the table still holds the
+    # legacy build, keyed without a generation, so an insert that named none collided with
+    # it and every drifted prefix halted. Every read below filters on the same generation.
+    q = HEAVY_TIMEOUT_SQL + build_associations(z3) + f"""
+insert into geo.n5_association (generation_id, source_key, zip, evidence)
+select {lit(GENERATION)}, source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
 on conflict do nothing;"""
     sql(q, "associate " + z3)
+
+
+def record_key_verdicts(z3, rec):
+    """Persist the per-key verdicts this shard MADE (docs/n5-generation-publish-part-d.sql D4).
+
+    The shard already decides these and used to print them and move on, so the accounting
+    stage had no evidence for them and INV-1 could never pass (audit 2026-09-25 #10). Every
+    class is read from this shard's own decision; nothing is inferred:
+      REGISTRY_UNCLASSIFIED       the frozen treatment is UNCLASSIFIED (no accepted_source row)
+      SOURCE_EXCLUDED             recover_shard reported the registry EXCLUDED
+      RECOVERY_UNSTABLE_IDENTITY  the key's identity basis is one recovery cannot use
+      RECOVERY_NOT_RETURNED       the registry's recovery completed (status OK) and the key
+                                  has no geometry row at all
+    A key spanning prefixes gets the same verdict from each shard, hence ON CONFLICT."""
+    excluded = sorted({r["registry_id"] for r in rec if r.get("status") == "EXCLUDED"})
+    recovered_ok = sorted({r["registry_id"] for r in rec if r.get("status") == "OK"})
+    arr = lambda xs: "array[" + ",".join(lit(x) for x in xs) + "]::text[]"
+    unstable = ",".join(lit(b) for b in UNRECOVERABLE_BASES)
+    sql(HEAVY_TIMEOUT_SQL + f"""
+insert into geo.n5_generation_key_verdict (generation_id, source_key, registry_id, verdict, detail)
+select distinct on (f.source_key) {lit(GENERATION)}, f.source_key, f.registry_id, v.verdict,
+       jsonb_build_object('z3', {lit(z3)}, 'treatment', f.treatment, 'basis', f.source_key_basis)
+  from geo.n5_frozen f
+  cross join lateral (select case
+      when f.treatment = 'UNCLASSIFIED' then 'REGISTRY_UNCLASSIFIED'
+      when f.treatment = 'RECOVERY' and f.registry_id = any ({arr(excluded)}) then 'SOURCE_EXCLUDED'
+      when f.treatment = 'RECOVERY' and f.source_key_basis in ({unstable}) then 'RECOVERY_UNSTABLE_IDENTITY'
+      when f.treatment = 'RECOVERY' and f.registry_id = any ({arr(recovered_ok)})
+       and not exists (select 1 from geo.n5_geom g where g.source_key = f.source_key
+                        and g.provenance = 'recovered_authoritative') then 'RECOVERY_NOT_RETURNED'
+    end as verdict) v
+ where f.z3 = {lit(z3)} and v.verdict is not null
+ order by f.source_key, v.verdict
+on conflict (generation_id, source_key) do nothing;""", "key verdicts " + z3)
+    return int(one(sql(f"""select count(*) n from geo.n5_generation_key_verdict v
+                            where v.generation_id={lit(GENERATION)}
+                              and v.detail->>'z3' = {lit(z3)};""", "verdicts n", read_only=True), "n"))
 
 
 def shard_counts(z3):
@@ -719,8 +759,8 @@ def run_shard(z3):
     # 4 - ASSOCIATE
     before = shard_counts(z3)
     associate(z3)
-    got = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                      "assoc n", read_only=True), "n"))
+    got = int(one(sql(f"select count(*) n from geo.n5_association where generation_id={lit(GENERATION)} "
+                      f"and left(zip,3)={lit(z3)};", "assoc n", read_only=True), "n"))
     say("", "")
     say("legacy pairs", before["legacy_pairs"])
     say("  geometry_verified (1)", before["v1"])
@@ -740,26 +780,33 @@ def run_shard(z3):
 
     # 5 - VERIFY: no phantom, and idempotent
     phantom = int(one(sql(f"""select count(*) n from geo.n5_association a
-                              where left(a.zip,3)={lit(z3)}
+                              where a.generation_id={lit(GENERATION)} and left(a.zip,3)={lit(z3)}
                                 and not exists (select 1 from geo.n5_frozen f
                                                  where f.z3={lit(z3)} and f.source_key=a.source_key);""",
                           "phantom", read_only=True), "n"))
     say("phantom projects (not in frozen slice)", phantom)
     fp1 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp1", read_only=True), "m")
+                         from geo.n5_association where generation_id={lit(GENERATION)}
+                          and left(zip,3)={lit(z3)}) z;""", "fp1", read_only=True), "m")
     associate(z3)
-    n2 = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
-                     "assoc n2", read_only=True), "n"))
+    n2 = int(one(sql(f"select count(*) n from geo.n5_association where generation_id={lit(GENERATION)} "
+                     f"and left(zip,3)={lit(z3)};", "assoc n2", read_only=True), "n"))
     fp2 = one(sql(f"""select md5(string_agg(k, ',' order by k collate "C")) m from
                       (select (source_key||'|'||zip||'|'||evidence::text) k
-                         from geo.n5_association where left(zip,3)={lit(z3)}) z;""", "fp2", read_only=True), "m")
+                         from geo.n5_association where generation_id={lit(GENERATION)}
+                          and left(zip,3)={lit(z3)}) z;""", "fp2", read_only=True), "m")
     say("second-run inserts", n2 - got)
     say("fingerprint identical", "yes" if fp1 == fp2 else "NO")
     say("shard fingerprint", fp1)
 
     verified = (closes and total_ok and phantom == 0 and n2 == got and fp1 == fp2)
     say("VERIFIED CLEAN", "yes" if verified else "NO")
+
+    # 5b - PERSIST the per-key verdicts this shard made (#10). Before the working set is
+    #      discarded: they are read from this shard's frozen slice.
+    n_verdicts = record_key_verdicts(z3, rec)
+    say("key verdicts recorded", n_verdicts)
 
     # 6 - DISCARD the per-shard disposable working set (boundaries + frozen slice).
     #     geo.n5_geom is deliberately NOT discarded: it is the cross-shard geometry cache.
@@ -784,7 +831,7 @@ def run_shard(z3):
               "unstable_projects": int(before["unstable_projects"]),
               "boundaries": nb, "boundary_missing": len(missing),
               "recovery": rec, "fingerprint": fp1,
-              "second_run_inserts": n2 - got, "phantom": phantom,
+              "second_run_inserts": n2 - got, "phantom": phantom, "key_verdicts": n_verdicts,
               "free_mb": round(free, 1), "verified": verified, "disk_ok": disk_ok}
 
     # ADVANCE ONLY IF VERIFIED CLEAN **AND** DISK ABOVE FLOOR. Both, and-not-or.

@@ -19,12 +19,19 @@ end $$;
 grant usage on schema public to anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------- lifecycle tables
+-- FIDELITY, 2026-09-25 (rebuilt after the runnability audit): every column, type, NOT NULL,
+-- default and key below is production's, read back from pg_attribute / pg_constraint /
+-- pg_index, in PRE-migration shape (Parts A-C then add what they add). The earlier version
+-- was LOOSER than production - nullable identity_hash, no n5_snapshot table, nullable
+-- NOT NULL columns - and a looser fixture is how the suite went green over a lifecycle that
+-- could not run. test/n5_generation_pg/fidelity.sql fingerprints these shapes; the suite
+-- compares that fingerprint to production's (FIDELITY_* in run_suite.py).
 create table geo.n5_generation (
-  generation_id text primary key,
-  snapshot_id   text,
-  cutoff        timestamptz,
-  state         text check (state in ('BUILDING','VALIDATING','READY','ACTIVE','SUPERSEDED','FAILED','ACTIVE_LEGACY')),
-  opened_at     timestamptz default now(),
+  generation_id text not null primary key,
+  snapshot_id   text not null,
+  cutoff        timestamptz not null,
+  state         text not null check (state in ('BUILDING','VALIDATING','READY','ACTIVE','SUPERSEDED','FAILED','ACTIVE_LEGACY')),
+  opened_at     timestamptz not null default now(),
   activated_at  timestamptz,
   superseded_at timestamptz,
   zips_expected integer,
@@ -34,48 +41,147 @@ create unique index n5_generation_one_serving on geo.n5_generation
   ((state = any (array['ACTIVE','ACTIVE_LEGACY']))) where (state = any (array['ACTIVE','ACTIVE_LEGACY']));
 
 create table geo.n5_generation_unresolved (
-  generation_id text references geo.n5_generation(generation_id) on delete cascade,
-  source_key text, zip text, reason_code text, detail jsonb,
-  recorded_at timestamptz default now(),
+  generation_id text not null references geo.n5_generation(generation_id) on delete cascade,
+  source_key text not null, zip text, reason_code text not null, detail jsonb,
+  recorded_at timestamptz not null default now(),
   primary key (generation_id, source_key));
+create index n5_generation_unresolved_gen_ix on geo.n5_generation_unresolved (generation_id, reason_code);
 
 create table geo.n5_generation_reconcile (
-  generation_id text, chunk_key text, expected_keys bigint, accounted_resolved bigint,
-  accounted_unresolved bigint, unaccounted bigint, computed_at timestamptz default now(),
+  generation_id text not null references geo.n5_generation(generation_id) on delete cascade,
+  chunk_key text not null, expected_keys bigint not null, accounted_resolved bigint not null,
+  accounted_unresolved bigint not null, unaccounted bigint not null,
+  computed_at timestamptz not null default now(),
   primary key (generation_id, chunk_key));
 
+create table geo.n5_snapshot (
+  snapshot_id text not null primary key, taken_at timestamptz not null, cutoff timestamptz not null,
+  scope text not null, sources integer not null, projects bigint not null, pairs bigint not null,
+  n_rows bigint not null, checksum numeric not null, notes text);
+
 create table geo.n5_shard (
-  snapshot_id text, z3 char(3), projects bigint, pairs bigint, zips integer, checksum numeric,
-  state text default 'pending' check (state in ('pending','running','done','halted')),
+  snapshot_id text not null, z3 char(3) not null, projects bigint not null, pairs bigint not null,
+  zips integer not null, checksum numeric not null,
+  state text not null default 'pending',
   started_at timestamptz, finished_at timestamptz, detail jsonb, generation_id text,
-  claimed_by text, claim_expires_at timestamptz, attempts integer default 0,
-  primary key (snapshot_id, z3));
+  claimed_by text, claim_expires_at timestamptz, attempts integer not null default 0,
+  primary key (snapshot_id, z3),
+  constraint n5_shard_state_ck check (state in ('pending','running','done','halted')));
+create index n5_shard_gen_state_ix on geo.n5_shard (generation_id, state);
+create index n5_shard_state_ix on geo.n5_shard (snapshot_id, state);
+
+create table geo.n5_frozen (
+  z3 char(3) not null, source_key text not null, zip char(5) not null, source_seq smallint,
+  registry_id text, treatment text, lat double precision, lng double precision, source_key_basis text);
+create index n5_frozen_key_ix on geo.n5_frozen (z3, source_key);
+create index n5_frozen_z3_ix on geo.n5_frozen (z3);
+
+create table geo.n5_zcta (
+  z3 char(3) not null, zcta5 char(5) not null, geom geometry(MultiPolygon, 4269) not null,
+  primary key (z3, zcta5));
+create index n5_zcta_gix on geo.n5_zcta using gist (geom);
+
+create table geo.n5_recovery_attempt (
+  z3 char(3) not null, registry_id text not null, projects_in_shard integer not null,
+  cache_hits integer not null, fetched integer not null, features integer not null,
+  bytes_in bigint not null default 0, requests integer not null default 0,
+  complete boolean not null default true, started_at timestamptz, completed_at timestamptz,
+  primary key (z3, registry_id));
+
+create table geo.n5_association (
+  source_key text not null, zip char(5) not null, evidence smallint not null,
+  primary key (source_key, zip));
 
 create table preservation.app_project_identity (
-  snapshot_id text, app_project_id uuid, zip text, source_key text, source_seq smallint,
-  registry_id text, record_kind text, source_ref text, submitted_at date,
-  lat double precision, lng double precision, identity_hash bytea, content_hash bytea,
+  snapshot_id text not null, app_project_id uuid not null, zip text not null, source_key text,
+  source_seq smallint, registry_id text, record_kind text not null, source_ref text,
+  submitted_at date, lat double precision, lng double precision,
+  identity_hash bytea not null, content_hash bytea not null,
   primary key (snapshot_id, app_project_id));
+create index app_project_identity_snapshot_kind_zip on preservation.app_project_identity (snapshot_id, record_kind, zip);
+create index app_project_identity_freeze_zip on preservation.app_project_identity (zip)
+  where record_kind = 'development' and left(zip, 3) = any (array['284','300','303','662']);
+
+create table preservation.protected_snapshot (
+  snapshot_id text not null primary key, protected_at timestamptz not null default now(),
+  reason text not null, authorized_by text not null);
+
+-- LIVE: preservation.guard_frozen (pg_get_functiondef read-back 2026-09-25), and its triggers.
+CREATE OR REPLACE FUNCTION preservation.guard_frozen()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'pg_catalog', 'preservation'
+AS $function$
+declare
+  v_snaps text[];
+  v_hit   text;
+  v_hint  text;
+begin
+  v_hint := format('Intentional override: ALTER TABLE %I.%I DISABLE TRIGGER %I;',
+                   tg_table_schema, tg_table_name, tg_name);
+
+  if tg_op = 'TRUNCATE' then
+    raise exception using
+      errcode = 'raise_exception',
+      message = format('preservation: TRUNCATE of %I.%I refused - the preservation baseline '
+                       'is protected data (founder ruling 2026-09-01).',
+                       tg_table_schema, tg_table_name),
+      hint    = v_hint;
+  end if;
+
+  -- An UPDATE is refused if EITHER side names a protected snapshot: that stops a
+  -- frozen row being edited AND an ordinary row being relabelled into the frozen set.
+  v_snaps := case tg_op
+               when 'INSERT' then array[new.snapshot_id]
+               when 'DELETE' then array[old.snapshot_id]
+               else               array[old.snapshot_id, new.snapshot_id]
+             end;
+
+  select p.snapshot_id into v_hit
+    from preservation.protected_snapshot p
+   where p.snapshot_id = any (v_snaps)
+   limit 1;
+
+  if v_hit is not null then
+    raise exception using
+      errcode = 'raise_exception',
+      message = format('preservation: %s on %I.%I refused - snapshot %L is protected data '
+                       '(founder ruling 2026-09-01).',
+                       tg_op, tg_table_schema, tg_table_name, v_hit),
+      hint    = v_hint;
+  end if;
+
+  return case tg_op when 'DELETE' then old else new end;
+end;
+$function$;
+create trigger zz_guard_frozen_row before insert or delete or update on preservation.app_project_identity
+  for each row execute function preservation.guard_frozen();
+create trigger zz_guard_frozen_truncate before truncate on preservation.app_project_identity
+  for each statement execute function preservation.guard_frozen();
 
 -- ---------------------------------------------------------------- geometry evidence
 create table geo.n5_geom (
-  source_key text, registry_id text, feature_id text, outcome smallint,
-  geom geometry, invalid_reason text, first_z3 char(3), recovered_at timestamptz default now(),
-  provenance text, verdict_snapshot_id text,
+  source_key text not null, registry_id text not null, feature_id text not null, outcome smallint not null,
+  geom geometry(Geometry, 4269), invalid_reason text, first_z3 char(3),
+  recovered_at timestamptz not null default now(),
+  provenance text not null, verdict_snapshot_id text,
   primary key (source_key, feature_id),
-  check ((outcome = 1 and geom is not null) or outcome <> 1),
-  check (provenance in ('recovered_authoritative','proven_stored_point')),
-  check ((provenance = 'proven_stored_point') = (verdict_snapshot_id is not null)),
-  check ((provenance = 'proven_stored_point') = (feature_id = 'pt:1')));
+  constraint n5_geom_semantics_ck check ((outcome = 1 and geom is not null) or outcome <> 1),
+  constraint n5_geom_provenance_ck check (provenance in ('recovered_authoritative','proven_stored_point')),
+  constraint n5_geom_verdict_snapshot_ck check ((provenance = 'proven_stored_point') = (verdict_snapshot_id is not null)),
+  constraint n5_geom_pt_namespace_ck check ((provenance = 'proven_stored_point') = (feature_id = 'pt:1')));
 create index n5_geom_gix on geo.n5_geom using gist (geom);
+create index n5_geom_sk_ix on geo.n5_geom (source_key);
 
 create table geo.n5_point_reject (
-  source_key text primary key, registry_id text,
-  reason text check (reason in ('NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND','OUTSIDE_JURISDICTION','INVALID_COORD','MULTI_COORD_UNRESOLVED')),
-  detail jsonb, rejected_at timestamptz default now(), lat double precision, lng double precision,
-  observed_in_z3 char(3), verdict_snapshot_id text);
+  source_key text not null primary key, registry_id text,
+  reason text not null,
+  detail jsonb, rejected_at timestamptz not null default now(), lat double precision, lng double precision,
+  observed_in_z3 char(3), verdict_snapshot_id text not null,
+  constraint n5_point_reject_reason_ck check (reason in ('NO_REGISTRY_VERDICT','NULL_COORD','NULL_ISLAND','OUTSIDE_JURISDICTION','INVALID_COORD','MULTI_COORD_UNRESOLVED')));
 
-create table geo.n5_accepted_source (registry_id text, treatment text, projects bigint, pairs bigint);
+create table geo.n5_accepted_source (
+  registry_id text not null primary key, treatment text not null, projects bigint not null, pairs bigint not null);
 
 -- ---------------------------------------------------------------- the four serving-plane tables (pre-migration keys)
 create table geo.n5_boundary_membership (
@@ -87,27 +193,31 @@ create table geo.zip_authoritative_membership (
   zcta5 char(5) not null, source_key text not null, lat double precision, lng double precision,
   point_rule text not null, clip_dim smallint, feature_count integer not null, geom_family text not null,
   run_id text not null, computed_at timestamptz not null default now(),
-  record_kind text default 'development' check (record_kind in ('development','facility')),
+  record_kind text not null default 'development',
   generation_id text,
-  primary key (zcta5, source_key));
+  primary key (zcta5, source_key),
+  constraint zip_auth_membership_kind_ck check (record_kind in ('development','facility')));
 
 create table geo.zip_authoritative_marker (
-  zcta5 char(5) not null, source_key text not null, marker_seq int not null,
+  zcta5 char(5) not null, source_key text not null, marker_seq integer not null,
   lat double precision not null, lng double precision not null, marker_rule text not null,
   family text, dim smallint, run_id text not null, computed_at timestamptz not null default now(),
-  record_kind text default 'development' check (record_kind in ('development','facility')),
+  record_kind text not null default 'development',
   generation_id text,
-  primary key (zcta5, source_key, marker_seq));
+  primary key (zcta5, source_key, marker_seq),
+  constraint zip_auth_marker_kind_ck check (record_kind in ('development','facility')));
 
 create table geo.maps_zip_geography_status (
-  zip char(5) primary key,
+  zip char(5) not null primary key,
   status text not null check (status in ('boundary_complete','not_measured')),
   membership_rows integer not null check (membership_rows >= 0),
-  completed_at timestamptz, run_id text, note text, cutover boolean default false,
+  completed_at timestamptz, run_id text, note text, cutover boolean not null default false,
   generation_id text);
 
 -- ---------------------------------------------------------------- public inputs
-create table public.canonical_zip_registry (zip text primary key);
+create table public.canonical_zip_registry (
+  zip text not null primary key, gold_master_version text not null, workbook_sha256 text not null,
+  loaded_at timestamptz not null default now());
 create table public.app_projects (
   id uuid primary key default gen_random_uuid(), community_id uuid, zip text, name text, type text,
   status text, stage text, developer text, size text, investment text, jobs text, submitted_at date,
@@ -117,8 +227,9 @@ create table public.app_projects (
   scope_text text, parties jsonb, provenance jsonb, source_key text, source_key_basis text,
   source_seq smallint, last_seen_at timestamptz, type_raw text);
 create table public.app_zip_geography_cutover (
-  zip char(5) primary key, enabled boolean, membership_rows int, marker_rows int, set_fingerprint text,
-  frozen_at timestamptz, enabled_at timestamptz, note text, production_geography_verified_at timestamptz);
+  zip char(5) not null primary key, enabled boolean not null default false, membership_rows integer,
+  marker_rows integer, set_fingerprint text, frozen_at timestamptz not null default now(),
+  enabled_at timestamptz, note text, production_geography_verified_at timestamptz);
 
 -- ---------------------------------------------------------------- LIVE: rep point (scripts/n5_unit_a_shadow.py ddl)
 create or replace function geo.n5_rep_point(g geometry)

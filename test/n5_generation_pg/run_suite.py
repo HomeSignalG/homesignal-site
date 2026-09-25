@@ -24,6 +24,9 @@ import psycopg2.extras
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 MIGRATION = os.path.join(ROOT, "docs", "n5-generation-publish.sql")
+PART_D = os.path.join(ROOT, "docs", "n5-generation-publish-part-d.sql")
+FIDELITY_SQL = os.path.join(HERE, "fidelity.sql")
+FIDELITY_PROD = os.path.join(HERE, "fidelity_production.json")
 PRESTATE = os.path.join(HERE, "fixture_prestate.sql")
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from n5_candidate_bounding import check_candidate_bounding  # noqa: E402
@@ -108,6 +111,35 @@ def migration_parts():
     return a, stmts, c
 
 
+def split_nontx(body):
+    """Statements of a NON-transactional section: DO blocks kept whole, comments dropped."""
+    body = "\n".join(l for l in body.splitlines() if not l.strip().startswith("--"))
+    blocks = re.findall(r"do \$gate\$.*?\$gate\$;", body, re.S)
+    for i, blk in enumerate(blocks):
+        body = body.replace(blk, f"@@BLOCK{i}@@;")
+    out = []
+    for st in (x.strip() for x in body.split(";")):
+        if not st:
+            continue
+        m = re.fullmatch(r"@@BLOCK(\d+)@@", st)
+        out.append(blocks[int(m.group(1))] if m else st)
+    return out
+
+
+def part_d_parts():
+    """PART D, split exactly as production applies it: D-A (one transaction, gate first),
+    D-B (each statement on its own - CONCURRENTLY), D-C (one transaction)."""
+    text = open(PART_D).read()
+    a, rest = text.split("-- @@PART_DB", 1)
+    b, c = rest.split("-- @@PART_DC", 1)
+    return a, split_nontx(b), c
+
+
+def fidelity(conn):
+    body = "\n".join(l for l in open(FIDELITY_SQL).read().splitlines() if not l.startswith("--"))
+    return {r["object"]: [r["cols"], r["cons"], r["idx"]] for r in q(conn, body)}
+
+
 def probe_text():
     """The candidate-bounding probe, sliced from the SHIPPED migration by its markers."""
     text = open(MIGRATION).read()
@@ -119,39 +151,63 @@ def probe_text():
 SEED = f"""
 -- 11301 sits in prefix 113, which carries NO expected project: the shape of the 40
 -- production prefixes (445 ZIPs, 442 serving a measured zero) a shard-only scope would drop.
-insert into public.canonical_zip_registry values ('11101'),('11102'),('11199'),('11201'),('11301');
+insert into public.canonical_zip_registry (zip, gold_master_version, workbook_sha256) values
+  ('11101','fixture','sha'),('11102','fixture','sha'),('11199','fixture','sha'),('11201','fixture','sha'),('11301','fixture','sha');
 -- as in production: enabled-and-verified = exactly the boundary_complete ZIPs; the one
 -- not_measured ZIP carries a disabled row.
 insert into public.app_zip_geography_cutover (zip, enabled, production_geography_verified_at) values
   ('11101', true, now()), ('11102', true, now()), ('11201', true, now()), ('11301', true, now()),
   ('11199', false, null);
-insert into geo.n5_accepted_source values ('reg-noauth','NOAUTH',1,1), ('reg-ok','RECOVERY',9,9);
+-- treatments are PER REGISTRY, as in production: reg-pt is PROVEN (its projects are placed by
+-- their own stored coordinate), reg-ok is RECOVERY (publisher geometry), reg-noauth NOAUTH.
+insert into geo.n5_accepted_source values ('reg-noauth','NOAUTH',1,1), ('reg-ok','RECOVERY',9,9), ('reg-pt','PROVEN',9,9);
 
+-- the LIVE project table (the capture reads it). Coordinates are what a NEW snapshot captures.
 insert into public.app_projects (source_key, record_kind, zip, name, type, status, stage, submitted_at,
-                                 date_kind, source_ref, registry_id, address, developer, scope_text)
+                                 date_kind, source_ref, registry_id, address, developer, scope_text, source_seq, lat, lng)
 select 'dev:P' || i, 'development', z, 'Project ' || i, 'type', 'filed', 'stage', date '2026-01-01' + i,
-       'filed', 'https://example.test/' || i, 'reg-ok', i || ' Main St', 'dev', 'scope'
-  from (values (1,'11101'),(2,'11101'),(3,'11102'),(4,'11102'),(5,'11101'),(6,'11101'),
-               (7,'11101'),(8,'11201'),(9,'11201'),(10,'11201'),(11,'11201')) v(i, z);
+       'filed', 'https://example.test/' || i, reg, i || ' Main St', 'dev', 'scope', seq, la, lo
+  from (values
+    -- P1 PROVEN, MOVED since phase1 (legacy point 0.5,0.5 -> now 0.6,0.6): B must use the new one
+    (1,'11101','reg-pt',1,0.6::float8,0.6::float8),
+    (2,'11101','reg-ok',1,null,null),            -- RECOVERY polygon spanning 11101/11102
+    (3,'11102','reg-pt',1,0.5,2.5),              -- stated 111, lies in 11201 (INV-5)
+    (4,'11102','reg-pt',1,0.5,1.5),              -- REJECTED in phase1, eligible now: B must publish it
+    (5,'11101','reg-pt',1,0.3,0.3),              -- not in B's snapshot (INV-2)
+    (6,'11101','reg-pt',1,null,null),            -- NULL_COORD now; a STALE legacy point must not resurrect it
+    (7,'11101','reg-ok',1,null,null),            -- only quarantined geometry -> GEOMETRY_INVALID
+    (8,'11201','reg-ok',1,null,null),            -- registry NOAUTH in B
+    (9,'11201','reg-pt',1,10,10),                -- a point outside every ZCTA -> NO_INTERSECTION
+    (10,'11201','reg-ok',1,null,null),           -- RECOVERY with no geometry and no verdict yet
+    (11,'11201','reg-pt',1,0.5,3.5),             -- stated 112, lies in 11301
+    (12,'11101','reg-pt',1,0.2,0.2),             -- two captured rows with DIFFERENT coordinates
+    (12,'11101','reg-pt',2,0.25,0.25)            --   -> MULTI_COORD_UNRESOLVED
+  ) v(i, z, reg, seq, la, lo);
 
+-- geometry evidence as production holds it: legacy phase1 proven points (P1 at its OLD spot,
+-- P5, and P6 whose coordinate has since gone), recovered geometry, one quarantined row.
 insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom, invalid_reason, provenance, verdict_snapshot_id) values
- ('dev:P1','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(0.5,0.5),4269),null,'proven_stored_point','phase1'),
+ ('dev:P1','reg-pt','pt:1',1,ST_SetSRID(ST_MakePoint(0.5,0.5),4269),null,'proven_stored_point','phase1'),
+ ('dev:P5','reg-pt','pt:1',1,ST_SetSRID(ST_MakePoint(0.3,0.3),4269),null,'proven_stored_point','phase1'),
+ ('dev:P6','reg-pt','pt:1',1,ST_SetSRID(ST_MakePoint(0.7,0.7),4269),null,'proven_stored_point','phase1'),
  ('dev:P2','reg-ok','f1',1,ST_GeomFromText('POLYGON((0.8 0.2,1.2 0.2,1.2 0.4,0.8 0.4,0.8 0.2))',4269),null,'recovered_authoritative',null),
- ('dev:P3','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(2.5,0.5),4269),null,'proven_stored_point','snapB'),
- ('dev:P4','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(1.5,0.5),4269),null,'proven_stored_point','snapB'),
- ('dev:P5','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(0.3,0.3),4269),null,'proven_stored_point','phase1'),
- ('dev:P7','reg-ok','bad',3,null,'SELF_INTERSECTION','recovered_authoritative',null),
- ('dev:P9','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(10,10),4269),null,'proven_stored_point','snapB'),
- ('dev:P11','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(3.5,0.5),4269),null,'proven_stored_point','snapB');
+ ('dev:P7','reg-ok','bad',3,null,'SELF_INTERSECTION','recovered_authoritative',null);
+-- a LEGACY (snapshot-less) reject: P4 was rejected in phase1. It must not decide B.
 insert into geo.n5_point_reject (source_key, registry_id, reason, verdict_snapshot_id)
-  values ('dev:P6','reg-ok','NULL_COORD','snapB');
+  values ('dev:P4','reg-pt','NULL_COORD','phase1');
 
 -- THE LEGACY GENERATION, in the pre-migration shape production holds today.
 insert into geo.n5_generation (generation_id, snapshot_id, cutoff, state, activated_at, note)
   values ('{LEGACY}', 'phase1', '2026-09-01', 'ACTIVE_LEGACY', '2026-09-05', 'fixture legacy');
-insert into preservation.app_project_identity (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id, record_kind)
-select 'phase1', p.id, p.zip, p.source_key, 1, p.registry_id, 'development'
+insert into preservation.app_project_identity
+  (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id, record_kind, lat, lng, identity_hash, content_hash)
+select 'phase1', p.id, p.zip, p.source_key, p.source_seq, p.registry_id, 'development',
+       case when p.source_key = 'dev:P1' then 0.5 else p.lat end,
+       case when p.source_key = 'dev:P1' then 0.5 else p.lng end,
+       decode(md5(p.source_key || '|' || p.source_seq), 'hex'), decode(md5(p.source_key || '|c'), 'hex')
   from public.app_projects p where p.source_key in ('dev:P1','dev:P2','dev:P5');
+-- the legacy build's association evidence (pre-migration key: no generation)
+insert into geo.n5_association (source_key, zip, evidence) values ('dev:P1','11101',1), ('dev:P2','11101',1);
 insert into geo.n5_boundary_membership (zcta5, source_key, provenance, run_id) values
  ('11101','dev:P1','proven_stored_point','legacy'), ('11101','dev:P2','recovered_authoritative','legacy'),
  ('11102','dev:P2','recovered_authoritative','legacy'), ('11101','dev:P5','proven_stored_point','legacy');
@@ -173,17 +229,22 @@ insert into geo.maps_zip_geography_status (zip, status, membership_rows, complet
  ('11301','boundary_complete',0,now(),'legacy','{LEGACY}');
 """
 
-# Candidate B: a fresh snapshot. P5 is NOT in it (INV-2); P3 is stated in 111 but lies in 112 (INV-5);
-# P6..P10 exercise every unresolved class, and P10 has no evidence at all (INV-4).
+# Candidate B: a fresh snapshot CAPTURED FROM THE LIVE TABLE (coordinates included), as
+# `open` captures it. P5 is NOT in it (INV-2); P3 is stated in 111 but lies in 112 (INV-5);
+# P6..P12 exercise every unresolved class, and P10 has no evidence at all (INV-4).
+# Shards are marked done: this suite's subject is publication; the build stage is exercised
+# by test/n5_generation_pg/run_lifecycle.py through the real orchestrator.
 SNAP_B = """
-insert into preservation.app_project_identity (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id, record_kind)
-select %(snap)s, p.id, p.zip, p.source_key, 1,
-       case when p.source_key = 'dev:P8' then 'reg-noauth' else p.registry_id end, 'development'
+insert into preservation.app_project_identity
+  (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id, record_kind, lat, lng, identity_hash, content_hash)
+select %(snap)s, p.id, p.zip, p.source_key, p.source_seq,
+       case when p.source_key = 'dev:P8' then 'reg-noauth' else p.registry_id end, 'development', p.lat, p.lng,
+       decode(md5(p.source_key || '|' || p.source_seq), 'hex'), decode(md5(p.source_key || '|c'), 'hex')
   from public.app_projects p where p.source_key <> 'dev:P5';
 insert into geo.n5_generation (generation_id, snapshot_id, cutoff, state, note)
   values (%(gen)s, %(snap)s, now(), 'BUILDING', 'fixture candidate');
-insert into geo.n5_shard (snapshot_id, generation_id, z3, state, checksum)
-  values (%(snap)s, %(gen)s, '111', 'done', 0), (%(snap)s, %(gen)s, '112', 'done', 0);
+insert into geo.n5_shard (snapshot_id, generation_id, z3, projects, pairs, zips, state, checksum)
+  values (%(snap)s, %(gen)s, '111', 0, 0, 0, 'done', 0), (%(snap)s, %(gen)s, '112', 0, 0, 0, 'done', 0);
 """
 
 ZCTA = {"11101": "MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))",
@@ -291,7 +352,37 @@ def run(conn, label, mutate=None, suite=None):
     s.ok("V3 the serving-view predicate and the serving function agree",
          q1(c, "select (select geo.n5_serving_generation_id()) = %s", (LEGACY,)) is True)
 
+    # FIDELITY: the fixture + Parts A-C must be production's post-C shape EXACTLY (72
+    # components: columns, constraints, indexes, and the live function bodies the fixture
+    # copies). A looser fixture is how this suite once went green over a lifecycle that
+    # could not run in production.
+    prod = json.load(open(FIDELITY_PROD))["objects"]
+    here = fidelity(c)
+    diff = sorted(f"{k}:{['cols','cons','idx'][i]}" for k in prod for i in range(3)
+                  if prod[k][i] != here.get(k, [None] * 3)[i])
+    s.ok("F1 fixture + Parts A-C fingerprint-equal production's post-C shape (72 components)",
+         not diff and len(prod) == 24, diff[:6])
+
+    d_a, d_b, d_c = part_d_parts()
+    q(c, "reset n5.verified_free_disk_mb")
+    s.ok("KD PART D-A refuses with no verified capacity stated, and applies nothing",
+         raises(c, d_a, None, r"CAPACITY GATE") and
+         q1(c, "select to_regprocedure('geo.n5_gen_prepare_publish(text)') is null") is True)
+    q(c, "set n5.verified_free_disk_mb = '2998'")
+    q(c, d_a)
+    for st in d_b:
+        q(c, st)
+    q(c, d_c)
+    s.ok("15e legacy Map 1 output unchanged after PART D", map_snapshot(c) == pre)
+    s.ok("15f the legacy association rows read as the legacy generation; the key is generation-scoped",
+         q1(c, "select count(*) from geo.n5_association where generation_id is distinct from %s", (LEGACY,)) == 0
+         and q1(c, "select pg_get_constraintdef(oid) from pg_constraint where conname='n5_association_pkey'")
+             == "PRIMARY KEY (generation_id, source_key, zip)"
+         and q1(c, "select column_default from information_schema.columns where table_schema='geo' "
+                   "and table_name='n5_association' and column_name='generation_id'") is None)
+
     if mutate:
+        # (applied after PART D, so a mutation may target any shipped definition)
         # A mutation that does not apply is indistinguishable from one that survives: prove
         # the definitions actually moved before counting anything.
         defs = ("select md5(string_agg(d, '|' order by d collate \"C\")) from ("
@@ -326,7 +417,21 @@ def run(conn, label, mutate=None, suite=None):
     q(c, SNAP_B, {"gen": GEN_B, "snap": "snapB"})
     s.ok("control: B is BUILDING and A serves", q1(c, "select geo.n5_serving_generation_id()") == LEGACY)
 
+    s.ok("D1 a generation cannot publish before it is prepared (its proven points do not exist yet)",
+         raises(c, "select geo.n5_gen_publish_prefix(%s,'111','run-x',0)", (GEN_B,), r"not prepared"))
+    prep = q1(c, "select geo.n5_gen_prepare_publish(%s)", (GEN_B,))
+    s.ok("D2 preparation applies the phase1 proven-point rule to B's OWN snapshot",
+         (prep["proven_points"], prep["null_coord"], prep["multi_coord_unresolved"], prep["recovered_keys"])
+         == (5, 1, 1, 2), prep)
+    s.ok("D3 the generation's association is generation-scoped: B may hold the same (key, ZIP) as legacy",
+         q1(c, "insert into geo.n5_association (generation_id, source_key, zip, evidence) "
+               "values (%s,'dev:P1','11101',1) returning 1", (GEN_B,)) == 1)
+    s.ok("D4 the legacy build's association evidence is guarded like every other generation's rows",
+         raises(c, "update geo.n5_association set evidence=2 where generation_id=%s", (LEGACY,), r"N5 GUARD"))
+
     publish(c, GEN_B, "111")
+    s.ok("D5 re-preparing under a published prefix is refused (its evidence is fixed)",
+         raises(c, "select geo.n5_gen_prepare_publish(%s)", (GEN_B,), r"already has published"))
     s.ok("2a building B (prefix 111 published) does not alter what Map 1 returns", map_snapshot(c) == pre)
     s.ok("9a a partially built B cannot become READY",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"prefixes_unpublished"))
@@ -359,6 +464,13 @@ def run(conn, label, mutate=None, suite=None):
          and q1(c, """select count(*) from geo.zip_authoritative_membership m where m.generation_id=%s and not exists
                       (select 1 from geo.zip_authoritative_marker k where k.generation_id=m.generation_id
                           and k.zcta5=m.zcta5 and k.source_key=m.source_key)""", (GEN_B,)) == 0)
+    s.ok("D6 a point that MOVED since phase1 publishes at B's coordinate, never the legacy one",
+         q(c, "select lat, lng from geo.zip_authoritative_membership where generation_id=%s and source_key='dev:P1'", (GEN_B,))
+         == [{"lat": 0.6, "lng": 0.6}])
+    s.ok("D7 a stale legacy point cannot resurrect a project B's snapshot has no coordinate for (P6)",
+         q1(c, "select count(*) from geo.n5_boundary_membership where generation_id=%s and source_key='dev:P6'", (GEN_B,)) == 0)
+    s.ok("D8 a legacy reject does not decide B: P4 (rejected in phase1, eligible now) is published",
+         q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s and source_key='dev:P4'", (GEN_B,)) == 1)
     s.ok("8b B's status rows cover every canonical ZIP of its prefixes (incl. 11199 not_measured)",
          q1(c, "select string_agg(zip||':'||status||':'||membership_rows, ',' order by zip) from geo.maps_zip_geography_status where generation_id=%s", (GEN_B,))
          == "11101:boundary_complete:2,11102:boundary_complete:2,11199:not_measured:0,11201:boundary_complete:1,11301:boundary_complete:1")
@@ -367,21 +479,36 @@ def run(conn, label, mutate=None, suite=None):
     got = {r["source_key"]: r["reason_code"] for r in q(c, "select source_key, reason_code from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,))}
     s.ok("7  explicit evidence-backed unresolved outcomes, one per class",
          got == {"dev:P6": "POINT_REJECTED", "dev:P7": "GEOMETRY_INVALID", "dev:P8": "REGISTRY_NOAUTH",
-                 "dev:P9": "NO_INTERSECTION_WITH_GENERATION_ZCTAS"}, got)
+                 "dev:P9": "NO_INTERSECTION_WITH_GENERATION_ZCTAS", "dev:P12": "POINT_REJECTED"}, got)
     s.ok("6  an expected record with neither membership nor evidence (P10) blocks READY",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1 violated — 1 of"))
     r111 = q(c, "select * from geo.n5_reconcile_chunk(%s,'111')", (GEN_B,))[0]
     s.ok("5  P3 (stated 111, resolved into 11201) counts RESOLVED for chunk 111",
-         (r111["expected_keys"], r111["accounted_resolved"], r111["accounted_unresolved"], r111["unaccounted"]) == (6, 4, 2, 0),
+         (r111["expected_keys"], r111["accounted_resolved"], r111["accounted_unresolved"], r111["unaccounted"]) == (7, 4, 3, 0),
          dict(r111))
+    per_chunk = [q(c, "select expected_keys, accounted_resolved, accounted_unresolved, unaccounted "
+                      "from geo.n5_reconcile_chunk(%s,%s)", (GEN_B, k))[0] for k in ("111", "112")]
+    setb = q(c, "select * from geo.n5_reconcile_chunks(%s, array['111','112'])", (GEN_B,))[0]
+    s.ok("5b the set-based reconcile equals the per-chunk definition, chunk for chunk",
+         (setb["chunks"], setb["expected_keys"], setb["accounted_resolved"], setb["accounted_unresolved"], setb["unaccounted"])
+         == (2, sum(r["expected_keys"] for r in per_chunk), sum(r["accounted_resolved"] for r in per_chunk),
+             sum(r["accounted_unresolved"] for r in per_chunk), sum(r["unaccounted"] for r in per_chunk))
+         and [dict(r) for r in q(c, "select expected_keys, accounted_resolved, accounted_unresolved, unaccounted "
+                                    "from geo.n5_generation_reconcile where generation_id=%s and chunk_key in ('111','112') "
+                                    "order by chunk_key", (GEN_B,))] == [dict(r) for r in per_chunk],
+         (dict(setb), [dict(r) for r in per_chunk]))
     s.ok("6b the declared chunk set must cover every expected key",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111'])", (GEN_B,), r"expected_keys_outside_declared_chunks"))
 
     # evidence for P10 arrives through the pipeline (a shard verdict), then accounting is re-run
-    q(c, "insert into geo.n5_point_reject (source_key, registry_id, reason, verdict_snapshot_id) values ('dev:P10','reg-ok','MULTI_COORD_UNRESOLVED','snapB')")
+    q(c, "insert into geo.n5_generation_key_verdict (generation_id, source_key, registry_id, verdict) "
+         "values (%s,'dev:P10','reg-ok','RECOVERY_NOT_RETURNED')", (GEN_B,))
     s.ok("7b stale unresolved accounting (older than the last publish) is refused at READY",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1|unresolved"))
     q1(c, "select geo.n5_gen_record_unresolved(%s)", (GEN_B,))
+    s.ok("7c a persisted shard verdict becomes an evidence-backed outcome (P10 RECOVERY_NOT_RETURNED)",
+         q1(c, "select reason_code from geo.n5_generation_unresolved where generation_id=%s and source_key='dev:P10'", (GEN_B,))
+         == "RECOVERY_NOT_RETURNED")
 
     # C1: a writer that saw BUILDING holds the generation until it commits; READY waits.
     # NOT c.dsn: psycopg2 masks the password there ("password=xxx"), which only works
@@ -450,7 +577,8 @@ def run(conn, label, mutate=None, suite=None):
          raises(c, "select geo.n5_generation_discard(%s)", (GEN_B,), r"only FAILED or SUPERSEDED"))
 
     # ---- failure (INV-8): a candidate C fails part-way; B keeps serving; C is discarded cleanly
-    q(c, SNAP_B.replace("'111', 'done'", "'111', 'done'"), {"gen": GEN_C, "snap": "snapC"})
+    q(c, SNAP_B, {"gen": GEN_C, "snap": "snapC"})
+    q1(c, "select geo.n5_gen_prepare_publish(%s)", (GEN_C,))
     publish(c, GEN_C, "111")
     s.ok("13b a partial candidate C leaves Map 1 serving B", map_snapshot(c) == served_b)
     s.ok("13c a partial candidate C cannot become READY",
@@ -459,6 +587,9 @@ def run(conn, label, mutate=None, suite=None):
     d = q1(c, "select geo.n5_generation_discard(%s)", (GEN_C,))
     s.ok("13d a FAILED candidate discards only its own rows; A and B untouched",
          q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN_C,)) == 0
+         and q1(c, "select count(*) from geo.n5_gen_proven_point where generation_id=%s", (GEN_C,)) == 0
+         and q1(c, "select count(*) from geo.n5_generation_key_verdict where generation_id=%s", (GEN_C,)) == 0
+         and q1(c, "select count(*) from geo.n5_gen_proven_point where generation_id=%s", (GEN_B,)) == 5
          and gen_fingerprint(c, LEGACY) == fp_a and map_snapshot(c) == served_b, d)
 
     # ---- rollback (INV-9)
@@ -521,6 +652,26 @@ MUTATIONS = {
     "M10 the write guard reads state without locking it": ("C1", """
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_row_guard()'::regprocedure),
           'where g.generation_id = v_gen for share;', 'where g.generation_id = v_gen;'); end $m$;"""),
+    "M11 candidate geometry reads the legacy proven points": ("D6", """
+        create or replace function geo.n5_gen_candidate_geom(p_generation_id text) returns setof geo.n5_geom
+        language sql stable as $$
+          select g.* from geo.n5_geom g
+           where g.provenance = 'proven_stored_point'
+              or exists (select 1 from geo.n5_gen_recovered_key rk
+                          where rk.generation_id = p_generation_id and rk.source_key = g.source_key) $$;"""),
+    "M12 unresolved accounting ignores the persisted verdicts": ("7", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
+          'when v.verdict in (''NULL_COORD'',''MULTI_COORD_UNRESOLVED'') then ''POINT_REJECTED''', ''); end $m$;"""),
+    "M13 the set-based reconcile bounds RESOLVED by the chunk": ("5b", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_reconcile_chunks(text,text[])'::regprocedure),
+          'left join n5_rc_res rs on rs.source_key = k.source_key',
+          'left join n5_rc_res rs on rs.source_key = k.source_key and exists (select 1 from geo.zip_authoritative_membership mm where mm.generation_id = p_generation_id and mm.source_key = k.source_key and left(mm.zcta5, length(c.k)) = c.k)'); end $m$;"""),
+    "M14 publish stops requiring preparation": ("D1", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_publish_prefix(text,text,text,integer,double precision,double precision,double precision)'::regprocedure),
+          'if g.publish_prepared_at is null then', 'if false then'); end $m$;"""),
+    "M15 preparation stops applying the multi-coordinate rule": ("D2", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_prepare_publish(text)'::regprocedure),
+          'from n5_prep_proven k where k.nc = 1;', 'from n5_prep_proven k where k.nc >= 1;'); end $m$;"""),
     "M7 activation stops recording the predecessor": ("16", """
         do $$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
           'predecessor_generation_id = coalesce(predecessor_generation_id, prev.generation_id)', 'predecessor_generation_id = predecessor_generation_id'); end $$;"""),
