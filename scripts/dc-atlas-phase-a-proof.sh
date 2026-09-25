@@ -100,6 +100,9 @@ build() { # $1 db, $2 git ref ('' = checkout)
   done
   L -d "$1" -c "create table if not exists public.canonical_zip_registry (zip text primary key)"
   L -d "$1" -c "create table public._snap_ident (k text, a text, b text, v text)"
+  # the replica's run table is the fixture's (no timestamps): each run's real start time is read from
+  # production into this helper, and the time boundary filters by run id through it
+  L -d "$1" -c "create table public._run_time (id uuid primary key, started_at timestamptz not null)"
   L -d "$1" -c "create table public._snap_geo as select canonical_entity_id, geography_status, geometry_type, null::text geom_wkt, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, rule_version, provenance, positional_uncertainty_m, created_at, updated_at from public.dc_entity_geography limit 0"
   L -d "$1" -c "create table public._snap_map1 as select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m limit 0"
 }
@@ -112,6 +115,7 @@ for t in $TABLES; do
   printf '  %-26s %8s rows\n' "$t" "$(($(wc -l < "$w/$t.csv") - 1))"
 done
 prod_copy "select k, a, b, v from public.dc_phase_a_ident_before_20260925" "$w/snap_ident.csv"
+prod_copy "select id, started_at from public.dc_acquisition_run" "$w/run_time.csv"
 prod_copy "select canonical_entity_id, geography_status, geometry_type, geom_wkt, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, rule_version, provenance, positional_uncertainty_m, created_at, updated_at from public.dc_phase_a_geo_before_20260925" "$w/snap_geo.csv"
 prod_copy "select * from public.dc_phase_a_map1_before_20260925" "$w/snap_map1.csv"
 echo "  snapshot: ident $(($(wc -l < "$w/snap_ident.csv") - 1)) · geo $(($(wc -l < "$w/snap_geo.csv") - 1)) · map1 $(($(wc -l < "$w/snap_map1.csv") - 1))"
@@ -130,6 +134,7 @@ for db in tmpl_old tmpl_new; do
     for t in $TABLES; do echo "\\copy public.$t ($(head -1 "$w/$t.csv")) from '$w/$t.csv' with (format csv, header)"; done
     echo "\\copy geo.zcta_boundary (zcta5, geom) from '$w/zcta.csv' with (format csv, header)"
     echo "\\copy public._snap_ident from '$w/snap_ident.csv' with (format csv, header)"
+    echo "\\copy public._run_time from '$w/run_time.csv' with (format csv, header)"
     echo "\\copy public._snap_geo from '$w/snap_geo.csv' with (format csv, header)"
     echo "\\copy public._snap_map1 from '$w/snap_map1.csv' with (format csv, header)"
   } > "$w/load.sql"
@@ -161,8 +166,12 @@ tail -2 "$w/c_parity.txt" | sed 's/^/  /'; dropdb ctl_parity
 reconstruct() { # $1 db, $2 boundary for observations/runs/geocodes
   L -d "$1" <<SQL >/dev/null
 set session_replication_role = replica;
-delete from public.dc_source_observation o using public.dc_acquisition_run r where r.id = o.acquisition_run_id and r.started_at >= '$2';
-delete from public.dc_acquisition_run where started_at >= '$2';
+do \$chk\$ begin
+  if exists (select 1 from public.dc_acquisition_run a where not exists (select 1 from public._run_time t where t.id = a.id)) then
+    raise exception 'a replica run has no production start time';
+  end if; end \$chk\$;
+delete from public.dc_source_observation o using public._run_time r where r.id = o.acquisition_run_id and r.started_at >= '$2';
+delete from public.dc_acquisition_run a using public._run_time r where r.id = a.id and r.started_at >= '$2';
 delete from public.dc_address_geocode where derived_at >= '$2';
 delete from public.dc_identity_decision where decided_at >= '$T';
 delete from public.dc_entity_observation where linked_at >= '$T';
@@ -216,8 +225,8 @@ for db in rep_old rep_new; do
     union all select 'IDENT_VS_SNAPSHOT_DIFF|' || (select count(*) from ((select k,a,b,v from t except all select k,a,b,v from public._snap_ident) union all (select k,a,b,v from public._snap_ident except all select k,a,b,v from t)) d)
     union all select 'START_FP|' || md5(concat_ws('#',
         (select md5(string_agg(concat_ws('~',k,a,b,v), E'\n' order by concat_ws('~',k,a,b,v) collate \"C\")) from t),
-        (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select home_signal_observation_id, acquisition_run_id, raw_record_sha256 from public.dc_source_observation) x),
-        (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select id, source_key, distribution_key, started_at, completeness_state from public.dc_acquisition_run) x),
+        (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select home_signal_observation_id, acquisition_run_id, md5(raw_payload::text) from public.dc_source_observation) x),
+        (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select a.id, a.source_key, a.distribution_key, a.run_seq, a.completeness_state, t.started_at from public.dc_acquisition_run a join public._run_time t using (id)) x),
         (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select derivation_id, geocoder_query, ladder_version, match_type, lat, lng from public.dc_address_geocode) x),
         (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from ($Q_GEO) x),
         (select md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from (select zip from public.canonical_zip_registry) x)))
