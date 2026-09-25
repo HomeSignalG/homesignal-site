@@ -92,8 +92,8 @@ for (const re of FORBIDDEN) ok(!re.test(PT_CODE), `3a lib/project-type.js code c
   const HS = ctx.HS;
   ok(HS && typeof HS.canonicalProjectType === 'function', '3b loads in a context with no window and no document');
   ok(JSON.stringify(Object.keys(HS).sort()) === JSON.stringify(['CATEGORY_REGISTRY', 'canonicalProjectType',
-    'canonicalFacilityType', 'categoryFor', 'classifyFacilityOverlayType', 'classifyProjectType', 'projectType'].sort()),
-    '3c exports only the Type surface (development Type + facility identity)', Object.keys(HS).join(','));
+    'canonicalFacilityType', 'canonicalLifecycle', 'categoryFor', 'classifyFacilityOverlayType', 'classifyProjectType', 'projectType'].sort()),
+    '3c exports only the Type surface (development Type + facility identity) and the lifecycle vocabulary', Object.keys(HS).join(','));
 }
 
 // ── §4 precedence, pinned on real record shapes ─────────────────────────────────────────

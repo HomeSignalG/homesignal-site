@@ -2270,6 +2270,58 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
+
+**NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
+inferred status. EPA FRS returns no lifecycle field, yet every surface said "Operating" for every
+EPA facility (measured: 197,991 / 197,991 facility rows). Cromby Generating Station (19475) was
+"Operating" while EPA's own ICIS-Air lists it **Permanently Closed** and its NPDES permit is issued
+to **"FORMER CROMBY GENERATING STATION"**.
+
+- ⛔ **EPA program/permit statuses are REGULATORY evidence, not lifecycle.** Effective, Terminated,
+  Admin Continued, Permanently Closed and "discontinued reporting" are NOT mapped to anything —
+  there is no Closed lifecycle, and none may be added without documented EPA field semantics AND a
+  contract change. Cromby is `unknown`, not Operating and not Closed; the facts stay verbatim in
+  `facility_env`.
+- **ONE authority, reused:** `trackerSiteItem` (what counts as evidence) → `statusTier`
+  (`proposed|approved|operating|unknown`). An FRS element's `type` is not evidence (the producer
+  stamped `built` on all of them); an explicit `bucket` still is. Stored rows carry the existing
+  unknown value `'On file'`.
+- ⚖️ **ONE lifecycle VOCABULARY, and it is not in `lib/map.js` (founder decisions, 2026-09-24).**
+  The keys, labels and status → key rule (`LIFECYCLE_KEYS`, `LIFECYCLE_LABELS`, `lifecycleKey`,
+  `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
+  can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
+  the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL")
+  and the facility detail pill. None prints the raw storage value `On file`.
+- ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
+  EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
+  that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
+  facilities (and every unknown-lifecycle development record) appeared in no list at all.
+  Pinned by `test/lifecycle-unknown-presentation.test.mjs` and `map1-stage-filter-chips` §0L.
+- **Seven places asserted it; all now read the one decision:** the producer's `type:"built"`, the
+  `app_refresh_zip` literal (migration `facility_lifecycle_unknown_20260924`, md5
+  `6591d7f7…` → `821a951b…`, reversal proven), `resolveMarker`'s three facility branches, the Map 1
+  popup's "operating now", the Map 1 **"Operating now" rail** (it appended every facility), the ZIP
+  card and the facility detail page.
+- ⚠️ **Do not replay a dated full `CREATE OR REPLACE` of `app_refresh_zip`** from `docs/` or the
+  ingest repo — nine such artifacts predate this and still carry `'Operating'`. They are kept as
+  receipts, and the DATABASE now refuses what a replay would write: trigger
+  `app_projects_facility_lifecycle_guard_trg` (`docs/facility-lifecycle-guard.sql`, migration
+  `facility_lifecycle_guard_20260924`) raises on any facility row becoming `Operating`, so a replay
+  fails loudly into `app_refresh_failures` instead of writing false rows. Proven by a rolled-back
+  replay of the exact pre-change body (md5 `6591d7f7…`) against 19475: refused on its first
+  facility. `public.facility_lifecycle_guard_selftest()` checks both directions (refuses the
+  defect; accepts `On file` and a development `Operating`). The guard writes nothing.
+  A future source that genuinely STATES a facility lifecycle must change the guard and the
+  materializer in the same reviewed change.
+- Rollout: stored rows change as the sweep revisits each ZIP (~10.8 h cycle); cached report sites
+  keep the old stamp until re-collected and are refused client-side meanwhile; the producer change
+  lands on the next `deploy-edge-functions` dispatch.
+- Pinned by `test/facility-lifecycle-unknown.test.mjs` (Cromby fixture
+  `fixtures/epa/zip19475-dfr-programs-2026-09-24.json`, md5 `d9354fad…`, extracted in-database);
+  10 of 10 mutations killed on exit code.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

@@ -341,7 +341,15 @@ async function facilitySites(
     const d = Math.hypot(e, n);
     if (d > radiusMi + 0.05) continue;
     const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
-    kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", type: "built", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
+    // NO LIFECYCLE IS EMITTED HERE (2026-09-24). A site's `type` is its lifecycle stage
+    // (proposed | approved | built), and this used to stamp `type: "built"` on EVERY FRS
+    // row. FRS returns no lifecycle field at all — registration is not operation — so that
+    // value was manufactured, and it became "Operating" on Map 1, the ZIP page and the
+    // facility detail page. Omitted rather than guessed: the canonical lifecycle contract
+    // (lib/map.js trackerSiteItem → statusTier) resolves a record with no lifecycle evidence
+    // to `unknown`. Nothing else reads a facility element's `type` (checked: app_source_key,
+    // dev_sites_deduped, the facility insert in app_refresh_zip, and the DC geography views).
+    kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
   }
   kept.sort((a, b) => (a._d as number) - (b._d as number));
   const sites = kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });

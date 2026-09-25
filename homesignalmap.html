@@ -243,6 +243,8 @@
   .band-h.t-built{background:#00893a}
   .band-h.t-approved{background:#2563EB}
   .band-h.t-proposed{background:#E2772F}
+  /* Lifecycle unknown — the legend's own neutral (HS.LIFECYCLE_HEX.unknown / statusHex.onfile). */
+  .band-h.t-unknown{background:#706468}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
   .rec{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
@@ -787,7 +789,7 @@
       <div class="grid band">
         <div class="card read">
           <div class="band-h t-built">Operating now</div>
-          <div class="band-s">EPA-registered facilities and completed construction filings, standing today</div>
+          <div class="band-s">Completed construction filings, standing today</div>
           <div id="builtList"></div>
         </div>
         <div class="card read">
@@ -802,6 +804,14 @@
                cannot carry a blanket "you can still weigh in on" claim. -->
           <div class="band-s" id="propSub">Hearings and notices in this area</div>
           <div id="propList"></div>
+        </div>
+        <!-- LIFECYCLE UNKNOWN (founder decision, 2026-09-24): on the public record, but the source
+             states no construction or operating stage. The legend's own neutral and its own label,
+             so such a record has a truthful home instead of "Operating now" or no list at all. -->
+        <div class="card read">
+          <div class="band-h t-unknown">Lifecycle unknown</div>
+          <div class="band-s">On the public record, but the source states no construction or operating stage (EPA-registered facilities are here)</div>
+          <div id="unknownList"></div>
         </div>
       </div>
 
@@ -865,8 +875,8 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
-<script src="lib/project-type.js?v=1956b224"></script>
-<script src="lib/map.js?v=672a9c19"></script>
+<script src="lib/project-type.js?v=6ad8270c"></script>
+<script src="lib/map.js?v=5824fe07"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
 <script src="lib/zip-authoritative.js?v=20260922a"></script>
@@ -1276,10 +1286,14 @@ HS.onReady(function(){
   //     when absent (EPA facilities, area notices, TABS, pre-connector cache rows) fall back to the
   //     coarse page bucket bucketOf(s.type) — the exact field COLORS keys on, so word ≡ colour.
   //   • An EPA FRS facility is the one physical-facility case; callers short-circuit on frsRid()
-  //     BEFORE stageWord (facilityType names the kind, popupHTML says "Facility · operating now").
+  //     BEFORE stageWord (facilityType names the kind; kindLabel appends the resolver's lifecycle
+  //     label — "Lifecycle unknown" when no source states one, never an asserted "operating now").
   var STAGE_WORD = { proposed:"Proposed / hearing", approved:"Approved / permitted",
                      operating:"Recorded / operating", built:"Built / operating" };
-  function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type); }
+  // The SITE rides along with its type (2026-09-24): bucketOf(type) alone rebuilt a bare
+  // {type} with no registry_id, so a cached EPA element's manufactured type='built' was read as
+  // operating in the marker title while the pin (which passes the site) read unknown.
+  function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type, s); }
   function stageWord(s){ return STAGE_WORD[stageOf(s)] || "Official record"; }
   // The one popup/subheader label for any record. EPA FRS facility → the physical-facility line;
   // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
@@ -1308,18 +1322,24 @@ HS.onReady(function(){
     // as what it IS first and what it CARRIES second. The words come from the resolver's
     // category registry, so the popup can never disagree with the symbol drawn.
     var mk = HS.resolveTrackerMarker(s, frsRid);
+    // THE LIFECYCLE WORD IS THE RESOLVER'S, NEVER A LITERAL (2026-09-24). Every facility line
+    // used to end " · operating now" — asserted for every EPA record, because the resolver
+    // used to hard-code it. EPA registration is not operation, so it now reads the marker's
+    // own lifecycleLabel ("Lifecycle unknown" for a record whose source states none), the same
+    // label the pin's colour and the legend chip come from.
+    var lcWord = mk.lifecycleLabel ? " · " + mk.lifecycleLabel : "";
     if(mk.isDataCenter){
       var REG = HS.CATEGORY_REGISTRY;
-      return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
+      return REG.datacenter.label + " · " + REG.facility.label + lcWord;
     }
     // Overlay-on-Type, GLOBAL: the pin is the Type; purple is the overlay. The
     // popup must say the Type first, same order as dual identity, or the map
     // would still read as "Facility" while the pin is an Industrial triangle.
     if(mk.overlayOnType){
       var REGo = HS.CATEGORY_REGISTRY;
-      return (mk.typeLabel || mk.legendLabel) + " · " + REGo.facility.label + " · operating now";
+      return (mk.typeLabel || mk.legendLabel) + " · " + REGo.facility.label + lcWord;
     }
-    return "Facility · operating now";
+    return "Facility" + lcWord;
   }
   // STATUS IS NEVER COMMUNICATED BY COLOUR ALONE. Every marker carries a text label of its
   // own — "Proposed data center", "Approved residential" — so the stage is readable to
@@ -1543,7 +1563,7 @@ HS.onReady(function(){
   // The single test for "is this an EPA-registered facility" — a real FRS Registry ID, present on
   // every EPA FRS site and on nothing else (a TABS construction permit is also scope:"point" but
   // has no registry_id). Every EPA affordance — the ECHO violations line, the ECHO link, the
-  // "Facility · operating now" label — keys on THIS, never on scope, so a permit never inherits
+  // "Facility · <lifecycle>" label — keys on THIS, never on scope, so a permit never inherits
   // an EPA-facility affordance. Returns the trimmed id or "".
   function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
   // Friendly, plain-language building type from the facility name (falls back to its layer).
@@ -2527,7 +2547,19 @@ HS.onReady(function(){
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="proposed"; }));
-    var builtRows = permits.filter(function(s){ return bucketOf(s.type, s)==="operating"; }).concat(fac);
+    // THE "OPERATING NOW" RAIL LISTS WHAT THE LIFECYCLE CONTRACT CALLS OPERATING, AND NOTHING
+    // ELSE (2026-09-24). It used to append EVERY EPA facility unconditionally (`.concat(fac)`),
+    // asserting each one was "standing today" on nothing more than an FRS registration. Facilities
+    // now pass the same bucketOf() test as every permit, so one with no sourced lifecycle
+    // (`unknown`) is not listed as operating. It is still drawn on the map, still counted in the
+    // Regulated facilities tile, and its popup still carries the EPA record and links.
+    var points = permits.concat(fac);
+    var builtRows = points.filter(function(s){ return bucketOf(s.type, s)==="operating"; });
+    // LIFECYCLE UNKNOWN HAS A LIST HOME (founder decision, 2026-09-24). A record whose canonical
+    // lifecycle is unknown — an EPA facility, a permit or an area notice alike — is listed under
+    // the legend's own "Lifecycle unknown" band instead of in no band at all. Membership is the
+    // SAME bucketOf the pin colour and the Stage chips read; it never keys on record kind.
+    var unknownRows = points.concat(dev).filter(function(s){ return bucketOf(s.type, s)==="unknown"; });
     // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
     // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
@@ -2613,7 +2645,8 @@ HS.onReady(function(){
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
-    listInto("builtList", builtRows, "No EPA-registered facility on record here.");
+    listInto("builtList", builtRows, "Nothing recorded as operating right now.");
+    listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
     // heading a reader takes as a statement about now, and the only one that can hold a
@@ -2815,8 +2848,8 @@ HS.onReady(function(){
       // Overlay-on-Type: a classifiable EPA record is Type shape + lifecycle colour + R,
       // never a purple square. Coverage for registry key `facility` is the UNMAPPED
       // fixture below (no layer / use_type — class fields only; the name is not a Type).
-      { label: "EPA overlay", cat: "industrial", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-OVERLAY" },
-      { label: "EPA", cat: "facility", type: "built", registry_id: "TX-VERIFY" },
+      { label: "EPA overlay", cat: "industrial", use_type: "Industrial", layer: "industrial", registry_id: "TX-OVERLAY" },
+      { label: "EPA", cat: "facility", registry_id: "TX-VERIFY" },
       { label: "Infra", cat: "infrastructure", use_type: "Infrastructure", type: "approved", layer: "infrastructure" },
       { label: "Comm", cat: "commercial", use_type: "Commercial", type: "proposed", layer: "commercial" },
       { label: "Civic", cat: "civic", use_type: "Civic/Public", type: "approved", layer: "civic" },
@@ -2862,8 +2895,9 @@ HS.onReady(function(){
       var geom = geomFromSvg(svg);
       if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
       if (s.registry_id && (s.layer || s.use_type)) {
-        // Classifiable EPA: Type shape, operating colour, purple R. A purple square
-        // here is the keep-purple regression this verifier exists to catch.
+        // Classifiable EPA: Type shape, LIFECYCLE-UNKNOWN colour, purple R. EPA FRS states no
+        // lifecycle, so an operating green here is an unsourced claim (2026-09-24). A purple
+        // square here is the keep-purple regression this verifier exists to catch.
         if (!mk.overlayOnType || mk.shape === "square" || mk.color === HS.markerRegistry.facilityHex
             || !mk.signal || mk.signal.letter !== "R") {
           fails.push({ label: s.label, err: "tracker-overlay-not-type-plus-r",
@@ -2872,9 +2906,9 @@ HS.onReady(function(){
         if (s.use_type === "Industrial" && mk.shape !== "triangle") {
           fails.push({ label: s.label, err: "tracker-overlay-industrial-not-triangle", want: "triangle", got: mk.shape });
         }
-        if (mk.color !== HS.LIFECYCLE_HEX.operating) {
-          fails.push({ label: s.label, err: "tracker-overlay-not-operating-colour",
-            want: HS.LIFECYCLE_HEX.operating, got: mk.color });
+        if (mk.color !== HS.LIFECYCLE_HEX.unknown || mk.lifecycle !== "unknown") {
+          fails.push({ label: s.label, err: "tracker-overlay-not-lifecycle-unknown",
+            want: HS.LIFECYCLE_HEX.unknown, got: mk.color + " " + mk.lifecycle });
         }
       } else if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex || mk.signal)) {
         fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
@@ -3209,7 +3243,8 @@ HS.onReady(function(){
       envHtml += "<div style='margin-top:3px;font-size:11px;color:#5d6f72'>"+esc(ENV_MATCH_NOTE)+"</div></div>";
     }
     // Label by lifecycle STAGE, not by source class (kindLabel): an EPA FRS facility is the one
-    // physical-facility case ("operating now"); every other record — point or area, TABS/Socrata/
+    // physical-facility case (Type · Regulated facility · its resolved lifecycle label — "Lifecycle
+    // unknown" unless a source states one); every other record — point or area, TABS/Socrata/
     // PMN/future source — reads its true stage, so the subheader can never contradict the dot's
     // colour (the old "any non-FRS point == Permitted construction" mislabelled proposed & operating).
     var kind = kindLabel(s);
@@ -3266,7 +3301,9 @@ HS.onReady(function(){
     items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
     el.innerHTML = items.slice(0,12).map(function(s, i){
-      var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
+      // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
+      // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
+      var col = opts.dotColor || COLORS[bucketOf(s.type, s)] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
       // internal property page — the external record link lives there, where every fact
@@ -3979,7 +4016,7 @@ HS.onReady(function(){
       var ll=siteLL(s);
       if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
       if(!mappable(s))return;
-      var bkt=bucketOf(s.type); if(!siteVisible(s))return;
+      var bkt=bucketOf(s.type, s); if(!siteVisible(s))return;
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
