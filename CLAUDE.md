@@ -1971,12 +1971,26 @@ PART C key swap + serving splice). Written, executable-tested, NOT applied to pr
   G's membership minus its predecessor's. It includes geography corrections, so it never means
   "new project". It is derivable only while the predecessor's rows exist, and discard refuses
   the serving generation's predecessor.
-- **Proof:** `test/n5_generation_pg/run_suite.py` (49 assertions + 7 mutations, all killed) via
-  `n5-generation-publish-suite.yml`; `test/n5-generation-publish.test.mjs` (42 static pins).
-- ⚠️ **Applying it needs disk the database does not have today.** Measured 2026-09-25: database
-  11,281 MB against the 11,607 MB the N5 scripts assume, with a 2,048 MB floor. PART B builds
-  ~450 MB of indexes before PART C frees ~375 MB. A second national generation adds ~1.25 GB
-  while both are retained. Capacity decides when this is applied; it does not change the design.
+- **ONE AUTHORITY — `public.app_zip_geography_cutover` is no longer a serving switch.** It was the
+  legacy build's per-ZIP rollout flag. `app_projects_for_zip` (the ZIP page, `development.html`,
+  `property.html`, `properties.html`) served Development only where it was enabled, while Map 1
+  never consulted it. PART C derives both `app_projects_for_zip` and `app_zip_geography_state`
+  from the serving generation. Measured 2026-09-25: enabled-and-verified = the 12,013
+  boundary_complete ZIPs exactly (0 either way), so no output changes today. The table stays as
+  the historical rollout record; only the diagnostic `refresh_maps_zip_export` (no readers)
+  still reads it.
+- **Publication scope = shard prefixes ∪ every canonical prefix** (`geo.n5_generation_publish_scope`).
+  Shards alone would leave **40 prefixes / 445 ZIPs** with no status; **442** of those serve a
+  measured zero today and would regress to 'unknown' on activation.
+- **Proof:** `test/n5_generation_pg/run_suite.py` (58 assertions + 10 mutations, all killed) via
+  `n5-generation-publish-suite.yml`; `test/n5-generation-publish.test.mjs` (53 static pins).
+- ⛔ **CAPACITY GATE: PRODUCTION MIGRATION/CUTOVER IS BLOCKED UNTIL VERIFIED DATABASE CAPACITY IS
+  SUFFICIENT.** PART A and PART B each raise unless the operator sets `n5.verified_free_disk_mb`
+  to an INDEPENDENTLY verified physical free-disk figure ≥ 2,048 MB floor + 950 MB PART B peak.
+  The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used to derive
+  it. Measured 2026-09-25: the database itself is 11,281 MB, and physical capacity is UNVERIFIED.
+  PART B builds ~450 MB of indexes before PART C frees ~375 MB; a second national generation adds
+  ~1.25 GB while both are kept.
 
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 

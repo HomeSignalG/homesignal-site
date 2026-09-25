@@ -38,6 +38,21 @@
 -- ############################################################################
 -- PART A — additive. One transaction.
 -- ############################################################################
+do $gate$
+declare v text := current_setting('n5.verified_free_disk_mb', true);
+begin
+  -- ⛔ CAPACITY GATE (PART A). PRODUCTION MIGRATION/CUTOVER IS BLOCKED UNTIL VERIFIED DATABASE
+  -- CAPACITY IS SUFFICIENT. The operator must state the PHYSICAL free disk, verified
+  -- independently (the provider's disk metrics), in MB:  set n5.verified_free_disk_mb = '<n>';
+  -- The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used
+  -- to derive it. Required: the 2,048 MB safety floor + ~950 MB for PART B's peak (≈450 MB of
+  -- new unique indexes built beside the old keys, plus a similar volume of WAL).
+  if v is null or v !~ '^[0-9]+$' or v::bigint < 2048 + 950 then
+    raise exception 'CAPACITY GATE: n5.verified_free_disk_mb is %, need >= % (2,048 MB floor + 950 MB PART B peak). Not applied.',
+      coalesce(v, 'unset'), 2048 + 950;
+  end if;
+end $gate$;
+
 begin;
 set local lock_timeout = '5s';
 
@@ -125,6 +140,28 @@ create or replace view geo.n5_serving_status as
 revoke all on geo.n5_serving_membership, geo.n5_serving_marker, geo.n5_serving_status from public;
 
 -- ---------------------------------------------------------------------------
+-- A4b. THE PUBLICATION SCOPE of a generation: its shard prefixes AND every canonical ZIP
+--      prefix. One definition, read by publish, unresolved accounting, the completeness
+--      check and the orchestrator.
+--      Shards alone are NOT enough, measured 2026-09-25: 40 canonical prefixes (445 ZIPs)
+--      carry no expected project, and 442 of those ZIP pages serve a `boundary_complete`
+--      measured zero today. A generation scoped to its shards would leave them with no
+--      status row — Map 1 would regress them to 'unknown' on activation — and would never
+--      probe their boundaries, so a project whose geometry lies there would be missed.
+-- ---------------------------------------------------------------------------
+create or replace function geo.n5_generation_publish_scope(p_generation_id text)
+returns table (z3 char(3))
+language sql stable
+set search_path = geo, public, pg_temp
+as $$
+  select s.z3::char(3) from geo.n5_shard s where s.generation_id = p_generation_id
+  union
+  select left(r.zip, 3)::char(3) from public.canonical_zip_registry r
+   where exists (select 1 from geo.n5_generation g where g.generation_id = p_generation_id);
+$$;
+revoke all on function geo.n5_generation_publish_scope(text) from public;
+
+-- ---------------------------------------------------------------------------
 -- A5. THE WRITE GUARD. Rows of a generation are writable only while it is BUILDING, or
 --     deletable by geo.n5_generation_discard for a FAILED / non-predecessor SUPERSEDED
 --     generation. This is what makes INV-1 / INV-8 / INV-9 hold against EVERY writer,
@@ -145,7 +182,10 @@ begin
     raise exception 'N5 GUARD: % rows may not move between generations (% -> %)',
       tg_table_name, old.generation_id, new.generation_id using errcode = '23514';
   end if;
-  select g.state into v_state from geo.n5_generation g where g.generation_id = v_gen;
+  -- FOR SHARE, not a plain read: READY/ACTIVATE take FOR UPDATE on this row, so a writer
+  -- that saw BUILDING holds the row until it commits and READY cannot slip in between
+  -- (proven by a two-connection test in test/n5_generation_pg).
+  select g.state into v_state from geo.n5_generation g where g.generation_id = v_gen for share;
   if v_state is null then
     raise exception 'N5 GUARD: % row names unknown generation %', tg_table_name, v_gen
       using errcode = '23514';
@@ -175,6 +215,10 @@ create trigger n5_generation_row_guard before insert or update or delete
 drop trigger if exists n5_generation_row_guard on geo.n5_boundary_membership;
 create trigger n5_generation_row_guard before insert or update or delete
   on geo.n5_boundary_membership for each row execute function geo.n5_generation_row_guard();
+-- the recorded unresolved outcomes are evidence too: frozen once the generation leaves BUILDING
+drop trigger if exists n5_generation_row_guard on geo.n5_generation_unresolved;
+create trigger n5_generation_row_guard before insert or update or delete
+  on geo.n5_generation_unresolved for each row execute function geo.n5_generation_row_guard();
 
 -- ---------------------------------------------------------------------------
 -- A6. The atomic-completion invariant, now per generation. Same rule as before (a
@@ -265,8 +309,8 @@ begin
   if p_prefix !~ '^[0-9]{3}$' then
     raise exception 'publish: prefix must be a ZIP3, got %', p_prefix using errcode = '22023';
   end if;
-  if not exists (select 1 from geo.n5_shard s where s.generation_id = p_generation_id and s.z3 = p_prefix) then
-    raise exception 'publish: % is not a shard of generation %', p_prefix, p_generation_id using errcode = '22023';
+  if not exists (select 1 from geo.n5_generation_publish_scope(p_generation_id) sc where sc.z3 = p_prefix) then
+    raise exception 'publish: % is not in the publication scope of generation %', p_prefix, p_generation_id using errcode = '22023';
   end if;
   -- Boundary resolution needs the WHOLE generation's geometry: a project whose expected
   -- ZIP is in another prefix can land here. Publishing before every shard finished would
@@ -475,10 +519,9 @@ begin
   if g.state <> 'BUILDING' then
     raise exception 'unresolved: generation % is %, not BUILDING', p_generation_id, g.state using errcode = '22023';
   end if;
-  select count(*) into n_unpub from geo.n5_shard s
-   where s.generation_id = p_generation_id
-     and not exists (select 1 from geo.n5_generation_publish p
-                      where p.generation_id = s.generation_id and p.z3 = s.z3);
+  select count(*) into n_unpub from geo.n5_generation_publish_scope(p_generation_id) sc
+   where not exists (select 1 from geo.n5_generation_publish p
+                      where p.generation_id = p_generation_id and p.z3 = sc.z3);
   if n_unpub > 0 then
     raise exception 'unresolved: % prefix(es) of % are unpublished — an absence is not evidence yet', n_unpub, p_generation_id
       using errcode = '22023';
@@ -614,9 +657,9 @@ as $$
     select 'no_shards', case when exists (select 1 from geo.n5_shard s where s.generation_id = p_generation_id) then 0 else 1 end
     union all
     select 'prefixes_unpublished',
-           (select count(*) from geo.n5_shard s where s.generation_id = p_generation_id
-              and not exists (select 1 from geo.n5_generation_publish p
-                               where p.generation_id = s.generation_id and p.z3 = s.z3))
+           (select count(*) from geo.n5_generation_publish_scope(p_generation_id) sc
+             where not exists (select 1 from geo.n5_generation_publish p
+                                where p.generation_id = p_generation_id and p.z3 = sc.z3))
     union all
     select 'unresolved_not_recorded_after_last_publish',
            (select case when g.unresolved_recorded_at is null
@@ -638,8 +681,7 @@ as $$
     union all
     select 'canonical_zip_without_status',
            (select count(*) from public.canonical_zip_registry r
-             where left(r.zip, 3) in (select s.z3 from geo.n5_shard s where s.generation_id = p_generation_id)
-               and not exists (select 1 from geo.maps_zip_geography_status st
+             where not exists (select 1 from geo.maps_zip_geography_status st
                                 where st.generation_id = p_generation_id and st.zip = r.zip))
     union all
     select 'boundary_scratch_residue',
@@ -724,6 +766,7 @@ declare
   n_expected   bigint;
   integ        record;
   prob         record;
+  c_key        text;
 begin
   select * into g from geo.n5_generation where generation_id = p_generation_id for update;
   if not found then
@@ -745,6 +788,12 @@ begin
   if n_missing > 0 then
     raise exception 'activate: % of % declared chunks have no reconciliation row', n_missing, n_chunks using errcode = '22023';
   end if;
+
+  -- RECOMPUTED, never trusted: reconcile rows are an ordinary table, so the answer the
+  -- switch acts on is derived here, inside the switching transaction.
+  foreach c_key in array p_expected_chunks loop
+    perform geo.n5_reconcile_chunk(p_generation_id, c_key);
+  end loop;
 
   select coalesce(sum(r.unaccounted), 0), coalesce(sum(r.expected_keys), 0)
     into n_unaccount, n_expected
@@ -896,6 +945,7 @@ begin
   delete from geo.zip_authoritative_membership where generation_id = p_generation_id; get diagnostics n_m = row_count;
   delete from geo.maps_zip_geography_status    where generation_id = p_generation_id; get diagnostics n_s = row_count;
   delete from geo.n5_boundary_membership       where generation_id = p_generation_id; get diagnostics n_b = row_count;
+  delete from geo.n5_generation_unresolved     where generation_id = p_generation_id;
   delete from geo.n5_gen_zcta                  where generation_id = p_generation_id;
   perform set_config('n5.discard_generation', '', true);
   update geo.n5_generation set superseded_from_state = null,
@@ -997,6 +1047,24 @@ commit;
 -- If any build fails it leaves an INVALID index: drop it and re-run that statement.
 -- ############################################################################
 -- @@PART_B
+-- Session-level (Part B runs outside a transaction). CONCURRENTLY builds wait only for
+-- SHARE UPDATE EXCLUSIVE; the three ADD CONSTRAINT ... NOT VALID take a brief ACCESS
+-- EXCLUSIVE, which this bounds so a blocked statement cannot queue readers behind it.
+do $gate$
+declare v text := current_setting('n5.verified_free_disk_mb', true);
+begin
+  -- ⛔ CAPACITY GATE (PART B). PRODUCTION MIGRATION/CUTOVER IS BLOCKED UNTIL VERIFIED DATABASE
+  -- CAPACITY IS SUFFICIENT. The operator must state the PHYSICAL free disk, verified
+  -- independently (the provider's disk metrics), in MB:  set n5.verified_free_disk_mb = '<n>';
+  -- The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used
+  -- to derive it. Required: the 2,048 MB safety floor + ~950 MB for PART B's peak (≈450 MB of
+  -- new unique indexes built beside the old keys, plus a similar volume of WAL).
+  if v is null or v !~ '^[0-9]+$' or v::bigint < 2048 + 950 then
+    raise exception 'CAPACITY GATE: n5.verified_free_disk_mb is %, need >= % (2,048 MB floor + 950 MB PART B peak). Not applied.',
+      coalesce(v, 'unset'), 2048 + 950;
+  end if;
+end $gate$;
+set lock_timeout = '5s';
 create unique index concurrently if not exists zip_authoritative_membership_gen_pk
   on geo.zip_authoritative_membership (generation_id, zcta5, source_key);
 create unique index concurrently if not exists zip_authoritative_marker_gen_pk
@@ -1120,22 +1188,67 @@ begin
     end if;
   end loop;
 
+  -- C3. ONE AUTHORITY: public.app_zip_geography_cutover STOPS BEING A SERVING SWITCH.
+  --     It was the per-ZIP rollout flag of the legacy build. app_projects_for_zip (the ZIP
+  --     page, development.html, property.html, properties.html) served Development only
+  --     where it was enabled, while Map 1 (app_zip_projects_markers) never consulted it —
+  --     so the two surfaces could disagree, and flipping one row changed resident-facing
+  --     Development without any generation changing. Measured 2026-09-25 the switch is
+  --     already redundant: enabled-and-verified = 12,013 ZIPs = exactly the 12,013
+  --     boundary_complete ZIPs of the serving generation (0 either way; the 64 disabled rows
+  --     are all not boundary_complete). So deriving it changes no output today, and after
+  --     this the serving generation alone decides. The table is RETAINED, unread by any
+  --     serving path, as the historical record of the legacy rollout.
+  def := pg_get_functiondef('public.app_projects_for_zip(text,text)'::regprocedure);
+  if (select count(*) from regexp_matches(def,
+        'if exists \(select 1 from public\.app_zip_geography_cutover c\s+where c\.zip = p_zip and c\.enabled\) then\s+return public\.app_authoritative_projects_for_zip\(p_zip\);\s+end if;\s+return jsonb_build_object\(\s+''unavailable'', true,\s+''zip_geography_status'', ''boundary_complete_not_cut_over'',\s+''projects'', null\);', 'g')) <> 1 then
+    raise exception 'C3: the app_projects_for_zip cutover gate does not appear exactly once — definition drifted';
+  end if;
+  newdef := regexp_replace(def,
+        'if exists \(select 1 from public\.app_zip_geography_cutover c\s+where c\.zip = p_zip and c\.enabled\) then\s+return public\.app_authoritative_projects_for_zip\(p_zip\);\s+end if;\s+return jsonb_build_object\(\s+''unavailable'', true,\s+''zip_geography_status'', ''boundary_complete_not_cut_over'',\s+''projects'', null\);',
+        '-- the serving N5 generation is the only authority (docs/n5-generation-publish.sql C3)
+    return public.app_authoritative_projects_for_zip(p_zip);');
+  execute newdef;
+
+  create or replace view public.app_zip_geography_state as
+   select r.zip,
+          case when s.status = 'boundary_complete' then 'authoritative'::text
+               when s.status = 'not_measured'      then 'not_measured'::text
+               else 'pending'::text
+          end as geography_state
+     from public.canonical_zip_registry r
+     left join geo.n5_serving_status s on s.zip::text = r.zip;
+
+  -- No Development SERVING reader may consult the retired switch. refresh_maps_zip_export
+  -- is excluded by name: it writes a diagnostic export that nothing reads (measured: no
+  -- function, view or site file reads geo.maps_zip_export) and serves no resident.
+  select count(*) into n_left from (
+    select p.oid from pg_proc p
+     where p.prosrc ~* 'app_zip_geography_cutover' and p.proname <> 'refresh_maps_zip_export'
+    union all
+    select c.oid from pg_class c join pg_rewrite rw on rw.ev_class = c.oid
+     where c.relkind = 'v' and pg_get_viewdef(c.oid) ~* 'app_zip_geography_cutover') x;
+  if n_left > 0 then
+    raise exception 'C3: % Development reader(s) still consult app_zip_geography_cutover', n_left;
+  end if;
+
   -- FINAL SWEEP: no function or view outside the generation-addressed lifecycle may read a
   -- serving base table directly. A reader nobody listed is a way to combine generations.
+  -- EVERY non-system schema, not only public and geo.
   select count(*) into n_left from (
     select p.oid::regprocedure::text o
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('public','geo')
+     where n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg\_%'
        and p.prosrc ~ pat
        and p.proname not in ('n5_serving_generation_id','n5_generation_row_guard','n5_assert_shadow_complete',
                              'n5_gen_publish_prefix','n5_gen_record_unresolved','n5_reconcile_chunk',
                              'n5_generation_publish_problems','n5_generation_mark_ready','n5_generation_activate',
                              'n5_generation_rollback','n5_generation_fail','n5_generation_discard',
-                             'n5_generation_entries','n5_generation_status')
+                             'n5_generation_entries','n5_generation_status','n5_generation_publish_scope')
     union all
     select schemaname || '.' || viewname
       from pg_views
-     where schemaname in ('public','geo')
+     where schemaname not in ('pg_catalog','information_schema')
        and definition ~ pat
        and viewname not in ('n5_serving_membership','n5_serving_marker','n5_serving_status')) x;
   if n_left > 0 then

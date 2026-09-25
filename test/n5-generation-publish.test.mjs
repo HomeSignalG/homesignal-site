@@ -1,8 +1,8 @@
 // n5-generation-publish.test.mjs — STRUCTURAL pins for the N5 generation publication path.
 //
 // The BEHAVIOURAL proof is test/n5_generation_pg/run_suite.py, executed against a real
-// PostgreSQL + PostGIS by .github/workflows/n5-generation-publish-suite.yml (49 assertions
-// and 7 mutations). This file pins what can be checked offline: that the pieces stay WIRED —
+// PostgreSQL + PostGIS by .github/workflows/n5-generation-publish-suite.yml (58 assertions
+// and 10 mutations). This file pins what can be checked offline: that the pieces stay WIRED —
 // one writer, one serving switch, retired scripts stay retired, and no Map 1 reader reads a
 // base table that holds more than one generation.
 import { readFileSync } from 'node:fs';
@@ -79,6 +79,31 @@ ok(/n5_generation_publish_problems/.test(act) && /predecessor_generation_id = co
   'activation re-checks completeness and records its predecessor');
 ok(!/insert into|delete from/i.test(act), 'activation copies and deletes nothing — the switch is state alone');
 
+// ── ONE AUTHORITY: the legacy per-ZIP cutover flag no longer chooses Development ──────
+ok(/C3: the app_projects_for_zip cutover gate does not appear exactly once/.test(code),
+  'C3 removes the app_projects_for_zip cutover gate, fail-closed on drift');
+const stateView = (code.match(/create or replace view public\.app_zip_geography_state as([^;]*);/) || [])[1] || '';
+ok(stateView.length > 100 && /n5_serving_status/.test(stateView) && !/app_zip_geography_cutover/.test(stateView),
+  'app_zip_geography_state is derived from the serving generation, not the cutover table');
+ok(/still consult app_zip_geography_cutover/.test(code), 'PART C aborts if any Development reader still consults the cutover table');
+
+// ── publication scope: shards AND every canonical prefix ─────────────────────────────
+const scope = fnBody('geo.n5_generation_publish_scope');
+ok(/n5_shard/.test(scope) && /canonical_zip_registry/.test(scope), 'publication scope = shard prefixes UNION canonical prefixes');
+ok(/n5_generation_publish_scope\(p_generation_id\)/.test(publish), 'publish accepts exactly the scope');
+ok((code.match(/n5_generation_publish_scope\(p_generation_id\)/g) || []).length >= 3,
+  'publish, unresolved accounting and the completeness check all read the one scope');
+
+// ── the guard serialises with READY, and freezes recorded evidence ────────────────────
+ok(/where g\.generation_id = v_gen for share;/.test(code), 'the write guard locks the generation row it reads');
+ok(/before insert or update or delete\s+on geo\.n5_generation_unresolved/.test(code), 'unresolved outcomes are guarded');
+ok(/perform geo\.n5_reconcile_chunk\(p_generation_id, c_key\)/.test(act), 'activation recomputes reconciliation itself');
+
+// ── capacity: PART A and PART B refuse without an independently verified free-disk figure ──
+ok((sql.match(/CAPACITY GATE \(PART [AB]\)/g) || []).length === 2 && /v::bigint < 2048 \+ 950/.test(code),
+  'PART A and PART B each refuse unless n5.verified_free_disk_mb >= the 2,048 MB floor + 950 MB peak');
+ok(sql.indexOf('CAPACITY GATE (PART A)') < sql.indexOf('A1. Generation lineage'), 'the PART A gate runs before any DDL');
+
 // ── orchestration: one writer, READY through the gate, activation still explicit ──────
 ok(/from n5_publish import publish_prefix/.test(orch) && /geo\.n5_gen_publish_prefix/.test(pub),
   'the orchestrator publishes through scripts/n5_publish.py -> geo.n5_gen_publish_prefix');
@@ -99,7 +124,7 @@ for (const s of ['scripts/n5_boundary_first.py', 'scripts/n5_unit_a_shadow.py', 
 
 // ── the executable suite is wired and carries its mutations ───────────────────────────
 ok(/run_suite\.py/.test(wf) && /postgis\/postgis/.test(wf), 'the executable suite runs on a disposable PostGIS in CI');
-ok((suite.match(/^\s+"M\d /gm) || []).length >= 7, 'the executable suite carries at least seven mutations');
+ok((suite.match(/^\s+"M\d+ /gm) || []).length >= 10, 'the executable suite carries at least ten mutations');
 ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied before it can count as a kill');
 
 console.log(`n5-generation-publish: ${n} structural checks passed`);

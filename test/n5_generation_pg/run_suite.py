@@ -31,7 +31,7 @@ from n5_candidate_bounding import check_candidate_bounding  # noqa: E402
 LEGACY = "legacy-phase1-2026-09-01"
 GEN_B = "gen-b"
 GEN_C = "gen-c"
-ZIPS = ["11101", "11102", "11199", "11201"]
+ZIPS = ["11101", "11102", "11199", "11201", "11301"]
 
 
 # --------------------------------------------------------------------------- plumbing
@@ -95,7 +95,16 @@ def migration_parts():
     a, rest = text.split("-- @@PART_B", 1)
     b, c = rest.split("-- @@PART_C", 1)
     body = "\n".join(l for l in b.splitlines() if not l.strip().startswith("--"))
-    stmts = [s.strip() for s in body.split(";") if s.strip()]
+    # dollar-quoted DO blocks (the capacity gate) are one statement each
+    blocks = re.findall(r"do \$gate\$.*?\$gate\$;", body, re.S)
+    for i, blk in enumerate(blocks):
+        body = body.replace(blk, f"@@BLOCK{i}@@;")
+    stmts = []
+    for st in (x.strip() for x in body.split(";")):
+        if not st:
+            continue
+        m = re.fullmatch(r"@@BLOCK(\d+)@@", st)
+        stmts.append(blocks[int(m.group(1))] if m else st)
     return a, stmts, c
 
 
@@ -108,9 +117,14 @@ def probe_text():
 
 # --------------------------------------------------------------------------- data
 SEED = f"""
-insert into public.canonical_zip_registry values ('11101'),('11102'),('11199'),('11201');
-insert into public.app_zip_geography_cutover (zip, enabled, production_geography_verified_at)
-  values ('11101', true, now());
+-- 11301 sits in prefix 113, which carries NO expected project: the shape of the 40
+-- production prefixes (445 ZIPs, 442 serving a measured zero) a shard-only scope would drop.
+insert into public.canonical_zip_registry values ('11101'),('11102'),('11199'),('11201'),('11301');
+-- as in production: enabled-and-verified = exactly the boundary_complete ZIPs; the one
+-- not_measured ZIP carries a disabled row.
+insert into public.app_zip_geography_cutover (zip, enabled, production_geography_verified_at) values
+  ('11101', true, now()), ('11102', true, now()), ('11201', true, now()), ('11301', true, now()),
+  ('11199', false, null);
 insert into geo.n5_accepted_source values ('reg-noauth','NOAUTH',1,1), ('reg-ok','RECOVERY',9,9);
 
 insert into public.app_projects (source_key, record_kind, zip, name, type, status, stage, submitted_at,
@@ -118,7 +132,7 @@ insert into public.app_projects (source_key, record_kind, zip, name, type, statu
 select 'dev:P' || i, 'development', z, 'Project ' || i, 'type', 'filed', 'stage', date '2026-01-01' + i,
        'filed', 'https://example.test/' || i, 'reg-ok', i || ' Main St', 'dev', 'scope'
   from (values (1,'11101'),(2,'11101'),(3,'11102'),(4,'11102'),(5,'11101'),(6,'11101'),
-               (7,'11101'),(8,'11201'),(9,'11201'),(10,'11201')) v(i, z);
+               (7,'11101'),(8,'11201'),(9,'11201'),(10,'11201'),(11,'11201')) v(i, z);
 
 insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom, invalid_reason, provenance, verdict_snapshot_id) values
  ('dev:P1','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(0.5,0.5),4269),null,'proven_stored_point','phase1'),
@@ -127,7 +141,8 @@ insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom, inv
  ('dev:P4','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(1.5,0.5),4269),null,'proven_stored_point','snapB'),
  ('dev:P5','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(0.3,0.3),4269),null,'proven_stored_point','phase1'),
  ('dev:P7','reg-ok','bad',3,null,'SELF_INTERSECTION','recovered_authoritative',null),
- ('dev:P9','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(10,10),4269),null,'proven_stored_point','snapB');
+ ('dev:P9','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(10,10),4269),null,'proven_stored_point','snapB'),
+ ('dev:P11','reg-ok','pt:1',1,ST_SetSRID(ST_MakePoint(3.5,0.5),4269),null,'proven_stored_point','snapB');
 insert into geo.n5_point_reject (source_key, registry_id, reason, verdict_snapshot_id)
   values ('dev:P6','reg-ok','NULL_COORD','snapB');
 
@@ -154,7 +169,8 @@ insert into geo.maps_zip_geography_status (zip, status, membership_rows, complet
  ('11101','boundary_complete',3,now(),'legacy','{LEGACY}'),
  ('11102','boundary_complete',1,now(),'legacy','{LEGACY}'),
  ('11201','boundary_complete',0,now(),'legacy','{LEGACY}'),
- ('11199','not_measured',0,now(),'legacy','{LEGACY}');
+ ('11199','not_measured',0,now(),'legacy','{LEGACY}'),
+ ('11301','boundary_complete',0,now(),'legacy','{LEGACY}');
 """
 
 # Candidate B: a fresh snapshot. P5 is NOT in it (INV-2); P3 is stated in 111 but lies in 112 (INV-5);
@@ -172,7 +188,8 @@ insert into geo.n5_shard (snapshot_id, generation_id, z3, state, checksum)
 
 ZCTA = {"11101": "MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))",
         "11102": "MULTIPOLYGON(((1 0,2 0,2 1,1 1,1 0)))",
-        "11201": "MULTIPOLYGON(((2 0,3 0,3 1,2 1,2 0)))"}
+        "11201": "MULTIPOLYGON(((2 0,3 0,3 1,2 1,2 0)))",
+        "11301": "MULTIPOLYGON(((3 0,4 0,4 1,3 1,3 0)))"}
 
 
 def load_zcta(conn, gen, prefix):
@@ -236,8 +253,8 @@ class Suite:
         return [n for n, c in self.results if not c]
 
 
-def run(conn, label, mutate=None):
-    s = Suite(conn, label)
+def run(conn, label, mutate=None, suite=None):
+    s = suite or Suite(conn, label)
     c = conn
     q(c, open(PRESTATE).read())
     q(c, SEED)
@@ -246,8 +263,18 @@ def run(conn, label, mutate=None):
          refs(c, "11101") == ["dev:P1", "dev:P2", "dev:P5"], refs(c, "11101"))
 
     part_a, part_b, part_c = migration_parts()
+    s.ok("K1 PART A refuses with no verified capacity stated, and applies nothing",
+         raises(c, part_a, None, r"CAPACITY GATE: n5\.verified_free_disk_mb is unset")
+         and q1(c, "select to_regprocedure('geo.n5_serving_generation_id()') is null") is True)
+    q(c, "set n5.verified_free_disk_mb = '2997'")
+    s.ok("K2 PART A refuses a stated capacity below the 2,048 MB floor + 950 MB peak",
+         raises(c, part_a, None, r"need >= 2998"))
+    q(c, "set n5.verified_free_disk_mb = '2998'")
     q(c, part_a)
     s.ok("15a legacy Map 1 output unchanged after PART A", map_snapshot(c) == pre)
+    q(c, "reset n5.verified_free_disk_mb")
+    s.ok("K3 PART B refuses with no verified capacity stated", raises(c, part_b[0], None, r"CAPACITY GATE"))
+    q(c, "set n5.verified_free_disk_mb = '2998'")
     for st in part_b:
         q(c, st)
     s.ok("15b legacy Map 1 output unchanged after PART B", map_snapshot(c) == pre)
@@ -278,13 +305,19 @@ def run(conn, label, mutate=None):
         if q1(c, defs) == before:
             raise RuntimeError("MUTATION DID NOT APPLY - no definition changed")
 
+    # X1: the retired per-ZIP switch no longer changes what a Development page serves
+    q(c, "update public.app_zip_geography_cutover set enabled=false where zip='11101'")
+    s.ok("X1 disabling a ZIP's cutover row does not change its Development page", map_snapshot(c) == pre)
+    q(c, "update public.app_zip_geography_cutover set enabled=true where zip='11101'")
+
     # A-tests: anon reaches the resident surfaces with no geo grant
     try:
         q(c, "set role anon")
         st = q1(c, "select count(*) from public.app_zip_geography_state")
         mk = q1(c, "select public.app_zip_projects_markers('11101','development',true)->>'status'")
         q(c, "reset role")
-        s.ok("A1 anon still reads app_zip_geography_state and Map 1 through the serving views", st == 4 and mk == "boundary_complete")
+        s.ok("A1 anon still reads app_zip_geography_state and Map 1 through the serving views",
+             st == len(ZIPS) and mk == "boundary_complete", (st, mk))
     except psycopg2.Error as e:
         q(c, "reset role")
         s.ok("A1 anon still reads app_zip_geography_state and Map 1 through the serving views", False, str(e).splitlines()[0])
@@ -307,6 +340,9 @@ def run(conn, label, mutate=None):
     s.ok("17a re-publishing the same prefix of B is idempotent (fingerprint unchanged)", gen_fingerprint(c, GEN_B) == fp_first)
 
     publish(c, GEN_B, "112")
+    s.ok("S1 a canonical prefix with no shard (113) is in B's scope and blocks READY until published",
+         raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"prefixes_unpublished = 1"))
+    publish(c, GEN_B, "113")
     s.ok("2b building B fully does not alter what Map 1 returns", map_snapshot(c) == pre)
     s.ok("13a a publish whose boundaries do not match the loader's declaration refuses",
          raises(c, "select geo.n5_gen_publish_prefix(%s,'111','run-x',99)", (GEN_B,), r"loader declared"))
@@ -319,13 +355,13 @@ def run(conn, label, mutate=None):
          q1(c, "select count(*) from geo.n5_boundary_membership where generation_id=%s and source_key='dev:P5'", (GEN_B,)) == 0
          and q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s and source_key='dev:P5'", (GEN_B,)) == 0)
     s.ok("8a membership and markers of B are generation-scoped and paired",
-         q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN_B,)) == 5
+         q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN_B,)) == 6
          and q1(c, """select count(*) from geo.zip_authoritative_membership m where m.generation_id=%s and not exists
                       (select 1 from geo.zip_authoritative_marker k where k.generation_id=m.generation_id
                           and k.zcta5=m.zcta5 and k.source_key=m.source_key)""", (GEN_B,)) == 0)
     s.ok("8b B's status rows cover every canonical ZIP of its prefixes (incl. 11199 not_measured)",
          q1(c, "select string_agg(zip||':'||status||':'||membership_rows, ',' order by zip) from geo.maps_zip_geography_status where generation_id=%s", (GEN_B,))
-         == "11101:boundary_complete:2,11102:boundary_complete:2,11199:not_measured:0,11201:boundary_complete:1")
+         == "11101:boundary_complete:2,11102:boundary_complete:2,11199:not_measured:0,11201:boundary_complete:1,11301:boundary_complete:1")
 
     q1(c, "select geo.n5_gen_record_unresolved(%s)", (GEN_B,))
     got = {r["source_key"]: r["reason_code"] for r in q(c, "select source_key, reason_code from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,))}
@@ -346,7 +382,24 @@ def run(conn, label, mutate=None):
     s.ok("7b stale unresolved accounting (older than the last publish) is refused at READY",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1|unresolved"))
     q1(c, "select geo.n5_gen_record_unresolved(%s)", (GEN_B,))
+
+    # C1: a writer that saw BUILDING holds the generation until it commits; READY waits.
+    w = psycopg2.connect(c.dsn)
+    try:
+        with w.cursor() as wc:
+            wc.execute("insert into geo.zip_authoritative_membership (generation_id, zcta5, source_key, point_rule, "
+                       "feature_count, geom_family, run_id) values (%s,'11199','dev:PX','X',1,'X','w')", (GEN_B,))
+        q(c, "set lock_timeout = '700ms'")
+        s.ok("C1 READY cannot commit while a BUILDING-time write is still open",
+             raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"lock timeout"))
+    finally:
+        q(c, "reset lock_timeout")
+        w.rollback()
+        w.close()
+
     q(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,))
+    s.ok("G6 recorded unresolved outcomes are frozen once B leaves BUILDING",
+         raises(c, "delete from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,), r"N5 GUARD"))
     s.ok("control: B is READY and A still serves",
          q1(c, "select state from geo.n5_generation where generation_id=%s", (GEN_B,)) == "READY"
          and map_snapshot(c) == pre)
@@ -354,8 +407,9 @@ def run(conn, label, mutate=None):
     fp_a = gen_fingerprint(c, LEGACY)
     q(c, "select geo.n5_generation_activate(%s, array['111','112'])", (GEN_B,))
     s.ok("10 activation switches Map 1 from A to B (P5 gone, P4 and P3 visible)",
-         refs(c, "11101") == ["dev:P1", "dev:P2"] and refs(c, "11102") == ["dev:P2", "dev:P4"] and refs(c, "11201") == ["dev:P3"],
-         [refs(c, z) for z in ("11101", "11102", "11201")])
+         refs(c, "11101") == ["dev:P1", "dev:P2"] and refs(c, "11102") == ["dev:P2", "dev:P4"]
+         and refs(c, "11201") == ["dev:P3"] and refs(c, "11301") == ["dev:P11"],
+         [refs(c, z) for z in ("11101", "11102", "11201", "11301")])
     s.ok("10b one serving generation, recorded with its predecessor",
          q1(c, "select count(*) from geo.n5_generation where state in ('ACTIVE','ACTIVE_LEGACY')") == 1
          and q1(c, "select predecessor_generation_id from geo.n5_generation where generation_id=%s", (GEN_B,)) == LEGACY)
@@ -367,10 +421,17 @@ def run(conn, label, mutate=None):
          and q1(c, "select jsonb_array_length(public.app_authoritative_projects_for_zip('11101'))") == 2, both)
     entries = sorted((r["zcta5"], r["source_key"]) for r in q(c, "select * from geo.n5_generation_entries(%s)", (GEN_B,)))
     s.ok("16 generation B minus A is derivable after activation",
-         entries == [("11102", "dev:P4"), ("11201", "dev:P3")], entries)
+         entries == [("11102", "dev:P4"), ("11201", "dev:P3"), ("11301", "dev:P11")], entries)
     s.ok("16b entries are refused for the baseline (no predecessor)",
          raises(c, "select * from geo.n5_generation_entries(%s)", (LEGACY,), r"no predecessor"))
     served_b = map_snapshot(c)
+    agree = all(
+        sorted(p.get("source_key") for p in (q1(c, "select public.app_projects_for_zip(%s,'development')", (z,)) or [])
+               if isinstance(p, dict)) == refs(c, z)
+        for z in ("11101", "11102", "11201", "11301"))
+    s.ok("X2 the Development pages and Map 1 show the same projects for every served ZIP", agree)
+    q(c, "delete from public.app_zip_geography_cutover")
+    s.ok("X3 with the retired switch emptied, every resident surface is unchanged", map_snapshot(c) == served_b)
 
     # ---- the write guard (INV-1 / INV-8 against ANY writer)
     s.ok("G1 a retired-script-style delete of a serving prefix is refused",
@@ -446,6 +507,18 @@ MUTATIONS = {
     "M6 READY stops checking publication completeness": ("9a", """
         do $$ begin execute regexp_replace(pg_get_functiondef('geo.n5_generation_mark_ready(text,text[])'::regprocedure),
           'for prob in select \\* from geo\\.n5_generation_publish_problems\\(p_generation_id, p_expected_chunks\\) loop.*?end loop;', ''); end $$;"""),
+    "M8 the cutover row gates Development again": ("X1", """
+        do $m$ begin execute replace(pg_get_functiondef('public.app_projects_for_zip(text,text)'::regprocedure),
+          'return public.app_authoritative_projects_for_zip(p_zip);',
+          'if exists (select 1 from public.app_zip_geography_cutover c where c.zip = p_zip and c.enabled) then '
+          'return public.app_authoritative_projects_for_zip(p_zip); end if; '
+          'return jsonb_build_object(''unavailable'', true, ''zip_geography_status'', ''boundary_complete_not_cut_over'', ''projects'', null);'); end $m$;"""),
+    "M9 publication scope shrinks to the shards": ("S1", """
+        create or replace function geo.n5_generation_publish_scope(p_generation_id text) returns table (z3 char(3))
+        language sql stable as $$ select s.z3::char(3) from geo.n5_shard s where s.generation_id = p_generation_id $$;"""),
+    "M10 the write guard reads state without locking it": ("C1", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_row_guard()'::regprocedure),
+          'where g.generation_id = v_gen for share;', 'where g.generation_id = v_gen;'); end $m$;"""),
     "M7 activation stops recording the predecessor": ("16", """
         do $$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
           'predecessor_generation_id = coalesce(predecessor_generation_id, prev.generation_id)', 'predecessor_generation_id = predecessor_generation_id'); end $$;"""),
@@ -473,18 +546,23 @@ def main():
             sql = old_reconcile()
         mdb = f"n5gen_mut{i}"
         mconn = fresh_db(mdb)
+        ms = None
         try:
-            ms = run(mconn, name.split()[0], mutate=sql)
-            red = [n for n in ms.failed() if n.split()[0] == test_id]
+            ms = Suite(mconn, name.split()[0])
+            run(mconn, name.split()[0], mutate=sql, suite=ms)
+            red = [n for n in ms.failed() if n.split()[0] == test_id] or ms.failed()[:1]
         except RuntimeError as e:
             red = []  # did not apply: counted as SURVIVED, never as a kill
             print(f"   {e}")
         except Exception as e:  # a mutation that crashes the suite is still a kill, but say so
-            red = [f"suite aborted: {str(e).splitlines()[0]}"]
+            first = (ms.failed()[:1] if ms else [])
+            red = first + [f"then aborted: {str(e).splitlines()[0]}"] if first else \
+                  [f"aborted before any check failed: {str(e).splitlines()[0]}"]
         mconn.close()
         drop_db(mdb)
         verdict = "KILLED" if red else "SURVIVED"
-        print(f"{verdict} — {name}  (guarding test {test_id}: {red[:1]})")
+        caught = "by its guarding test" if red and red[0].split()[0] == test_id else "FIRST by another check"
+        print(f"{verdict} — {name}  (guarding test {test_id}; caught {caught}: {red[:2]})")
         if not red:
             survivors.append(name)
 
