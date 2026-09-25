@@ -6,7 +6,7 @@
 # QUESTION (only this): given the same production evidence, does the Phase A code with Atlas
 # unadmitted decide identity, canonical geography or Map 1 differently from the pre-#1335 code?
 #
-# PRODUCTION IS ONLY READ (prod_copy: one SELECT per session, READ ONLY, 2 s lock_timeout).
+# PRODUCTION IS ONLY READ (prod_copy: one SELECT per READ ONLY transaction, asserted in-session, rolled back).
 #
 # 1. TRUE PRE-IDENTITY STATE, reconstructed from production's own history, never guessed:
 #    T = 2026-09-25 15:25:00.080497Z, the start of the first identity run after the 14:44Z Atlas and
@@ -56,8 +56,17 @@ ok = re.match(r'(?is)^(select|with)\b', q) and ';' not in q and not re.search(
 sys.exit(0 if ok else 1)
 PY
   local q; q="$(tr '\n' ' ' <<<"$1")"
-  PGOPTIONS='-c default_transaction_read_only=on -c lock_timeout=2s -c statement_timeout=15min -c idle_in_transaction_session_timeout=60s -c TimeZone=UTC' \
-    psql "$PROD_DB_URL" -X -q -v ON_ERROR_STOP=1 -c "\\copy ($q) to '$2' with (format csv, header, null '\N')"
+  # READ ONLY IS ENFORCED IN THE TRANSACTION, not by connection options: the production URL goes through a
+  # pooler that DROPS startup options (measured: run 36174738257 hit the database's 2 min statement_timeout
+  # although PGOPTIONS asked for 15 min, and a fresh session reads default_transaction_read_only = off).
+  # So every read runs inside BEGIN ... READ ONLY, asserted in-session before the copy, then rolled back.
+  psql "$PROD_DB_URL" -X -q -v ON_ERROR_STOP=1 \
+    -c "begin transaction isolation level repeatable read, read only" \
+    -c "set local statement_timeout = '15min'" -c "set local lock_timeout = '2s'" \
+    -c "set local idle_in_transaction_session_timeout = '60s'" -c "set local timezone = 'UTC'" \
+    -c "do \$\$ begin if current_setting('transaction_read_only') <> 'on' then raise exception 'prod_copy: transaction is not read-only'; end if; end \$\$" \
+    -c "\\copy ($q) to '$2' with (format csv, header, null '\N')" \
+    -c "rollback"
 }
 rcopy() { L -d "$1" -c "set timezone = 'UTC'" -c "\\copy ($2) to '$3' with (format csv, header, null '\N')"; }
 clone() { dropdb --if-exists "$2"; createdb -T "$1" "$2"; }
@@ -380,6 +389,15 @@ mkdir -p "$w/dx_prod" "$w/dx_new"
 cp "$w/prod/entities.csv" "$w/prod/links.csv" "$w/dx_prod/"; cp "$w/f_new/entities.csv" "$w/f_new/links.csv" "$w/dx_new/"
 prod_copy "$Q_GEOTXT" "$w/dx_prod/geo.csv"; rcopy rep_new "$Q_GEOTXT" "$w/dx_new/geo.csv"
 echo "  DIAGNOSTIC geometry-as-text (not gated): $($CMP compare "$w/dx_prod" "$w/dx_new" "$w/start_ids.csv" geo zero || true)"
+python3 - "$root/scripts" "$w/dx_prod" "$w/dx_new" "$w/start_ids.csv" <<'PY' || true
+import sys; sys.path.insert(0, sys.argv[1]); import dc_phase_a_proof as P
+ids = {r[0] for r in P.read(sys.argv[4])[1]}
+a = dict(P.load_side(sys.argv[2], ids)['geo'][1]); b = dict(P.load_side(sys.argv[3], ids)['geo'][1])
+d = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+print(f'  DIAGNOSTIC text-differing rows: {len(d)}')
+for k in d[:3]:
+    print(f'    {k}: production {a[k]} | replay {b[k]}')
+PY
 
 echo "== 8. POSITIVE CONTROLS (disposable clones only; the SAME comparator; exact expected results)"
 N_ROWS="$(python3 -c "import json;print(json.load(open('$w/final.json'))['map1']['rows'][0])")"
