@@ -51,3 +51,31 @@ plus an orchestrator-level test.
 - **Disk:** 24 GB provisioned, database ~11.5 GB. The attempt used no space.
 - ⛔ **Do not dispatch `open` again until #2–#5 are fixed.** Once #1 is fixed, a run commits
   ~1.4 GB of capture and then fails at #2, leaving an orphan that blocks the name.
+
+## Fixes (same day)
+
+| # | fix | where |
+|---|---|---|
+| 1 | canonical fingerprint expressions, pinned byte-for-byte | `n5_orchestrate.py` `mode_open`; `test/n5-generation-publish.test.mjs` |
+| 2 | snapshot row computes sources/projects/pairs/checksum (reproduces phase1: 234 / 925,463 / 2,753,802 / 2,976,275) | `mode_open` |
+| 3 | `open` is ONE simple-query message = one transaction | `mode_open` |
+| 4 | explicit per-statement `statement_timeout` (840 s) with a longer client wait on open, prepare, unresolved, reconcile, ready, activate | `n5_orchestrate.py` (`heavy()`) |
+| 5 | `work` passes the generation's own `snapshot_id` to the shard | `mode_work` |
+| 6 | `n5_association.generation_id` (fast default → concurrent unique index → PK swap), guarded | Part D D5 / D-B / D-C; `n5_shard.py` |
+| 7 | the read-only guard ignores quoted literal content; the cache probe joins instead of inlining keys | `n3_pilot.py`, `n5_shard.py`, `scripts/test_sql_retry.py` |
+| 8 | per-generation proven points via `geo.n5_gen_prepare_publish`, using the phase1 rule. Verified on production 2026-09-25: over `phase1-2026-09-01` it reproduces 718,278 / 294 / 4,877 key for key, and 718,278 of 718,278 coordinates exactly. The legacy `pt:1` rows (read live by the radius RPC) are never touched. | Part D D2/D6/D7/D8 |
+| 9 | the orchestrator publishes `geo.n5_generation_publish_scope` | `unpublished_prefixes` |
+| 10 | the shard persists its verdicts (`geo.n5_generation_key_verdict`) and unresolved accounting classifies them. There is still no catch-all. | Part D D4/D9; `n5_shard.py` `record_key_verdicts` |
+| 11 | set-based reconcile, per-ZIP chunk coverage, and a membership `(generation_id, source_key)` index | Part D D10–D12 |
+
+**Proof.** The fixture was rebuilt from production's shapes. `test/n5_generation_pg/fidelity.sql`
+fingerprints 26 objects, and fixture + Parts A–C equal production on all 78 components.
+- `run_suite.py` applies Part D as production will: **72 PASS / 0 FAIL, 15/15 mutations killed.**
+- New: `run_lifecycle.py` drives the **real** orchestrator, shard and publish code from open to
+  activate: **16/16**.
+- Re-introducing each audit defect (#2, #3, #5, #6, #8, #9, #10) fails it: **7/7 killed.**
+
+**Measured cost.** The publish boundary probe at production volume (753,000 candidates, 30
+ZCTAs) takes about 2 s per prefix locally, because each candidate is checked against the
+prefix's resident-boundary index. Choosing a different point column type does not change the
+plan.
