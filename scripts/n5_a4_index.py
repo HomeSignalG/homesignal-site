@@ -30,8 +30,7 @@ from n5_shard import sql, say  # noqa: E402
 
 MODE = os.environ.get("A4_MODE", "index").strip()
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a4-{int(time.time())}"
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 EST_INDEX_MB = float(os.environ.get("EST_INDEX_MB", "455"))
 PASSES = [int(x) for x in os.environ.get("BENCH_PASSES", "3,4").split(",")]
 
@@ -41,9 +40,8 @@ DDL = (f"create index concurrently if not exists {IDX} "
 
 
 def free_mb():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"]))
+    """Free MiB for LOGGING only; decisions are n5_capacity.require_capacity."""
+    return n5_capacity.assess(sql, "reading")["free"]
 
 
 def build_index():
@@ -60,12 +58,8 @@ def build_index():
         raise SystemExit(f"STOP: an equivalent leading index already exists: {leading}")
     say("equivalent leading source_key index exists", "no")
 
-    f0 = free_mb()
-    say("BEFORE free disk MB", round(f0, 1))
-    say("conservative estimate MB / hard floor MB", f"{EST_INDEX_MB} / {FLOOR_MB}")
-    if f0 - EST_INDEX_MB < FLOOR_MB:
-        raise SystemExit(f"STOP: {f0:.1f} - {EST_INDEX_MB} would fall below the {FLOOR_MB} floor")
-    say("projected free after build MB", round(f0 - EST_INDEX_MB, 1))
+    # The one builder whose own write size is estimated: the index build is gated on it.
+    f0 = n5_capacity.require_capacity(sql, "a4-index build", EST_INDEX_MB)["free"]
 
     say("DDL", DDL)
     t0 = time.time()
@@ -97,8 +91,7 @@ def build_index():
     f1 = free_mb()
     say("AFTER free disk MB", round(f1, 1))
     say("actual cost MB", round(f0 - f1, 1))
-    if f1 < FLOOR_MB:
-        raise SystemExit(f"STOP: free {f1:.1f} MB below the {FLOOR_MB} hard floor")
+    n5_capacity.require_capacity(sql, "a4-index after")
 
     # Does the planner actually choose it? EXPLAIN alone is not the performance claim
     # (that is the bench mode) but a planner that ignores the index is a build that failed

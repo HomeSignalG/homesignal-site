@@ -380,26 +380,29 @@ EXPECT = {
     "cron_md5": "75b49e8c7e274ea10a3c17e979f86e6f",
 }
 
-# 12 GB provisioned. Everything the database itself does not account for was measured
-# at the B1 commit and is held constant here; it is disclosed rather than hidden
-# inside a threshold, because free disk is not readable from SQL on this platform.
-DISK_TOTAL_MB = 12288
-DISK_OTHER_MB = 681
-DISK_STOP_MB = 2048
+# Free disk is not readable from SQL on this platform, so the decision is the ONE capacity
+# gate (scripts/n5_capacity.py): the dated record replaced the 12,288 / 681 MB constants
+# this file carried, and this file compares nothing itself.
+import n5_capacity  # noqa: E402
+
+
+def _sql_ro(query, tag="", read_only=False):
+    """n5_capacity passes read_only=; this file's sql() predates that keyword."""
+    return sql(query, tag)
 
 
 def controls(tag):
+    # THE GATE FIRST: controls() is what every write path calls before it writes.
+    cap = n5_capacity.require_capacity(_sql_ro, f"b3 {tag}")
     row = sql(CONTROLS_SQL, tag)[0]
     bad = [f"{k}: expected {v}, got {row.get(k)}"
            for k, v in EXPECT.items() if str(row.get(k)) != str(v)]
     db_mb = int(row["db_bytes"]) / 1048576.0
     wal_mb = int(row["wal_bytes"]) / 1048576.0
-    free_mb = DISK_TOTAL_MB - (db_mb + wal_mb + DISK_OTHER_MB)
+    free_mb = cap["free"]
     say(f"[{tag}] db / wal / free (MB)", f"{db_mb:,.0f} / {wal_mb:,.0f} / {free_mb:,.0f}")
     if bad:
         raise SystemExit("STOP: control failure\n  " + "\n  ".join(bad))
-    if free_mb < DISK_STOP_MB:
-        raise SystemExit(f"STOP: free disk {free_mb:,.0f} MB below the {DISK_STOP_MB} MB hard stop")
     row["_free_mb"] = free_mb
     row["_db_mb"] = db_mb
     row["_wal_mb"] = wal_mb

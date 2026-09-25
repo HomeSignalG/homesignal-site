@@ -35,8 +35,7 @@ from n5_shard import sql, say, tiger_index  # noqa: E402
 
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"a3m-{int(time.time())}"
 MODE = os.environ.get("MARKER_MODE", "measure").strip()
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 
 # Marker rule parameters. Chosen from the measure pass; see UNIT-A3 evidence doc.
 D_M = float(os.environ.get("MARKER_D_M", "1000"))          # max gap along a line component
@@ -49,9 +48,8 @@ MARK = "geo.zip_authoritative_marker"
 
 
 def disk():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"]))
+    """Free MiB for LOGGING only; decisions are n5_capacity.require_capacity."""
+    return n5_capacity.assess(sql, "reading")["free"]
 
 
 def load_boundaries(pfx):
@@ -330,10 +328,7 @@ def ensure_scratch():
 def main():
     say("UNIT A3 - MARKER GRAIN", MODE)
     say("run id", RUN_ID)
-    free0 = disk()
-    say("BEFORE free disk MB", round(free0, 1))
-    if free0 < FLOOR_MB:
-        raise SystemExit(f"STOP: free {free0:.1f} MB already below the {FLOOR_MB} floor")
+    n5_capacity.require_capacity(sql, f"a3-markers {MODE} start")   # before any write
 
     if MODE == "measure":
         sql(f"""create table if not exists {COMP} (
@@ -389,10 +384,8 @@ def main():
                 .replace("{DTAG}", str(int(D_M))), f"{MODE} {pfx}")
         n = int(sql(f"select count(*) n from {tbl} where left(zcta5,3)={lit(pfx)};", "n")[0]["n"])
         total += n
-        free = disk()
-        say("rows / seconds / free MB", f"{n} / {time.time()-t0:.1f} / {free:.1f}")
-        if free < FLOOR_MB:
-            raise SystemExit(f"STOP: free {free:.1f} MB below the {FLOOR_MB} floor")
+        say("rows / seconds", f"{n} / {time.time()-t0:.1f}")
+        n5_capacity.require_capacity(sql, f"a3-markers after {pfx}")
 
     if MODE == "build":
         # Prove it while the boundaries are still loaded: every marker inside its ZIP.

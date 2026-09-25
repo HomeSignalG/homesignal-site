@@ -33,6 +33,7 @@ from n3_pilot import (  # noqa: E402  - one implementation, imported not re-deri
     paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL, TIGER_SHA256,
     CANON_SRID, UA, STATS,
 )
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
 # EVERY BUILD ARTIFACT BELONGS TO A GENERATION. Shard state keyed on snapshot alone cannot
@@ -42,9 +43,9 @@ SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
 GENERATION = os.environ.get("GENERATION", "").strip()
 Z3_ENV = os.environ.get("Z3", "AUTO").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
-DISK_FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-# Same basis as the N3/N4 receipts so the floor means the same thing across phases.
-DISK_TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+# Capacity is decided in ONE place (scripts/n5_capacity.py): the volume size comes from the
+# committed, dated record, the floor can be raised and never lowered, and this file makes
+# NO comparison of its own - it replaced an 11,607 MB constant the database had outgrown.
 REG_PATH = "supabase/functions/get-address-report/jurisdiction-registry.json"
 
 # Carried-forward gates. These are decisions, not TODOs - see the N5 authorization.
@@ -154,12 +155,17 @@ def load_registry():
     return out
 
 
+def shard_advance_capacity(z3):
+    """The per-shard ADVANCE decision: (ok, reading). A shard that leaves the volume below
+    the floor is HALTED (recorded, not raised); an unknown or invalid capacity raises."""
+    return n5_capacity.capacity_ok(sql, f"n5-shard {z3} advance")
+
+
 def disk_free_mb():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")
-    db = float(r[0]["db"])
-    wal = float(r[0]["wal"])
-    return DISK_TOTAL_MB - (db + wal), db, wal
+    """(free, db, wal) for LOGGING. Validated by n5_capacity (unknown capacity raises);
+    it decides nothing - every decision is n5_capacity.require_capacity/capacity_ok."""
+    r = n5_capacity.assess(sql, "reading")
+    return r["free"], r["db"], r["wal"]
 
 
 # ---------------------------------------------------------------- boundaries
@@ -760,10 +766,9 @@ def run_shard(z3):
     say("working set discarded (boundaries / frozen)", f"{left_z} / {left_f} remaining")
 
     # 7 - DISK
-    free, db, wal = disk_free_mb()
+    disk_ok, cr = shard_advance_capacity(z3)
+    free, db, wal = cr["free"], cr["db"], cr["wal"]
     say("db / WAL MB", f"{db:,.0f} / {wal:,.0f}")
-    say("free MB (floor %.0f)" % DISK_FLOOR_MB, f"{free:,.0f}")
-    disk_ok = free > DISK_FLOOR_MB
     say("disk above floor", "yes" if disk_ok else "NO")
 
     say("shard seconds", round(time.time() - t_shard, 1))
@@ -880,10 +885,10 @@ def main():
         f"{snap['sources']} / {snap['projects']:,} / {snap['pairs']:,}")
     say("baseline rows (repeated triples preserved)",
         f"{snap['n_rows']:,}  = pairs + {int(snap['n_rows']) - int(snap['pairs']):,} repeated source_seq")
-    free0, db0, wal0 = disk_free_mb()
-    say("free MB at start", f"{free0:,.0f}  (floor {DISK_FLOOR_MB:,.0f})")
-    if free0 <= DISK_FLOOR_MB:
-        raise SystemExit("STOP: free disk is at or below the floor before any shard ran")
+    # Before the first shard writes anything. Floor-only: one shard's own peak is not
+    # projected (the per-shard advance check below stops the run after any shard that
+    # leaves the volume below the floor).
+    n5_capacity.require_capacity(sql, "n5-shard start")
 
     todo = parse_shard_list(Z3_ENV, MAX_SHARDS)
     if todo is None:

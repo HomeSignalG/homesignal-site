@@ -36,6 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import sql, lit  # noqa: E402  - one implementation, imported not re-derived
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 GENERATION = os.environ.get("GENERATION", "").strip()
 MODE = os.environ.get("MODE", "status").strip()
@@ -128,6 +129,13 @@ def mode_open():
            f"limit 1;", "snap exists", read_only=True):
         raise SystemExit(f"STOP: snapshot {snapshot_id} already has rows. A capture is "
                          f"immutable; refusing to append to one.")
+
+    # CAPACITY BEFORE ANYTHING IS WRITTEN. The capture is ONE transaction of ~3M rows, so
+    # running out part-way is not a clean halt. n5_capacity.require_generation_fits
+    # validates the capacity reading, projects the generation's peak space component by
+    # component, and REFUSES while any component has no defensible model - an unknown
+    # term in a peak-space sum is not zero, so no national generation is opened on one.
+    n5_capacity.require_generation_fits(sql, "open")
 
     # The cutoff is read ONCE and reused for the capture and the generation row, so the
     # watermark the generation advertises is exactly the instant it captured.

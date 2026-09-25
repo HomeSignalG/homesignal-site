@@ -476,6 +476,21 @@ select
 """
 
 
+def zcta_capacity_gate(wkt_total_bytes):
+    """Refuse the national reload unless it fits above the floor (scripts/n5_capacity.py)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import n5_capacity                                           # noqa: E402
+    from n3_pilot import sql as ro_sql                           # noqa: E402
+    live = ro_sql("select coalesce(pg_total_relation_size(to_regclass('geo.zcta_boundary')),0)"
+                  "/1048576.0 mib;", "zcta size", read_only=True)[0]["mib"]
+    wal = n5_capacity.wal_reserve_mib(ro_sql)
+    if wal is None:
+        raise n5_capacity.CapacityRefused(
+            "zcta reload: WAL retention is unbounded (max_slot_wal_keep_size = -1)")
+    need = max(float(live), wkt_total_bytes / 1048576.0) + wal
+    return n5_capacity.require_capacity(ro_sql, "zcta national reload", need)
+
+
 def run_sql(sql):
     token = os.environ["SUPABASE_ACCESS_TOKEN"]
     req = urllib.request.Request(
@@ -585,6 +600,13 @@ def main():
     print("\n--- pre-write controls (read-only) ---")
     if run_sql(PREFLIGHT_SQL) != 0:
         raise SystemExit("STOP: pre-write controls could not be read")
+
+    # THE CAPACITY GATE, before the first write. A national reload lands a full second copy
+    # of every ZCTA polygon in the LOAD table beside the live one until the swap, plus the
+    # WAL that carries it. Need = the larger of the live table's measured size (the same
+    # archive) and this payload's measured WKT bytes, plus WAL room up to its limits; an
+    # unbounded WAL setting refuses, because it cannot be projected.
+    zcta_capacity_gate(wkt_total)
 
     print("\n--- prepare the LOAD table (the live table is untouched) ---")
     if run_sql(build_prepare_sql(srid)) != 0:

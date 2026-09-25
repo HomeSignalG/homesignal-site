@@ -41,6 +41,7 @@ from n3_pilot import lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SR
 from n5_shard import (  # noqa: E402  - one implementation, imported not re-derived
     sql, say, one, tiger_index, SNAPSHOT,
 )
+import n5_capacity  # noqa: E402  - the one capacity decision
 
 SCRATCH = "geo.n5_verify_zcta"
 
@@ -185,6 +186,14 @@ def main():
     shards = done_shards()
     say("done shards", ",".join(shards))
 
+    # THE CAPACITY GATE, before the scratch table is created. Despite its read-only
+    # purpose this run loads ZCTA polygons for EVERY done shard into one scratch table and
+    # drops it only at the end - up to a national polygon set. Need = the live
+    # geo.zcta_boundary (the same TIGER archive, measured); rechecked after every shard.
+    zcta = sql("select coalesce(pg_total_relation_size(to_regclass('geo.zcta_boundary')),0)"
+               "/1048576.0 mib;", "zcta size", read_only=True)[0]["mib"]
+    n5_capacity.require_capacity(sql, "n5-verify scratch", float(zcta))
+
     sql(f"""create table {SCRATCH} (
               z3 char(3) not null, zcta5 char(5) not null,
               geom geometry(MultiPolygon,{CANON_SRID}) not null,
@@ -202,6 +211,7 @@ def main():
         for z3 in shards:
             zips = zips_for(z3)
             loaded, no_zcta = load_scratch(z3, zips)
+            n5_capacity.require_capacity(sql, f"n5-verify after {z3}")
             c = compare(z3)
             for k in tot:
                 tot[k] += int(c[k] or 0)

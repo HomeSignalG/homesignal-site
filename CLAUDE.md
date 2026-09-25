@@ -2270,6 +2270,45 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.13 BULK DATABASE WRITES PASS ONE CAPACITY GATE, AND "UNKNOWN" MEANS STOP (2026-09-24)
+
+**`scripts/n5_capacity.py` is the only place that decides whether a bulk geography write may
+run.** Every N5 builder and both Phase 2 loaders call `require_capacity` (or, for n5_shard's
+per-shard advance, `capacity_ok`) before their first write and after each unit of work. No
+builder compares a number itself. It replaced `DISK_TOTAL_MB = 11607` (copied into seven
+builders), 12,288 MB in `phase2_b3_geometry.py`, and 11607 inlined into SQL.
+
+- ⚠️ **The constant was wrong, not conservative:** database **11,292 MB + WAL 1,024 MB**
+  against an "11,607 MB total" (2026-09-24), so builders computed negative free space. The
+  founder reported the volume **69% used, CPU ~100%**, and held the N5 build.
+- **The record** (`data/db-capacity.json`) is the **provisioned** volume from Compute and Disk:
+  not database size, free, used, a percentage, the Storage quota or an estimate. Closed schema;
+  every quantity is `{"value", "unit"}` with unit `MiB | GiB | MB | GB` (MB/GB **decimal**),
+  normalised to MiB. `NaN`/`Infinity` are rejected at parse, non-finite values again after.
+  `observed_at` is an ISO-8601 time with a timezone.
+- **Freshness: 24 h.** Unsafe drift (non-database usage, a dashboard change) is invisible to
+  Postgres, so age is the only defence; a multi-day national build therefore needs a daily
+  refresh, and a stale tick **stops**.
+- **Plausibility:** the volume must exceed measured use (else stale) and be ≤ 100× it (a unit
+  mistake is ≥ ~954×). **The floor:** 2,048 MB, raisable via `DISK_FLOOR_MB`, never lowered.
+- **Trust:** honoured only in a GitHub Actions run on `refs/heads/main`, with the checked-out
+  commit equal to `GITHUB_SHA` and the file byte-identical to HEAD's copy. **`DISK_TOTAL_MB`
+  is retired and is itself a refusal.**
+- **`open` cannot pass today, by design.** Its peak projection names each component; two are
+  **UNMODELED** — `n5_geom` growth (new keys unknown until capture) and temp files
+  (`temp_file_limit = -1` on this instance) — and an unknown term refuses. Modeled: capture,
+  generation tables, one dead copy, WAL to its limits, rollback (already additional), and the
+  floor as working headroom.
+- ⛔ **RESIDUAL, NOT CLOSABLE IN CODE:** a workflow dispatched from a branch runs *that
+  branch's* scripts and workflow file. Any branch cut before this gate still carries the old,
+  ungated builders. Closing it means restricting `SUPABASE_ACCESS_TOKEN` to `main` (a GitHub
+  Environment with a deployment-branch rule) — a repository setting, not a PR.
+- 📌 **Ships UNRECORDED** (`provisioned_disk.value: null`): every gated builder refuses today.
+- Pinned by `test/n5-capacity.test.mjs` + `test/n5_capacity/harness.py`: every builder's REAL
+  entry point runs against a fake database under 12 capacity scenarios and must refuse with
+  **zero writes and zero network**, while the ample scenario must pass the gate. 32 of 32
+  mutations killed on exit code.
+
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
 **Map 1 has TWO INDEPENDENT DATA PLANES.** The **core project plane** (project records, ZIP

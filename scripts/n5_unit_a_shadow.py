@@ -38,8 +38,7 @@ from n3_pilot import lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SR
 from n5_shard import sql, say, one, tiger_index  # noqa: E402
 
 RUN_ID = os.environ.get("RUN_ID", "").strip() or f"unitA-{int(time.time())}"
-FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
-TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
+import n5_capacity  # noqa: E402  - the ONE capacity decision; this file compares nothing
 SCRATCH = "geo.n5_unit_a_zcta"
 MEMB = "geo.zip_authoritative_membership"
 STATUS = "geo.maps_zip_geography_status"
@@ -47,9 +46,9 @@ FAULT_TEST = os.environ.get("FAULT_TEST", "1").strip() == "1"
 
 
 def disk():
-    r = sql("select (pg_database_size(current_database())/1048576.0) db, "
-            "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")[0]
-    return TOTAL_MB - (float(r["db"]) + float(r["wal"])), float(r["db"]), float(r["wal"])
+    """(free, db, wal) for LOGGING only; decisions are n5_capacity.require_capacity."""
+    r = n5_capacity.assess(sql, "reading")
+    return r["free"], r["db"], r["wal"]
 
 
 def ddl():
@@ -268,10 +267,7 @@ def main():
     prefixes = select_prefixes()
     say("UNIT A - AUTHORITATIVE SHADOW READ PRODUCT", "")
     say("run id / completed prefixes", f"{RUN_ID} / {','.join(prefixes)}")
-    free0, db0, wal0 = disk()
-    say("BEFORE free disk MB / db MB / wal MB", f"{free0:.1f} / {db0:.1f} / {wal0:.1f}")
-    if free0 < FLOOR_MB:
-        raise SystemExit(f"STOP: free {free0:.1f} MB already below the {FLOOR_MB} floor")
+    n5_capacity.require_capacity(sql, "unit-a start")   # before ddl() or any prefix write
 
     ddl()
     sql(f"""create table if not exists {SCRATCH} (
@@ -292,10 +288,8 @@ def main():
         tot_memb += m
         tot_status += s
         tot_nopoint += np_
-        free, _, _ = disk()
-        say("prefix seconds / free disk MB", f"{time.time()-t0:.1f} / {free:.1f}")
-        if free < FLOOR_MB:
-            raise SystemExit(f"STOP: free {free:.1f} MB below the {FLOOR_MB} floor")
+        say("prefix seconds", f"{time.time()-t0:.1f}")
+        n5_capacity.require_capacity(sql, f"unit-a after {pfx}")
 
     sql(f"drop table if exists {SCRATCH};", "drop scratch")
     say("", "")
