@@ -1,0 +1,53 @@
+name: dc-atlas-phase-a-counterfactual
+
+# AFTER Phase A (#1335) is applied: on the data production holds NOW, does the Phase A code decide
+# anything differently from the pre-#1335 code? Production is only READ. Two disposable replicas
+# of production's own database image receive one copy of production's tables; one runs the DDL of
+# record at main@f9d1326 (before #1335), the other this checkout's; each runs its own resolvers; the
+# outcomes are compared row for row. See scripts/dc-atlas-phase-a-counterfactual.sh.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/dc-atlas-phase-a-counterfactual.sh'
+      - '.github/workflows/dc-atlas-phase-a-counterfactual.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-phase-a-counterfactual
+  cancel-in-progress: false
+
+jobs:
+  counterfactual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Counterfactual on production's current data (production is only read)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-atlas-phase-a-counterfactual.sh
