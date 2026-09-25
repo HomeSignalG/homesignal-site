@@ -2127,6 +2127,38 @@ never a rank.
   `test/dc_atlas_validation_pg/replica_offline.sh` (fakeprod byte-identical; parity negative control
   executed).
 
+### ✅ PHASE A IS LIVE (applied 2026-09-25 14:49:47Z). ATLAS IS STILL NOT ADMITTED.
+Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
+- **Applied by `dc-atlas-phase-a-apply.yml`** (run `36149909384`, merged in #1339). The committed
+  artifact ran byte for byte through psql `\i`, sha256 `891bb210…`.
+  - `lock_timeout 5s` was asserted inside the applying session, on one backend pid, before and after.
+  - Runtime 2.4 s, with 0 blocked sessions. Definition parity: 30/30 objects equal to the DDL of record.
+  - That path is the fix for #1324's apply, which had no lock timeout. Its offline proof shows a held
+    lock failing the apply in 5.05 s with 0 objects committed.
+- **Acquired, not admitted:**
+  - The Atlas queue drained in 2 batches (400 + 389).
+  - `dc_address_geocode` went 56 → 845, with 0 duplicates.
+  - 650 Atlas derivations were accepted. **0 reach geography evidence.**
+- **Zero effect, proven on production's own data rather than by a before/after diff:**
+  `dc-atlas-phase-a-counterfactual.yml` (PR #1341) loads one read-only copy into an OLD (f9d1326)
+  replica and a NEW replica. Resolver inputs, Map 1, geography decisions and identity were all
+  identical: 0 of 1,835 Map 1 rows and 0 of 4,105 geography decisions differ.
+- ⚠️ **WHY A COUNTERFACTUAL AND NOT A DIFF: the data moves under any deployment.** The Compute Atlas
+  acquisition (cron `40 9`) and the Epoch acquisition (cron `10 10`) ran at **14:44Z and 15:10Z**,
+  about 5 hours late, as they do daily. "Nothing acquires before tomorrow" was said in this session
+  and was wrong. **Read `dc_acquisition_run` before assuming a quiet window.**
+- 🔴 **PRE-EXISTING, NAMED, NOT FIXED: Map 1 LOSES ITS CANONICAL LAYER EVERY DAY between an Atlas
+  acquisition and the next :25 identity run.**
+  - A new acquisition makes every Atlas current observation unlinked (measured 2,216 / 2,216).
+  - Measured 14:52Z: 969 → 1 canonical rows; 1,814 → 1,084 rows; 758 → 365 ZIP pages.
+  - It restored at 15:35Z. It is independent of this change (Map 1's dependency closure contains none of
+    Phase A's objects). It is an ordering defect between acquisition and resolution, and needs its own
+    fix.
+- ⛔ **Admission still needs a POST-Phase-A national dry run.** `dc-atlas-dryrun.yml` refuses by design
+  now that production carries Phase A. The counterfactual script is its natural base: add the Phase D
+  switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
+  records.
+
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 
 Two defects in the canonical DC geography layer (`docs/dc-step3b-canonical-geography.sql`,
