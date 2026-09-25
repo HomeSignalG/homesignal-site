@@ -1,0 +1,94 @@
+name: n5-generation-publish-suite
+
+# EXECUTABLE PostgreSQL + PostGIS proof for docs/n5-generation-publish.sql — the checked,
+# generation-scoped path onto Map 1. It runs the SHIPPED migration, verbatim, against a
+# production pre-state (test/n5_generation_pg/fixture_prestate.sql: the live definitions read
+# back 2026-09-25) and proves the 17 required behaviours plus the write guard, anon access and
+# view options. Then it breaks each critical invariant on purpose and requires the suite to go
+# red — a mutation that survives fails this job.
+#
+# The target is a THROWAWAY service container created for this job and destroyed with it.
+# It holds no credentials, can reach no Supabase project, and nothing here touches production.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/n5-generation-publish.sql'
+      - 'test/n5_generation_pg/**'
+      - 'test/n5-generation-publish.test.mjs'
+      - 'scripts/n5_orchestrate.py'
+      - 'scripts/n5_publish.py'
+      - 'scripts/n5_candidate_bounding.py'
+      - '.github/workflows/n5-generation-publish-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Production runs PostgreSQL 17 (measured 2026-09-03); 16 is kept so the suite is not
+    # proven on one major only.
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgis/postgis:16-3.4
+          - postgis/postgis:17-3.5
+    name: publish-suite (${{ matrix.image }})
+    services:
+      postgres:
+        image: ${{ matrix.image }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: n5_publish_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: a Supabase credential is visible to this job."
+            exit 1
+          fi
+
+      - name: Install the driver (CI-only; the repo stays dependency-free)
+        run: pip install --quiet psycopg2-binary
+
+      - name: Run the executable publication suite (base + mutations)
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_suite.py 2>&1 | tee /tmp/n5-publish-suite.log
+
+      - name: Run the STATIC wiring guards (same commit, no database)
+        if: always()
+        run: node test/n5-generation-publish.test.mjs
+
+      - name: Publish the receipt
+        if: always()
+        run: |
+          {
+            echo '## N5 generation publication — executable receipt'
+            echo '```'
+            grep -E '^(BASE|KILLED|SURVIVED|FAIL)' /tmp/n5-publish-suite.log || echo '(no log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

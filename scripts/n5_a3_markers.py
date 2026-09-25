@@ -327,7 +327,17 @@ def ensure_scratch():
             alter table {SCRATCH} enable row level security;""", "scratch")
 
 
+RETIRED = (
+    "STOP: RETIRED 2026-09-25. This script rewrote the SERVING geography in place, prefix by\n"
+    "prefix, with no generation. The canonical path is the N5 generation lifecycle:\n"
+    "n5-generation.yml -> scripts/n5_orchestrate.py (work/publish/ready/activate) ->\n"
+    "geo.n5_gen_publish_prefix (docs/n5-generation-publish.sql). The database also refuses\n"
+    "these writes (geo.n5_generation_row_guard), so this refusal only says why sooner.")
+
+
 def main():
+    if MODE != "bench":  # bench is read-only; every other mode wrote serving-plane rows
+        raise SystemExit(RETIRED)
     say("UNIT A3 - MARKER GRAIN", MODE)
     say("run id", RUN_ID)
     free0 = disk()
