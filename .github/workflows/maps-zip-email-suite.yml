@@ -1,0 +1,75 @@
+name: maps-zip-email-suite
+
+# The "What is changing in my zip code?" email stream (A12) against a DISPOSABLE Postgres.
+#
+# WHY postgres:17 AND NOT THE POSTGIS IMAGE THE OTHER SUITES USE: A12 changes a generated
+# column with ALTER COLUMN ... SET EXPRESSION, which exists only from PostgreSQL 17, and
+# production is 17.6. On 16 the harness has to shim that one statement; here it runs the
+# shipped file unmodified, so CI proves the statement production will actually execute.
+#
+# The delivery half (homesignal-ingest supabase/migrations/20260925230000_maps_email_delivery.sql)
+# is applied when it is on that repo's main; until then its checks print SKIP, which the
+# runner never counts as a pass.
+on:
+  pull_request:
+    paths:
+      - 'docs/alert-subscription-canonical-a12.sql'
+      - 'test/maps_zip_email_pg/**'
+      - '.github/workflows/maps-zip-email-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/alert-subscription-canonical-a12.sql'
+      - 'test/maps_zip_email_pg/**'
+      - '.github/workflows/maps-zip-email-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maps_zip_email_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      # Public repo; read-only. Supplies the delivery migration once it is on main.
+      - uses: actions/checkout@v4
+        with:
+          repository: HomeSignalG/homesignal-ingest
+          path: homesignal-ingest
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped migrations pass (applied twice); every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: maps_zip_email_disposable
+          INGEST_ROOT: ${{ github.workspace }}/homesignal-ingest
+        run: |
+          set -o pipefail
+          bash test/maps_zip_email_pg/run.sh 2>&1 | grep -v NOTICE

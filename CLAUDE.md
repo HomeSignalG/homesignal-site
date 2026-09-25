@@ -1184,6 +1184,35 @@ selections**, per-stream before→after otherwise identical, fingerprint
 - **Per-place unsubscribe is preserved** (contract G): `users` is keyed
   `(email, community_id)`, so one place stopping never stops another.
 
+### A12 — A SIXTH STREAM, `maps`: "What is changing in my zip code?" ⚖️ FOUNDER (2026-09-25) — ⏳ NOT YET APPLIED
+
+A button on Map 1 (`homesignalmap.html`, ZIP mode) signs a resident up for **email copies of
+the Bluesky MAPS posts about that ZIP**. Approved plan: *"Add MAPS as a new type in the
+existing subscription system rather than building a separate signup."* So it is a stream in
+the one store, written by the one additive writer — `docs/alert-subscription-canonical-a12.sql`.
+Until that file is applied the button's RPC is refused by the old stream CHECK; **apply A12
+(and the ingest delivery migration) before merging the Map 1 change**, then re-read
+`CURRENT-STATE.sql` back from production.
+
+- 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
+  other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
+  post is about exactly one ZIP (`social_posts.zip`), so a root anchor could never be matched to a
+  post. The database refuses it (`user_subscriptions_maps_zip_scoped`), and the integrity view
+  reports that guard (`maps_zip_scope_trigger` MUST be 1). Filing per ZIP also means one email
+  can follow several ZIPs in one county — each is its own identity, its own unsubscribe.
+- **Alert consent only.** `enable_area_email_alerts` gained `p_marketing_consent` (default
+  `true` = every existing caller unchanged); Map 1 passes `false` (contract F). A false tap
+  never REVOKES marketing consent given elsewhere. It also records the first-touch referral.
+- **Nothing is written on the county identity** — no follow floor, no reconcile-to-exact
+  `signup_complete`. The ZIP is saved to My Places by `persistCommunityFollow`, which is also
+  what keeps a brand-new resident out of the non-dismissible onboarding overlay.
+- The sign-in resumes the sign-up after the 6-digit code (`HS.requireAuth(label, afterAuth)`);
+  every other open of the sign-in clears the pending action, so it can never fire on a later,
+  unrelated sign-in.
+- Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
+  (the SQL against a disposable Postgres 17, every prohibited mutation killed) via
+  `maps-zip-email-suite.yml`.
+
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
 A1 seeded `alert_topic_catalog` from `digest.py::CANONICAL_TOPICS` alone; A3 then added the
