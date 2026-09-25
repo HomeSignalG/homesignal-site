@@ -31,8 +31,14 @@
 #    (this checkout's DDL, Atlas unadmitted) — asserted to be DIFFERENT code in step 1a — start from that state,
 #    fingerprinted identical; each runs its OWN identity then geography resolver; identity,
 #    geography and Map 1 over every registry ZIP are compared row for row.
-# 3. POSITIVE CONTROLS on disposable clones, through the SAME comparator (scripts/dc_phase_a_proof.py):
-#    each must produce its exact expected nonzero result, or the run fails.
+# 3. POSITIVE CONTROLS on disposable clones, each with an exact expected result, or the run fails:
+#    Map 1 move, equal-totals swap, identity (entity; link + decision), geography, and admission END TO
+#    END (the NEW resolvers re-run with Atlas admitted) all go through the SAME comparator
+#    (scripts/dc_phase_a_proof.py); the admission and evidence-leak GATE controls must show Atlas
+#    evidence rows > 0 with Epoch's count unchanged; the parity control must be refused.
+# 4. Phase A also changed ACQUISITION: its Atlas queue derived geocodes that did not exist before, and a
+#    derivation is keyed by address text alone. Step 4 proves no admitted observation consumes one, and
+#    step 6b replays OLD in the true pre-#1335 world (without them) and must equal the replay.
 set -euo pipefail
 : "${PROD_DB_URL:?}" "${PGHOST:?}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -352,6 +358,19 @@ done
 CO="$(tail -n +2 "$w/cand_rep_old.csv" | LC_ALL=C sort | md5sum | cut -c1-32)"; CN="$(tail -n +2 "$w/cand_rep_new.csv" | LC_ALL=C sort | md5sum | cut -c1-32)"
 echo "  IDENTITY_CANDIDATES OLD $(($(wc -l < "$w/cand_rep_old.csv") - 1)) $CO | NEW $(($(wc -l < "$w/cand_rep_new.csv") - 1)) $CN"
 [ "$CO" = "$CN" ] && [ "$(wc -l < "$w/cand_rep_old.csv")" -gt 1 ] || fail "identity candidates differ (or are empty)"
+# A derivation is keyed by address text, not by source: one queued for Atlas by Phase A would be read by
+# any ADMITTED observation stating the same line, and in the pre-#1335 world it would not yet exist.
+IFS='|' read -r PN_ADM PN_ADM_ANY PN_UNADM < <(L -d rep_new -tA -F'|' -c "select
+  count(*) filter (where admitted and derivation_id is not null and derived_at >= '$S'),
+  count(*) filter (where admitted and derivation_id is not null),
+  count(*) filter (where not admitted and derivation_id is not null and derived_at >= '$S') from public.dc_observation_derived_point")
+IFS='|' read -r PO_CONS PO_ANY < <(L -d rep_old -tA -F'|' -c "select
+  count(*) filter (where derivation_id is not null and derived_at >= '$S'),
+  count(*) filter (where derivation_id is not null) from public.dc_observation_derived_point")
+echo "  PHASE_A_ONLY_DERIVATIONS read by an admitted observation: NEW $PN_ADM (controls: admitted consumers $PN_ADM_ANY, unadmitted consumers of them $PN_UNADM) | OLD $PO_CONS (control: consumers $PO_ANY)"
+[ "$PN_ADM" = 0 ] && [ "$PO_CONS" = 0 ] && [ "$PN_ADM_ANY" -gt 0 ] && [ "$PN_UNADM" -gt 0 ] && [ "$PO_ANY" -gt 0 ] \
+  || fail "an admitted observation consumes a derivation only Phase A's queue produced (or a control is zero)"
+clone rep_old rep_old_start; clone rep_new rep_new_start
 
 echo "== 5. IDENTITY: each replica runs its own dc_resolve_canonical from the common state"
 for db in rep_old rep_new; do
@@ -377,6 +396,17 @@ $CMP compare "$w/f_old" "$w/f_new" "$w/start_ids.csv" entities,links,decisions,g
 echo "  FINAL $(cat "$w/final.json")"
 gate rep_new "$w/gate_real.txt" | sed 's/^/  NEW /' || fail "admission/evidence gate on the NEW replica"
 sed 's/^/  NEW /' "$w/gate_real.txt"
+
+echo "== 6b. TRUE PRE-#1335 WORLD: OLD without the geocodes only Phase A's Atlas queue derived must equal the replay"
+REMOVED="$(L -d rep_old_start -tA -c "set session_replication_role = replica" -c "with d as (delete from public.dc_address_geocode where derived_at >= '$S' returning 1) select count(*) from d")"
+KEPT="$(L -d rep_old_start -tA -c "select count(*) from public.dc_address_geocode")"
+echo "  geocodes removed (derived after the snapshot, all by Phase A's queue) $REMOVED | kept $KEPT"
+[ "$REMOVED" -gt 0 ] && [ "$KEPT" -gt 0 ] || fail "6b control: nothing removed or nothing kept"
+L -d rep_old_start -tA -c "select metric, value from public.dc_resolve_canonical(true, false)" >/dev/null
+L -d rep_old_start -tA -c "select metric, value from public.dc_resolve_geography(true)" >/dev/null
+dump rep_old_start "$w/f_oldw" decisions,geo,map1; dropdb rep_old_start
+$CMP compare "$w/f_old" "$w/f_oldw" "$w/start_ids.csv" entities,links,decisions,geo,map1 zero > "$w/oldw.json" || fail "the true pre-#1335 world decides differently from the replay"
+echo "  TRUE_OLD_WORLD_VS_REPLAY $(cat "$w/oldw.json")"
 
 echo "== 7. REPLAY vs PRODUCTION: the NEW replay reproduces what production actually decided at 15:25/15:35"
 prod_copy "$Q_DEC" "$w/prod/decisions.csv"; prod_copy "$Q_GEO" "$w/prod/geo.csv"
@@ -433,6 +463,23 @@ dump c_id "$w/c_id" decisions; dropdb c_id
 if $CMP compare "$w/id_old" "$w/c_id" "$w/start_ids.csv" entities,links,decisions control '{"entities.row_diff": 2, "links.row_diff": 0, "decisions.row_diff": 0, "identity_row_diff": 2}' > "$w/c_IDENTITY.txt"; then r=true; else r=false; fi
 echo '  IDENTITY: expected {"entities.row_diff": 2, "links.row_diff": 0, "decisions.row_diff": 0, "identity_row_diff": 2}'
 echo "  IDENTITY: observed $(head -1 "$w/c_IDENTITY.txt")"; echo "  IDENTITY: DETECTED=$r"; [ "$r" = true ] || fail "control IDENTITY not detected"
+# a uuid-valued field (one link repointed between two starting entities) and one decision state
+clone rep_new_postid c_ld
+L -d c_ld <<SQL >/dev/null
+set session_replication_role = replica;
+create temp table st as select a::uuid e from public._snap_ident where k = 'entity';
+create temp table src as select eo.canonical_entity_id e from public.dc_entity_observation eo join st on st.e = eo.canonical_entity_id
+  group by 1 having count(*) >= 2 order by 1 limit 1;
+create temp table tgt as select e from st where e <> (select e from src) and exists (select 1 from public.dc_canonical_entity c where c.canonical_entity_id = st.e) order by 1 limit 1;
+update public.dc_entity_observation set canonical_entity_id = (select e from tgt)
+ where home_signal_observation_id = (select max(home_signal_observation_id::text)::uuid from public.dc_entity_observation where canonical_entity_id = (select e from src));
+update public.dc_identity_decision set decision_state = case when decision_state = 'UNRESOLVED' then 'POSSIBLE_MATCH' else 'UNRESOLVED' end
+ where decision_id = (select decision_id from public.dc_identity_decision order by observation_a, observation_b, candidate_rule_key limit 1);
+SQL
+dump c_ld "$w/c_ld" decisions; dropdb c_ld
+if $CMP compare "$w/id_old" "$w/c_ld" "$w/start_ids.csv" entities,links,decisions control '{"entities.row_diff": 0, "links.row_diff": 2, "decisions.row_diff": 2, "identity_row_diff": 4}' > "$w/c_LD.txt"; then r=true; else r=false; fi
+echo '  LINK_AND_DECISION: expected {"entities.row_diff": 0, "links.row_diff": 2, "decisions.row_diff": 2, "identity_row_diff": 4}'
+echo "  LINK_AND_DECISION: observed $(head -1 "$w/c_LD.txt")"; echo "  LINK_AND_DECISION: DETECTED=$r"; [ "$r" = true ] || fail "control LINK_AND_DECISION not detected"
 clone rep_new c_geo
 L -d c_geo -c "update public.dc_entity_geography set quality_flags = array_append(quality_flags, 'PROOF_CONTROL') where canonical_entity_id = (select min(canonical_entity_id::text)::uuid from public.dc_entity_geography)" >/dev/null
 dump c_geo "$w/c_geo" geo; dropdb c_geo
@@ -445,10 +492,32 @@ old = "in (('epoch_ai', 'data_centers'))"
 assert m and m.group(0).count(old) == 1, 'admission body shape changed'
 print(m.group(0).replace(old, "in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'))"))
 PY
+EPOCH_REAL="$(grep '^EPOCH_EVIDENCE_ROWS|' "$w/gate_real.txt" | cut -d'|' -f2)"
+gate_control() { # $1 name, $2 db, $3 expected ATLAS_ADMITTED: the gate must FAIL for exactly the expected reason
+  local r=false
+  if L -d "$2" -tA -F'|' -c "$GATE_SQL" > "$w/gate_$1.txt"; then
+    if ! $CMP gate "$w/gate_$1.txt" > "$w/c_$1.txt"; then
+      python3 - "$w/gate_$1.txt" "$3" "$EPOCH_REAL" <<'PY' && r=true
+import sys
+kv = dict(l.strip().split('|', 1) for l in open(sys.argv[1]) if '|' in l)
+ok = kv.get('ATLAS_ADMITTED') == sys.argv[2] and int(kv.get('ATLAS_EVIDENCE_ROWS', '0')) > 0 and kv.get('EPOCH_EVIDENCE_ROWS') == sys.argv[3]
+sys.exit(0 if ok else 1)
+PY
+    fi
+  fi
+  echo "  $1: expected ATLAS_ADMITTED=$3, ATLAS_EVIDENCE_ROWS>0, EPOCH_EVIDENCE_ROWS=$EPOCH_REAL, gate FAIL"
+  echo "  $1: observed $(tr '\n' ' ' < "$w/gate_$1.txt")-> $(cat "$w/c_$1.txt" 2>/dev/null) DETECTED=$r"
+  [ "$r" = true ] || fail "control $1 not detected"
+}
 clone rep_new c_admit; L -d c_admit -f "$w/admit.sql" >/dev/null
-if gate c_admit "$w/gate_admit.txt" > "$w/c_ADMISSION.txt"; then r=false; else r=true; fi
+gate_control ADMISSION c_admit t
 dropdb c_admit
-echo "  ADMISSION: $(tr '\n' ' ' < "$w/gate_admit.txt")-> $(cat "$w/c_ADMISSION.txt") DETECTED=$r"; [ "$r" = true ] || fail "control ADMISSION not detected"
+# END TO END: the NEW resolvers themselves, with Atlas admitted, must produce a difference the comparator sees
+clone rep_new_start c_e2e; L -d c_e2e -f "$w/admit.sql" >/dev/null
+L -d c_e2e -tA -c "select metric, value from public.dc_resolve_canonical(true, false)" >/dev/null
+L -d c_e2e -tA -c "select metric, value from public.dc_resolve_geography(true)" >/dev/null
+dump c_e2e "$w/c_e2e" decisions,geo,map1; dropdb c_e2e
+control ADMISSION_END_TO_END "$w/c_e2e" entities,links,decisions,geo,map1 '{}'
 clone rep_new c_leak
 VD="$(L -d c_leak -tA -c "select pg_get_viewdef('public.dc_entity_geography_evidence'::regclass)")"
 python3 - "$VD" > "$w/leak.sql" <<'PY'
@@ -459,10 +528,8 @@ assert n == 1, f'expected the admission predicate exactly once, found {n}'
 print('create or replace view public.dc_entity_geography_evidence as ' + v.replace(' AND dp.admitted', '').rstrip().rstrip(';') + ';')
 PY
 L -d c_leak -f "$w/leak.sql" >/dev/null
-if gate c_leak "$w/gate_leak.txt" > "$w/c_LEAK.txt"; then r=false; else r=true; fi
-grep -q '^ATLAS_ADMITTED|f' "$w/gate_leak.txt" || r=false   # the leak control must leak WITHOUT admission
+gate_control EVIDENCE_LEAK c_leak f   # must leak WITHOUT admission
 dropdb c_leak
-echo "  EVIDENCE_LEAK: $(tr '\n' ' ' < "$w/gate_leak.txt")-> $(cat "$w/c_LEAK.txt") DETECTED=$r"; [ "$r" = true ] || fail "control EVIDENCE_LEAK not detected"
 echo "  PARITY_NEGATIVE_CONTROL: DETECTED=$PARITY_NEG"
 
 echo "== 9. result"
