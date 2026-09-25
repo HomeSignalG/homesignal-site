@@ -63,10 +63,10 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
   // legitimately names stored statuses and is out of scope here).
   const CPR = read('lib/community-page.js');
   const helper = code(CPR.slice(CPR.indexOf('HS.facTypeBadge = function'), CPR.indexOf('HS.onReady(')));
-  const cardSrc = code(CPR.slice(CPR.indexOf('facilities.slice(0,6).map(function(f){'), CPR.indexOf("}).join('')", CPR.indexOf('facilities.slice(0,6).map(function(f){'))));
-  ok(/HS\.canonicalLifecycle\(f\)/.test(helper) && cardSrc.length > 100,
-    '5e positive control: the facility helper and card regions are found, and the helper asks HS.canonicalLifecycle');
-  ok(!/Lifecycle unknown|Operating/.test(helper + cardSrc), '5f the facility card and its helper carry no copy of a lifecycle label');
+  // The ZIP facility card is retired (founder hierarchy, 2026-09-25); the helper is what remains.
+  ok(/HS\.canonicalLifecycle\(f\)/.test(helper) && helper.length > 100,
+    '5e positive control: the facility helper region is found, and it asks HS.canonicalLifecycle');
+  ok(!/Lifecycle unknown|Operating/.test(helper), '5f the facility helper carries no copy of a lifecycle label');
 }
 
 // ── §6 Map 1 list bands derive from lifecycle ──────────────────────────────────────────
@@ -106,15 +106,15 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
   H.esc = (s) => String(s == null ? '' : s);
   H.onReady = () => {};
   new Function('HS', RT)(H);
-  const START = 'facilities.slice(0,6).map(function(f){';
-  const i0 = RT.indexOf(START), i1 = RT.indexOf("}).join('')", i0);
-  const card = new Function('HS', 'f', RT.slice(i0 + START.length, i1));
-  const html = card(H, { name: 'PLOTTS ENERGY', type: 'energy', status: 'On file',
-    facility_env: { epa: { permit_status: 'Terminated' } } });
-  ok(/<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="infrastructure"[^>]*>Roads &amp; infrastructure<\/span>|<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="infrastructure"[^>]*>Roads & infrastructure<\/span>/.test(html),
-    '7a Plotts Energy card: "Lifecycle unknown" beside its Type badge', html.slice(0, 260));
-  ok(!/Operating|Closed|Terminated/.test(html.slice(0, html.indexOf('</span></span>') + 14)),
-    '7b the lifecycle slot shows no Operating, no Closed and no raw permit status');
+  // No ZIP facility card since 2026-09-25 (What's Changing carries no regulatory-inventory
+  // section); the shared helpers are exercised directly.
+  const f = { name: 'PLOTTS ENERGY', type: 'energy', status: 'On file',
+    facility_env: { epa: { permit_status: 'Terminated' } } };
+  const html = H.facLifecycleLabel(f) + H.facTypeBadge(f);
+  ok(/^Lifecycle unknown<span class="devtype" data-type-key="infrastructure"[^>]*>Roads (&amp;|&) infrastructure<\/span>$/.test(html),
+    '7a Plotts Energy: "Lifecycle unknown" beside its Type badge', html.slice(0, 260));
+  ok(!/Operating|Closed|Terminated/.test(html),
+    '7b the lifecycle word is no Operating, no Closed and no raw permit status');
   const DEV = read('development.html');
   ok(!/<span class="status active">Operating<\/span>/.test(DEV) && /HS\.canonicalLifecycle\(f\)/.test(DEV)
      && /lib\/project-type\.js\?v=/.test(DEV),

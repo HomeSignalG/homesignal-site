@@ -127,27 +127,23 @@ HS.onReady = () => {};
 // The card's lifecycle word is the stored status in the shared vocabulary (HS.facLifecycleLabel →
 // HS.canonicalLifecycle, lib/project-type.js — already loaded above), never a literal.
 new Function('HS', RT)(HS);
-const START = 'facilities.slice(0,6).map(function(f){';
-const i0 = RT.indexOf(START), i1 = RT.indexOf("}).join('')", i0);
-ok(i0 > 0 && i1 > i0, '5a the Regulated facilities card template is found');
-const card = new Function('HS', 'f', RT.slice(i0 + START.length, i1));
-const PRE = "return '<div class=\"card mini\" style=\"border-left-color:#3f7fb0;margin-bottom:10px\">'\n"
-  + "            + '<span class=\"lens\">' + HS.esc(HS.facLifecycleLabel(f)) + (f.dist? ' · ' + HS.esc(f.dist):'') + '</span><h3>' + HS.esc(f.name) + '</h3>'\n"
-  + "            + '<p class=\"sowhat\">' + HS.esc(f.type||'Regulated facility') + (f.developer? ' · ' + HS.esc(f.developer):'') + '</p>'\n"
-  + "            + (f.source_ref? '<a href=\"' + HS.esc(f.source_ref) + '\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12.5px;font-weight:600\">View public record →</a>':'') + '</div>';";
-const pre = new Function('HS', 'f', PRE);
+// The ZIP page no longer renders a facility card (founder hierarchy, 2026-09-25: What's Changing
+// carries no standalone "Regulated facilities nearby" section — registry presence is regulatory
+// inventory, not a change event). The byte-identity-with-the-pre-badge-card check is therefore
+// retired with the card; the Type/lifecycle identity is pinned on the shared helpers directly.
+ok(!RT.includes('facilities.slice(0,6).map(function(f){') && !/Regulated facilities nearby/.test(code(RT)),
+  '5a the ZIP runtime carries no facility card template and no Regulated facilities nearby section');
 const rows = Z.map(([n, cls]) => ({ name: n, type: cls, status: 'On file', registry_id: '1', source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=1' }))
   .concat([{ name: 'UNTYPED SITE', type: '', status: 'On file' }, { name: 'DC SITE', type: 'datacenter', dist: '0.4 mi', status: 'On file' }]);
-const strip = (h) => h.replace(/<span class="devtype"[^>]*>[^<]*<\/span>/, '');
-ok(rows.every((f) => strip(card(HS, f)) === pre(HS, f)), '5b with the badge removed every card is byte-identical to the pre-badge template');
-const miller = card(HS, rows[0]);
-ok(/<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="industrial"[^>]*>Industrial<\/span><\/span><h3>A\.C\. MILLER CONCRETE PRODUCTS, INC\.<\/h3>/.test(miller),
+const lens = (f) => HS.facLifecycleLabel(f) + HS.facTypeBadge(f);
+const miller = lens(rows[0]);
+ok(/^Lifecycle unknown<span class="devtype" data-type-key="industrial"[^>]*>Industrial<\/span>$/.test(miller),
   '5c A.C. Miller reads "Lifecycle unknown [INDUSTRIAL]" — the lifecycle first, Type badge beside it', miller.slice(0, 220));
-ok(/data-type-key="facility"[^>]*>Regulated facility</.test(card(HS, rows[4])), '5d an unclassified facility reads "Regulated facility"');
-ok(/data-type-key="datacenter"[^>]*>Data center</.test(card(HS, rows[5])) && /· 0\.4 mi<\/span>/.test(card(HS, rows[5])),
-  '5e a data-centre class reads "Data center", and the distance still follows');
-ok(RT.includes(START) && RT.includes("var facTotal = metaCount('regulated facilities', facilities.length);"),
-  '5f membership (slice 0..6), order and the count are the same expressions');
+ok(/data-type-key="facility"[^>]*>Regulated facility</.test(lens(rows[4])), '5d an unclassified facility reads "Regulated facility"');
+ok(/data-type-key="datacenter"[^>]*>Data center</.test(lens(rows[5])),
+  '5e a data-centre class reads "Data center"');
+ok(RT.includes("var facTotal = metaCount('regulated facilities', facilities.length);"),
+  '5f the regulated-facility count is the same expression (data plane unchanged)');
 
 // ── §6 development Type untouched ────────────────────────────────────────────────────────
 ok(HS.canonicalProjectType({ type: 'Industrial', name: 'Pennhurst Data Centers' }).typeKey === 'datacenter',

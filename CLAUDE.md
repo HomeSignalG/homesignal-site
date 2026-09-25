@@ -1988,9 +1988,18 @@ PART C key swap + serving splice). Written, executable-tested, NOT applied to pr
   SUFFICIENT.** PART A and PART B each raise unless the operator sets `n5.verified_free_disk_mb`
   to an INDEPENDENTLY verified physical free-disk figure ≥ 2,048 MB floor + 950 MB PART B peak.
   The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used to derive
-  it. Measured 2026-09-25: the database itself is 11,281 MB, and physical capacity is UNVERIFIED.
-  PART B builds ~450 MB of indexes before PART C frees ~375 MB; a second national generation adds
-  ~1.25 GB while both are kept.
+  it. PART B builds ~450 MB of indexes before PART C frees ~375 MB.
+- ✅ **VERIFIED PHYSICAL CAPACITY (Supabase dashboard, founder-read, 2026-09-25): provisioned
+  database disk 18 GB · utilization 81% · Database 11.3 GB · WAL 2.7 GB · System 206.1 MB.** This
+  REPLACES every assumption that the physical disk is 11,607 MB. ⚖️ **Verdict: 18 GB is
+  INSUFFICIENT** for the migration plus a retained second generation plus the 2,048 MB floor; the
+  provisioned disk is being increased before anything proceeds. Full receipt, arithmetic and the
+  corrected second-generation size (it is ~2.9 GB, not ~1.25 GB — the ~1.25 GB omitted the new
+  snapshot): `docs/maps-coverage/N5-CAPACITY-VERIFIED-2026-09-25.md`.
+  - ⚠️ The scripts still carry `DISK_TOTAL_MB` = 11,607 (unchanged; no code was touched). Against
+    the real 11.3 GB database + 2.7 GB WAL that constant yields a NEGATIVE "free" figure, so those
+    guards refuse on a wrong number rather than a right one. Set `DISK_TOTAL_MB` from the verified
+    provisioned size when running them; do not treat 11,607 as capacity.
 
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
@@ -2386,6 +2395,8 @@ HS.classifyProjectType (lib/project-type.js)
 ### 7.11a The FACILITY identity lives there too — and it is not a Development Type (2026-09-24)
 
 A regulated (EPA FRS) facility's badge on the ZIP page's **Regulated facilities nearby** cards
+(⚠️ those cards are retired 2026-09-25 — see *WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT ·
+LOCAL NEWS*; `HS.facTypeBadge` / `HS.facLifecycleLabel` remain as the shared helpers)
 is Map 1's facility identity, decided once by `facilityIdentity` in `lib/project-type.js` (moved
 verbatim out of `resolveMarker`; `resolveMarker` now calls it):
 
@@ -2424,8 +2435,8 @@ to **"FORMER CROMBY GENERATING STATION"**.
   `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
   can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
   the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
-  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL")
-  and the facility detail pill. None prints the raw storage value `On file`.
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL";
+  ⚠️ that card is retired 2026-09-25, the helper remains) and the facility detail pill. None prints the raw storage value `On file`.
 - ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
   EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
   that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
@@ -3977,7 +3988,9 @@ has ever written**.
   *"prototype placeholders pending the TCEQ/ECHO feed"*. `app_coverage_states` has no Environment
   state. So every page asserted a verified absence that nothing measured — #1307's defect class.
 - ⛔ **NO CANONICAL ENVIRONMENT SUBJECT-MEMBERSHIP CONTRACT EXISTS.** Environmental facts live
-  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby*;
+  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby* (⚠️ that
+  ZIP-page section is retired 2026-09-25 — see the next section; facilities live on Map 1's
+  Regulatory Records overlay);
   `Water districts & utilities` is a GOVERNMENT SUBSCRIPTION TOPIC → *Government & civic*;
   environmental Local News → *Local news*; utility-sounding permits → *Development*;
   `app_environmental_risk` has 0 rows; `gov_actions` (enforcement) has 0 rows. None of these is
@@ -3995,6 +4008,44 @@ has ever written**.
   and asserts each renders once in its own section and nothing renders as Environment.
 
 ---
+
+## WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT · LOCAL NEWS ⚖️ FOUNDER DECISION (2026-09-25)
+
+**On the ZIP detail page, the Map and the What's Changing feed have different jobs.**
+
+- **Map 1** exposes three independent dimensions — STATUS (Operating now · Approved · Proposed ·
+  Lifecycle unknown), PROJECT TYPE (Data center · Industrial · Residential · Roads &
+  infrastructure · Commercial · Civic & public · Other project) and REGULATORY RECORDS
+  (Regulatory facilities). Regulatory is an overlay/attribute. **The Regulatory Records control
+  and the purple R are correct and are unchanged.**
+- **What's Changing** (`lib/community-page.js`) renders exactly **Development & growth ·
+  Government & civic · Local news**. The standalone *"Regulated facilities nearby"* section that
+  sat between Development and Government is **removed**, with its card template and the
+  Development absence sentence's cross-reference to it (*"… the regulated-facility record below
+  is the current public-record floor"*), and the `facilities_only` coverage banner's clause
+  *"— the EPA-registered facility records below are live public data"* (a follow-up: the first
+  merge missed it and left the banner pointing at a section that no longer exists).
+
+**Why:** TYPE = what the entity is · LIFECYCLE = its current state · REGULATORY = an independent
+R attribute · CHANGE = a qualifying real-world event. EPA/ECHO/FRS registry presence establishes
+regulatory **inventory**; it does not by itself establish that anything changed. A future
+qualifying event involving a regulated entity may appear in What's Changing with its regulatory
+attribute preserved — that event architecture is a separate unit and is not built.
+
+- **The data plane is unchanged.** `HS.data.facilities(zip, home)` is still read and still feeds
+  `facTotal`, the *Regulated facilities* count tile in the summary strip above the lens cards
+  (not inside What's Changing). `HS.facTypeBadge` / `HS.facLifecycleLabel` stay defined and
+  tested as the shared facility presentation helpers.
+- ⛔ **Do not restore the section on the strength of older tests or comments.** The tests that
+  pinned its placement were narrowed rather than deleted — the data-plane half kept, the
+  placement half inverted: `test/environment-absence-requires-authoritative-outcome.test.mjs`
+  §4 D, `test/environment-absence.browser.test.mjs` (the EPA row renders in no What's Changing
+  section, the strip tile still counts it, and the headings are exactly the three above), and
+  the card-template checks in `community-facility-type-badge`, `facility-lifecycle-unknown` and
+  `lifecycle-unknown-presentation`, which now exercise the helpers directly. Each new assertion
+  was proven load-bearing by restoring the pre-change runtime (all fail) and re-applying (all pass).
+- Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
+  `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
