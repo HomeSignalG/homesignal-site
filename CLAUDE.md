@@ -2657,6 +2657,34 @@ Do not read the Phase 1A/1B sections above as the whole story — they describe 
   contradicted. 0 rows at review time; reachable on any EPA recovery. The refusal branch now
   LEADS: no trusted facility write ⇒ the count renders UNKNOWN, never as fact.
 
+### ✅ `app_refresh_zip()` WRITES ONLY THE `app_projects` ROWS THAT CHANGED (2026-09-25)
+SQL of record: **`docs/app-refresh-zip-write-only-changed.sql`**, a splice of the live body (never
+retyped). Pinned by `test/app-refresh-zip-write-only-changed.test.mjs`.
+- 🔑 **THE HEARTBEAT WAS THE REAPER'S INPUT, SO EVERY ROW HAD TO BE REWRITTEN TO SURVIVE.** Both
+  upserts set every column plus `last_seen_at` unconditionally, and stale rows were
+  `last_seen_at < _run`. Measured: ~250 rewrites per refresh against ~245 rows per ZIP.
+- ⛔ **THE CONDITIONAL UPDATE IS ONLY SAFE TOGETHER WITH THE IDENTITY REAPER.** A stale row is now
+  "key absent from this refresh's expected set" (captured from the same `src` CTE that feeds the
+  insert, for BOTH the development and the facility statement). Skipping unchanged rows while the
+  reaper still reads `last_seen_at` would delete every valid unchanged row.
+- **`last_seen_at` now means "last time the materializer WROTE this row's content"**, not "last
+  refresh". Readers checked: the fingerprint excludes it; `dc_resident_lineage_ledger` passes it
+  through; `geo.n5_shadow_projects_for_zip` (N5, not applied) orders cross-ZIP copies by it. Nothing
+  resident-facing reads it.
+- ⚠️ **A SKIPPED `DO UPDATE` STILL LOCKS THE ROW.** The first revision relied on
+  `on conflict do update ... where is distinct from` alone: physical updates fell ~92%, but WAL
+  and dirtied blocks did not (ON CONFLICT locks the conflicting row before evaluating WHERE; 394/394
+  unchanged rows sampled carried a fresh `xmax`). Identical rows are now anti-joined out BEFORE the
+  insert, so they never conflict. Measure locks with `xmax` taken immediately before the run: a lock
+  from a rolled-back savepoint stays on the tuple, and autovacuum clearing aborted `xmax` values
+  reads as a false lock.
+- The coordinate post-pass condition now lives in `public.app_coord_outlier()`, used by BOTH the
+  upsert and the post-pass. Without that, a clamped row would be rewritten on every refresh forever.
+- Deliberately NOT changed: `app_changes` (no stable identity for every change type),
+  `app_community_meta` (`updated_at` is the sweep's ordering key), `app_zip_source_ids`.
+- Rollback: `public.app_refresh_zip_def_archive` holds the pre-change body (tag
+  `pre-write-only-changed`); execute it and drop `public.app_coord_outlier`.
+
 ### ✅ `dev_refresh_collect()` EVALUATES EACH RESPONSE ONCE (2026-09-24)
 SQL of record for the collector is now **`docs/dev-refresh-collect-once-per-response.sql`**; it
 supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the ROLLBACK path).
