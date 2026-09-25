@@ -115,11 +115,28 @@ def compare_map1(a, b):
     }
 
 
+def diff_columns(hdr, ra, rb):
+    """Informational only (never part of a verdict): for rows whose first column appears exactly
+    once on each side but whose rows differ, how many differ in each column."""
+    ka, kb = Counter(r[0] for r in ra), Counter(r[0] for r in rb)
+    a = {r[0]: r for r in ra if ka[r[0]] == 1}
+    b = {r[0]: r for r in rb if kb[r[0]] == 1}
+    cols = Counter()
+    for k in set(a) & set(b):
+        for i, (x, y) in enumerate(zip(a[k], b[k])):
+            if x != y:
+                cols[hdr[i]] += 1
+    return dict(sorted(cols.items()))
+
+
 def compare_table(a, b):
     (ha, ra), (hb, rb) = a, b
     if ha != hb:
         raise SystemExit(f'REFUSED: column sets differ: {ha} vs {hb}')
-    return {'rows': [len(ra), len(rb)], 'fp': [fp(ra), fp(rb)], 'row_diff': multiset_diff(ra, rb)}
+    res = {'rows': [len(ra), len(rb)], 'fp': [fp(ra), fp(rb)], 'row_diff': multiset_diff(ra, rb)}
+    if res['row_diff']:
+        res['diff_columns'] = diff_columns(ha, ra, rb)
+    return res
 
 
 def compare(da, db, start_file, parts):

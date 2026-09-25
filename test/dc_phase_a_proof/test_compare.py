@@ -106,6 +106,15 @@ class Compare(unittest.TestCase):
         self.assertEqual(r['geo']['row_diff'], 2)
         self.assertFalse(P.is_zero(r))
 
+    def test_diff_columns_names_what_differs_and_null_is_not_empty(self):
+        r = self.run_(side(MA), side(MB, flags='{X}'), ['geo'])['geo']
+        self.assertEqual(r['diff_columns'], {'quality_flags': 1})
+        self.assertEqual(self.run_(side(MA), side(MB), ['geo'])['geo'].get('diff_columns'), None)
+        # the harness writes NULL as \N, so NULL and '' are different values to the comparator
+        r = self.run_(side(MA, flags='\\N'), side(MB, flags=''), ['geo'])['geo']
+        self.assertEqual((r['row_diff'], r['diff_columns']), (2, {'quality_flags': 1}))
+        self.assertFalse(P.is_zero({'geo': r}))
+
     def test_multiplicity_is_counted(self):
         r = self.run_(side(MA), side(MB, decisions=[(O1, O3, 'CONFIRMED_DISTINCT'), (O1, O3, 'CONFIRMED_DISTINCT')]), ['decisions'])
         self.assertEqual(r['decisions']['row_diff'], 1)

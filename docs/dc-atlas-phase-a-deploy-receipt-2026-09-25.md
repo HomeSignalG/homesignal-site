@@ -46,7 +46,12 @@ at the time shown, or read from the named Actions run.
 | TOTAL_RUNTIME | 456 s of derivation; about 8.6 min wall clock across the two jobs |
 | Resumability | the queue went 789 → 389 → 0; `dc_address_geocode` went 56 → 456 → 845; 0 duplicate `(geocoder_query, ladder_version)` pairs; 0 pre-existing derivations lost; admitted work queued = 0 at both reads |
 
-## Canonical decisions: counterfactual (run 36155723984, PR #1341)
+## Canonical decisions: counterfactual (run 36155723984, PR #1341) — SUPERSEDED
+> 🛑 **Superseded by the hardened proof below (PR #1344).** This counterfactual copied production after
+> the 15:25Z new-code identity run, so OLD never replayed identity from the pre-resolver inputs. Its
+> comparator was also never shown able to detect a nonzero. Its numbers are kept as the dated record,
+> not as proof. `dc-atlas-phase-a-counterfactual` is deleted.
+
 Production's data moved during the deployment: Atlas acquired at 14:44Z, Epoch at 15:10Z, and the
 15:25 and 15:35 resolvers re-linked everything. So Phase A's effect was isolated by resolving **one
 read-only copy of production** under the OLD code (main@f9d1326) and under the NEW code.
@@ -69,7 +74,7 @@ read-only copy of production** under the OLD code (main@f9d1326) and under the N
 - **Lancaster:** GEOGRAPHY_UNRESOLVED / SOURCES_DISAGREE, flags SOURCES_DISAGREE +
   DERIVED_ADDRESS_BEYOND_UNCERTAINTY. It was withheld before and is withheld after.
 
-## Map 1: all 12,722 ZIP pages
+## Map 1: all 12,722 ZIP pages (counterfactual — superseded, see the hardened proof)
 | | OLD code | NEW code | Δ |
 |---|---:|---:|---:|
 | rows | 1,835 | 1,835 | 0 |
@@ -95,13 +100,13 @@ All of these read 0 or unchanged:
   `9fc1c9f5…`) and is the single polygon authority; this is pinned by the structure test.
 - SECOND_GEOCODER 0: 0 SQL provider calls; the writer is the one ladder.
 - SECOND_MAP1_READER 0: exactly 1 reader.
-- IDENTITY and GEOGRAPHY changes from non-admitted Atlas evidence: 0 (counterfactual).
-- MAP1_CHANGES from Phase A: 0 (counterfactual).
+- IDENTITY and GEOGRAPHY changes from non-admitted Atlas evidence: 0 (hardened proof).
+- MAP1_CHANGES from Phase A: 0 (hardened proof).
 - Atlas derived-address authority rows: 0.
 
 ## Schedule safety (traced, not assumed)
-Actual production order today:
-1. Atlas acquisition 14:44Z (cron `40 9`, about 5 h late).
+Production order observed on 2026-09-25 only (no general pattern is claimed):
+1. Atlas acquisition 14:44Z (cron `40 9`).
 2. Epoch acquisition 15:10Z (cron `10 10`).
 3. Writer (cron `45 10`, plus dispatch).
 4. Identity resolver at :25.
@@ -111,13 +116,14 @@ Actual production order today:
 - **Batches cannot starve Epoch.** The queue reads `order by (not admitted), geocoder_query collate
   "C" limit 400`, so every admitted (Epoch) address precedes every Atlas address in every batch. Atlas
   gets a slot only when admitted work is below 400. Admitted queue at both reads today: 0.
-- Epoch adds single-digit addresses per day; it has 93 records in total.
-- An address acquired after that day's writer run is derived on the next run. Absent evidence never
+- Epoch has 93 records in total. Its per-day address volume has not been measured.
+- An address acquired after a writer run is derived on the next run. Absent evidence never
   removes a publisher point, so the only cost is a day of delay.
 
 ## Found and NOT fixed (pre-existing, independent of Phase A)
-**Map 1 loses its canonical layer every day** between an Atlas acquisition and the next :25 identity
-run.
+**Map 1 lost its canonical layer** between the Atlas acquisition and the next identity run. This was
+observed on 2026-09-25 after the 14:44Z Atlas acquisition and before the 15:25Z identity run. It has not
+been measured on other days.
 
 Measured 14:52Z:
 - 2,216 / 2,216 Atlas current observations were unlinked.
@@ -130,6 +136,9 @@ objects. It is an ordering defect and needs its own change.
 ## Not done, by design
 - **Atlas is not admitted.** Admission needs a POST-Phase-A national dry run.
   - `dc-atlas-dryrun.yml` refuses now that production carries Phase A.
-  - `scripts/dc-atlas-phase-a-counterfactual.sh` is the natural base: add the Phase D switch on the
-    NEW replica.
+  - `scripts/dc-atlas-phase-a-proof.sh` is the natural base: add the Phase D switch on the NEW replica.
   - The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas records.
+- **Follow-up, not done here: production-write workflow authorization / human-review gate.**
+  `dc-atlas-phase-a-apply.yml` (#1339) writes DDL to production when dispatched from `main` with a typed
+  confirmation string. It has no protected `environment:` and no required reviewer. The proof work
+  neither reuses nor modifies it.

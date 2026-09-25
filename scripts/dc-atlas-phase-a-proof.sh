@@ -57,16 +57,19 @@ sys.exit(0 if ok else 1)
 PY
   local q; q="$(tr '\n' ' ' <<<"$1")"
   PGOPTIONS='-c default_transaction_read_only=on -c lock_timeout=2s -c statement_timeout=15min -c idle_in_transaction_session_timeout=60s -c TimeZone=UTC' \
-    psql "$PROD_DB_URL" -X -q -v ON_ERROR_STOP=1 -c "\\copy ($q) to '$2' with (format csv, header)"
+    psql "$PROD_DB_URL" -X -q -v ON_ERROR_STOP=1 -c "\\copy ($q) to '$2' with (format csv, header, null '\N')"
 }
-rcopy() { L -d "$1" -c "set timezone = 'UTC'" -c "\\copy ($2) to '$3' with (format csv, header)"; }
+rcopy() { L -d "$1" -c "set timezone = 'UTC'" -c "\\copy ($2) to '$3' with (format csv, header, null '\N')"; }
 clone() { dropdb --if-exists "$2"; createdb -T "$1" "$2"; }
 
 Q_ENT="select canonical_entity_id, entity_grain, classification, classification_conflict, rule_version, observation_count, source_count, superseded_by, supersede_reason from public.dc_canonical_entity"
 Q_LINK="select home_signal_observation_id, canonical_entity_id, source_key, distribution_key, publisher_record_id, observation_classification, classification_rule_key, classification_evidence, link_rule_key from public.dc_entity_observation"
 Q_DEC="select observation_a, observation_b, decision_state, candidate_rule_key, decision_rule_key, rule_version, evidence from public.dc_identity_decision"
-# every decision column; rule_version (a restamp, not a decision) and the two timestamps are the only exclusions
-Q_GEO="select canonical_entity_id, geography_status, geometry_type, st_astext(geom) geom_text, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, positional_uncertainty_m, provenance from public.dc_entity_geography"
+# every decision column; rule_version (a restamp, not a decision) and the two timestamps are the only exclusions.
+# Geometry is compared as EXACT EWKB, never st_astext: text is formatted by the PostGIS version, which differs
+# between production and the replica image, so identical points can print differently (run 36173136525: 18 rows).
+# CSVs carry NULL as \N so the comparator can tell NULL from ''.
+Q_GEO="select canonical_entity_id, geography_status, geometry_type, encode(st_asewkb(geom), 'hex') geom_ewkb, lat, lng, coordinate_decimals, authority_source_key, authority_observation_id, publisher_precision, quality_flags, rule_key, positional_uncertainty_m, provenance from public.dc_entity_geography"
 Q_MAP="select r.zip, m.* from public.canonical_zip_registry r cross join lateral public.map1_dc_zip_members(r.zip) m"
 Q_SNAPTXT="select 'entity' k, canonical_entity_id::text a, null::text b, concat_ws('|', entity_grain, classification, classification_conflict, rule_version, observation_count, source_count, superseded_by, supersede_reason) v from public.dc_canonical_entity
   union all select 'link', home_signal_observation_id::text, canonical_entity_id::text, concat_ws('|', source_key, distribution_key, link_rule_key) from public.dc_entity_observation
@@ -145,6 +148,8 @@ for k in ('map1_dc_zip_members', 'dc_record_citation', 'dc_current_observation')
 print('  CODE_DIFFERS ' + ('PASS' if not bad else 'FAIL ' + '; '.join(bad)))
 sys.exit(1 if bad else 0)
 PY
+prod_copy "select postgis_lib_version() as postgis" "$w/pgis.csv"
+echo "  POSTGIS production $(tail -1 "$w/pgis.csv") | replicas $(L -d tmpl_new -tA -c 'select postgis_lib_version()')"
 for t in $TABLES; do
   cols="$(L -d tmpl_new -tA -c "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = '$t' and is_generated = 'NEVER'")"
   cols_old="$(L -d tmpl_old -tA -c "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema = 'public' and table_name = '$t' and is_generated = 'NEVER'")"
@@ -169,12 +174,12 @@ prod_copy "select z.zcta5, z.geom from geo.zcta_boundary z where z.zcta5 in (
 for db in tmpl_old tmpl_new; do
   { echo "set session_replication_role = replica;"
     echo "truncate $(sed 's/\([a-z_]*\)/public.\1/g; s/ /, /g' <<<"$TABLES"), geo.zcta_boundary cascade;"
-    for t in $TABLES; do echo "\\copy public.$t ($(head -1 "$w/$t.csv")) from '$w/$t.csv' with (format csv, header)"; done
-    echo "\\copy geo.zcta_boundary (zcta5, geom) from '$w/zcta.csv' with (format csv, header)"
-    echo "\\copy public._snap_ident from '$w/snap_ident.csv' with (format csv, header)"
-    echo "\\copy public._run_time from '$w/run_time.csv' with (format csv, header)"
-    echo "\\copy public._snap_geo from '$w/snap_geo.csv' with (format csv, header)"
-    echo "\\copy public._snap_map1 from '$w/snap_map1.csv' with (format csv, header)"
+    for t in $TABLES; do echo "\\copy public.$t ($(head -1 "$w/$t.csv")) from '$w/$t.csv' with (format csv, header, null '\N')"; done
+    echo "\\copy geo.zcta_boundary (zcta5, geom) from '$w/zcta.csv' with (format csv, header, null '\N')"
+    echo "\\copy public._snap_ident from '$w/snap_ident.csv' with (format csv, header, null '\N')"
+    echo "\\copy public._run_time from '$w/run_time.csv' with (format csv, header, null '\N')"
+    echo "\\copy public._snap_geo from '$w/snap_geo.csv' with (format csv, header, null '\N')"
+    echo "\\copy public._snap_map1 from '$w/snap_map1.csv' with (format csv, header, null '\N')"
   } > "$w/load.sql"
   L -d "$db" -f "$w/load.sql" >/dev/null
   for t in $TABLES; do
@@ -272,7 +277,7 @@ python3 - "$w/v3.csv" <<'PY' || fail "V3 production premises"
 import csv, sys
 from datetime import datetime
 r = list(csv.DictReader(open(sys.argv[1])))[0]
-ts = lambda s: datetime.fromisoformat(s.replace('+00', '+00:00')) if s else None
+ts = lambda s: datetime.fromisoformat(s.replace('+00', '+00:00')) if s and s != '\\N' else None
 end, run, geo = ts(r['last_resolver_end']), ts(r['first_run_after_s']), ts(r['first_geocode_after_s'])
 bad = []
 if int(r['resolver_runs']) < 1: bad.append('control: no resolver run found in [S,T)')
@@ -368,6 +373,13 @@ echo "== 7. REPLAY vs PRODUCTION: the NEW replay reproduces what production actu
 prod_copy "$Q_DEC" "$w/prod/decisions.csv"; prod_copy "$Q_GEO" "$w/prod/geo.csv"
 $CMP compare "$w/prod" "$w/f_new" "$w/start_ids.csv" entities,links,decisions,geo,map1 zero > "$w/v4.json" || fail "the NEW replay does not reproduce production's actual outcome"
 echo "  REPLAY_VS_PRODUCTION $(cat "$w/v4.json")"
+# DIAGNOSTIC, not a gate: the same geometry as TEXT. It can differ only in how two PostGIS versions print
+# bit-identical points (the gated comparison above uses exact EWKB); diff_columns names what differs.
+Q_GEOTXT="select canonical_entity_id, st_astext(geom) geom_text from public.dc_entity_geography"
+mkdir -p "$w/dx_prod" "$w/dx_new"
+cp "$w/prod/entities.csv" "$w/prod/links.csv" "$w/dx_prod/"; cp "$w/f_new/entities.csv" "$w/f_new/links.csv" "$w/dx_new/"
+prod_copy "$Q_GEOTXT" "$w/dx_prod/geo.csv"; rcopy rep_new "$Q_GEOTXT" "$w/dx_new/geo.csv"
+echo "  DIAGNOSTIC geometry-as-text (not gated): $($CMP compare "$w/dx_prod" "$w/dx_new" "$w/start_ids.csv" geo zero || true)"
 
 echo "== 8. POSITIVE CONTROLS (disposable clones only; the SAME comparator; exact expected results)"
 N_ROWS="$(python3 -c "import json;print(json.load(open('$w/final.json'))['map1']['rows'][0])")"
