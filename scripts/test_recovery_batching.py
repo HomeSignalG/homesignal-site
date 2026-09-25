@@ -168,10 +168,15 @@ ok(all(f.endswith("#0") or f.endswith("#1") for _, f in ids1),
 _src = io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_shard.py"),
                encoding="utf-8").read()
 _freeze = _src[_src.index("    zips = freeze_zips(z3)"):_src.index('", f"freeze {z}")')]
-ok("and i.zip = {lit(z)}" in _freeze,
+# The freeze now reads the canonical contract public.n5_expected_captured(SNAPSHOT) rather
+# than the identity table directly. That SQL function inlines, and an equality on zip is
+# served by preservation.app_project_identity_snapshot_kind_zip (snapshot_id, record_kind,
+# zip): measured 2026-09-25 on production, one ZIP = Index Scan, 36 buffers, 15 ms. The
+# left(zip,3) predicate the old partial index needed is therefore no longer required.
+ok("where e.zip = {lit(z)}" in _freeze,
    "the freeze inserts ONE ZIP at a time - the whole-prefix statement is what timed out")
-ok("left(i.zip,3) = {lit(z3)}" in _freeze,
-   "it also carries left(zip,3), without which the planner cannot use the partial index")
+ok("public.n5_expected_captured({lit(SNAPSHOT)})" in _freeze,
+   "it reads the canonical contract for THIS run's snapshot, never a hard-coded one")
 ok("statement_timeout='110s'" in _freeze,
    "each ZIP statement bounds itself below the proxy cap instead of inheriting the default")
 ok("delete from geo.n5_frozen where z3=" in _src[:_src.index("    zips = freeze_zips(z3)")],

@@ -105,6 +105,24 @@ except SystemExit as e:
        "read_only=True on a write refuses and names the word")
 ok(len(calls) == 0, "the refusal happened BEFORE any request (got %d)" % len(calls))
 
+# 8b. literal CONTENT is data, not SQL: the live key that crashed shard 168 must pass...
+try:
+    N.assert_read_only("select 1 from geo.n5_geom where source_key in "
+                       "('arcgis:centre-county-pa-building-permits:Call In R Fi', 'x''s update');",
+                       "literal"); ok(True, "a write word INSIDE a quoted literal is not a write")
+except SystemExit as e:
+    ok(False, "a quoted literal was read as SQL: %s" % e)
+# ...while a write OUTSIDE the literals is still refused, including one hiding after a
+# literal that contains an escaped quote (the stripper must not swallow past its end).
+for q in ("select 'a''b'; delete from geo.n5_geom;", "select 'call'; update geo.n5_geom set x=1;",
+          "select 1; do $$ begin null; end $$;",
+          # a literal on EACH side of the write: a greedy stripper would eat the DELETE
+          "select 'x'; delete from geo.n5_geom where source_key = 'y';"):
+    try:
+        N.assert_read_only(q, "mixed"); ok(False, "a write outside the literals was refused: %r" % q)
+    except SystemExit:
+        ok(True, "a write outside the literals is still refused: %r" % q)
+
 # 9. a real SQL error still fails closed even under read_only
 slept, seq, calls = [], [err(400), Resp("[]")], []
 try:
