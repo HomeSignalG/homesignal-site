@@ -2402,6 +2402,19 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+- ⚖️ **SUPERSEDED 2026-09-25 for the ZIP page only — those cards no longer exist (founder
+  decision).** Static EPA/ECHO/FRS registry inventory is not a change, so the *Regulated
+  facilities nearby* section was removed from the ZIP page's "What's changing" feed, which is now
+  exactly **Development & growth · Government & civic · Local news**. `HS.facTypeBadge` /
+  `HS.facLifecycleLabel` went with it. **Nothing was relocated** (no new section, tab or card
+  list). **Unchanged:** `facilityIdentity` / `HS.canonicalFacilityType` / `HS.canonicalLifecycle`
+  in `lib/project-type.js`, Map 1 and its Regulatory Records control / purple R, the facility
+  dossier, the facility read (`HS.data.facilities`), and the summary strip's *Regulated
+  facilities* tile (`facTotal`). A future qualifying real-world CHANGE EVENT may admit an entity
+  to the feed; registry presence alone never does. Pinned by
+  `test/environment-absence.browser.test.mjs` (FULL: facility served, 0 cards, tile = 1, feed
+  order) and `test/environment-absence-requires-authoritative-outcome.test.mjs` §4 D.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
@@ -2424,8 +2437,8 @@ to **"FORMER CROMBY GENERATING STATION"**.
   `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
   can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
   the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
-  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL")
-  and the facility detail pill. None prints the raw storage value `On file`.
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL";
+  that card was retired 2026-09-25, see §7.11a) and the facility detail pill. None prints the raw storage value `On file`.
 - ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
   EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
   that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
@@ -3977,7 +3990,8 @@ has ever written**.
   *"prototype placeholders pending the TCEQ/ECHO feed"*. `app_coverage_states` has no Environment
   state. So every page asserted a verified absence that nothing measured — #1307's defect class.
 - ⛔ **NO CANONICAL ENVIRONMENT SUBJECT-MEMBERSHIP CONTRACT EXISTS.** Environmental facts live
-  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby*;
+  on OTHER planes and stay there: EPA/ECHO facilities → Map 1 (and the summary tile; the ZIP
+  page's *Regulated facilities nearby* feed section was retired 2026-09-25, §7.11a);
   `Water districts & utilities` is a GOVERNMENT SUBSCRIPTION TOPIC → *Government & civic*;
   environmental Local News → *Local news*; utility-sounding permits → *Development*;
   `app_environmental_risk` has 0 rows; `gov_actions` (enforcement) has 0 rows. None of these is

@@ -49,7 +49,7 @@ const page = exec(pageRaw);
 const hosts = { 'community.html': exec(read('community.html')), 'scripts/gen_zip_pages.py': exec(read('scripts/gen_zip_pages.py')) };
 
 // ── positive controls: the file under test is the file that renders the sections ────────
-ok(/Government &amp; civic/.test(page) && /Local news/.test(page) && /\+ facHtml/.test(page)
+ok(/Government &amp; civic/.test(page) && /Local news/.test(page)
    && /Development &amp; growth/.test(page),
   'control — lib/community-page.js is the shared runtime that composes the neighbouring sections');
 ok(/No permit or planning records on file for this ZIP yet/.test(page),
@@ -105,8 +105,15 @@ ok(!/\benvChanges\b/.test(page), '§1 A — the old Environment row set (and its
 // ── §4 neighbours are composed exactly as before (D) ─────────────────────────────────────
 ok(/var notices = changes\.filter\(function\(x\)\{\s*return \/planning\|government\|civic\/i\.test\(x\.category\)/.test(page),
   '§4 D — Government & civic notices are still selected by their own rule, unchanged');
-ok(/HS\.data\.facilities\(zip, home\)/.test(page) && /Regulated facilities nearby/.test(page),
-  '§4 D — Regulated facilities still reads its own plane and renders its own section');
+// Two contracts that used to be one assertion (founder decision, 2026-09-25): the regulatory
+// DATA plane stays read — it feeds the summary strip's "Regulated facilities" tile — while its
+// static inventory no longer renders as a section of the "What's changing" feed.
+ok(/HS\.data\.facilities\(zip, home\)/.test(page)
+   && /var facTotal = metaCount\('regulated facilities', facilities\.length\);/.test(page)
+   && /HS\.tpl\.statTile\(facTotal, 'Regulated facilities', ''\)/.test(page),
+  '§4 D — the regulated-facility plane is still read and still feeds the summary tile');
+ok(!/Regulated facilities nearby/.test(page) && !/\bfacHtml\b/.test(page),
+  '§4 D — ...and its static inventory renders no section in the What\'s changing feed');
 ok(/HS\.data\.news\(zip, home\)/.test(page) && /LOCAL_NEWS_CAP/.test(page), '§4 D — Local News is still read and rendered');
 ok(/HS\.data\.meetings\(zip, home\)/.test(page) && /mtgWord/.test(page), '§4 D — Meetings still render from meetings()');
 ok(/devReadComplete\s*\?/.test(page), '§4 D — Development keeps its #1307 complete-read absence gate');

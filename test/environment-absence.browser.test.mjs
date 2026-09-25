@@ -170,8 +170,20 @@ for (const zip of ['01001', '01002']) {
   ok(count(f.text, T.news) >= 1 && f.heads.some(h => /^Local news — 1 item/.test(h)),
     zip + ' FULL — D: environmental Local News renders under Local news (1 item)', f.heads);
   ok(count(f.text, T.devUtil) === 1, zip + ' FULL — D: the utility-sounding project renders once, under Development', count(f.text, T.devUtil));
-  ok(count(f.text, T.facility) === 1 && f.heads.some(h => /^Regulated facilities nearby/.test(h)),
-    zip + ' FULL — D: the EPA facility renders once, under Regulated facilities nearby', f.heads);
+  // STATIC REGULATORY INVENTORY IS NOT A CHANGE (founder decision, 2026-09-25). The EPA facility
+  // is served (rpc_facility) but renders in NO section of the "What's changing" feed — not its old
+  // own section, and not relocated into Development & growth. The data plane is still read: the
+  // summary strip's "Regulated facilities" tile counts it (component_scores is {} here, so the
+  // tile falls back to facilities.length = 1), which is also what makes the zero non-vacuous.
+  ok(count(f.text, T.facility) === 0 && !f.heads.some(h => /^Regulated facilities/.test(h)),
+    zip + ' FULL — D: the EPA facility renders no card and no "Regulated facilities nearby" section', f.heads);
+  ok(/<div class="n">1<\/div><div class="l">Regulated facilities<\/div>/.test(f.html),
+    zip + ' FULL — D: the facility plane is still read — the summary tile counts it (1)');
+  const dev = f.heads.find(h => /^Development & growth/.test(h)) || '';
+  ok(/— 1 record\b/.test(dev), zip + ' FULL — D: Development counts only its own record, not the facility', dev);
+  const order = f.heads.map(h => (h.match(/^(Development & growth|Government & civic|Local news)/) || [])[1]).filter(Boolean);
+  ok(order.join(' | ') === 'Development & growth | Government & civic | Local news' && order.length === f.heads.length,
+    zip + ' FULL — the feed is exactly Development & growth, Government & civic, Local news, in that order', f.heads);
   ok(count(f.text, T.meeting) === 1, zip + ' FULL — D: the water meeting renders once, in the Meetings card', count(f.text, T.meeting));
   const gov = f.heads.find(h => /^Government & civic/.test(h)) || '';
   ok(/1 notice\b/.test(gov), zip + ' FULL — D: Government & civic counts its notice (the Environment row is not a notice)', gov);

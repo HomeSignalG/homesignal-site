@@ -103,12 +103,13 @@ ok(comm('', 'A.C. MILLER CONCRETE PRODUCTS, INC.').typeKey === 'facility',
   '3b an unclassified facility with an industrial-sounding name stays "Regulated facility"');
 ok(['Operating', 'Closed', '', 'Proposed'].every((st) => comm('energy', 'X', st).typeKey === 'infrastructure'),
   '3c status is never read — "Operating" is lifecycle, not Type');
-const RT = read('lib/community-page.js');
-const fb = code(RT.slice(RT.indexOf('HS.facTypeBadge = function'), RT.indexOf('HS.onReady(')));
-ok(/HS\.canonicalFacilityType\(f\)/.test(fb) && /HS\.typeBadge\(t\)/.test(fb),
-  '3d the facility badge asks HS.canonicalFacilityType and renders through the shared badge');
-ok(!/f\.(name|type|status|developer|dist)|\.test\(|match\(|RegExp|indexOf|toLowerCase/.test(fb),
-  '3e ...and reads no field and applies no rule of its own', fb);
+// 3d/3e — HS.facTypeBadge is GONE with the ZIP page's facility cards (founder decision,
+// 2026-09-25: static regulatory inventory is not a "What's changing" item). The identity rule it
+// displayed is unchanged and lives once in lib/project-type.js — pinned by §1-§4 above and below.
+const RT = code(read('lib/community-page.js'));
+ok(/HS\.devTypeBadge = function/.test(RT) && !/HS\.facTypeBadge/.test(RT),
+  '3d the ZIP page keeps the Development badge and carries no facility badge (no second copy of the identity rule)');
+ok(!/canonicalFacilityType/.test(RT), '3e ...and the page no longer consults the facility identity at all');
 
 // ── §4 ZIP 19475, class values as served by app_projects_for_zip('19475','facility') ──────
 const Z = [['A.C. MILLER CONCRETE PRODUCTS, INC.', 'industrial', 'industrial', 'Industrial'],
@@ -120,34 +121,14 @@ for (const [n, cls, key, label] of Z) {
   ok(c.typeKey === key && c.label === label && map1(cls, n) === key, `4 ${n} (${cls}) → ${label}, Map 1 ${key}`);
 }
 
-// ── §5 the shipped card ─────────────────────────────────────────────────────────────────
-HS.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
-  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-HS.onReady = () => {};
-// The card's lifecycle word is the stored status in the shared vocabulary (HS.facLifecycleLabel →
-// HS.canonicalLifecycle, lib/project-type.js — already loaded above), never a literal.
-new Function('HS', RT)(HS);
-const START = 'facilities.slice(0,6).map(function(f){';
-const i0 = RT.indexOf(START), i1 = RT.indexOf("}).join('')", i0);
-ok(i0 > 0 && i1 > i0, '5a the Regulated facilities card template is found');
-const card = new Function('HS', 'f', RT.slice(i0 + START.length, i1));
-const PRE = "return '<div class=\"card mini\" style=\"border-left-color:#3f7fb0;margin-bottom:10px\">'\n"
-  + "            + '<span class=\"lens\">' + HS.esc(HS.facLifecycleLabel(f)) + (f.dist? ' · ' + HS.esc(f.dist):'') + '</span><h3>' + HS.esc(f.name) + '</h3>'\n"
-  + "            + '<p class=\"sowhat\">' + HS.esc(f.type||'Regulated facility') + (f.developer? ' · ' + HS.esc(f.developer):'') + '</p>'\n"
-  + "            + (f.source_ref? '<a href=\"' + HS.esc(f.source_ref) + '\" target=\"_blank\" rel=\"noopener\" style=\"font-size:12.5px;font-weight:600\">View public record →</a>':'') + '</div>';";
-const pre = new Function('HS', 'f', PRE);
-const rows = Z.map(([n, cls]) => ({ name: n, type: cls, status: 'On file', registry_id: '1', source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=1' }))
-  .concat([{ name: 'UNTYPED SITE', type: '', status: 'On file' }, { name: 'DC SITE', type: 'datacenter', dist: '0.4 mi', status: 'On file' }]);
-const strip = (h) => h.replace(/<span class="devtype"[^>]*>[^<]*<\/span>/, '');
-ok(rows.every((f) => strip(card(HS, f)) === pre(HS, f)), '5b with the badge removed every card is byte-identical to the pre-badge template');
-const miller = card(HS, rows[0]);
-ok(/<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="industrial"[^>]*>Industrial<\/span><\/span><h3>A\.C\. MILLER CONCRETE PRODUCTS, INC\.<\/h3>/.test(miller),
-  '5c A.C. Miller reads "Lifecycle unknown [INDUSTRIAL]" — the lifecycle first, Type badge beside it', miller.slice(0, 220));
-ok(/data-type-key="facility"[^>]*>Regulated facility</.test(card(HS, rows[4])), '5d an unclassified facility reads "Regulated facility"');
-ok(/data-type-key="datacenter"[^>]*>Data center</.test(card(HS, rows[5])) && /· 0\.4 mi<\/span>/.test(card(HS, rows[5])),
-  '5e a data-centre class reads "Data center", and the distance still follows');
-ok(RT.includes(START) && RT.includes("var facTotal = metaCount('regulated facilities', facilities.length);"),
-  '5f membership (slice 0..6), order and the count are the same expressions');
+// ── §5 the ZIP page's facility card is retired; its data plane is not ──────────────────
+// Founder decision, 2026-09-25: the static "Regulated facilities nearby" inventory no longer
+// renders in the What's changing feed. The facility read and the summary-tile count stay.
+ok(!RT.includes('facilities.slice(0,6).map(function(f){') && !/Regulated facilities nearby/.test(RT),
+  '5a no Regulated facilities card template remains on the ZIP page');
+ok(/HS\.data\.facilities\(zip, home\)/.test(RT)
+   && RT.includes("var facTotal = metaCount('regulated facilities', facilities.length);"),
+  '5b the facility plane is still read and the count is the same expression');
 
 // ── §6 development Type untouched ────────────────────────────────────────────────────────
 ok(HS.canonicalProjectType({ type: 'Industrial', name: 'Pennhurst Data Centers' }).typeKey === 'datacenter',

@@ -180,19 +180,20 @@ ok(!/EPA-registered facilities and completed construction filings/.test(PAGE) &&
   '7c the rail no longer tells a resident that EPA facilities are "standing today"');
 ok(/function stageOf\(s\)\{[^}]*bucketOf\(s && s\.type, s\)/.test(PAGE),
   '7d stageOf passes the SITE, so a cached FRS stamp cannot re-enter through the marker title');
-const RT = read('lib/community-page.js');
-const cardSrc = RT.slice(RT.indexOf('facilities.slice(0,6).map(function(f){'), RT.indexOf("}).join('')", RT.indexOf('facilities.slice(0,6).map(function(f){')));
-ok(cardSrc.length > 100 && !/'Operating|Operating'/.test(code(cardSrc)) && /HS\.facLifecycleLabel\(f\)/.test(cardSrc),
-  '7e ZIP card: no literal Operating; the lifecycle word is the stored status in the shared vocabulary (HS.facLifecycleLabel)');
+// 7e/7f — THE ZIP PAGE NO LONGER DRAWS FACILITY CARDS (founder decision, 2026-09-25: static
+// regulatory inventory is not a "What's changing" item). What these checks protected — no literal
+// "Operating" on an EPA facility — is now true by absence on the ZIP page, and the lifecycle
+// itself is still decided by the one authority (HS.canonicalLifecycle), pinned here directly.
+const RT = code(read('lib/community-page.js'));
+ok(/HS\.tpl\.statTile\(facTotal, 'Regulated facilities', ''\)/.test(RT)
+   && !/facilities\.slice\(0,6\)\.map/.test(RT) && !/HS\.fac(LifecycleLabel|TypeBadge)/.test(RT),
+  '7e ZIP page: positive control (the runtime is the one with the facility summary tile), and it renders no facility card that could carry a lifecycle word');
 {
-  HS.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  HS.typeBadge = HS.typeBadge || (() => '');
-  HS.onReady = () => {};
-  new Function('HS', RT)(HS);
-  const card = new Function('HS', 'f', cardSrc.slice('facilities.slice(0,6).map(function(f){'.length));
-  const html = card(HS, { name: 'CROMBY GENERATING STATION', type: 'energy', status: 'On file', source_ref: 'https://echo.epa.gov/x' });
-  ok(!/Operating/.test(html) && /<span class="lens">Lifecycle unknown/.test(html) && /Roads &amp; infrastructure/.test(html),
-    '7f the rendered Cromby card reads "Lifecycle unknown [ROADS & INFRASTRUCTURE]", never Operating', html.slice(0, 200));
+  const cromby = { name: 'CROMBY GENERATING STATION', type: 'energy', status: 'On file', record_kind: 'facility',
+    source_ref: 'https://echo.epa.gov/x' };
+  ok(HS.canonicalLifecycle(cromby).label === 'Lifecycle unknown' && HS.canonicalLifecycle(cromby).key === 'unknown'
+     && HS.canonicalFacilityType(cromby).label === 'Roads & infrastructure',
+    '7f Cromby at the shared authority: "Lifecycle unknown", Type Roads & infrastructure — never Operating');
 }
 const DEV = read('development.html');
 const hdr = DEV.slice(DEV.indexOf('Regulated facility <span class="status'), DEV.indexOf('Regulated facility <span class="status') + 300);

@@ -59,14 +59,14 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
   const MAP = code(read('lib/map.js'));
   ok(!/s === 'operating' \|\| s === 'active' \|\| s === 'built'/.test(MAP) && !/'Lifecycle unknown'/.test(MAP),
     '5d lib/map.js carries no second copy of the rule or the label');
-  // The facility helpers + the facility card (the Development filter elsewhere in the file
-  // legitimately names stored statuses and is out of scope here).
-  const CPR = read('lib/community-page.js');
-  const helper = code(CPR.slice(CPR.indexOf('HS.facTypeBadge = function'), CPR.indexOf('HS.onReady(')));
-  const cardSrc = code(CPR.slice(CPR.indexOf('facilities.slice(0,6).map(function(f){'), CPR.indexOf("}).join('')", CPR.indexOf('facilities.slice(0,6).map(function(f){'))));
-  ok(/HS\.canonicalLifecycle\(f\)/.test(helper) && cardSrc.length > 100,
-    '5e positive control: the facility helper and card regions are found, and the helper asks HS.canonicalLifecycle');
-  ok(!/Lifecycle unknown|Operating/.test(helper + cardSrc), '5f the facility card and its helper carry no copy of a lifecycle label');
+  // The ZIP page's facility helpers and card are retired (founder decision, 2026-09-25: static
+  // regulatory inventory is not a "What's changing" item), so no surface there can carry a copy
+  // of a lifecycle label. Map 1 and the dossier still say it in the shared words (§6, §7c, §9).
+  const CPR = code(read('lib/community-page.js'));
+  ok(/HS\.devTypeBadge = function/.test(CPR) && !/HS\.fac(TypeBadge|LifecycleLabel)/.test(CPR)
+     && !/facilities\.slice\(0,6\)\.map/.test(CPR),
+    '5e positive control: the ZIP runtime is found, and it carries no facility helper or card');
+  ok(!/Lifecycle unknown/.test(CPR), '5f the ZIP runtime carries no copy of a lifecycle label');
 }
 
 // ── §6 Map 1 list bands derive from lifecycle ──────────────────────────────────────────
@@ -101,20 +101,14 @@ const epaSite = (layer, extra) => Object.assign({ label: 'EPA SITE', layer, scop
 
 // ── §7 ZIP card and dossier ─────────────────────────────────────────────────────────────
 {
-  const RT = read('lib/community-page.js');
-  const H = load(['lib/project-type.js']);
-  H.esc = (s) => String(s == null ? '' : s);
-  H.onReady = () => {};
-  new Function('HS', RT)(H);
-  const START = 'facilities.slice(0,6).map(function(f){';
-  const i0 = RT.indexOf(START), i1 = RT.indexOf("}).join('')", i0);
-  const card = new Function('HS', 'f', RT.slice(i0 + START.length, i1));
-  const html = card(H, { name: 'PLOTTS ENERGY', type: 'energy', status: 'On file',
-    facility_env: { epa: { permit_status: 'Terminated' } } });
-  ok(/<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="infrastructure"[^>]*>Roads &amp; infrastructure<\/span>|<span class="lens">Lifecycle unknown<span class="devtype" data-type-key="infrastructure"[^>]*>Roads & infrastructure<\/span>/.test(html),
-    '7a Plotts Energy card: "Lifecycle unknown" beside its Type badge', html.slice(0, 260));
-  ok(!/Operating|Closed|Terminated/.test(html.slice(0, html.indexOf('</span></span>') + 14)),
-    '7b the lifecycle slot shows no Operating, no Closed and no raw permit status');
+  // 7a/7b — the ZIP facility card is retired (2026-09-25); the lifecycle it printed is pinned
+  // at the shared authority instead, on the same Plotts Energy row.
+  const row = { name: 'PLOTTS ENERGY', type: 'energy', status: 'On file', record_kind: 'facility',
+    facility_env: { epa: { permit_status: 'Terminated' } } };
+  ok(HS.canonicalLifecycle(row).label === 'Lifecycle unknown' && HS.canonicalFacilityType(row).label === 'Roads & infrastructure',
+    '7a Plotts Energy: "Lifecycle unknown", Type Roads & infrastructure');
+  ok(!/Operating|Closed|Terminated/.test(HS.canonicalLifecycle(row).label),
+    '7b the lifecycle shows no Operating, no Closed and no raw permit status');
   const DEV = read('development.html');
   ok(!/<span class="status active">Operating<\/span>/.test(DEV) && /HS\.canonicalLifecycle\(f\)/.test(DEV)
      && /lib\/project-type\.js\?v=/.test(DEV),
