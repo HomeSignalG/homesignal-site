@@ -13,10 +13,24 @@ condition against the DECLARED chunk set and raises rather than returning false.
 MODES
   status     one-read generation state (geo.n5_generation_status)
   open       capture an immutable snapshot + open a BUILDING generation + seed its shards
-  work       claim and run shards under a lease; bounded; resumable; duplicate-safe
+  work       claim and run shards under a lease; bounded; resumable; duplicate-safe.
+             Once EVERY shard is done, the same bounded tick publishes the generation's
+             prefixes (scripts/n5_publish.py -> geo.n5_gen_publish_prefix) and then records
+             its unresolved outcomes (geo.n5_gen_record_unresolved). All of it is written
+             under the BUILDING generation, which Map 1 never reads.
+  publish    only the publish stage of `work`
+  unresolved only the unresolved-accounting stage of `work`
   reconcile  compute reconciliation chunks for a generation
-  ready      BUILDING -> READY, only when every shard is done
-  activate   hand the DECLARED chunk set to the activation gate
+  ready      BUILDING -> READY through geo.n5_generation_mark_ready, which re-derives
+             completeness and reconciliation itself and raises on any gap
+  activate   hand the DECLARED chunk set to the activation gate. Its COMMIT is the one
+             serving switch: Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation.
+  rollback   GENERATION = the superseded generation to restore; REASON required
+  fail       mark a candidate FAILED; REASON required
+  discard    delete a FAILED / superseded generation's rows (never the serving generation
+             or its predecessor, which is the rollback target)
+
+docs/n5-generation-publish.sql holds every rule these modes call; see it before changing one.
 
 SAFETY PROPERTIES, and where each one actually lives:
   restartable       - `work` claims from the DB, so a killed process loses nothing but its
@@ -50,6 +64,7 @@ WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')
 # ~12,700 rows and returns in well under a second. Deriving them also means the set declared
 # at activation is exactly the set that was built — one list, not two that can drift.
 CHUNKS = [c for c in os.environ.get("CHUNKS", "").split(",") if c.strip()]
+REASON = os.environ.get("REASON", "").strip()
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -69,6 +84,7 @@ def status(gen):
     for k in ("generation_id", "snapshot_id", "state", "source_cutoff", "freshness_lag_days",
               "elapsed_seconds", "snapshot_rows", "shards_total", "shards_pending",
               "shards_running", "shards_done", "shards_failed", "reconcile_chunks",
+              "prefixes_published", "unresolved_recorded_at", "serving", "predecessor",
               "expected_keys", "accounted_resolved", "accounted_unresolved", "unaccounted",
               "unresolved_recorded", "activation_eligible_hint"):
         say(k, s.get(k))
@@ -206,6 +222,66 @@ def mode_work():
                              f"BUILDING; nothing advances on a failed shard.")
         done += 1
     say("shards completed this invocation", done)
+    budget = MAX_SECONDS - (time.time() - t0)
+    if budget > 0:
+        publish_pending(gen, budget)
+    return 0
+
+
+def shards_unfinished(gen):
+    return int(sql(f"select count(*) n from geo.n5_shard where generation_id={lit(gen)} "
+                   f"and state <> 'done';", "unfinished", read_only=True)[0]["n"])
+
+
+def unpublished_prefixes(gen):
+    return [r["z3"] for r in sql(
+        f"select s.z3 from geo.n5_shard s where s.generation_id={lit(gen)} "
+        f"and not exists (select 1 from geo.n5_generation_publish p "
+        f"where p.generation_id=s.generation_id and p.z3=s.z3) order by s.z3;",
+        "unpublished", read_only=True)]
+
+
+def publish_pending(gen, budget_seconds):
+    """The publish + unresolved stages, bounded. Publishing waits for EVERY shard: a project
+    stated in one prefix can resolve into another, so a boundary probed before all geometry
+    exists would miss it in silence."""
+    from n5_publish import publish_prefix  # noqa: E402 - one implementation
+    left = shards_unfinished(gen)
+    if left:
+        say("publish", f"waiting - {left} shard(s) not done")
+        return 0
+    t0 = time.time()
+    run_id = f"pub-{WORKER}"
+    todo = unpublished_prefixes(gen)
+    say("prefixes to publish", len(todo))
+    for z3 in todo:
+        if time.time() - t0 >= budget_seconds:
+            say("publish", "budget spent - resuming next tick")
+            return 0
+        publish_prefix(gen, z3, run_id)
+    if not unpublished_prefixes(gen):
+        stale = sql(f"select (g.unresolved_recorded_at is null or g.unresolved_recorded_at < "
+                    f"(select max(p.completed_at) from geo.n5_generation_publish p "
+                    f"where p.generation_id=g.generation_id)) s from geo.n5_generation g "
+                    f"where g.generation_id={lit(gen)};", "unresolved stale", read_only=True)[0]["s"]
+        if stale:
+            r = sql(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[0]["r"]
+            say("unresolved outcomes recorded", r)
+    return 0
+
+
+def mode_publish():
+    gen = GENERATION or discover_building()
+    if not gen:
+        say("publish", "no BUILDING generation - nothing to do (clean no-op)")
+        return 0
+    return publish_pending(gen, MAX_SECONDS)
+
+
+def mode_unresolved():
+    gen = require_generation()
+    r = sql(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[0]["r"]
+    say("unresolved outcomes recorded", r)
     return 0
 
 
@@ -222,16 +298,15 @@ def mode_reconcile():
 
 
 def mode_ready():
-    """BUILDING -> READY. A state change only; it asserts nothing about reconciliation."""
+    """BUILDING -> READY, decided by geo.n5_generation_mark_ready: every shard done, every
+    prefix published, unresolved outcomes recorded after the last publish, membership and
+    markers paired, every canonical ZIP carrying a status, the declared chunks covering the
+    whole expected set, and reconciliation recomputed to zero unaccounted. It raises on any
+    gap; this script adds no second copy of those rules."""
     gen = require_generation()
-    bad = sql(f"select count(*) n from geo.n5_shard where generation_id={lit(gen)} "
-              f"and state <> 'done';", "unfinished", read_only=True)[0]["n"]
-    if int(bad) != 0:
-        raise SystemExit(f"STOP: {bad} shard(s) are not done. READY means every shard "
-                         f"finished, and it still proves nothing about reconciliation.")
-    sql(f"update geo.n5_generation set state='READY' where generation_id={lit(gen)} "
-        f"and state='BUILDING';", "ready")
-    say("generation", f"{gen} -> READY (activation still requires reconciliation)")
+    arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
+    sql(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready")
+    say("generation", f"{gen} -> READY (serving still requires `activate`)")
     return 0
 
 
@@ -243,8 +318,37 @@ def mode_activate():
     return 0
 
 
-MODES = {"status": lambda: 0, "open": mode_open, "work": mode_work,
-         "reconcile": mode_reconcile, "ready": mode_ready, "activate": mode_activate}
+def require_reason():
+    if not REASON:
+        raise SystemExit("STOP: REASON is required for this mode.")
+    return REASON
+
+
+def mode_rollback():
+    gen = require_generation()
+    sql(f"select geo.n5_generation_rollback({lit(gen)}, {lit(require_reason())});", "rollback")
+    say("generation", f"{gen} restored as the serving generation")
+    return 0
+
+
+def mode_fail():
+    gen = require_generation()
+    sql(f"select geo.n5_generation_fail({lit(gen)}, {lit(require_reason())});", "fail")
+    say("generation", f"{gen} -> FAILED")
+    return 0
+
+
+def mode_discard():
+    gen = require_generation()
+    r = sql(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard")[0]["r"]
+    say("discarded", r)
+    return 0
+
+
+MODES = {"status": lambda: 0, "open": mode_open, "work": mode_work, "publish": mode_publish,
+         "unresolved": mode_unresolved, "reconcile": mode_reconcile, "ready": mode_ready,
+         "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
+         "discard": mode_discard}
 
 
 def main():
@@ -253,7 +357,7 @@ def main():
     if MODE not in MODES:
         raise SystemExit(f"STOP: unknown MODE {MODE!r}. Known: {sorted(MODES)}")
     rc = MODES[MODE]()
-    gen = GENERATION or (discover_building() if MODE in ("work", "reconcile", "status") else None)
+    gen = GENERATION or (discover_building() if MODE in ("work", "publish", "reconcile", "status") else None)
     if gen:
         status(gen)
     return rc

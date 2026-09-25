@@ -1948,6 +1948,36 @@ in production, in any schema, in any transaction.**
 **Rule:** any future "production dry run" of DDL uses this shape — copy out read-only, change a
 replica, prove parity. Never `begin; <DDL>; rollback;` against production.
 
+## 7.13 MAP 1 SERVES ONE N5 GENERATION, AND ONLY ACTIVATION CHANGES WHICH (2026-09-25 — NOT YET APPLIED)
+
+**DDL of record: `docs/n5-generation-publish.sql` (PART A additive · PART B concurrent indexes ·
+PART C key swap + serving splice). Written, executable-tested, NOT applied to production.**
+
+- **Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation**, through `geo.n5_serving_membership`
+  / `_marker` / `_status`. Every reader of the base tables is spliced onto those views in PART C,
+  which aborts if any reader it did not name still reads a base table.
+- **Candidate rows are written only while their generation is BUILDING.** The database enforces
+  this (`geo.n5_generation_row_guard` on all four serving-plane tables), so a build can never
+  touch what residents see, and the old in-place writers fail closed.
+- ⛔ **`n5_boundary_first.py`, `n5_unit_a_shadow.py` and `n5_a3_markers.py` (except `bench`)
+  are RETIRED.** They deleted and re-inserted the SERVING rows prefix by prefix, with no
+  generation. Do not re-run them through `phase2-b1-zcta.yml`. The one writer is
+  `n5_orchestrate.py` → `scripts/n5_publish.py` → `geo.n5_gen_publish_prefix`.
+- **Lifecycle:** `open` → `work` (shards, then publish every prefix, then
+  `geo.n5_gen_record_unresolved`) → `ready` (`geo.n5_generation_mark_ready`) → `activate`. The
+  COMMIT of `geo.n5_generation_activate` is the only serving switch; no rows are copied.
+  `rollback` restores a superseded generation by state alone.
+- **"Newly visible on HomeSignal" is derived, not stored:** `geo.n5_generation_entries(G)` =
+  G's membership minus its predecessor's. It includes geography corrections, so it never means
+  "new project". It is derivable only while the predecessor's rows exist, and discard refuses
+  the serving generation's predecessor.
+- **Proof:** `test/n5_generation_pg/run_suite.py` (49 assertions + 7 mutations, all killed) via
+  `n5-generation-publish-suite.yml`; `test/n5-generation-publish.test.mjs` (42 static pins).
+- ⚠️ **Applying it needs disk the database does not have today.** Measured 2026-09-25: database
+  11,281 MB against the 11,607 MB the N5 scripts assume, with a 2,048 MB floor. PART B builds
+  ~450 MB of indexes before PART C frees ~375 MB. A second national generation adds ~1.25 GB
+  while both are retained. Capacity decides when this is applied; it does not change the design.
+
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
 **Every coordinate claim is classified by what the evidence is, and authority follows that

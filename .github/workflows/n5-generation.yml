@@ -4,6 +4,11 @@
 # was "build every ZIP3 prefix once" and every prefix reached done. Nothing failed; there
 # was simply nothing that would ever run again. This workflow is that something.
 #
+# The scheduled `work` tick now also PUBLISHES a candidate once every shard is done
+# (scripts/n5_publish.py -> geo.n5_gen_publish_prefix, docs/n5-generation-publish.sql) and
+# records its unresolved outcomes. Everything it writes belongs to the BUILDING generation,
+# which Map 1 never reads; the database refuses writes to any other generation.
+#
 # ⛔ IT CANNOT ACTIVATE A GENERATION. `activate` is manual-dispatch only and even then the
 # decision belongs to geo.n5_generation_activate(), which re-derives every condition and
 # raises. A green run of this workflow means work advanced — never that production moved.
@@ -22,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'status | open | work | reconcile | ready | activate'
+        description: 'status | open | work | publish | unresolved | reconcile | ready | activate | rollback | fail | discard'
         required: true
         default: 'status'
       generation:
@@ -35,6 +40,10 @@ on:
         default: '4'
       chunks:
         description: 'chunk keys (blank = the generation own shard prefixes)'
+        required: false
+        default: ''
+      reason:
+        description: 'rollback / fail: why (required for those modes)'
         required: false
         default: ''
 
@@ -63,6 +72,7 @@ jobs:
           GENERATION: ${{ github.event.inputs.generation || '' }}
           MAX_SHARDS: ${{ github.event.inputs.max_shards || '4' }}
           CHUNKS: ${{ github.event.inputs.chunks }}
+          REASON: ${{ github.event.inputs.reason }}
           MAX_SECONDS: '3000'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py
