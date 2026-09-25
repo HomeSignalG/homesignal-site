@@ -2124,8 +2124,9 @@ never a rank.
   street, leave their publisher point exactly as it was.
 - ⚠️ **Coverage is bounded by the source.** 1,311 of 2,187 Atlas records state no street address.
   Validation reaches every Atlas record that states one, not every Atlas record.
-- **Schedule, measured:** 763 addresses in 407.7 s. The writer batch is 400, and the queue drains in
-  two daily runs. The queue SQL orders admitted work first and works on either side of the apply.
+- **Derivation, measured:** 763 addresses in 407.7 s on the replica. The writer batch is 400; on
+  2026-09-25 the live queue (789) drained in two batches. The queue SQL orders admitted work first and
+  works on either side of the apply.
 - #1324's apply artifact is **frozen by hash** (it was applied). `dc-epoch-dryrun.yml` is dispatch-only:
   its production step refuses by design once production is past #1324.
 
@@ -2148,23 +2149,87 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
   - The Atlas queue drained in 2 batches (400 + 389).
   - `dc_address_geocode` went 56 → 845, with 0 duplicates.
   - 650 Atlas derivations were accepted. **0 reach geography evidence.**
-- **Zero effect, proven on production's own data rather than by a before/after diff:**
-  `dc-atlas-phase-a-counterfactual.yml` (PR #1341) loads one read-only copy into an OLD (f9d1326)
-  replica and a NEW replica. Resolver inputs, Map 1, geography decisions and identity were all
-  identical: 0 of 1,835 Map 1 rows and 0 of 4,105 geography decisions differ.
-- ⚠️ **WHY A COUNTERFACTUAL AND NOT A DIFF: the data moves under any deployment.** The Compute Atlas
-  acquisition (cron `40 9`) and the Epoch acquisition (cron `10 10`) ran at **14:44Z and 15:10Z**,
-  about 5 hours late, as they do daily. "Nothing acquires before tomorrow" was said in this session
-  and was wrong. **Read `dc_acquisition_run` before assuming a quiet window.**
-- 🔴 **PRE-EXISTING, NAMED, NOT FIXED: Map 1 LOSES ITS CANONICAL LAYER EVERY DAY between an Atlas
-  acquisition and the next :25 identity run.**
-  - A new acquisition makes every Atlas current observation unlinked (measured 2,216 / 2,216).
+- **Zero effect — HARDENED PROOF (PR #1344), superseding the #1341 counterfactual.** Production is only
+  READ. `scripts/dc-atlas-phase-a-proof.sh` / `dc-atlas-phase-a-proof.yml`; the one comparator is
+  `scripts/dc_phase_a_proof.py`. Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md` §"Hardened
+  proof".
+  - 🛑 **The #1341 counterfactual had two defects, and its zero was not evidence.** It copied production
+    AFTER the new-code identity run (15:25Z), so OLD never replayed identity from the pre-resolver
+    inputs. And its comparator was never shown able to detect a nonzero. `dc-atlas-phase-a-counterfactual`
+    is deleted.
+  - **True pre-identity replay.** T = `2026-09-25 15:25:00.080497Z`, the first identity run after the
+    14:44Z Atlas and 15:10Z Epoch acquisitions. The state at T is rebuilt from production's history plus
+    the retained `dc_phase_a_*_before_20260925` snapshot (13:43:12Z), and validated four ways against
+    evidence it did not use:
+    - V1: it reproduces the snapshot's own Map 1.
+    - V2: it reproduces the live 14:52:45Z Map 1 (1,084 rows, `c874ef2a…`).
+    - V3: the only resolver runs in [S,T) (14:25, 14:35) ended before the first new input (14:44). The
+      OLD code they ran writes 0 on that state, so no write can hide behind a later T timestamp.
+    - The NEW replay reproduces production's actual 15:25/15:35 decisions row for row.
+  - **The instrument is proven to detect:** 9 positive controls on disposable clones, each with an exact
+    expected result, all detected (run `36176907428` on `6ac7d13`):
+    - Map 1 row move, and an equal-totals swap;
+    - parity refusal;
+    - identity (an entity; a link plus a decision);
+    - geography;
+    - admission (the gate, and END TO END through the NEW resolvers: Map 1 1,835 → 1,811 on a disposable
+      replica);
+    - an evidence leak.
+    Plus 13/13 comparator mutants killed, and an assertion that OLD and NEW are genuinely different code.
+  - **Result (run `36176907428`):** OLD and NEW are identical from the same start fingerprint
+    (`5448f00d…`), with floats and geometry compared exactly.
+    - Identity 25,762 rows, row diff 0.
+    - Geography 4,105 decisions, row diff 0. `rule_version` restamping is the only difference, and is
+      not a decision.
+    - Map 1 over all 12,722 ZIP pages: 1,835 rows / 767 pages, 0 added, 0 removed, 0 moved, 0 ZIP-changed.
+    - Atlas derived evidence in the NEW plane: 0.
+  - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
+    runs it replays. Re-deriving it later needs a new boundary, not a re-run.
+  - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
+    `dc_address_geocode` is keyed by address text alone. Any ADMITTED observation stating the same line
+    consumes a derivation, whichever source queued it. The 789 lines Phase A's Atlas queue derived before T
+    would not have existed pre-#1335, so giving both replicas the same geocode table made this path read
+    zero by construction.
+    - Measured: 0 admitted consumers of a post-snapshot derivation. Controls: 58 admitted consumers, all on
+      the 56 pre-snapshot derivations; 803 unadmitted consumers of the new ones.
+    - The proof asserts that on both replicas, and step 6b replays OLD in the true pre-#1335 world, without
+      those geocodes. It must equal the replay.
+    - 📌 **It is latent for the future.** An Epoch record whose address equals an already-derived Atlas line
+      would use that derivation. Admitting-by-text is the design, not a leak, but it means acquisition for
+      a non-admitted source is not decision-inert in general.
+  - ⚠️ **THREE INSTRUMENT DEFECTS, each of which made a zero look cleaner than it was:**
+    1. **The production URL goes through a pooler that DROPS startup options.** `PGOPTIONS`
+       (`default_transaction_read_only=on`, `statement_timeout=15min`) never reached the server. A fresh
+       session reads `statement_timeout = 2min` and `default_transaction_read_only = off`. Read-only must be
+       enforced **inside the transaction**: `BEGIN … READ ONLY`, asserted in-session, then rolled back.
+       Earlier runs were read-only only because every query was a fixed SELECT of read functions.
+    2. **Production sets `extra_float_digits = 0` in its configuration file**, so any text dump of a
+       float8 is rounded to 15 significant digits. The replicas were built from rounded coordinates, and
+       lat/lng compared as text were blind below the 15th digit on both sides. Only exact EWKB exposed it,
+       on 18 geocoded points. **Every dump that will be compared or reloaded sets `extra_float_digits = 3`.**
+       The first explanation, two PostGIS versions, was wrong: both sides are 3.3.7.
+    3. **psql CSV writes NULL and `''` identically to Python's `csv.reader`.** Every dump now uses
+       `null '\N'`.
+- ⚠️ **WHY A REPLAY AND NOT A DIFF: the data moves under a deployment.** On 2026-09-25 the Compute Atlas
+  acquisition (cron `40 9`) ran at **14:44Z** and the Epoch acquisition (cron `10 10`) at **15:10Z**.
+  Both are observed times for that one day; no general lateness pattern is claimed. "Nothing acquires
+  before tomorrow" was said in this session and was wrong. **Read `dc_acquisition_run` before assuming a
+  quiet window.**
+- 🔴 **PRE-EXISTING, NAMED, NOT FIXED: Map 1 lost its canonical layer between the Atlas acquisition and
+  the next identity run.** Observed on 2026-09-25 after the 14:44Z Atlas acquisition and before the
+  15:25Z identity run. It has not been measured on other days, so do not generalise it.
+  - The acquisition left every Atlas current observation unlinked (measured 2,216 / 2,216).
   - Measured 14:52Z: 969 → 1 canonical rows; 1,814 → 1,084 rows; 758 → 365 ZIP pages.
-  - It restored at 15:35Z. It is independent of this change (Map 1's dependency closure contains none of
-    Phase A's objects). It is an ordering defect between acquisition and resolution, and needs its own
-    fix.
+  - It restored after the 15:25Z/15:35Z resolvers. It is independent of Phase A: the live Map 1
+    dependency closure, traced recursively on 2026-09-25, contains no Phase A object. It is an ordering
+    defect between acquisition and resolution, and needs its own fix.
+- 📌 **FOLLOW-UP, NOT DONE HERE: production-write workflow authorization / human-review gate.**
+  `dc-atlas-phase-a-apply.yml` (#1339) writes DDL to production when dispatched from `main` with the
+  typed string `APPLY-PHASE-A-ccd637e`. There is no protected `environment:` and no required human
+  reviewer; its own preflight (artifact sha256 pin, drift guard, window) is the only other gate. The
+  proof work neither reuses nor modifies it.
 - ⛔ **Admission still needs a POST-Phase-A national dry run.** `dc-atlas-dryrun.yml` refuses by design
-  now that production carries Phase A. The counterfactual script is its natural base: add the Phase D
+  now that production carries Phase A. The hardened proof script is its natural base: add the Phase D
   switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
   records.
 
