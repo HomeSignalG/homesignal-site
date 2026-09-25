@@ -1988,9 +1988,18 @@ PART C key swap + serving splice). Written, executable-tested, NOT applied to pr
   SUFFICIENT.** PART A and PART B each raise unless the operator sets `n5.verified_free_disk_mb`
   to an INDEPENDENTLY verified physical free-disk figure ≥ 2,048 MB floor + 950 MB PART B peak.
   The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used to derive
-  it. Measured 2026-09-25: the database itself is 11,281 MB, and physical capacity is UNVERIFIED.
-  PART B builds ~450 MB of indexes before PART C frees ~375 MB; a second national generation adds
-  ~1.25 GB while both are kept.
+  it. PART B builds ~450 MB of indexes before PART C frees ~375 MB.
+- ✅ **VERIFIED PHYSICAL CAPACITY (Supabase dashboard, founder-read, 2026-09-25): provisioned
+  database disk 18 GB · utilization 81% · Database 11.3 GB · WAL 2.7 GB · System 206.1 MB.** This
+  REPLACES every assumption that the physical disk is 11,607 MB. ⚖️ **Verdict: 18 GB is
+  INSUFFICIENT** for the migration plus a retained second generation plus the 2,048 MB floor; the
+  provisioned disk is being increased before anything proceeds. Full receipt, arithmetic and the
+  corrected second-generation size (it is ~2.9 GB, not ~1.25 GB — the ~1.25 GB omitted the new
+  snapshot): `docs/maps-coverage/N5-CAPACITY-VERIFIED-2026-09-25.md`.
+  - ⚠️ The scripts still carry `DISK_TOTAL_MB` = 11,607 (unchanged; no code was touched). Against
+    the real 11.3 GB database + 2.7 GB WAL that constant yields a NEGATIVE "free" figure, so those
+    guards refuse on a wrong number rather than a right one. Set `DISK_TOTAL_MB` from the verified
+    provisioned size when running them; do not treat 11,607 as capacity.
 
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
