@@ -115,6 +115,24 @@ for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready'])
   ok(body && !/n5_generation_activate/.test(body), `${fn} can never activate`);
 }
 
+// ── `open` writes the snapshot's NOT NULL fingerprints with the CANONICAL expressions ──
+// preservation.app_project_identity.identity_hash / content_hash are NOT NULL in production;
+// the first production `open` (2026-09-25) omitted them and was refused. One definition:
+// docs/preservation-baseline-phase1.sql. The capture must carry the same two expressions.
+{
+  const canon = readFileSync('docs/preservation-baseline-phase1.sql', 'utf8');
+  const hashes = (t) => (t.match(/decode\(md5\([\s\S]*?\),'hex'\)/g) || [])
+    .map((h) => h.replace(/\s+/g, ' '));
+  const canonHashes = hashes(canon.slice(canon.indexOf('ins_identity as ('), canon.indexOf('ins_report as (')));
+  const openBody = (orch.split('def mode_open(')[1] || '').split('\ndef ')[0];
+  const capture = openBody.slice(openBody.indexOf('insert into preservation.app_project_identity'));
+  ok(canonHashes.length === 2, 'the canonical capture defines exactly identity_hash and content_hash');
+  ok(/identity_hash, content_hash\)/.test(capture), '`open` names both NOT NULL fingerprint columns');
+  const openHashes = hashes(capture.slice(0, capture.indexOf('from public.app_projects')));
+  ok(openHashes.length === 2 && openHashes[0] === canonHashes[0] && openHashes[1] === canonHashes[1],
+    '`open` fingerprints with the canonical expressions, byte for byte after whitespace');
+}
+
 // ── the retired in-place writers stay retired ─────────────────────────────────────────
 for (const s of ['scripts/n5_boundary_first.py', 'scripts/n5_unit_a_shadow.py', 'scripts/n5_a3_markers.py']) {
   const t = readFileSync(s, 'utf8');

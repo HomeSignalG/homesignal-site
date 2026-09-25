@@ -1948,10 +1948,27 @@ in production, in any schema, in any transaction.**
 **Rule:** any future "production dry run" of DDL uses this shape — copy out read-only, change a
 replica, prove parity. Never `begin; <DDL>; rollback;` against production.
 
-## 7.13 MAP 1 SERVES ONE N5 GENERATION, AND ONLY ACTIVATION CHANGES WHICH (2026-09-25 — NOT YET APPLIED)
+## 7.13 MAP 1 SERVES ONE N5 GENERATION, AND ONLY ACTIVATION CHANGES WHICH (2026-09-25 — APPLIED; GENERATION PATH NOT YET RUNNABLE)
 
 **DDL of record: `docs/n5-generation-publish.sql` (PART A additive · PART B concurrent indexes ·
-PART C key swap + serving splice). Written, executable-tested, NOT applied to production.**
+PART C key swap + serving splice). ✅ APPLIED TO PRODUCTION 2026-09-25** (founder "go", after the
+disk was raised to 24 GB): PART A via `db-sql.yml` from a byte-equal copy of lines 1-1041 (HTTP
+201); PART B statement by statement (4 unique indexes valid, ~300 MB; 3 NOT NULL checks
+validated); PART C via `db-sql.yml` from a byte-equal copy of lines 1085-1259. **Map 1 was
+fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
+`app_projects_for_zip`, `app_zip_geography_state`} and the national 12,722-row
+`app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
+still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
+
+- ⛔ **THE GENERATION PATH (`open` → `work` → publish → `ready` → `activate`) HAS NEVER RUN END TO
+  END AGAINST PRODUCTION, AND IT CANNOT YET.** The first real `open` (run `36172375498`) was
+  refused, wrote nothing, and a read-only audit of the whole path against the LIVE catalog then
+  found **11 blocking defects**, each adversarially verified. Receipt, evidence and fix class for
+  each: `docs/maps-coverage/N5-GENERATION-RUNNABILITY-AUDIT-2026-09-25.md`. **Do not dispatch
+  `open` again until they are fixed** — a re-run after the capture commits and before the
+  generation row exists leaves ~1.4 GB of orphaned snapshot rows under a name `open` then refuses.
+  🔑 The executable suite passed because its fixture is more permissive than production and seeds
+  evidence nothing in production writes; **a green suite here proved the design, not the run.**
 
 - **Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation**, through `geo.n5_serving_membership`
   / `_marker` / `_status`. Every reader of the base tables is spliced onto those views in PART C,

@@ -150,11 +150,22 @@ def mode_open():
     cutoff = sql("select now() c;", "cutoff", read_only=True)[0]["c"]
     say("capture cutoff", cutoff)
 
+    # identity_hash and content_hash are NOT NULL in production. Both expressions are the
+    # canonical ones from docs/preservation-baseline-phase1.sql, byte for byte, so every
+    # snapshot fingerprints the same way; test/n5-generation-publish.test.mjs pins the
+    # parity. (The first production `open`, 2026-09-25, omitted them and was refused.)
     sql(f"""insert into preservation.app_project_identity
               (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id,
-               record_kind, source_ref, submitted_at, lat, lng)
+               record_kind, source_ref, submitted_at, lat, lng, identity_hash, content_hash)
             select {lit(snapshot_id)}, p.id, p.zip, p.source_key, p.source_seq, p.registry_id,
-                   'development', p.source_ref, p.submitted_at, p.lat, p.lng
+                   'development', p.source_ref, p.submitted_at, p.lat, p.lng,
+         decode(md5(coalesce(p.zip,'')||'|'||coalesce(p.source_key,'')||'|'||
+                    coalesce(p.source_seq::text,'')||'|'||coalesce(p.record_kind,'')||'|'||
+                    coalesce(p.registry_id,'')),'hex'),
+         decode(md5(coalesce(p.source_ref,'')||'|'||coalesce(p.submitted_at::text,'')||'|'||
+                    coalesce(p.lat::text,'')||'|'||coalesce(p.lng::text,'')||'|'||
+                    coalesce(p.name,'')||'|'||coalesce(p.status,'')||'|'||
+                    coalesce(p.type,'')),'hex')
               from public.app_projects p
               join public.n5_expected_input({lit(cutoff)}) e
                 on e.source_key = p.source_key and e.zip = p.zip and e.source_seq = p.source_seq
