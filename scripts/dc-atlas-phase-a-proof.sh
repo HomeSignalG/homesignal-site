@@ -70,11 +70,17 @@ PY
     -c "begin transaction isolation level repeatable read, read only" \
     -c "set local statement_timeout = '15min'" -c "set local lock_timeout = '2s'" \
     -c "set local idle_in_transaction_session_timeout = '60s'" -c "set local timezone = 'UTC'" \
+    -c "set local extra_float_digits = 3" \
     -c "do \$\$ begin if current_setting('transaction_read_only') <> 'on' then raise exception 'prod_copy: transaction is not read-only'; end if; end \$\$" \
     -c "\\copy ($q) to '$2' with (format csv, header, null '\N')" \
     -c "rollback"
 }
-rcopy() { L -d "$1" -c "set timezone = 'UTC'" -c "\\copy ($2) to '$3' with (format csv, header, null '\N')"; }
+rcopy() { L -d "$1" -c "set timezone = 'UTC'" -c "set extra_float_digits = 3" -c "\\copy ($2) to '$3' with (format csv, header, null '\N')"; }
+# EXACT FLOATS: production's configuration file sets extra_float_digits = 0, so its default text output of
+# a float8 is rounded to 15 significant digits. Copied that way, every coordinate a replica is built from
+# would be rounded (run 36175378803: 18 geocoded points moved in their 16th-17th digit), and every compared
+# float would be blind below the 15th digit. Every production read and every compared dump sets 3
+# (shortest round-trip exact).
 clone() { dropdb --if-exists "$2"; createdb -T "$1" "$2"; }
 
 Q_ENT="select canonical_entity_id, entity_grain, classification, classification_conflict, rule_version, observation_count, source_count, superseded_by, supersede_reason from public.dc_canonical_entity"
@@ -267,7 +273,8 @@ echo "  V1 boundary 13:43:12Z: reconstructed Map 1 $V1B rows vs the snapshot's o
 [ "$V1D" = 0 ] && [ "$V1A" -gt 0 ] || fail "V1 reconstruction at the snapshot boundary does not reproduce the snapshot Map 1"
 dropdb val_s
 clone tmpl_new val_1452; reconstruct val_1452 "$B1452"
-V2="$(L -d val_1452 -tA -c "set timezone='UTC'" -c "select count(*) || ' ' || md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from ($Q_MAP) x")"
+# the live 14:52:45Z fingerprint was taken in a production session, whose extra_float_digits is 0: match it
+V2="$(L -d val_1452 -tA -c "set timezone='UTC'" -c "set extra_float_digits = 0" -c "select count(*) || ' ' || md5(string_agg(x::text, E'\n' order by x::text collate \"C\")) from ($Q_MAP) x")"
 echo "  V2 boundary 14:52:45Z: reconstructed Map 1 = $V2 | live measurement at that instant = $LIVE1452_ROWS $LIVE1452_MD5"
 [ "$V2" = "$LIVE1452_ROWS $LIVE1452_MD5" ] || fail "V2 reconstruction does not reproduce the live 14:52:45Z Map 1 measurement"
 dropdb val_1452
