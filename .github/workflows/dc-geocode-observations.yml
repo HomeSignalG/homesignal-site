@@ -70,8 +70,10 @@ jobs:
 
       # RESUMABLE BATCH (2026-09-24): one run derives at most DCG_BATCH addresses, admitted work first,
       # in a total deterministic order; the rest wait for the next run (docs/dc-geocode-observations-queue.sql).
-      # Sized from the MEASURED ladder time in the national dry run (dc-atlas-dryrun.yml, DCG_TIMING),
-      # so a full batch finishes well inside timeout-minutes, and the load -- one transaction -- lands
+      # Sized from the MEASURED ladder time in the national dry run (dc-atlas-dryrun.yml run 36078120976:
+      # DCG_TIMING addresses=763 total_s=407.7, ladder p50 202 ms / p95 414 ms / max 1,458 ms + 300 ms
+      # pacing => 400 addresses ~= 3.6 min against a 30 min timeout; the 763-address Atlas backlog drains
+      # in two daily runs), so a full batch finishes well inside timeout-minutes, and the load -- one transaction -- lands
       # long before the :25 identity / :35 geography resolvers. An address not yet derived is absent
       # evidence, which never removes a publisher point: a multi-day drain cannot black out a facility.
       - name: Read the queue (READ ONLY transaction)
