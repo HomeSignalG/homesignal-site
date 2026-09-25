@@ -384,7 +384,9 @@ def run(conn, label, mutate=None, suite=None):
     q1(c, "select geo.n5_gen_record_unresolved(%s)", (GEN_B,))
 
     # C1: a writer that saw BUILDING holds the generation until it commits; READY waits.
-    w = psycopg2.connect(c.dsn)
+    # NOT c.dsn: psycopg2 masks the password there ("password=xxx"), which only works
+    # against a trust-auth server. Rebuild it from the admin DSN plus this database's name.
+    w = psycopg2.connect(with_db(admin_dsn(), c.get_dsn_parameters()["dbname"]))
     try:
         with w.cursor() as wc:
             wc.execute("insert into geo.zip_authoritative_membership (generation_id, zcta5, source_key, point_rule, "
