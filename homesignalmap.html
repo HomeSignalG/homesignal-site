@@ -104,7 +104,10 @@
      posts (founder, 2026-09-25). ZIP mode only: an address search is about a home, not a
      ZIP, and zipmode is the class the page already uses to say which one it is showing.
      It lives inside .head, so the Place-page embed hides it with the rest of the hero. */
-  .zip-email{display:none;margin:16px 0 4px;max-width:640px}
+  /* No width cap: the consent line (~660px at 12.5px) fits on ONE line on desktop (founder,
+     2026-09-26). The old 640px cap wrapped "anytime." onto a second line. It still wraps
+     where the screen is narrower than the sentence, so a phone never scrolls sideways. */
+  .zip-email{display:none;margin:16px 0 4px}
   body.zipmode .zip-email{display:block}
   .zip-email-btn{min-height:44px;padding:11px 18px;border:0;border-radius:11px;
     background:var(--green);color:#fff;font-family:var(--font);font-size:15px;font-weight:700;
@@ -657,11 +660,13 @@
            placeholder now carries the instruction the sentence used to. -->
       <div class="search-err" id="addrErr" role="alert" hidden></div>
       <!-- "What is changing in my zip code?" — email copies of the Bluesky MAPS posts about
-           THIS ZIP (founder, 2026-09-25). The label is the founder's wording, word for word.
+           THIS ZIP (founder, 2026-09-25). The label is the founder's wording, word for word:
+           "Sign up for emails on what is changing in this zip code" (founder, 2026-09-26; the
+           first label was the topic itself). The TOPIC the sign-up stores is unchanged.
            The note is filled from HS.MAPS_CONSENT_COPY, the SAME string the sign-up records
            as its consent audit trail, so what is shown is what is stored. -->
       <div class="zip-email" id="zipEmail" data-zip="">
-        <button type="button" class="zip-email-btn" id="zipEmailBtn">What is changing in my zip code?</button>
+        <button type="button" class="zip-email-btn" id="zipEmailBtn">Sign up for emails on what is changing in this zip code</button>
         <div class="zip-email-note" id="zipEmailNote"></div>
         <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
       </div>
@@ -2206,7 +2211,9 @@ HS.onReady(function(){
   // posts (founder, 2026-09-25). The page only PAINTS: signing in, saving the ZIP to My
   // Places, writing the selection and reading it back all live in shell.js
   // (HS.mapsZipEmailSignup / HS.mapsZipEmailState), which is the one path for this sign-up.
-  var ZIP_EMAIL_LABEL = "What is changing in my zip code?";
+  // The button's LABEL, not the topic: the founder renamed the button on 2026-09-26, and the
+  // topic (HS.MAPS_EMAIL_TOPIC) is what links a sign-up to the posts, so it stays as it was.
+  var ZIP_EMAIL_LABEL = "Sign up for emails on what is changing in this zip code";
   function setZipEmailSubscribed(on){
     var btn = $("zipEmailBtn"); if(!btn) return;
     btn.disabled = !!on;

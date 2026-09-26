@@ -24,6 +24,8 @@ let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 
 const TOPIC = 'What is changing in my zip code?';
+// The button's label is the founder's wording (2026-09-26) and is NOT the topic.
+const BUTTON_LABEL = 'Sign up for emails on what is changing in this zip code';
 
 // ---------------------------------------------------------------- §1 + §2 driven
 const COMMUNITIES = [
@@ -136,12 +138,16 @@ ok(/requireAuth = function \(thenLabel, afterAuth\)[\s\S]{0,300}HS\.openAuth\(af
 const page = read('homesignalmap.html');
 const head = (page.match(/<div class="head">[\s\S]*?<div class="status" id="status">/) || [''])[0];
 ok(head.length > 0, '§5 the Map 1 hero (.head) is locatable (positive control)');
-ok(/<button type="button" class="zip-email-btn" id="zipEmailBtn">What is changing in my zip code\?<\/button>/.test(head),
+ok(head.includes('<button type="button" class="zip-email-btn" id="zipEmailBtn">' + BUTTON_LABEL + '</button>'),
   "§5 the button reads the founder's wording, word for word, and lives inside .head");
 ok(/\.hs-embed \.wrap>\.head,/.test(page),
   '§5 .head is on the embed hide list, so the button never appears inside a Place-page map');
 ok(/\.zip-email\{display:none;/.test(page) && /body\.zipmode \.zip-email\{display:block\}/.test(page),
   '§5 the control shows in ZIP mode only');
+ok(/\.zip-email\{display:none;margin:16px 0 4px\}/.test(page),
+  '§5 the sign-up block has no width cap, so the consent line fits on one line on desktop');
+ok(!/\.zip-email-note\{[^}]*nowrap/.test(page),
+  '§5 the consent line can still wrap, so a phone never scrolls sideways');
 const loadZip = (page.match(/function loadZip\(zip\)\{[\s\S]*?paintZipEmail\(zip\);/) || [''])[0];
 ok(loadZip.length > 0 && loadZip.indexOf('classList.add("zipmode")') > -1,
   '§5 loadZip paints the control when it enters ZIP mode');
@@ -158,6 +164,12 @@ ok(/err && err\.friendly\) \? err\.message : "Couldn't sign you up/.test(paint),
 // ---------------------------------------------------------------- §5b approved wording
 // The founder APPROVED this wording on 2026-09-26, so it is locked (CLAUDE.md Rule #0).
 // Each string is pinned WHOLE: a fragment match would let the rest of it change.
+// ⚖️ The button LABEL (founder, 2026-09-26, later the same day): "Change the text in the button
+// to Sign up for emails on what is changing in this zip code". It replaced the first label,
+// which was the topic itself; the TOPIC the sign-up stores is unchanged (§1).
+ok(page.includes('var ZIP_EMAIL_LABEL = "' + BUTTON_LABEL + '";'),
+  '§5b the label the page paints back is the approved wording, verbatim');
+ok(!head.includes('>' + TOPIC + '</button>'), '§5b the button no longer reads the topic');
 const APPROVED_CONSENT =
   "We'll email you when HomeSignal posts about what's changing in this ZIP code. No spam · Unsubscribe anytime.";
 ok(shell.includes(`const MAPS_CONSENT_COPY =\n    "${APPROVED_CONSENT}";`),

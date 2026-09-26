@@ -37,6 +37,8 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 
 const TOPIC = 'What is changing in my zip code?';
+// The button's label (founder, 2026-09-26) is not the topic the sign-up stores.
+const BUTTON_LABEL = 'Sign up for emails on what is changing in this zip code';
 const ZIP_ROW = [{ zip: '97702', home_lat: 44.02, home_lng: -121.30, counts: { facilities: 0 },
   refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false, sites: [] }];
 
@@ -169,10 +171,25 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
   const { ctx, page } = await open(LANDING);
   const btn = page.locator('#zipEmailBtn');
   ok(await btn.isVisible(), '1a the button is visible on the Map 1 ZIP page');
-  ok((await btn.textContent()).trim() === TOPIC, "1b it reads the founder's wording, word for word");
+  ok((await btn.textContent()).trim() === BUTTON_LABEL, "1b it reads the founder's wording, word for word");
   const note = (await page.locator('#zipEmailNote').textContent()).trim();
   ok(/^We'll email you when HomeSignal posts about what's changing in this ZIP code\./.test(note),
     '1c the consent line is shown next to the button', note);
+  // The consent line fits on ONE line at desktop width (founder, 2026-09-26). Counted from the
+  // rendered line boxes, not read off a CSS rule, so a width or font change cannot fake it.
+  const noteLayout = () => page.evaluate(() => {
+    const el = document.getElementById('zipEmailNote');
+    const r = document.createRange(); r.selectNodeContents(el);
+    return { lines: new Set(Array.from(r.getClientRects()).map(x => Math.round(x.top))).size,
+             overflow: el.scrollWidth > el.clientWidth };
+  });
+  const wide = await noteLayout();
+  ok(wide.lines === 1, '1c2 at desktop width the consent line fits on one line', wide);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrow = await noteLayout();
+  ok(narrow.lines > 1 && !narrow.overflow,
+    '1c3 on a phone it wraps inside its box instead of running off the screen', narrow);
+  await page.setViewportSize({ width: 1280, height: 1000 });
   if (process.env.MAPS_EMAIL_SCREENSHOT_BEFORE) {
     await page.screenshot({ path: process.env.MAPS_EMAIL_SCREENSHOT_BEFORE, clip: { x: 0, y: 0, width: 1280, height: 560 } }).catch(() => {});
   }
