@@ -2149,6 +2149,15 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   copied `p_zip` into a `char(5)` variable; `docs/map1-zip-read-char5.sql` gives Map 1's reader the
   same shape. Output cannot change: `p_zip` is refused unless it is exactly 5 digits, and all
   1.9 M stored keys are. Proof: `test/n5_generation_pg/run_map1_char5.py`.
+  - ✅ **APPLIED 2026-09-26 21:33Z** (`apply_migration`, ledger `20260926213351
+    map1_zip_read_char5`, stored text = the committed file byte for byte, md5 `6d57aa41…`, 7,741
+    chars). Body `5517dce9…` → `4918783a…`; owner, grants, SECURITY DEFINER, STABLE, search_path
+    and the 25 s timeout unchanged. **Same answers, byte for byte, on 6 recorded ZIP reads**
+    (97702 dev + facility, 01004 not_measured, 01009 zero projects, 94128 no status row, 28451 the
+    largest at 8.8 MB), and the public PostgREST call for 97702 returns the same 996,316 bytes.
+  - **Measured after:** 97702 3,221 ms / 128,931 blocks read → **69 ms / 0 read**; 28451 → 576 ms
+    (before, four large ZIPs in one call ran past 60 s); the public call for 97702 used 82 ms of
+    database time and read 0 blocks (before: mean 4,553 ms, ~119,000 blocks read per call).
   - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
     never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
 
