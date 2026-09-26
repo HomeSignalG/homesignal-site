@@ -103,9 +103,10 @@ ok(/if\(!CUR_ADDRESS\) return;/.test(map),
 for (const fam of ['stagechip', 'typechip', 'regchip'])
   ok(map.includes(fam), 'A-008 Map 1 keeps the ' + fam + ' filter family');
 
-// ---- A-008: map -> list stays 0 (list -> map is the one direction that exists) ----
-ok(!/development\.html/.test(map),
-  'A-008 Map 1 carries NO link back into the development list — the one-way gap is preserved',
+// ---- A-008: map -> list now exists (founder, 2026-09-26: "should have back button so you
+// can go back to list"). One link, ZIP-stamped through the shared data-znav mechanism. ----
+ok(/<a class="backbtn devlist-back" href="development\.html" data-znav="development\.html"/.test(map),
+  'A-008 Map 1 carries ONE ZIP-stamped link back into the development list',
   (map.match(/.{0,40}development\.html.{0,40}/) || [])[0]);
 ok(/See it on the map/.test(dev) && /homesignalmap\.html/.test(dev),
   'A-008 list -> map ("See it on the map") is the direction that DOES exist');

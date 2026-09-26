@@ -110,7 +110,7 @@ ok(/HS\.N5_RADII = \[0\.5, 1, 2, 5\];/.test(read('lib/n5-radius.js'))
   'LEFTOVER 5 ...seven UI stops against four RPC stops, unreconciled');
 ok(/meetings\.find\(function\(x\)\{return x\.related_project_id===projectId;\}\) \|\| meetings\[0\];/.test(dev),
   'LEFTOVER 6 HS.addToCalendar still falls back to meetings[0]');
-ok(!/development\.html/.test(map), 'LEFTOVER 7 map→list is still 0');
+ok(/data-znav="development\.html"/.test(map), 'LEFTOVER 7 CLOSED 2026-09-26: map→list exists (founder request)');
 ok(/HS\.navHref\('homesignalmap\.html', S\.zip\)/.test(dev), 'LEFTOVER 7 ...and list→map is still the one direction that exists');
 ok(!/sampleBtn/.test(map), 'LEFTOVER 7 #sampleBtn is still absent');
 ok(!/repPreview|impact model|updated today/.test(strip(read('reports.html'))),

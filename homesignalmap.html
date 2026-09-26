@@ -41,7 +41,6 @@
 })();
 </script>
 <link rel="stylesheet" href="app.css?v=20814d85"/>
-<style>.devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}</style>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -608,6 +607,8 @@
   .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
   .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
 
+/* Map 1 -> Development list back link: ZIP pages only. */
+.devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
