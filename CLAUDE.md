@@ -1279,6 +1279,13 @@ the committed file.
     sign-up stores, `HS.MAPS_EMAIL_TOPIC` = "What is changing in my zip code?", is what links
     a sign-up to the MAPS posts and the email, so it stays as it was, and §5b pins that the
     button no longer reads it.
+  - ⚖️ **THE CONSENT LINE FITS ON ONE LINE ON DESKTOP** (founder, 2026-09-26: *"this should fit
+    on one line. fix it"*). The words are unchanged; the layout was the defect. `.zip-email`
+    was capped at 640px and the sentence needs ~660px at 12.5px, so "anytime." wrapped. The cap
+    is gone, and nothing forces `nowrap`, so a phone still wraps it instead of scrolling
+    sideways. Checked from the rendered line boxes in Chromium: 1 line at 1280px (browser test
+    1c2), wrapped with no overflow at 390px (1c3). Restoring the cap fails 1c2; adding `nowrap`
+    fails 1c3.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 

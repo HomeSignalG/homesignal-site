@@ -104,7 +104,10 @@
      posts (founder, 2026-09-25). ZIP mode only: an address search is about a home, not a
      ZIP, and zipmode is the class the page already uses to say which one it is showing.
      It lives inside .head, so the Place-page embed hides it with the rest of the hero. */
-  .zip-email{display:none;margin:16px 0 4px;max-width:640px}
+  /* No width cap: the consent line (~660px at 12.5px) fits on ONE line on desktop (founder,
+     2026-09-26). The old 640px cap wrapped "anytime." onto a second line. It still wraps
+     where the screen is narrower than the sentence, so a phone never scrolls sideways. */
+  .zip-email{display:none;margin:16px 0 4px}
   body.zipmode .zip-email{display:block}
   .zip-email-btn{min-height:44px;padding:11px 18px;border:0;border-radius:11px;
     background:var(--green);color:#fff;font-family:var(--font);font-size:15px;font-weight:700;

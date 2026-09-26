@@ -144,6 +144,10 @@ ok(/\.hs-embed \.wrap>\.head,/.test(page),
   '§5 .head is on the embed hide list, so the button never appears inside a Place-page map');
 ok(/\.zip-email\{display:none;/.test(page) && /body\.zipmode \.zip-email\{display:block\}/.test(page),
   '§5 the control shows in ZIP mode only');
+ok(/\.zip-email\{display:none;margin:16px 0 4px\}/.test(page),
+  '§5 the sign-up block has no width cap, so the consent line fits on one line on desktop');
+ok(!/\.zip-email-note\{[^}]*nowrap/.test(page),
+  '§5 the consent line can still wrap, so a phone never scrolls sideways');
 const loadZip = (page.match(/function loadZip\(zip\)\{[\s\S]*?paintZipEmail\(zip\);/) || [''])[0];
 ok(loadZip.length > 0 && loadZip.indexOf('classList.add("zipmode")') > -1,
   '§5 loadZip paints the control when it enters ZIP mode');
