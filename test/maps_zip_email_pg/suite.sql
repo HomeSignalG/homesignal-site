@@ -264,6 +264,17 @@ select to_regprocedure('public.alert_confirmation_claim(uuid)') is not null
       not has_function_privilege('anon', 'public.alert_identity_streams(uuid)', 'EXECUTE')
       and not has_function_privilege('authenticated', 'public.alert_identity_streams(uuid)', 'EXECUTE')
       and has_function_privilege('service_role', 'public.alert_identity_streams(uuid)', 'EXECUTE');
+    -- The unsubscribe endpoint turns the identity off FIRST and reads its streams AFTER, so
+    -- the page can say "You're unsubscribed from Development alerts". That holds only while
+    -- the resolver still answers for an unsubscribed identity. A view or function that hid
+    -- unsubscribed people (a tidy-looking change) would drop every MAPS unsubscribe to the
+    -- general wording, and no other check would notice.
+    update public.users set unsubscribed = true where community_id = '00000000-0000-0000-0000-0000000097a2';
+    insert into _r select 'D10', 'alert_identity_streams still answers {maps} after the identity unsubscribes (the unsubscribe page reads it after the PATCH)',
+      coalesce((select public.alert_identity_streams(u.id) = array['maps']
+                  from public.users u where u.community_id = '00000000-0000-0000-0000-0000000097a2' and u.unsubscribed),
+               false);
+    update public.users set unsubscribed = false where community_id = '00000000-0000-0000-0000-0000000097a2';
   \else
     insert into _r values ('D07', 'SKIP: the ingest identity-streams migration was not applied', true);
   \endif

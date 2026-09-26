@@ -75,7 +75,7 @@ fi
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out" || true)
 n_fail=$(grep -c '|f$' <<<"$out" || true)
-floor=19; [ "$have_delivery" = 1 ] && floor=24; [ "$have_identity" = 1 ] && floor=27
+floor=19; [ "$have_delivery" = 1 ] && floor=24; [ "$have_identity" = 1 ] && floor=28
 echo "SHIPPED: $n_all checks, $n_fail failed (floor $floor)"
 if [ -s "$tmp/suite_err" ] || [ "$n_all" -lt "$floor" ] || [ "$n_fail" -ne 0 ]; then
   cat "$tmp/suite_err" >&2; echo "FAIL -- the shipped MAPS email stream does not pass"; exit 1
@@ -87,7 +87,8 @@ for name in subscriptions-forget-maps zip-scope-guard-not-installed pipeline-typ
             maps-tap-grants-marketing false-tap-revokes-marketing writer-becomes-delete-to-match \
             old-overload-kept referral-last-touch-wins integrity-view-not-appended \
             ledger-forgets-social-post claim-streams-not-scoped-to-identity claim-opened-to-public \
-            identity-streams-not-scoped identity-streams-opened-to-public; do
+            identity-streams-not-scoped identity-streams-hide-unsubscribed \
+            identity-streams-opened-to-public; do
   target="$A12"; case "$name" in ledger-*|claim-*) target="$DELIVERY";; identity-*) target="$IDENTITY";; esac
   if [ "$target" = "$DELIVERY" ] && [ "$have_delivery" != 1 ]; then echo "SKIP     $name (delivery migration absent)"; continue; fi
   if [ "$target" = "$IDENTITY" ] && [ "$have_identity" != 1 ]; then echo "SKIP     $name (identity-streams migration absent)"; continue; fi
