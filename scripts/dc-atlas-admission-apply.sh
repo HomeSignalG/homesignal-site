@@ -12,11 +12,27 @@
 # After it: Atlas and Epoch read admitted, nothing else does, and every dc_% view/function + the Map 1
 # reader equals a replica built from this checkout's DDL of record. Map 1 itself does not move until
 # the next hourly resolver run; stage 11 compares that run with the stage 8 dry run.
+#
+# DCA_MODE=rollback runs the SAME discipline in reverse with docs/dc-atlas-admission-rollback.sql:
+# refused unless Atlas reads admitted, and afterwards Atlas reads NOT admitted, the switch body is
+# byte-identical to Phase A's (md5 cd968b64...), and every OTHER dc_% object still equals the DDL of
+# record (the switch itself deliberately differs from it until the DDL is reverted too). The next
+# hourly geography run then restores the pre-admission decisions (V07 in the Atlas suite).
 set -euo pipefail
 
 : "${PROD_DB_URL:?PROD_DB_URL is required}"
-ART=docs/dc-atlas-admission-apply.sql
-EXPECTED_SHA256=2c2c8571c7ac8167210e66eb9d72a0ddff82843d972526e5951d97d8e2a3341c
+MODE="${DCA_MODE:-admit}"
+case "$MODE" in
+  admit)    ART=docs/dc-atlas-admission-apply.sql
+            EXPECTED_SHA256=2c2c8571c7ac8167210e66eb9d72a0ddff82843d972526e5951d97d8e2a3341c
+            ATLAS_BEFORE=false; ATLAS_AFTER=true ;;
+  rollback) ART=docs/dc-atlas-admission-rollback.sql
+            EXPECTED_SHA256=a440713b3ede8fef49495c9a60cc2c509660c33babc1d2c72cdffa0969e9a2e8
+            ATLAS_BEFORE=true; ATLAS_AFTER=false ;;
+  *) echo "REFUSED: DCA_MODE must be admit or rollback"; exit 1 ;;
+esac
+PHASE_A_PROSRC_MD5=cd968b64ada7adaee18a4dc8be0c4a4b
+echo "MODE: $MODE"
 LOCK_TIMEOUT=5s
 STMT_TIMEOUT=2min
 APP=dc-atlas-admission-apply
@@ -33,6 +49,7 @@ if grep -niE '^\s*(set|reset)\s[^;]*;\s*$|set_config\s*\(' "$ART"; then echo "RE
 [ "$(grep -cE '^begin;$' "$ART")" = 1 ] && [ "$(grep -cE '^commit;$' "$ART")" = 1 ] \
   || { echo "REFUSED: the artifact is not exactly one begin/commit transaction"; exit 1; }
 python3 test/dc_atlas_validation_pg/build_admission.py --check
+[ "$(grep -c "dc_derived_address_admitted" "$ART")" -ge 1 ] || { echo "REFUSED: control: the artifact does not name the switch"; exit 1; }
 
 echo "== 1. PREFLIGHT (read-only; nothing written)"
 port="$(python3 -c 'import sys,urllib.parse as u; print(u.urlparse(sys.argv[1]).port or 5432)' "$PROD_DB_URL")"
@@ -62,9 +79,11 @@ sed 's/^/  /' "$w/pre.txt"
 v() { grep "^$1=" "$w/pre.txt" | cut -d= -f2; }
 [ "$(v pid1)" = "$(v pid2)" ] || { echo "REFUSED: backend changed between statements"; exit 1; }
 [ "$(v lock_timeout)" = 5s ] || { echo "REFUSED: lock_timeout did not hold in-session"; exit 1; }
-[ "$(v atlas_admitted)" = false ] || { echo "REFUSED: production already carries this change (Atlas admitted)"; exit 1; }
+[ "$(v atlas_admitted)" = "$ATLAS_BEFORE" ] || { echo "REFUSED: production already carries this change (atlas_admitted=$(v atlas_admitted), $MODE expects $ATLAS_BEFORE)"; exit 1; }
 [ "$(v epoch_admitted)" = true ] || { echo "REFUSED: Epoch is not admitted; production is not in the state stage 8 measured"; exit 1; }
-[ "$(v atlas_evidence_rows)" = 0 ] || { echo "REFUSED: Atlas derived evidence already reaches decisions"; exit 1; }
+if [ "$MODE" = admit ]; then
+  [ "$(v atlas_evidence_rows)" = 0 ] || { echo "REFUSED: Atlas derived evidence already reaches decisions"; exit 1; }
+fi
 [ "$(v conflicting_sessions)" = 0 ] || { echo "REFUSED: an active DC session is running"; exit 1; }
 if [ "${DCA_OFFLINE_ALLOW_LOCKS:-}" = 1 ] && [ "${DCA_OFFLINE:-}" = 1 ]; then
   echo "  (offline negative control: pre-existing locks deliberately allowed, to prove the bounded wait)"
@@ -108,12 +127,18 @@ select 'OTHER_ADMITTED=' || (public.dc_derived_address_admitted('compute_atlas',
                           or public.dc_derived_address_admitted('some_new_source', 'facilities'));
 select 'ADMITTED_ATLAS_DERIVED_POINTS=' || count(*) from public.dc_observation_derived_point
  where source_key = 'compute_atlas' and admitted;
+select 'SWITCH_PROSRC_MD5=' || md5(prosrc) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'dc_derived_address_admitted';
 select 'BLOCKED_SESSIONS_AFTER=' || count(*) from pg_stat_activity where cardinality(pg_blocking_pids(pid)) > 0;
 SQL
 p() { grep "^$1=" "$w/post.txt" | cut -d= -f2; }
-[ "$(p ATLAS_ADMITTED)" = true ] && [ "$(p EPOCH_ADMITTED)" = true ] && [ "$(p OTHER_ADMITTED)" = false ] \
-  || { echo "FAILED: the switch does not admit exactly Epoch and Atlas"; exit 1; }
-[ "$(p ADMITTED_ATLAS_DERIVED_POINTS)" -gt 0 ] || { echo "FAILED: control: no Atlas derived point reads admitted"; exit 1; }
+[ "$(p ATLAS_ADMITTED)" = "$ATLAS_AFTER" ] && [ "$(p EPOCH_ADMITTED)" = true ] && [ "$(p OTHER_ADMITTED)" = false ] \
+  || { echo "FAILED: the switch does not read as $MODE expects (atlas $ATLAS_AFTER, epoch true, nothing else)"; exit 1; }
+if [ "$MODE" = admit ]; then
+  [ "$(p ADMITTED_ATLAS_DERIVED_POINTS)" -gt 0 ] || { echo "FAILED: control: no Atlas derived point reads admitted"; exit 1; }
+else
+  [ "$(p ADMITTED_ATLAS_DERIVED_POINTS)" = 0 ] || { echo "FAILED: Atlas derived points still read admitted after rollback"; exit 1; }
+  [ "$(p SWITCH_PROSRC_MD5)" = "$PHASE_A_PROSRC_MD5" ] || { echo "FAILED: the rolled-back switch is not Phase A's body"; exit 1; }
+fi
 
 echo "== 4. DEFINITION PARITY: production after the apply == a replica built from this checkout's DDL of record"
 export PGPASSWORD=postgres
@@ -135,9 +160,20 @@ RR -tA -F, -c "$SIG" | LC_ALL=C sort > "$w/rep_sig.csv"
 RO -tA -F, -c "$SIG" | LC_ALL=C sort > "$w/prod_sig.csv"
 echo "  replica objects: $(wc -l < "$w/rep_sig.csv")   production objects: $(wc -l < "$w/prod_sig.csv")"
 [ "$(wc -l < "$w/rep_sig.csv")" -gt 20 ] || { echo "FAILED: replica signature suspiciously small"; exit 1; }
+if [ "$MODE" = rollback ]; then
+  # the switch is proven equal to Phase A's body above; every other object must still equal the DDL of record
+  grep -v '^function,dc_derived_address_admitted(' "$w/rep_sig.csv" > "$w/rep_sig.x"; mv "$w/rep_sig.x" "$w/rep_sig.csv"
+fi
 missing="$(LC_ALL=C comm -23 "$w/rep_sig.csv" "$w/prod_sig.csv")"
 if [ -n "$missing" ]; then echo "FAILED: DDL-of-record objects that differ in production:"; echo "$missing" | sed 's/^/    /'; exit 1; fi
-grep -q '^function,dc_derived_address_admitted(' "$w/rep_sig.csv" || { echo "FAILED: parity did not cover the switch"; exit 1; }
+if [ "$MODE" = admit ]; then
+  grep -q '^function,dc_derived_address_admitted(' "$w/rep_sig.csv" || { echo "FAILED: parity did not cover the switch"; exit 1; }
+fi
+grep -q '^function,dc_resolve_geography(' "$w/rep_sig.csv" || { echo "FAILED: control: parity did not cover the resolver"; exit 1; }
 echo "  DEFINITION_PARITY PASS: $(wc -l < "$w/rep_sig.csv") dc_% views/functions + map1 reader identical to the DDL of record"
 
-echo "ATLAS ADMITTED: artifact $sha, lock_timeout $LOCK_TIMEOUT asserted in-session. Map 1 moves at the next resolver run (stage 11)."
+if [ "$MODE" = admit ]; then
+  echo "ATLAS ADMITTED: artifact $sha, lock_timeout $LOCK_TIMEOUT asserted in-session. Map 1 moves at the next resolver run (stage 11)."
+else
+  echo "ATLAS ROLLED BACK: artifact $sha, switch is Phase A's body again. Map 1 returns to the pre-admission state at the next resolver run."
+fi

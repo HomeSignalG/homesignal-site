@@ -2200,17 +2200,30 @@ admission dry run.** `dc_derived_address_admitted` now admits exactly `epoch_ai/
 measured Map 1 1,842 → 1,817 rows / 768 → 757 ZIP pages: **1 added, 26 withheld (SOURCES_DISAGREE),
 0 moved**, every change attributed. The founder lifted this session's no-admission / read-only rules
 for stage 10 explicitly.
-- **Production changes only through `dc-atlas-admission-apply.yml`** (dispatch from main, confirm
-  `ADMIT-ATLAS-STAGE-10`): generated artifact `docs/dc-atlas-admission-apply.sql`, sha256 pinned,
-  in-transaction drift guard on the live switch's `md5(prosrc)` `cd968b64…` (read on production
-  2026-09-26 18:16 UTC), bounded lock wait, post-condition, definition parity. **Until that job has
-  run, production is still Epoch-only** — the DDL of record is ahead of production by one function.
-- **Map 1 moves at the next hourly resolver run, not at the apply.** Stage 11 compares that run with
-  the stage 8 list; anything outside the 27 is a finding.
+- ✅ **APPLIED 2026-09-26 18:48 UTC AND VERIFIED — production admits Atlas.** Run `36263746674`
+  (`dc-atlas-admission-apply.yml`, main, confirm `ADMIT-ATLAS-STAGE-10`): generated artifact
+  `docs/dc-atlas-admission-apply.sql` (sha256 `2c2c8571…`), in-transaction drift guard on the live
+  switch's `md5(prosrc)` `cd968b64…`, bounded lock wait, post-condition, definition parity. Live
+  switch now `31cb6c9e…`, byte-identical to the DDL of record (recomputed from the file).
+- ✅ **STAGE 11: live Map 1 equals the reviewed list EXACTLY.** After the 19:25/19:35 resolver runs:
+  1,817 rows / 757 ZIPs; the 18:58 snapshot minus the 26 withheld plus Google 46360 fingerprints to
+  the live `18944a61…`, with a control reproducing the snapshot's own fingerprint. Identity
+  fingerprints unchanged. Full receipt: `docs/dc-atlas-admission-receipt-2026-09-26.md`.
+  - ⚠️ **A Map 1 fingerprint is ZIP membership, not position.** The within-ZIP half was measured
+    separately: 2,127 / 2,127 publisher-point placements sit exactly on their observation's point.
+  - ⚠️ **The admission changed 21 decisions the review list did not show:** 21 more entities
+    (16 `CONFIRMED_DC`) are now `DERIVED_ADDRESS_POINT` at a 2 km Atlas-derived disk, **on Map 1 neither
+    before nor after** (the disk does not fit one ZIP). A future review list must cover geography
+    decisions, not only Map 1 rows.
+- 🔁 **ROLLBACK EXISTS AND IS TESTED, NEVER APPLIED:** `dc-atlas-admission-apply.yml` → confirm
+  `ROLLBACK-ATLAS-STAGE-10` runs `docs/dc-atlas-admission-rollback.sql` (Phase A's body from
+  `PHASE_A_REGION`, not retyped). Offline proof: one resolver run after a rollback restores the
+  pre-admission Map 1 exactly. After a real rollback, revert the DDL of record too.
 - The Phase A artifact still regenerates byte for byte: its generator restores exactly the stage-10
-  region (extracted from git, sha256-pinned to `891bb210…`). The pre-admission instruments
-  (`dc-atlas-dryrun.yml`, `dc-atlas-admission-dryrun.yml`, `dc-atlas-phase-a-proof.yml`) patch an
-  Epoch-only switch and now refuse with "admission body shape changed" — they are retired receipts.
+  region (extracted from git, sha256-pinned to `891bb210…`). **The pre-admission instruments refuse
+  cleanly on their production preconditions** (corrected 2026-09-26: an earlier line here said they
+  fail with "admission body shape changed"; checked, they stop first with "Atlas is admitted in
+  production" / "already admitted" / "production already carries this change") — retired receipts.
 
 **Why it was missing: two source-keyed shortcuts, both removed.**
 - `dc_geocode_input` had one Epoch branch; every other source got `NO_GEOCODE_RULE`.

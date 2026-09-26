@@ -130,5 +130,15 @@ ok((ADM.match(/create or replace (function|view)/g) || []).length === 1 && ADM.i
    && !/create table|alter table|drop /i.test(ADM),
   'P4: the admission apply replaces exactly one object (the switch), guarded before and checked after, and adds/alters/drops nothing');
 
+// ── the tested ROLLBACK is generated too: it restores Phase A's exact body and nothing else ─────
+const RB = stripSql(read('docs/dc-atlas-admission-rollback.sql'));
+const rbFn = (RB.match(/create or replace function public\.dc_derived_address_admitted\([\s\S]*?\$\$;/) || [''])[0];
+ok((RB.match(/create or replace (function|view)/g) || []).length === 1
+   && /in \(\('epoch_ai', 'data_centers'\)\) \$\$;$/.test(rbFn) && !/compute_atlas/.test(rbFn)
+   && RB.indexOf('DRIFT:') > 0 && RB.indexOf('DRIFT:') < RB.indexOf('create or replace function')
+   && RB.indexOf('POST-CONDITION') > RB.indexOf('create or replace function') && RB.includes('cd968b64ada7adaee18a4dc8be0c4a4b')
+   && !/create table|alter table|drop /i.test(RB),
+  'P5: the rollback replaces exactly the switch with Phase A\'s Epoch-only body, guarded before, fingerprint-checked after, and adds/alters/drops nothing');
+
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);
