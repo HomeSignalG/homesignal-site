@@ -4854,7 +4854,7 @@ HS.onReady(function(){
     $("dtAnchorBody").innerHTML = h;
   }
 
- when the ZIP has no cached development_reports
+  // Create the Leaflet map for the parcel footprint when the ZIP has no cached development_reports
   // row (so drawMap never ran). Mirrors drawMap's base-map setup.
   function ensureParcelMap(lat, lng){
     if(map) return;
