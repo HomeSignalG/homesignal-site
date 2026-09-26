@@ -130,6 +130,18 @@ def build():
 
 
 if __name__ == '__main__':
+    # ⛔ FROZEN 2026-09-25: this artifact WAS APPLIED to production (Phase A, #1335 -> ccd637e, applied
+    # 25 Sep 14:49 UTC). Same rule as test/dc_epoch_geography_pg/build_apply.py: from then on the DDL
+    # of record keeps moving (stage 10 admission, the OSM layer check), and regenerating would rewrite
+    # history into an artifact nobody applied. --check verifies the FROZEN bytes and nothing else.
+    if '--check' in sys.argv:
+        got = hashlib.sha256(OUT.read_bytes()).hexdigest() if OUT.exists() else None
+        ok = got == PHASE_A_SHA256
+        print('apply file is the frozen Phase A artifact applied 2026-09-25' if ok
+              else f'apply file is NOT the frozen applied artifact (sha256 {got})')
+        sys.exit(0 if ok else 1)
+    if not sys.argv[1:]:
+        raise SystemExit('REFUSED: the Phase A apply is frozen (applied to production); it is never regenerated')
     text = build()
     if '--body' in sys.argv:
         # the same statements WITHOUT begin/commit, for a caller that owns the transaction (the replica)

@@ -115,7 +115,7 @@ ok(!/create table[^;]*(review|override|manual|queue)/i.test(all),
 
 // ── the apply for this change is GENERATED, never retyped ────────────────────────────────────
 const gen = spawnSync('python3', [join(ROOT, 'test/dc_atlas_validation_pg/build_apply.py'), '--check'], { encoding: 'utf8' });
-ok(gen.status === 0, 'P1: docs/dc-atlas-validation-apply.sql is byte-identical to what its generator emits from the DDL of record', (gen.stdout + gen.stderr).trim());
+ok(gen.status === 0, 'P1: docs/dc-atlas-validation-apply.sql is the FROZEN Phase A artifact applied 2026-09-25 (sha256-pinned; never regenerated)', (gen.stdout + gen.stderr).trim());
 const APPLY = read('docs/dc-atlas-validation-apply.sql');
 ok(APPLY.indexOf('DRIFT:') > 0 && APPLY.indexOf('DRIFT:') < APPLY.indexOf('create or replace function public.dc_publisher_stated_address')
    && !/create or replace function public\.map1_dc_zip_members/.test(APPLY) && !/create table|alter table/i.test(stripSql(APPLY)),

@@ -100,3 +100,13 @@ compared against production. That is the next step, and it changes nothing in pr
 Of the 846 OSM markers on Map 1, **460** carry `addr:housenumber` + `addr:street`; 437 of those also
 carry a city or postcode and 2 are house-number ranges, so roughly **435 are geocodable** under the
 one policy. 386 carry no house-number address (378 no address tags at all).
+
+## 5. Decision and C3a (2026-09-26, later the same day)
+
+The founder chose **option 1: OpenStreetMap stays a separate layer**, and ruled that the later Map 1
+change is gated by **automated checks only**. C3a implements the check without the merge:
+`dc_osm_derived_point` (Step 3D) and `dc_osm_address_check` (Step 3B) judge each OSM pin against its
+own stated address with the shared extraction policy, geocoder, verdict and conflict rule. OSM
+addresses join the one `dc_geocode_queue`. OSM is **not admitted**. `map1_dc_zip_members` does not read
+either view, and nothing is written to `national_dc_records` or any canonical table. The licensing
+architecture described in §2 is unchanged. Full record: site `CLAUDE.md` §7.14.

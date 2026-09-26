@@ -414,6 +414,40 @@ comment on function public.dc_site_claims_conflict(text, double precision, doubl
 their quantified positional errors (a derived point''s calibrated bound), or than the 1 km peer
 tolerance when neither carries one. Evidence classes only; no source, place or facility.';
 
+-- ── THE OPENSTREETMAP LAYER'S ADDRESS CHECK (2026-09-26) ─────────────────────────────────
+-- OpenStreetMap is a SEPARATE layer (founder, 2026-09-26): its records are never merged into the
+-- canonical entity or geography tables. This view judges each OSM pin against its OWN stated
+-- address with the SAME rule every canonical site claim is judged by, dc_site_claims_conflict
+-- above, fed by Step 3D's dc_osm_derived_point (shared extraction, policy, geocoder, verdict).
+-- The pin is a PUBLISHER_SITE claim (osm_claim_class); the geocode is a DERIVED_ADDRESS claim with
+-- its calibrated bound. An OSM pin is never MOVED. The only outcomes:
+--   CORROBORATED      the address places the facility within the allowance of its pin
+--   SOURCES_DISAGREE  farther apart than the allowance
+--   UNCHECKED_*       no usable check (absence of evidence is not evidence against the pin)
+-- It decides nothing on Map 1: map1_dc_zip_members does not read it.
+create or replace view public.dc_osm_address_check with (security_invoker = true) as
+select o.osm_record_id, o.source_key, o.map_eligible, o.location_precision, o.osm_lat, o.osm_lng,
+       o.input_quality, o.geocoder_query, o.derivation_id, o.lat, o.lng, o.verdict,
+       o.positional_uncertainty_m, o.verdict_reason, o.osm_claim_class,
+       case when o.lat is not null and o.osm_lat is not null
+            then ST_DistanceSphere(ST_MakePoint(o.osm_lng, o.osm_lat), ST_MakePoint(o.lng, o.lat)) end as distance_m,
+       case when o.input_quality <> 'GEOCODABLE' then 'UNCHECKED_' || o.input_quality
+            when o.verdict <> 'ACCEPTED' then 'UNCHECKED_' || o.verdict
+            when o.osm_claim_class is null or o.osm_lat is null then 'UNCHECKED_NO_SITE_CLAIM'
+            when public.dc_site_claims_conflict(o.osm_claim_class, null, o.osm_lat, o.osm_lng,
+                                                'DERIVED_ADDRESS', o.positional_uncertainty_m, o.lat, o.lng)
+              then 'SOURCES_DISAGREE'
+            else 'CORROBORATED' end as check_outcome,
+       o.admitted
+  from public.dc_osm_derived_point o;
+
+revoke all on public.dc_osm_address_check from anon, authenticated;
+
+comment on view public.dc_osm_address_check is
+'STEP 3B. The OpenStreetMap layer''s address check: each OSM pin judged against its own stated
+address by the shared conflict rule. CORROBORATED / SOURCES_DISAGREE / UNCHECKED_*. Never moves a
+pin, never merged into canonical tables, not read by the Map 1 reader.';
+
 create or replace function public.dc_resolve_geography(p_apply boolean default false)
 returns table(metric text, value text)
 language plpgsql
