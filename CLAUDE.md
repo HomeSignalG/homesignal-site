@@ -1208,10 +1208,12 @@ the committed file.
   today resolved to the new writer and stopped at its first check (no JWT), before any write.
 - `CURRENT-STATE.sql` was re-read the same day; every quoted definition is md5-equal to
   production.
-- ⏳ **Still before merging the Map 1 change:** merge ingest #600, then deploy `confirm-alerts`
-  from `main` (its deploy workflow pins `ref: main`). Then the confirmation email knows about
-  MAPS before anyone can press the button. Until then the live function is safe as it is: it
-  ignores the claim's new `streams` column.
+- ✅ **The email half went live on 2026-09-26, before this button existed.** Ingest #600 merged
+  (`cc0d2dd`), then `deploy-edge-function.yml` (run `36249476811`, which checks out `ref: main`)
+  deployed `confirm-alerts`. Read back with `get_edge_function`: **version 3**, updated
+  2026-09-26 14:43:54Z, and its source has the approved MAPS wording and the claim's `streams`
+  field. So the confirmation email knows about MAPS before anyone can press the button. The
+  version it replaced (v2) was also safe: it ignored the `streams` column.
 
 - 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
   other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
