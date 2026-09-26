@@ -41,9 +41,9 @@
 -- PostgreSQL 16 and 17). It builds the suite's production pre-state, shows that the plans
 -- inside the function compare the key as text BEFORE the change (the control), applies this
 -- file, and requires identical Map 1 output on every fixture ZIP, no text comparison of a
--- ZIP key in any plan inside the function, the ZIP in an index condition on all three serving
--- tables, and the attributes above. Reverting any one of the five comparisons must turn the
--- plan check red.
+-- ZIP key in any plan inside the function, a char-to-char ZIP comparison on all three
+-- serving tables, and the attributes above. Reverting any one of the five comparisons must
+-- turn the plan check red.
 --
 -- MEASURED AND DELIBERATELY NOT CHANGED: public.app_projects_for_zip compares
 -- geo.n5_serving_status.zip with its text p_zip too, but that table holds 12,719 rows and the
