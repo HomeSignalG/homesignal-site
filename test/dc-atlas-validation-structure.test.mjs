@@ -34,20 +34,24 @@ const input = fn('dc_geocode_input', D3);
 ok(/if p_source_key = 'compute_atlas' and p_distribution_key = 'facilities' then/.test(extract)
    && /loc->>'street'/.test(extract) && /loc->>'postalCode'/.test(extract),
   'A1: Atlas addresses are EXTRACTED from the publisher\'s own location fields, in the extraction function');
-const atlasOutsideExtraction = (D3.replace(extract, '')).match(/'compute_atlas'/g) || [];
-ok(atlasOutsideExtraction.length === 0,
-  'A2: Step 3D names compute_atlas ONLY in the extraction: no Atlas geocodability rule, no Atlas verdict, no Atlas admission yet',
+const admitFn = fn('dc_derived_address_admitted', D3, '\\$\\$;');
+const atlasOutsideExtraction = (D3.replace(extract, '').replace(admitFn, '')).match(/'compute_atlas'/g) || [];
+ok(admitFn.length > 100 && atlasOutsideExtraction.length === 0,
+  'A2: Step 3D names compute_atlas ONLY in the extraction and the admission switch: no Atlas geocodability rule, no Atlas verdict',
   atlasOutsideExtraction.length);
 ok(policy.length > 400 && !/source|atlas|epoch/i.test(policy) && !/p_source_key\s*(=|<>|in)|'compute_atlas'|'epoch_ai'/.test(input),
   'A3: the geocodability policy and its composition know no source (one rule for every publisher)');
 ok(/dc_publisher_stated_address\(/.test(input) && /dc_geocodable_site_address\(/.test(input),
   'A3b: dc_geocode_input is exactly extraction -> policy');
 
-// ── THE ADMISSION GATE: acquired != admitted. Admitting Atlas is a reviewed, deliberate edit ─────
-const admit = fn('dc_derived_address_admitted', D3, '\\$\\$;');
-ok(/in \(\('epoch_ai', 'data_centers'\)\)/.test(admit) && !/compute_atlas/.test(admit),
-  'A4: Atlas derivations are ACQUIRED but NOT ADMITTED: its admission waits for the national dry run to be reviewed '
-  + '(admitting it is a deliberate edit of this function AND of this pin -- never a side effect)');
+// ── THE ADMISSION GATE: acquired != admitted. Admitting Atlas was a reviewed, deliberate edit ────
+// Stage 10 (2026-09-26): admitted after the admission dry run on that day's production copy
+// (run 36253526398: 1 added, 26 withheld, 0 moved) was reviewed. The switch admits EXACTLY these
+// two extractions; any other change to it is a new deliberate edit of this function AND this pin.
+const admit = admitFn;
+ok(/in \(\('epoch_ai', 'data_centers'\), \('compute_atlas', 'facilities'\)\) \$\$;$/.test(admit)
+   && (admit.match(/\('[a-z_]+', '[a-z_]+'\)/g) || []).length === 2,
+  'A4: the admission switch admits exactly Epoch data_centers and Atlas facilities (stage 10) -- nothing else, never a side effect');
 const ev = (B3.match(/create or replace view public\.dc_entity_geography_evidence[\s\S]*?;/) || [''])[0];
 const res = fn('dc_resolve_geography', B3);
 const cand = (A3.match(/create or replace view public\.dc_identity_candidate[\s\S]*?;\n/) || [''])[0];
@@ -116,6 +120,15 @@ const APPLY = read('docs/dc-atlas-validation-apply.sql');
 ok(APPLY.indexOf('DRIFT:') > 0 && APPLY.indexOf('DRIFT:') < APPLY.indexOf('create or replace function public.dc_publisher_stated_address')
    && !/create or replace function public\.map1_dc_zip_members/.test(APPLY) && !/create table|alter table/i.test(stripSql(APPLY)),
   'P2: the apply opens with its drift guard, adds no table, alters no table, and does not touch the Map 1 reader');
+
+// ── the STAGE 10 admission apply is GENERATED too, and carries only the switch ───────────────
+const genAdm = spawnSync('python3', [join(ROOT, 'test/dc_atlas_validation_pg/build_admission.py'), '--check'], { encoding: 'utf8' });
+ok(genAdm.status === 0, 'P3: docs/dc-atlas-admission-apply.sql is byte-identical to what its generator emits from the DDL of record', (genAdm.stdout + genAdm.stderr).trim());
+const ADM = stripSql(read('docs/dc-atlas-admission-apply.sql'));
+ok((ADM.match(/create or replace (function|view)/g) || []).length === 1 && ADM.includes('create or replace function public.dc_derived_address_admitted(')
+   && ADM.indexOf('DRIFT:') > 0 && ADM.indexOf('DRIFT:') < ADM.indexOf('create or replace function') && ADM.indexOf('POST-CONDITION') > ADM.indexOf('create or replace function')
+   && !/create table|alter table|drop /i.test(ADM),
+  'P4: the admission apply replaces exactly one object (the switch), guarded before and checked after, and adds/alters/drops nothing');
 
 console.log(`\n${bad ? bad + ' FAILED' : 'ALL CHECKS PASSED'} (${n} checks)`);
 process.exit(bad ? 1 : 0);

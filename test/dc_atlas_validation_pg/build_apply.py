@@ -24,6 +24,36 @@ _spec = importlib.util.spec_from_file_location('epoch_apply', ROOT / 'test/dc_ep
 _epoch = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_epoch)
 pick = _epoch.pick
 
+# PHASE A IS DEPLOYED (25 Sep 2026, artifact sha256 below). Stage 10 (2026-09-26) then admitted Atlas
+# by editing ONE region of Step 3D: the Atlas line of the admission comment and the admission body.
+# The Phase A artifact must keep regenerating byte for byte, so the generator reads Step 3D with
+# exactly that region restored to its Phase A text. The two strings below were extracted from git
+# (main@4465d4a vs the stage-10 edit), not retyped, and the sha256 pin makes any slip fail closed.
+PHASE_A_SHA256 = '891bb2101d1f99d5861529953e7f216cdb1d61c64d898d381efee2c0d39ea5a3'
+STAGE10_REGION = "--   compute_atlas/facilities admitted 2026-09-26 (stage 10), after the admission dry run on that\n--                            day's production copy (dc-atlas-admission-dryrun.yml, run 36253526398:\n--                            1 facility added, 26 withheld, 0 moved), reviewed by the founder.\n--                            Applied by scripts/dc-atlas-admission-apply.sh.\ncreate or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)\nreturns boolean\nlanguage sql\nimmutable\nset search_path to 'public', 'pg_temp'\nas $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;\n"
+PHASE_A_REGION = "--   compute_atlas/facilities NOT admitted: evidence acquisition only, pending review of the\n--                            national dry run (dc-atlas-dryrun.yml)\ncreate or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)\nreturns boolean\nlanguage sql\nimmutable\nset search_path to 'public', 'pg_temp'\nas $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;\n"
+
+
+def pick(path, preds):
+    if path != 'docs/dc-step3d-derived-location.sql':
+        return _epoch.pick(path, preds)
+    text = (ROOT / path).read_text()
+    if text.count(STAGE10_REGION) == 1:
+        text = text.replace(STAGE10_REGION, PHASE_A_REGION)
+    elif text.count(PHASE_A_REGION) != 1:
+        raise SystemExit(f'{path}: neither the stage-10 nor the Phase A admission region is present exactly once')
+    stmts = _epoch.split(text)
+    out, hit = [], {p: 0 for p in preds}
+    for s in stmts:
+        c = ' '.join(_epoch.code(s).split())
+        for p in preds:
+            if c.startswith(p):
+                out.append(s.strip('\n')); hit[p] += 1
+    missing = [p for p, k in hit.items() if k == 0]
+    if missing:
+        raise SystemExit(f'{path}: no statement starts with {missing}')
+    return out
+
 # md5(prosrc) of the live functions, measured on production 2026-09-25 AND reproduced locally from
 # main@f9d1326's DDL of record: byte-identical, all seven.
 EXPECT_LIVE = {
@@ -108,7 +138,8 @@ if __name__ == '__main__':
         sys.stdout.write(body.rstrip()[:-len('commit;')] + '\n')
         sys.exit(0)
     if '--check' in sys.argv:
-        ok = OUT.exists() and OUT.read_text() == text
+        ok = (OUT.exists() and OUT.read_text() == text
+              and hashlib.sha256(text.encode()).hexdigest() == PHASE_A_SHA256)
         print('apply file is current' if ok else 'apply file is STALE: regenerate it'); sys.exit(0 if ok else 1)
     OUT.write_text(text)
     print(f'wrote {OUT.relative_to(ROOT)} ({len(text)} bytes, sha256 {hashlib.sha256(text.encode()).hexdigest()[:16]})')
