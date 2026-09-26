@@ -887,6 +887,12 @@
     if ($('authForm')) $('authForm').classList.remove('hidden');
     if ($('authDone')) $('authDone').classList.add('hidden');
     authMsg('New here? Entering your email creates your free account — no password, no spam.', false);
+    // The sign-in can be asked for from INSIDE another modal (the Alerts topic picker's Save).
+    // Every overlay has the same z-index, so the later one in the page paints on top, and the
+    // picker comes after the sign-in in partials/shell.html: the sign-in opened BEHIND it and
+    // could not be clicked. Moving it to the end of its parent keeps it on top of its caller.
+    const am = $('authModal');
+    if (am && am.parentNode) am.parentNode.appendChild(am);
     HS.openModal('authModal');
     setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
   };
@@ -1989,7 +1995,12 @@
     $('tmCount').textContent = n + ' topic' + (n === 1 ? '' : 's') + ' selected';
   }
   HS.saveTopics = async function () {
-    if (!HS.requireAuth('save-topics')) return;
+    // Signed out, Save opens the sign-in and FINISHES THIS SAVE once the code is verified.
+    // The picks are still in the open topic modal (the sign-in stacks on top of it) and the
+    // page keeps its ?zip= (the MAPS confirmation email links here as alerts.html?zip=).
+    // Without the resume, a verified code sent the resident to location.pathname: ?zip=
+    // dropped and the picks gone, so they had to choose again, possibly on another ZIP.
+    if (!HS.requireAuth('save-topics', HS.saveTopics)) return;
     const chips = [...document.querySelectorAll('#tmGrid .tchip.on span:last-child')].map(s => s.textContent);
     const cats = HS.data.topicCategories();
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };

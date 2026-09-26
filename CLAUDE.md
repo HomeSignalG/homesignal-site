@@ -1257,6 +1257,20 @@ the committed file.
 - The sign-in resumes the sign-up after the 6-digit code (`HS.requireAuth(label, afterAuth)`);
   every other open of the sign-in clears the pending action, so it can never fire on a later,
   unrelated sign-in.
+- **The Alerts page's "Save alerts" resumes the same way (2026-09-26).** The MAPS confirmation
+  email links "Sign up for those alerts" to `alerts.html?zip=<ZIP>`. A resident who opened it
+  signed out met two faults, both found by `test/alerts-save-topics.browser.test.mjs`:
+  - **The sign-in opened BEHIND the topic picker and could not be clicked.** Every overlay has
+    `z-index:100`, so the later one in `partials/shell.html` paints on top, and the picker
+    comes after the sign-in. `HS.openAuth` now moves the sign-in to the end of its parent,
+    so it is always above whatever asked for it.
+  - **A verified code dropped the save.** `saveTopics` called `requireAuth` with nothing to
+    resume, so the page went to `location.pathname`, losing `?zip=` and the ticked topics.
+    It now resumes itself (`HS.requireAuth('save-topics', HS.saveTopics)`): the picks are
+    still in the open picker, and the save lands on the page's ZIP.
+  - The test drives it signed out in Chromium and checks the save (`signup_complete` once, on
+    97702's government community, with the ticked topic, after the code), the unchanged URL,
+    and the "saved" message. Both halves were broken on purpose and each was caught.
 - Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
   (the SQL against a disposable Postgres 17, every prohibited mutation killed). **Two
   workflows, split by repo** — the `check-alert-subscription-parity.yml` precedent:
