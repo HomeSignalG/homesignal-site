@@ -13,6 +13,7 @@ import sys
 
 A12 = "a12"
 DELIVERY = "delivery"
+IDENTITY = "identity"
 
 # name -> (which file, anchor regex, replacement). Anchors are exact enough to match once.
 MUTATIONS = {
@@ -53,6 +54,12 @@ MUTATIONS = {
         "where true"),
     "claim-opened-to-public": (DELIVERY,
         r"revoke all on function public\.alert_confirmation_claim\(uuid\) from public, anon, authenticated;\n",
+        ""),
+    # identity (homesignal-ingest 20260926230000_alert_identity_streams.sql) ---------------
+    "identity-streams-not-scoped": (IDENTITY,
+        r"   where st\.user_id = p_user_id\n", "   where true\n"),
+    "identity-streams-opened-to-public": (IDENTITY,
+        r"revoke all on function public\.alert_identity_streams\(uuid\) from public, anon, authenticated;\n",
         ""),
 }
 
