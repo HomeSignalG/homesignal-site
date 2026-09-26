@@ -849,19 +849,6 @@
         </div>
       </div>
 
-      <!-- Other civic notices & hearings: real public meetings the county posts (personnel/employee,
-           budgets, tax rates, canvassing, elections) that are NOT land-use development. The engine's
-           v15 classifier tags these relevance:"civic"; they are listed here — clearly separated from
-           the development buckets and excluded from the "proposed" project count — so an item like a
-           "Commissioners Court Employee Hearing" is never presented as proposed development. The band
-           hides itself when there are none (honest empty, never placeholder). -->
-      <div class="card read band" id="civicBand" style="display:none">
-        <div class="band-h" style="background:#64748b">Other civic notices &amp; hearings</div>
-        <div class="band-s">Public meetings in your area that aren't development — budgets, personnel,
-          tax rates, elections and the like. Listed for transparency; not counted as proposed projects.</div>
-        <div id="civicList"></div>
-      </div>
-
       <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
            Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
            v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
@@ -876,19 +863,6 @@
           <div id="dtAnchorBody"></div>
         </div>
 
-        <div class="grid band" id="dtNotices" style="display:none">
-          <div class="card read">
-            <div class="band-h" style="background:#0f766e">Notices in your ZIP</div>
-            <div class="band-s" id="dtBucketBSub">Filed with a specific address in this ZIP</div>
-            <div id="dtBucketB"><div class="empty">Loading…</div></div>
-          </div>
-          <div class="card read">
-            <div class="band-h" style="background:#3b5566">County-wide notices</div>
-            <div class="band-s">Apply across Box Elder County — not specific to your ZIP.
-              Shown here, clearly labeled, never hidden.</div>
-            <div id="dtBucketC"><div class="empty">Loading…</div></div>
-          </div>
-        </div>
       </div>
 
       <div class="foot" id="foot"></div>
@@ -1790,10 +1764,6 @@ HS.onReady(function(){
   // render even on a ZIP with no cached development_reports row. parcelLayer holds the resolved
   // parcel polygons; RESOLVED_PARCELS is cached so drawParcels() can (re)draw once the map exists.
   var parcelLayer = null, RESOLVED_PARCELS = null, CURRENT_DEV_ZIP = null;
-  var BOX_ELDER = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
-  var DEV_CATEGORIES = ['Planning, zoning & development',
-                        'Stratos data center project',
-                        'County Commission & county business'];
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   // esc() is a TEXT-NODE escape and leaves quotes alone, which is correct there and unsafe
@@ -2743,9 +2713,8 @@ HS.onReady(function(){
     }
     // Non-headlined civic list (engine contract): real public hearings that aren't development.
     // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
-    var civicBand = $("civicBand");
-    if(civic.length){ civicBand.style.display = ""; listInto("civicList", civic, "", { dotColor:"#64748b", plainDate:true }); }
-    else { civicBand.style.display = "none"; }
+    // (The civic list band was removed 2026-09-26, founder decision: these notices live on the
+    // ZIP detail page and the Alerts page, which keep only current items.)
 
     var locked = data.counts && data.counts.locked ? data.counts.locked : 0;
     $("foot").innerHTML =
@@ -4885,55 +4854,7 @@ HS.onReady(function(){
     $("dtAnchorBody").innerHTML = h;
   }
 
-  function renderNoticeList(elId, alerts, meetings, zip, countywide){
-    var el = $(elId); alerts = alerts||[]; meetings = meetings||[];
-    var total = alerts.length + meetings.length;
-    if(!total){
-      el.innerHTML = countywide
-        ? "<div class='empty'>No county-wide development notices on record right now.</div>"
-        : "<div class='empty'>No address-specific development notices filed in ZIP " + esc(zip) + " yet. " +
-          "For a rural ZIP this is expected — the county-wide items are listed alongside.</div>";
-      return;
-    }
-    var badge = countywide ? "<span class='dt-badge'>County-wide</span>" : "";
-    var body = "";
-    meetings.forEach(function(m){
-      var when = m.meeting_date ? " · " + fmtDate(m.meeting_date) : "";
-      var link = m.source_url ? " · " + recordLink({ record_url:m.source_url, scope:"area" }, m.source_url) : "";
-      body += "<div class='rec'><span class='dot' style='background:#0f766e'></span><div style='flex:1'>" +
-        "<div class='t'>" + badge + esc(m.title||"Untitled meeting") + "</div>" +
-        "<div class='s'>" + esc(m.category||"") + when + (m.agency_name?" · "+esc(m.agency_name):"") +
-        (m.location?" · "+esc(m.location):"") + link + "</div></div></div>";
-    });
-    alerts.forEach(function(a){
-      var when = (a.published_at||a.created_at) ? " · " + fmtDate(a.published_at||a.created_at) : "";
-      var link = a.source_url ? " · " + recordLink({ record_url:a.source_url, scope:"area" }, a.source_url) : "";
-      body += "<div class='rec'><span class='dot' style='background:#3b5566'></span><div style='flex:1'>" +
-        "<div class='t'>" + badge + esc(a.title||"Untitled notice") + "</div>" +
-        "<div class='s'>" + esc(a.category||"") + when + (a.agency_name?" · "+esc(a.agency_name):"") +
-        link + "</div></div></div>";
-    });
-    el.innerHTML = "<div class='dt-count'>" + total + " notice" + (total===1?"":"s") + "</div>" +
-                   "<div class='dt-roster'>" + body + "</div>";
-  }
-
-  function renderNotices(zip){
-    var catIn = "in.(" + DEV_CATEGORIES.map(function(c){ return '"'+c.replace(/"/g,'\\"')+'"'; }).join(",") + ")";
-    var aSel = "title,category,agency_name,source_url,published_at,created_at,geo_scope,zip,impact_level";
-    var mSel = "title,category,source_url,meeting_date,location,geo_scope,zip"; // meetings has no agency_name
-    // Bucket (b): address-precise notices in THIS ZIP.
-    Promise.all([
-      sbFetch("alerts_public",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
-      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:mSel, order:"meeting_date.asc" })
-    ]).then(function(r){ renderNoticeList("dtBucketB", r[0], r[1], zip, false); });
-    // Bucket (c): county-wide notices (geo_scope countywide OR null) — cascade, labeled, never hidden.
-    Promise.all([
-      sbFetch("alerts_public",   { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:aSel, order:"created_at.desc" }),
-      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:mSel, order:"meeting_date.asc" })
-    ]).then(function(r){ renderNoticeList("dtBucketC", r[0], r[1], zip, true); });
-  }
-
-  // Create the Leaflet map for the parcel footprint when the ZIP has no cached development_reports
+ when the ZIP has no cached development_reports
   // row (so drawMap never ran). Mirrors drawMap's base-map setup.
   function ensureParcelMap(lat, lng){
     if(map) return;
@@ -5015,13 +4936,8 @@ HS.onReady(function(){
         drawParcels();
       });
     });
-    // (b)/(c) notices — only for a Box Elder ZIP (the county whose notices cascade onto this page).
-    sbFetch("communities", { zip_codes:"cs.{"+zip+"}", select:"county" }).then(function(crows){
-      var isBE = (crows||[]).some(function(r){ return (r.county||"").toLowerCase()==="box elder"; });
-      if(!isBE) return; // outside Box Elder → county notices don't apply here
-      renderNotices(zip);
-      $("dtNotices").style.display = ""; $("devTracker").style.display = "";
-    });
+    // (b)/(c) ZIP + county-wide notice boxes were removed 2026-09-26 (founder decision): the same
+    // notices live on the ZIP detail page and the Alerts page, which keep only current items.
   }
 
   // ===================== EMBED MODE — Place Context Maps =====================
