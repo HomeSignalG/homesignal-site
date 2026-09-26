@@ -841,10 +841,14 @@
       state.session = { user: { id: u.id, email: u.email }, demo: true, name: u.name, initials: u.initials };
     }
   }
-  HS.requireAuth = function (thenLabel) {
+  // `afterAuth` (optional) is the action to RESUME once the 6-digit code is verified,
+  // e.g. Map 1's "What is changing in my zip code?" sign-up. Without it, verifying the
+  // code navigated to location.pathname, dropping ?zip= and the Bluesky utm_* — so the
+  // tap that asked for the sign-in was simply lost.
+  HS.requireAuth = function (thenLabel, afterAuth) {
     if (state.session && !state.session.demo) return true;
     // open the in-page email sign-in / sign-up modal (no redirect)
-    HS.openAuth();
+    HS.openAuth(afterAuth);
     return false;
   };
   HS.onAvatar = function () {
@@ -862,11 +866,17 @@
   // signs in a returning one. On success we bounce to ?return= (or reload) so the
   // now-persisted Supabase session is picked up by bootSession().
   let _authStep = 'email', _authEmail = '';
+  // The action to resume after a successful verify. Set ONLY by the control that
+  // opened the modal and CLEARED by every other open: an abandoned intent must never
+  // fire on a later, unrelated sign-in — for an email sign-up that would be consent
+  // the resident did not give at that moment.
+  let _afterAuth = null;
   function authMsg(t, err) {
     const m = $('authMsg'); if (!m) return;
     m.textContent = t || ''; m.style.color = err ? '#c23b34' : '';
   }
-  HS.openAuth = function () {
+  HS.openAuth = function (afterAuth) {
+    _afterAuth = typeof afterAuth === 'function' ? afterAuth : null;
     _authStep = 'email'; _authEmail = '';
     const e = $('authEmail'), c = $('authCode'), b = $('authSubmitBtn');
     if (e) { e.value = ''; e.classList.remove('hidden'); }
@@ -880,7 +890,8 @@
     HS.openModal('authModal');
     setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
   };
-  HS.authReset = function () { HS.openAuth(); };
+  // "Use a different email" restarts the SAME sign-in, so it keeps the pending action.
+  HS.authReset = function () { HS.openAuth(_afterAuth); };
   HS.authSubmit = async function () {
     if (!window.supabase) { authMsg('Sign-in is unavailable right now — please try again.', true); return; }
     const btn = $('authSubmitBtn');
@@ -898,11 +909,20 @@
         await hydrateAccountLocation();
         HS.paintTopicCounts();
         paintTopbar();
+        // Resume the action that asked for this sign-in (Map 1's ZIP email sign-up). It
+        // runs BEFORE the onboarding check, so the ZIP it saves to My Places counts as the
+        // resident's location; its own control reports success or failure on the page.
+        const resume = _afterAuth; _afterAuth = null;
+        if (resume) {
+          try { await resume(); } catch (e) { console.warn('after-auth', e); }
+        }
         setTimeout(() => {
           HS.closeModal('authModal');
           const back = new URLSearchParams(location.search).get('return');
           if (HS.needsOnboarding && HS.needsOnboarding()) {
             HS.startOnboarding();
+          } else if (resume) {
+            // The resumed action owns this page: stay on it, with ?zip= and utm_* intact.
           } else {
             location.href = back ? decodeURIComponent(back) : location.pathname;
           }
@@ -1752,6 +1772,90 @@
     const box = $('hsOptin');
     if (box) box.innerHTML = '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Emailing you development &amp; hearings for '
       + HS.esc(info.zip) + '.</div><div style="color:var(--ink-3,#5a6b63);margin-top:4px">Unsubscribe anytime.</div>';
+  };
+
+  // ------------------------------------ "What is changing in my zip code?" (Map 1) ----
+  // Founder, 2026-09-25: a button on Map 1 signs a resident up for email copies of the
+  // Bluesky MAPS posts about THAT ZIP. Every step is an existing canonical path:
+  //   1. sign-in is the shell's own 6-digit code; the sign-up RESUMES after the code is
+  //      verified (HS.requireAuth's afterAuth) instead of being lost to a navigation;
+  //   2. the ZIP is saved to My Places by persistCommunityFollow — the follow writer
+  //      onboarding uses — which is also what keeps a brand-new resident out of the
+  //      non-dismissible first-time setup screen. The county "digest floor" that the
+  //      Follow button also writes (subscribe_area_defaults) is deliberately NOT written:
+  //      this tap files nothing on the county identity, so an existing county
+  //      subscriber's row is left exactly as it was;
+  //   3. the selection is written by enable_area_email_alerts, the one ADDITIVE consent
+  //      writer, on the ZIP's own community row, alert consent only (HS.mapsOptinRpcArgs);
+  //   4. the control's state is read back from my_alert_subscriptions — the same
+  //      canonical state digest_recipients resolves through (UI = DELIVERY).
+  // The consent sentence is ONE string: the page renders MAPS_CONSENT_COPY and the RPC
+  // records that same string as the audit trail, so what was shown is what is stored.
+  const MAPS_CONSENT_VERSION = '2026-09-25';
+  const MAPS_CONSENT_COPY =
+    "We'll email you when HomeSignal posts about what's changing in this ZIP code. No spam · Unsubscribe anytime.";
+  HS.MAPS_CONSENT_COPY = MAPS_CONSENT_COPY;
+
+  // { signedIn, subscribed } for this ZIP's maps selection, read from the canonical view.
+  // Scoped by the ZIP community's id — never by users.zip_code equality.
+  // lib/data.js carries no cache key, so for a few minutes after a deploy a browser can
+  // pair this shell.js with the previous lib/data.js. Detect that instead of throwing.
+  function mapsHelpersLoaded() {
+    return !!(HS.data && typeof HS.data.zipCommunity === 'function'
+              && typeof HS.mapsOptinRpcArgs === 'function' && HS.MAPS_EMAIL_STREAM);
+  }
+  HS.mapsZipEmailState = async function (zip) {
+    const out = { signedIn: !!(state.session && !state.session.demo), subscribed: false };
+    if (!out.signedIn || CFG.DATA_SOURCE !== 'supabase' || !HS.sb || !mapsHelpersLoaded()) return out;
+    const zc = await HS.data.zipCommunity(zip);
+    if (!zc) return out;
+    const res = await HS.sb().from('my_alert_subscriptions')
+      .select('community_id, stream, subscribed')
+      .eq('community_id', zc.id).eq('stream', HS.MAPS_EMAIL_STREAM);
+    if (res.error) throw res.error;
+    out.subscribed = (res.data || []).some(r => r && r.subscribed === true);
+    return out;
+  };
+
+  // A message written for residents. Anything else (a database or network error) is
+  // shown by the page as a generic "please try again", never verbatim.
+  function friendlyError(msg) { const e = new Error(msg); e.friendly = true; return e; }
+  async function mapsZipEmailWrite(zip) {
+    zip = String(zip || '').trim();
+    if (!/^\d{5}$/.test(zip)) throw friendlyError('This page is not a ZIP code page.');
+    if (!state.session || state.session.demo || !HS.sb) throw friendlyError('Sign in to get these emails.');
+    if (!mapsHelpersLoaded()) throw friendlyError('Please refresh the page and try again.');
+    const zc = await HS.data.zipCommunity(zip);
+    if (!zc) throw friendlyError("Email updates aren't available for this ZIP code yet.");
+    // (2) My Places. persistCommunityFollow needs the onboarding helpers to tell an
+    // already-saved follow (success) from a real failure; they load at boot, and this
+    // makes sure of it.
+    try { await loadOnboardingLib(); } catch (e) { /* the follow reports its own failure */ }
+    await persistCommunityFollow(zip);
+    // (3) The selection — the one additive consent writer, alert consent only.
+    const r = await HS.sb().rpc('enable_area_email_alerts',
+      HS.mapsOptinRpcArgs(state.session.user.email, zc.id, zip,
+        MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS.referral()));
+    if (r && r.error) throw new Error(r.error.message || 'Could not save your email sign-up.');
+    // (4) Read it back: the control says what DELIVERY will do, never what we hoped.
+    const st = await HS.mapsZipEmailState(zip);
+    if (!st.subscribed) throw friendlyError('Your sign-up did not save — please try again.');
+    paintTopbar();
+    return st;
+  }
+
+  // The button. Signed out, it opens the 6-digit sign-in and the sign-up resumes after
+  // the code is verified. onResult(err, state) lets the page repaint its control.
+  HS.mapsZipEmailSignup = function (zip, onResult) {
+    const done = typeof onResult === 'function' ? onResult : function () {};
+    const run = function () {
+      return mapsZipEmailWrite(zip).then(
+        function (st) { done(null, st); return st; },
+        function (e) { done(e || new Error('Could not save your email sign-up.')); throw e; });
+    };
+    if (!HS.requireAuth('maps-zip-email', run)) return 'auth';
+    run().catch(function (e) { console.warn('maps-zip-email', e); });
+    return 'saving';
   };
   // Chip row of followed ZIP codes (+ an add button), reused across pages.
   HS.communitiesStripHTML = function (opts) {

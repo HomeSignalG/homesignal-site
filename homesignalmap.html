@@ -100,6 +100,23 @@
      no-match copy suggests a city or ZIP rather than prescribing a triple). */
   .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
 
+  /* "What is changing in my zip code?" — the email sign-up for this ZIP's Bluesky MAPS
+     posts (founder, 2026-09-25). ZIP mode only: an address search is about a home, not a
+     ZIP, and zipmode is the class the page already uses to say which one it is showing.
+     It lives inside .head, so the Place-page embed hides it with the rest of the hero. */
+  .zip-email{display:none;margin:16px 0 4px;max-width:640px}
+  body.zipmode .zip-email{display:block}
+  .zip-email-btn{min-height:44px;padding:11px 18px;border:0;border-radius:11px;
+    background:var(--green);color:#fff;font-family:var(--font);font-size:15px;font-weight:700;
+    cursor:pointer}
+  .zip-email-btn:hover{background:var(--green-dark)}
+  .zip-email-btn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  .zip-email-btn:disabled{cursor:default;opacity:.7}
+  .zip-email-btn.on{background:#fff;color:var(--green);border:1px solid var(--line);opacity:1}
+  .zip-email-note{font-size:12.5px;color:var(--soft);margin-top:7px}
+  .zip-email-msg{font-size:12.5px;color:var(--violation);margin-top:4px}
+  .zip-email-msg:empty{display:none}
+
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
 
@@ -639,6 +656,15 @@
            "Browse all development in ZIP NNNNN" self-link, emptying this row), because the
            placeholder now carries the instruction the sentence used to. -->
       <div class="search-err" id="addrErr" role="alert" hidden></div>
+      <!-- "What is changing in my zip code?" — email copies of the Bluesky MAPS posts about
+           THIS ZIP (founder, 2026-09-25). The label is the founder's wording, word for word.
+           The note is filled from HS.MAPS_CONSENT_COPY, the SAME string the sign-up records
+           as its consent audit trail, so what is shown is what is stored. -->
+      <div class="zip-email" id="zipEmail" data-zip="">
+        <button type="button" class="zip-email-btn" id="zipEmailBtn">What is changing in my zip code?</button>
+        <div class="zip-email-note" id="zipEmailNote"></div>
+        <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
+      </div>
     </div>
 
     <div class="status" id="status"></div>
@@ -883,7 +909,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=75464c7b"></script>
+<script src="shell.js?v=d5a2b311"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -2176,6 +2202,46 @@ HS.onReady(function(){
     el.textContent = heading || '';
   }
 
+  // "What is changing in my zip code?" — the email sign-up for this ZIP's Bluesky MAPS
+  // posts (founder, 2026-09-25). The page only PAINTS: signing in, saving the ZIP to My
+  // Places, writing the selection and reading it back all live in shell.js
+  // (HS.mapsZipEmailSignup / HS.mapsZipEmailState), which is the one path for this sign-up.
+  var ZIP_EMAIL_LABEL = "What is changing in my zip code?";
+  function setZipEmailSubscribed(on){
+    var btn = $("zipEmailBtn"); if(!btn) return;
+    btn.disabled = !!on;
+    btn.classList.toggle("on", !!on);
+    btn.textContent = on ? "✓ You're signed up" : ZIP_EMAIL_LABEL;
+  }
+  function paintZipEmail(zip){
+    var box = $("zipEmail"), btn = $("zipEmailBtn"), note = $("zipEmailNote"), msg = $("zipEmailMsg");
+    if(!box || !btn || !window.HS || !HS.mapsZipEmailSignup) return;
+    box.dataset.zip = zip;
+    if(note) note.textContent = HS.MAPS_CONSENT_COPY || "";
+    if(msg) msg.textContent = "";
+    setZipEmailSubscribed(false);
+    btn.onclick = function(){
+      var z = box.dataset.zip; if(!z) return;
+      btn.disabled = true; if(msg) msg.textContent = "";
+      var how = HS.mapsZipEmailSignup(z, function(err){
+        if(box.dataset.zip !== z) return;              // the page has moved on to another ZIP
+        if(err){
+          btn.disabled = false;
+          if(msg) msg.textContent = (err && err.friendly) ? err.message : "Couldn't sign you up — please try again.";
+          return;
+        }
+        setZipEmailSubscribed(true);
+      });
+      // The 6-digit sign-in is open and resumes the sign-up itself; leave the button usable.
+      if(how === "auth") btn.disabled = false;
+    };
+    if(HS.mapsZipEmailState){
+      HS.mapsZipEmailState(zip).then(function(st){
+        if(box.dataset.zip === zip && st && st.subscribed) setZipEmailSubscribed(true);
+      }, function(){ /* state unknown: the button keeps offering the sign-up */ });
+    }
+  }
+
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     // HOME_ANCHOR is TRUE here and does NOT mean "there is a home" - it means area items
@@ -2264,6 +2330,7 @@ HS.onReady(function(){
     // Kind is zip-mode (this host). The H1 still names the place ("Del Valle (78617)");
     // the standfirst names the ZIP the map is rendering.
     paintMap1PlaceHeading('zip', zip);
+    paintZipEmail(zip);
     // NO helper text under the field in either mode, so ZIP mode has nothing to override.
     // The field carries its own instruction in the placeholder, which reads correctly in both.
     var _cap = document.querySelector(".map-cap");

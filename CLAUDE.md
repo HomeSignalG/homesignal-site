@@ -1162,13 +1162,14 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 show a topic as on while the digest treats it as off, because there is no second answer to
 disagree with.
 
-SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a10.sql`, plus
+SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a12.sql`, plus
 `docs/alert-subscription-canonical-CURRENT-STATE.sql` — a dated **read-back** from
 `pg_get_viewdef` / `pg_get_functiondef`, not a hand-written copy. **Read CURRENT-STATE
-before touching any of it.**
+before touching any of it.** Since 2026-09-25 each quoted definition in it carries its
+production md5, so the read-back can be checked rather than trusted.
 
 **Five streams, and notices/meetings NEVER collapse** — `notices | meetings | news |
-global | emerging`. The predecessor unique key was
+global | emerging` (six since A12 below, which added `maps`). The predecessor unique key was
 `(user_id, community_id, pipeline_type, topic)` and notices+meetings share
 `pipeline_type='government_notice'`, so **one of the two selections was silently
 overwritten**. That is why the migration moved 120 → 155 rows: **+35 recovered meetings
@@ -1183,6 +1184,65 @@ selections**, per-stream before→after otherwise identical, fingerprint
   contract F) and is what delivery gates on. No legal conclusion is drawn from the split.
 - **Per-place unsubscribe is preserved** (contract G): `users` is keyed
   `(email, community_id)`, so one place stopping never stops another.
+
+### A12 — A SIXTH STREAM, `maps`: "What is changing in my zip code?" ⚖️ FOUNDER (2026-09-25) — ✅ APPLIED 2026-09-25
+
+A button on Map 1 (`homesignalmap.html`, ZIP mode) signs a resident up for **email copies of
+the Bluesky MAPS posts about that ZIP**. Approved plan: *"Add MAPS as a new type in the
+existing subscription system rather than building a separate signup."* So it is a stream in
+the one store, written by the one additive writer — `docs/alert-subscription-canonical-a12.sql`.
+✅ **APPLIED 2026-09-25 on the founder's "go"**, with its delivery half. Ledger:
+`20260925231226 alert_subscription_canonical_a12_maps_stream` and
+`20260925231403 maps_email_delivery` (homesignal-ingest), each through `apply_migration` from
+the committed file.
+- **No DDL dry run touched production (§7.11).** Instead the pg suite's fixture was first proved
+  to BE production for everything the two files touch: all **20** fingerprints it carries
+  (function bodies, views, constraints, the generated expression, the unique index, the
+  trigger) matched production byte for byte. So CI's 25 checks and 12 killed mutations are a
+  result about production, not about a stand-in.
+- **After:** production equals that replica with both files applied, on all **24** fingerprints
+  (combined md5 `3551a7571400fa623a04e5c941f624e0` on both sides). `user_subscriptions` is
+  still 155 rows with an unchanged row fingerprint; `users` is 13 with an unchanged consent
+  fingerprint; the catalog gained exactly its one `maps` row; `maps_zip_scope_trigger` = 1.
+- **Today's callers still work:** a live call with the six named arguments the site sends
+  today resolved to the new writer and stopped at its first check (no JWT), before any write.
+- `CURRENT-STATE.sql` was re-read the same day; every quoted definition is md5-equal to
+  production.
+- ✅ **The email half went live on 2026-09-26, before this button existed.** Ingest #600 merged
+  (`cc0d2dd`), then `deploy-edge-function.yml` (run `36249476811`, which checks out `ref: main`)
+  deployed `confirm-alerts`. Read back with `get_edge_function`: **version 3**, updated
+  2026-09-26 14:43:54Z, and its source has the approved MAPS wording and the claim's `streams`
+  field. So the confirmation email knows about MAPS before anyone can press the button. The
+  version it replaced (v2) was also safe: it ignored the `streams` column.
+
+- 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
+  other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
+  post is about exactly one ZIP (`social_posts.zip`), so a root anchor could never be matched to a
+  post. The database refuses it (`user_subscriptions_maps_zip_scoped`), and the integrity view
+  reports that guard (`maps_zip_scope_trigger` MUST be 1). Filing per ZIP also means one email
+  can follow several ZIPs in one county — each is its own identity, its own unsubscribe.
+- **Alert consent only.** `enable_area_email_alerts` gained `p_marketing_consent` (default
+  `true` = every existing caller unchanged); Map 1 passes `false` (contract F). A false tap
+  never REVOKES marketing consent given elsewhere. It also records the first-touch referral.
+- **Nothing is written on the county identity** — no follow floor, no reconcile-to-exact
+  `signup_complete`. The ZIP is saved to My Places by `persistCommunityFollow`, which is also
+  what keeps a brand-new resident out of the non-dismissible onboarding overlay.
+- The sign-in resumes the sign-up after the 6-digit code (`HS.requireAuth(label, afterAuth)`);
+  every other open of the sign-in clears the pending action, so it can never fire on a later,
+  unrelated sign-in.
+- Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
+  (the SQL against a disposable Postgres 17, every prohibited mutation killed). **Two
+  workflows, split by repo** — the `check-alert-subscription-parity.yml` precedent:
+  `maps-zip-email-suite.yml` here runs A12 alone (the delivery checks print SKIP), and
+  homesignal-ingest's `check-maps-email-pg.yml` clones this PUBLIC repo and runs both halves
+  with `REQUIRE_DELIVERY=1`. ⚠️ The reverse is impossible — homesignal-ingest is private, and
+  the first version of this job tried to check it out and failed with "Not Found".
+- ⚖️ **THE WORDING IS FOUNDER-APPROVED (2026-09-26) AND LOCKED (Rule #0):** the button
+  ("What is changing in my zip code?"), the consent line, "✓ You're signed up", and both error
+  messages. Each is pinned WHOLE in `test/maps-zip-email.test.mjs` §5b (the button in §5); a
+  fragment match would let the rest of a sentence change and still pass. Each pin was broken
+  on purpose (5 mutations) and each failure exited 1. The email side's approved wording is
+  pinned the same way in homesignal-ingest.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
