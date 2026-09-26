@@ -79,7 +79,9 @@ ok(located.length === Object.keys(readers).length && leak.length === 0,
 // from national_dc_records alone (never the geocode).
 const osmCte = (map1.match(/\n  osm as \([\s\S]*?\n  osm_kept as/) || [''])[0];
 ok(map1.length > 2000 && osmCte.length > 400
-   && (map1.match(/dc_osm_address_check/g) || []).length === 1 && /left join public\.dc_osm_address_check k on k\.osm_record_id = r\.id/.test(osmCte)
+   && (map1.match(/dc_osm_address_check/g) || []).length === 1
+   && /left join lateral \(select c\.check_outcome, c\.admitted\s+from public\.dc_osm_address_check c\s+where c\.osm_record_id = r\.id\) k on true/.test(osmCte)
+   && /\nset jit to 'off'\n/.test(map1)
    && !/dc_osm_derived_point/.test(map1)
    && /and not \(coalesce\(k\.admitted, false\) and k\.check_outcome = 'SOURCES_DISAGREE'\)\)/.test(osmCte)
    && /case when k\.admitted and k\.check_outcome = 'CORROBORATED'\s+then array\['CORROBORATED_BY_DERIVED_ADDRESS'\]::text\[\] else '\{\}'::text\[\] end as quality_flags/.test(osmCte)

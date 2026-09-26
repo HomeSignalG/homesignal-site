@@ -85,6 +85,11 @@ language sql
 stable
 security definer
 set search_path to 'public', 'geo', 'pg_temp'
+-- JIT OFF (C3c, 2026-09-26): the OSM check's plpgsql functions carry the default 1,000-row estimate,
+-- which inflates this function's estimated cost past jit_above_cost, and JIT compilation then cost
+-- ~2 s per ZIP read on a JIT-enabled server (measured: 12 ZIPs 24.3 s with JIT, 38 ms without; the
+-- pre-C3c reader 33 ms). Production runs jit=off in its configuration; this pins it on the function.
+set jit to 'off'
 as $function$
   with
   -- THE ONE LIFECYCLE MAP: source lifecycle word -> Map 1 permit-vocabulary pin status.
@@ -172,7 +177,11 @@ as $function$
         on r.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
        and r.lng between bb.x0 - 1e-4 and bb.x1 + 1e-4
       join lifecycle lc on lc.v = r.normalized_status
-      left join public.dc_osm_address_check k on k.osm_record_id = r.id
+      -- one check per pin in the box, looked up per pin: the check view's plpgsql functions carry
+      -- the default 1,000-row estimate, so a plain join lets the planner cost it as a national scan
+      left join lateral (select c.check_outcome, c.admitted
+                           from public.dc_osm_address_check c
+                          where c.osm_record_id = r.id) k on true
      where r.map_eligible
        and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),
   osm_kept as (

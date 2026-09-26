@@ -44,14 +44,25 @@ READER = ['create or replace function public.map1_dc_zip_members(',
           'comment on function public.map1_dc_zip_members(']
 
 OSM_TUPLE = ", ('openstreetmap', 'telecom_data_center')"
+JIT_LINE = """-- JIT OFF (C3c, 2026-09-26): the OSM check's plpgsql functions carry the default 1,000-row estimate,
+-- which inflates this function's estimated cost past jit_above_cost, and JIT compilation then cost
+-- ~2 s per ZIP read on a JIT-enabled server (measured: 12 ZIPs 24.3 s with JIT, 38 ms without; the
+-- pre-C3c reader 33 ms). Production runs jit=off in its configuration; this pins it on the function.
+set jit to 'off'
+"""
 READER_EDITS = [
+    (JIT_LINE, ""),
     ("""           'legacy_osm_compat'::text as publication_basis,
            case when k.admitted and k.check_outcome = 'CORROBORATED'
                 then array['CORROBORATED_BY_DERIVED_ADDRESS']::text[] else '{}'::text[] end as quality_flags,
 """, """           'legacy_osm_compat'::text as publication_basis, '{}'::text[] as quality_flags,
 """),
     ("""      join lifecycle lc on lc.v = r.normalized_status
-      left join public.dc_osm_address_check k on k.osm_record_id = r.id
+      -- one check per pin in the box, looked up per pin: the check view's plpgsql functions carry
+      -- the default 1,000-row estimate, so a plain join lets the planner cost it as a national scan
+      left join lateral (select c.check_outcome, c.admitted
+                           from public.dc_osm_address_check c
+                          where c.osm_record_id = r.id) k on true
      where r.map_eligible
        and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),""",
      """      join lifecycle lc on lc.v = r.normalized_status

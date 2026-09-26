@@ -69,6 +69,8 @@ MUTATIONS = {
         "       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),",
         "       and not (coalesce(k.admitted, false) and k.check_outcome <> 'CORROBORATED')),", 1)]),
     'Y14_reader_moves_pin_to_geocode': (MAP, [(
+        "      left join lateral (select c.check_outcome, c.admitted\n",
+        "      left join lateral (select c.check_outcome, c.admitted, c.lat, c.lng\n", 1), (
         "           lc.map_status, r.project_type, r.lat, r.lng, r.location_text, r.location_precision,",
         "           lc.map_status, r.project_type, coalesce(k.lat, r.lat) as lat, coalesce(k.lng, r.lng) as lng, r.location_text, r.location_precision,", 1)]),
 }

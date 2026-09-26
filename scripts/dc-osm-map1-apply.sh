@@ -24,10 +24,10 @@ set -euo pipefail
 MODE="${DCO_MODE:-apply}"
 case "$MODE" in
   apply)    ART=docs/dc-osm-map1-apply.sql
-            EXPECTED_SHA256=ed0b0c2ce64c52119a7a1b02459801d314036dcca79d90ebe7e4937c81de1ef2
+            EXPECTED_SHA256=eb1759911d4dcaeea8e1c185924f3c33948543d25887072f35e64dc618a44983
             OSM_BEFORE=false; OSM_AFTER=true ;;
   rollback) ART=docs/dc-osm-map1-rollback.sql
-            EXPECTED_SHA256=c685313af684b4dcaf03a96671b2f8721c0b95dfc2fefd5cbcad70b7e7f55a12
+            EXPECTED_SHA256=7be1b88257606cdb51fea2a106c82e3fa2c25eb677332f7b1f627fa7bf39e4ef
             OSM_BEFORE=true; OSM_AFTER=false ;;
   *) echo "REFUSED: DCO_MODE must be apply or rollback"; exit 1 ;;
 esac

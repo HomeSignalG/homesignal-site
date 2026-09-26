@@ -82,6 +82,11 @@ language sql
 stable
 security definer
 set search_path to 'public', 'geo', 'pg_temp'
+-- JIT OFF (C3c, 2026-09-26): the OSM check's plpgsql functions carry the default 1,000-row estimate,
+-- which inflates this function's estimated cost past jit_above_cost, and JIT compilation then cost
+-- ~2 s per ZIP read on a JIT-enabled server (measured: 12 ZIPs 24.3 s with JIT, 38 ms without; the
+-- pre-C3c reader 33 ms). Production runs jit=off in its configuration; this pins it on the function.
+set jit to 'off'
 as $function$
   with
   -- THE ONE LIFECYCLE MAP: source lifecycle word -> Map 1 permit-vocabulary pin status.
@@ -169,7 +174,11 @@ as $function$
         on r.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
        and r.lng between bb.x0 - 1e-4 and bb.x1 + 1e-4
       join lifecycle lc on lc.v = r.normalized_status
-      left join public.dc_osm_address_check k on k.osm_record_id = r.id
+      -- one check per pin in the box, looked up per pin: the check view's plpgsql functions carry
+      -- the default 1,000-row estimate, so a plain join lets the planner cost it as a national scan
+      left join lateral (select c.check_outcome, c.admitted
+                           from public.dc_osm_address_check c
+                          where c.osm_record_id = r.id) k on true
      where r.map_eligible
        and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),
   osm_kept as (
@@ -238,7 +247,7 @@ begin
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted') is distinct from '2c05d65aba736fab7c79199e78614ab6' then bad := bad || ' dc_derived_address_admitted'; end if;
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '523c1cb011f66211406be9af9f2ef9e1' then bad := bad || ' map1_dc_zip_members'; end if;
+        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '2146b68afc2cda03948b1e1cd51b29b8' then bad := bad || ' map1_dc_zip_members'; end if;
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'dc_publisher_stated_address') is distinct from '7605c217d2d4d4fb0e36cff42015b0f1' then bad := bad || ' dc_publisher_stated_address'; end if;
   if to_regclass('public.dc_osm_derived_point') is null or to_regclass('public.dc_osm_address_check') is null then

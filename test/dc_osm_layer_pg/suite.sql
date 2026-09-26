@@ -334,7 +334,7 @@ select 'W19 [never moved, nothing else touched] every surviving row keeps its ex
 insert into _r (check_name, pass, detail)
 select 'W20 the Map 1 reader reads the OSM check only through dc_osm_address_check (control: still national_dc_records)',
        (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') ~ 'left join public\.dc_osm_address_check k on k\.osm_record_id = r\.id'
+         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') ~ 'from public\.dc_osm_address_check c\s+where c\.osm_record_id = r\.id\) k on true'
    and (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') !~ 'dc_osm_derived_point'
    and (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace

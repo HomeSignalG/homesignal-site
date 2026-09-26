@@ -14,7 +14,7 @@ begin
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted') is distinct from '2c05d65aba736fab7c79199e78614ab6' then bad := bad || ' dc_derived_address_admitted'; end if;
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '523c1cb011f66211406be9af9f2ef9e1' then bad := bad || ' map1_dc_zip_members'; end if;
+        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '2146b68afc2cda03948b1e1cd51b29b8' then bad := bad || ' map1_dc_zip_members'; end if;
   if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'dc_publisher_stated_address') is distinct from '7605c217d2d4d4fb0e36cff42015b0f1' then bad := bad || ' dc_publisher_stated_address'; end if;
   if to_regclass('public.dc_osm_derived_point') is null or to_regclass('public.dc_osm_address_check') is null then
