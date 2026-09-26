@@ -126,7 +126,9 @@ def fetch_data(key, now_iso):
                           "zip,name,county,state,data_quality,indexable", keyset="zip")
     d["changes"] = fetch_all("app_changes", key,
                              "id,zip,community_id,category,title,source_ref,occurred_at")
-    d["agency"] = fetch_all("alerts", key, "id,source_url,agency_name",
+    # alerts_public, not alerts: anon SELECT on alerts was revoked 2026-09-26
+    # (phase3_revoke_anon_alerts_after_site_swap). Same rows for local_news, measured.
+    d["agency"] = fetch_all("alerts_public", key, "id,source_url,agency_name",
                             "&category=eq.local_news")
     # keyset MUST be unique: `gt.` on a non-unique column skips the rest of a tied group
     # the moment a page fills. alert_id is one row per retraction; community_id is not.
