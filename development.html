@@ -164,7 +164,8 @@ HS.onReady(async function () {
       }
       page.innerHTML =
         '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
-        + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p></div>'
+        + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p>'
+        + '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(HS.navHref('homesignalmap.html', S.zip)) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div></div>'
         + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
         + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
