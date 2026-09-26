@@ -1270,6 +1270,15 @@ the committed file.
   fragment match would let the rest of a sentence change and still pass. Each pin was broken
   on purpose (5 mutations) and each failure exited 1. The email side's approved wording is
   pinned the same way in homesignal-ingest.
+  - ⚖️ **THE BUTTON NOW READS "Sign up for emails on what is changing in this zip code"**
+    (founder, 2026-09-26, later the same day: *"Change the text in the button to Sign up for
+    emails on what is changing in this zip code"*). Word for word, including the lowercase
+    "zip code". It is set in two places in `homesignalmap.html` — the button and
+    `ZIP_EMAIL_LABEL`, which paints the label back — and both are pinned whole (§5, §5b; a
+    one-letter change to "ZIP code" was caught). **Only the LABEL changed.** The topic the
+    sign-up stores, `HS.MAPS_EMAIL_TOPIC` = "What is changing in my zip code?", is what links
+    a sign-up to the MAPS posts and the email, so it stays as it was, and §5b pins that the
+    button no longer reads it.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 

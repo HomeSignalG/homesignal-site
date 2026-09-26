@@ -37,6 +37,8 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 
 const TOPIC = 'What is changing in my zip code?';
+// The button's label (founder, 2026-09-26) is not the topic the sign-up stores.
+const BUTTON_LABEL = 'Sign up for emails on what is changing in this zip code';
 const ZIP_ROW = [{ zip: '97702', home_lat: 44.02, home_lng: -121.30, counts: { facilities: 0 },
   refreshed_at: '2026-09-01T00:00:00Z', paywall: false, facilities_unavailable: false, sites: [] }];
 
@@ -169,7 +171,7 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
   const { ctx, page } = await open(LANDING);
   const btn = page.locator('#zipEmailBtn');
   ok(await btn.isVisible(), '1a the button is visible on the Map 1 ZIP page');
-  ok((await btn.textContent()).trim() === TOPIC, "1b it reads the founder's wording, word for word");
+  ok((await btn.textContent()).trim() === BUTTON_LABEL, "1b it reads the founder's wording, word for word");
   const note = (await page.locator('#zipEmailNote').textContent()).trim();
   ok(/^We'll email you when HomeSignal posts about what's changing in this ZIP code\./.test(note),
     '1c the consent line is shown next to the button', note);
