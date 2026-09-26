@@ -107,7 +107,9 @@ select md5(string_agg(t::text, ',' order by t.home_signal_observation_id)) fp fr
 -- really is the admitted switch, so this cannot hide a regression of the switch itself. Kept BELOW
 -- the marker line above: apply_offline.sh loads everything above it into a pre-Phase A database.)
 create temp table _gate_ddl as select public.dc_derived_address_admitted('compute_atlas', 'facilities') atlas,
-                                      public.dc_derived_address_admitted('epoch_ai', 'data_centers') epoch;
+                                      public.dc_derived_address_admitted('epoch_ai', 'data_centers') epoch,
+                                      public.dc_derived_address_admitted('compute_atlas', 'other_distribution') atlas_other,
+                                      public.dc_derived_address_admitted('some_new_source', 'facilities') other_source;
 create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
 returns boolean language sql immutable set search_path to 'public', 'pg_temp'
 as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;
@@ -209,10 +211,10 @@ create or replace function pg_temp.g(p_name text) returns text language sql as $
 -- ── V00. the DDL of record's switch (stage 10) ───────────────────────────────────────
 insert into _r (check_name, pass, detail)
 select 'V00 the DDL of record admits Atlas facilities and Epoch data_centers (stage 10); the suite set Phase A''s switch itself',
-       (select atlas and epoch from _gate_ddl)
-   and not public.dc_derived_address_admitted('compute_atlas', 'other_distribution')
-   and not public.dc_derived_address_admitted('some_new_source', 'facilities'),
-       (select 'ddl atlas=' || atlas || ' epoch=' || epoch from _gate_ddl);
+       -- every answer is the DDL of record's, captured BEFORE the suite replaced the switch (asking
+       -- the function here would ask the suite's own PHASE D copy: X00b survived exactly that way)
+       (select atlas and epoch and not atlas_other and not other_source from _gate_ddl),
+       (select 'ddl atlas=' || atlas || ' epoch=' || epoch || ' atlas_other=' || atlas_other || ' other_source=' || other_source from _gate_ddl);
 
 -- ── Z. ZERO HUMAN ────────────────────────────────────────────────────────────────────
 insert into _r (check_name, pass, detail)
