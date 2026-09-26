@@ -24,9 +24,11 @@ end $g$;
 --     envelope, p_env. That is the one narrowing the candidate-bounding rule admits (the GiST
 --     prefilter from the boundary's envelope, scripts/n5_candidate_bounding.py) - it removes
 --     nothing ST_Intersects(c.geom, boundary) would keep. Without it the planner cannot reach
---     either GiST index through the UNION, and every boundary was compared with every one of
---     ~960k candidates: MEASURED on production 2026-09-26, ~90 s per prefix (010: 59 ZCTAs),
---     i.e. ~14 h for 584 prefixes, with every prefix over 120 s lost to the API gateway.
+--     either GiST index through the UNION: EXPLAIN on production 2026-09-26 showed a nested
+--     loop comparing each boundary with all ~960k candidates (join filter, no GiST; estimated
+--     cost 24.2M), and the envelope form uses n5_geom_gix + n5_gen_proven_point_gix. Whole
+--     prefixes measured 11-63 s (median ~25 s) before this change; the first two, 95 s, were
+--     cold-cache and are NOT representative - an early "~14 h" projection from them was wrong.
 drop function if exists geo.n5_gen_candidate_geom(text);
 create or replace function geo.n5_gen_candidate_geom(p_generation_id text, p_env geometry)
 returns setof geo.n5_geom
