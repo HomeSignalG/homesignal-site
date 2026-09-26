@@ -2424,6 +2424,50 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
   switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
   records.
 
+## 7.14 THE OPENSTREETMAP LAYER IS CHECKED WITH THE SHARED RULES AND NEVER MERGED ⚖️ FOUNDER RULING (2026-09-26 — C3a BUILT, NOT YET APPLIED)
+
+**OpenStreetMap is an approved, active data-centre source and stays a SEPARATE layer** (founder,
+2026-09-26: "sepaarate"). Its records stay in `national_dc_records` (ODbL) and are **never merged into
+the canonical CC BY tables**, because that merge would build one database from both licences
+(`docs/dc-osm-current-state-2026-09-26.md` §2). The Map 1 change that follows is gated by **automated
+checks only**. There is no manual list review (founder: "no manual human review", "automated checks").
+
+**C3a gives each OSM pin the same address check every source gets. It reuses shared code and adds no OSM
+decision logic of its own:**
+
+| piece | object | owner |
+|---|---|---|
+| extraction | `dc_publisher_stated_address` OSM branch (the record's own `addr:*` tags; `addr:country` ≠ US → `NOT_US`) | Step 3D |
+| policy, geocoder, cache, verdict | `dc_geocode_input` → `dc_address_geocode` → `dc_derived_point_verdict` (unchanged) | Step 3D |
+| acquisition | `dc_osm_derived_point` (new view) | Step 3D |
+| queue | `dc_geocode_queue` now also lists map-eligible OSM addresses: one writer, one cache | Step 3D |
+| judgement | `dc_osm_address_check` (new view): `dc_site_claims_conflict`, pin = `PUBLISHER_SITE`, geocode = `DERIVED_ADDRESS` | Step 3B |
+
+- **Outcomes:** `CORROBORATED`, `SOURCES_DISAGREE` or `UNCHECKED_*`. An OSM pin is **never moved**.
+  `approximate_project_area` is not a site claim (`UNCHECKED_NO_SITE_CLAIM`).
+- ⛔ **OSM is NOT admitted, and the Map 1 reader does not read either view.** Nothing on Map 1 moves at
+  C3a. Using the check on Map 1 is C3c: a replica dry run, then an automated gate.
+- 🔑 **The judgement lives in Step 3B because the conflict rule does.** The first draft put it in Step 3D.
+  Step 3D loads before Step 3B, so that draft failed to apply (`function dc_site_claims_conflict … does
+  not exist`). The acquisition view (Step 3D) is the only OSM view the queue reads.
+- **Tested, both halves:**
+  - `test/dc_osm_layer_pg`: 15 checks, 9 of 9 prohibited mutations killed, including admitting OSM, a
+    private distance threshold, a moved pin, and a queue that drops or over-takes OSM. Positive control:
+    8 OSM rows on the page, and Map 1 byte-identical after every OSM derivation loads.
+  - `test/dc-osm-layer-structure.test.mjs`: 14 checks.
+  - The Atlas, Epoch, geography, publication and membership suites all still pass.
+- **Apply:** `dc-osm-layer-apply.yml`, dispatch from main with `APPLY-OSM-LAYER-C3A`
+  (`ROLLBACK-OSM-LAYER-C3A` reverses it). It uses the same discipline as the Atlas admission.
+  - The drift guard pins 8 functions to main@800b9a3. Their md5(prosrc) was read on production
+    2026-09-26 and reproduced from that commit's DDL, and all 8 matched. The queue viewdef was also
+    read on production.
+  - Only `dc_publisher_stated_address` changes: md5 `83675b5b…` → `7605c217…`.
+  - Round trip proven offline: apply equals the DDL of record; rollback restores main byte for byte;
+    a second apply and a second rollback are both refused.
+- 📌 **Measured before C3a (read-only):** of 1,384 map-eligible OSM records, **724** GEOCODABLE, 575
+  BLANK, 84 NO_LOCALITY (mostly Canadian), 1 NO_HOUSE_NUMBER. C3b measures the verdicts once the daily
+  10:45 UTC writer has geocoded them.
+
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 
 Two defects in the canonical DC geography layer (`docs/dc-step3b-canonical-geography.sql`,

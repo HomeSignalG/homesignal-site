@@ -123,6 +123,29 @@ begin
             'Atlas location.street, city, state postalCode'::text;
         return;
     end if;
+    -- OpenStreetMap (telecom=data_center), the SEPARATE ODbL layer in national_dc_records. The
+    -- payload is the record's own OSM tags (raw_tags). Composed in the same "number street, city,
+    -- state zip" shape as Atlas, so the same policy and the same calibrated bound apply. A missing
+    -- house number or street yields an empty line (BLANK); an OSM country tag other than US is NOT_US.
+    if p_source_key = 'openstreetmap' and p_distribution_key = 'telecom_data_center' then
+        if nullif(upper(btrim(coalesce(p_payload->>'addr:country', ''))), '') not in ('US', 'USA') then
+            return query select 'NOT_US'::text, null::text, 'the OSM record places this facility outside the United States'::text;
+            return;
+        end if;
+        st := btrim(regexp_replace(concat_ws(' ', nullif(btrim(coalesce(p_payload->>'addr:housenumber', '')), ''),
+                                                  nullif(btrim(coalesce(p_payload->>'addr:street', '')), '')), '\s+', ' ', 'g'));
+        return query select 'STATED'::text,
+            case when btrim(coalesce(p_payload->>'addr:housenumber', '')) = ''
+                   or btrim(coalesce(p_payload->>'addr:street', '')) = '' then ''
+                 else concat_ws(', ', st,
+                                nullif(btrim(regexp_replace(coalesce(p_payload->>'addr:city', ''), '\s+', ' ', 'g')), ''),
+                                nullif(btrim(concat_ws(' ',
+                                    nullif(btrim(coalesce(p_payload->>'addr:state', '')), ''),
+                                    nullif(btrim(coalesce(p_payload->>'addr:postcode', '')), ''))), ''))
+            end,
+            'OSM addr:housenumber addr:street, addr:city, addr:state addr:postcode'::text;
+        return;
+    end if;
     return query select 'NO_RULE'::text, null::text, 'no address extraction rule for this source'::text;
 end;
 $fn$;
@@ -361,17 +384,69 @@ comment on view public.dc_observation_derived_point is
 'STEP 3D. Each current observation of a source with an address rule, its geocoder query, the
 derivation for the current ladder version (if any) and the fail-closed verdict.';
 
+-- ── OPENSTREETMAP: THE SEPARATE LAYER'S ADDRESS CHECK (2026-09-26, founder: OSM stays separate) ──
+-- OpenStreetMap is an approved source kept as its OWN ODbL layer (national_dc_records): it is never
+-- merged into the canonical CC BY tables (docs/dc-osm-current-state-2026-09-26.md §2). This view
+-- checks each OSM pin against the OSM record's own stated address WITHOUT that merge. It owns no
+-- decision of its own; every one is the shared rule every source uses:
+--   extraction + policy  dc_geocode_input('openstreetmap', 'telecom_data_center', raw_tags)
+--   the geocoder         dc_address_geocode, filled by the one writer from dc_geocode_queue
+--   the output rule      dc_derived_point_verdict
+--   the gate             dc_derived_address_admitted -- false: acquired and reported, decides nothing
+-- It is a separate view, not rows in dc_observation_derived_point, because that view feeds the
+-- canonical identity and geography resolvers: an OSM row there would be the merge.
+-- An OSM pin is a SITE claim when the loader recorded it as the facility's own mapped point
+-- (precise_location) or its own mapped outline (approximate_campus_area); anything else makes no
+-- site claim and is never judged. The JUDGEMENT (the shared conflict rule) is Step 3B's view
+-- dc_osm_address_check; this view is acquisition only, which is all the writer's queue reads.
+create or replace view public.dc_osm_derived_point with (security_invoker = true) as
+select r.source_key, r.map_eligible, r.location_precision, r.lat as osm_lat, r.lng as osm_lng,
+       gi.input_quality, gi.geocoder_query, gi.reason as input_reason,
+       d.derivation_id, d.provider, d.match_type, d.lat, d.lng, d.matched_address,
+       d.provider_candidates, d.derived_at, d.run_ref,
+       case when gi.input_quality <> 'GEOCODABLE' then 'NOT_GEOCODABLE' else v.verdict end as verdict,
+       v.positional_uncertainty_m,
+       case when gi.input_quality <> 'GEOCODABLE' then gi.reason else v.reason end as verdict_reason,
+       case when r.location_precision in ('precise_location', 'approximate_campus_area')
+            then 'PUBLISHER_SITE' end as osm_claim_class,
+       r.id as osm_record_id,
+       public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center') as admitted
+  from public.national_dc_records r
+ cross join lateral public.dc_geocode_input('openstreetmap', 'telecom_data_center', r.raw_tags) gi
+  left join public.dc_address_geocode d
+    on d.geocoder_query = gi.geocoder_query
+   and d.ladder_version = public.dc_geocode_ladder_version()
+  left join lateral public.dc_derived_point_verdict(d.match_type, d.provider_candidates,
+                    gi.geocoder_query, d.matched_address, d.lat, d.lng) v on true;
+
+revoke all on public.dc_osm_derived_point from anon, authenticated;
+
+comment on view public.dc_osm_derived_point is
+'STEP 3D. The OpenStreetMap layer''s address check: each national_dc_records row, its own stated
+address through the shared extraction/policy, the shared geocoder''s derivation and the shared
+verdict. Acquisition only: judged by dc_osm_address_check (Step 3B). Never merged into canonical
+tables; never moves an OSM pin.';
+
 -- ── WORK QUEUE for the writer ────────────────────────────────────────────────────────────
 -- `admitted` (appended 2026-09-24): whether ANY current observation stating this address belongs to
 -- an admitted extraction. The writer drains admitted work first, so a large not-yet-admitted
 -- backlog can never delay a derivation that decisions are waiting for.
+-- The OpenStreetMap layer's map-eligible addresses join the SAME queue (2026-09-26): one geocoder,
+-- one ladder, one cache keyed by the address, whichever layer states it.
 create or replace view public.dc_geocode_queue with (security_invoker = true) as
-select p.geocoder_query, public.dc_geocode_ladder_version() as ladder_version,
-       bool_or(p.admitted) as admitted
-  from public.dc_observation_derived_point p
- where p.input_quality = 'GEOCODABLE'
-   and p.derivation_id is null
- group by p.geocoder_query;
+select q.geocoder_query, public.dc_geocode_ladder_version() as ladder_version,
+       bool_or(q.admitted) as admitted
+  from (select p.geocoder_query, p.admitted
+          from public.dc_observation_derived_point p
+         where p.input_quality = 'GEOCODABLE'
+           and p.derivation_id is null
+        union all
+        select o.geocoder_query, o.admitted
+          from public.dc_osm_derived_point o
+         where o.map_eligible
+           and o.input_quality = 'GEOCODABLE'
+           and o.derivation_id is null) q
+ group by q.geocoder_query;
 
 revoke all on public.dc_geocode_queue from anon, authenticated;
 
