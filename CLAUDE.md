@@ -1271,6 +1271,11 @@ the committed file.
   - The test drives it signed out in Chromium and checks the save (`signup_complete` once, on
     97702's government community, with the ticked topic, after the code), the unchanged URL,
     and the "saved" message. Both halves were broken on purpose and each was caught.
+  - ✅ **LIVE 2026-09-26 22:13Z** (`pages` run `36275409104`, `554c9d2`, the #1366 merge).
+    Fetched through `pg_net` 30 seconds later (requests 24237–24239, all HTTP 200):
+    `alerts.html` 20,154 bytes, md5 `636d6c55…`, linking `shell.js?v=9d7b871e`; that
+    `shell.js` 125,076 bytes, md5 `45badcc7…`, carrying both fixes; `homesignalmap.html`
+    328,157 bytes, md5 `fc69d8e4…`. All three are byte-identical to `554c9d2`.
 - Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
   (the SQL against a disposable Postgres 17, every prohibited mutation killed). **Two
   workflows, split by repo** — the `check-alert-subscription-parity.yml` precedent:
