@@ -28,6 +28,7 @@ on:
       - 'scripts/n5_publish.py'
       - 'scripts/n5_shard.py'
       - 'scripts/n3_pilot.py'
+      - 'scripts/test_heavy_gateway.py'
       - 'scripts/n5_candidate_bounding.py'
       - '.github/workflows/n5-generation-publish-suite.yml'
   workflow_dispatch: {}
@@ -104,6 +105,10 @@ jobs:
         run: |
           set -o pipefail
           python3 test/n5_generation_pg/run_map1_char5.py 2>&1 | tee /tmp/map1-char5.log
+
+      - name: Run the gateway-timeout guard (a lost 524 response is proven, never re-sent)
+        if: always()
+        run: python3 scripts/test_heavy_gateway.py
 
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
