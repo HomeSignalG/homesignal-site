@@ -100,10 +100,14 @@ def plans_inside(conn):
     """Every plan executed INSIDE the function for each fixture ZIP and kind, as parsed JSON.
     auto_explain logs nested statements at LOG, and client_min_messages=log hands them to the
     client. DISCARD PLANS first: PL/pgSQL keeps its statements' plans across calls, so without
-    it the capture would show plans made before the body or the settings changed."""
+    it the capture would show plans made before the body or the settings changed.
+    log_min_messages = panic keeps the plans out of the SERVER log (the CI job prints the whole
+    container log at the end, where they buried this script's result line); the client still
+    receives them."""
     for s in ("load 'auto_explain'", "set auto_explain.log_min_duration = 0",
               "set auto_explain.log_nested_statements = on", "set auto_explain.log_format = 'json'",
-              "set enable_seqscan = off", "discard plans", "set client_min_messages = log"):
+              "set enable_seqscan = off", "discard plans", "set log_min_messages = panic",
+              "set client_min_messages = log"):
         q(conn, s)
     plans = []
     dec = json.JSONDecoder()
@@ -119,6 +123,7 @@ def plans_inside(conn):
                         plans.append(dec.raw_decode(n[start:])[0])
     finally:
         q(conn, "reset client_min_messages")
+        q(conn, "reset log_min_messages")
         q(conn, "reset enable_seqscan")
         q(conn, "set auto_explain.log_min_duration = -1")
     return plans
