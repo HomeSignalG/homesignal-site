@@ -43,15 +43,16 @@ def pt(side):
 
 MUTATIONS = {
     # X00 the reviewed admission (stage 10, 2026-09-26) is silently withdrawn from the DDL of record.
+    # (The anchor carries the C3c openstreetmap entry too; only the Atlas entry is withdrawn.)
     # (Before stage 10, X00 was the opposite break: Atlas admitted before review. The suite now sets
     # Phase A's Epoch-only switch itself, so the gate's "false decides nothing" guarantee is still
     # proven by V07; what the DDL of record must carry is proven by V00.)
     'X00_admission_withdrawn': (D3, [(
-        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;",
-        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;", 1)]),
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;",
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('openstreetmap', 'telecom_data_center')) $$;", 1)]),
     # X00b the admission is widened past the reviewed extraction (every Atlas distribution, any source)
     'X00b_admission_widened': (D3, [(
-        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;",
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;",
         "as $$ select p_source_key in ('epoch_ai', 'compute_atlas', 'some_new_source') $$;", 1)]),
     # X01 an Atlas publisher point always wins: its own address can never contradict it
     'X01_atlas_point_always_wins': (B3, disagree_unless("'compute_atlas' in (a.source_key, b.source_key)")),

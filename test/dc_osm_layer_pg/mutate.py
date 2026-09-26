@@ -10,6 +10,7 @@ import sys
 
 D3 = 'docs/dc-step3d-derived-location.sql'
 B3 = 'docs/dc-step3b-canonical-geography.sql'
+MAP = 'docs/map1-dc-publication.sql'
 
 OSM_QUEUE = """        union all
         select o.geocoder_query, o.admitted
@@ -22,10 +23,13 @@ CONFLICT = """            when public.dc_site_claims_conflict(o.osm_claim_class,
 NOT_US = """        if nullif(upper(btrim(coalesce(p_payload->>'addr:country', ''))), '') not in ('US', 'USA') then"""
 
 MUTATIONS = {
-    # the deployment gate: OSM derivations are acquired and reported, never admitted here
-    'Y01_osm_admitted': (D3, [(
-        "(('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;",
-        "(('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;", 1)]),
+    # the deployment gate (C3c): OSM admitted, and ONLY this extraction added
+    'Y01_osm_not_admitted': (D3, [(
+        "(('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;",
+        "(('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;", 1)]),
+    'Y01b_osm_admitted_widened': (D3, [(
+        "('openstreetmap', 'telecom_data_center')) $$;",
+        "('openstreetmap', 'telecom_data_center'), ('openstreetmap', 'other_distribution')) $$;", 1)]),
     # the OSM addresses never reach the ONE writer (a second queue would be needed)
     'Y02_queue_drops_osm': (D3, [(OSM_QUEUE, "", 1)]),
     # ineligible OSM records are geocoded too
@@ -51,6 +55,24 @@ MUTATIONS = {
     'Y09_pin_moved': (D3, [(
         "select r.source_key, r.map_eligible, r.location_precision, r.lat as osm_lat, r.lng as osm_lng,",
         "select r.source_key, r.map_eligible, r.location_precision, coalesce(d.lat, r.lat) as osm_lat, coalesce(d.lng, r.lng) as osm_lng,", 1)]),
+    # THE MAP 1 READER (C3c)
+    'Y10_reader_ignores_admission': (MAP, [(
+        "       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),",
+        "       and k.check_outcome is distinct from 'SOURCES_DISAGREE'),", 1)]),
+    'Y11_reader_withholds_nothing': (MAP, [(
+        "       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),",
+        "       ),", 1)]),
+    'Y12_reader_flags_every_row': (MAP, [(
+        "           case when k.admitted and k.check_outcome = 'CORROBORATED'\n",
+        "           case when true\n", 1)]),
+    'Y13_reader_withholds_unchecked': (MAP, [(
+        "       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),",
+        "       and not (coalesce(k.admitted, false) and k.check_outcome <> 'CORROBORATED')),", 1)]),
+    'Y14_reader_moves_pin_to_geocode': (MAP, [(
+        "      left join lateral (select c.check_outcome, c.admitted\n",
+        "      left join lateral (select c.check_outcome, c.admitted, c.lat, c.lng\n", 1), (
+        "           lc.map_status, r.project_type, r.lat, r.lng, r.location_text, r.location_precision,",
+        "           lc.map_status, r.project_type, coalesce(k.lat, r.lat) as lat, coalesce(k.lng, r.lng) as lng, r.location_text, r.location_precision,", 1)]),
 }
 
 

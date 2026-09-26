@@ -60,7 +60,12 @@ jobs:
       PGUSER: supabase_admin
       PGPASSWORD: postgres
     steps:
+      # PINNED to the commit this tool was APPLIED from (stage 10 admission). The DDL of record has moved on
+      # since, so the proof runs against the DDL it was written for; the artifacts are frozen
+      # (the builder's --check verifies their sha256 on every commit).
       - uses: actions/checkout@v4
+        with:
+          ref: c19821671ae923c8bd92183f78c0b97a42f01174
       - name: Install psql client
         run: |
           set -euo pipefail

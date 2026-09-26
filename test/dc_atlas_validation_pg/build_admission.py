@@ -132,7 +132,23 @@ def build_rollback():
     return '\n\n'.join(parts) + '\n'
 
 
+# ⛔ FROZEN 2026-09-26: the apply was APPLIED to production (run 36263746674) from main@c198216.
+# The DDL of record kept moving (C3c admitted openstreetmap in the same switch), so regenerating
+# would rewrite history into an artifact nobody applied. --check verifies the FROZEN bytes only;
+# the offline proof runs pinned to c198216 (.github/workflows/dc-atlas-admission-apply.yml).
+FROZEN = {OUT: '2c2c8571c7ac8167210e66eb9d72a0ddff82843d972526e5951d97d8e2a3341c',
+          OUT_ROLLBACK: 'a440713b3ede8fef49495c9a60cc2c509660c33babc1d2c72cdffa0969e9a2e8'}
+
+
 if __name__ == '__main__':
+    if '--check' in sys.argv and '--regenerate-at-applied-commit' not in sys.argv:
+        bad = [o.name for o, want in FROZEN.items()
+               if not o.exists() or hashlib.sha256(o.read_bytes()).hexdigest() != want]
+        print('admission apply + rollback files are the frozen applied artifacts' if not bad
+              else f'NOT the frozen applied artifacts: {bad}')
+        sys.exit(1 if bad else 0)
+    if '--regenerate-at-applied-commit' not in sys.argv:
+        raise SystemExit('REFUSED: the stage 10 artifacts are frozen (applied to production); they are never regenerated')
     outs = ((OUT, build()), (OUT_ROLLBACK, build_rollback()))
     if '--check' in sys.argv:
         stale = [o.name for o, t in outs if not (o.exists() and o.read_text() == t)]

@@ -14,7 +14,7 @@ CHAIN=(docs/dc-step3d-derived-location.sql docs/dc-step3a-canonical-identity.sql
        docs/dc-step3b-canonical-geography.sql docs/map1-dc-publication.sql)
 LOAD=docs/dc-geocode-observations-load.sql
 QUEUE=docs/dc-geocode-observations-queue.sql
-MIN=15   # checks the shipped suite reports; fewer means the suite died part-way
+MIN=20   # checks the shipped suite reports; fewer means the suite died part-way
 
 apply_chain() {
   P -f "$root/test/zip_membership_pg/fixture_schema.sql" >/dev/null 2>&1

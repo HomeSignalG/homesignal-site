@@ -48,10 +48,12 @@ ok(/dc_publisher_stated_address\(/.test(input) && /dc_geocodable_site_address\(/
 // Stage 10 (2026-09-26): admitted after the admission dry run on that day's production copy
 // (run 36253526398: 1 added, 26 withheld, 0 moved) was reviewed. The switch admits EXACTLY these
 // two extractions; any other change to it is a new deliberate edit of this function AND this pin.
+// C3c (2026-09-26) added the separate OpenStreetMap layer's check as the third, gated by
+// scripts/dc-osm-map1-gate.sh; it reaches no canonical decision (OSM is never a dc_source_observation).
 const admit = admitFn;
-ok(/in \(\('epoch_ai', 'data_centers'\), \('compute_atlas', 'facilities'\)\) \$\$;$/.test(admit)
-   && (admit.match(/\('[a-z_]+', '[a-z_]+'\)/g) || []).length === 2,
-  'A4: the admission switch admits exactly Epoch data_centers and Atlas facilities (stage 10) -- nothing else, never a side effect');
+ok(/in \(\('epoch_ai', 'data_centers'\), \('compute_atlas', 'facilities'\), \('openstreetmap', 'telecom_data_center'\)\) \$\$;$/.test(admit)
+   && (admit.match(/\('[a-z_]+', '[a-z_]+'\)/g) || []).length === 3,
+  'A4: the admission switch admits exactly Epoch data_centers, Atlas facilities (stage 10) and the OSM layer check (C3c) -- nothing else, never a side effect');
 const ev = (B3.match(/create or replace view public\.dc_entity_geography_evidence[\s\S]*?;/) || [''])[0];
 const res = fn('dc_resolve_geography', B3);
 const cand = (A3.match(/create or replace view public\.dc_identity_candidate[\s\S]*?;\n/) || [''])[0];

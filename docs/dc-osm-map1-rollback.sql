@@ -1,77 +1,70 @@
--- =====================================================================================
--- MAP 1 · THE ONE DATA-CENTRE PUBLICATION CONTRACT — DDL of record
---
--- public.map1_dc_zip_members(p_zip) is the ONLY data-centre read Map 1 makes, for every one
--- of the 12,722 ZIP pages. It answers ONE question: which data-centre records belong to ZIP X?
--- The answer never depends on which source first observed a record, and the page never
--- unions sources itself.
---
--- WHERE EACH ROW COMES FROM (publication_basis)
---   'canonical'          a canonical entity (Step 3A dc_canonical_entity) with canonical
---                        geography (Step 3B dc_entity_geography). Every source that reaches the
---                        canonical plane — Compute Atlas, Epoch AI, whatever is onboarded next —
---                        publishes through here with no change to this function or the page.
---   'legacy_osm_compat'  TRANSITIONAL. public.national_dc_records (1,824 OpenStreetMap rows, a
---                        one-time load with no recurring acquisition) is not yet a dc_source.
---                        It is served behind this boundary so existing OSM markers do not
---                        disappear. RETIREMENT CONDITION: OpenStreetMap onboarded as a dc_source
---                        through dc_evidence_writer with a recurring acquisition, after which its
---                        records arrive as 'canonical' and this CTE is deleted. Nothing outside
---                        this function may read national_dc_records for Map 1.
---
--- WHAT PUBLISHES (canonical)
---   classification = CONFIRMED_DC only. DC_CANDIDATE is withheld: Step 3A classifies a record
---     as a candidate exactly when the publisher calls it rumored or its own fields disagree,
---     and "a rumored record does not become a HomeSignal certainty" (dc-step3a-canonical-
---     identity.sql). NON_DC and CLASSIFICATION_UNRESOLVED never publish.
---   geography_status = RESOLVED and geometry_type = POINT only. GEOGRAPHY_UNRESOLVED has no
---     geometry to publish and is never given one; NOT_A_SITE is a multi-site aggregate and is
---     never drawn as a point.
---   lifecycle: the ONE status map below. A STATED status outside it (cancelled, shelved,
---     blocked, any unlisted word) does not publish — a cancelled data centre drawn as a data
---     centre is a false statement. The same map governs the compatibility rows.
---     ⚖️ ABSENT IS NOT A STATUS (2026-09-24). A canonical entity that NO current observation
---     states any lifecycle for is published with map_status 'Unknown' — the truth, and the
---     value Map 1 already renders as its grey "Lifecycle unknown" stage (every data-centre pin
---     reaches that stage today; the page reads no lifecycle from this column) and the one the
---     page verifier accepts. Nothing is invented: no source's silence becomes 'operational'.
---     A lifecycle any observation DOES state always wins over silence, whichever observation
---     places the entity — location and lifecycle are separate facts. Compatibility rows are
---     unchanged: an absent OSM status still does not publish.
---   a record URL: the first http(s) URL the source itself cites for the record, read through
---     the source-keyed public.dc_record_citation (Step 3A) — never a payload shape parsed here.
---     No URL, no pin (the page's anti-fabrication gate needs something to open).
---
--- MEMBERSHIP: geo.zip_point_membership_in(geo.zip_membership_boundary(zip), lat, lng) — the one
---   point-in-ZIP authority (docs/zip-membership-canonical.sql). Candidates are retrieved by the
---   ZCTA polygon's bounding box, which contains every member, so no radius can lose one. A ZIP
---   with no usable boundary returns no rows (not_measured is never replaced by a centroid,
---   radius, nearest ZIP or neighbouring boundary). No distance is returned.
---
--- THE OSM ADDRESS CHECK (2026-09-26, C3c): a compatibility row carries the OpenStreetMap layer's
---   own address check (Step 3B dc_osm_address_check: its own stated address, the shared geocoder
---   and the shared conflict rule). ONLY WHEN THAT EXTRACTION IS ADMITTED
---   (dc_derived_address_admitted('openstreetmap', 'telecom_data_center'), reported as the check's
---   `admitted`): a SOURCES_DISAGREE pin is withheld, exactly as a canonical entity whose site
---   claims conflict is GEOGRAPHY_UNRESOLVED; a CORROBORATED pin carries the same quality flag a
---   corroborated canonical point carries (CORROBORATED_BY_DERIVED_ADDRESS). Every other outcome
---   publishes unchanged: absence of a usable check is not evidence against a pin. A pin is never
---   moved, and OSM stays a separate layer (never merged into the canonical tables).
---
--- ONE MARKER PER FACILITY ACROSS THE TWO POPULATIONS: a compatibility row is suppressed when a
---   published canonical entity sits at IDENTICAL coordinates (<= 1 m) and the pairing is
---   one-to-one (exactly one published entity within 1 m of the OSM point and exactly one
---   eligible OSM point within 1 m of the entity). Measured 2026-09-22: 263 such pairs, every
---   sampled one the same facility (Compute Atlas copied OSM's point). Anything looser is NOT a
---   match: "Vantage WA12" and "Vantage WA13" are 166 m apart with one operator and are two
---   buildings. An ambiguous pair keeps both markers — dropping existing coverage is the worse
---   failure during a migration.
---
--- This function reads the private dc_* planes as SECURITY DEFINER and exposes only the columns
--- below. No resident role holds any grant on a dc_* relation.
--- =====================================================================================
+-- GENERATED by test/dc_osm_layer_pg/build_map1.py. Do not edit.
+
+-- C3c ROLLBACK: withdraw the OSM layer check from the admission switch and restore the pre-C3c
+
+-- Map 1 reader (both bodies proven to fingerprint to production before C3c). Applied only by
+
+-- dc-osm-map1-apply.yml with confirm=ROLLBACK-OSM-MAP1-C3C.
 
 begin;
+
+do $guard$
+declare bad text := '';
+begin
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted') is distinct from '2c05d65aba736fab7c79199e78614ab6' then bad := bad || ' dc_derived_address_admitted'; end if;
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '2146b68afc2cda03948b1e1cd51b29b8' then bad := bad || ' map1_dc_zip_members'; end if;
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'dc_publisher_stated_address') is distinct from '7605c217d2d4d4fb0e36cff42015b0f1' then bad := bad || ' dc_publisher_stated_address'; end if;
+  if to_regclass('public.dc_osm_derived_point') is null or to_regclass('public.dc_osm_address_check') is null then
+    bad := bad || ' (the C3a OSM views are missing)';
+  end if;
+  if not public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center')
+     or not public.dc_derived_address_admitted('compute_atlas', 'facilities')
+     or not public.dc_derived_address_admitted('epoch_ai', 'data_centers')
+     or public.dc_derived_address_admitted('openstreetmap', 'other')
+     or public.dc_derived_address_admitted('some_new_source', 'facilities') then
+    bad := bad || ' (admission)';
+  end if;
+  if not has_function_privilege('anon', 'public.map1_dc_zip_members(text)', 'execute') then
+    bad := bad || ' (anon cannot execute the Map 1 reader)';
+  end if;
+  if bad <> '' then
+    raise exception 'DRIFT: production does not carry the C3c definitions this rollback reverses:%', bad;
+  end if;
+end $guard$;
+
+-- ── ADMISSION: which extractions' derivations may reach canonical decisions ───────────────
+-- Acquiring derived evidence and letting it change decisions are two deployments, not one. A new
+-- extraction is admitted only after a national dry run of its consequences has been reviewed as a
+-- system (docs/dc-atlas-dryrun-report.sql). Until then its derivations are written and reported
+-- (dc_observation_derived_point.admitted = false) and change NOTHING: not the geography evidence,
+-- not the geography provenance, not the identity candidates.
+-- This is a deployment gate over an extraction, never an authority rank: an admitted derivation is
+-- judged by the SAME class rules as every other, and a non-admitted one is simply absent.
+-- Admitting an extraction = one reviewed edit to this function (the committed-switch pattern).
+--   epoch_ai/data_centers   admitted 2026-09-24 (#1324, national dry run 36058486723)
+--   compute_atlas/facilities admitted 2026-09-26 (stage 10), after the admission dry run on that
+--                            day's production copy (dc-atlas-admission-dryrun.yml, run 36253526398:
+--                            1 facility added, 26 withheld, 0 moved), reviewed by the founder.
+--                            Applied by scripts/dc-atlas-admission-apply.sh.
+--   openstreetmap/telecom_data_center admitted (C3c) -- the SEPARATE OSM layer's address check. It
+--                            reaches no canonical decision (OSM is never a dc_source_observation);
+--                            it lets map1_dc_zip_members withhold an OSM pin its own address
+--                            contradicts and flag one it corroborates. Gated by
+--                            scripts/dc-osm-map1-gate.sh on a replica of production; applied by
+--                            scripts/dc-osm-map1-apply.sh.
+create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
+returns boolean
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;
+
+comment on function public.dc_derived_address_admitted(text, text) is
+'STEP 3D. Deployment gate: whether an extraction''s derivations may reach geography and identity.
+Binary admission of a reviewed extraction, never a rank. See the header of this section.';
 
 create or replace function public.map1_dc_zip_members(p_zip text)
 returns table(source_key text, source_name text, source_url text, source_licence text,
@@ -85,11 +78,6 @@ language sql
 stable
 security definer
 set search_path to 'public', 'geo', 'pg_temp'
--- JIT OFF (C3c, 2026-09-26): the OSM check's plpgsql functions carry the default 1,000-row estimate,
--- which inflates this function's estimated cost past jit_above_cost, and JIT compilation then cost
--- ~2 s per ZIP read on a JIT-enabled server (measured: 12 ZIPs 24.3 s with JIT, 38 ms without; the
--- pre-C3c reader 33 ms). Production runs jit=off in its configuration; this pins it on the function.
-set jit to 'off'
 as $function$
   with
   -- THE ONE LIFECYCLE MAP: source lifecycle word -> Map 1 permit-vocabulary pin status.
@@ -168,22 +156,14 @@ as $function$
            r.project_name, r.developer_or_operator, r.raw_status, r.normalized_status,
            lc.map_status, r.project_type, r.lat, r.lng, r.location_text, r.location_precision,
            r.last_seen_at, null::uuid as canonical_entity_id,
-           'legacy_osm_compat'::text as publication_basis,
-           case when k.admitted and k.check_outcome = 'CORROBORATED'
-                then array['CORROBORATED_BY_DERIVED_ADDRESS']::text[] else '{}'::text[] end as quality_flags,
+           'legacy_osm_compat'::text as publication_basis, '{}'::text[] as quality_flags,
            1 as source_count, null::double precision as positional_uncertainty_m
       from bb
       join public.national_dc_records r
         on r.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
        and r.lng between bb.x0 - 1e-4 and bb.x1 + 1e-4
       join lifecycle lc on lc.v = r.normalized_status
-      -- one check per pin in the box, looked up per pin: the check view's plpgsql functions carry
-      -- the default 1,000-row estimate, so a plain join lets the planner cost it as a national scan
-      left join lateral (select c.check_outcome, c.admitted
-                           from public.dc_osm_address_check c
-                          where c.osm_record_id = r.id) k on true
-     where r.map_eligible
-       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),
+     where r.map_eligible),
   osm_kept as (
     select o.* from osm o
      where not (
@@ -235,6 +215,7 @@ as $function$
 $function$;
 
 revoke all on function public.map1_dc_zip_members(text) from public;
+
 grant execute on function public.map1_dc_zip_members(text) to anon, authenticated, service_role;
 
 comment on function public.map1_dc_zip_members(text) is
@@ -243,9 +224,31 @@ comment on function public.map1_dc_zip_members(text) is
   'compatibility population, each admitted only on geo.zip_point_membership_in = member. '
   'docs/map1-dc-publication.sql.';
 
-commit;
+do $post$
+declare bad text := '';
+begin
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted') is distinct from '31cb6c9e7481311ab33042a8845c9276' then bad := bad || ' dc_derived_address_admitted'; end if;
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') is distinct from '9fc1c9f51375f25db5658a14ca36937c' then bad := bad || ' map1_dc_zip_members'; end if;
+  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'dc_publisher_stated_address') is distinct from '7605c217d2d4d4fb0e36cff42015b0f1' then bad := bad || ' dc_publisher_stated_address'; end if;
+  if to_regclass('public.dc_osm_derived_point') is null or to_regclass('public.dc_osm_address_check') is null then
+    bad := bad || ' (the C3a OSM views are missing)';
+  end if;
+  if public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center')
+     or not public.dc_derived_address_admitted('compute_atlas', 'facilities')
+     or not public.dc_derived_address_admitted('epoch_ai', 'data_centers')
+     or public.dc_derived_address_admitted('openstreetmap', 'other')
+     or public.dc_derived_address_admitted('some_new_source', 'facilities') then
+    bad := bad || ' (admission)';
+  end if;
+  if not has_function_privilege('anon', 'public.map1_dc_zip_members(text)', 'execute') then
+    bad := bad || ' (anon cannot execute the Map 1 reader)';
+  end if;
+  if bad <> '' then
+    raise exception 'POST-CONDITION failed:%. Rolled back.', bad;
+  end if;
+end $post$;
 
--- =====================================================================================
--- ROLLBACK: point homesignalmap.html / lib/data.js back at national_dc_zip_members, then
---   drop function public.map1_dc_zip_members(text);
--- =====================================================================================
+commit;

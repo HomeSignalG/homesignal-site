@@ -2507,6 +2507,60 @@ decision logic of its own:**
 - 📌 **Measured before C3a (read-only):** of 1,384 map-eligible OSM records, **724** GEOCODABLE, 575
   BLANK, 84 NO_LOCALITY (mostly Canadian), 1 NO_HOUSE_NUMBER. C3b measures the verdicts once the daily
   10:45 UTC writer has geocoded them.
+- ✅ **C3a APPLIED 2026-09-26 21:53 UTC (run 36274352481); C3b MEASURED 22:26 UTC**
+  (`docs/dc-osm-address-check-receipt-2026-09-26.md`). All 1,384 map-eligible records were checked:
+  527 CORROBORATED, 2 SOURCES_DISAGREE, 195 no match, 660 with no checkable address. Of the 846 OSM
+  markers on Map 1: 303 corroborated, **1 disagrees (QTS NAL 2 DC2, ZIP 43054, 2.2 km)**, 127 no
+  match, 415 uncheckable.
+  - ⚠️ **"On Map 1" means ON A REGISTRY ZIP PAGE.** `map1_dc_zip_members(zip)` answers for any ZCTA,
+    but only the 12,722 `canonical_zip_registry` ZIPs have a page. Rice Data Center (77025) is returned
+    by the per-ZIP read and appears on no page. I first recorded it as the Map 1 disagreement; the
+    receipt carries the correction.
+
+### C3c: the Map 1 change, decided by an automated gate (BUILT; production apply awaits the founder's go)
+
+- **DDL of record:** the switch admits `('openstreetmap', 'telecom_data_center')`. The Map 1 reader's
+  OSM CTE left-joins `dc_osm_address_check`: an ADMITTED `SOURCES_DISAGREE` pin is withheld (the
+  canonical counterpart of a site conflict is GEOGRAPHY_UNRESOLVED), and an ADMITTED `CORROBORATED`
+  pin carries the same `CORROBORATED_BY_DERIVED_ADDRESS` flag a canonical point carries. Every other
+  outcome publishes unchanged. The pin is always the OSM record's own; the geocode never moves it.
+- **THE GATE is `scripts/dc-osm-map1-gate.sh` + `docs/dc-osm-map1-gate.sql`** (founder: "no manual human
+  review", "automated checks").
+  - It copies production into a replica, read-only.
+  - It rolls the replica back to production's exact pre-C3c definitions with the rollback artifact,
+    whose post-condition proves the fingerprints.
+  - It proves the replica's Map 1 equals production's row for row, then applies the byte-identical
+    production artifact to the replica.
+  - Then 11 checks: after == a prediction written independently of the reader; no row added; no pin
+    moved; every removal an admitted OSM disagreement; every flag an admitted corroboration; canonical
+    rows byte-identical; every other column unchanged; withheld ≤ disagreements; rows reconcile.
+  - The resolvers must also write nothing after the switch, since OSM reaches no canonical decision.
+- **The apply job `needs: [offline, gate]` in the same run** (`dc-osm-map1-apply.yml`, confirm
+  `APPLY-OSM-MAP1-C3C`), so production changes only right after the gate passes on that moment's data.
+  A dispatch with any other confirm string runs the rehearsal alone.
+- **The negative control is a CONSISTENTLY wrong artifact.** The offline proof tampers with the reader
+  and also rewrites the artifact's own post-condition fingerprint to match. The artifact's self-check
+  then passes, and only the gate's independent prediction can refuse it: G03 "8 predicted / 3 after",
+  G06 "6 removed". A plain tamper is caught one layer earlier, by the artifact's post-condition, which
+  proves nothing about the gate. That is how the first draft of this control "passed".
+- **Applied tools are FROZEN** (`build_admission.py`, `dc_osm_layer_pg/build_apply.py`, and Phase A's
+  `build_apply.py`): `--check` verifies the applied sha256, and their offline proofs run pinned to the
+  commit they were applied from (c198216, e647a09). Both of their rollbacks now fail closed against
+  production, because their drift guards see the C3c switch. That is intended: roll back C3c first.
+- 🔑 **THE FIRST READER WAS 50× SLOWER ON A JIT-ENABLED SERVER — caught by CI timing out, not by a
+  check.** The OSM check view's plpgsql functions carry Postgres's default 1,000-row estimate, which
+  pushed the reader's estimated cost to ~43 M, past `jit_above_cost`. Each ZIP read then spent ~2 s
+  compiling. The Epoch suite went 9.4 s → **485.7 s**, and CI cancelled `membership` and
+  `atlas-validation` at their 15-minute budgets. Production was unaffected because it runs `jit=off`
+  in its configuration file, which is exactly why nothing would have shown it before merge. Fixed in
+  the reader itself: `set jit to 'off'` on the function, plus a per-pin `left join lateral` lookup.
+  After the fix: 12 ZIPs in 38 ms (pre-C3c reader 33 ms), Epoch suite 9.2 s. Structure pin M1 now
+  requires both. **When a reader joins a view built on plpgsql SRFs, check the estimated cost, not
+  only the result.**
+- ⚠️ **Test-harness hazard found and fixed:** the Map 1 publication fixture stands in a TABLE for
+  `dc_osm_address_check`. The CI `membership` job runs the suites in one database, so the next suite's
+  `create view` failed with "is not a view". `test/map1_dc_publication_pg/run.sh` now drops the
+  stand-in on exit.
 
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 

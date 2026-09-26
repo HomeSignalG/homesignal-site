@@ -108,9 +108,15 @@ const readers = ALL.filter((p) => /create\s+or\s+replace\s+function\s+public\.ma
 // The ONE exception is a GENERATED production apply, and only while it is byte-identical to what its
 // generator emits from the file of record (test/dc-epoch-geography-structure.test.mjs S6 pins the
 // same). A hand-edited copy fails the generator check and is counted as a second definition again.
-const GENERATED_APPLY = 'docs/dc-epoch-geography-apply.sql';
-const genOk = spawnSync('python3', ['test/dc_epoch_geography_pg/build_apply.py', '--check'], { encoding: 'utf8' }).status === 0;
-const ofRecord = readers.filter((p) => !(p === GENERATED_APPLY && genOk));
+// C3c (2026-09-26) adds a second generated pair, the OSM Map 1 apply and its rollback, under the same
+// rule: excused only while test/dc_osm_layer_pg/build_map1.py --check says they are its exact output.
+const GENERATED = {
+  'docs/dc-epoch-geography-apply.sql': ['test/dc_epoch_geography_pg/build_apply.py', '--check'],
+  'docs/dc-osm-map1-apply.sql': ['test/dc_osm_layer_pg/build_map1.py', '--check'],
+  'docs/dc-osm-map1-rollback.sql': ['test/dc_osm_layer_pg/build_map1.py', '--check'],
+};
+const genOk = (p) => GENERATED[p] && spawnSync('python3', GENERATED[p], { encoding: 'utf8' }).status === 0;
+const ofRecord = readers.filter((p) => !genOk(p));
 ok(ofRecord.join(',') === 'docs/map1-dc-publication.sql', 'C2 exactly ONE file of record defines a map1_dc_* function (a generated apply counts unless it is byte-identical to its generator output)', readers);
 
 console.log(bad ? `\n${bad} FAILED (${n} checks)` : `\nALL CHECKS PASSED (${n} checks)`);
