@@ -134,6 +134,17 @@ except SystemExit as e:
     check("publish: lost response + no publish row stops", "post-condition is NOT met" in str(e))
 check("publish: never re-sent", c["write"] == 1)
 
+# 5b. the per-prefix publish budget covers the largest prefix, and the job outlives it
+import re as _re
+check("publish budget >= 90 min (largest prefix ~65 min, measured 2026-09-26)",
+      pub.PUBLISH_STATEMENT_TIMEOUT_S >= 5400)
+wf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".github", "workflows",
+                       "n5-generation.yml")).read()
+tmin = int(_re.search(r"timeout-minutes:\s*(\d+)", wf).group(1))
+msec = int(_re.search(r"MAX_SECONDS:\s*'(\d+)'", wf).group(1))
+check("job timeout covers MAX_SECONDS plus one full publish budget",
+      tmin * 60 >= msec + pub.PUBLISH_STATEMENT_TIMEOUT_S)
+
 # 5. every heavy lifecycle caller supplies a post-condition
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
 for fn in ("n5_gen_prepare_publish", "n5_gen_record_unresolved", "n5_generation_mark_ready",

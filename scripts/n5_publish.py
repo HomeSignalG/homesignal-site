@@ -30,7 +30,16 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import sql, sql_proven, lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SRID  # noqa: E402
-from n5_shard import tiger_index, HEAVY_TIMEOUT_SQL  # noqa: E402
+from n5_shard import tiger_index  # noqa: E402
+
+# ONE prefix's publish is one transaction whose cost grows with its projects: MEASURED
+# 2026-09-26 at ~33 ms per membership row (104: 7,689 rows in 255 s). Brooklyn (112, ~21k
+# rows) was rolled back by the old 600 s budget, and the largest prefix (284, ~119k legacy
+# rows) projects to ~65 min. The budget therefore covers the largest prefix with margin;
+# the workflow's job timeout is sized to MAX_SECONDS plus this (checked by
+# scripts/test_heavy_gateway.py) so the runner is still waiting when a late prefix commits.
+PUBLISH_STATEMENT_TIMEOUT_S = 5400
+PUBLISH_TIMEOUT_SQL = f"set statement_timeout = '{PUBLISH_STATEMENT_TIMEOUT_S}s';\n"
 
 BATCH = 20
 
@@ -74,9 +83,10 @@ def publish_prefix(generation, prefix, run_id):
     verify = (f"select count(*) = 1 ok, max(completed_at) completed_at from geo.n5_generation_publish "
               f"where generation_id={lit(generation)} and z3={lit(prefix)} and run_id={lit(run_id)}"
               + (f" and completed_at > {lit(prev)}::timestamptz;" if prev else ";"))
-    out = sql_proven(HEAVY_TIMEOUT_SQL
+    out = sql_proven(PUBLISH_TIMEOUT_SQL
                      + f"select geo.n5_gen_publish_prefix({lit(generation)}, {lit(prefix)}, {lit(run_id)}, {loaded}) r;",
-                     f"publish {prefix}", verify, timeout=900, max_wait=900)
+                     f"publish {prefix}", verify, timeout=PUBLISH_STATEMENT_TIMEOUT_S + 300,
+                     max_wait=PUBLISH_STATEMENT_TIMEOUT_S + 300)
     r = out[-1]["r"] if out else None
     print(f"{'published ' + prefix:38} canonical={canon} zcta={loaded} -> {r} "
           f"({time.time() - t0:.1f}s)", flush=True)
