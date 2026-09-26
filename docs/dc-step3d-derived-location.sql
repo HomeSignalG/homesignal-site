@@ -210,14 +210,16 @@ comment on function public.dc_geocode_input(text, text, jsonb) is
 -- judged by the SAME class rules as every other, and a non-admitted one is simply absent.
 -- Admitting an extraction = one reviewed edit to this function (the committed-switch pattern).
 --   epoch_ai/data_centers   admitted 2026-09-24 (#1324, national dry run 36058486723)
---   compute_atlas/facilities NOT admitted: evidence acquisition only, pending review of the
---                            national dry run (dc-atlas-dryrun.yml)
+--   compute_atlas/facilities admitted 2026-09-26 (stage 10), after the admission dry run on that
+--                            day's production copy (dc-atlas-admission-dryrun.yml, run 36253526398:
+--                            1 facility added, 26 withheld, 0 moved), reviewed by the founder.
+--                            Applied by scripts/dc-atlas-admission-apply.sh.
 create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
 returns boolean
 language sql
 immutable
 set search_path to 'public', 'pg_temp'
-as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;
+as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;
 
 comment on function public.dc_derived_address_admitted(text, text) is
 'STEP 3D. Deployment gate: whether an extraction''s derivations may reach geography and identity.

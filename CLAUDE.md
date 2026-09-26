@@ -2194,6 +2194,24 @@ production ladder and compared with its own point by the SAME `dc_site_claims_co
 Atlas geocoder, no Atlas geography rule, no Atlas reader. PR #1335. Full receipt:
 `docs/dc-atlas-dryrun-receipt-2026-09-25.md`.
 
+⚖️ **STAGE 10 (2026-09-26): ATLAS IS ADMITTED IN THE DDL OF RECORD — founder-approved after the
+admission dry run.** `dc_derived_address_admitted` now admits exactly `epoch_ai/data_centers` and
+`compute_atlas/facilities`. The dry run on that day's production copy (run `36253526398`, PR #1356)
+measured Map 1 1,842 → 1,817 rows / 768 → 757 ZIP pages: **1 added, 26 withheld (SOURCES_DISAGREE),
+0 moved**, every change attributed. The founder lifted this session's no-admission / read-only rules
+for stage 10 explicitly.
+- **Production changes only through `dc-atlas-admission-apply.yml`** (dispatch from main, confirm
+  `ADMIT-ATLAS-STAGE-10`): generated artifact `docs/dc-atlas-admission-apply.sql`, sha256 pinned,
+  in-transaction drift guard on the live switch's `md5(prosrc)` `cd968b64…` (read on production
+  2026-09-26 18:16 UTC), bounded lock wait, post-condition, definition parity. **Until that job has
+  run, production is still Epoch-only** — the DDL of record is ahead of production by one function.
+- **Map 1 moves at the next hourly resolver run, not at the apply.** Stage 11 compares that run with
+  the stage 8 list; anything outside the 27 is a finding.
+- The Phase A artifact still regenerates byte for byte: its generator restores exactly the stage-10
+  region (extracted from git, sha256-pinned to `891bb210…`). The pre-admission instruments
+  (`dc-atlas-dryrun.yml`, `dc-atlas-admission-dryrun.yml`, `dc-atlas-phase-a-proof.yml`) patch an
+  Epoch-only switch and now refuse with "admission body shape changed" — they are retired receipts.
+
 **Why it was missing: two source-keyed shortcuts, both removed.**
 - `dc_geocode_input` had one Epoch branch; every other source got `NO_GEOCODE_RULE`.
 - The resolver paired claims with `a.source_key < b.source_key`, so a claim only ever met ANOTHER

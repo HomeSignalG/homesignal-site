@@ -6,8 +6,8 @@ Usage: mutate.py --list                 -> "NAME FILE" per line (FILE is repo-re
 Every anchor must match EXACTLY the stated number of times, so a mutation can never silently fail
 to apply (a mutation that does not apply is indistinguishable from one that survives).
 
-X01-X18 are the eighteen breaks the Atlas validation brief names, in its order; X00 is the
-deployment gate (acquisition must be inert until an extraction is admitted). X17 (a second
+X01-X18 are the eighteen breaks the Atlas validation brief names, in its order; X00/X00b are the
+deployment gate as admitted at stage 10 (exactly Epoch data_centers + Atlas facilities). X17 (a second
 geocoder) also has a structural pin in test/dc-atlas-validation-structure.test.mjs.
 """
 import sys
@@ -42,10 +42,17 @@ def pt(side):
 
 
 MUTATIONS = {
-    # X00 the deployment gate is bypassed: Atlas acquisition changes decisions before review
-    'X00_admission_bypassed': (D3, [(
-        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;",
-        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;", 1)]),
+    # X00 the reviewed admission (stage 10, 2026-09-26) is silently withdrawn from the DDL of record.
+    # (Before stage 10, X00 was the opposite break: Atlas admitted before review. The suite now sets
+    # Phase A's Epoch-only switch itself, so the gate's "false decides nothing" guarantee is still
+    # proven by V07; what the DDL of record must carry is proven by V00.)
+    'X00_admission_withdrawn': (D3, [(
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;",
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers')) $$;", 1)]),
+    # X00b the admission is widened past the reviewed extraction (every Atlas distribution, any source)
+    'X00b_admission_widened': (D3, [(
+        "as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;",
+        "as $$ select p_source_key in ('epoch_ai', 'compute_atlas', 'some_new_source') $$;", 1)]),
     # X01 an Atlas publisher point always wins: its own address can never contradict it
     'X01_atlas_point_always_wins': (B3, disagree_unless("'compute_atlas' in (a.source_key, b.source_key)")),
     # X02 a derived geocode always wins over a publisher site point
