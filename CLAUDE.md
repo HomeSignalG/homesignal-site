@@ -2139,6 +2139,18 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     the real 11.3 GB database + 2.7 GB WAL that constant yields a NEGATIVE "free" figure, so those
     guards refuse on a wrong number rather than a right one. Set `DISK_TOTAL_MB` from the verified
     provisioned size when running them; do not treat 11,607 as capacity.
+- 🔑 **MAP 1'S ZIP READ COMPARED `char(5)` KEYS WITH A `text` PARAMETER, SO IT NEVER USED ITS
+  INDEX (2026-09-26).** `zcta5` / `zip` are `char(5)` on all three serving tables; `p_zip` is
+  `text`. Postgres casts the column (`(zcta5)::text = p_zip`), no index covers that, and every
+  `app_zip_projects_markers` call scanned the whole serving plane. Measured: 411 PostgREST calls,
+  mean 4.6 s, max 24.5 s against the function's own 25 s timeout, ~119,000 blocks read per call;
+  a cold call took 30.1 s and Map 1 showed "could not be read just now". The same marker read with
+  a `char(5)` value: 19 ms, 68 blocks. `app_authoritative_projects_for_zip` (the ZIP page) already
+  copied `p_zip` into a `char(5)` variable; `docs/map1-zip-read-char5.sql` gives Map 1's reader the
+  same shape. Output cannot change: `p_zip` is refused unless it is exactly 5 digits, and all
+  1.9 M stored keys are. Proof: `test/n5_generation_pg/run_map1_char5.py`.
+  - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
+    never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
 
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
