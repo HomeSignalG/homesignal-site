@@ -1286,6 +1286,25 @@ the committed file.
     sideways. Checked from the rendered line boxes in Chromium: 1 line at 1280px (browser test
     1c2), wrapped with no overflow at 390px (1c3). Restoring the cap fails 1c2; adding `nowrap`
     fails 1c3.
+  - ⚖️ **THE UNSUBSCRIBE PAGE HAS THE FOUNDER'S TEXT FOR A MAP SIGN-UP** (2026-09-26, *"change
+    the text to this"*): *"You're unsubscribed from Development alerts"*, *"You'll no longer
+    receive Development email alerts for ZIP code <ZIP>."*, *"This only changes the Development
+    alerts you signed up for from the map. If you also receive Government Notices, Upcoming
+    Meetings, or Local News emails, those subscriptions are separate and will continue as
+    usual."*, *"You can sign up for Development alerts again anytime from the HomeSignal map."*,
+    and a *"Return to the <ZIP> map"* link to Map 1.
+    - **Shown only when homesignal-ingest's `unsubscribe` function answers `maps_only: true`**
+      with a 5-digit `zip`. It answers that when the identity it just turned off carried
+      nothing but the map sign-up, decided with the confirmation email's own `isMapsOnly`.
+      That is exactly when "those subscriptions are separate" is true: an unsubscribe turns
+      off one identity (email + community), and the other alerts live on other identities.
+      Every other answer keeps the general page, unchanged.
+    - "Sign up again from the map" is true as well: `enable_area_email_alerts` sets
+      `unsubscribed = false` on the identity it writes.
+    - Pinned in `test/unsubscribe-page.test.mjs` (offline) and
+      `test/unsubscribe-page.browser.test.mjs` (Chromium renders each answer). The text is
+      shared from `test/lib/unsubscribe-founder-copy.mjs`. 8 deliberate breaks each failed on
+      exit code.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
