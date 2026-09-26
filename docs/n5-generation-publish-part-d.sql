@@ -222,7 +222,17 @@ revoke all on function geo.n5_gen_prepare_publish(text) from public;
 --     legacy pt:1 rows in geo.n5_geom are never read for a generation: they carry phase1's
 --     coordinates, which a later snapshot may have moved. Row shape stays geo.n5_geom.
 -- ---------------------------------------------------------------------------
-create or replace function geo.n5_gen_candidate_geom(p_generation_id text)
+-- D7 (revised 2026-09-26): the candidate set is read THROUGH the probing boundary's own
+--     envelope, p_env. That is the one narrowing the candidate-bounding rule admits (the GiST
+--     prefilter from the boundary's envelope, scripts/n5_candidate_bounding.py) - it removes
+--     nothing ST_Intersects(c.geom, boundary) would keep. Without it the planner cannot reach
+--     either GiST index through the UNION: EXPLAIN on production 2026-09-26 showed a nested
+--     loop comparing each boundary with all ~960k candidates (join filter, no GiST; estimated
+--     cost 24.2M), and the envelope form uses n5_geom_gix + n5_gen_proven_point_gix. Whole
+--     prefixes measured 11-63 s (median ~25 s) before this change; the first two, 95 s, were
+--     cold-cache and are NOT representative - an early "~14 h" projection from them was wrong.
+drop function if exists geo.n5_gen_candidate_geom(text);
+create or replace function geo.n5_gen_candidate_geom(p_generation_id text, p_env geometry)
 returns setof geo.n5_geom
 language sql stable
 as $$
@@ -231,15 +241,17 @@ as $$
     join geo.n5_gen_recovered_key rk
       on rk.generation_id = p_generation_id and rk.source_key = g.source_key
    where g.provenance = 'recovered_authoritative'
+     and g.geom && p_env
   union all
   select pp.source_key, pp.registry_id, 'pt:1'::text, 1::smallint,
          pp.geom::geometry(Geometry, 4269), null::text, null::char(3),
          gen.publish_prepared_at, 'proven_stored_point'::text, gen.snapshot_id
     from geo.n5_gen_proven_point pp
     join geo.n5_generation gen on gen.generation_id = pp.generation_id
-   where pp.generation_id = p_generation_id;
+   where pp.generation_id = p_generation_id
+     and pp.geom && p_env;
 $$;
-revoke all on function geo.n5_gen_candidate_geom(text) from public;
+revoke all on function geo.n5_gen_candidate_geom(text, geometry) from public;
 
 -- ---------------------------------------------------------------------------
 -- D8. PUBLISH ONE PREFIX — Part A's function with two changes and nothing else:
@@ -312,7 +324,7 @@ begin
   select distinct on (b.zcta5, c.source_key)
          b.generation_id, b.zcta5, c.source_key, c.provenance, p_run_id
     from geo.n5_gen_zcta b
-    join geo.n5_gen_candidate_geom(p_generation_id) c
+    join lateral geo.n5_gen_candidate_geom(p_generation_id, b.geom) c
       on c.outcome = 1 and c.geom is not null and ST_Intersects(c.geom, b.geom)
    where b.generation_id = p_generation_id and b.prefix = p_prefix
    order by b.zcta5, c.source_key, c.provenance;

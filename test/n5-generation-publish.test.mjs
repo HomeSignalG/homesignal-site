@@ -59,6 +59,14 @@ const publish = fnBody('geo.n5_gen_publish_prefix');
 ok(publish.length > 2000, 'publish function located');
 ok(/g\.state <> 'BUILDING'/.test(publish), 'publish refuses any generation that is not BUILDING');
 ok(/n5_gen_candidate_geom\(p_generation_id\)/.test(publish), 'boundary resolution reads the generation candidate set');
+// Part D supersedes it: the probe reaches the candidate set THROUGH the boundary's envelope so
+// both GiST indexes serve it (measured 2026-09-26: ~90 s/prefix without, the planner scanned
+// every candidate per boundary). One definition: the one-argument form is dropped.
+const partD = readFileSync('docs/n5-generation-publish-part-d.sql', 'utf8');
+ok(/join lateral geo\.n5_gen_candidate_geom\(p_generation_id, b\.geom\) c\s+on c\.outcome = 1 and c\.geom is not null and ST_Intersects\(c\.geom, b\.geom\)/.test(partD),
+  'Part D: boundary resolution reads the candidate set through the boundary envelope');
+ok(/drop function if exists geo\.n5_gen_candidate_geom\(text\);/.test(partD) && (partD.match(/and (g|pp)\.geom && p_env/g) || []).length === 2,
+  'Part D: one candidate definition, envelope-bounded on both branches');
 ok(/not done — geometry is incomplete/.test(publish), 'publish waits for every shard (cross-prefix resolution)');
 ok(/have no marker/.test(publish) && /fall outside their ZIP/.test(publish), 'publish proves marker pairing and containment');
 ok(!/insert into geo\.zip_authoritative_membership\s*\(\s*zcta5/.test(code), 'no membership insert omits generation_id');

@@ -162,11 +162,29 @@ HS.onReady(async function () {
       } else {
         body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
       }
-      page.innerHTML =
-        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
-        + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p>'
-        + '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(HS.navHref('homesignalmap.html', S.zip)) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div></div>'
-        + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
+      // Header + the Map 1 preview are drawn ONCE; sorting and Table view repaint only
+      // #devResults, so the iframe (canonical Map 1 via ?embed=1, the same host pattern
+      // lib/community-page.js uses) keeps its browsing context and never reloads.
+      var results = page.querySelector('#devResults');
+      if (!results) {
+        var mapHref = HS.navHref('homesignalmap.html', S.zip);
+        page.innerHTML =
+          '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
+          + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p>'
+          + '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div></div>'
+          + (S.zip
+            ? '<div class="devmap-preview" id="devMapPreview" style="margin:0 0 20px">'
+              + '<iframe id="devMapFrame" title="Development Map for ZIP ' + HS.esc(S.zip) + '" loading="lazy" '
+              + 'style="width:100%;height:clamp(300px,42vw,400px);border:1px solid var(--line);border-radius:12px;display:block" '
+              + 'src="homesignalmap.html?embed=1&amp;zip=' + encodeURIComponent(S.zip) + '"></iframe>'
+              + '<a class="inlinebtn" id="devMapFull" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none;margin-top:10px">View full Development Map →</a>'
+              + '</div>'
+            : '')
+          + '<div id="devResults"></div>';
+        results = page.querySelector('#devResults');
+      }
+      results.innerHTML =
+        '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
         + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'

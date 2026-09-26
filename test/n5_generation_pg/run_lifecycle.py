@@ -56,7 +56,7 @@ def _json_default(v):
 
 def make_local_sql(conn, n3):
     """The Management API contract, locally: one request = one simple-query message."""
-    def sql(query, tag="", raise_413=False, read_only=False, timeout=900):
+    def sql(query, tag="", raise_413=False, read_only=False, timeout=900, gateway_unknown=False):
         if read_only:
             n3.assert_read_only(query, tag)
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as c:

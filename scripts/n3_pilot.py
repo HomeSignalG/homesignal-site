@@ -28,6 +28,7 @@ import io
 import json
 import os
 import re
+import socket
 import struct
 import sys
 import time
@@ -168,7 +169,22 @@ class SQLPayloadTooLarge(Exception):
     """
 
 
-def sql(query, tag="", raise_413=False, read_only=False, timeout=900):
+#: Front-of-origin timeouts: the gateway gave up waiting, the origin may still be working.
+SQL_GATEWAY_TIMEOUT_STATUS = (502, 504, 520, 522, 524)
+
+
+class SQLGatewayTimeout(SystemExit):
+    """The response was lost in FRONT of the origin; the statement's outcome is UNKNOWN.
+
+    Raised only when a caller passes gateway_unknown=True. The Supabase API gateway cuts a
+    request at 120 s (HTTP 524, measured 2026-09-26 on geo.n5_gen_prepare_publish) while the
+    database keeps executing and commits. A caller that opts in must then PROVE the outcome
+    from database state - it never re-sends the write. It subclasses SystemExit so any caller
+    that does not handle it still stops, exactly as before.
+    """
+
+
+def sql(query, tag="", raise_413=False, read_only=False, timeout=900, gateway_unknown=False):
     if read_only:
         assert_read_only(query, tag)
     retryable = SQL_RETRY_STATUS_READONLY if read_only else SQL_RETRY_STATUS
@@ -182,9 +198,15 @@ def sql(query, tag="", raise_413=False, read_only=False, timeout=900):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
+        except (TimeoutError, socket.timeout) as e:
+            if gateway_unknown and not read_only:
+                raise SQLGatewayTimeout(f"{tag}: client wait expired - outcome unknown ({e})")
+            raise
         except urllib.error.HTTPError as e:
             if e.code == 413 and raise_413:
                 raise SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
+            if gateway_unknown and not read_only and e.code in SQL_GATEWAY_TIMEOUT_STATUS:
+                raise SQLGatewayTimeout(f"{tag}: HTTP {e.code} - response lost, outcome unknown")
             if e.code not in retryable or attempt == SQL_MAX_ATTEMPTS:
                 raise SystemExit(
                     f"STOP: SQL {tag} failed HTTP {e.code} on attempt {attempt}\n"
