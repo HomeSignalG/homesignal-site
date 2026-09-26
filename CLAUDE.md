@@ -2208,7 +2208,16 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
     - **The real boundary** is a protected `environment:` with required reviewers holding those secrets.
       That is a founder settings action, and it is still open.
     - `test/workflow-secret-exposure.test.mjs` fails any NEW secret-holding job wired to run on
-      `pull_request` without an event guard.
+      `pull_request`. It accepts a job only if its `if:` is a pure conjunction containing exactly
+      `github.event_name == 'workflow_dispatch'`, and it fails on:
+      - an `if:` containing `||`;
+      - a workflow-level `env:` secret;
+      - `secrets: inherit`;
+      - `!= 'pull_request'` used under `pull_request_target`.
+      Each shape is pinned by a test case.
+    - ⚠️ **homesignal-ingest runs 14 PR-time database gates with `SUPABASE_WRITE_KEY` by design** (measured
+      2026-09-26). This test does not cover them. The fix for both repos is the same boundary: a protected
+      environment, or a read-only key for read-only gates.
     - Three exposures from other sessions are named in its `KNOWN_EXPOSED`, each with a reason:
       `dc-geocode-probe`, `dc-step3c-probe`, `dc-step3c-reconcile` (a PR gate by design). The list can
       only shrink.
