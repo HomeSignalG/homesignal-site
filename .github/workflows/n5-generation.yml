@@ -19,11 +19,14 @@ name: n5-generation
 
 on:
   schedule:
-    # Every 2 hours. Chosen against measured cost, not taste: the 2026-09-02..09-05 build
-    # was ~75 wall-clock hours for 544 shards (~8 min/shard serial-equivalent), so a
-    # 50-minute bounded tick advances several shards and a national generation completes in
-    # days rather than never. Raise MAX_SHARDS before shortening this interval.
-    - cron: '17 */2 * * *'
+    # HOURLY, and a scheduled tick uses its whole 50-minute budget (MAX_SHARDS below).
+    # MEASURED 2026-09-26: the national generation's shards average ~45 s and a publish
+    # prefix ~20 s, so each tick finishes ~60 shards or ~150 prefixes - the build completes
+    # on its own in well under a day. The previous 2-hourly tick took 4 shards, so a build
+    # advanced only while someone dispatched runs by hand, and it sat idle ~12.5 h overnight
+    # on 2026-09-25/26. With no BUILDING generation the tick is a one-query no-op; the
+    # concurrency group below queues at most one tick behind a running one.
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -70,7 +73,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           MODE: ${{ github.event.inputs.mode || 'work' }}
           GENERATION: ${{ github.event.inputs.generation || '' }}
-          MAX_SHARDS: ${{ github.event.inputs.max_shards || '4' }}
+          MAX_SHARDS: ${{ github.event.inputs.max_shards || '200' }}
           CHUNKS: ${{ github.event.inputs.chunks }}
           REASON: ${{ github.event.inputs.reason }}
           MAX_SECONDS: '3000'
