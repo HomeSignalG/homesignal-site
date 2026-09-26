@@ -49,7 +49,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from n3_pilot import sql, lit, SQLGatewayTimeout  # noqa: E402  - one implementation, imported not re-derived
+from n3_pilot import sql, lit, sql_proven  # noqa: E402  - one implementation, imported not re-derived
 
 GENERATION = os.environ.get("GENERATION", "").strip()
 MODE = os.environ.get("MODE", "status").strip()
@@ -143,39 +143,15 @@ HEAVY_CLIENT_TIMEOUT = 2400
 # afterwards. So a 524 on a heavy call means "outcome unknown", never "failed" and never
 # "re-send": heavy() waits for its own backend to leave pg_stat_activity, then the caller's
 # POST-CONDITION (read from the database) decides. The write is never issued twice.
-HEAVY_POLL_S = 20
-
-
-def _heavy_running(marker):
-    rows = sql("select count(*) n from pg_stat_activity where pid <> pg_backend_pid() "
-               f"and state <> 'idle' and position({lit(marker)} in query) > 0;",
-               "heavy poll", read_only=True)
-    return int(rows[0]["n"])
 
 
 def heavy(query, tag, verify=None):
-    """Run one national lifecycle statement. `verify` is a read-only SQL returning one row
-    with a boolean `ok`: it proves the outcome when the gateway loses the response. Without
-    it a lost response stays fatal (fail closed), exactly as before."""
-    marker = f"n5heavy:{tag}:{WORKER}:{int(time.time() * 1000)}"
-    body = f"set statement_timeout = '{HEAVY_STATEMENT_TIMEOUT}';\n/* {marker} */ " + query
-    try:
-        return sql(body, tag, timeout=HEAVY_CLIENT_TIMEOUT, gateway_unknown=verify is not None)
-    except SQLGatewayTimeout as e:
-        say(f"{tag}", f"response lost ({e}); waiting for the statement to finish on the server")
-    deadline = time.time() + HEAVY_CLIENT_TIMEOUT
-    while _heavy_running(marker):
-        if time.time() > deadline:
-            raise SystemExit(f"STOP: {tag} still running on the server after "
-                             f"{HEAVY_CLIENT_TIMEOUT}s - outcome unknown, not re-sent")
-        time.sleep(HEAVY_POLL_S)
-    row = sql(verify, f"{tag} verify", read_only=True)[0]
-    if not row.get("ok"):
-        raise SystemExit(f"STOP: {tag} response was lost and its post-condition is NOT met "
-                         f"({row}); the statement failed or rolled back - read its cause "
-                         "by re-running this mode.")
-    say(f"{tag}", f"post-condition verified from the database: {row}")
-    return None
+    """Run one national lifecycle statement through n3_pilot.sql_proven: `verify` proves the
+    outcome from database state when the gateway loses the response; without it a lost
+    response stays fatal (fail closed), exactly as before."""
+    return sql_proven(f"set statement_timeout = '{HEAVY_STATEMENT_TIMEOUT}';\n" + query, tag,
+                      verify, timeout=HEAVY_CLIENT_TIMEOUT, max_wait=HEAVY_CLIENT_TIMEOUT,
+                      say=lambda m: say(tag, m))
 
 
 def _verify_prepared(gen):

@@ -222,6 +222,47 @@ def sql(query, tag="", raise_413=False, read_only=False, timeout=900, gateway_un
     raise SystemExit(f"STOP: SQL {tag} exhausted {SQL_MAX_ATTEMPTS} attempts")
 
 
+#: Seconds between checks for a statement whose response the gateway lost.
+PROVEN_POLL_S = 20
+
+
+def _statement_running(marker):
+    rows = sql("select count(*) n from pg_stat_activity where pid <> pg_backend_pid() "
+               f"and state <> 'idle' and position({lit(marker)} in query) > 0;",
+               "proven poll", read_only=True)
+    return int(rows[0]["n"])
+
+
+def sql_proven(query, tag, verify, timeout=900, max_wait=2400, say=print):
+    """Run ONE write whose outcome is proven from database state if the gateway loses it.
+
+    The Management API gateway cuts a request at 120 s (HTTP 524) while the database keeps
+    executing and commits (measured 2026-09-26: prepare, and publish of dense prefix 100).
+    On a lost response this waits for the tagged statement to leave pg_stat_activity, then
+    runs `verify` - a read-only SQL returning one row with a boolean `ok`. Met -> returns
+    None; not met -> stops. The write is NEVER sent twice. With verify=None a lost
+    response stays fatal, exactly as sql() behaves.
+    """
+    marker = f"n5proven:{tag}:{os.getpid()}:{int(time.time() * 1000)}"
+    body = f"/* {marker} */ " + query
+    try:
+        return sql(body, tag, timeout=timeout, gateway_unknown=verify is not None)
+    except SQLGatewayTimeout as e:
+        say(f"{tag}: response lost ({e}); waiting for the statement to finish on the server")
+    deadline = time.time() + max_wait
+    while _statement_running(marker):
+        if time.time() > deadline:
+            raise SystemExit(f"STOP: {tag} still running on the server after {max_wait}s - "
+                             "outcome unknown, not re-sent")
+        time.sleep(PROVEN_POLL_S)
+    row = sql(verify, f"{tag} verify", read_only=True)[0]
+    if not row.get("ok"):
+        raise SystemExit(f"STOP: {tag} response was lost and its post-condition is NOT met "
+                         f"({row}); the statement failed or rolled back - not re-sent.")
+    say(f"{tag}: post-condition verified from the database: {row}")
+    return None
+
+
 def http(url, params=None, method="GET", timeout=TIMEOUT):
     STATS["requests"] += 1
     try:
