@@ -1,73 +1,143 @@
 #!/usr/bin/env python3
-"""Generate docs/dc-atlas-admission-apply.sql FROM the DDL of record -- never retyped (claims rule 7).
+"""Generate the STAGE 10 admission artifacts FROM the DDL of record -- never retyped (claims rule 7).
 
-STAGE 10 of Atlas coordinate validation: ADMIT Atlas. The apply carries exactly the two statements
-the admission changes -- dc_derived_address_admitted and its comment -- sliced out of
-docs/dc-step3d-derived-location.sql by #1324's own dollar-quote-aware splitter (imported, not copied).
+  docs/dc-atlas-admission-apply.sql     ADMIT Atlas (applied to production 2026-09-26 18:48 UTC)
+  docs/dc-atlas-admission-rollback.sql  WITHDRAW it again (tested, never applied)
 
-Inside ONE transaction:
+The apply carries exactly the two statements the admission changes -- dc_derived_address_admitted and
+its comment -- sliced out of docs/dc-step3d-derived-location.sql by #1324's own dollar-quote-aware
+splitter (imported, not copied). Inside ONE transaction:
   1. a FAIL-CLOSED drift guard: the live switch must still be Phase A's (md5(prosrc) measured on
      production 2026-09-26 18:16 UTC, and Atlas must read NOT admitted, Epoch admitted), or nothing
      is applied;
   2. the two statements;
   3. an in-transaction post-condition: Atlas admitted, Epoch admitted, nothing else admitted.
-It adds no table, alters no table, and touches no view, resolver or the Map 1 reader: Map 1 moves only
-when the next hourly resolver runs (stage 11 compares that with the stage 8 dry run).
+
+The rollback is the same shape in reverse. Its switch body is Phase A's deployed text, taken from
+test/dc_atlas_validation_pg/build_apply.py's PHASE_A_REGION (itself extracted from git and pinned by the
+Phase A artifact's sha256), so it too is never retyped. Its guard requires the live switch to be the
+admitted one (md5 computed here from the DDL of record, and read on production 2026-09-26: 31cb6c9e...);
+its post-condition requires Atlas NOT admitted, Epoch admitted, and the body byte-identical to Phase A's.
+
+Neither adds, alters or drops a table, view, resolver or the Map 1 reader: Map 1 moves only when the
+next hourly resolver run re-decides geography.
 Run: python3 test/dc_atlas_validation_pg/build_admission.py [--check]
 """
-import hashlib, importlib.util, pathlib, sys
+import hashlib, importlib.util, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'docs/dc-atlas-admission-apply.sql'
-_spec = importlib.util.spec_from_file_location('epoch_apply', ROOT / 'test/dc_epoch_geography_pg/build_apply.py')
-_epoch = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_epoch)
+OUT_ROLLBACK = ROOT / 'docs/dc-atlas-admission-rollback.sql'
+
+
+def _load(name, rel):
+    spec = importlib.util.spec_from_file_location(name, ROOT / rel)
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    return mod
+
+
+_epoch = _load('epoch_apply', 'test/dc_epoch_geography_pg/build_apply.py')
+_phase_a = _load('atlas_phase_a_apply', 'test/dc_atlas_validation_pg/build_apply.py')
 
 # md5(prosrc) of the live switch, read on production 2026-09-26 18:16 UTC (Phase A's Epoch-only body).
 PHASE_A_PROSRC_MD5 = 'cd968b64ada7adaee18a4dc8be0c4a4b'
+ADMISSION_FN = 'create or replace function public.dc_derived_address_admitted('
+ADMISSION_COMMENT = 'comment on function public.dc_derived_address_admitted('
 
 
-def build():
-    stmts = _epoch.pick('docs/dc-step3d-derived-location.sql', [
-        'create or replace function public.dc_derived_address_admitted(',
-        'comment on function public.dc_derived_address_admitted(',
-    ])
+def prosrc_md5(stmt):
+    m = re.search(r'\bas \$\$(.*?)\$\$;', stmt, re.S)
+    assert m, 'admission statement shape changed'
+    return hashlib.md5(m.group(1).encode()).hexdigest()
+
+
+def admission_statements():
+    stmts = _epoch.pick('docs/dc-step3d-derived-location.sql', [ADMISSION_FN, ADMISSION_COMMENT])
     assert len(stmts) == 2, stmts
-    guard = "\n".join([
-        "do $guard$",
+    return stmts
+
+
+def phase_a_function():
+    region = _phase_a.PHASE_A_REGION
+    fn = region[region.index(ADMISSION_FN):].rstrip('\n')
+    assert prosrc_md5(fn) == PHASE_A_PROSRC_MD5, 'Phase A switch text no longer fingerprints to production'
+    return fn
+
+
+def guard(name, want_md5, atlas_now, message):
+    return "\n".join([
+        f"do ${name}$",
         "begin",
         "  if (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace",
         "       where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted') is distinct from",
-        f"     '{PHASE_A_PROSRC_MD5}'",
-        "     or public.dc_derived_address_admitted('compute_atlas', 'facilities')",
+        f"     '{want_md5}'",
+        f"     or {'not ' if atlas_now else ''}public.dc_derived_address_admitted('compute_atlas', 'facilities')",
         "     or not public.dc_derived_address_admitted('epoch_ai', 'data_centers') then",
-        "    raise exception 'DRIFT: the live admission switch is not Phase A''s (Epoch only). Nothing applied.';",
+        f"    raise exception '{message}';",
         "  end if;",
-        "end $guard$;"])
-    post = "\n".join([
-        "do $post$",
-        "begin",
-        "  if not public.dc_derived_address_admitted('compute_atlas', 'facilities')",
-        "     or not public.dc_derived_address_admitted('epoch_ai', 'data_centers')",
-        "     or public.dc_derived_address_admitted('compute_atlas', 'other')",
-        "     or public.dc_derived_address_admitted('some_new_source', 'facilities') then",
-        "    raise exception 'POST-CONDITION: the switch does not admit exactly Epoch data_centers and Atlas facilities. Rolled back.';",
-        "  end if;",
-        "end $post$;"])
+        f"end ${name}$;"])
+
+
+def post(atlas_after, extra=None):
+    lines = ["do $post$",
+             "begin",
+             f"  if {'not ' if atlas_after else ''}public.dc_derived_address_admitted('compute_atlas', 'facilities')",
+             "     or not public.dc_derived_address_admitted('epoch_ai', 'data_centers')",
+             "     or public.dc_derived_address_admitted('compute_atlas', 'other')",
+             "     or public.dc_derived_address_admitted('some_new_source', 'facilities')"]
+    # the apply's text is DEPLOYED (sha256 pinned in the apply script): its "then" stays on the last line
+    if extra:
+        lines += [extra, "  then"]
+    else:
+        lines[-1] += " then"
+    want = 'exactly Epoch data_centers and Atlas facilities' if atlas_after else 'exactly Epoch data_centers (Phase A)'
+    lines += [f"    raise exception 'POST-CONDITION: the switch does not admit {want}. Rolled back.';",
+              "  end if;",
+              "end $post$;"]
+    return "\n".join(lines)
+
+
+def build():
+    stmts = admission_statements()
     parts = ['-- GENERATED by test/dc_atlas_validation_pg/build_admission.py from the DDL of record. Do not edit.',
              '-- STAGE 10: admit Atlas (compute_atlas/facilities) in the derived-address admission switch.',
              '-- One transaction: drift guard, the switch and its comment, in-transaction post-condition.',
-             'begin;', guard,
+             'begin;',
+             guard('guard', PHASE_A_PROSRC_MD5, False,
+                   "DRIFT: the live admission switch is not Phase A''s (Epoch only). Nothing applied."),
              '-- ===== STEP 3D  docs/dc-step3d-derived-location.sql (the admission switch) =====']
     parts.extend(stmts)
-    parts.extend([post, 'commit;'])
+    parts.extend([post(True), 'commit;'])
+    return '\n\n'.join(parts) + '\n'
+
+
+def build_rollback():
+    fn, comment = admission_statements()
+    admitted_md5 = prosrc_md5(fn)
+    parts = ['-- GENERATED by test/dc_atlas_validation_pg/build_admission.py. Do not edit.',
+             '-- STAGE 10 ROLLBACK: withdraw Atlas (compute_atlas/facilities) from the admission switch,',
+             "-- restoring Phase A's deployed Epoch-only body. Tested offline; applied only by",
+             '-- dc-atlas-admission-apply.yml with confirm=ROLLBACK-ATLAS-STAGE-10.',
+             '-- One transaction: drift guard, the Phase A switch and its comment, in-transaction post-condition.',
+             'begin;',
+             guard('guard', admitted_md5, True,
+                   'DRIFT: the live admission switch is not the stage 10 admitted one. Nothing rolled back.'),
+             "-- ===== the switch as Phase A deployed it (build_apply.py PHASE_A_REGION) =====",
+             phase_a_function(),
+             comment,
+             post(False, "     or (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace\n"
+                         "          where n.nspname = 'public' and p.proname = 'dc_derived_address_admitted')\n"
+                         f"        is distinct from '{PHASE_A_PROSRC_MD5}'"),
+             'commit;']
     return '\n\n'.join(parts) + '\n'
 
 
 if __name__ == '__main__':
-    text = build()
+    outs = ((OUT, build()), (OUT_ROLLBACK, build_rollback()))
     if '--check' in sys.argv:
-        ok = OUT.exists() and OUT.read_text() == text
-        print('admission apply file is current' if ok else 'admission apply file is STALE: regenerate it')
-        sys.exit(0 if ok else 1)
-    OUT.write_text(text)
-    print(f'wrote {OUT.relative_to(ROOT)} ({len(text)} bytes, sha256 {hashlib.sha256(text.encode()).hexdigest()})')
+        stale = [o.name for o, t in outs if not (o.exists() and o.read_text() == t)]
+        print('admission apply + rollback files are current' if not stale else f'STALE: regenerate {stale}')
+        sys.exit(1 if stale else 0)
+    for o, t in outs:
+        o.write_text(t)
+        print(f'wrote {o.relative_to(ROOT)} ({len(t)} bytes, sha256 {hashlib.sha256(t.encode()).hexdigest()})')

@@ -95,4 +95,26 @@ PROD_DB_URL="$URL" DCA_OFFLINE=1 bash scripts/dc-atlas-admission-apply.sh > "$tm
 set -e
 [ "$rc" != 0 ] && grep -q 'already carries this change' "$tmp/again.txt" || { echo "FAIL: second apply not refused"; cat "$tmp/again.txt"; exit 1; }
 echo "  PASS: refused"
+
+echo "== 5. ROLLBACK: withdraw Atlas; Map 1 does not move at the rollback, and the next resolver run restores the pre-admission Map 1 exactly"
+map_admitted="$(M1)"
+[ "$map_admitted" != "$map_before" ] || { echo "FAIL: control: admission changed nothing, so a rollback proves nothing"; exit 1; }
+PROD_DB_URL="$URL" DCA_OFFLINE=1 DCA_MODE=rollback bash scripts/dc-atlas-admission-apply.sh > "$tmp/rb.txt" 2>&1 || { sed 's/^/  | /' "$tmp/rb.txt"; echo "FAIL: rollback exited non-zero"; exit 1; }
+sed 's/^/  /' "$tmp/rb.txt"
+grep -q '^ATLAS ROLLED BACK' "$tmp/rb.txt" && grep -q 'ATLAS_ADMITTED=false' "$tmp/rb.txt" && grep -q 'DEFINITION_PARITY PASS' "$tmp/rb.txt" \
+  || { echo "FAIL: rollback did not complete"; exit 1; }
+[ "$(gate)" = "false/true/cd968b64ada7adaee18a4dc8be0c4a4b" ] || { echo "FAIL: switch after rollback $(gate)"; exit 1; }
+[ "$(M1)" = "$map_admitted" ] || { echo "FAIL: Map 1 moved on the rollback itself (before any resolver run)"; exit 1; }
+Q "select count(*) from public.dc_resolve_geography(true)" >/dev/null
+[ "$(M1)" = "$map_before" ] || { echo "FAIL: after rollback + resolver, Map 1 is not the pre-admission Map 1"; exit 1; }
+echo "  PASS: switch $(gate); Map 1 unmoved at rollback; after the resolver run it equals the pre-admission Map 1 ($map_before)"
+
+echo "== 6. a second rollback is refused, and the admission can be re-applied after a rollback"
+set +e
+PROD_DB_URL="$URL" DCA_OFFLINE=1 DCA_MODE=rollback bash scripts/dc-atlas-admission-apply.sh > "$tmp/rb2.txt" 2>&1; rc=$?
+set -e
+[ "$rc" != 0 ] && grep -q 'already carries this change' "$tmp/rb2.txt" || { echo "FAIL: second rollback not refused"; cat "$tmp/rb2.txt"; exit 1; }
+PROD_DB_URL="$URL" DCA_OFFLINE=1 bash scripts/dc-atlas-admission-apply.sh > "$tmp/re.txt" 2>&1 || { sed 's/^/  | /' "$tmp/re.txt"; echo "FAIL: re-admission after rollback failed"; exit 1; }
+case "$(gate)" in true/true/*) ;; *) echo "FAIL: switch after re-admission $(gate)"; exit 1;; esac
+echo "  PASS: second rollback refused; re-admission after rollback succeeds"
 echo "ALL ADMISSION APPLY OFFLINE CHECKS PASSED"

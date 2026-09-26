@@ -14,18 +14,23 @@ name: dc-atlas-admission-apply
 # lock wait with a held row, success, second-apply refusal). The `apply` job runs only on a manual
 # dispatch from main that types the confirmation string exactly. Map 1 moves at the next hourly
 # resolver run; stage 11 compares it with the stage 8 dry run (run 36253526398).
+#
+# APPLIED 2026-09-26 18:48 UTC (run 36263746674) and verified by stage 11. The `rollback` job withdraws
+# the admission with docs/dc-atlas-admission-rollback.sql (DCA_MODE=rollback), proven offline by the
+# same `offline` job (rollback, Map 1 restored after one resolver run, second rollback refused).
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type ADMIT-ATLAS-STAGE-10 to write to production (anything else runs the offline proof only)'
+        description: 'ADMIT-ATLAS-STAGE-10 admits Atlas; ROLLBACK-ATLAS-STAGE-10 withdraws it (anything else runs the offline proof only)'
         required: false
         default: ''
   pull_request:
     paths:
       - 'scripts/dc-atlas-admission-apply.sh'
       - 'docs/dc-atlas-admission-apply.sql'
+      - 'docs/dc-atlas-admission-rollback.sql'
       - 'docs/dc-step3d-derived-location.sql'
       - 'test/dc_atlas_validation_pg/**'
       - '.github/workflows/dc-atlas-admission-apply.yml'
@@ -95,5 +100,36 @@ jobs:
           sudo apt-get install -y -qq postgresql-client >/dev/null
       - name: ADMIT ATLAS in production
         env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-atlas-admission-apply.sh
+
+  rollback:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ROLLBACK-ATLAS-STAGE-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ROLL BACK the Atlas admission in production
+        env:
+          DCA_MODE: rollback
           PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash scripts/dc-atlas-admission-apply.sh
