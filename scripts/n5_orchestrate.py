@@ -49,7 +49,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from n3_pilot import sql, lit  # noqa: E402  - one implementation, imported not re-derived
+from n3_pilot import sql, lit, SQLGatewayTimeout  # noqa: E402  - one implementation, imported not re-derived
 
 GENERATION = os.environ.get("GENERATION", "").strip()
 MODE = os.environ.get("MODE", "status").strip()
@@ -137,11 +137,62 @@ def discover_building():
 # workflow's 55-minute job, and a timeout is safe: the function rolls back and can be re-run.
 HEAVY_STATEMENT_TIMEOUT = "1800s"
 HEAVY_CLIENT_TIMEOUT = 2400
+# MEASURED 2026-09-26: the Management API sits behind a gateway that cuts every request at
+# 120 s (HTTP 524) while the database KEEPS EXECUTING and commits - n5_gen_prepare_publish
+# returned 524 at 21:59:14 and its publish_prepared_at + 720,460 proven points were there
+# afterwards. So a 524 on a heavy call means "outcome unknown", never "failed" and never
+# "re-send": heavy() waits for its own backend to leave pg_stat_activity, then the caller's
+# POST-CONDITION (read from the database) decides. The write is never issued twice.
+HEAVY_POLL_S = 20
 
 
-def heavy(query, tag):
-    return sql(f"set statement_timeout = '{HEAVY_STATEMENT_TIMEOUT}';\n" + query, tag,
-               timeout=HEAVY_CLIENT_TIMEOUT)
+def _heavy_running(marker):
+    rows = sql("select count(*) n from pg_stat_activity where pid <> pg_backend_pid() "
+               f"and state <> 'idle' and position({lit(marker)} in query) > 0;",
+               "heavy poll", read_only=True)
+    return int(rows[0]["n"])
+
+
+def heavy(query, tag, verify=None):
+    """Run one national lifecycle statement. `verify` is a read-only SQL returning one row
+    with a boolean `ok`: it proves the outcome when the gateway loses the response. Without
+    it a lost response stays fatal (fail closed), exactly as before."""
+    marker = f"n5heavy:{tag}:{WORKER}:{int(time.time() * 1000)}"
+    body = f"set statement_timeout = '{HEAVY_STATEMENT_TIMEOUT}';\n/* {marker} */ " + query
+    try:
+        return sql(body, tag, timeout=HEAVY_CLIENT_TIMEOUT, gateway_unknown=verify is not None)
+    except SQLGatewayTimeout as e:
+        say(f"{tag}", f"response lost ({e}); waiting for the statement to finish on the server")
+    deadline = time.time() + HEAVY_CLIENT_TIMEOUT
+    while _heavy_running(marker):
+        if time.time() > deadline:
+            raise SystemExit(f"STOP: {tag} still running on the server after "
+                             f"{HEAVY_CLIENT_TIMEOUT}s - outcome unknown, not re-sent")
+        time.sleep(HEAVY_POLL_S)
+    row = sql(verify, f"{tag} verify", read_only=True)[0]
+    if not row.get("ok"):
+        raise SystemExit(f"STOP: {tag} response was lost and its post-condition is NOT met "
+                         f"({row}); the statement failed or rolled back - read its cause "
+                         "by re-running this mode.")
+    say(f"{tag}", f"post-condition verified from the database: {row}")
+    return None
+
+
+def _verify_prepared(gen):
+    return (f"select publish_prepared_at is not null ok, publish_prepared_at "
+            f"from geo.n5_generation where generation_id={lit(gen)};")
+
+
+def _verify_unresolved(gen):
+    return (f"select g.unresolved_recorded_at is not null and g.unresolved_recorded_at >= "
+            f"coalesce((select max(p.completed_at) from geo.n5_generation_publish p "
+            f"where p.generation_id=g.generation_id), '-infinity') ok, g.unresolved_recorded_at "
+            f"from geo.n5_generation g where g.generation_id={lit(gen)};")
+
+
+def _verify_state(gen, want):
+    return (f"select state = {lit(want)} ok, state from geo.n5_generation "
+            f"where generation_id={lit(gen)};")
 
 
 def mode_open():
@@ -342,8 +393,9 @@ def publish_pending(gen, budget_seconds):
     if not prepared:
         # Once, after every shard is done and before any prefix: the generation's own proven
         # points and verdicts, and its recovered candidate key set (part D, D6).
-        r = heavy(f"select geo.n5_gen_prepare_publish({lit(gen)}) r;", "prepare")[-1]["r"]
-        say("publication prepared", r)
+        r = heavy(f"select geo.n5_gen_prepare_publish({lit(gen)}) r;", "prepare",
+                  verify=_verify_prepared(gen))
+        say("publication prepared", r[-1]["r"] if r else "verified from state")
     t0 = time.time()
     run_id = f"pub-{WORKER}"
     todo = unpublished_prefixes(gen)
@@ -359,8 +411,9 @@ def publish_pending(gen, budget_seconds):
                     f"where p.generation_id=g.generation_id)) s from geo.n5_generation g "
                     f"where g.generation_id={lit(gen)};", "unresolved stale", read_only=True)[0]["s"]
         if stale:
-            r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[-1]["r"]
-            say("unresolved outcomes recorded", r)
+            r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved",
+                      verify=_verify_unresolved(gen))
+            say("unresolved outcomes recorded", r[-1]["r"] if r else "verified from state")
     return 0
 
 
@@ -374,8 +427,9 @@ def mode_publish():
 
 def mode_unresolved():
     gen = require_generation()
-    r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved")[-1]["r"]
-    say("unresolved outcomes recorded", r)
+    r = heavy(f"select geo.n5_gen_record_unresolved({lit(gen)}) r;", "unresolved",
+              verify=_verify_unresolved(gen))
+    say("unresolved outcomes recorded", r[-1]["r"] if r else "verified from state")
     return 0
 
 
@@ -402,7 +456,8 @@ def mode_ready():
     gap; this script adds no second copy of those rules."""
     gen = require_generation()
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
-    heavy(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready")
+    heavy(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready",
+          verify=_verify_state(gen, "READY"))
     say("generation", f"{gen} -> READY (serving still requires `activate`)")
     return 0
 
@@ -410,7 +465,8 @@ def mode_ready():
 def mode_activate():
     gen = require_generation()
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
-    heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate")
+    heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate",
+          verify=_verify_state(gen, "ACTIVE"))
     say("generation", f"{gen} -> ACTIVE")
     return 0
 

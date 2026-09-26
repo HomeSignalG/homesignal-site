@@ -627,8 +627,8 @@ MUTATIONS = {
         create or replace view geo.n5_serving_marker as select k.* from geo.zip_authoritative_marker k;"""),
     "M2 reconciliation reverts to the prefix-bounded resolved set": ("5", None),   # filled from the fixture text
     "M3 the candidate set is all resident geometry": ("4", """
-        create or replace function geo.n5_gen_candidate_geom(p_generation_id text) returns setof geo.n5_geom
-        language sql stable as $$ select g.* from geo.n5_geom g $$;"""),
+        create or replace function geo.n5_gen_candidate_geom(p_generation_id text, p_env geometry) returns setof geo.n5_geom
+        language sql stable as $$ select g.* from geo.n5_geom g where g.geom && p_env $$;"""),
     "M4 the write guard is removed": ("G1", """
         drop trigger n5_generation_row_guard on geo.zip_authoritative_membership;
         drop trigger n5_generation_row_guard on geo.zip_authoritative_marker;
@@ -653,12 +653,16 @@ MUTATIONS = {
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_row_guard()'::regprocedure),
           'where g.generation_id = v_gen for share;', 'where g.generation_id = v_gen;'); end $m$;"""),
     "M11 candidate geometry reads the legacy proven points": ("D6", """
-        create or replace function geo.n5_gen_candidate_geom(p_generation_id text) returns setof geo.n5_geom
+        create or replace function geo.n5_gen_candidate_geom(p_generation_id text, p_env geometry) returns setof geo.n5_geom
         language sql stable as $$
           select g.* from geo.n5_geom g
-           where g.provenance = 'proven_stored_point'
+           where g.geom && p_env
+             and (g.provenance = 'proven_stored_point'
               or exists (select 1 from geo.n5_gen_recovered_key rk
-                          where rk.generation_id = p_generation_id and rk.source_key = g.source_key) $$;"""),
+                          where rk.generation_id = p_generation_id and rk.source_key = g.source_key)) $$;"""),
+    "M16 the envelope prefilter narrows below the boundary's own envelope": ("4", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_candidate_geom(text,geometry)'::regprocedure),
+          'pp.geom && p_env', 'pp.geom && ST_Expand(ST_Centroid(p_env), 0.0001)'); end $m$;"""),
     "M12 unresolved accounting ignores the persisted verdicts": ("7", """
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
           'when v.verdict in (''NULL_COORD'',''MULTI_COORD_UNRESOLVED'') then ''POINT_REJECTED''', ''); end $m$;"""),
