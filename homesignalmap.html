@@ -4923,12 +4923,12 @@ HS.onReady(function(){
     var mSel = "title,category,source_url,meeting_date,location,geo_scope,zip"; // meetings has no agency_name
     // Bucket (b): address-precise notices in THIS ZIP.
     Promise.all([
-      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
+      sbFetch("alerts_public",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
       sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:mSel, order:"meeting_date.asc" })
     ]).then(function(r){ renderNoticeList("dtBucketB", r[0], r[1], zip, false); });
     // Bucket (c): county-wide notices (geo_scope countywide OR null) — cascade, labeled, never hidden.
     Promise.all([
-      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:aSel, order:"created_at.desc" }),
+      sbFetch("alerts_public",   { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:aSel, order:"created_at.desc" }),
       sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:mSel, order:"meeting_date.asc" })
     ]).then(function(r){ renderNoticeList("dtBucketC", r[0], r[1], zip, true); });
   }
