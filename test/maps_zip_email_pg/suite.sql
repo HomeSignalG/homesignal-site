@@ -247,6 +247,26 @@ select to_regprocedure('public.alert_confirmation_claim(uuid)') is not null
     not has_function_privilege('anon', 'public.alert_confirmation_claim(uuid)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.alert_confirmation_claim(uuid)', 'EXECUTE')
     and has_function_privilege('service_role', 'public.alert_confirmation_claim(uuid)', 'EXECUTE');
+
+  -- One read for both callers: the claim and the unsubscribe endpoint call
+  -- public.alert_identity_streams (homesignal-ingest 20260926230000_alert_identity_streams.sql).
+  select to_regprocedure('public.alert_identity_streams(uuid)') is not null as identity_applied \gset
+  \if :identity_applied
+    insert into _r select 'D07', 'the claim reads streams through alert_identity_streams, not its own query',
+      (select position('public.alert_identity_streams(v_user.id)' in p.prosrc) > 0
+              and position('user_subscriptions' in p.prosrc) = 0
+         from pg_proc p where p.oid = 'public.alert_confirmation_claim(uuid)'::regprocedure);
+    insert into _r select 'D08', 'alert_identity_streams answers {maps} and {meetings,notices}, as the claim did',
+      (select public.alert_identity_streams(u.id) = array['maps']
+         from public.users u where u.community_id = '00000000-0000-0000-0000-0000000097a2')
+      and public.alert_identity_streams('00000000-0000-0000-0000-0000000000a1') = array['meetings','notices'];
+    insert into _r select 'D09', 'alert_identity_streams is service_role only',
+      not has_function_privilege('anon', 'public.alert_identity_streams(uuid)', 'EXECUTE')
+      and not has_function_privilege('authenticated', 'public.alert_identity_streams(uuid)', 'EXECUTE')
+      and has_function_privilege('service_role', 'public.alert_identity_streams(uuid)', 'EXECUTE');
+  \else
+    insert into _r values ('D07', 'SKIP: the ingest identity-streams migration was not applied', true);
+  \endif
 \else
   insert into _r values ('D00', 'SKIP: the ingest delivery migration was not applied', true);
 \endif
