@@ -41,9 +41,9 @@ ok(/if p_source_key = 'openstreetmap' and p_distribution_key = 'telecom_data_cen
    && /p_payload->>'addr:country'/.test(extract) && /'NOT_US'/.test(extract),
   'E1: OSM addresses are EXTRACTED from the record\'s own addr:* tags, in the extraction function; a non-US record says so');
 const osmLits = (s) => (s.match(/'openstreetmap'/g) || []).length;
-ok(osmLits(D3.replace(extract, '').replace(acq, '')) === 0 && osmLits(extract) >= 1 && osmLits(acq) >= 1
-   && osmLits(B3) === 0 && osmLits(A3) === 0 && osmLits(MAP) === 0,
-  'E2: \'openstreetmap\' is named ONLY in the extraction and the acquisition view: no OSM policy, verdict, threshold or reader rule anywhere');
+ok(osmLits(D3.replace(extract, '').replace(acq, '').replace(admit, '')) === 0 && osmLits(extract) >= 1 && osmLits(acq) >= 1
+   && osmLits(admit) === 1 && osmLits(B3) === 0 && osmLits(A3) === 0 && osmLits(MAP) === 0,
+  'E2: \'openstreetmap\' is named ONLY in the extraction, the acquisition view and the admission switch: no OSM policy, verdict, threshold or reader rule anywhere');
 
 // ── shared machinery only ────────────────────────────────────────────────────────────────────
 ok(/public\.dc_geocode_input\('openstreetmap', 'telecom_data_center', r\.raw_tags\)/.test(acq)
@@ -61,8 +61,8 @@ ok(/from public\.dc_osm_derived_point o/.test(chk) && !/national_dc_records/.tes
   'S4: the check reads only the acquisition view (one OSM input path)');
 
 // ── separate layer: never merged, never written, not read by Map 1 ───────────────────────────
+const map1 = fn('map1_dc_zip_members', MAP, 'revoke all on function public\\.map1_dc_zip_members');
 const readers = {
-  map1_dc_zip_members: fn('map1_dc_zip_members', MAP, 'revoke all on function public\\.map1_dc_zip_members'),
   dc_resolve_canonical: fn('dc_resolve_canonical', A3, '\\$fn\\$;'),
   dc_resolve_geography: fn('dc_resolve_geography', B3, '\\$fn\\$;'),
   dc_identity_candidate: view('dc_identity_candidate', A3),
@@ -71,17 +71,29 @@ const readers = {
 };
 const located = Object.entries(readers).filter(([, s]) => s.length > 200).map(([k]) => k);
 const leak = Object.entries(readers).filter(([, s]) => /dc_osm_(derived_point|address_check)/.test(s)).map(([k]) => k);
-ok(located.length === Object.keys(readers).length && leak.length === 0 && /national_dc_records/.test(readers.map1_dc_zip_members),
-  'L1: no canonical resolver, candidate/evidence view, derived-point view or the Map 1 reader reads either OSM view (control: Map 1 still reads national_dc_records)',
+ok(located.length === Object.keys(readers).length && leak.length === 0,
+  'L1: no canonical resolver, candidate/evidence view or derived-point view reads either OSM view: OSM is never merged',
   'located ' + located.join(',') + ' leak ' + leak.join(','));
+// C3c: the Map 1 reader reads the JUDGEMENT only (never the acquisition view), inside the OSM CTE only,
+// withholds only an ADMITTED SOURCES_DISAGREE, flags only an ADMITTED CORROBORATED, and draws the pin
+// from national_dc_records alone (never the geocode).
+const osmCte = (map1.match(/\n  osm as \([\s\S]*?\n  osm_kept as/) || [''])[0];
+ok(map1.length > 2000 && osmCte.length > 400
+   && (map1.match(/dc_osm_address_check/g) || []).length === 1 && /left join public\.dc_osm_address_check k on k\.osm_record_id = r\.id/.test(osmCte)
+   && !/dc_osm_derived_point/.test(map1)
+   && /and not \(coalesce\(k\.admitted, false\) and k\.check_outcome = 'SOURCES_DISAGREE'\)\)/.test(osmCte)
+   && /case when k\.admitted and k\.check_outcome = 'CORROBORATED'\s+then array\['CORROBORATED_BY_DERIVED_ADDRESS'\]::text\[\] else '\{\}'::text\[\] end as quality_flags/.test(osmCte)
+   && /r\.project_type, r\.lat, r\.lng,/.test(osmCte) && !/k\.(lat|lng)/.test(map1),
+  'M1: the Map 1 reader reads only dc_osm_address_check, only in the OSM CTE: admitted disagreement withheld, admitted corroboration flagged, the pin always the OSM record\'s own');
 const writes = [D3, A3, B3, MAP, LOAD].some((s) => /(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?national_dc_records\b/i.test(s));
 ok(!writes, 'L2: nothing in the chain writes national_dc_records: an OSM pin is never moved or merged');
 ok(/revoke all on public\.dc_osm_derived_point from anon, authenticated;/.test(D3)
    && /revoke all on public\.dc_osm_address_check from anon, authenticated;/.test(B3)
    && !/grant[^;]*dc_osm_/i.test(D3 + B3),
   'L3: both OSM views are service-role only');
-ok(!/'openstreetmap'/.test(admit) && /'compute_atlas', 'facilities'/.test(admit),
-  'L4: the admission switch does NOT admit OpenStreetMap (control: it names the admitted Atlas extraction)');
+ok(/\('openstreetmap', 'telecom_data_center'\)/.test(admit) && !/'openstreetmap', '(?!telecom_data_center)/.test(admit)
+   && /'compute_atlas', 'facilities'/.test(admit),
+  'L4: the admission switch admits the OSM layer check (C3c), telecom_data_center only (control: it still names Atlas)');
 
 // ── ONE queue, ONE writer ────────────────────────────────────────────────────────────────────
 ok(/from public\.dc_observation_derived_point p/.test(queue) && /from public\.dc_osm_derived_point o\s+where o\.map_eligible/.test(queue)

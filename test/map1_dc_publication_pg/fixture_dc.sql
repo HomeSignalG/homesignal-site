@@ -6,6 +6,7 @@
 -- production's posture: RLS on, nothing granted to anon/authenticated.
 
 drop view  if exists public.dc_current_observation cascade;
+drop table if exists public.dc_osm_address_check cascade;
 drop table if exists public.dc_entity_geography cascade;
 drop table if exists public.dc_entity_observation cascade;
 drop table if exists public.dc_canonical_entity cascade;
@@ -63,6 +64,17 @@ create table public.dc_entity_observation (
 create view public.dc_current_observation as
   select o.* from public.dc_source_observation o;
 
+-- The OSM layer's address check (Step 3B dc_osm_address_check, a view in production): only the
+-- columns the reader reads. A table here so the suite can set each outcome directly; the real view
+-- end to end is exercised by test/dc_osm_layer_pg. Empty = no check yet, which must change nothing.
+create table public.dc_osm_address_check (
+  osm_record_id uuid primary key,
+  check_outcome text not null,
+  admitted      boolean not null,
+  lat           double precision,
+  lng           double precision
+);
+
 alter table public.dc_source             enable row level security;
 alter table public.dc_source_observation enable row level security;
 alter table public.dc_canonical_entity   enable row level security;
@@ -70,4 +82,4 @@ alter table public.dc_entity_geography   enable row level security;
 alter table public.dc_entity_observation enable row level security;
 revoke all on public.dc_source, public.dc_source_observation, public.dc_canonical_entity,
               public.dc_entity_geography, public.dc_entity_observation, public.dc_current_observation,
-              public.national_dc_records from anon, authenticated;
+              public.national_dc_records, public.dc_osm_address_check from anon, authenticated;

@@ -237,12 +237,18 @@ comment on function public.dc_geocode_input(text, text, jsonb) is
 --                            day's production copy (dc-atlas-admission-dryrun.yml, run 36253526398:
 --                            1 facility added, 26 withheld, 0 moved), reviewed by the founder.
 --                            Applied by scripts/dc-atlas-admission-apply.sh.
+--   openstreetmap/telecom_data_center admitted (C3c) -- the SEPARATE OSM layer's address check. It
+--                            reaches no canonical decision (OSM is never a dc_source_observation);
+--                            it lets map1_dc_zip_members withhold an OSM pin its own address
+--                            contradicts and flag one it corroborates. Gated by
+--                            scripts/dc-osm-map1-gate.sh on a replica of production; applied by
+--                            scripts/dc-osm-map1-apply.sh.
 create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
 returns boolean
 language sql
 immutable
 set search_path to 'public', 'pg_temp'
-as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;
+as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;
 
 comment on function public.dc_derived_address_admitted(text, text) is
 'STEP 3D. Deployment gate: whether an extraction''s derivations may reach geography and identity.

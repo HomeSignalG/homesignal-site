@@ -71,6 +71,21 @@ select md5(string_agg(t::text, ',' order by t.source_key collate "C")) fp from p
 create temp table _obs_fp as
 select md5(string_agg(t::text, ',' order by t.home_signal_observation_id)) fp from public.dc_source_observation t;
 
+-- ── PHASE A: the C3a deployment (OSM acquired and judged, NOT admitted) ─────────────
+-- The DDL of record admits openstreetmap since C3c. The switch's answers are captured FIRST (asking
+-- the function later would ask the suite's own copy), then the pre-C3c switch is set explicitly so
+-- the acquisition phase reproduces the deployment before that edit. PHASE D below restores the
+-- DDL of record's switch. W10 checks the captured answers, so this cannot hide a switch regression.
+create temp table _gate_ddl as select public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center') osm,
+                                      public.dc_derived_address_admitted('compute_atlas', 'facilities') atlas,
+                                      public.dc_derived_address_admitted('epoch_ai', 'data_centers') epoch,
+                                      public.dc_derived_address_admitted('openstreetmap', 'other_distribution') osm_other,
+                                      public.dc_derived_address_admitted('some_new_source', 'facilities') other_source;
+create temp table _switch_ddl as select pg_get_functiondef('public.dc_derived_address_admitted(text, text)'::regprocedure) d;
+create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
+returns boolean language sql immutable set search_path to 'public', 'pg_temp'
+as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities')) $$;
+
 -- ── before any derivation ────────────────────────────────────────────────────────────
 create temp table _chk0 as select * from public.dc_osm_address_check;
 
@@ -129,7 +144,26 @@ create temp table _chk1 as select * from public.dc_osm_address_check;
 truncate _dcg_in;
 insert into _dcg_in select j from _dcg_all where grp = 'shared';
 \i :loadsql
+select count(*) >= 0 from public.dc_resolve_canonical(true, false);
+select count(*) >= 0 from public.dc_resolve_geography(true);
 create temp table _chk2 as select * from public.dc_osm_address_check;
+create temp table _s2 as select pg_temp.snap_geo() g, pg_temp.snap_identity() i;
+create temp table _pages2 as select z.zcta5 zip, m.* from geo.zcta_boundary z cross join lateral public.map1_dc_zip_members(z.zcta5) m;
+
+-- ── PHASE D: the DDL of record's switch (C3c: openstreetmap admitted) ────────────────
+select set_config('osm_suite.switch', d, false) from _switch_ddl;
+do $d$ begin execute current_setting('osm_suite.switch'); end $d$;
+select count(*) >= 0 from public.dc_resolve_canonical(true, false);
+select count(*) >= 0 from public.dc_resolve_geography(true);
+create temp table _sd as select pg_temp.snap_geo() g, pg_temp.snap_identity() i;
+create temp table _chkd as select * from public.dc_osm_address_check;
+create temp table _pagesd as select z.zcta5 zip, m.* from geo.zcta_boundary z cross join lateral public.map1_dc_zip_members(z.zcta5) m;
+create or replace function pg_temp.pd(p_name text) returns text language sql as $$
+  select coalesce(string_agg(zip || ':' || quality_flags::text, ',' order by zip), '-')
+    from _pagesd where project_name = p_name and publication_basis = 'legacy_osm_compat' $$;
+create or replace function pg_temp.pa(p_name text) returns text language sql as $$
+  select coalesce(string_agg(zip || ':' || quality_flags::text, ',' order by zip), '-')
+    from _pages2 where project_name = p_name and publication_basis = 'legacy_osm_compat' $$;
 
 create or replace function pg_temp.o(p_name text) returns text language sql as $$
   select c.check_outcome from _chk2 c join public.national_dc_records r on r.id = c.osm_record_id
@@ -229,12 +263,11 @@ select 'W09 [one geocoder, one cache] the address both layers state has ONE deri
        pg_temp.o('Shared OSM');
 
 insert into _r (check_name, pass, detail)
-select 'W10 OSM is NOT admitted: every OSM row reports admitted = false; Atlas and Epoch remain admitted',
-       not public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center')
-   and public.dc_derived_address_admitted('compute_atlas', 'facilities')
-   and public.dc_derived_address_admitted('epoch_ai', 'data_centers')
-   and not exists (select 1 from _chk2 where admitted),
-       null;
+select 'W10 the DDL of record admits OSM (C3c) with Atlas and Epoch and nothing else; Phase A ran with OSM NOT admitted',
+       (select osm and atlas and epoch and not osm_other and not other_source from _gate_ddl)
+   and not exists (select 1 from _chk2 where admitted)
+   and not exists (select 1 from _chkd where not admitted),
+       (select 'ddl osm=' || osm || ' atlas=' || atlas || ' epoch=' || epoch || ' osm_other=' || osm_other || ' other=' || other_source from _gate_ddl);
 
 -- ── separate layer: nothing merges, nothing moves, Map 1 unchanged ───────────────────
 insert into _r (check_name, pass, detail)
@@ -261,11 +294,51 @@ select 'W13 [never moved] every OSM pin and tag is exactly as loaded; publisher 
        null;
 
 insert into _r (check_name, pass, detail)
-select 'W14 the Map 1 reader does not read the OSM check (it is evidence only until an automated-gated change)',
+select 'W14 PHASE A: with OSM not admitted, the check changes nothing on Map 1 (every OSM row present, no flag)',
+       (select count(*) from _pages2 where publication_basis = 'legacy_osm_compat') = 8
+   and not exists (select 1 from _pages2 where publication_basis = 'legacy_osm_compat' and quality_flags <> '{}'),
+       (select count(*)::text || ' OSM rows' from _pages2 where publication_basis = 'legacy_osm_compat');
+
+-- ── PHASE D: the Map 1 change (C3c) ──────────────────────────────────────────────────
+insert into _r (check_name, pass, detail)
+select 'W16 [withheld] the pin its own address contradicts is withheld from Map 1 once OSM is admitted',
+       pg_temp.pa('Far OSM') = '99931:{}' and pg_temp.pd('Far OSM') = '-',
+       pg_temp.pa('Far OSM') || ' -> ' || pg_temp.pd('Far OSM');
+
+insert into _r (check_name, pass, detail)
+select 'W17 [flagged] a corroborated pin carries the canonical flag CORROBORATED_BY_DERIVED_ADDRESS, and only those',
+       pg_temp.pd('Corrob OSM') = '99931:{CORROBORATED_BY_DERIVED_ADDRESS}'
+   and pg_temp.pd('Shared OSM') = '99931:{CORROBORATED_BY_DERIVED_ADDRESS}'
+   and (select count(*) from _pagesd where publication_basis = 'legacy_osm_compat' and quality_flags <> '{}') = 2,
+       concat_ws(' ', pg_temp.pd('Corrob OSM'), pg_temp.pd('Shared OSM'));
+
+insert into _r (check_name, pass, detail)
+select 'W18 [absence is not evidence] no match, no address, not US, no locality, area claim: still published, unflagged',
+       pg_temp.pd('Failed OSM') = '99931:{}' and pg_temp.pd('Blank OSM') = '99931:{}'
+   and pg_temp.pd('Canada OSM') = '99931:{}' and pg_temp.pd('Nolocal OSM') = '99931:{}'
+   and pg_temp.pd('Area OSM') = '99931:{}'
+   and (select count(*) from _pagesd where publication_basis = 'legacy_osm_compat') = 7,
+       (select count(*)::text || ' OSM rows after' from _pagesd where publication_basis = 'legacy_osm_compat');
+
+insert into _r (check_name, pass, detail)
+select 'W19 [never moved, nothing else touched] every surviving row keeps its exact pin; canonical rows, geography and identity are byte-identical',
+       not exists (select 1 from _pagesd a join _pages2 b using (zip, source_key)
+                    where a.lat is distinct from b.lat or a.lng is distinct from b.lng)
+   and not exists (select 1 from _pagesd a where not exists (select 1 from _pages2 b where b.zip = a.zip and b.source_key = a.source_key))
+   and (select md5(coalesce(string_agg(m::text, ',' order by m::text collate "C"), '')) from _pagesd m where publication_basis = 'canonical')
+     = (select md5(coalesce(string_agg(m::text, ',' order by m::text collate "C"), '')) from _pages2 m where publication_basis = 'canonical')
+   and (select count(*) from _pages2 where publication_basis = 'canonical') > 0   -- control
+   and (select g from _s2) = (select g from _sd) and (select i from _s2) = (select i from _sd),
+       (select count(*)::text || ' canonical rows' from _pagesd where publication_basis = 'canonical');
+
+insert into _r (check_name, pass, detail)
+select 'W20 the Map 1 reader reads the OSM check only through dc_osm_address_check (control: still national_dc_records)',
        (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') !~ 'dc_osm_(derived_point|address_check)'
+         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') ~ 'left join public\.dc_osm_address_check k on k\.osm_record_id = r\.id'
    and (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') ~ 'national_dc_records',   -- control
+         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') !~ 'dc_osm_derived_point'
+   and (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = 'map1_dc_zip_members') ~ 'national_dc_records',
        null;
 
 insert into _r (check_name, pass, detail)

@@ -217,7 +217,23 @@ def build_rollback():
     return '\n\n'.join(parts) + '\n'
 
 
+# ⛔ FROZEN 2026-09-26: the C3a apply was APPLIED to production (run 36274352481) from main@e647a09.
+# C3c then moved the admission switch and the Map 1 reader in the DDL of record, so regenerating
+# would rewrite history. --check verifies the FROZEN bytes; the offline proof runs pinned to
+# e647a09 (.github/workflows/dc-osm-layer-apply.yml).
+FROZEN = {OUT: '0501b6ae9d7fa9b856d752815088d58df2c16fbba187d708bf3b0a66853abd35',
+          OUT_ROLLBACK: 'ab80519957309d9a6aff664a1913f1d1709ea51bafaf7bdda067b3d495018d17'}
+
+
 if __name__ == '__main__':
+    if '--check' in sys.argv and '--regenerate-at-applied-commit' not in sys.argv:
+        bad = [o.name for o, want in FROZEN.items()
+               if not o.exists() or hashlib.sha256(o.read_bytes()).hexdigest() != want]
+        print('OSM layer apply + rollback files are the frozen applied artifacts' if not bad
+              else f'NOT the frozen applied artifacts: {bad}')
+        sys.exit(1 if bad else 0)
+    if '--regenerate-at-applied-commit' not in sys.argv:
+        raise SystemExit('REFUSED: the C3a artifacts are frozen (applied to production); they are never regenerated')
     outs = ((OUT, build()), (OUT_ROLLBACK, build_rollback()))
     if '--check' in sys.argv:
         stale = [o.name for o, t in outs if not (o.exists() and o.read_text() == t)]
