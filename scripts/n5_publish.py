@@ -29,7 +29,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from n3_pilot import sql, lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SRID  # noqa: E402
+from n3_pilot import sql, sql_proven, lit, read_shp_polygons, rings_to_multipolygon_wkt, CANON_SRID  # noqa: E402
 from n5_shard import tiger_index, HEAVY_TIMEOUT_SQL  # noqa: E402
 
 BATCH = 20
@@ -64,9 +64,19 @@ def load_boundaries(generation, prefix):
 def publish_prefix(generation, prefix, run_id):
     t0 = time.time()
     canon, loaded = load_boundaries(generation, prefix)
-    out = sql(HEAVY_TIMEOUT_SQL
-              + f"select geo.n5_gen_publish_prefix({lit(generation)}, {lit(prefix)}, {lit(run_id)}, {loaded}) r;",
-              f"publish {prefix}")
+    # A dense prefix can outlast the API gateway's 120 s (measured 2026-09-26: prefix 100 got
+    # HTTP 524 and had committed). The publish row it writes is the proof: it must exist for
+    # THIS run, stamped after the one that existed before this call (if any).
+    before = sql(f"select completed_at from geo.n5_generation_publish where generation_id="
+                 f"{lit(generation)} and z3={lit(prefix)};", f"publish {prefix} before",
+                 read_only=True)
+    prev = before[0]["completed_at"] if before else None
+    verify = (f"select count(*) = 1 ok, max(completed_at) completed_at from geo.n5_generation_publish "
+              f"where generation_id={lit(generation)} and z3={lit(prefix)} and run_id={lit(run_id)}"
+              + (f" and completed_at > {lit(prev)}::timestamptz;" if prev else ";"))
+    out = sql_proven(HEAVY_TIMEOUT_SQL
+                     + f"select geo.n5_gen_publish_prefix({lit(generation)}, {lit(prefix)}, {lit(run_id)}, {loaded}) r;",
+                     f"publish {prefix}", verify, timeout=900, max_wait=900)
     r = out[-1]["r"] if out else None
     print(f"{'published ' + prefix:38} canonical={canon} zcta={loaded} -> {r} "
           f"({time.time() - t0:.1f}s)", flush=True)
