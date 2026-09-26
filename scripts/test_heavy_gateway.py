@@ -16,7 +16,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("SUPABASE_ACCESS_TOKEN", "test")
 
+import n3_pilot as n3  # noqa: E402
 import n5_orchestrate as o  # noqa: E402
+import n5_publish as pub  # noqa: E402
 from n3_pilot import SQLGatewayTimeout  # noqa: E402
 
 FAILS = []
@@ -32,7 +34,7 @@ def harness(lose, still_running_polls, verify_ok):
     calls = {"write": 0, "poll": 0, "verify": 0, "flags": []}
 
     def fake_sql(query, tag="", timeout=900, gateway_unknown=False, read_only=False, **kw):
-        if tag == "heavy poll":
+        if tag == "proven poll":
             assert read_only
             calls["poll"] += 1
             return [{"n": 1 if calls["poll"] <= still_running_polls else 0}]
@@ -42,15 +44,15 @@ def harness(lose, still_running_polls, verify_ok):
             return [{"ok": verify_ok, "state": "X"}]
         calls["write"] += 1
         calls["flags"].append(gateway_unknown)
-        assert "/* n5heavy:" in query and "statement_timeout" in query
+        assert "/* n5proven:" in query and "statement_timeout" in query
         if lose:
             if not gateway_unknown:
                 raise SystemExit("STOP: SQL x failed HTTP 524 on attempt 1")
             raise SQLGatewayTimeout("x: HTTP 524")
         return [{"r": "fine"}]
 
-    o.sql = fake_sql
-    o.HEAVY_POLL_S = 0
+    n3.sql = fake_sql
+    n3.PROVEN_POLL_S = 0
     o.say = lambda *a, **k: None
     return calls
 
@@ -88,6 +90,49 @@ except SystemExit as e:
     check("no verify: lost response stays fatal", "HTTP 524" in str(e))
 check("no verify: gateway_unknown not requested", c["flags"] == [False])
 check("no verify: no poll", c["poll"] == 0)
+
+# 5a. the per-prefix PUBLISH call is proven the same way (dense prefix 100, 2026-09-26)
+def pub_harness(lose, prev, verify_ok):
+    calls = {"write": 0, "verify_sql": None, "flags": []}
+
+    def fake_sql(query, tag="", timeout=900, gateway_unknown=False, read_only=False, **kw):
+        if tag.endswith(" before"):
+            return [{"completed_at": prev}] if prev else []
+        if tag == "proven poll":
+            return [{"n": 0}]
+        if tag.endswith(" verify"):
+            calls["verify_sql"] = query
+            return [{"ok": verify_ok}]
+        calls["write"] += 1
+        calls["flags"].append(gateway_unknown)
+        assert "n5_gen_publish_prefix" in query
+        if lose:
+            raise SQLGatewayTimeout("publish: HTTP 524")
+        return [{"r": {"prefix": "100"}}]
+
+    n3.sql = fake_sql
+    pub.sql = fake_sql
+    pub.load_boundaries = lambda g, p: (10, 10)
+    return calls
+
+
+c = pub_harness(lose=True, prev=None, verify_ok=True)
+pub.publish_prefix("gen-x", "100", "run-1")
+check("publish: lost response + publish row for this run -> continues", c["write"] == 1)
+check("publish: gateway_unknown requested", c["flags"] == [True])
+check("publish: verify is scoped to generation, prefix AND run",
+      all(x in (c["verify_sql"] or "") for x in ("'gen-x'", "'100'", "'run-1'")))
+c = pub_harness(lose=True, prev="2026-09-26 22:00:00+00", verify_ok=True)
+pub.publish_prefix("gen-x", "100", "run-1")
+check("publish: a re-publish must be stamped AFTER the previous row",
+      "completed_at > '2026-09-26 22:00:00+00'" in (c["verify_sql"] or ""))
+c = pub_harness(lose=True, prev=None, verify_ok=False)
+try:
+    pub.publish_prefix("gen-x", "100", "run-1")
+    check("publish: lost response + no publish row stops", False)
+except SystemExit as e:
+    check("publish: lost response + no publish row stops", "post-condition is NOT met" in str(e))
+check("publish: never re-sent", c["write"] == 1)
 
 # 5. every heavy lifecycle caller supplies a post-condition
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
