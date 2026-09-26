@@ -1214,6 +1214,33 @@ the committed file.
   2026-09-26 14:43:54Z, and its source has the approved MAPS wording and the claim's `streams`
   field. So the confirmation email knows about MAPS before anyone can press the button. The
   version it replaced (v2) was also safe: it ignored the `streams` column.
+- ✅ **The button went live on 2026-09-26, measured on the live site.** #1352 merged on the
+  founder's "go merge" (`a584ce3`), and `pages` run `36252240912` deployed it at 15:33:53Z.
+  The session sandbox cannot reach homesignal.net (the proxy refuses it, and so does
+  WebFetch), so the live files were fetched through `pg_net` (requests 22617 and 22618, both
+  HTTP 200): `homesignalmap.html` 327,194 bytes, md5 `45c569816f16d9363140a95ec0d1e4bf`, and
+  `shell.js?v=d5a2b311` 124,136 bytes, md5 `29616dfc2269c4b1506f65e99af9014c`. Both are
+  byte-identical to `a584ce3`.
+  - ⚠️ **A live verifier started by the same push can pass against the OLD deploy.**
+    `verify-property-page`, `verify-alerts-page`, `verify-representative-zips` and
+    `verify-communities` read https://homesignal.net and start on the same push as `pages`.
+    On `a584ce3` the first two finished at 15:32:36 and 15:32:50, more than a minute before
+    the deploy landed, and the third ran across it. So those three greens said nothing about
+    the new code. **Compare a live verifier's finish time with the deploy time before
+    counting it.** `verify-map1-card-grain` is not affected: on a push it serves the
+    checked-out tree over localhost.
+  - `verify-communities` also started first, but its walk ran from 15:32:14 to 16:01:11, so
+    only the first 1m39s of 29 minutes came before the deploy. It passed: **12,722**
+    materialized pages checked on https://homesignal.net, **0** failed, **0** cross-state
+    ZIP violations (run `36252240925`).
+  - After the deploy, the three were dispatched again from `main`, with
+    `verify-map1-card-grain` also pointed at the live site (`site_base`):
+    `verify-property-page` run `36252815834` ✅, `verify-alerts-page` run `36252814629` ✅,
+    `verify-representative-zips` run `36252813295` ✅, `verify-map1-card-grain` run
+    `36252817410` ✅. The card-grain run's one LATENT line (TxDOT rows repeated past the
+    12-row cap) is identical in the 2026-09-25 run, before #1352.
+  - Not fixed here: making these verifiers wait for the deploy (for example, triggering them
+    when `pages` completes) changes four workflows and belongs in its own PR.
 
 - 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
   other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
