@@ -2547,6 +2547,16 @@ decision logic of its own:**
   `build_apply.py`): `--check` verifies the applied sha256, and their offline proofs run pinned to the
   commit they were applied from (c198216, e647a09). Both of their rollbacks now fail closed against
   production, because their drift guards see the C3c switch. That is intended: roll back C3c first.
+- 🔑 **THE FIRST READER WAS 50× SLOWER ON A JIT-ENABLED SERVER — caught by CI timing out, not by a
+  check.** The OSM check view's plpgsql functions carry Postgres's default 1,000-row estimate, which
+  pushed the reader's estimated cost to ~43 M, past `jit_above_cost`. Each ZIP read then spent ~2 s
+  compiling. The Epoch suite went 9.4 s → **485.7 s**, and CI cancelled `membership` and
+  `atlas-validation` at their 15-minute budgets. Production was unaffected because it runs `jit=off`
+  in its configuration file, which is exactly why nothing would have shown it before merge. Fixed in
+  the reader itself: `set jit to 'off'` on the function, plus a per-pin `left join lateral` lookup.
+  After the fix: 12 ZIPs in 38 ms (pre-C3c reader 33 ms), Epoch suite 9.2 s. Structure pin M1 now
+  requires both. **When a reader joins a view built on plpgsql SRFs, check the estimated cost, not
+  only the result.**
 - ⚠️ **Test-harness hazard found and fixed:** the Map 1 publication fixture stands in a TABLE for
   `dc_osm_address_check`. The CI `membership` job runs the suites in one database, so the next suite's
   `create view` failed with "is not a view". `test/map1_dc_publication_pg/run.sh` now drops the
