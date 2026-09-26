@@ -62,7 +62,10 @@ jobs:
     runs-on: ubuntu-latest
     # Bounded so a wedged shard cannot hold the lane. The lease in n5_claim_shard is what
     # releases the shard afterwards; this only bounds the runner.
-    timeout-minutes: 55
+    # MAX_SECONDS (3000 s) stops new work from STARTING; a publish that starts just before it
+    # may run up to its own budget (scripts/n5_publish.py, 5400 s). 150 min covers both, so the
+    # runner is still waiting when that prefix commits. Pinned by scripts/test_heavy_gateway.py.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
