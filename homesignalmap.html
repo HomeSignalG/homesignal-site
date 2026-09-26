@@ -607,6 +607,8 @@
   .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
   .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
 
+/* Map 1 -> Development list back link: ZIP pages only. */
+.devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
@@ -623,6 +625,7 @@
 <template id="hs-content">
   <div class="wrap">
     <div class="head">
+      <a class="backbtn devlist-back" href="development.html" data-znav="development.html" style="text-decoration:none">← Back to development list</a>
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
       <h1>Development around your home</h1>
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
