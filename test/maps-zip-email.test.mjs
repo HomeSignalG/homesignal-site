@@ -9,6 +9,7 @@
 //   §4 the sign-in resume can never fire on a later, unrelated sign-in;
 //   §5 Map 1: the founder's label word for word, ZIP mode only, inside the hero the
 //      Place-page embed hides, and the consent line rendered from the recorded string;
+//   §5b the founder-approved wording (2026-09-26), each string pinned verbatim;
 //   §6 the SQL of record (a12), read as EXECUTABLE statements, never as prose.
 // Run: node test/maps-zip-email.test.mjs
 import { createRequire } from 'node:module';
@@ -153,6 +154,20 @@ ok(/HS\.mapsZipEmailSignup\(z, function\(err\)/.test(paint) && /HS\.mapsZipEmail
   '§5 the page only paints: sign-up and state come from shell.js');
 ok(/err && err\.friendly\) \? err\.message : "Couldn't sign you up/.test(paint),
   '§5 a raw database error is never shown to a resident verbatim');
+
+// ---------------------------------------------------------------- §5b approved wording
+// The founder APPROVED this wording on 2026-09-26, so it is locked (CLAUDE.md Rule #0).
+// Each string is pinned WHOLE: a fragment match would let the rest of it change.
+const APPROVED_CONSENT =
+  "We'll email you when HomeSignal posts about what's changing in this ZIP code. No spam · Unsubscribe anytime.";
+ok(shell.includes(`const MAPS_CONSENT_COPY =\n    "${APPROVED_CONSENT}";`),
+  '§5b the consent line is the approved sentence, verbatim (shell.js MAPS_CONSENT_COPY)');
+ok(page.includes(`btn.textContent = on ? "✓ You're signed up" : ZIP_EMAIL_LABEL;`),
+  "§5b once signed up, the button reads the approved \"✓ You're signed up\"");
+ok(paint.includes('"Couldn\'t sign you up — please try again."'),
+  '§5b the approved sign-up error, verbatim');
+ok(shell.includes("friendlyError('Please refresh the page and try again.')"),
+  '§5b the approved stale-page error, verbatim');
 
 // ---------------------------------------------------------------- §6 the SQL of record
 const sqlCode = (s) => (s || '').replace(/--[^\n]*/g, '');

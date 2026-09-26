@@ -1235,6 +1235,12 @@ the committed file.
   homesignal-ingest's `check-maps-email-pg.yml` clones this PUBLIC repo and runs both halves
   with `REQUIRE_DELIVERY=1`. ⚠️ The reverse is impossible — homesignal-ingest is private, and
   the first version of this job tried to check it out and failed with "Not Found".
+- ⚖️ **THE WORDING IS FOUNDER-APPROVED (2026-09-26) AND LOCKED (Rule #0):** the button
+  ("What is changing in my zip code?"), the consent line, "✓ You're signed up", and both error
+  messages. Each is pinned WHOLE in `test/maps-zip-email.test.mjs` §5b (the button in §5); a
+  fragment match would let the rest of a sentence change and still pass. Each pin was broken
+  on purpose (5 mutations) and each failure exited 1. The email side's approved wording is
+  pinned the same way in homesignal-ingest.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
