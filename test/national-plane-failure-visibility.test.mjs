@@ -44,12 +44,17 @@ function makeSb(result) {
 }
 async function loadData(sbClient) {
   delete require.cache[require.resolve('../lib/data.js')];
+  // The lifecycle vocabulary is loaded too, as every page that reaches HS.map1DcSite loads it
+  // (homesignalmap.html). Without it the mapping fails closed to `unknown` on every row, so a
+  // lifecycle regression would be invisible here.
+  delete require.cache[require.resolve('../lib/project-type.js')];
   global.window = {
     HS_CONFIG: { DATA_SOURCE: 'supabase', DEFAULT_ZIP: '20147' },
     HS: { state: { session: null, zip: '20147' } },
     supabase: { createClient: () => sbClient },
   };
   require('../lib/data.js');
+  require('../lib/project-type.js');
   return global.window.HS;
 }
 const HS = await loadData(makeSb({ data: [], error: null }));
@@ -206,7 +211,19 @@ console.log('\n9. lib/data.js carries the same distinction on its own contract')
   const propRes = await (await loadData(makeSb({ data: [prop], error: null })))
     .data.nationalDataCenters('20147', { lat: 39.0, lng: -77.4 });
   ok(propRes.length === 1 && propRes[0].status === 'Proposed',
-    '9g the pin status is the server map_status — a proposed project is never drawn as Approved');
+    '9g the mapped status is the server map_status — a proposed row is not relabelled Approved (drawing is 9h + the browser suite)');
+  // 9h — the fields Map 1 classifies from (trackerSiteItem): lifecycle in bucket/type, Type in
+  // use_type, name in label. Until 2026-09-27 none were set, and every pin drew as Other project /
+  // Lifecycle unknown while 9g passed.
+  const mapped = HS.map1DcSite(prop);
+  ok(mapped.bucket === 'proposed' && mapped.type === 'proposed' && mapped.use_type === 'datacenter'
+     && mapped.label === 'NTT Ashburn VA9 Data Center',
+    '9h the Map 1 site carries the lifecycle (bucket, type), the Type (use_type) and the name (label)');
+  // 9i — nationalDataCenters returns the app_projects shape the card templates read: `type` is the
+  // category again, so its factual summary is unchanged ("datacenter · proposed — NTT").
+  ok(propRes.length === 1 && propRes[0].type === 'datacenter' && propRes[0].bucket === 'proposed'
+     && propRes[0].sowhat === 'datacenter · proposed — NTT',
+    '9i nationalDataCenters keeps the app_projects shape: type is the category, the summary unchanged', propRes[0] && propRes[0].sowhat);
 }
 
 console.log('\n10. The raw table stays blocked and the approved RPC stays the only door');

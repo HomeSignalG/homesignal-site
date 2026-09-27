@@ -2680,7 +2680,8 @@ the healed v1 state and not the identity-pending outage. Both sides were read th
 **Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
 `public.map1_dc_zip_members(p_zip)`** (DDL of record `docs/map1-dc-publication.sql`, called
 through `HS.MAP1_DC_RPC` by `homesignalmap.html` and `lib/data.js`). The page never asks which
-source a record came from, never unions sources, and never maps a lifecycle word itself.
+source a record came from and never unions sources. It turns the server's `map_status` into a
+lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `HS.map1DcSite`).
 
 - **Canonical rows**: `CONFIRMED_DC` canonical entities (Step 3A) with `RESOLVED` `POINT`
   geography (Step 3B), a lifecycle inside the ONE map (`operational`→Operating,
@@ -2707,6 +2708,37 @@ source a record came from, never unions sources, and never maps a lifecycle word
   Atlas-only, cancelled, status collapse, superseded) in `zip-membership-suite.yml`, and
   `test/map1-dc-publication.test.mjs` (no second reader, no `atlas_for_zip`/`epoch_for_zip`,
   no private table named by resident code, no place/project special case).
+- 🛑 **UNTIL 2026-09-27 THE PAGE DREW EVERY ONE OF THESE ROWS AS "Other project · lifecycle
+  unknown", WITH NO NAME.** The server was right; the page mapping was not. `HS.map1DcSite`
+  (`lib/data.js`) put the Type in `type`, the lifecycle in `status` and the name in `name`, but
+  Map 1 classifies every site through `HS.resolveTrackerMarker` → `trackerSiteItem`, which reads
+  the Type from `use_type`, the name from `label`, and the lifecycle from `bucket` (then `type`,
+  as a lifecycle word) — the shape `zipAuthSiteFromMarker` and `n5-radius.js` already build.
+  Measured on production 2026-09-27 over all 12,722 registry ZIPs: **1,816 of 1,816 rows on 757
+  ZIP pages** (control: 0 non-member, 0 truncated; map_status Operating 1,481 · Approved 183 ·
+  Proposed 152; `project_type` = `datacenter` on all). The Data center chip hid none of them and
+  the Other project chip hid all of them.
+  - **Fixed as a mapping only:** `use_type` = `project_type`, `label` = `project_name`,
+    `bucket` = `type` = `HS.canonicalLifecycle(map_status)`. No SQL, identity, dedupe, geography
+    or OSM change; `name` and `status` are kept. After, computed by running the shipped code over
+    those production rows: 1,816 of 1,816 Data center in their own lifecycle, 0 Other project,
+    0 Lifecycle unknown. Live on the 28-row sample, the probe below read 28 of 28.
+  - 🔑 **WHY NO TEST SAW IT: the one positive control (`facility-lifecycle-unknown` 8q) called
+    `HS.resolveMarker(site)` directly**, which does read `type` and `status`. The page never
+    takes that path. Test the path the page takes; `test/map1-dc-site-shape.test.mjs` (28 real
+    rows, fingerprinted against production) and `test/map1-dc-type-lifecycle.browser.test.mjs`
+    now do, and both fail on the old mapping.
+  - `scripts/probe-map1-dc-type-lifecycle.mjs` (`verify-map1-dc-type-lifecycle.yml`) checks the
+    real page against the live RPC for the deterministic sample (01040, 01852, 07033, 20187,
+    23150); dispatch it with `site_base=https://homesignal.net` to check what is live.
+    ⚠️ **It goes red between a Compute Atlas acquisition and the next identity (:25) and geography
+    (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
+    2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
+    returned 0 rows. That is production, not the page. Re-run it after the next :35.
+  - `docs/map1-dc-publication.sql`'s header said *"every data-centre pin reaches that stage
+    today; the page reads no lifecycle from this column"*. True when written, false now; the
+    comment is annotated. The edit is inert: every builder that reads the file still passes
+    `--check` (positive control: `build_map1.py --check` fails when the function body changes).
 
 ---
 
