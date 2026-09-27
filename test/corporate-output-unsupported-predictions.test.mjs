@@ -68,12 +68,14 @@ ok(!/sowhat/.test(addrReport) && !/Effect at this address/.test(addrReport),
 ok(!/impact_score/.test(addrReport),
   '4c get-address-report has no impact_score field');
 
-const missingTemplate = [
-  'future-surroundings-report.html',
-  'corporate-report.html',
-  'lib/corporate-report.js'
-].every((f) => !existsSync(join(root, f)));
-ok(missingTemplate, '5 no corporate report template file exists yet');
+const fsr = existsSync(join(root, 'future-surroundings-report.html'))
+  ? read('future-surroundings-report.html')
+  : '';
+ok(!!fsr, '5a NYC V1 report page exists');
+ok(!/value_outlook|insurance_outlook|Effect at this address|Quality of Life Impact Score|projectImpact/.test(fsr),
+  '5b NYC V1 report page has no Step 3 EXCLUDE families');
+ok(!existsSync(join(root, 'corporate-report.html')),
+  '5c no generic corporate-report.html bypass');
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

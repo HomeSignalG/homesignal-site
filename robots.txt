@@ -19,6 +19,7 @@ Disallow: /alerts.html
 Disallow: /properties.html
 Disallow: /property.html
 Disallow: /reports.html
+Disallow: /future-surroundings-report.html
 Disallow: /maps.html
 Disallow: /development.html
 Disallow: /my-alerts.html

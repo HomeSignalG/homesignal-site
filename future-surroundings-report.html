@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>HomeSignal — Future Surroundings Report</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://data.cityofnewyork.us; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=20814d85">
+<style>
+  .fsr { max-width: 820px; margin: 0 auto; padding: 28px 18px 64px; }
+  .fsr h1 { font-size: 28px; margin: 0 0 8px; }
+  .fsr .sub { color: var(--ink-2); margin: 0 0 22px; }
+  .fsr form { display: grid; gap: 10px; grid-template-columns: 1fr 140px 120px auto; align-items: end; margin-bottom: 22px; }
+  .fsr label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .fsr input, .fsr select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .fsr .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 22px; }
+  .fsr table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .fsr th, .fsr td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .fsr .miss, .fsr .note, .fsr .attr, .fsr .excl { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .fsr .id { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .fsr .workspace { margin-top: 28px; }
+  .fsr .workspace a { display: block; margin: 4px 0; }
+  @media (max-width: 720px) {
+    .fsr form { grid-template-columns: 1fr; }
+  }
+  @media print {
+    .fsr form, .fsr .actions, .fsr .workspace { display: none !important; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="fsr">
+  <div class="eyebrow">FUTURE SURROUNDINGS REPORT · NYC V1</div>
+  <h1>What is on the record around this property</h1>
+  <p class="sub">New York City AddressPoint plus Department of Buildings ledgers. No scores, outlooks, or predicted effects.</p>
+
+  <form id="fsrForm">
+    <div>
+      <label for="fsrAddress">Address</label>
+      <input id="fsrAddress" name="address" required autocomplete="street-address" placeholder="1 Centre Street">
+    </div>
+    <div>
+      <label for="fsrZip">ZIP</label>
+      <input id="fsrZip" name="zip" inputmode="numeric" pattern="[0-9]{5}" placeholder="10007">
+    </div>
+    <div>
+      <label for="fsrRadius">Radius</label>
+      <select id="fsrRadius" name="radius_mi">
+        <option value="0.25">0.25 mi</option>
+        <option value="0.5" selected>0.5 mi</option>
+        <option value="1">1 mi</option>
+      </select>
+    </div>
+    <button type="submit" class="btn primary" id="fsrGo">Build report</button>
+  </form>
+
+  <div id="fsrStatus" class="note" hidden></div>
+  <div id="fsrOut" hidden></div>
+
+  <div class="workspace">
+    <h2>Recent reports</h2>
+    <p class="sub">This browser only. A share link rebuilds the report from the same buyer inputs.</p>
+    <div id="fsrRecent"></div>
+  </div>
+</div>
+
+<script src="lib/nyc-v1-report.js"></script>
+<script src="lib/nyc-v1-soda.js"></script>
+<script>
+(function () {
+  var form = document.getElementById('fsrForm');
+  var status = document.getElementById('fsrStatus');
+  var out = document.getElementById('fsrOut');
+  var recent = document.getElementById('fsrRecent');
+  var KEY = 'hs_nyc_v1_reports';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function setStatus(msg, show) {
+    status.hidden = !show;
+    status.textContent = msg || '';
+  }
+
+  function remember(report) {
+    var list = [];
+    try { list = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (_e) { list = []; }
+    list = list.filter(function (x) { return x.report_id !== report.report_id; });
+    list.unshift({
+      report_id: report.report_id,
+      address: report.buyer.address,
+      zip: report.buyer.zip,
+      radius_mi: report.radius_mi,
+      generated_at: report.generated_at
+    });
+    sessionStorage.setItem(KEY, JSON.stringify(list.slice(0, 20)));
+    paintRecent();
+  }
+
+  function paintRecent() {
+    var list = [];
+    try { list = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (_e) { list = []; }
+    if (!list.length) {
+      recent.textContent = 'None in this session.';
+      return;
+    }
+    recent.innerHTML = list.map(function (x) {
+      var href = 'future-surroundings-report.html?' + new URLSearchParams({
+        address: x.address, zip: x.zip || '', radius_mi: String(x.radius_mi || 0.5)
+      }).toString();
+      return '<a href="' + esc(href) + '">' + esc(x.address) + (x.zip ? ' ' + esc(x.zip) : '') + ' · ' + esc((x.report_id || '').slice(0, 12)) + '</a>';
+    }).join('');
+  }
+
+  function shareUrl(report) {
+    return location.origin + location.pathname + '?' + new URLSearchParams({
+      address: report.buyer.address,
+      zip: report.buyer.zip || '',
+      radius_mi: String(report.radius_mi)
+    }).toString();
+  }
+
+  function render(report) {
+    var html = '';
+    html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
+    html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
+
+    if (report.status === 'address_miss' || !report.property) {
+      html += '<div class="miss"><b>No AddressPoint match.</b> This report does not guess a rooftop and does not call the Census geocoder, OpenAddresses, or Geoclient.</div>';
+    } else if (report.status === 'address_ambiguous') {
+      html += '<div class="miss"><b>More than one AddressPoint matched.</b> Add a ZIP or borough. The report does not pick a building.</div>';
+    } else {
+      var p = report.property;
+      html += '<div class="note"><b>On the record:</b> ' + esc(p.house_number + ' ' + p.full_street_name) +
+        ', ZIP ' + esc(p.zipcode) + '. AddressPoint ' + esc(p.addresspointid) +
+        '. Pin ' + esc(p.lat) + ', ' + esc(p.lng) + '. Radius ' + esc(report.radius_mi) + ' mi.</div>';
+
+      if (!report.nearby.length) {
+        html += '<p>No allowlisted Department of Buildings rows with publisher coordinates in that radius in the last 365 days.</p>';
+      } else {
+        html += '<h2>Department of Buildings records near this property</h2>';
+        html += '<table><thead><tr><th>Distance</th><th>On the record</th><th>Status</th><th>Issued</th><th>Source</th></tr></thead><tbody>';
+        report.nearby.forEach(function (row) {
+          html += '<tr><td>' + esc(row.distance_mi) + ' mi (' + esc(row.east_mi) + ' E, ' + esc(row.north_mi) + ' N)</td>' +
+            '<td>' + esc(row.type) + ' · ' + esc(row.address) + (row.zip ? ' ' + esc(row.zip) : '') +
+            '<br><a href="' + esc(row.record_url) + '">' + esc(row.case_number || row.dataset_id) + '</a></td>' +
+            '<td>' + esc(row.status) + '</td><td>' + esc(row.issued) + '</td>' +
+            '<td>' + esc(row.source) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+    }
+
+    html += '<div class="note">' + esc(report.investigate) + '</div>';
+    html += '<div class="attr"><b>Attribution</b><ul>';
+    report.attribution.forEach(function (a) {
+      html += '<li>' + esc(a.source) + ' — ' + esc(a.name) + ' (' + esc(a.dataset) + '). ' +
+        esc(a.version) + '. Modifications: ' + esc(a.modifications) + '</li>';
+    });
+    html += '</ul></div>';
+    html += '<div class="excl"><b>This report excludes</b><ul>';
+    report.exclusions.forEach(function (x) { html += '<li>' + esc(x) + '</li>'; });
+    html += '</ul></div>';
+
+    html += '<div class="actions">' +
+      '<button type="button" class="btn" id="fsrPrint">Print / PDF</button>' +
+      '<button type="button" class="btn" id="fsrShare">Copy share link</button>' +
+      '<button type="button" class="btn" id="fsrJson">Download JSON</button>' +
+      '</div>';
+
+    out.hidden = false;
+    out.innerHTML = html;
+    document.getElementById('fsrPrint').onclick = function () { window.print(); };
+    document.getElementById('fsrShare').onclick = function () {
+      navigator.clipboard.writeText(shareUrl(report));
+    };
+    document.getElementById('fsrJson').onclick = function () {
+      var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'future-surroundings-' + report.report_id.slice(0, 12) + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    remember(report);
+  }
+
+  function run(address, zip, radius) {
+    setStatus('Retrieving AddressPoint and Department of Buildings rows from NYC Open Data…', true);
+    out.hidden = true;
+    return window.HSNycV1Soda.loadReport(address, zip, radius).then(function (report) {
+      setStatus('', false);
+      render(report);
+      return report;
+    }).catch(function (err) {
+      setStatus('Could not retrieve the allowlisted NYC Open Data views. ' + (err && err.message ? err.message : ''), true);
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var address = document.getElementById('fsrAddress').value;
+    var zip = document.getElementById('fsrZip').value;
+    var radius = Number(document.getElementById('fsrRadius').value);
+    var u = new URL(location.href);
+    u.searchParams.set('address', address);
+    if (zip) u.searchParams.set('zip', zip); else u.searchParams.delete('zip');
+    u.searchParams.set('radius_mi', String(radius));
+    history.replaceState({}, '', u);
+    run(address, zip, radius);
+  });
+
+  paintRecent();
+  var q = new URLSearchParams(location.search);
+  if (q.get('address')) {
+    document.getElementById('fsrAddress').value = q.get('address');
+    document.getElementById('fsrZip').value = q.get('zip') || '';
+    if (q.get('radius_mi')) document.getElementById('fsrRadius').value = q.get('radius_mi');
+    run(q.get('address'), q.get('zip') || '', Number(q.get('radius_mi') || 0.5));
+  }
+})();
+</script>
+</body>
+</html>

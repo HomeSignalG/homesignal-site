@@ -65,6 +65,7 @@ ROOT_FILES = (
     'properties.html',
     'property.html',
     'reports.html',
+    'future-surroundings-report.html',
     'share-text.html',
     'terms.html',
     'today.html',
