@@ -97,7 +97,7 @@ ROOT_FILES = (
 #: `.md`, `.py` or build-only `.mjs` dropped inside a shipped tree still does not ship.
 #: (`lib/generated/` holds two runtime JSONs the browser fetches alongside three
 #: build-tooling artifacts — transitions.mjs, versions.mjs and transitions.sql — which
-#: only `scripts/gov-feeds/**` imports from the checkout, never over HTTP.)
+#: are never served over HTTP; their generator now lives in homesignal-ingest.)
 TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
