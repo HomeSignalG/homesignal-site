@@ -2109,6 +2109,34 @@ fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
 `app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
 still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
 
+- ✅ **SUPERSEDED 2026-09-27 — THE GENERATION PATH RAN END TO END AND MAP 1 NOW SERVES
+  `n5-national-2026-09-25` (ACTIVE since 15:00:49Z; `legacy-phase1-2026-09-01` is SUPERSEDED and
+  recorded as its predecessor, so `rollback` restores it exactly).** The heading and the ⛔ bullet
+  below are the dated receipt of 2026-09-25; read this first.
+  - **Serving == candidate, fingerprinted:** membership **905,390** rows, order-independent fp
+    `1945248397386972` (was 901,465 / `1936506161376757` — re-measured equal to the pre-activation
+    baseline immediately before the switch) · markers **1,012,663** (was 1,004,080) · status
+    **12,722** (was 12,719) · **874,158** projects. Sample ZIPs through `app_zip_projects_markers`:
+    97503 1,852 markers · 97502 1,528 · 40207 837, all `boundary_complete`.
+  - **Newly visible (`geo.n5_generation_entries`): 68,575 (ZIP, project) pairs · 66,491 projects ·
+    2,618 ZIPs.**
+  - ⚠️ **AND 64,130 PROJECTS LEFT MAP 1 — measured, not inferred from the +3,925 net.** Split,
+    summing exactly: **57,307** no longer exist in `public.app_projects` at all (their sources
+    pruned them; the legacy build had kept serving records the canonical table had dropped) ·
+    **6,691** still exist but were **re-created after the cutoff** (`created_at` 2026-09-26 00:16Z →
+    09-27 08:15Z against cutoff 2026-09-25 22:01Z — Miami, Tempe and others re-ingest by
+    delete-and-insert), so the frozen snapshot does not contain them; **the next generation
+    recovers them** · **131** `POINT_REJECTED` · **1** `NO_INTERSECTION_WITH_GENERATION_ZCTAS`.
+    57,307 + 6,691 + 131 + 1 = 64,130.
+  - **READY first refused on INV-1 (17 of 1,031,884 keys, reported as 18 over chunks), and INV-1
+    was right.** Both causes were in `geo.n5_gen_record_unresolved` and fixed at the cause by
+    #1392 / Part F (md5 `26db5d6c…` → `7264883d…`): the catalogue join used the raw registry_id
+    while the shard files a registry-less key under `'(null)'` (5 `tdlr_tabs` keys →
+    `REGISTRY_NOAUTH`), and a publisher that timed out in its shard had no class (10 kytc + 2
+    wisdot keys → `RECOVERY_PUBLISHER_UNREACHABLE`, read from that shard's persisted report). No
+    catch-all was added. Unresolved total **54,725**.
+  - Receipt: `docs/maps-coverage/N5-GENERATION-RUNNABILITY-AUDIT-2026-09-25.md` §"Outcome".
+
 - ⛔ **THE GENERATION PATH (`open` → `work` → publish → `ready` → `activate`) HAS NEVER RUN END TO
   END AGAINST PRODUCTION, AND IT CANNOT YET.** The first real `open` (run `36172375498`) was
   refused, wrote nothing, and a read-only audit of the whole path against the LIVE catalog then
