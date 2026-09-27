@@ -324,8 +324,12 @@ immutable
 set search_path to 'public', 'pg_temp'
 as $fn$
 declare
-    q_no text := substring(coalesce(p_query, '') from '^(\d+)');
-    m_no text := substring(coalesce(p_matched, '') from '^(\d+)');
+    -- a house number is digits (one optional letter) and then a space: '31st Avenue' carries none
+    q_no text := substring(coalesce(p_query, '') from '^(\d+)[A-Za-z]?\s');
+    m_no text := substring(coalesce(p_matched, '') from '^(\d+)[A-Za-z]?\s');
+    -- the street's leading direction, as its first letter (North/N -> N): 300 S Fish Lake Rd is not 300 N
+    q_dir text := upper(left(substring(coalesce(p_query, '') from '(?i)^\d+[A-Za-z]?\s+(north|south|east|west|n|s|e|w)\M'), 1));
+    m_dir text := upper(left(substring(coalesce(p_matched, '') from '(?i)^\d+[A-Za-z]?\s+(north|south|east|west|n|s|e|w)\M'), 1));
     q_st text := substring(coalesce(p_query, '') from ',\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*(?:,|$)');
     m_st text := substring(coalesce(p_matched, '') from ',\s*([A-Z]{2}),\s*\d{5}\s*$');
 begin
@@ -345,6 +349,9 @@ begin
     elsif q_no is null or m_no is null or q_no <> m_no then
         return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
             'matched house number ' || coalesce(m_no, 'none') || ' is not the queried ' || coalesce(q_no, 'none');
+    elsif q_dir is not null and m_dir is not null and q_dir <> m_dir then
+        return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
+            'matched street direction ' || m_dir || ' is not the queried ' || q_dir;
     elsif q_st is not null and m_st is not null and q_st <> m_st then
         return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
             'matched state ' || m_st || ' is not the queried ' || q_st;
@@ -357,7 +364,8 @@ $fn$;
 
 comment on function public.dc_derived_point_verdict(text, integer, text, text, double precision, double precision) is
 'STEP 3D. Output-quality rule for a derived point. Area centroids, failures, unknown types,
-ambiguous or divergent matches never become a site. ACCEPTED carries the calibrated 2,000 m
+ambiguous or divergent matches (house number, street direction, state) never become a site.
+ACCEPTED carries the calibrated 2,000 m
 positional uncertainty that Map 1 membership must respect.';
 
 -- ── CURRENT OBSERVATION -> DERIVED POINT ─────────────────────────────────────────────────
