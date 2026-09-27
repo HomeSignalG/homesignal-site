@@ -3244,6 +3244,27 @@ supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the R
 - Pinned by `test/dev-refresh-collect-once-per-response.test.mjs`. Its §1 proves that the new body,
   minus the named additions, **equals** the superseded body.
 
+### ✅ THE EPA WRITE-GUARD JUDGES FRESHNESS BY THE FACILITY CLOCK (2026-09-27) — PARKED
+SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from the once-per-response
+body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**
+Do not re-apply `docs/dev-refresh-collect-once-per-response.sql` after this file: that body still
+passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would restore the defect.
+- 🔑 **THE 7-DAY FRESHNESS LIMB WAS READING THE WRONG CLOCK.** Development refreshes on a ~53 h
+  sweep, so `d.refreshed_at` stayed inside 7 days forever and a genuine EPA zero could never
+  replace a cached nonzero count. Measured 2026-09-27 (read-only): healthy EPA + zero + cached 12
+  + core 1 h → refused; 6.9 d → refused; 7.1 d → accepted. `facilities_refreshed_at` was never an
+  input. Live: **1,004** ZIPs had a fresh core, a facility layer older than 7 days and a nonzero
+  count; **418** were older than 30 days.
+- **The refusal predicate is unchanged** — only the clock that "fresh" consults moves. CORE GUARD 2
+  still reads `d.refreshed_at`. An EPA failure still cannot block a core write.
+- 🆕 **`development_reports.epa_last_outcome`** stores the per-ZIP `epa` object (`ok`, `radius_used`,
+  `raw_rows`, `pre_cap`, `kept`, `reason`, `attempts`) plus `collected_at` / `response_id` /
+  `write_refused` on every evaluated response — accepted in step (d), withheld/core-refused in
+  step (e). `net._http_response` is temporary (1,590 rows at 00:36Z, **0** at 00:37Z). Without this
+  column, source-zero / partial-scope / product-filtered / cap-hit are not instrumented.
+- The engine now emits `pre_cap` (product-filtered count before `MAX_FACILITIES=40`) so a ZIP at
+  exactly 40 can be told apart from a cap-hit after the next deploy.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`

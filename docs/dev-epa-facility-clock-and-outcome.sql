@@ -1,100 +1,106 @@
 -- ============================================================================
--- dev_refresh_collect() EVALUATES EACH HTTP RESPONSE ONCE (2026-09-24)
+-- FACILITY CLOCK + DURABLE PER-ZIP EPA OUTCOME (2026-09-27)
 --
--- ⚠️ SUPERSEDED IN PART (2026-09-27). This body still passes the CORE clock
---    (`d.refreshed_at`) to `dev_epa_write_refused`. SQL of record for the
---    facility-clock correction and durable per-ZIP EPA outcome is
---    docs/dev-epa-facility-clock-and-outcome.sql. Do not apply THIS file after
---    that one: it would restore the stale-facility clearing defect. This file
---    remains the once-per-response pin and the rollback path for that change.
---
--- SQL OF RECORD (2026-09-24..2026-09-27) for public.dev_refresh_collect(),
--- superseding the body parked in
--- docs/epa-decouple-phase1b-split-write.sql. That parked body was verified equal to
--- live before this change (comments stripped, whitespace collapsed, lower-cased:
--- normalized md5 0df2014d815e35cf881d75650916a1c1 on BOTH sides; pre-apply
--- pg_get_functiondef md5 6fe77ceeb720f3a99a3866734feafc73, 10,697 chars). The body
--- below was produced by SPLICING that parked body with asserted occurrence counts,
--- never by retyping it. Every guard, diagnostic and write expression is unchanged.
+-- SQL OF RECORD for public.dev_epa_write_refused() and public.dev_refresh_collect(),
+-- superseding the collector body parked in docs/dev-refresh-collect-once-per-response.sql
+-- (that file remains the rollback path AND the once-per-response pin). The collector
+-- body below was produced by SPLICING that parked body with asserted occurrence counts,
+-- never by retyping it. Every diagnostic, core guard, and write expression is unchanged
+-- except the two named additions:
+--   (1) the 4th argument of every dev_epa_write_refused() call is now
+--       d.facilities_refreshed_at (the REGULATORY clock), not d.refreshed_at (CORE);
+--   (2) development_reports.epa_last_outcome is written on every evaluated response
+--       (accepted in step (d), withheld/core-refused in step (e)).
 --
 -- WHAT WAS WRONG
 -- ----------------------------------------------------------------------------
--- All four steps re-derived their input from a ROLLING WINDOW of net._http_response:
---     status 200, created in the last 20 minutes, ZIP mode, JSON, newest per ZIP.
--- Nothing recorded that a response had already been evaluated. Job 14 runs
--- dev_refresh_tick(8, 20) every 2 minutes, so each response stayed eligible for
--- ~10 ticks and was re-evaluated, re-logged and (if accepted) re-WRITTEN each time.
--- Measured 2026-09-24 over the pg_net retention window (150 ticks, 0 failed):
---     1,401 responses, 1,401 ZIPs, 12,070 collector evaluations
---     avg 8.62 evaluations per response, median 10, max 10
---     dev_refresh_source_failures fetch_failed: 562 rows in 5h for 43 ZIPs — the
---     same failed payloads logged again on every tick
--- Each accepted re-write rewrote the whole `sites` array and re-fired the BEFORE
--- UPDATE OF sites trigger (dev_reports_enforce_dc_zip_membership). That is the
--- measured ~10.8 writes/fetch, and the temp-block and WAL volume behind it.
+-- 1. STALE-FACILITY CLEARING DEFECT. dev_epa_write_refused() judged the 7-day freshness
+--    limb by the CORE clock. Development refreshes on a ~53 h sweep, so that limb stayed
+--    TRUE forever while core kept writing. A genuine EPA zero therefore could never
+--    replace a cached nonzero count. Measured 2026-09-27 (read-only): healthy EPA +
+--    genuine zero + cached 12 + core refreshed 1 h ago → refused; same case at 6.9 d →
+--    refused; at 7.1 d → accepted. facilities_refreshed_at was never an input.
+--    Live: 1,004 ZIPs had a fresh core, a facility layer older than 7 days and a
+--    nonzero count; 418 were older than 30 days. Oldest: 97201, facility layer
+--    2026-08-07, core 2026-09-26.
 --
--- WHY A NEW COLUMN — existing state was checked first and cannot represent this
+-- 2. PER-ZIP EPA OUTCOMES ARE NOT INSTRUMENTED. epa.ok, radius_used, reason, attempts,
+--    raw_rows, kept and (now) pre_cap exist only in the pg_net response body.
+--    net._http_response held 1,590 rows at 00:36Z on 2026-09-27 and 0 at 00:37Z.
+--    They are not stored in development_reports, app_projects or any failure table.
+--    Source-zero / partial-scope-zero / product-filtered-zero / national cap-hit rate
+--    are therefore NOT INSTRUMENTED.
+--
+-- THE FIX
 -- ----------------------------------------------------------------------------
--- * net._http_response is pg_net's table: no "handled" flag, purged on pg_net's own
---   TTL. Not ours to add columns to.
--- * public.dev_refresh_inflight maps request_id -> zip, but ONLY for the fire paths
---   that write it (dev_refresh_fire_batch, dev_refresh_fire_targets,
---   commercial_fire_batch). dev_refresh_fire, dev_backfill_fire, dev_gate_catchup,
---   epa_recovery_repair and epa_recovery_step2 also POST get-address-report and write
---   no inflight row, and this collector consumes their responses too. Inflight rows
---   are also DELETED by dev_refresh_log_fire_failures() as soon as a response lands,
---   in the same tick, so they cannot carry "evaluated" state across ticks.
--- * development_reports.last_refresh_attempt_at is FIRE/cooldown state per ZIP, not a
---   response identity. refreshed_at moves only on an ACCEPTED write, so a refused
---   response would still replay.
--- So: ONE nullable bigint on development_reports, last_collected_response_id — the id
--- of the newest response this collector has fully evaluated for that ZIP. It is
--- processing state only: no development data, no payload copy, and nothing reads it
--- but this function. NULL means "nothing evaluated yet", which is the SAFE state —
--- the next tick evaluates the ZIP's newest in-window response exactly as before. So
--- there is no backfill (backfilling to the newest id would SKIP a response that landed
--- after the last tick), and the old body running against the new column is harmless:
--- the Phase 1B column-then-writer hazard cannot occur. The column and the function
--- still ship in one transaction.
+-- The refusal PREDICATE is unchanged: untrusted EPA, OR a fresh facility layer, AND
+-- incoming facilities = 0 AND cached facilities > 0. Only the clock that "fresh"
+-- consults moves. A genuine EPA zero may now clear an old nonzero count once the
+-- facility layer itself is older than 7 days, even while Development keeps refreshing.
 --
--- RESPONSE LIFECYCLE, AFTER
--- ----------------------------------------------------------------------------
--- (0)  eligible = the newest in-window ZIP-mode JSON 200 for a ZIP, AND id > cursor.
---      Computed ONCE into _ids; steps (a)-(e) all read exactly that set.
--- (a)-(c) diagnostics, unchanged — once per response now, not ~10 times.
--- (d)  ACCEPTED -> the resident write and cursor := id, in the SAME row version.
--- (e)  SOURCE-FAILURE BLOCKED / REDUCTION-GUARD REFUSED / SHAPE-WITHHELD -> cursor := id
---      only. No resident-facing column moves, so refreshed_at stays old and
---      dev_refresh_fire_batch (UNCHANGED) re-fires the ZIP oldest-first after the
---      cooldown. RETRY IS A FRESH REQUEST with a new, higher id — never a replay of
---      the payload that was refused.
--- non-200, non-JSON, non-ZIP-mode: never selected by the collector (unchanged).
---      Non-200 fires are still attributed by dev_refresh_log_fire_failures().
--- A ZIP-mode response for a ZIP with no development_reports row is no longer
---      evaluated: it could never be written and there is no row to carry its cursor.
---      Measured 0 such responses of 1,497 at the time of this change.
--- All of (0)-(e) is ONE transaction: a raise anywhere rolls back diagnostics, write
--- and cursor together, and the response is evaluated again on the next tick.
--- A transaction-scoped advisory lock stops two collectors evaluating the same
--- response, and step (d) re-checks the cursor, so a row is never written twice.
+-- epa_last_outcome is processing/observability state, like last_collected_response_id:
+-- no development data, nothing resident-facing reads it, NULL = nothing recorded yet
+-- (the safe state — no backfill). The column and the writer ship in one transaction.
 --
--- ONE BEHAVIOUR CHANGES, deliberately: a response used to be re-judged on later
--- ticks against a NEWER epa_ok, so facilities_unavailable could flip on a replay of
--- the same payload. It is now judged once, against the EPA health current when it was
--- evaluated. A later EPA recovery reaches the ZIP through its next fresh fetch.
---
--- ROLLBACK: re-apply the dev_refresh_collect() body parked in
--- docs/epa-decouple-phase1b-split-write.sql (it ignores the column). The column may
--- stay (NULL-safe) or be dropped afterwards.
+-- ROLLBACK: re-apply the collector body parked in
+-- docs/dev-refresh-collect-once-per-response.sql (it ignores the new column and
+-- restores the core-clock argument). The column may stay (NULL-safe) or be dropped.
 -- ============================================================================
 
 begin;
 
 alter table public.development_reports
-  add column if not exists last_collected_response_id bigint;
+  add column if not exists epa_last_outcome jsonb;
 
-comment on column public.development_reports.last_collected_response_id is
-  'Processing state ONLY: net._http_response.id of the newest get-address-report ZIP-mode response dev_refresh_collect() has fully evaluated for this ZIP (accepted or refused). Stops the same response being re-evaluated on later ticks. NULL = nothing evaluated yet. Not development data. See docs/dev-refresh-collect-once-per-response.sql.';
+comment on column public.development_reports.epa_last_outcome is
+  'Last evaluated per-ZIP EPA FRS outcome for this ZIP (ok, radius_used, raw_rows, pre_cap, kept, reason, attempts), plus collected_at / response_id / write_refused. Written by dev_refresh_collect() on every evaluated response, accepted or refused. Observability only — not a resident-facing fact. NULL = nothing recorded yet. See docs/dev-epa-facility-clock-and-outcome.sql.';
+
+-- ONE definition of the stored outcome so steps (d) and (e) cannot drift.
+create or replace function public.dev_epa_outcome_record(
+  _epa jsonb,
+  _response_id bigint,
+  _write_refused boolean
+) returns jsonb
+language sql
+stable
+set search_path to 'public'
+as $function$
+  select coalesce(_epa, '{}'::jsonb) || jsonb_build_object(
+           'collected_at', now(),
+           'response_id', _response_id,
+           'write_refused', _write_refused
+         );
+$function$;
+
+comment on function public.dev_epa_outcome_record(jsonb, bigint, boolean) is
+  'Compose the durable per-ZIP EPA outcome from the report body plus collector metadata. '
+  'The single writer used by both step (d) and step (e) of dev_refresh_collect().';
+
+-- The refusal predicate is BYTE-IDENTICAL except the 4th parameter is now named for the
+-- clock it must be given. Passing the core clock is the defect this file exists to end.
+create or replace function public.dev_epa_write_refused(
+  _epa_ok boolean,
+  _j jsonb,
+  _cached_counts jsonb,
+  _cached_facilities_refreshed_at timestamptz
+) returns boolean
+language sql
+stable
+set search_path to 'public'
+as $function$
+  select (
+      (not (coalesce(_epa_ok, false) and coalesce((_j->'epa'->>'ok')::boolean, true))
+       or _cached_facilities_refreshed_at >= now() - interval '7 days')
+      and coalesce((_j->'counts'->>'facilities')::int, 0) = 0
+      and coalesce((_cached_counts->>'facilities')::int, 0) > 0
+  );
+$function$;
+
+comment on function public.dev_epa_write_refused(boolean, jsonb, jsonb, timestamptz) is
+  'True when the incoming EPA facility payload must NOT overwrite the stored one. The 4th '
+  'argument is the FACILITY clock (development_reports.facilities_refreshed_at), never the '
+  'core refreshed_at. A genuine EPA zero may replace a cached nonzero count only when the '
+  'facility layer itself is older than 7 days.';
 
 create or replace function public.dev_refresh_collect()
  returns integer
@@ -249,7 +255,7 @@ begin
   update public.development_reports d set
     -- counts: core keys from the payload; facilities preserved when the EPA write is refused.
     counts = case
-               when public.dev_epa_write_refused(epa_ok, j, d.counts, d.refreshed_at)
+               when public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at)
                  then (j->'counts') || jsonb_build_object(
                         'facilities', coalesce((d.counts->>'facilities')::int, 0))
                else j->'counts'
@@ -259,7 +265,7 @@ begin
                         from jsonb_array_elements(j->'sites') with ordinality t(x, o)
                        where not (x ? 'registry_id')), '[]'::jsonb)
             || case
-                 when public.dev_epa_write_refused(epa_ok, j, d.counts, d.refreshed_at)
+                 when public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at)
                    then coalesce((select jsonb_agg(x order by o)
                                     from jsonb_array_elements(d.sites) with ordinality t(x, o)
                                    where x ? 'registry_id'), '[]'::jsonb)
@@ -275,16 +281,23 @@ begin
     -- this response is now fully evaluated for this ZIP (accepted). Same row version as
     -- the write, so an accepted response costs exactly one row write.
     last_collected_response_id = resp.rid,
+    -- PER-ZIP EPA OUTCOME. Written on every accepted core write, EPA up or down, refused
+    -- or accepted. net._http_response is TEMPORARY (pg_net TTL; measured empty inside a
+    -- minute). Without this column, ok / radius_used / raw_rows / pre_cap exist only in
+    -- a body that is about to be deleted.
+    epa_last_outcome = public.dev_epa_outcome_record(
+                         j->'epa', resp.rid,
+                         public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at)),
     -- REGULATORY freshness. Advances only when the facility layer actually took a write.
     facilities_refreshed_at = case
-                                when public.dev_epa_write_refused(epa_ok, j, d.counts, d.refreshed_at)
+                                when public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at)
                                   then d.facilities_refreshed_at
                                 else now()
                               end,
     -- ⚖️ REVIEW FIX 2 — THE FLAG FOLLOWS THE FACILITY PLANE, NOT THE EPA READ.
     -- The first Phase 1B build kept the pre-split expression, which had only ever run on
     -- rows where BOTH planes wrote. Under the split it also runs on REFUSED rows, and on
-    -- the FRESHNESS limb (EPA healthy, legitimately returns 0, row < 7 days old, cached
+    -- the FRESHNESS limb (EPA healthy, legitimately returns 0, facility layer < 7 days old, cached
     -- count > 0) it evaluated to FALSE while the stale cached count was preserved — so the
     -- page asserted a count EPA had just contradicted as confirmed fact. Pre-split the row
     -- was not written at all, so the flag kept its prior "unknown". Measured 0 rows in that
@@ -295,7 +308,7 @@ begin
     -- facility count, refused is false, the first branch below fires, and the page stops
     -- saying "unavailable".
     facilities_unavailable = case
-                               when public.dev_epa_write_refused(epa_ok, j, d.counts, d.refreshed_at) then true
+                               when public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at) then true
                                when coalesce((j->'counts'->>'facilities')::int, 0) > 0 then false
                                when not (epa_ok and coalesce((j->'epa'->>'ok')::boolean, true)) then true
                                else false
@@ -336,13 +349,20 @@ begin
   -- (e) MARK THE REST HANDLED. Every response in the set that step (d) did NOT write —
   -- source-failure blocked, reduction-guard refused, shape-withheld — was nonetheless fully
   -- evaluated above, its diagnostics recorded in (a)-(c) in THIS transaction. Advancing the
-  -- cursor here only records that; it touches no resident-facing column (not sites, counts,
-  -- paywall, refreshed_at, the facility plane or last_refresh_attempt_at), so the refusal
+  -- cursor here records that, and stores the per-ZIP EPA outcome (observability only).
+  -- It still touches no resident-facing column (not sites, counts, paywall, refreshed_at,
+  -- the facility plane or last_refresh_attempt_at), so the refusal
   -- still leaves the ZIP stale and the fire side still retries it with a fresh request.
   -- Atomic with (a)-(d): if anything above raised, this never commits either, and the
   -- response is evaluated again on the next tick.
   update public.development_reports d
-     set last_collected_response_id = r.id
+     set last_collected_response_id = r.id,
+         -- Same outcome record as step (d). A core-guard refusal must still tell us what
+         -- EPA said for this ZIP; otherwise the 74 reverse-coupling ZIPs stay dark.
+         epa_last_outcome = public.dev_epa_outcome_record(
+                              r.content::jsonb->'epa', r.id,
+                              public.dev_epa_write_refused(
+                                epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at))
     from net._http_response r
    where r.id = any(_ids)
      and d.zip = (r.content::jsonb->>'zip')
@@ -351,17 +371,33 @@ begin
   return n;
 end $function$;
 
--- Fail closed: the body that committed must be the one parked here.
+-- Fail closed: the body that committed must be the facility-clock / durable-outcome version.
 do $verify$
 declare src text;
 begin
   select prosrc into src from pg_proc where oid = 'public.dev_refresh_collect'::regproc;
   if position('last_collected_response_id' in src) = 0
-     or position('pg_try_advisory_xact_lock' in src) = 0 then
-    raise exception 'dev_refresh_collect body is not the once-per-response version';
+     or position('pg_try_advisory_xact_lock' in src) = 0
+     or position('epa_last_outcome' in src) = 0
+     or position('dev_epa_outcome_record' in src) = 0 then
+    raise exception 'dev_refresh_collect body is not the facility-clock / durable-outcome version';
   end if;
   if (select count(*) from regexp_matches(src, 'r\.id = any\(_ids\)', 'g')) <> 5 then
     raise exception 'expected 5 consumers of the single response set';
+  end if;
+  if position('dev_epa_write_refused(epa_ok, j, d.counts, d.refreshed_at)' in src) > 0 then
+    raise exception 'collector still passes the CORE clock to the EPA write-guard';
+  end if;
+  if (select count(*) from regexp_matches(src, 'd\.facilities_refreshed_at\)', 'g')) < 4 then
+    raise exception 'expected the facility clock as the write-guard argument';
+  end if;
+  if to_regclass('public.development_reports') is null
+     or not exists (
+          select 1 from information_schema.columns
+           where table_schema = 'public'
+             and table_name = 'development_reports'
+             and column_name = 'epa_last_outcome') then
+    raise exception 'epa_last_outcome column missing';
   end if;
 end $verify$;
 
