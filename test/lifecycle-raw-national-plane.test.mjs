@@ -19,8 +19,8 @@ function ok(cond, msg) {
   if (!cond) { console.error('FAIL:', msg); failed++; } else { console.log('ok:', msg); }
 }
 
-// (1) THE DEFECT. A national record verbatim in the shape lib/data.js builds: `type` is the
-// CATEGORY, the lifecycle is in `status`.
+// (1) THE DEFECT. A national record verbatim in the shape lib/data.js built until 2026-09-27:
+// `type` is the CATEGORY, the lifecycle is in `status`.
 const national = { relevance: 'development', type: 'datacenter', status: 'Operating',
                    record_kind: 'national_project' };
 ok(lifecycleRaw(national) === 'operating', 'national record reads its lifecycle from status');
@@ -28,6 +28,21 @@ ok(lifecycleValueRecognised(national), 'national record is RECOGNISED (was the f
 ok(lifecycleRail(national) === 'built', 'national Operating rails to built');
 ok(lifecycleValueRecognised({ type: 'datacenter', status: 'Approved' }), 'national Approved recognised');
 ok(lifecycleRail({ type: 'datacenter', status: 'Approved' }) === 'approved', 'national Approved rails');
+
+// (1b) THE SHAPE lib/data.js BUILDS SINCE 2026-09-27 (HS.map1DcSite): the lifecycle key is in
+// `type` and `bucket`, the Type in `use_type`, and `status` still carries map_status.
+for (const [st, key, rail] of [['Operating', 'operating', 'built'], ['Approved', 'approved', 'approved'],
+                               ['Proposed', 'proposed', 'proposed']]) {
+  const site = { relevance: 'development', status: st, bucket: key, type: key, use_type: 'datacenter',
+                 record_kind: 'national_project' };
+  ok(lifecycleRaw(site) === key && lifecycleValueRecognised(site) && lifecycleRail(site) === rail,
+    `current-shape national ${st} reads ${key} and rails to ${rail}`);
+}
+{
+  const unk = { status: 'Unknown', bucket: 'unknown', type: 'unknown', use_type: 'datacenter' };
+  ok(lifecycleValueRecognised(unk) && lifecycleRail(unk) === null,
+    'current-shape national Unknown is recognised and belongs to no rail');
+}
 
 // (2) NO-OP FOR EVERY OTHER PLANE. Cached engine sites and authoritative markers carry no
 // `status` key at all — measured over 237,713 cached sites across 1,481 ZIPs: 0 with a

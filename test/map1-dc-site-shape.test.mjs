@@ -17,7 +17,7 @@
 // production population grouped by the only fields the mapping reads.
 //
 // Run: node test/map1-dc-site-shape.test.mjs
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { join, dirname } from 'node:path';
@@ -216,6 +216,14 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
   const P = stripJs(read('homesignalmap.html'));
   ok((P.match(/\.map\(HS\.map1DcSite\)/g) || []).length === 1 && /resolveTrackerMarker/.test(P),
     '§7d the page maps the contract rows through HS.map1DcSite once and classifies through resolveTrackerMarker');
+  // The mapping fails closed to `unknown` when the lifecycle vocabulary is absent (§5c). That is
+  // right for a missing script, and it would silently recreate this defect — so every shipped page
+  // that calls the mapping must also load lib/project-type.js.
+  const pages = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+  const callers = pages.filter((f) => /HS\.map1DcSite/.test(stripJs(read(f))));
+  const missing = callers.filter((f) => !/<script[^>]+src="\/?lib\/project-type\.js/.test(read(f)));
+  ok(callers.length >= 1 && callers.includes('homesignalmap.html') && missing.length === 0,
+    '§7e every page that maps contract rows loads the lifecycle vocabulary', { callers, missing });
 }
 
 console.log(`\n${n - bad} passed, ${bad} failed`);

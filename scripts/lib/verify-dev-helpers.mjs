@@ -49,10 +49,13 @@ export const LIFECYCLE_BUCKETS = new Set([
  * ⚠️ `type` MEANS TWO DIFFERENT THINGS, AND BOTH REACH `window.__HS_SITES`. On a cached
  * engine site and on an authoritative marker (lib/zip-authoritative.js::zipAuthSiteFromMarker,
  * which sets `type: bucket`) it is the LIFECYCLE. On a NATIONAL data-centre record
- * (lib/data.js, the `national_dc_for_zip` plane) it is the project CATEGORY — the literal
+ * (lib/data.js, the `national_dc_for_zip` plane) it WAS the project CATEGORY — the literal
  * string `datacenter` — and the lifecycle is in `status` ('Operating'/'Approved'), exactly as
  * that code's own comment says: "Map 1's pin vocabulary is PERMIT status". Reading `type`
  * alone reported all 31 national records across the panel as unrecognised lifecycles.
+ * Since 2026-09-27 HS.map1DcSite also puts the lifecycle key in `type` (and `bucket`), and the
+ * Type in `use_type`, because that is what Map 1's classifier reads; `status` still carries
+ * map_status, so reading `status` first gives the same answer for both shapes.
  *
  * ⛔ IT DELIBERATELY DOES NOT READ `bucket`, THOUGH lib/map.js::isActiveUndecided DOES.
  * That function answers an ELIGIBILITY question and is decision-aware by design; `bucket`
