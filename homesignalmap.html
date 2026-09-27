@@ -2388,9 +2388,10 @@ HS.onReady(function(){
         // The RPC returns ONLY rows that already carry a real source URL, real coordinates
         // and a displayable status, so nothing unsourced can enter here. These still pass
         // through render()'s sourced() gate with everything else - no bypass.
-        // `status` is Map 1's PERMIT vocabulary (pin colour); the source's own lifecycle word
-        // is carried unmodified as normalized_status/raw_status so the popup can state what
-        // the source actually said rather than our bucket for it.
+        // HS.map1DcSite puts each row in Map 1's site shape: `bucket`/`type` carry the lifecycle
+        // (from map_status), `use_type` the Type (project_type) and `label` the name — the fields
+        // resolveTrackerMarker reads. The source's own lifecycle word is carried unmodified as
+        // normalized_status/raw_status.
         var natl = both[3] || HS.nationalPlaneResult(null);
         // FIX 29 — PROXIMITY IS NOT MEMBERSHIP. national_dc_for_zip selects by a 5-mile
         // great-circle radius around development_reports.home_lat/home_lng — a ZIP CENTROID.

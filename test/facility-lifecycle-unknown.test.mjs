@@ -228,14 +228,24 @@ ok(HS.resolveMarker({ record_kind: 'facility', _facility: true, type: 'industria
   // raw_status 'operational' → server map_status 'Operating', live row MGHPCC, Holyoke 01040,
   // read from public.map1_dc_zip_members on 2026-09-24) still resolves operating through the
   // canonical statusTier. Built with the shipped HS.map1DcSite mapping, not a hand-made item.
+  // THE PAGE'S PATH (2026-09-27). This used to call HS.resolveMarker(dc) directly, which read the
+  // mapping's old `type: 'datacenter'` and `status` — fields the page never classifies from. Map 1
+  // resolves every site through HS.resolveTrackerMarker (trackerSiteItem), which read none of
+  // them, so all 1,816 data-centre pins drew as Other project / Lifecycle unknown while this check
+  // passed. It now asserts the page's path, and that resolveMarker agrees with it. The row carries
+  // `project_type`, as the live row does (map1_dc_zip_members returns it on every row).
   const D = read('lib/data.js');
   new Function('HS', D.slice(D.indexOf('HS.map1DcSite = function'), D.indexOf('HS.map1DcCredits')))(HS);
   const dc = HS.map1DcSite({ source_key: 'dc:c46a54a1', project_name: 'Massachusetts Green High Performance Computing Center',
-    map_status: 'Operating', normalized_status: 'operational', raw_status: 'operational', lat: 42.20285, lng: -72.60693,
+    map_status: 'Operating', normalized_status: 'operational', raw_status: 'operational', project_type: 'datacenter',
+    lat: 42.20285, lng: -72.60693,
     source_url: 'https://en.wikipedia.org/wiki/Massachusetts_Green_High_Performance_Computing_Center', zip_membership: 'member' });
   const m = HS.resolveMarker(dc);
-  ok(m.lifecycle === 'operating' && m.categoryKey === 'datacenter' && !m.isFacility,
-    '8q positive control: a data centre whose source states operational still resolves Operating (not a facility, not refused)');
+  const mt = HS.resolveTrackerMarker(dc, (x) => (x && x.registry_id) || '');
+  ok(mt.lifecycle === 'operating' && mt.categoryKey === 'datacenter' && !mt.isFacility,
+    '8q positive control: a data centre whose source states operational resolves Operating + Data center on the page path (not a facility, not refused)');
+  ok(m.lifecycle === mt.lifecycle && m.categoryKey === mt.categoryKey,
+    '8q-ii resolveMarker and the page path (resolveTrackerMarker) agree on the mapped site');
 }
 
 // ── §9 one authority ─────────────────────────────────────────────────────────────────────
