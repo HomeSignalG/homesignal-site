@@ -105,14 +105,17 @@ ok(!/\benvChanges\b/.test(page), '§1 A — the old Environment row set (and its
 // ── §4 neighbours are composed exactly as before (D) ─────────────────────────────────────
 ok(/var notices = changes\.filter\(function\(x\)\{\s*return \/planning\|government\|civic\/i\.test\(x\.category\)/.test(page),
   '§4 D — Government & civic notices are still selected by their own rule, unchanged');
-// The regulatory DATA-PLANE invariant stands: facilities are read from their own plane and
-// counted there. The old PRESENTATION invariant — a standalone "Regulated facilities nearby"
-// section inside What's Changing — is retired by founder decision (2026-09-25): registry presence
-// is regulatory inventory, not a change event, so What's Changing is Development & growth ·
-// Government & civic · Local news, and Map 1's Regulatory Records overlay is where R lives.
-ok(/HS\.data\.facilities\(zip, home\)/.test(page)
-   && /var facTotal = metaCount\('regulated facilities', facilities\.length\);/.test(page),
-  '§4 D — Regulated facilities still reads its own plane (data plane unchanged; count tile still fed)');
+// The strip tile is the same polygon-member count Map 1 uses (zip_mode_report_sites →
+// HS.zipFacilityMemberCount). The old PRESENTATION invariant — a standalone "Regulated
+// facilities nearby" section inside What's Changing — is retired by founder decision
+// (2026-09-25): registry presence is regulatory inventory, not a change event, so What's
+// Changing is Development & growth · Government & civic · Local news, and Map 1's Regulatory
+// Records overlay is where R lives. The radius-count metaCount path is the defect this pins.
+ok(/HS\.data\.zipModeReportSites\(zip\)/.test(page)
+   && /HS\.zipFacilityMemberCount/.test(page)
+   && !/metaCount\('regulated facilities'/.test(page)
+   && !/HS\.data\.facilities\(zip, home\)/.test(page),
+  '§4 D — Regulated facilities tile is the polygon-member count (zip_mode_report_sites → zipFacilityMemberCount)');
 ok(!/Regulated facilities nearby/.test(page) && !/\bfacHtml\b/.test(page) && !/facilities\.slice\(/.test(page),
   '§4 D — What\'s Changing composes no standalone regulatory-inventory section (founder hierarchy, 2026-09-25)');
 ok(/Regulated facilities nearby/.test(pageRaw),

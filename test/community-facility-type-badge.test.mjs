@@ -142,8 +142,10 @@ ok(/^Lifecycle unknown<span class="devtype" data-type-key="industrial"[^>]*>Indu
 ok(/data-type-key="facility"[^>]*>Regulated facility</.test(lens(rows[4])), '5d an unclassified facility reads "Regulated facility"');
 ok(/data-type-key="datacenter"[^>]*>Data center</.test(lens(rows[5])),
   '5e a data-centre class reads "Data center"');
-ok(RT.includes("var facTotal = metaCount('regulated facilities', facilities.length);"),
-  '5f the regulated-facility count is the same expression (data plane unchanged)');
+ok(/HS\.data\.zipModeReportSites/.test(code(RT))
+   && /HS\.zipFacilityMemberCount/.test(code(RT))
+   && !/metaCount\('regulated facilities'/.test(code(RT)),
+  '5f the regulated-facility count is the polygon-member count (zip_mode_report_sites)');
 
 // ── §6 development Type untouched ────────────────────────────────────────────────────────
 ok(HS.canonicalProjectType({ type: 'Industrial', name: 'Pennhurst Data Centers' }).typeKey === 'datacenter',

@@ -107,6 +107,18 @@ window.supabase = { createClient: function () {
   return { from: function(t){ return q(t); },
            rpc: function(n, a){
              if (n === 'app_projects_for_zip') return Promise.resolve({ data: D['rpc_' + (a && a.p_kind)] || [], error: null });
+             if (n === 'zip_mode_report_sites') {
+               var fac = D.rpc_facility || [];
+               return Promise.resolve({
+                 data: {
+                   zip: (a && a.p_zip) || Z,
+                   status: 'complete',
+                   sites: [],
+                   facility_counts: { member: fac.length, outside: 0, not_measured: 0, no_coordinates: 0 }
+                 },
+                 error: null
+               });
+             }
              return Promise.resolve({ data: null, error: null }); },
            auth: { getSession: function(){ return Promise.resolve({ data: { session: null } }); },
                    onAuthStateChange: function(){ return { data: { subscription: { unsubscribe: function(){} } } }; } } };
