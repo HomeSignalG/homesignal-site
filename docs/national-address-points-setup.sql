@@ -28,3 +28,5 @@ create table if not exists public.national_address_points (
 
 create index if not exists nap_state_idx on public.national_address_points (state);
 alter table public.national_address_points enable row level security;   -- service-role only
+
+-- Demand scope, city-less lookup, run receipt, and geocode upgrade: docs/oa-health-recovery.sql
