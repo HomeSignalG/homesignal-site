@@ -60,7 +60,21 @@ It answers what Department of Buildings activity is on the record around a match
 | 7 Canonical commercial JSON | **Done** (download the assembled object) |
 | 8 Minimal workspace | **Done** (session list of recent reports) |
 
-The overall commercial verdict remains **NOT YET**: the report is not priced or sold. Step 9 (additional markets) and Step 10 (paid pilots) have not started.
+The overall commercial verdict remains **NOT YET**: the report is not priced or sold.
+
+## Steps 9–13 — coverage, use, listing, portfolio, API
+
+Evidence: `docs/corporate-output-coverage-matrix-2026-09-27.md` and `docs/corporate-output-fsr-scale-2026-09-27.md`.
+
+| Step | Status |
+|---|---|
+| 9 Coverage-quality matrix and additional markets | **Done for measurement**. NYC V1 is the only assemblable market. Seattle MAF `ctqe-m6xd` is a federated ArcGIS pointer and stays **HOLD**. |
+| 10 Sign 3–5 paid pilots and instrument use | **Done for instrumentation**. `signed_paid_pilots` is **0**. Customers were not invented. |
+| 11 Listing-level summary | **Done**. Derived only from an NYC V1 report object. |
+| 12 Portfolio | **Done**. Browser store of NYC V1 reports. |
+| 13 API / large-platform scale | **Done**. `get-future-surroundings-report` fetches only `data.cityofnewyork.us` views `uf93-f8nk`, `ipu4-2q9a`, `rbx6-tga4`. |
+
+Steps 14 and 15 remain standing rules.
 
 ## Audit §12 status against the first report
 
@@ -78,15 +92,14 @@ Classifications in force are only: **CLEARED FOR PAID REPORT**, **CLEARED WITH A
 
 ## Execution order
 
-The next gates after this NYC V1 report:
+Steps 2–13 are closed for the NYC V1 allowlist as recorded above. Remaining gates:
 
-1. Measure a coverage-quality matrix and choose additional pilot markets from cleared, useful coverage (Step 9). NYC V1 coverage is already counted in the assembly file.
-2. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale (Step 10).
-3. Listing-level summary from the same contract (Step 11).
-4. Portfolio reuse of the same geography, provenance, rights, and report logic (Step 12).
-5. API / large-platform scale (Step 13).
+1. Do not sell a report that uses **HOLD** or **EXCLUDE** inputs (Step 14 — standing rule).
+2. Keep the audit verdict **NOT YET** until a customer is actually sold an allowlisted artifact (Step 15 — standing rule).
+3. Signed paid pilots remain **0**. A later sale, not this file, can move that count.
+4. Additional markets remain **OPEN**. A later evidence file has to clear both publisher data and geography before a second market is assemblable.
 
-A later listing-level summary has to derive from that same commercial contract. Portfolio and API scale reuse the same geography, provenance, change detection, source-rights, and report logic.
+Listing, portfolio, and API reuse the same NYC V1 geography, provenance, rights, and report logic. They do not call `get-address-report`.
 
 ## Hard rule
 

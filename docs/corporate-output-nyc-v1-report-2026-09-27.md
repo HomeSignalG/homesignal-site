@@ -32,4 +32,4 @@ BIS `gis_latitude` / `gis_longitude` are text. The issuance query scopes by Addr
 
 ## Still not sold
 
-No price, no paywall, no brokerage account, no listing-level summary. The overall verdict remains **NOT YET** until a customer is actually sold an artifact from this allowlist.
+No price, no paywall, no brokerage account. Listing, portfolio, usage, and the allowlist JSON API shipped in `docs/corporate-output-fsr-scale-2026-09-27.md`. Signed paid pilots remain 0. The overall verdict remains **NOT YET** until a customer is actually sold an artifact from this allowlist.
