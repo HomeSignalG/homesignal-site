@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27
 **Audited tree:** `HomeSignalG/homesignal-site` `main` at `09f5cdb5fb275a9e8a6b5e9daf6e4f7f560afe9e` (working tree matched `origin/main`; clean before this document).
-**Companion repo:** `HomeSignalG/homesignal-ingest` — **not readable in this audit.** `gh` and `git ls-remote` both returned repository-not-found. Ingest-only licensing is unresolved, not assumed.
+**Companion repo:** `HomeSignalG/homesignal-ingest` — **still not readable.** A second attempt on 2026-09-27 (section 14) used the same GitHub app token (`gh` account `cursor`). The org repo list, `gh api repos/HomeSignalG/homesignal-ingest`, and `git ls-remote` all returned not-found. Meetings, Local News, email, and Bluesky/MAPS stay **HOLD**. They are not CLEARED, not ATTRIBUTION REQUIRED, and not EXCLUDE.
 **Scope:** Read-only. No production, Supabase, adapter, Map 1, `property.html`, `reports.html`, or `"Not for resale"` change.
 **Rule used throughout:** UNCLEAR is not YES. A missing terms statement is not a grant. A STOP sends the item to HOLD.
 
@@ -21,7 +21,7 @@ Epoch AI's own text fields are distributable with credit under the publisher's c
 | Repo | HEAD | Working tree vs `main` |
 |---|---|---|
 | `HomeSignalG/homesignal-site` | `09f5cdb5fb275a9e8a6b5e9daf6e4f7f560afe9e` — "Map 1 data-centre pins draw as Data center in their own lifecycle (field mapping fix) (#1393)", 2026-09-27 | Matched `origin/main`. Clean at the start of this audit. |
-| `HomeSignalG/homesignal-ingest` | **Unknown.** Not in the token's visible org repo list. Clone and `git ls-remote` returned "Repository not found." | **Blocked.** |
+| `HomeSignalG/homesignal-ingest` | **Unknown.** Second read on 2026-09-27: not in the token's org list; `gh api` and `git ls-remote` returned not-found. See section 14. | **Blocked.** |
 
 Open site PRs that could change provenance, address-report sources, Map 1 sources, or what a corporate output may include, if later merged. None of them are in the tree audited above.
 
@@ -236,7 +236,7 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 3. A written decision on OSM inside Compute Atlas, and a customer-visible way to exclude `osm`-typed evidence. Until then, Atlas pins stay held.
 4. Professional review of a paid product that returns ODbL rows and CC BY rows in one response.
 5. Redistribution terms for the Census geocoder, OpenAddresses source files actually loaded, and ZCTA polygons, before any distance, pin, or "near" claim.
-6. Read access to `homesignal-ingest` before meetings, notices, local news, email, or MAPS content is included.
+6. Read access to `homesignal-ingest` before meetings, notices, local news, email, or MAPS content is included. Section 14 records a second failed read. Those four families stay HOLD.
 7. Removal of score, outlook, QoL, and predictive prose from any corporate template. They stay on the consumer site.
 
 ## 13. Step 2 scope
@@ -259,6 +259,47 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 - change `property.html`, `reports.html`, Map 1, adapters, or Supabase.
 
 Step 2 is not the paid brokerage report. That report waits on §12.
+
+## 14. Second pass — Meetings, Local News, email, Bluesky/MAPS
+
+Requested classification set: **CLEARED**, **ATTRIBUTION REQUIRED**, **HOLD**, or **EXCLUDE**.
+
+This pass did not open `homesignal-ingest`. No product file was changed. The four families are not reclassified from the section 4 rows except to state the new label explicitly. HOLD is the STOP outcome: the canonical generators were not read, so a CLEARED, ATTRIBUTION REQUIRED, or EXCLUDE decision would be a guess.
+
+### Access receipt
+
+| Attempt | Result |
+|---|---|
+| `gh repo list HomeSignalG` | `homesignal-site`, `bedsheet`, `storyos-kids` only. No ingest repo. |
+| `gh api repos/HomeSignalG/homesignal-ingest` | HTTP 404, `Not Found` |
+| `git ls-remote https://github.com/HomeSignalG/homesignal-ingest.git HEAD` | `Repository not found` |
+| Token | `gh auth status`: logged in as `cursor` on github.com. This is the Cloud Agent app token. It can read `homesignal-site`. It cannot see the private ingest repo. |
+| Local checkout | No `homesignal-ingest` directory on this machine. |
+
+### What the site repo proves, and what it does not
+
+The site repo names the ingest files. It does not contain them.
+
+| Family | Named in this repo | Present in this repo |
+|---|---|---|
+| Email body | `digest_template.py`, `digest.py` (`docs/email-branding-audit.md`) | No. The branding audit describes logo and share-link fixes. It does not quote publisher licenses or the record text the digest inserts. |
+| Email share line | `lib/share-text.js` builds `HomeSignal daily briefing — <label>` plus a `homesignal.net` URL, and says that shape matches `digest_template.py::_share` | The share line is HomeSignal-authored. It does not show whether the rest of the email reprints permit titles, meeting titles, or news text. |
+| Meetings / government notices | `docs/state-notice-portals.md` names `adapters/legistar.py` and `adapters/civicclerk.py` in ingest | No adapter source and no vendor terms. |
+| Local News | `docs/local-news-phase-a-evidence-report.md` says the feed-drift audit is `homesignal-ingest/docs/local-news-feed-drift-audit-2026-07-24.md` | That file is not here. `lib/data.js` `news()` only shows the read of `app_changes` where `category = 'Local News'`. |
+| Bluesky / MAPS | `lib/maps-social-theme.js` and `lib/maps-capture-binding.js` say `post_text` and the draft are written by `homesignal-ingest` `bluesky/generate-maps.mjs` | The post body generator is not in this repo. |
+
+### Classification
+
+| Family | Class | Paid web | PDF | Paid API | White-label | Reason |
+|---|---|---|---|---|---|---|
+| Meetings / government notices | **HOLD** | HOLD | HOLD | HOLD | HOLD | Agenda and notice text is produced by ingest adapters that were not read. A public meeting page is not, by itself, a recorded commercial grant. |
+| Local News | **HOLD** | HOLD | HOLD | HOLD | HOLD | Publisher republication terms are not in this repo. Ingesting a headline is not permission to sell it. |
+| Email output | **HOLD** | HOLD | HOLD | HOLD | HOLD | `digest_template.py` was not read. The HomeSignal-authored share line in `lib/share-text.js` does not clear the digest body. |
+| Bluesky / MAPS output | **HOLD** | HOLD | HOLD | HOLD | HOLD | `bluesky/generate-maps.mjs` was not read. Whether a post reprints a source record, and under what credit, is unknown. |
+
+None of the four is CLEARED. None is ATTRIBUTION REQUIRED. None is EXCLUDE. ATTRIBUTION REQUIRED would mean the evidence shows commercial use is allowed if credit is kept. EXCLUDE would mean the evidence shows the material must not be sold. Neither showing was available.
+
+Unblock: grant this Cloud Agent read access to `HomeSignalG/homesignal-ingest` (private-repo permission on the GitHub app), then re-run this section against that repo's `main` HEAD. Until that read exists, these four families stay out of the corporate allowlist in section 6.
 
 ## Appendix A — Jurisdiction registry (240)
 
