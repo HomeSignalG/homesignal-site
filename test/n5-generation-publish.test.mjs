@@ -153,4 +153,24 @@ ok(/run_suite\.py/.test(wf) && /postgis\/postgis/.test(wf), 'the executable suit
 ok((suite.match(/^\s+"M\d+ /gm) || []).length >= 10, 'the executable suite carries at least ten mutations');
 ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied before it can count as a kill');
 
+// ── Part F is Part D's D9 function, verbatim — never a second hand-kept copy ──────────
+{
+  const partF = readFileSync('docs/n5-generation-publish-part-f.sql', 'utf8');
+  const slice = (t) => {
+    const i = t.indexOf('create or replace function geo.n5_gen_record_unresolved(');
+    const end = 'revoke all on function geo.n5_gen_record_unresolved(text) from public;';
+    const j = t.indexOf(end, i);
+    return i < 0 || j < 0 ? '' : t.slice(i, j + end.length);
+  };
+  ok(slice(partD).length > 3000, 'Part D carries the unresolved-accounting function (control)');
+  ok(slice(partF) === slice(partD), 'Part F applies exactly Part D\'s unresolved-accounting function');
+  ok(/a\.registry_id = coalesce\(x\.registry_id, '\(null\)'\)/.test(slice(partD)),
+    'the catalogue is joined with the shard\'s own registry-less rule');
+  ok(/'RECOVERY_PUBLISHER_UNREACHABLE'/.test(slice(partD)) && /s\.z3 = any \(x\.z3s\)/.test(slice(partD)),
+    'an unreachable publisher is an outcome only where the key\'s own shard reported it');
+  ok(/^begin;$/m.test(partF) && /^commit;$/m.test(partF) && (partF.match(/raise exception 'part F/g) || []).length === 2,
+    'Part F is one transaction, fail-closed before and after');
+  ok(/n5-generation-publish-part-f\.sql/.test(wf), 'the executable suite runs when Part F changes');
+}
+
 console.log(`n5-generation-publish: ${n} structural checks passed`);

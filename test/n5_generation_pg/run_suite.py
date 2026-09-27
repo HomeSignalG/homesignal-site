@@ -160,7 +160,10 @@ insert into public.app_zip_geography_cutover (zip, enabled, production_geography
   ('11199', false, null);
 -- treatments are PER REGISTRY, as in production: reg-pt is PROVEN (its projects are placed by
 -- their own stored coordinate), reg-ok is RECOVERY (publisher geometry), reg-noauth NOAUTH.
-insert into geo.n5_accepted_source values ('reg-noauth','NOAUTH',1,1), ('reg-ok','RECOVERY',9,9), ('reg-pt','PROVEN',9,9);
+insert into geo.n5_accepted_source values ('reg-noauth','NOAUTH',1,1), ('reg-ok','RECOVERY',9,9), ('reg-pt','PROVEN',9,9),
+  ('reg-down','RECOVERY',9,9),
+  -- as in production: the shard's freeze files a registry-less key under '(null)', graded NOAUTH
+  ('(null)','NOAUTH',1,1);
 
 -- the LIVE project table (the capture reads it). Coordinates are what a NEW snapshot captures.
 insert into public.app_projects (source_key, record_kind, zip, name, type, status, stage, submitted_at,
@@ -181,7 +184,10 @@ select 'dev:P' || i, 'development', z, 'Project ' || i, 'type', 'filed', 'stage'
     (10,'11201','reg-ok',1,null,null),           -- RECOVERY with no geometry and no verdict yet
     (11,'11201','reg-pt',1,0.5,3.5),             -- stated 112, lies in 11301
     (12,'11101','reg-pt',1,0.2,0.2),             -- two captured rows with DIFFERENT coordinates
-    (12,'11101','reg-pt',2,0.25,0.25)            --   -> MULTI_COORD_UNRESOLVED
+    (12,'11101','reg-pt',2,0.25,0.25),           --   -> MULTI_COORD_UNRESOLVED
+    (13,'11201',null,1,null,null),               -- NO registry: the shard grades it '(null)' = NOAUTH
+    (14,'11201','reg-down',1,null,null),         -- RECOVERY, publisher timed out in shard 112
+    (15,'11101','reg-down',1,null,null)          -- same publisher, but shard 111 reported it OK
   ) v(i, z, reg, seq, la, lo);
 
 -- geometry evidence as production holds it: legacy phase1 proven points (P1 at its OLD spot,
@@ -245,6 +251,11 @@ insert into geo.n5_generation (generation_id, snapshot_id, cutoff, state, note)
   values (%(gen)s, %(snap)s, now(), 'BUILDING', 'fixture candidate');
 insert into geo.n5_shard (snapshot_id, generation_id, z3, projects, pairs, zips, state, checksum)
   values (%(snap)s, %(gen)s, '111', 0, 0, 0, 'done', 0), (%(snap)s, %(gen)s, '112', 0, 0, 0, 'done', 0);
+-- each shard's persisted recovery report, the shape scripts/n5_shard.py writes into detail
+update geo.n5_shard set detail = jsonb_build_object('recovery', jsonb_build_array(
+         jsonb_build_object('registry_id', 'reg-down',
+                            'status', case when z3 = '112' then 'PUBLISHER_UNREACHABLE' else 'OK' end)))
+ where generation_id = %(gen)s;
 """
 
 ZCTA = {"11101": "MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))",
@@ -479,12 +490,17 @@ def run(conn, label, mutate=None, suite=None):
     got = {r["source_key"]: r["reason_code"] for r in q(c, "select source_key, reason_code from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,))}
     s.ok("7  explicit evidence-backed unresolved outcomes, one per class",
          got == {"dev:P6": "POINT_REJECTED", "dev:P7": "GEOMETRY_INVALID", "dev:P8": "REGISTRY_NOAUTH",
-                 "dev:P9": "NO_INTERSECTION_WITH_GENERATION_ZCTAS", "dev:P12": "POINT_REJECTED"}, got)
-    s.ok("6  an expected record with neither membership nor evidence (P10) blocks READY",
-         raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1 violated — 1 of"))
+                 "dev:P9": "NO_INTERSECTION_WITH_GENERATION_ZCTAS", "dev:P12": "POINT_REJECTED",
+                 "dev:P13": "REGISTRY_NOAUTH", "dev:P14": "RECOVERY_PUBLISHER_UNREACHABLE"}, got)
+    s.ok("7d a registry-less key takes the treatment the shard gave it ('(null)' -> NOAUTH), never none",
+         got.get("dev:P13") == "REGISTRY_NOAUTH", got.get("dev:P13"))
+    s.ok("7e an unreachable publisher is an outcome ONLY where that key's own shard reported it (P15 stays open)",
+         got.get("dev:P14") == "RECOVERY_PUBLISHER_UNREACHABLE" and "dev:P15" not in got, got)
+    s.ok("6  expected records with neither membership nor evidence (P10, P15) block READY",
+         raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1 violated — 2 of"))
     r111 = q(c, "select * from geo.n5_reconcile_chunk(%s,'111')", (GEN_B,))[0]
     s.ok("5  P3 (stated 111, resolved into 11201) counts RESOLVED for chunk 111",
-         (r111["expected_keys"], r111["accounted_resolved"], r111["accounted_unresolved"], r111["unaccounted"]) == (7, 4, 3, 0),
+         (r111["expected_keys"], r111["accounted_resolved"], r111["accounted_unresolved"], r111["unaccounted"]) == (8, 4, 3, 1),
          dict(r111))
     per_chunk = [q(c, "select expected_keys, accounted_resolved, accounted_unresolved, unaccounted "
                       "from geo.n5_reconcile_chunk(%s,%s)", (GEN_B, k))[0] for k in ("111", "112")]
@@ -500,9 +516,10 @@ def run(conn, label, mutate=None, suite=None):
     s.ok("6b the declared chunk set must cover every expected key",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111'])", (GEN_B,), r"expected_keys_outside_declared_chunks"))
 
-    # evidence for P10 arrives through the pipeline (a shard verdict), then accounting is re-run
+    # evidence for P10 and P15 arrives through the pipeline (shard verdicts), then accounting is re-run
     q(c, "insert into geo.n5_generation_key_verdict (generation_id, source_key, registry_id, verdict) "
-         "values (%s,'dev:P10','reg-ok','RECOVERY_NOT_RETURNED')", (GEN_B,))
+         "values (%s,'dev:P10','reg-ok','RECOVERY_NOT_RETURNED'), (%s,'dev:P15','reg-down','RECOVERY_NOT_RETURNED')",
+      (GEN_B, GEN_B))
     s.ok("7b stale unresolved accounting (older than the last publish) is refused at READY",
          raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,), r"INV-1|unresolved"))
     q1(c, "select geo.n5_gen_record_unresolved(%s)", (GEN_B,))
@@ -676,6 +693,18 @@ MUTATIONS = {
     "M15 preparation stops applying the multi-coordinate rule": ("D2", """
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_prepare_publish(text)'::regprocedure),
           'from n5_prep_proven k where k.nc = 1;', 'from n5_prep_proven k where k.nc >= 1;'); end $m$;"""),
+    "M17 unresolved accounting joins the catalogue on the raw registry_id": ("7d", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
+          'a.registry_id = coalesce(x.registry_id, ''(null)'')', 'a.registry_id = x.registry_id'); end $m$;"""),
+    "M18 an unreachable report from ANY shard classifies the key": ("7e", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
+          'and s.z3 = any (x.z3s)', ''); end $m$;"""),
+    "M19 any recovery status counts as unreachable": ("7e", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
+          'and r->>''status'' = ''PUBLISHER_UNREACHABLE''', ''); end $m$;"""),
+    "M20 the unreachable class is removed": ("7e", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
+          'then ''RECOVERY_PUBLISHER_UNREACHABLE''', 'then null'); end $m$;"""),
     "M7 activation stops recording the predecessor": ("16", """
         do $$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
           'predecessor_generation_id = coalesce(predecessor_generation_id, prev.generation_id)', 'predecessor_generation_id = predecessor_generation_id'); end $$;"""),

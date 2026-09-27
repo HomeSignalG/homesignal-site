@@ -489,6 +489,16 @@ revoke all on function geo.n5_gen_publish_prefix(text, text, text, integer, doub
 --       REGISTRY_NOAUTH / _IDENT_UNRESOLVED / _HIST_UNRECOVERABLE   the source catalogue
 --       SOURCE_EXCLUDED / RECOVERY_UNSTABLE_IDENTITY / RECOVERY_NOT_RETURNED /
 --       REGISTRY_UNCLASSIFIED                  the shard's persisted verdict
+--       RECOVERY_PUBLISHER_UNREACHABLE         a RECOVERY key with no geometry whose publisher
+--                                              a shard of THIS generation covering the key's
+--                                              prefix reported PUBLISHER_UNREACHABLE (read
+--                                              from that shard's persisted recovery report)
+--     The catalogue is joined on coalesce(registry_id, '(null)') - the SAME rule the shard's
+--     freeze uses (scripts/n5_shard.py). Joining the raw NULL left a registry-less key with
+--     no treatment here while the shard had graded it NOAUTH, so it matched no class.
+--     (2026-09-27: READY refused n5-national-2026-09-25 on 17 such keys - 5 registry-less
+--     tdlr_tabs keys in 786, and 12 kytc/wisdot keys whose publishers timed out in their
+--     shards; the shard's verdict list had no class for an unreachable publisher.)
 --     An expected key matching none of them is NOT written: it stays UNACCOUNTED and blocks
 --     readiness. There is still no catch-all. The legacy, snapshot-less geo.n5_point_reject
 --     is no longer read: a generation's point verdicts are its own.
@@ -523,7 +533,8 @@ begin
   delete from geo.n5_generation_unresolved where generation_id = p_generation_id;
 
   with expected as (
-    select e.source_key, min(e.zip) zip, min(e.registry_id) registry_id
+    select e.source_key, min(e.zip) zip, min(e.registry_id) registry_id,
+           array_agg(distinct left(e.zip, 3)) z3s
       from public.n5_expected_captured(g.snapshot_id) e
      group by e.source_key),
   missing as (
@@ -548,6 +559,16 @@ begin
              when v.verdict in ('SOURCE_EXCLUDED','RECOVERY_UNSTABLE_IDENTITY',
                                 'RECOVERY_NOT_RETURNED','REGISTRY_UNCLASSIFIED')
                then v.verdict
+             when a.treatment = 'RECOVERY'
+              and exists (select 1 from geo.n5_shard s
+                            cross join lateral jsonb_array_elements(
+                              case when jsonb_typeof(s.detail->'recovery') = 'array'
+                                   then s.detail->'recovery' else '[]'::jsonb end) r
+                           where s.generation_id = p_generation_id and s.state = 'done'
+                             and s.z3 = any (x.z3s)
+                             and r->>'registry_id' = coalesce(x.registry_id, '(null)')
+                             and r->>'status' = 'PUBLISHER_UNREACHABLE')
+               then 'RECOVERY_PUBLISHER_UNREACHABLE'
            end as reason_code,
            jsonb_strip_nulls(jsonb_build_object(
              'prefixes_probed', n_pref,
@@ -559,7 +580,7 @@ begin
       from missing x
       left join geo.n5_generation_key_verdict v
              on v.generation_id = p_generation_id and v.source_key = x.source_key
-      left join geo.n5_accepted_source a on a.registry_id = x.registry_id)
+      left join geo.n5_accepted_source a on a.registry_id = coalesce(x.registry_id, '(null)'))
   insert into geo.n5_generation_unresolved (generation_id, source_key, zip, reason_code, detail)
   select p_generation_id, c.source_key, c.zip, c.reason_code, c.detail
     from classified c
