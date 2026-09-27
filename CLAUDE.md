@@ -3256,15 +3256,17 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
   45s+grace, not taken off the write.** The join still waits for both planes — a BOUND, not
   independence — until Unit 3 splits `sites`.
 
-**Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
-sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+**Unlisting those ~1,005 plant-only map pages because nothing is being built is REJECTED
+(founder, 2026-09-27).** "Nothing is being built" is a valid answer. Those pages stay listed.
+The live `indexable` limb `(_ndp > 0 or _nfc >= 3)` stays. It is not autonomous work under
+the §3 standing grant.
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
-### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+### 🅿️ PHASE 2 · UNIT 1 — LISTING CHANGE REJECTED (2026-09-27); core markers still parked
 SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
-**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
-load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
-robots and coverage states are untouched. Full record: audit §14.
+**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs`. Production still stamps
+`((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))`. The sitemap, robots and coverage states are
+untouched. Full record: audit §14.
 
 - 🔑 **THE AUDIT'S OWN §10.2 RECOMMENDATION IS WRONG ON ITS `data_quality` HALF — do not
   implement it.** `data_quality` is not only a completeness claim, it is the **layout gate** in
@@ -3276,11 +3278,13 @@ robots and coverage states are untouched. Full record: audit §14.
   **Unit 1 therefore leaves `data_quality` alone** and gives core its own EPA-free markers —
   `core_project_scan_status` (`not_scanned` · `projects_found` · `no_qualifying_projects_found`)
   and `core_records_present`, both computed from `_has_report`/`_nd`/`_nc` only.
-- **What Unit 1 changes is `indexable`, and only `indexable`:**
-  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`.
-  Stored-stamp measurement: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb on
-  1,005 of 1,005, 0 pages newly advertised**, all 1,005 carrying a `development_reports` row.
-  *(The "1,004" above was an estimate; −1,005 is exact.)*
+- 🛑 **What Unit 1 does NOT change is `indexable`.** The old splice
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`
+  would have unlisted **1,005** pages (11,704 → 10,699, sole cause the `_nfc >= 3` limb).
+  **Rejected 2026-09-27.** Plant-only Map 1 pages stay listed. "Nothing is being built"
+  is a valid, complete scan (`no_qualifying_projects_found`), not a reason to drop the
+  page from the sitemap or mark it `noindex`. If the parked SQL is ever applied, it
+  adds the completeness markers and keeps the live listing limb.
 - ⚠️ **NAME THE INSTRUMENT WITH THE NUMBER — two correct readings disagree by 463.** The 766
   comes from the STORED stamps (`component_scores`, one self-consistent row read). Recomputing
   the same question live from `app_projects`/`app_changes` returns **303**, and again later
@@ -3291,7 +3295,7 @@ robots and coverage states are untouched. Full record: audit §14.
   would be a §11 false negative; pin-precision is `indexable`'s question, not completeness's.
 - **Community / Alerts pages are unaffected.** Their robots and sitemap entries come from
   **Rule F** at build time; `gen_zip_pages.py` fetches `indexable` and never reads it. The
-  −1,005 is entirely Map 1 / development pages, which stay real, reachable and fully rendered.
+  1,005 plant-only pages are Map 1 / development pages and they stay listed.
 - **Unit order is forced:** doing §3's `data_quality` half first would break the CI pin
   `legacy: populated/facilities_only => pass` (`scripts/verify-coverage-state.mjs:64`) by
   construction. Unit 1 leaves that pin true; reworking `facilities_only` is Unit 2, the
@@ -3323,8 +3327,9 @@ robots and coverage states are untouched. Full record: audit §14.
 Migration `20260907200252 epa_decouple_phase2_unit2_coverage_state_split_from_d25efff`, applied
 from `docs/epa-decouple-phase2-unit2-coverage-state-split.sql` at `main` `d25efff`. DDL of
 record `docs/coverage-state-model.sql` updated in the same change. Pinned by
-`test/epa-phase2-coverage-state-split.test.mjs` (53 assertions). **Independent of Unit 1, which
-is still PARKED.** Full record: audit §15.
+`test/epa-phase2-coverage-state-split.test.mjs` (53 assertions). **Independent of Unit 1,
+whose listing change is REJECTED and whose completeness markers are still PARKED.** Full
+record: audit §15.
 
 - **Live after apply** (measured, not recalled): view md5 `20df44e40d53699183aadd4d8dbe3e8e` →
   `a2fda9feca0bcc3d0ca412cd9b54b2b8`; `security_invoker=true` intact; `facilities_only` absent

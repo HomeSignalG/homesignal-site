@@ -505,11 +505,17 @@ Still open, and each one requires product/SEO sign-off before any work begins:
 
 ---
 
-## 14. PHASE 2 · UNIT 1 — BUILT AND PARKED (2026-09-07)
+## 14. PHASE 2 · UNIT 1 — LISTING CHANGE REJECTED (2026-09-27); core markers still parked
+
+🛑 **Founder ruling 2026-09-27:** do not unlist the ~1,005 map pages that have plants and
+no new construction. "Nothing is being built" is a valid answer. Those pages stay listed.
+The old Unit 1 idea of dropping `_nfc >= 3` from `indexable` (11,704 → 10,699) is rejected.
+The measurements below are historical — they describe what that splice *would* have done,
+not an approved product change.
 
 Branch `claude/epa-phase2-unit1-core-completion-markers`. SQL of record:
 `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic, **not
-applied**). Pins: `test/epa-phase2-core-markers.test.mjs`, 41 assertions.
+applied**; listing limb kept). Pins: `test/epa-phase2-core-markers.test.mjs`.
 
 **Nothing outward-facing has moved.** Production still stamps `data_quality` as
 `(_nd+_nf+_nc)>0` and `indexable` as `… and (_ndp > 0 or _nfc >= 3)`; the sitemap, robots
@@ -518,9 +524,11 @@ as Phase 1B was between PR #1102 and its authorized apply.
 
 ### 14.1 ⚠️ §10 ITEM 2 IS SUPERSEDED ON ITS `data_quality` HALF — the recommendation was wrong
 
-§10.2 says to *"recompute `data_quality` and `indexable` from `_nd`/`_ndp`/`_nc` only"*. The
-`indexable` half is right. **The `data_quality` half would cause a product regression, and
-it is not recorded anywhere else in this audit, so it would have been implemented.**
+§10.2 says to *"recompute `data_quality` and `indexable` from `_nd`/`_ndp`/`_nc` only"*.
+**Both halves are now rejected for listing/layout:** the `data_quality` half would hide
+real facility pages (see below), and the `indexable` half would unlist the ~1,005
+plant-only Map 1 pages (founder, 2026-09-27). Completeness markers may still ignore EPA;
+listing may not.
 
 `data_quality` is not only a completeness claim. It is the **layout gate** for the community
 page — `lib/community-page.js`:
@@ -559,7 +567,8 @@ the stamps and is correct as such; it is not interchangeable with a live recount
 
 ### 14.2 What Unit 1 does instead
 
-**`indexable` drops the EPA limb, and nothing else changes.**
+**`indexable` was going to drop the EPA limb. That listing change is REJECTED (2026-09-27).**
+The completeness markers below remain the optional parked half of this unit.
 
 ```
 before   ((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))
@@ -602,11 +611,11 @@ belongs to `indexable`, which is a different question. Pinned by test case 4.
   come from **Rule F** at build time (`scripts/gen_zip_pages.py`), not from `indexable` —
   `gen_zip_pages.py` fetches the column and never reads it (`dev_indexable` is assigned at
   line 227 and referenced nowhere).
-- **Map 1 / development pages: 1,005 stop being advertised.** They remain real, reachable
-  pages, keep every record they render today including their facilities, and flip to
-  `noindex` (`homesignalmap.html` reads the flag live) and out of the sitemap's development
-  half (`scripts/gen_sitemap.py::fetch_index_zips`, which `reconcile_sitemap` deliberately
-  leaves alone).
+- **Map 1 / development pages: the 1,005 stay advertised.** Historical note: the rejected
+  splice would have flipped them to `noindex` and dropped them from the sitemap. Founder
+  ruling 2026-09-27 keeps them listed. They remain real, reachable pages and keep every
+  record they render today including their facilities. "Nothing is being built" may stay
+  as honest copy.
 - **No rendering changes anywhere**, because `data_quality` is untouched.
 
 ### 14.4 Deliberately NOT in this unit
