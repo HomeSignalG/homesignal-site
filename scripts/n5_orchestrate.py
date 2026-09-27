@@ -211,7 +211,15 @@ def mode_open():
     # snapshot fingerprints the same way; test/n5-generation-publish.test.mjs pins the
     # parity. (The first production `open`, 2026-09-25, omitted them and was refused.)
     OPEN_STATEMENT_TIMEOUT = "840s"
-    sql(f"""set statement_timeout = '{OPEN_STATEMENT_TIMEOUT}';
+    # The transaction outlives the API gateway's 120 s (measured 2026-09-27: HTTP 524 at 125 s,
+    # committed, generation BUILDING with its full manifest). A lost response is proven from
+    # state, never re-sent: the generation row carrying THIS run's cutoff exists only if this
+    # transaction committed, because every statement above and below commits together.
+    open_verify = (f"select count(*) = 1 ok from geo.n5_generation g "
+                   f"where g.generation_id={lit(gen)} and g.snapshot_id={lit(snapshot_id)} "
+                   f"and g.cutoff = {lit(cutoff)}::timestamptz "
+                   f"and exists (select 1 from geo.n5_shard s where s.generation_id=g.generation_id);")
+    sql_proven(f"""set statement_timeout = '{OPEN_STATEMENT_TIMEOUT}';
             insert into preservation.app_project_identity
               (snapshot_id, app_project_id, zip, source_key, source_seq, registry_id,
                record_kind, source_ref, submitted_at, lat, lng, identity_hash, content_hash)
@@ -275,7 +283,8 @@ def mode_open():
                         ||coalesce(e.source_seq::text,'')),1,8))::bit(32)::bigint),
                    'pending'
               from public.n5_expected_captured({lit(snapshot_id)}) e
-             group by left(e.zip,3);""", "open (one transaction)", timeout=3000)
+             group by left(e.zip,3);""", "open (one transaction)", open_verify,
+               timeout=3000, max_wait=3000, say=lambda m: say("open", m))
 
     # Read back what committed, as one statement: the manifest must sum to the snapshot row.
     got = sql(f"""select s.n_rows, s.sources, s.projects, s.pairs, s.checksum,
