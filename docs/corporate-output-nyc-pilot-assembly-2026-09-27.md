@@ -145,7 +145,7 @@ A first paid report that answers what Department of Buildings activity is changi
 
 ## What this does not do
 
-HomeSignal does not currently load AddressPoint. This file clears the dataset as a candidate input. It does not load it, wire it, or change `get-address-report`.
+HomeSignal does not load AddressPoint into `national_address_points`. The NYC V1 report fetches the Socrata view live. It does not change `get-address-report`.
 
 `"Not for resale"` remains product copy and remains in the function. The allowlist does not call that function.
 
@@ -157,4 +157,4 @@ The Step 2 close condition was: at least one useful pilot market assembled entir
 
 That condition is met for **New York City V1** as defined above.
 
-Step 2 remains **OPEN** for every other market. The Census geocoder, OpenAddresses, Atlas, OSM, and the uncleared registry entries are unchanged. Step 3 (unsupported prediction claims) is recorded in `docs/corporate-output-unsupported-predictions-2026-09-27.md`. The overall commercial verdict remains **NOT YET**: Step 4 (build the report from this allowlist) has not started. Nothing here starts the paid report.
+Step 2 remains **OPEN** for every other market. The Census geocoder, OpenAddresses, Atlas, OSM, and the uncleared registry entries are unchanged. Step 3 is recorded in `docs/corporate-output-unsupported-predictions-2026-09-27.md`. The NYC V1 report is `future-surroundings-report.html`. The overall commercial verdict remains **NOT YET**: the report is not sold.

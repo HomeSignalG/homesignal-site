@@ -36,7 +36,7 @@ That condition is met for **New York City V1**. Evidence: `docs/corporate-output
 
 Census geocoder, OpenAddresses, ZCTA-as-proximity, Geoclient, the ArcGIS AddressPoint FeatureServer, Atlas, OSM, Local News, meetings, scores, and every other registry entry stay **HOLD** or **EXCLUDE** and are not in the allowlist.
 
-Step 2 remains **OPEN** for every other market. AddressPoint is not loaded. `get-address-report` is not the allowlist.
+Step 2 remains **OPEN** for every other market. AddressPoint is fetched live from the Socrata view for this report. It is not loaded into `national_address_points`. `get-address-report` is not the allowlist.
 
 ## Step 3 — Unsupported prediction claims
 
@@ -44,9 +44,23 @@ Step 3 closes when unsupported prediction claims cannot enter a report that woul
 
 That condition is met. Evidence: `docs/corporate-output-unsupported-predictions-2026-09-27.md`.
 
-Scores, outlooks, Quality of Life scoring, `HS.projectImpact`, stored `sowhat`, "Effect at this address", and engineering / traffic / utility / insurance-loss / property-value forecasts are **EXCLUDE** from any sold Future Surroundings Report, including NYC V1. They stay on the consumer site. `reports.html` still generates nothing. The paid report was not started.
+Scores, outlooks, Quality of Life scoring, `HS.projectImpact`, stored `sowhat`, "Effect at this address", and engineering / traffic / utility / insurance-loss / property-value forecasts are **EXCLUDE** from any sold Future Surroundings Report, including NYC V1. They stay on the consumer site. `reports.html` still generates nothing.
 
-The overall commercial verdict remains **NOT YET**: Step 4 (build the report from the NYC V1 allowlist) has not started.
+## Step 4–8 — NYC V1 report
+
+The report exists at `future-surroundings-report.html`. Evidence: `docs/corporate-output-nyc-v1-report-2026-09-27.md`.
+
+It answers what Department of Buildings activity is on the record around a matching AddressPoint. It does not predict effects. It does not call `get-address-report`.
+
+| Step | Status |
+|---|---|
+| 4 Build the report from the NYC V1 allowlist | **Done** |
+| 5 Durable `report_id` tied to data state | **Done** (SHA-256 of the canonical object) |
+| 6 Share link and print/PDF | **Done** (query rebuild + browser print) |
+| 7 Canonical commercial JSON | **Done** (download the assembled object) |
+| 8 Minimal workspace | **Done** (session list of recent reports) |
+
+The overall commercial verdict remains **NOT YET**: the report is not priced or sold. Step 9 (additional markets) and Step 10 (paid pilots) have not started.
 
 ## Audit §12 status against the first report
 
@@ -58,21 +72,19 @@ The first report is the NYC V1 allowlist. Later evidence files sit beside the au
 4. ODbL and CC BY in one response: still **HOLD**. Excluded from NYC V1.
 5. Census geocoder, OpenAddresses, ZCTA proximity: still **HOLD** as those inputs (`docs/corporate-output-property-location-stack-2026-09-27.md`, #1418). NYC V1 does not use them. Property placement is AddressPoint.
 6. Local News, meetings, notices: still **HOLD**. Excluded from NYC V1. NWS alert text remains attributed text, not a property-proximity grant.
-7. Scores, outlooks, Quality of Life scoring, and predictive prose: **EXCLUDE** from any sold report (`docs/corporate-output-unsupported-predictions-2026-09-27.md`). They stay on the consumer site. No corporate template emits them.
+7. Scores, outlooks, Quality of Life scoring, and predictive prose: **EXCLUDE** from any sold report (`docs/corporate-output-unsupported-predictions-2026-09-27.md`). They stay on the consumer site. `future-surroundings-report.html` does not emit them.
 
 Classifications in force are only: **CLEARED FOR PAID REPORT**, **CLEARED WITH ATTRIBUTION**, **DERIVED FACTS ONLY**, **HOLD — TERMS/RIGHTS NOT ESTABLISHED**, **EXCLUDE**. No family is **CLEARED FOR PAID REPORT**.
 
 ## Execution order
 
-The next gates after this Step 3 close:
+The next gates after this NYC V1 report:
 
-1. Build the real Future Surroundings Report that answers what is happening and changing around the property, using only the NYC V1 allowlist and without the Step 3 EXCLUDE families (Step 4).
-2. Add a durable `report_id` and a reproducible report object tied to the data state that created it.
-3. Add a secure share link and print/PDF delivery that use the same rights and attribution rules as the canonical report.
-4. Expose one canonical commercial JSON response that enforces the Corporate Output Source Allowlist.
-5. Add a minimal brokerage workspace for generating, finding, opening, and sharing reports.
-6. Measure a coverage-quality matrix and choose additional pilot markets from cleared, useful coverage.
-7. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale.
+1. Measure a coverage-quality matrix and choose additional pilot markets from cleared, useful coverage (Step 9). NYC V1 coverage is already counted in the assembly file.
+2. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale (Step 10).
+3. Listing-level summary from the same contract (Step 11).
+4. Portfolio reuse of the same geography, provenance, rights, and report logic (Step 12).
+5. API / large-platform scale (Step 13).
 
 A later listing-level summary has to derive from that same commercial contract. Portfolio and API scale reuse the same geography, provenance, change detection, source-rights, and report logic.
 
