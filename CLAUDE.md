@@ -2680,7 +2680,8 @@ the healed v1 state and not the identity-pending outage. Both sides were read th
 **Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
 `public.map1_dc_zip_members(p_zip)`** (DDL of record `docs/map1-dc-publication.sql`, called
 through `HS.MAP1_DC_RPC` by `homesignalmap.html` and `lib/data.js`). The page never asks which
-source a record came from, never unions sources, and never maps a lifecycle word itself.
+source a record came from and never unions sources. It turns the server's `map_status` into a
+lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `HS.map1DcSite`).
 
 - **Canonical rows**: `CONFIRMED_DC` canonical entities (Step 3A) with `RESOLVED` `POINT`
   geography (Step 3B), a lifecycle inside the ONE map (`operational`→Operating,
@@ -2733,9 +2734,10 @@ source a record came from, never unions sources, and never maps a lifecycle word
     (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
     2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
     returned 0 rows. That is production, not the page. Re-run it after the next :35.
-  - ⚠️ `docs/map1-dc-publication.sql`'s header says *"every data-centre pin reaches that stage
-    today; the page reads no lifecycle from this column"*. That was true when written and is
-    false now. The file is the DDL of record and apply tooling reads it, so it is left as is.
+  - `docs/map1-dc-publication.sql`'s header said *"every data-centre pin reaches that stage
+    today; the page reads no lifecycle from this column"*. True when written, false now; the
+    comment is annotated. The edit is inert: every builder that reads the file still passes
+    `--check`, and the same `--check` fails when the function body changes.
 
 ---
 

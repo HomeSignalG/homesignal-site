@@ -99,7 +99,11 @@ for (const zip of ZIPS) {
   const m = await page.evaluate(() => {
     const sites = window.__HS_SITES || [];
     const dev = sites.filter((s) => s && s.scope === 'point' && s.relevance === 'development');
-    const refOf = (s) => s.zip_project_ref || s.source_id || s.project_ref || null;
+    // The page's own rail identity (homesignalmap.html railKey): a row with no project ref is its
+    // own card, never collapsed. National data-centre rows carry no ref, and since 2026-09-27 they
+    // reach the Approved/Proposed rails, so pooling them under one '(no-ref)' key would report
+    // repeats the renderer does not make.
+    const refOf = (s) => s.zip_project_ref || s.n5_source_key || s.source_id || s.project_ref || null;
     const per = {};
     dev.forEach((s) => { const k = refOf(s) || '(no-ref)'; per[k] = (per[k] || 0) + 1; });
     const rows = (id) => Array.from(document.querySelectorAll('#' + id + ' .rec'));
@@ -114,7 +118,7 @@ for (const zip of ZIPS) {
     const railFor = (bucket) => dev.filter((s) => stageOf(s) === bucket).slice(0, 12);
     const repeatsIn = (arr) => {
       const c = {};
-      arr.forEach((s) => { const k = refOf(s) || '(no-ref)'; c[k] = (c[k] || 0) + 1; });
+      arr.forEach((s, i) => { const k = refOf(s) || ('(row ' + i + ')'); c[k] = (c[k] || 0) + 1; });
       return Object.entries(c).filter(([, n]) => n > 1);
     };
     const apprSlice = railFor('approved');
@@ -141,7 +145,7 @@ for (const zip of ZIPS) {
       devSites: dev.length,
       uniqueRefs: Object.keys(per).length,
       noRef: per['(no-ref)'] || 0,
-      maxPerRef: Object.values(per).reduce((a, n) => Math.max(a, n), 0),
+      maxPerRef: Object.entries(per).filter(([k]) => k !== '(no-ref)').reduce((a, [, n]) => Math.max(a, n), 0),
       multiRefs: Object.entries(per).filter(([k, n]) => k !== '(no-ref)' && n > 1)
         .sort((a, b) => b[1] - a[1]).slice(0, 5),
       railRows,

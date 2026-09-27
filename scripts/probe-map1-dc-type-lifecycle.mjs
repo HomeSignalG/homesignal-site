@@ -34,7 +34,10 @@ const ENDPOINT = grab('ENDPOINT');
 const APIKEY = grab('APIKEY');
 const SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
-const DEFAULT_ZIPS = '01040,01852,07033,20187,23150';
+// The deterministic sample, read from its fixture rather than copied (the selection rule and the
+// production fingerprint live there).
+const FIXTURE = JSON.parse(readFileSync(new URL('../test/fixtures/map1-dc-zip-sample-2026-09-27.json', import.meta.url), 'utf8'));
+const DEFAULT_ZIPS = [...new Set(FIXTURE.rows.map((r) => r.zip))].sort().join(',');
 const ZIPS = (process.env.ZIPS || DEFAULT_ZIPS).split(',').map((z) => z.trim()).filter(Boolean);
 const hdr = { apikey: APIKEY, Authorization: 'Bearer ' + APIKEY, 'Content-Type': 'application/json' };
 
@@ -83,7 +86,8 @@ for (const zip of ZIPS) {
       || s.publication_basis === 'legacy_osm_compat'));
     return { plane, sites: sites.map((s) => {
       const mk = window.__HS_RESOLVE_TRACKER ? window.__HS_RESOLVE_TRACKER(s) : {};
-      return { key: s.source_key, label: s.label || '', type: mk.typeKey, life: mk.lifecycle, shape: mk.shape };
+      return { key: s.source_key, label: s.label || '', type: mk.typeKey, life: mk.lifecycle, shape: mk.shape,
+               siteType: s.type, siteBucket: s.bucket };
     }) };
   });
   await page.context().close();
@@ -93,8 +97,10 @@ for (const zip of ZIPS) {
     zip + ' the data-centre plane was read and admitted', got.plane ? got.plane.status + '/' + got.plane.admitted : 'no signal');
   ok(got.sites.length === rows.length, zip + ' the page accepted every backend row',
     got.sites.length + ' of ' + rows.length);
-  const bad = got.sites.filter((s) => s.type !== 'datacenter' || s.life !== want.get(s.key) || !s.label);
-  ok(bad.length === 0, zip + ' every data-centre pin: Data center, lifecycle = map_status, named',
+  // `type` and `bucket` too: the Approved/Proposed lists read bucketOf(s.type) with no site.
+  const bad = got.sites.filter((s) => s.type !== 'datacenter' || s.life !== want.get(s.key) || !s.label
+    || s.siteType !== want.get(s.key) || s.siteBucket !== want.get(s.key));
+  ok(bad.length === 0, zip + ' every data-centre pin: Data center, lifecycle = map_status (pin and lists), named',
     bad.slice(0, 3).map((s) => s.key + '=' + s.type + '/' + s.life + (s.label ? '' : '/unnamed')).join(' '));
   got.sites.forEach((s) => { byLife[s.life] = (byLife[s.life] || 0) + 1; });
   totalRows += rows.length;

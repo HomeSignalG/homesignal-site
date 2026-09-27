@@ -155,7 +155,10 @@ console.log('\n1. ZIP 20187 — all three lifecycles on one page');
   ok(/CyrusOne Vint Hill Campus/.test(prop) && /Vint Hill Corners/.test(prop), '1m the Proposed list names both proposed campuses');
   ok(/Blackwell Road Data Center/.test(appr), '1n the Approved list names Blackwell Road');
   ok(/OVH US East Vint Hill/.test(built), '1o the Operating list names OVH US East Vint Hill');
-  ok(!/Vint Hill|Blackwell|OVH/.test(unk || ''), '1p the Lifecycle unknown list holds none of them', unk);
+  // Exactly the empty state. (Matching the names alone passed on the old mapping too, because the
+  // unknown list then held these four rows with BLANK names.)
+  ok(String(unk || '').trim() === 'Nothing on record here without a stated lifecycle.',
+    '1p the Lifecycle unknown list is empty — none of them sits there', unk);
   await page.context().close();
 }
 

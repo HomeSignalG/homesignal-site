@@ -29,6 +29,7 @@ on:
       - 'lib/project-type.js'
       - 'lib/zip-authoritative.js'
       - 'scripts/probe-map1-dc-type-lifecycle.mjs'
+      - 'test/fixtures/map1-dc-zip-sample-2026-09-27.json'
       - '.github/workflows/verify-map1-dc-type-lifecycle.yml'
 
 jobs:

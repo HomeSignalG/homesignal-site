@@ -63,8 +63,10 @@ const LIB = stripJs(read('lib/data.js'));
 ok(/HS\.MAP1_DC_RPC = 'map1_dc_zip_members';/.test(LIB), 'B0 lib/data.js names the one contract');
 ok(/sb\(\)\.rpc\(HS\.MAP1_DC_RPC, \{ p_zip: zip \}\)/.test(LIB), 'B1 lib/data.js::nationalDataCenters reads it, with no radius');
 ok(/outcome\.records\.map\(HS\.map1DcSite\)/.test(LIB), 'B2 lib/data.js maps rows through the one mapper');
-ok(/status: r\.map_status,/.test(LIB) && !/normalized_status === 'operational' \? 'Operating' : 'Approved'/.test(LIB),
-  'B3 the pin status is the server map_status — the client lifecycle collapse is gone');
+ok(/status: r\.map_status,/.test(LIB) && !/normalized_status === 'operational' \? 'Operating' : 'Approved'/.test(LIB)
+   && /HS\.canonicalLifecycle\(\{ status: r\.map_status \}\)/.test(LIB)
+   && /bucket: bucket, type: bucket, use_type: r\.project_type/.test(LIB),
+  'B3 the pin lifecycle is the server map_status, through the shared vocabulary into bucket/type (the fields Map 1 reads) — the client lifecycle collapse is gone');
 const PAGE = stripJs(read('homesignalmap.html'));
 ok(/rest\/v1\/rpc\/" \+ HS\.MAP1_DC_RPC/.test(PAGE) && /natl\.records\.map\(HS\.map1DcSite\)/.test(PAGE),
   'B4 homesignalmap.html reads the one contract through the one mapper');

@@ -32,9 +32,10 @@
 --     centre is a false statement. The same map governs the compatibility rows.
 --     ⚖️ ABSENT IS NOT A STATUS (2026-09-24). A canonical entity that NO current observation
 --     states any lifecycle for is published with map_status 'Unknown' — the truth, and the
---     value Map 1 already renders as its grey "Lifecycle unknown" stage (every data-centre pin
---     reaches that stage today; the page reads no lifecycle from this column) and the one the
---     page verifier accepts. Nothing is invented: no source's silence becomes 'operational'.
+--     value Map 1 renders as its grey "Lifecycle unknown" stage and the one the page verifier
+--     accepts. (Until 2026-09-27 EVERY data-centre pin reached that stage, because the page read
+--     no lifecycle from this column; HS.map1DcSite now maps map_status to the lifecycle, so only
+--     a genuine 'Unknown' does.) Nothing is invented: no source's silence becomes 'operational'.
 --     A lifecycle any observation DOES state always wins over silence, whichever observation
 --     places the entity — location and lifecycle are separate facts. Compatibility rows are
 --     unchanged: an absent OSM status still does not publish.

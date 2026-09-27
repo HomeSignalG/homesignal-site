@@ -7,6 +7,7 @@
 // exact in BOTH directions on 2026-09-21 — every failing ZIP's failure count equalled its
 // `national_dc_for_zip` record count (60601 12, 85004 7, 98101 6, 80202 3, and 78617 /
 // 02138 / 58102 at 1 each) and all five ZIPs with zero national records passed.
+import { createRequire } from 'node:module';
 import {
   lifecycleRaw,
   lifecycleRail,
@@ -29,18 +30,27 @@ ok(lifecycleRail(national) === 'built', 'national Operating rails to built');
 ok(lifecycleValueRecognised({ type: 'datacenter', status: 'Approved' }), 'national Approved recognised');
 ok(lifecycleRail({ type: 'datacenter', status: 'Approved' }) === 'approved', 'national Approved rails');
 
-// (1b) THE SHAPE lib/data.js BUILDS SINCE 2026-09-27 (HS.map1DcSite): the lifecycle key is in
-// `type` and `bucket`, the Type in `use_type`, and `status` still carries map_status.
-for (const [st, key, rail] of [['Operating', 'operating', 'built'], ['Approved', 'approved', 'approved'],
-                               ['Proposed', 'proposed', 'proposed']]) {
-  const site = { relevance: 'development', status: st, bucket: key, type: key, use_type: 'datacenter',
-                 record_kind: 'national_project' };
-  ok(lifecycleRaw(site) === key && lifecycleValueRecognised(site) && lifecycleRail(site) === rail,
-    `current-shape national ${st} reads ${key} and rails to ${rail}`);
-}
+// (1b) THE SHAPE lib/data.js BUILDS SINCE 2026-09-27, built by the SHIPPED HS.map1DcSite (never
+// hand-written, so this cannot drift from the real mapper): the lifecycle key is in `type` and
+// `bucket`, the Type in `use_type`, and `status` still carries map_status.
 {
-  const unk = { status: 'Unknown', bucket: 'unknown', type: 'unknown', use_type: 'datacenter' };
-  ok(lifecycleValueRecognised(unk) && lifecycleRail(unk) === null,
+  const require = createRequire(import.meta.url);
+  global.window = { HS: {}, HS_CONFIG: { DATA_SOURCE: 'supabase', DEFAULT_ZIP: '20187' },
+                    supabase: { createClient: () => ({}) } };
+  require('../lib/data.js');
+  require('../lib/project-type.js');
+  const map = global.window.HS.map1DcSite;
+  const row = (st) => ({ source_key: 'dc:x', source_url: 'https://e.x/r', project_name: 'A Campus',
+    map_status: st, project_type: 'datacenter', zip_membership: 'member', lat: 1, lng: 1 });
+  ok(typeof map === 'function', 'the shipped HS.map1DcSite loads (positive control)');
+  for (const [st, key, rail] of [['Operating', 'operating', 'built'], ['Approved', 'approved', 'approved'],
+                                 ['Proposed', 'proposed', 'proposed']]) {
+    const site = map(row(st));
+    ok(site.type === key && lifecycleRaw(site) === key && lifecycleValueRecognised(site) && lifecycleRail(site) === rail,
+      `current-shape national ${st} reads ${key} and rails to ${rail}`);
+  }
+  const unk = map(row('Unknown'));
+  ok(unk.type === 'unknown' && lifecycleValueRecognised(unk) && lifecycleRail(unk) === null,
     'current-shape national Unknown is recognised and belongs to no rail');
 }
 

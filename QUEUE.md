@@ -203,6 +203,14 @@ interaction is the root cause, and neither ruling is wrong.
   (`FALLBACK:other`), because the page builds them with `name`/`type` while `HS.trackerSiteItem`
   reads `label`/`use_type`/`layer`. Fixing (b) would move *Other project* geography, which is why
   it was not bundled here.
+  - ✅ **(b) IS FIXED (2026-09-27, PR #1393) — a field mapping, nothing else.** `HS.map1DcSite`
+    now fills `use_type` (from `project_type`), `label` (from `project_name`) and `bucket` / `type`
+    (the lifecycle key of `map_status`, via `HS.canonicalLifecycle`). Moving these pins out of
+    *Other project* is the intended outcome. Measured on production over all 12,722 registry ZIPs:
+    before the fix, **1,816 of 1,816** rows on 757 ZIP pages drew as Other project / Lifecycle
+    unknown with no name; after it, 1,816 of 1,816 draw as Data center in their own lifecycle
+    (Operating 1,481 · Approved 183 · Proposed 152). No SQL, identity, dedupe, geography or OSM
+    change. (a) is the membership read #1315 replaced; see CLAUDE.md §7.09.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
   path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace

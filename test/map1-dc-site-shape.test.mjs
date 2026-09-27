@@ -161,9 +161,16 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
       ['raw_status', r.raw_status], ['scope', 'point'], ['relevance', 'development'], ['record_kind', 'national_project']];
     pairs.forEach(([k, v]) => { if (s[k] !== v) wrong.push(r.source_key + ' ' + k); });
     if (JSON.stringify(s.quality_flags) !== JSON.stringify(r.quality_flags)) wrong.push(r.source_key + ' quality_flags');
-    if (s.registry_id !== undefined) wrong.push(r.source_key + ' gained a registry_id');
+    // Fields that would change behaviour beyond the mapping: registry_id makes a row an EPA
+    // facility; source_id / zip_project_ref / n5_source_key / project_ref make it a capture target
+    // or collapse rail rows (dedupe); layer / type_raw / permit_class / src / decision feed other
+    // classifiers. None may appear.
+    ['registry_id', 'source_id', 'zip_project_ref', 'n5_source_key', 'project_ref', 'layer',
+     'type_raw', 'permit_class', 'src', 'decision', 'decision_evidence'].forEach((k) => {
+      if (s[k] !== undefined) wrong.push(r.source_key + ' gained ' + k);
+    });
   });
-  ok(wrong.length === 0, '§4 identity, geography, membership, source and licence are the row\'s own values', wrong);
+  ok(wrong.length === 0, '§4 identity, geography, membership, source and licence are the row\'s own values, and no identity/dedupe field is added', wrong);
   const osm = FIX.rows.filter((r) => r.publication_basis === 'legacy_osm_compat').map(HS.map1DcSite);
   ok(osm.length > 0 && osm.every((s) => s.canonical_entity_id === null && /^osm:/.test(s.source_key)),
     '§4b OSM compatibility rows stay OSM: no canonical id, osm: keys, their own licence', osm.length);

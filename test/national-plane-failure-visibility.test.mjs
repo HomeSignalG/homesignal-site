@@ -211,7 +211,7 @@ console.log('\n9. lib/data.js carries the same distinction on its own contract')
   const propRes = await (await loadData(makeSb({ data: [prop], error: null })))
     .data.nationalDataCenters('20147', { lat: 39.0, lng: -77.4 });
   ok(propRes.length === 1 && propRes[0].status === 'Proposed',
-    '9g the pin status is the server map_status — a proposed project is never drawn as Approved');
+    '9g the mapped status is the server map_status — a proposed row is not relabelled Approved (drawing is 9h + the browser suite)');
   // 9h — the fields Map 1 classifies from (trackerSiteItem): lifecycle in bucket/type, Type in
   // use_type, name in label. Until 2026-09-27 none were set, and every pin drew as Other project /
   // Lifecycle unknown while 9g passed.
