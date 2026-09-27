@@ -2806,10 +2806,19 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
     re-shoots NAMED drafts even when bound; it is refused without `--ids`, and `--ids` alone
     still never re-shoots a bound draft. Measured 2026-09-27: every MAPS image predates the
     fix; six DRAFTS have a frame that can contain a data-centre pin (listed in the PR that added
-    `--recapture`) and are
-    re-shot with it once this reaches `main`. The one approved post (97702) has none in frame
+    `--recapture`). The one approved post (97702) has none in frame
     (the nearest pin is ~0.054° of longitude off-centre at zoom 15) and is not touched; four
     published posts are already on Bluesky.
+    - ✅ **The six were re-shot 2026-09-27** (run `36339216006`, from `main` at `bd7a7af`, after
+      the live `homesignalmap.html` was checked byte-identical to the repo). All six are
+      `REAL_MAP_VISUAL`, captured 18:04:22–18:04:39Z, still drafts, and pass both approval
+      checks (`hs_maps_map_gate_violations` and `hs_maps_dc_capture_policy_violations` return
+      `[]`). Five keep their capture key and storage path; the file was overwritten in place.
+      **97702's draft moved from a ZIP map to a pinned map of its own project**
+      (`dca8c3bd…`), because the capture ladder prefers a project map and that project is now
+      drawn on Map 1. Its old file `maps/97702/zip-1iivwwic4mzo.png` is now referenced by 0 of
+      58 MAPS rows; removing it is the ingest repo's dispatch-only
+      `cleanup-social-images.yml`, not done here.
   - 📌 **Observed, not changed:** a proposed national pin's popup still says
     *"Proposed / hearing"*, the stage word every Proposed record uses, though no hearing is
     known for these records; and the list tag reads "Development" for any record without a
