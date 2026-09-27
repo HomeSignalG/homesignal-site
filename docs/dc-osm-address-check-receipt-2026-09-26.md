@@ -60,3 +60,62 @@ pin, and never move a pin. The change is gated by automated checks.
 
 The 127 UNCHECKED_REJECTED_NO_MATCH markers are step 8 (C4) work: group them by cause and fix only
 in the shared policy.
+
+## C3c applied — the Map 1 change (2026-09-26 23:53 UTC)
+
+`dc-osm-map1-apply.yml` run **36280510291**, dispatched from main at 23:47 UTC with the confirm string
+`APPLY-OSM-MAP1-C3C`. The `apply` job `needs: [offline, gate]` in that same run.
+
+**The gate, on that moment's production data** (production was only read; the change ran on a replica):
+
+- **Preconditions:** switch md5 `31cb6c9e…` (post-C3a, pre-C3c), Map 1 reader md5 `9fc1c9f5…`,
+  queue 0, C3a live.
+- **Replica:** production copied read-only. 17,691 observations · 4,676 entities · 1,336 geocodes ·
+  1,824 OSM records · 12,722 registry ZIPs.
+- **PARITY PASS:** the replica's Map 1 matched production's, **1,817 rows identical**.
+- **Steady state after the switch:** ENTITIES_MINTED 0 · OBSERVATIONS_NEWLY_LINKED 0 ·
+  OBSERVATIONS_RELINKED 0 · ENTITIES_SUPERSEDED 0 · ROWS_WRITTEN 0.
+
+| check | result |
+|---|---|
+| G01 before is not empty | 1,817 rows, 846 OSM |
+| G02 OSM admitted after | 1,824 checks |
+| G03 after == independent prediction | **1,816 predicted / 1,816 after** |
+| G04 no row added · G05 no pin moved | true · true |
+| G06 every removal an admitted OSM disagreement | **1 removed** |
+| G07 every flag an admitted OSM corroboration | **303 flagged** |
+| G08 canonical rows byte-identical | 971 canonical rows |
+| G09 every other column unchanged | true |
+| G10 withheld ≤ disagreements | 1 withheld / 2 SOURCES_DISAGREE |
+| G11 rows reconcile | 1,817 = 1,816 + 1 |
+
+`CHANGE|WITHHELD|43054 osm:way/1425043213 QTS NAL 2 DC2`. The flags fall across 172 ZIPs; the largest
+are 20147 (36), 20166 (25), 20109 (12) and 95054 (7).
+
+**Live production, verified read-only at 00:14 UTC 2026-09-27:**
+
+- **Switch:** OSM admitted (Atlas still admitted). Switch md5 `2c05d65a…`.
+- **Reader:** md5 `2146b68a…`, config `jit=off`. Both are the DDL of record and match the offline
+  proof's post-apply fingerprints.
+- **43054:** QTS NAL 2 DC2 is **absent**; the ZIP shows 24 OSM markers, 3 of them flagged.
+- **Registry-wide Map 1:** canonical 971 markers (495 flagged, unchanged). OSM **846 → 845** markers,
+  **303 flagged**, across 291 ZIPs.
+
+## Coverage after C3c (the session's measure of done)
+
+| bucket | markers |
+|---|---:|
+| CHECKED: canonical (placed by or corroborated by its own address) | 496 |
+| CHECKED: OSM (corroborated by its own address) | 303 |
+| checkable, no clean geocoder match: canonical | 98 |
+| checkable, no clean geocoder match: OSM | 127 |
+| not checkable: canonical (publisher states no usable address) | 377 |
+| not checkable: OSM, no house-number address | 386 |
+| not checkable: OSM, no locality | 28 |
+| not checkable: OSM, no house number | 1 |
+| **total Map 1 markers** | **1,816** |
+
+**Coverage = checked / (checked + checkable) = 799 / 1,024 = 78.0%.** Before C3 it was 496 / 1,054 =
+47.1%. The denominator moved because the earlier OSM "checkable" figure was an estimate from raw tags
+(house number + street present: 435). This one applies the one shared policy, which also requires a
+locality and a US address.
