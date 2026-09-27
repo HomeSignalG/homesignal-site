@@ -9,17 +9,19 @@ name: load-openaddresses
 # Runs on the GitHub runner because it needs egress (the build sandbox cannot reach
 # data.openaddresses.io / *.supabase.co). Writes with SUPABASE_SERVICE_ROLE_KEY (repo secret) —
 # national_address_points is RLS service-role only. Manual/monthly; new ZIPs picked up with no code
-# change (scope derives from property_reports unless ZIPS is passed).
+# change (scope derives from geocodes ∪ dc_geocode_queue ∪ property_reports unless ZIPS is passed).
+# After a live load, upgrade_geocodes_from_national_address_points copies outranking OA points
+# into the write-once geocode cache (upgrade-only; never downgrades).
 
 on:
   workflow_dispatch:
     inputs:
       zips:
-        description: 'Optional comma-list of target ZIPs (default: distinct zips from property_reports)'
+        description: 'Optional comma-list of target ZIPs (default: demand-scope ZIPs from geocodes ∪ DC queue ∪ property_reports)'
         required: false
         default: ''
       states:
-        description: 'Optional comma-list of 2-letter states to download (default: derived from target rows)'
+        description: 'Optional comma-list of 2-letter states to download (default: derived from demand pairs)'
         required: false
         default: ''
       dry_run:
@@ -28,13 +30,13 @@ on:
         default: ''
   schedule:
     - cron: '19 8 1 * *'   # 08:19 UTC on the 1st of each month — the self-expanding refresh:
-                           # re-derives scope from property_reports, so a newly-ingested state's
+                           # re-derives scope from demand tables, so a newly-seen state's
                            # region is picked up automatically with no code change.
 
 jobs:
   load:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,3 +49,9 @@ jobs:
           STATES: ${{ github.event.inputs.states }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: python3 scripts/load-openaddresses.py
+      - name: Upgrade geocodes from national_address_points
+        if: ${{ github.event.inputs.dry_run != '1' }}
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python3 scripts/upgrade-geocodes-from-oa.py

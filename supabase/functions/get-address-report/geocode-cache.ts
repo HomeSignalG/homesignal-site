@@ -188,22 +188,47 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
   };
 }
 
+/** "NUM STREET, CITY, ST ZIP" → "NUM STREET, ST ZIP". Lockstep with public.oa_cityless_key. */
+export function oaCitylessKey(addr: string): string | null {
+  const m = String(addr).match(/^(.+), [^,]+, ([A-Z]{2} \d{5}(?:-\d{4})?)$/);
+  return m ? `${m[1]}, ${m[2]}` : null;
+}
+
+function napHit(data: { lat?: unknown; lng?: unknown; match_type?: unknown } | null, canonical: string) {
+  if (!data || typeof data.lat !== "number" || typeof data.lng !== "number") return null;
+  // Honour the row's stamped tier; fall back to the conservative parcel_centroid, never rooftop.
+  const mt = (data.match_type === "rooftop" || data.match_type === "parcel_centroid") ? data.match_type : "parcel_centroid";
+  return { lat: data.lat, lng: data.lng, match_type: mt as MatchType, matched_address: canonical };
+}
+
 /** Dataset rung — a LOCAL-DATASET lookup, no runtime egress, no per-call cost. Reads a table
  *  the CI loader populated (today: national_address_points from OpenAddresses), keyed by
  *  canonicalAddr(). Returns the point AT THE TIER THE LOADER STAMPED ON THE ROW (match_type):
  *  OpenAddresses defaults to 'parcel_centroid' and is only 'rooftop' where the source gave an
  *  explicit rooftop signal — so precision is never overstated. A miss returns null → next rung.
+ *  Lookup order: lookup_national_address_point (exact, then unique city-less), then the table
+ *  eq on the filed key, then the city-less key the loader also stores.
  *  (No commercial geocoder rung exists — the ladder is zero-fee: this dataset, then Census.) */
 // deno-lint-ignore no-explicit-any
 export function datasetRung(supabase: any, table: string, source = table): GeocoderRung {
   return {
     source,
     resolve: async (_input: string, canonical: string) => {
+      const viaRpc = await Promise.resolve(
+        supabase.rpc("lookup_national_address_point", { p_canonical: canonical }),
+      ).catch(() => ({ data: null, error: true }));
+      if (!viaRpc?.error) {
+        const rpcRow = Array.isArray(viaRpc?.data) ? viaRpc.data[0] : viaRpc?.data;
+        const fromRpc = napHit(rpcRow ?? null, canonical);
+        if (fromRpc) return fromRpc;
+      }
       const { data } = await supabase.from(table).select("lat,lng,match_type").eq("canonical_addr", canonical).maybeSingle();
-      if (!data || typeof data.lat !== "number" || typeof data.lng !== "number") return null;
-      // Honour the row's stamped tier; fall back to the conservative parcel_centroid, never rooftop.
-      const mt = (data.match_type === "rooftop" || data.match_type === "parcel_centroid") ? data.match_type : "parcel_centroid";
-      return { lat: data.lat, lng: data.lng, match_type: mt as MatchType, matched_address: canonical };
+      const exact = napHit(data, canonical);
+      if (exact) return exact;
+      const alt = oaCitylessKey(canonical);
+      if (!alt || alt === canonical) return null;
+      const second = await supabase.from(table).select("lat,lng,match_type").eq("canonical_addr", alt).maybeSingle();
+      return napHit(second?.data ?? null, canonical);
     },
   };
 }
