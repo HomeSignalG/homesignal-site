@@ -3290,6 +3290,15 @@ re-apply it after this file or the loose `"Results" and not "Error"` harvest ret
 - Ingest `frsAt` now treats any status other than 200 as transient (was any non-2xx). A 204
   used to fall through to parse and become a schema miss or, before that, a silent zero.
 
+### ✅ COMMUNITY ZIP TILE MATCHES MAP 1 ON AN UNKNOWN EPA COUNT (2026-09-27)
+`lib/community-page.js` used the materializer's `regulated facilities` component score
+alone. A refused EPA read with no stored markers (`overlay_unknown` /
+`facilities_unavailable`) rendered as **"0 Regulated facilities"** — the same false
+zero Map 1 already refuses. The strip now shows an em-dash on that flag, never
+inferred from a zero, so a genuine rural empty still reads 0. Pinned by
+`test/facilities-unavailable-copy.test.mjs`. Cache keys on `community.html` and
+`scripts/gen_zip_pages.py` moved with the file.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
