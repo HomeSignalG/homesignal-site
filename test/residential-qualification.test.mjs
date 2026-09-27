@@ -188,7 +188,8 @@ ok(railEnv.dedupeByProject(corridor).length === 2,
   '25: one road project drawn as many markers becomes ONE rail card');
 ok(railEnv.dedupeByProject([{ label: 'a' }, { label: 'b' }, { label: 'c' }]).length === 3,
   '26: rows with NO project identity are never collapsed — two real permits at one address both keep a card');
-ok(/items = dedupeByProject\(items\);[\s\S]{0,200}items\.slice\(0,12\)/.test(pageSrc),
+ok(/items = dedupeByProject\(items\);[\s\S]{0,200}items\.slice\(0, LIST_CAP\)/.test(pageSrc)
+  && /var LIST_CAP = 12;/.test(pageSrc),
   '27: the page de-dups BEFORE the 12-row cap, so the cap can never hide a duplicate');
 ok(/<div class='rec' data-ref='\"\+esc\(railKey\(s, i\)\)\+\"'/.test(pageSrc),
   '28: every rail row carries its project identity, so one-project-one-card is checkable in the DOM');

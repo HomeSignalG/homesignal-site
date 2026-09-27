@@ -130,6 +130,30 @@ ok(P.proposedRailNote([{ type: 'proposed' }]) === '',
 ok(P.proposedRailNote([{ type: 'proposed' }, { type: 'proposed', decision: dec }]) === P.PROPOSED_INCLUDES_HISTORY_NOTE,
   'and appears the moment one is present');
 
+// A source's own listing (a national data-centre record) is not a filing (2026-09-27). The
+// engine never sees such a record, so this branch is page-only and pinned here, not compared.
+{
+  const APPROVED = 'Application on file · Current decision status not verified.';
+  ok(P.currentStatusLine(null, 'none') === APPROVED && E.currentStatusLine(null, 'none') === APPROVED,
+    'control: an application with no decision still reads the approved sentence, on both copies');
+  const own = P.currentStatusLine(null, 'none', { filing: false });
+  ok(own === 'Current decision status not verified.' && own === P.SOURCE_RECORD_STATUS_LINE,
+    'a source\'s own listing keeps the qualification and drops "Application on file"', own);
+  ok(APPROVED.endsWith(own), 'and its sentence is the approved one minus that claim, nothing added');
+  ok(P.currentStatusLine(null, 'decision', { filing: false }) === own,
+    'even where the source could report a decision, a listing is never called an application');
+  ok(P.currentStatusLine(dec, 'decision', { filing: false }) === P.currentStatusLine(dec, 'decision'),
+    'a recorded decision is stated the same way whatever kind of record carries it');
+  ok(P.currentStatusLine(null, 'none', { filing: true }) === APPROVED
+     && P.currentStatusLine(null, 'none', {}) === APPROVED,
+    'only an explicit filing:false changes the line; anything else keeps the application wording');
+  ok(P.isSourceOwnRecord({ record_kind: 'national_project' }) === true,
+    'HS.isSourceOwnRecord recognises the national data-centre record HS.map1DcSite builds');
+  ok(!P.isSourceOwnRecord({}) && !P.isSourceOwnRecord(null) && !P.isSourceOwnRecord({ record_kind: 'development' })
+     && !P.isSourceOwnRecord({ type: 'proposed', project_no: 'X1' }),
+    'and nothing else: a permit, a notice or an empty record keeps the application wording');
+}
+
 // ── the pin must not move. A decision ANNOTATES a marker; it never re-buckets one ──
 {
   const base = { type: 'Data center', use_type: 'Data center', status: 'Proposed', label: 'X' };

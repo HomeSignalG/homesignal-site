@@ -27,6 +27,7 @@
 // Usage:
 //   node scripts/maps-social-image.mjs --list
 //   node scripts/maps-social-image.mjs --limit 5 [--dry] [--ids <uuid,uuid>]
+//   node scripts/maps-social-image.mjs --ids <uuid,uuid> --recapture   (re-shoot named drafts)
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY), BASE.
 
 import { chromium } from 'playwright';
@@ -59,6 +60,14 @@ const val = (f, d) => { const i = argv.indexOf(f); return i > -1 && argv[i + 1] 
 const DRY = has('--dry');
 const LIMIT = parseInt(val('--limit', '5'), 10);
 const ONLY_IDS = (val('--ids', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
+// --recapture re-shoots the NAMED drafts even when their picture is still bound (see
+// HS.mapsCaptureDue). It is for a fix to Map 1 itself, which no binding key can see, and it
+// is refused without --ids: a whole-queue re-shoot is never one flag away.
+const RECAPTURE = has('--recapture');
+if (RECAPTURE && !ONLY_IDS.length) {
+  console.error('REFUSING --recapture without --ids: name the drafts to re-shoot.');
+  process.exit(2);
+}
 const OUT_DIR = val('--out', '/tmp/maps-social-images');
 
 // 1200x630 — the ratio HomeSignal already ships (og-default.png is 1200x630) and the ratio
@@ -263,7 +272,7 @@ async function selectDrafts() {
   const skipped = { bound: 0, backoff: 0, exhausted: 0 };
   for (const d of rows) {
     // THE SHIPPED PREDICATE, not a second opinion about it.
-    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0 });
+    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0, recapture: RECAPTURE });
     if (!verdict.due) {
       // Reported separately so "already has its picture", "waiting out a backoff" and "has
       // burned its attempt budget" never read as one number.

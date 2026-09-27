@@ -39,7 +39,10 @@ const base = 'http://127.0.0.1:8849';
 const rowsFor = (zip) => FIX.rows.filter((r) => r.zip === zip).map((r) => { const o = Object.assign({}, r); delete o.zip; return o; });
 const HOME = { '20187': [38.72, -77.75], '23150': [37.50, -77.25] };
 // No local records at all, so every pin on the map is a data-centre row from the one contract.
-const zipRow = (zip) => [{ zip, home_lat: HOME[zip][0], home_lng: HOME[zip][1], counts: {}, sites: [],
+// The cached report's counters are planted at 999: they describe the report's own radius set,
+// so the page must drop them and count what it draws (section 3).
+const zipRow = (zip) => [{ zip, home_lat: HOME[zip][0], home_lng: HOME[zip][1],
+  counts: { proposed_active: 999, proposed: 999, development: 999 }, sites: [],
   paywall: false, refreshed_at: '2026-09-27T00:00:00Z', facilities_unavailable: false }];
 
 const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
@@ -174,6 +177,68 @@ console.log('\n2. ZIP 23150 — twenty rows, OSM compatibility and canonical tog
   ok(!t.some((x) => BAD.test(x)), '2c no pin reads Other project or lifecycle unknown');
   await clickType(page, 'data_center');
   ok((await titles(page)).length === 0, '2d Data center OFF removes every one of them');
+  await page.context().close();
+}
+
+console.log('\n3. What a resident reads on these rows: popup, list row, list cap, counter (2026-09-27)');
+// Each drawn marker's OWN popup, opened the way a click opens it and read from that marker's
+// popup object. (Reading document.querySelector('.leaflet-popup-content') returned the FIRST
+// popup every time: Leaflet fades a closed popup out rather than removing it at once.)
+const popups = (page) => page.evaluate(() => (window.siteMarkers || []).map((x) => {
+  x.m.openPopup();
+  const pop = x.m.getPopup();
+  const el = pop && pop.getElement ? pop.getElement() : null;
+  const body = el ? el.querySelector('.leaflet-popup-content') : null;
+  const out = { name: x.s.label, src: x.s.source_name, status: x.s.map_status || x.s.status,
+                text: body ? body.innerText : '' };
+  x.m.closePopup();
+  return out;
+}));
+const rows = (page, id) => page.evaluate((i) => Array.from(document.querySelectorAll('#' + i + ' .rec'))
+  .map((r) => ({ name: (r.querySelector('.t') || {}).innerText || '', line: (r.querySelector('.s') || {}).innerText || '',
+                 all: r.innerText })), id);
+const more = (page, id) => page.evaluate((i) => { const m = document.querySelector('#' + i + ' .listmore'); return m ? m.innerText : null; }, id);
+{
+  const { page, pageErrors } = await open('20187');
+  ok(pageErrors.length === 0, '3a no page errors', pageErrors[0]);
+  const cdev = await page.evaluate(() => document.getElementById('cDev').textContent);
+  ok(cdev === '2', '3b "New projects proposed" counts the 2 proposed pins drawn, not the report\'s planted 999', cdev);
+  const ps = await popups(page);
+  ok(ps.length === 4 && ps.every((p) => p.text && p.text.split('\n')[0] === p.name),
+    '3c all four markers open their OWN popup (its first line is that marker\'s name)', ps.map((p) => p.text.split('\n')[0]));
+  const prop = ps.filter((p) => p.status === 'Proposed');
+  ok(prop.length === 2 && prop.every((p) => /Current decision status not verified\./.test(p.text)),
+    '3d each proposed data-centre popup keeps the qualification', prop.map((p) => p.text));
+  ok(!ps.some((p) => /Application on file/.test(p.text)),
+    '3e no popup calls a source\'s own listing an application', ps.filter((p) => /Application on file/.test(p.text)).map((p) => p.name));
+  ok(ps.every((p) => p.src && p.text.includes(p.src)),
+    '3f every popup names the record\'s source (Compute Atlas / OpenStreetMap)', ps.map((p) => [p.name, p.src]));
+  ok(!ps.some((p) => /(^|\n)\s*\u00b7/.test(p.text)), '3g no popup line starts with a stray dot', ps.map((p) => p.text));
+  const pr = await rows(page, 'propList');
+  const every = pr.concat(await rows(page, 'apprList'), await rows(page, 'builtList'));
+  ok(every.length === 4, '3h the four rows are listed', every.map((r) => r.name));
+  ok(every.every((r) => /Compute Atlas|OpenStreetMap/.test(r.line)) && !every.some((r) => /\u00b7\s*\u00b7/.test(r.line)),
+    '3i every list row names its source, with no empty "· ·" gap', every.map((r) => r.line));
+  ok(pr.length === 2 && pr.every((r) => /Current decision status not verified\./.test(r.all) && !/Application on file/.test(r.all)),
+    '3j the Proposed list keeps the qualification and drops "Application on file"', pr.map((r) => r.all));
+  ok((await more(page, 'propList')) === null && (await more(page, 'builtList')) === null,
+    '3k a list under the cap says nothing extra');
+  await page.context().close();
+}
+{
+  const { page, pageErrors } = await open('23150');
+  ok(pageErrors.length === 0, '3l no page errors', pageErrors[0]);
+  const operating = FIX.rows.filter((r) => r.zip === '23150' && r.map_status === 'Operating').length;
+  const approved = FIX.rows.filter((r) => r.zip === '23150' && r.map_status === 'Approved').length;
+  ok(operating > 12, `3m control: 23150 has ${operating} operating data centres, more than the 12-row cap`, operating);
+  const br = await rows(page, 'builtList');
+  const note = await more(page, 'builtList');
+  const rest = operating - 12;
+  ok(br.length === 12 && note === `Showing 12 of ${operating}. The other ${rest} ${rest === 1 ? 'is' : 'are'} on the map.`,
+    '3n the Operating list shows 12 rows and says how many more are on the map', { rows: br.length, note });
+  ok(approved <= 12 && (await more(page, 'apprList')) === null, `3o the Approved list (${approved} rows) carries no note`);
+  const cdev = await page.evaluate(() => document.getElementById('cDev').textContent);
+  ok(cdev === '0', '3p no proposed pins here, so the counter reads 0, not the report\'s planted 999', cdev);
   await page.context().close();
 }
 

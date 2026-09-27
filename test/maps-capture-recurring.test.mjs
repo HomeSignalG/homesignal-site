@@ -240,6 +240,12 @@ ok(HS.mapsCaptureDue(notMoved, T0, { ignoreClock: true }).due,
   '8d: --ids bypasses the clock (an operator naming a row has decided)');
 ok(!HS.mapsCaptureDue(bound(), T0, { ignoreClock: true }).due,
   '8e: but --ids never bypasses BOUNDNESS — a bound row genuinely needs no picture');
+// --recapture is the one explicit exception (2026-09-27): a fix to Map 1 itself leaves every
+// older picture bound while it shows the old drawing, and no binding key can see that.
+ok(HS.mapsCaptureDue(bound(), T0, { ignoreClock: true, recapture: true }).due,
+  '8f: --ids --recapture re-shoots a BOUND named draft');
+ok(!HS.mapsCaptureDue(bound(), T0, { recapture: 'true' }).due && !HS.mapsCaptureDue(bound(), T0, { recapture: 1 }).due,
+  '8g: only a literal recapture:true does it — a truthy stand-in does not');
 
 // ── §9 NO FAILURE STATE MAY READ AS A FINDING ABOUT A ZIP ─────────────────────────────
 // This is the one the founder named explicitly. A failed or ineligible capture must never
@@ -258,8 +264,17 @@ ok(HS.mapsCaptureStateCopy('SOMETHING_ELSE') === '',
   '9d: an unknown state gets NO invented copy');
 
 // ── §10 STRUCTURAL PINS on the files a behavioural test cannot execute ────────────────
-ok(/HS\.mapsCaptureDue\(d, now, \{ ignoreClock: ONLY_IDS\.length > 0 \}\)/.test(GEN),
+ok(/HS\.mapsCaptureDue\(d, now, \{ ignoreClock: ONLY_IDS\.length > 0, recapture: RECAPTURE \}\)/.test(GEN),
   '10a: the capture script uses the SHIPPED predicate — not a second copy of it');
+// --recapture is refused without --ids, before anything is read, so a whole-queue re-shoot is
+// never one flag away; and the workflow passes it only when its input is literally 'true'.
+ok(/const RECAPTURE = has\('--recapture'\);\s*\nif \(RECAPTURE && !ONLY_IDS\.length\) \{[\s\S]{0,160}process\.exit\(2\);/.test(GEN),
+  '10a2: the script refuses --recapture without --ids, at startup');
+{
+  ok(/\$\{\{ inputs\.recapture == 'true' && '--recapture' \|\| '' \}\}/.test(WF)
+     && /recapture:\s*\n\s*description:[^\n]*\n\s*default: 'false'/.test(WF),
+    '10a3: the workflow passes --recapture only when its input is \'true\', and it defaults to false');
+}
 ok(/HS\.MAPS_CAPTURE_RETRY/.test(GEN), '10b: and the SHIPPED retry ladder');
 // ⚖️ AT THE SCOPE THE SHUTTER ACTUALLY USED. Keying at the draft's own widest scope
 // stamps a PROJECT key on a ZIP-scope picture, which then never matches what
@@ -399,6 +414,8 @@ ok(!HS.mapsCaptureDue(dcBound(), T0).due && HS.mapsCaptureDue(dcBound(), T0).ski
   '11h: …so a second run against it is a NO-OP');
 ok(!HS.mapsCaptureDue(dcBound(), T0, { ignoreClock: true }).due,
   '11i: …and --ids does not re-photograph it either — an explicit id bypasses the CLOCK, never boundness');
+ok(HS.mapsCaptureDue(dcBound(), T0, { ignoreClock: true, recapture: true }).due,
+  '11i2: …unless the operator also says --recapture, which re-shoots it');
 
 // LEGACY INVALIDATION. Every image captured before this policy existed carries a key without
 // the policy segment AND no measured evidence. It must become unbound and due.

@@ -212,6 +212,17 @@ interaction is the root cause, and neither ruling is wrong.
     1,816 draw as Data center in their own lifecycle (Operating 1,481 · Approved 183 · Proposed
     152). The live probe read 28 of 28 on the deterministic sample. No SQL, identity, dedupe, geography or OSM
     change. (a) is the membership read #1315 replaced; see CLAUDE.md §7.09.
+  - ✅ **Four follow-on defects fixed (2026-09-27, founder: "fix defects"):** the "Application on
+    file" line on proposed national pins, the blank source line, lists cut at 12 with nothing
+    said, and the "New projects proposed" tile reading the report's radius `proposed_active`.
+    See CLAUDE.md §7.09.
+  - ⏳ **OPEN: re-shoot six MAPS drafts after merge** (`maps-social-image.yml`, `recapture=true`,
+    `ids` below, dispatched from `main`). Their pictures predate the fix and their frame can
+    contain a data-centre pin: `5aca7ffc-2473-4e4c-b00e-d5ee01adcfc8` (20904),
+    `c6245e38-386f-434e-88b0-d32aab4fd984` (60607), `491380a5-259e-4c63-b7a7-96d914eb9c36`
+    (64153), `532ff7fe-a30d-4653-9768-816e35e869c7` (85008), `a41fb90e-049d-4e71-babc-5ef2f8a27f18`
+    (85034), `f89ea810-1b98-47ce-9c21-550c42768d6a` (97702, ZIP scope). Done when each row's
+    `evidence.visual.captured_at` is later than the dispatch.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
   path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace

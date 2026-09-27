@@ -2776,6 +2776,44 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
     today; the page reads no lifecycle from this column"*. True when written, false now; the
     comment is annotated. The edit is inert: every builder that reads the file still passes
     `--check` (positive control: `build_map1.py --check` fails when the function body changes).
+- 🛑 **FOUR MORE DEFECTS THE FIX EXPOSED, FIXED THE SAME DAY (2026-09-27, founder: "fix
+  defects").** Each was read off the rendered page in the browser harness, and each fix is
+  pinned by a test that was shown to fail when the fix is removed (12 mutations, all caught on
+  exit code).
+  - **"Application on file" on a source's own listing.** The 152 proposed pins read
+    *"Application on file · Current decision status not verified."* while the page footer says
+    *"These are the sources' own records, not local permit filings"*. `HS.currentStatusLine`
+    takes `{ filing: false }` for a record `HS.isSourceOwnRecord` recognises (`record_kind`
+    `national_project`, set only by `HS.map1DcSite`) and returns the approved sentence minus
+    that claim: *"Current decision status not verified."* It is page-only, because the engine
+    never sees such a record, and it is pinned in the parity test's page-extras section.
+  - **Blank source line.** The popup and list rows read the source from `src` or
+    `jurisdiction`; national rows carry `source_name`, so the line was empty ("Development ·
+    · Official record ▸"). `srcLabel` now falls back to `source_name`, and a record with no
+    source at all no longer leaves a stray dot.
+  - **Lists cut at 12 with nothing said.** Every Map 1 list shows at most 12 rows (23150: 13
+    operating data centres, 12 listed). A longer list now ends with *"Showing 12 of N. The
+    other M are on the map."* Ordering and the cap are unchanged.
+  - **The "New projects proposed" tile counted the wrong records.** Both loaders dropped the
+    cached report's `development`/`proposed`/`comment_open` counters (they describe the
+    report's radius set, which Map 1 no longer draws) but not `proposed_active`, added later.
+    12,603 of 12,722 cached reports carry it, so on almost every ZIP page the tile showed the
+    report's radius count, and never counted a proposed data-centre pin. Both loaders now drop
+    it, and the tile counts the Proposed set the page draws through `HS.isActiveUndecided`.
+  - **Screenshots taken before the fix.** The capture key describes the record and the
+    map-state policy, never how Map 1 draws neighbouring records, so a fix to Map 1 leaves old
+    pictures bound. The capture job gained `--recapture` (workflow input `recapture`), which
+    re-shoots NAMED drafts even when bound; it is refused without `--ids`, and `--ids` alone
+    still never re-shoots a bound draft. Measured 2026-09-27: every MAPS image predates the
+    fix; six DRAFTS have a frame that can contain a data-centre pin (listed in the PR that added
+    `--recapture`) and are
+    re-shot with it once this reaches `main`. The one approved post (97702) has none in frame
+    (the nearest pin is ~0.054° of longitude off-centre at zoom 15) and is not touched; four
+    published posts are already on Bluesky.
+  - 📌 **Observed, not changed:** a proposed national pin's popup still says
+    *"Proposed / hearing"*, the stage word every Proposed record uses, though no hearing is
+    known for these records; and the list tag reads "Development" for any record without a
+    `layer`. Both are page-wide wording, not specific to data centres.
 
 ---
 
