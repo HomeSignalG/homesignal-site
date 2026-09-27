@@ -66,7 +66,7 @@ export type FrsOutcome = {
   /** the radius that actually answered; null when nothing did */
   radius_used: number | null;
   /** null on success; else why the sequence gave up — for logs and for the cache guard */
-  reason: "process_limit" | "transient" | "deadline" | "schema" | null;
+  reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null;
   /** how many HTTP attempts were made (observability: a 1 means it worked first try) */
   attempts: number;
 };
@@ -167,7 +167,7 @@ export async function frsFacilities(
 ): Promise<FrsOutcome> {
   const now = opts.now ?? (() => Date.now());
   const deadlineAt = opts.deadlineAt;
-  let reason: "process_limit" | "transient" | "deadline" | "schema" | null = null;
+  let reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null = null;
   let attempts = 0;
   for (const rad of frsRadii(radiusMi)) {
     let transientExhausted = false;
@@ -189,7 +189,18 @@ export async function frsFacilities(
       }
       attempts++;
       const { ok, tooBig, schema, rows } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
-      if (ok) return { ok: true, rows, radius_used: rad, reason: null, attempts };
+      if (ok) {
+        // A zero at a SMALLER radius is not a whole-ZIP zero. Process-limit back-off
+        // answered a tighter circle; "nothing here" does not prove the requested
+        // circle is empty. The 2026-09-27 audit: r=3 and r=2 refused, r=1.5 returned
+        // [] → ok:true, treated as authoritative. A smaller NONZERO count still
+        // writes (observable via radius_used / pre_cap) — that is undercount, not a
+        // false zero.
+        if (rows.length === 0 && rad < radiusMi) {
+          return { ok: false, rows: [], radius_used: null, reason: "partial_scope", attempts };
+        }
+        return { ok: true, rows, radius_used: rad, reason: null, attempts };
+      }
       if (schema) {
         // Same body will come back on retry. Not a zero, not a reason to shrink the circle.
         return { ok: false, rows: [], radius_used: null, reason: "schema", attempts };

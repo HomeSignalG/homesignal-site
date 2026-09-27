@@ -289,5 +289,36 @@ ok(frsRadii(1).join(',') === '1,0.5,0.25', '11b. a smaller request never widens 
     `got ${out.attempts}`);
 }
 
+// ── 14. a ZERO at a smaller radius is NOT a whole-ZIP zero ────────────────────────────────────
+// Audit 2026-09-27: process limit at 3 and 2, empty answer at 1.5 → ok:true, rows=[],
+// radius_used:1.5, treated as authoritative. That is a partial-scope zero.
+{
+  const f = recorder((rad) => (rad > 1.5 ? res(200, PROCESS_LIMIT) : res(200, body([]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'partial_scope',
+    '14. process limit then empty at r=1.5 → ok:FALSE, reason:partial_scope',
+    `got ok=${out.ok} reason=${out.reason} radius=${out.radius_used}`);
+  ok(out.rows.length === 0 && out.radius_used === null,
+    '14b. the partial zero carries no rows and names no radius');
+  ok(f.seen.join(',') === '3,2,1.5',
+    '14c. it stopped at the first smaller radius that answered empty',
+    `saw ${f.seen.join(',')}`);
+}
+{
+  // Control: empty at the REQUESTED radius is still an authoritative zero.
+  const f = recorder(() => res(200, body([])));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 0 && out.radius_used === 3,
+    '14d. empty at the requested radius is still an authoritative zero');
+}
+{
+  // Control: a smaller NONZERO answer is still accepted (undercount, not a false zero).
+  const f = recorder((rad) => (rad > 1.5 ? res(200, PROCESS_LIMIT) : res(200, body([FACILITY]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 1 && out.radius_used === 1.5,
+    '14e. process limit then a smaller NONZERO count is still accepted',
+    `got ok=${out.ok} radius=${out.radius_used} rows=${out.rows.length}`);
+}
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll EPA result-semantics checks passed');
 process.exit(fails ? 1 : 0);
