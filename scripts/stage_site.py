@@ -95,9 +95,9 @@ ROOT_FILES = (
 #: Directory trees that ship, each with the file extensions allowed inside it. A tree is
 #: copied recursively, but only files whose suffix appears here are taken — so a `.sql`,
 #: `.md`, `.py` or build-only `.mjs` dropped inside a shipped tree still does not ship.
-#: (`lib/generated/` holds two runtime JSONs the browser fetches alongside three
-#: build-tooling artifacts — transitions.mjs, versions.mjs and transitions.sql — which
-#: are never served over HTTP; their generator now lives in homesignal-ingest.)
+#: (`lib/generated/` holds two runtime JSONs the browser fetches; the three
+#: build-tooling artifacts — transitions.mjs, versions.mjs and transitions.sql — moved
+#: to homesignal-ingest with their generator.)
 TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
