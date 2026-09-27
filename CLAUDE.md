@@ -3288,11 +3288,12 @@ robots and coverage states are untouched. Full record: audit §14.
   **Unit 1 therefore leaves `data_quality` alone** and gives core its own EPA-free markers —
   `core_project_scan_status` (`not_scanned` · `projects_found` · `no_qualifying_projects_found`)
   and `core_records_present`, both computed from `_has_report`/`_nd`/`_nc` only.
-- **What Unit 1 changes is `indexable`, and only `indexable`:**
-  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`.
-  Stored-stamp measurement: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb on
-  1,005 of 1,005, 0 pages newly advertised**, all 1,005 carrying a `development_reports` row.
-  *(The "1,004" above was an estimate; −1,005 is exact.)*
+- ⛔ **What Unit 1 *proposed* to change was `indexable` — REJECTED 2026-09-27.**
+  The parked splice no longer touches the flag. Live rule stays
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))`. The dated measurement of the
+  rejected unlist: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb**.
+  Re-measured live 2026-09-27: **11,696 indexable / 945 plant-only (≥3 facilities,
+  zero development-project rows). They stay advertised.**
 - ⚠️ **NAME THE INSTRUMENT WITH THE NUMBER — two correct readings disagree by 463.** The 766
   comes from the STORED stamps (`component_scores`, one self-consistent row read). Recomputing
   the same question live from `app_projects`/`app_changes` returns **303**, and again later

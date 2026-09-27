@@ -5,11 +5,12 @@
 //
 // WHY THIS FILE EXISTS. Phase 1 cut the two RUNTIME control paths (EPA could pause the
 // national core refresh; refusing the regulatory write refused the core write). A third
-// path is SEMANTIC and survived: `app_refresh_zip` decided indexability with
-// `(_ndp > 0 or _nfc >= 3)`, so EPA facility count alone advertised a ZIP as a
-// DEVELOPMENT page. Measured from the stored stamps 2026-09-07: 1,005 of 11,704
-// indexable ZIPs qualify on the EPA limb and carry zero parcel-precise development
-// records — 1,005 of 1,005 via that limb, 0 via anything else.
+// path is SEMANTIC: `app_refresh_zip` decides indexability with
+// `(_ndp > 0 or _nfc >= 3)`, so EPA facility count alone can advertise a ZIP page.
+// Measured 2026-09-07: 1,005 of 11,704 indexable ZIPs qualified on that limb with
+// zero parcel-precise development records. The 2026-09-07 Unit 1 proposal would have
+// dropped them from the advertised set. Founder 2026-09-27: that idea is rejected.
+// Those pages stay listed. "Nothing is being built" is a valid answer.
 //
 // ⚠️ THE MODEL IS NOT THE PRODUCT. A truth table proves the RULE; it cannot prove the
 // parked SQL implements it. Every semantic case is therefore paired with a structural
@@ -38,11 +39,11 @@ const ok = (name, cond) => { if (cond) console.log(`PASS — ${name}`); else { c
 const skip = (name, why) => console.log(`SKIP — ${name}\n        ${why}`);
 
 // ───────────────────────── the model ─────────────────────────
-// Mirrors the spliced expressions. `nf`/`nfc` are accepted as arguments ON PURPOSE:
-// the point of this unit is that they are accepted and IGNORED, and a model that
-// simply omitted them could not demonstrate that.
-const indexableAfter  = ({ nd, ndp, nc }) => (nd + nc) > 0 && ndp > 0;
-const indexableBefore = ({ nd, ndp, nc, nf, nfc }) => (nd + nf + nc) > 0 && (ndp > 0 || nfc >= 3);
+// `indexableListed` is the LIVE / KEPT rule (founder, 2026-09-27): plants with
+// no new construction stay listed. `indexableRejectedUnlist` is the old Unit 1
+// proposal, kept only as a control so the test can prove it is not the product.
+const indexableListed = ({ nd, ndp, nc, nf, nfc }) => (nd + nf + nc) > 0 && (ndp > 0 || nfc >= 3);
+const indexableRejectedUnlist = ({ nd, ndp, nc }) => (nd + nc) > 0 && ndp > 0;
 const coreRecords     = ({ nd, nc }) => (nd + nc) > 0;
 const scanStatus      = ({ hasReport, nd }) =>
   !hasReport ? 'not_scanned' : nd > 0 ? 'projects_found' : 'no_qualifying_projects_found';
@@ -65,21 +66,23 @@ const CORE_GRID = [
   let varied = 0;
   for (const core of CORE_GRID) {
     const answers = EPA_GRID.map((e) => JSON.stringify([
-      indexableAfter({ ...core, ...e }), coreRecords({ ...core, ...e }), scanStatus({ ...core, ...e }),
+      coreRecords({ ...core, ...e }), scanStatus({ ...core, ...e }),
     ]));
     if (new Set(answers).size !== 1) varied++;
   }
-  ok('1. core markers are invariant across the whole EPA grid (rule #1)', varied === 0);
-  ok('1b. the grid is non-trivial (control: the OLD expression DOES vary)',
-     CORE_GRID.some((core) => new Set(EPA_GRID.map((e) => indexableBefore({ ...core, ...e }))).size > 1));
+  ok('1. core markers (not indexable) are invariant across the whole EPA grid (rule #1)', varied === 0);
+  ok('1b. the grid is non-trivial (control: listing MAY use the facility limb)',
+     CORE_GRID.some((core) => new Set(EPA_GRID.map((e) => indexableListed({ ...core, ...e }))).size > 1));
 }
 
-// 2 — the facilities-only ZIP: the 1,005. Advertised today, not advertised after, and
-// honestly described by the new markers rather than silently demoted.
+// 2 — the facilities-only ZIP: the ~1,005. STAYS listed. "Nothing is being built"
+// is a valid answer (founder, 2026-09-27). Core markers still describe the empty
+// development plane honestly; they do not take the page out of the advertised set.
 {
   const z = { hasReport: true, nd: 0, ndp: 0, nc: 0, nf: 40, nfc: 40 };
-  ok('2. facilities-only ZIP was indexable before', indexableBefore(z) === true);
-  ok('2b. facilities-only ZIP is NOT indexable after', indexableAfter(z) === false);
+  ok('2. facilities-only ZIP stays listed under the live rule', indexableListed(z) === true);
+  ok('2b. the rejected Unit 1 unlist would have dropped it (control)',
+     indexableRejectedUnlist(z) === false);
   ok('2c. its scan status is a COMPLETE result, not a failure',
      scanStatus(z) === 'no_qualifying_projects_found');
   ok('2d. its core plane is honestly reported empty', coreRecords(z) === false);
@@ -91,13 +94,13 @@ const CORE_GRID = [
   const healthy = { hasReport: true, nd: 5, ndp: 5, nc: 3, nf: 40, nfc: 40 };
   const outage  = { hasReport: true, nd: 5, ndp: 5, nc: 3, nf: 0,  nfc: 0 };
   ok('3. an EPA outage does not change indexability of a core-backed ZIP',
-     indexableAfter(healthy) === indexableAfter(outage) && indexableAfter(outage) === true);
+     indexableListed(healthy) === indexableListed(outage) && indexableListed(outage) === true);
   ok('3b. an EPA outage does not change its scan status',
      scanStatus(healthy) === scanStatus(outage) && scanStatus(outage) === 'projects_found');
   ok('3c. an EPA outage does not change core_records_present',
      coreRecords(healthy) === coreRecords(outage) && coreRecords(outage) === true);
-  ok('3d. under the OLD rule the outage ZIP was still indexable too (no regression here)',
-     indexableBefore(outage) === true);
+  ok('3d. the rejected unlist would also have kept the core-backed ZIP (control)',
+     indexableRejectedUnlist(outage) === true);
 }
 
 // 4 — the case that separates _nd from _ndp. A ZIP with area-scope development records
@@ -107,8 +110,8 @@ const CORE_GRID = [
 {
   const z = { hasReport: true, nd: 3, ndp: 0, nc: 0, nf: 0, nfc: 0 };
   ok('4. area-scope-only development reports projects_found', scanStatus(z) === 'projects_found');
-  ok('4b. ... and is still not indexable (the pin-precision bar is unchanged)',
-     indexableAfter(z) === false);
+  ok('4b. ... and is still not indexable (no pins and no facility limb)',
+     indexableListed(z) === false);
   ok('4c. ... and its core plane is present', coreRecords(z) === true);
 
   // ⚠️ OPEN, AND DELIBERATELY NOT RESOLVED IN THIS PASS.
@@ -151,15 +154,18 @@ ok('6. projects_found always implies core_records_present',
 
 // ───────────────────── structural pins on the SQL of record ─────────────────────
 
-// 7 — the new expression, and the removed limb.
-ok('7. SQL: the EPA-free indexable expression is spliced in',
-   /\(\(_nd\+_nc\)>0 and _ndp > 0\),/.test(sql));
-ok('7b. SQL: the replacement value itself names no EPA counter',
+// 7 — indexable is unchanged. The replacement keeps the facility limb.
+ok('7. SQL: replacement indexable KEEPS the facility limb',
    (() => {
      const m = sql.match(/va\s+text := ([\s\S]*?);\n\s*kb\s+text/);
-     return !!m && !/_nfc|_nf\b/.test(m[1]);
+     return !!m && /\(_ndp > 0 or _nfc >= 3\)/.test(m[1]);
    })());
-ok('7c. SQL: the removed anchor is the facility limb', /_ndp > 0 or _nfc >= 3/.test(sql));
+ok('7b. SQL: the rejected unlist is not the replacement indexable line',
+   (() => {
+     const m = sql.match(/va\s+text := ([\s\S]*?);\n\s*kb\s+text/);
+     return !!m && !/\(\(_nd\+_nc\)>0 and _ndp > 0\)/.test(m[1]);
+   })());
+ok('7c. SQL: the kept live anchor is the facility limb', /_ndp > 0 or _nfc >= 3/.test(sql));
 
 // 8 — the splice fails CLOSED. Each anchor must be asserted unique, with its own raise.
 ok('8. SQL: three anchors, each asserted to occur exactly once',
@@ -217,10 +223,10 @@ ok('10e. SQL: an invariant forbids core records claimed on Local News alone',
 ok('11. SQL: no unreachable draft statement survived', !/\bwhere false\b/i.test(sql));
 
 // 12 — the invariants actually assert the thing.
-ok('12. SQL: an invariant forbids the EPA limb returning',
-   /the EPA facility limb still gates indexable/.test(sql));
-ok('12b. SQL: an invariant pins the overlay is still SELF-REPORTING (6 _nfc refs)',
-   /n_nf_index <> 6/.test(sql));
+ok('12. SQL: an invariant forbids removing the facility limb',
+   /plant-only pages must stay listed/.test(sql));
+ok('12b. SQL: an invariant pins 7 _nfc refs (limb kept + overlay self-reporting)',
+   /n_nf_index <> 7/.test(sql));
 ok('12c. SQL: an invariant forbids NULL markers after backfill',
    /core_project_scan_status is null or core_records_present is null/.test(sql));
 ok('12d. SQL: an invariant pins projects_found => core_records_present',
