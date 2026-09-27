@@ -5,7 +5,7 @@ carry a "corroborated by address" flag earned from the opposite side of the road
 the ONE derived-point verdict every source uses. It checked the house number and the state, but not the
 street's direction, and it read "31" out of "31st Avenue" as a house number.
 
-**Change (built, gated, not yet applied):** `dc_derived_point_verdict` also rejects
+**Change (APPLIED 2026-09-27 15:57 UTC, verified after the 16:35 resolver):** `dc_derived_point_verdict` also rejects
 (`REJECTED_MATCH_DIVERGES`):
 - a match whose leading street direction contradicts the query's;
 - a query or match with no house number (digits, one optional letter, then a space).
@@ -89,3 +89,41 @@ The same discipline as C3c, adapted for a change that reaches Map 1 through the 
 **Other suites.** Epoch, OSM, Atlas validation, zip membership, Map 1 publication and canonical geography
 all pass. The structure test is `test/dc-verdict-structure.test.mjs` (14 checks); three of its pins were
 mutation-checked, and all three mutations were caught.
+
+## 4. Applied and verified in production (2026-09-27)
+
+**First dispatch, run `36327173817` (14:47 UTC): the gate REFUSED at parity, and it was right to.**
+Replica Map 1 1,816 rows vs production 1,083. Compute Atlas re-acquired at **14:49:52**, in the middle of
+the gate's copy (each table is copied in its own read-only transaction). Its 2,242 new observations were
+unlinked until the hourly identity resolver ran, so production Map 1 briefly showed **1 canonical marker
+instead of 971** (OSM 845 → 1,082 as suppressed duplicates reappeared). Nothing was applied. See §5.
+
+**Second dispatch, run `36330904342` (15:48 UTC): gate PASSED, applied 15:57:14–15:57:18.**
+- Parity 1,816 rows identical. Baseline resolvers wrote 0; after the change geography wrote 7; steady 0.
+- G01–G12 all true: **7 flips = 7 predicted**, 4 Map 1 rows touched, no pin moved, **1 restored**
+  (Volo Data Center, 60073), **0 removed**, **3 corroborations withdrawn** (68508 ×2, 85338), 7 affected
+  entities + 1 OSM record, identity unchanged, 1,816 − 0 + 1 = 1,817.
+- Live verdict `md5(prosrc)` `09bbb34f73aefe2e9c6bbefedbdd829e`; the direction case now returns
+  `REJECTED_MATCH_DIVERGES`; the Goodyear OSM check reads `UNCHECKED_REJECTED_MATCH_DIVERGES`.
+
+**After the 16:35 geography resolver (16:36:45), read-only:** Map 1 **1,817** rows (canonical 971 → **972**,
+OSM 845) — exactly the gate's prediction. Volo Data Center on 60073. The three dc: rows carry no
+`CORROBORATED_BY_DERIVED_ADDRESS`. `SOURCES_DISAGREE` **49 → 46**; Merom, Volo and Superior are no longer
+among them.
+
+Why only Volo reappears on Map 1: Merom and Superior are now placed correctly, but neither placement fits
+inside one ZIP, so neither is drawn — before or after. Lockport and the Goodyear Atlas row were not on the
+map with the flag to begin with.
+
+## 5. Step 13 measured live: the marker-loss window
+
+| event | UTC |
+|---|---|
+| Compute Atlas acquisition lands (2,242 new observations, 0 linked) | 14:49:52 |
+| Map 1 canonical rows | 971 → **1** |
+| `dc-resolve-canonical` (hourly, :25) links them | 15:25:00–15:25:19 |
+| Map 1 back to 971 canonical / 845 OSM | by 15:47 |
+
+**≈ 35½ minutes this time; up to ~60 minutes worst case**, because the identity resolver runs once an hour
+at :25 and an acquisition can land just after it. During the window a resident sees almost no canonical
+data-centre markers. The gate's parity check is what surfaced it. Fixing it is step 13's work.
