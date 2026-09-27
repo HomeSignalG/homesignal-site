@@ -121,6 +121,16 @@ HS.onReady(async function () {
       sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'impact',
       dataView: false
     };
+    // DISTANCE IS ADDRESS-RELATIVE. On a ZIP Place (declared above by
+    // HS.declareRouteZipPlace -> S.viewPlaceType === 'zip') there is no address to measure
+    // from, so Distance is offered neither as a sort nor as a table column, and a URL that
+    // asks for it (sort=distance, or lens=2, the distance lens) falls back to the default.
+    // Address context (no route ZIP) keeps all of it unchanged.
+    var zipPlace = S.viewPlaceType === 'zip';
+    if (zipPlace) {
+      if (state2.sort === 'distance') state2.sort = 'impact';
+      if (state2.lens === 2) state2.lens = 0;
+    }
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage
@@ -185,7 +195,7 @@ HS.onReady(async function () {
       }
       results.innerHTML =
         '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
-        + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
+        + seg('impact','Impact on me') + seg('status','Status') + (zipPlace ? '' : seg('distance','Distance')) + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
@@ -219,10 +229,10 @@ HS.onReady(async function () {
       return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
     }
     function dataTable(a){
-      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th>' + (zipPlace ? '' : '<th>Distance</th>') + '<th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
-          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
+          + '<td>' + HS.esc(p.stage||'') + '</td>' + (zipPlace ? '' : '<td>' + HS.esc(p.dist||'') + '</td>') + '<td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
         + '</tbody></table>';
     }
     function wire() {
