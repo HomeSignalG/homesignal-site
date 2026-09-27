@@ -216,13 +216,18 @@ interaction is the root cause, and neither ruling is wrong.
     file" line on proposed national pins, the blank source line, lists cut at 12 with nothing
     said, and the "New projects proposed" tile reading the report's radius `proposed_active`.
     See CLAUDE.md §7.09.
-  - ⏳ **OPEN: re-shoot six MAPS drafts after merge** (`maps-social-image.yml`, `recapture=true`,
-    `ids` below, dispatched from `main`). Their pictures predate the fix and their frame can
-    contain a data-centre pin: `5aca7ffc-2473-4e4c-b00e-d5ee01adcfc8` (20904),
-    `c6245e38-386f-434e-88b0-d32aab4fd984` (60607), `491380a5-259e-4c63-b7a7-96d914eb9c36`
+  - ✅ **Six MAPS drafts re-shot 2026-09-27** (`maps-social-image.yml` run `36339216006`,
+    `recapture=true`, dispatched from `main` at `bd7a7af` at 18:03:21Z, after the live
+    `homesignalmap.html` was checked byte-identical to the repo): `5aca7ffc-2473-4e4c-b00e-d5ee01adcfc8`
+    (20904), `c6245e38-386f-434e-88b0-d32aab4fd984` (60607), `491380a5-259e-4c63-b7a7-96d914eb9c36`
     (64153), `532ff7fe-a30d-4653-9768-816e35e869c7` (85008), `a41fb90e-049d-4e71-babc-5ef2f8a27f18`
-    (85034), `f89ea810-1b98-47ce-9c21-550c42768d6a` (97702, ZIP scope). Done when each row's
-    `evidence.visual.captured_at` is later than the dispatch.
+    (85034), `f89ea810-1b98-47ce-9c21-550c42768d6a` (97702). Each row's `evidence.visual.captured_at`
+    (18:04:22–18:04:39Z) and its stored file's `updated_at` are after the dispatch; all six are
+    still drafts and pass both approval checks. 97702 is now a pinned map of its own project
+    instead of a ZIP map (see CLAUDE.md §7.09).
+  - 📌 **Left for the ingest cleanup job:** `maps/97702/zip-1iivwwic4mzo.png` is referenced by 0 of
+    58 MAPS rows after the re-shoot. It is removed by `homesignal-ingest`'s dispatch-only
+    `cleanup-social-images.yml`, not by this repo.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
   path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace
