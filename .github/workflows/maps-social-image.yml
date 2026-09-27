@@ -61,6 +61,9 @@ on:
       ids:
         description: 'Optional comma-separated social_posts ids (bypasses the retry clock)'
         default: ''
+      recapture:
+        description: 'true = re-shoot the named ids even if their picture is still bound (after a Map 1 fix). Requires ids.'
+        default: 'false'
       dry:
         description: 'true = capture and upload nothing'
         default: 'false'
@@ -139,6 +142,7 @@ jobs:
             --limit "${{ inputs.limit || '8' }}" \
             ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
             ${{ inputs.dry == 'true' && '--dry' || '' }} \
+            ${{ inputs.recapture == 'true' && '--recapture' || '' }} \
             ${{ inputs.stamp_types == 'true' && '--stamp-types' || '' }} \
             --out "$GITHUB_WORKSPACE/maps-social-out"
 

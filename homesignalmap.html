@@ -285,6 +285,7 @@
   .rec .vflag{display:inline-block;margin-top:4px;font-size:11px;color:var(--violation);
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
+  .listmore{color:var(--mute);font-size:12.5px;padding:8px 0 2px}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
 
@@ -884,7 +885,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=ec3b1cb1"></script>
 <script src="lib/project-type.js?v=6ad8270c"></script>
-<script src="lib/map.js?v=5824fe07"></script>
+<script src="lib/map.js?v=f98598d2"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
 <script src="lib/zip-authoritative.js?v=20260922a"></script>
@@ -1372,7 +1373,11 @@ HS.onReady(function(){
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
-  function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
+  // National data-centre rows (HS.map1DcSite) carry neither; they name their publisher in
+  // source_name ("Compute Atlas (Edward Kubiak)", "OpenStreetMap"), so that is the last fallback.
+  function srcLabel(s){ return (s && (s.src || s.jurisdiction || s.source_name)) || ""; }
+  // " · <source>", or nothing when a record names no source, so a line never carries a stray dot.
+  function srcPart(s){ var l = srcLabel(s); return l ? " · " + esc(l) : ""; }
   // ── DECISION HISTORY on the page — every surface reads these, none re-derives ─────
   // The authority is lib/map.js (HS.decisionOf / decisionNotation / currentStatusLine /
   // isActiveUndecided), which is itself pinned against the engine's sources/decision.ts
@@ -1403,8 +1408,11 @@ HS.onReady(function(){
   // Proposed category as a statement about today. A RECENT FETCH IS NOT PROOF OF A RECENT
   // DECISION CHECK, so this never consults `data.updated`.
   function currentStatusHTML(s, cls){
+    // A source's own listing (a national data-centre record) is not a filing, so it never
+    // reads "Application on file" (HS.isSourceOwnRecord, lib/map.js).
+    var own = !!(HS.isSourceOwnRecord && HS.isSourceOwnRecord(s));
     var line = HS.currentStatusLine
-      ? HS.currentStatusLine(decisionOf(s), (s && s.decision_evidence) || "none") : "";
+      ? HS.currentStatusLine(decisionOf(s), (s && s.decision_evidence) || "none", own ? { filing: false } : undefined) : "";
     return line ? "<div class='"+(cls||"decunv")+"'>"+esc(line)+"</div>" : "";
   }
   // Facilities (scope "point") pin at their exact EPA-registered coordinates. Development
@@ -2135,8 +2143,12 @@ HS.onReady(function(){
         // The engine's development counters described ITS development set, which no longer
         // renders in address mode. Drop them so render() recomputes from what is actually on
         // screen; the facilities count is still the engine's and is still accurate.
+        // proposed_active too (2026-09-27): it is the same rule over that same set, and
+        // keeping it made the "New projects proposed" tile count records the map was not
+        // drawing, while leaving out the data-centre pins it was.
         if(data.counts){
           delete data.counts.development; delete data.counts.proposed; delete data.counts.comment_open;
+          delete data.counts.proposed_active;
         }
         N5_NOTE = HS.n5CoverageNote(n5.rows, radiusLabel(radius));
         render(data);
@@ -2453,6 +2465,12 @@ HS.onReady(function(){
         // and is still accurate, so it stays. Same guard address mode has always had.
         var zipCounts = rows && rows.length ? (rows[0].counts || {}) : {};
         delete zipCounts.development; delete zipCounts.proposed; delete zipCounts.comment_open;
+        // proposed_active is the active-proposal count over that same radius set, so it goes too
+        // (2026-09-27). It was added after this list was written, and until then the "New
+        // projects proposed" tile read the report's radius count (12,603 of 12,722 cached
+        // reports carry it) instead of the whole-ZIP Proposed set the map draws, which also
+        // left out every proposed data-centre pin.
+        delete zipCounts.proposed_active;
         // FACILITIES follow the same rule: with the engine's radius-derived counts.facilities gone,
         // render() counts the facilities it actually DRAWS (its `fac` set) — members of this ZIP by
         // the canonical predicate — so the tile and the pins are one population by construction.
@@ -2645,10 +2663,10 @@ HS.onReady(function(){
     // longer equals the orange Proposed rail, and that gap is the point. The rail is a
     // BROWSING category and keeps historical proposals (a denied application must stay
     // findable); the counter is an ELIGIBILITY number and must not describe a refused
-    // application as an active, pending one. Reads counts.proposed_active, the engine's
-    // projection of the same predicate (HS.isActiveUndecided); falls back to computing it
-    // locally so a report cached before this shipped still counts honestly rather than
-    // silently reverting to the browsing size.
+    // application as an active, pending one. It counts the Proposed set this page DRAWS through
+    // the one predicate (HS.isActiveUndecided). Both loaders drop the report's own
+    // counts.proposed_active before render(), because that number describes the report's
+    // radius set, not what is on screen; a caller that passes one on is still honoured.
     var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(prop) : prop.length;
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
       : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
@@ -3315,9 +3333,11 @@ HS.onReady(function(){
     var decHtml = decisionNoteHTML(s, "popdec");
     // And, for anything in the Proposed category, what we can honestly say about today.
     var statusHtml = (bucketOf(s.type, s) === "proposed") ? currentStatusHTML(s, "popunv") : "";
+    // The source line leads with the source; with none to name, the links lose their leading dot.
+    var sl = srcLabel(s);
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
       decHtml+statusHtml+
-      "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
+      "<div style='margin-top:4px'>"+esc(sl)+(sl ? a : a.replace(/^ · /, ""))+"</div>"+envHtml+approxNote+fanNote;
   }
 
   // ONE PROJECT = ONE CARD. The rails are built from SITES, and one project can legitimately own
@@ -3347,7 +3367,7 @@ HS.onReady(function(){
     var el = $(id);
     items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
-    el.innerHTML = items.slice(0,12).map(function(s, i){
+    el.innerHTML = items.slice(0, LIST_CAP).map(function(s, i){
       // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
       // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
       var col = opts.dotColor || COLORS[bucketOf(s.type, s)] || "#5d6f72";
@@ -3397,8 +3417,19 @@ HS.onReady(function(){
       // the rendered row is the fix, and it makes "one project = one card" checkable directly.
       return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
-        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
-    }).join("");
+        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+srcPart(s)+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
+    }).join("") + listMoreHTML(items.length);
+  }
+  // A rail shows at most LIST_CAP rows. When it holds more, it says so, rather than reading as
+  // the whole list: on a dense ZIP the Operating rail used to stop at 12 with nothing to say
+  // that more records existed, all of them still drawn on the map (23150: 13 operating data
+  // centres, 12 listed).
+  var LIST_CAP = 12;
+  function listMoreHTML(n){
+    if(n <= LIST_CAP) return "";
+    var rest = n - LIST_CAP;
+    return "<div class='listmore'>Showing " + LIST_CAP + " of " + n + ". The other " + rest
+      + (rest === 1 ? " is" : " are") + " on the map.</div>";
   }
 
   // ===================== 3D AERIAL VIEW (three.js) =====================
