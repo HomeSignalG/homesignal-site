@@ -60,7 +60,7 @@ const P = norm(prevBody);
 // epa_ok, an absent `epa` key and a null counts object all resolve toward preserving
 // what is already stored. The 4th input is the FACILITY clock, not the core clock.
 function epaWriteRefused({ epaOk, payload, cached, facilityFreshDays }) {
-  const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : true;
+  const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : false;
   const untrusted = !((epaOk === true) && reportEpaOk);
   const facilityFresh = facilityFreshDays < 7;
   return (untrusted || facilityFresh)
@@ -114,7 +114,7 @@ function applyWrite({
   const facSites = refused
     ? cached.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s)
     : payload.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s);
-  const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : true;
+  const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : false;
   return {
     withheld: false,
     sites: [...coreSites, ...facSites],
@@ -254,17 +254,26 @@ console.log('\n== 2. the outcome is stored on EVERY evaluated response ==');
 }
 
 {
-  // LATENT, named: a payload with no `epa` key still coalesces to ok:true.
-  // Not changed here — pre-v23 compatibility. The stored outcome is `{}` plus metadata,
-  // so the absence is now observable (`ok` key missing).
+  // Missing `epa` key is untrusted. The 2026-09-27 audit named this as LATENT case G
+  // (coalesce to true). Fail-closed: a genuine zero must carry epa.ok=true.
   const refused = epaWriteRefused({
     epaOk: true,
     payload: { counts: { facilities: 0 } },
     cached: { counts: { facilities: 12 } },
     facilityFreshDays: 30,
   });
-  ok('C8. LATENT: missing epa key still defaults to ok:true (pre-v23 compatibility)',
-     refused === false);
+  ok('C8. missing epa key is untrusted → write REFUSED (fail-closed, was latent ok:true)',
+     refused === true);
+
+  const unknownZero = applyWrite({
+    epaOk: true,
+    payload: { sites: [proj(1)], counts: { development: 1, facilities: 0 } },
+    cached: { sites: [proj(1)], counts: { development: 1, facilities: 0 }, facilities_refreshed_at: 'T0' },
+    coreFreshDays: 30,
+    facilityFreshDays: 30,
+  });
+  ok('C8b. missing epa key + incoming 0 + cached 0 → flagged unavailable (not a fact)',
+     unknownZero.facilities_unavailable === true);
 }
 
 console.log('\n== 3. engine emits pre_cap BEFORE the 40-cap ==');
@@ -295,6 +304,11 @@ console.log('\n== 4. structural pins on the SQL of record ==');
   ok('the write-refused 4th parameter is named for the facility clock',
      /_cached_facilities_refreshed_at/.test(sqlNew)
      && !/_cached_refreshed_at/.test(sqlNew));
+  ok('missing epa.ok fail-closes to false in the write-guard and the unavailable flag',
+     count(sqlNew, "coalesce((_j->'epa'->>'ok')::boolean, false)") === 1
+     && count(N, norm("coalesce((j->'epa'->>'ok')::boolean, false)")) === 1
+     && !/coalesce\(\(_j->'epa'->>'ok'\)::boolean,\s*true\)/.test(sqlNew)
+     && !/coalesce\(\(j->'epa'->>'ok'\)::boolean,\s*true\)/.test(N));
   ok('the collector never passes d.refreshed_at to the write-guard',
      !/dev_epa_write_refused\(\s*epa_ok,\s*j,\s*d\.counts,\s*d\.refreshed_at\)/.test(N));
   ok('every write-guard call in step (d) takes d.facilities_refreshed_at',
@@ -331,18 +345,23 @@ console.log('\n== 5. §1 PARITY: new body minus the named additions == supersede
   const E_OLD = norm(`update public.development_reports d
      set last_collected_response_id = r.id
     from net._http_response r`);
+  const COALESCE_NEW = norm("coalesce((j->'epa'->>'ok')::boolean, false)");
+  const COALESCE_OLD = norm("coalesce((j->'epa'->>'ok')::boolean, true)");
 
   ok('the facility-clock argument appears exactly 5 times in the j-shaped calls (4 write sites + 1 outcome)',
      count(N, CLOCK_NEW) === 5);
   ok('the (d) outcome assignment appears exactly once', count(N, D_OUTCOME) === 1);
   ok('the (e) outcome assignment appears exactly once', count(N, E_NEW) === 1);
+  ok('the fail-closed epa.ok default appears exactly once in the collector body',
+     count(N, COALESCE_NEW) === 1);
 
   let stripped = N;
   stripped = stripped.split(D_OUTCOME).join(' ');
   stripped = stripped.split(E_NEW).join(E_OLD);
   stripped = stripped.split(CLOCK_NEW).join(CLOCK_OLD);
+  stripped = stripped.split(COALESCE_NEW).join(COALESCE_OLD);
   stripped = stripped.replace(/\s+/g, ' ').trim();
-  ok('§1 PARITY: new collector minus clock-move and outcome storage == once-per-response body',
+  ok('§1 PARITY: new collector minus clock-move, outcome storage, and fail-closed epa.ok == once-per-response body',
      stripped === P,
      stripped === P ? '' : `len ${stripped.length} vs ${P.length}`);
 }

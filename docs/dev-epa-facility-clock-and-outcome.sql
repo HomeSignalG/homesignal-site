@@ -6,11 +6,14 @@
 -- (that file remains the rollback path AND the once-per-response pin). The collector
 -- body below was produced by SPLICING that parked body with asserted occurrence counts,
 -- never by retyping it. Every diagnostic, core guard, and write expression is unchanged
--- except the two named additions:
+-- except the named additions:
 --   (1) the 4th argument of every dev_epa_write_refused() call is now
 --       d.facilities_refreshed_at (the REGULATORY clock), not d.refreshed_at (CORE);
 --   (2) development_reports.epa_last_outcome is written on every evaluated response
---       (accepted in step (d), withheld/core-refused in step (e)).
+--       (accepted in step (d), withheld/core-refused in step (e));
+--   (3) a missing `epa.ok` key fail-closes to false (was true — LATENT case G). The
+--       predicate in dev_epa_write_refused and the facilities_unavailable third branch
+--       both use coalesce(..., false). A genuine zero must carry epa.ok=true.
 --
 -- WHAT WAS WRONG
 -- ----------------------------------------------------------------------------
@@ -89,7 +92,7 @@ stable
 set search_path to 'public'
 as $function$
   select (
-      (not (coalesce(_epa_ok, false) and coalesce((_j->'epa'->>'ok')::boolean, true))
+      (not (coalesce(_epa_ok, false) and coalesce((_j->'epa'->>'ok')::boolean, false))
        or _cached_facilities_refreshed_at >= now() - interval '7 days')
       and coalesce((_j->'counts'->>'facilities')::int, 0) = 0
       and coalesce((_cached_counts->>'facilities')::int, 0) > 0
@@ -100,7 +103,7 @@ comment on function public.dev_epa_write_refused(boolean, jsonb, jsonb, timestam
   'True when the incoming EPA facility payload must NOT overwrite the stored one. The 4th '
   'argument is the FACILITY clock (development_reports.facilities_refreshed_at), never the '
   'core refreshed_at. A genuine EPA zero may replace a cached nonzero count only when the '
-  'facility layer itself is older than 7 days.';
+  'facility layer itself is older than 7 days. Missing epa.ok fail-closes to false.';
 
 create or replace function public.dev_refresh_collect()
  returns integer
@@ -310,7 +313,7 @@ begin
     facilities_unavailable = case
                                when public.dev_epa_write_refused(epa_ok, j, d.counts, d.facilities_refreshed_at) then true
                                when coalesce((j->'counts'->>'facilities')::int, 0) > 0 then false
-                               when not (epa_ok and coalesce((j->'epa'->>'ok')::boolean, true)) then true
+                               when not (epa_ok and coalesce((j->'epa'->>'ok')::boolean, false)) then true
                                else false
                              end
   from resp

@@ -3249,6 +3249,10 @@ SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from t
 body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**
 Do not re-apply `docs/dev-refresh-collect-once-per-response.sql` after this file: that body still
 passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would restore the defect.
+- 🔑 **MISSING `epa.ok` FAIL-CLOSES TO FALSE.** The audit's latent case G coalesced a missing
+  key to `true`, so a payload with no `epa` object was treated as a healthy retrieval. Both
+  `dev_epa_write_refused` and the `facilities_unavailable` third branch now use
+  `coalesce(..., false)`. A genuine zero must carry `epa.ok=true`.
 - 🔑 **THE 7-DAY FRESHNESS LIMB WAS READING THE WRONG CLOCK.** Development refreshes on a ~53 h
   sweep, so `d.refreshed_at` stayed inside 7 days forever and a genuine EPA zero could never
   replace a cached nonzero count. Measured 2026-09-27 (read-only): healthy EPA + zero + cached 12
