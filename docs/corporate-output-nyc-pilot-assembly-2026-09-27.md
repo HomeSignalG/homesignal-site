@@ -157,4 +157,4 @@ The Step 2 close condition was: at least one useful pilot market assembled entir
 
 That condition is met for **New York City V1** as defined above.
 
-Step 2 remains **OPEN** for every other market. The Census geocoder, OpenAddresses, Atlas, OSM, and the uncleared registry entries are unchanged. The overall commercial verdict remains **NOT YET**: Step 3 (unsupported prediction claims) and Step 4 (build the report from this allowlist) have not started. Nothing here starts the paid report.
+Step 2 remains **OPEN** for every other market. The Census geocoder, OpenAddresses, Atlas, OSM, and the uncleared registry entries are unchanged. Step 3 (unsupported prediction claims) is recorded in `docs/corporate-output-unsupported-predictions-2026-09-27.md`. The overall commercial verdict remains **NOT YET**: Step 4 (build the report from this allowlist) has not started. Nothing here starts the paid report.

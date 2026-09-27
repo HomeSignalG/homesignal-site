@@ -36,7 +36,17 @@ That condition is met for **New York City V1**. Evidence: `docs/corporate-output
 
 Census geocoder, OpenAddresses, ZCTA-as-proximity, Geoclient, the ArcGIS AddressPoint FeatureServer, Atlas, OSM, Local News, meetings, scores, and every other registry entry stay **HOLD** or **EXCLUDE** and are not in the allowlist.
 
-Step 2 remains **OPEN** for every other market. The overall commercial verdict remains **NOT YET**: Step 3 (unsupported prediction claims) and Step 4 (build the report from this allowlist) have not started. AddressPoint is not loaded. `get-address-report` is not the allowlist.
+Step 2 remains **OPEN** for every other market. AddressPoint is not loaded. `get-address-report` is not the allowlist.
+
+## Step 3 — Unsupported prediction claims
+
+Step 3 closes when unsupported prediction claims cannot enter a report that would be sold.
+
+That condition is met. Evidence: `docs/corporate-output-unsupported-predictions-2026-09-27.md`.
+
+Scores, outlooks, Quality of Life scoring, `HS.projectImpact`, stored `sowhat`, "Effect at this address", and engineering / traffic / utility / insurance-loss / property-value forecasts are **EXCLUDE** from any sold Future Surroundings Report, including NYC V1. They stay on the consumer site. `reports.html` still generates nothing. The paid report was not started.
+
+The overall commercial verdict remains **NOT YET**: Step 4 (build the report from the NYC V1 allowlist) has not started.
 
 ## Audit §12 status against the first report
 
@@ -48,22 +58,21 @@ The first report is the NYC V1 allowlist. Later evidence files sit beside the au
 4. ODbL and CC BY in one response: still **HOLD**. Excluded from NYC V1.
 5. Census geocoder, OpenAddresses, ZCTA proximity: still **HOLD** as those inputs (`docs/corporate-output-property-location-stack-2026-09-27.md`, #1418). NYC V1 does not use them. Property placement is AddressPoint.
 6. Local News, meetings, notices: still **HOLD**. Excluded from NYC V1. NWS alert text remains attributed text, not a property-proximity grant.
-7. Scores, outlooks, Quality of Life scoring, and predictive prose stay **EXCLUDE**.
+7. Scores, outlooks, Quality of Life scoring, and predictive prose: **EXCLUDE** from any sold report (`docs/corporate-output-unsupported-predictions-2026-09-27.md`). They stay on the consumer site. No corporate template emits them.
 
 Classifications in force are only: **CLEARED FOR PAID REPORT**, **CLEARED WITH ATTRIBUTION**, **DERIVED FACTS ONLY**, **HOLD — TERMS/RIGHTS NOT ESTABLISHED**, **EXCLUDE**. No family is **CLEARED FOR PAID REPORT**.
 
 ## Execution order
 
-The next gates after this Step 2 close for NYC V1:
+The next gates after this Step 3 close:
 
-1. Remove unsupported prediction claims from any report that would be sold (Step 3).
-2. Build the real Future Surroundings Report that answers what is happening and changing around the property, using only the NYC V1 allowlist (Step 4).
-3. Add a durable `report_id` and a reproducible report object tied to the data state that created it.
-4. Add a secure share link and print/PDF delivery that use the same rights and attribution rules as the canonical report.
-5. Expose one canonical commercial JSON response that enforces the Corporate Output Source Allowlist.
-6. Add a minimal brokerage workspace for generating, finding, opening, and sharing reports.
-7. Measure a coverage-quality matrix and choose additional pilot markets from cleared, useful coverage.
-8. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale.
+1. Build the real Future Surroundings Report that answers what is happening and changing around the property, using only the NYC V1 allowlist and without the Step 3 EXCLUDE families (Step 4).
+2. Add a durable `report_id` and a reproducible report object tied to the data state that created it.
+3. Add a secure share link and print/PDF delivery that use the same rights and attribution rules as the canonical report.
+4. Expose one canonical commercial JSON response that enforces the Corporate Output Source Allowlist.
+5. Add a minimal brokerage workspace for generating, finding, opening, and sharing reports.
+6. Measure a coverage-quality matrix and choose additional pilot markets from cleared, useful coverage.
+7. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale.
 
 A later listing-level summary has to derive from that same commercial contract. Portfolio and API scale reuse the same geography, provenance, change detection, source-rights, and report logic.
 
