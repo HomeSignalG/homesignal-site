@@ -145,6 +145,53 @@ msec = int(_re.search(r"MAX_SECONDS:\s*'(\d+)'", wf).group(1))
 check("job timeout covers MAX_SECONDS plus one full publish budget",
       tmin * 60 >= msec + pub.PUBLISH_STATEMENT_TIMEOUT_S)
 
+# 5c. OPEN's one transaction is proven the same way (HTTP 524 at 125 s, committed, 2026-09-27)
+def open_harness(lose, verify_ok):
+    calls = {"write": 0, "verify_sql": None, "flags": []}
+
+    def fake_sql(query, tag="", timeout=900, gateway_unknown=False, read_only=False, **kw):
+        if tag in ("exists", "snap exists"):
+            return []
+        if tag == "cutoff":
+            return [{"c": "2026-09-27 16:59:37.364003+00"}]
+        if tag == "proven poll":
+            return [{"n": 0}]
+        if tag.endswith(" verify"):
+            calls["verify_sql"] = query
+            return [{"ok": verify_ok}]
+        if tag == "open read-back":
+            return [{"n_rows": 1, "sources": 1, "projects": 1, "pairs": 1, "checksum": 7,
+                     "shards": 1, "manifest_checksum": 7}]
+        calls["write"] += 1
+        calls["flags"].append(gateway_unknown)
+        assert "insert into geo.n5_generation" in query
+        if lose:
+            raise SQLGatewayTimeout("open: HTTP 524")
+        return []
+
+    n3.sql = fake_sql
+    o.sql = fake_sql
+    n3.PROVEN_POLL_S = 0
+    o.say = lambda *a, **k: None
+    o.GENERATION = "gen-open"
+    return calls
+
+
+c = open_harness(lose=True, verify_ok=True)
+o.mode_open()
+check("open: lost response + committed generation -> continues to the read-back", c["write"] == 1)
+check("open: gateway_unknown requested", c["flags"] == [True])
+check("open: verify is keyed on THIS run's cutoff and snapshot",
+      all(x in (c["verify_sql"] or "") for x in ("'gen-open'", "'n5-gen-open'",
+                                                 "'2026-09-27 16:59:37.364003+00'")))
+c = open_harness(lose=True, verify_ok=False)
+try:
+    o.mode_open()
+    check("open: lost response + no generation row stops", False)
+except SystemExit as e:
+    check("open: lost response + no generation row stops", "post-condition is NOT met" in str(e))
+check("open: never re-sent", c["write"] == 1)
+
 # 5. every heavy lifecycle caller supplies a post-condition
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
 for fn in ("n5_gen_prepare_publish", "n5_gen_record_unresolved", "n5_generation_mark_ready",
