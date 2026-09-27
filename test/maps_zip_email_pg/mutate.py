@@ -58,6 +58,9 @@ MUTATIONS = {
     # identity (homesignal-ingest 20260926230000_alert_identity_streams.sql) ---------------
     "identity-streams-not-scoped": (IDENTITY,
         r"   where st\.user_id = p_user_id\n", "   where true\n"),
+    "identity-streams-hide-unsubscribed": (IDENTITY,
+        r"   where st\.user_id = p_user_id\n",
+        "   where st.user_id = p_user_id\n     and not st.unsubscribed\n"),
     "identity-streams-opened-to-public": (IDENTITY,
         r"revoke all on function public\.alert_identity_streams\(uuid\) from public, anon, authenticated;\n",
         ""),

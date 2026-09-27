@@ -1324,6 +1324,14 @@ the committed file.
       `test/unsubscribe-page.browser.test.mjs` (Chromium renders each answer). The text is
       shared from `test/lib/unsubscribe-founder-copy.mjs`. 8 deliberate breaks each failed on
       exit code.
+    - 🔑 **The function turns the identity off FIRST and asks for its streams AFTER**, so this
+      page works only while `public.alert_identity_streams` still answers for an unsubscribed
+      identity. It does: the resolver view exposes `unsubscribed` as a column and filters only
+      on `origin = 'explicit'`, and no trigger clears a selection on unsubscribe (both read
+      live 2026-09-26). A view that hid unsubscribed people would look like a tidy-up and would
+      quietly drop every MAPS unsubscribe to the general wording, so the SQL suite pins it:
+      **D10** in `test/maps_zip_email_pg/suite.sql` (2026-09-26), killed by the mutation
+      `identity-streams-hide-unsubscribed`; the suite's check floor is now 28.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
