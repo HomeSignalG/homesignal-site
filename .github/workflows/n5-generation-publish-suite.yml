@@ -20,6 +20,7 @@ on:
     paths:
       - 'docs/n5-generation-publish.sql'
       - 'docs/n5-generation-publish-part-d.sql'
+      - 'docs/n5-generation-publish-part-f.sql'
       - 'docs/map1-zip-read-char5.sql'
       - 'docs/map1-zip-read-char5.rollback.sql'
       - 'test/n5_generation_pg/**'
