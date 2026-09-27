@@ -59,6 +59,8 @@ PAGE = 1000
 ZIP_TAIL_RE = re.compile(r"(\d{5})(?:-\d{4})?$")
 STATE_ZIP_RE = re.compile(r",\s*([A-Za-z]{2})\s+\d{5}(?:-\d{4})?$")
 CITYLESS_RE = re.compile(r"^(.+), [^,]+, ([A-Z]{2} \d{5}(?:-\d{4})?)$")
+STREET_ZIP_TAIL_RE = re.compile(r", [A-Z]{2} \d{5}(?:-\d{4})?$")
+HOUSE_RE = re.compile(r"^[0-9]+[A-Z]?(?:-[0-9]+[A-Z]?)?\s+")
 
 # Census regions, exactly as OpenAddresses groups its collected downloads.
 STATE_REGION = {}
@@ -124,6 +126,20 @@ def cityless_key(canon: str) -> str | None:
     """NUM STREET, CITY, ST ZIP → NUM STREET, ST ZIP. None when the key has no city slot."""
     m = CITYLESS_RE.match(canon)
     return f"{m.group(1)}, {m.group(2)}" if m else None
+
+
+def street_zip_key(canon: str) -> str | None:
+    """NUM STREET, CITY, ST ZIP → STREET, ST ZIP. None without a ST ZIP tail."""
+    k = cityless_key(canon) or canon
+    if not STREET_ZIP_TAIL_RE.search(k):
+        return None
+    return HOUSE_RE.sub("", k, count=1)
+
+
+def housestreet_key(canon: str) -> str | None:
+    """NUM STREET, CITY, ST ZIP → NUM STREET."""
+    s = STREET_ZIP_TAIL_RE.sub("", canon).split(",", 1)[0].strip()
+    return s or None
 
 
 def extract_zip(text: str) -> str:

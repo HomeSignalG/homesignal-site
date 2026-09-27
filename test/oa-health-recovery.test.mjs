@@ -92,6 +92,13 @@ print(json.dumps({
   "s3": oa.extract_state("10 oak ave, tx 78617-1234"),
   "c1": oa.cityless_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
   "c2": oa.cityless_key("2200 CALDWELL LN, TX 78617"),
+  "sz1": oa.street_zip_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
+  "sz2": oa.street_zip_key("2200 CALDWELL LN, TX 78617"),
+  "sz3": oa.street_zip_key("CALDWELL LN, TX 78617"),
+  "sz4": oa.street_zip_key("3521 RAIDER DR"),
+  "hs1": oa.housestreet_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
+  "hs2": oa.housestreet_key("2200 CALDWELL LN, TX 78617"),
+  "hs3": oa.housestreet_key("3521 RAIDER DR"),
 }))
 `);
   const d = JSON.parse(raw);
@@ -103,6 +110,13 @@ print(json.dumps({
   assert.equal(d.s3, 'TX');
   assert.equal(d.c1, '2200 CALDWELL LN, TX 78617');
   assert.equal(d.c2, null);
+  assert.equal(d.sz1, 'CALDWELL LN, TX 78617');
+  assert.equal(d.sz2, 'CALDWELL LN, TX 78617');
+  assert.equal(d.sz3, 'CALDWELL LN, TX 78617');
+  assert.equal(d.sz4, null);
+  assert.equal(d.hs1, '2200 CALDWELL LN');
+  assert.equal(d.hs2, '2200 CALDWELL LN');
+  assert.equal(d.hs3, '3521 RAIDER DR');
 });
 
 test('enqueue stores the city-less key once, first-wins on the full key', () => {
@@ -197,13 +211,25 @@ print(json.dumps({"n": len(rows), "q": stats["quarantined"], "addr": rows[0][0] 
 });
 
 test('oaCitylessKey matches the Python cityless_key', async () => {
-  const { oaCitylessKey } = await import(join(root, 'supabase/functions/get-address-report/geocode-cache.ts'));
+  const { oaCitylessKey, oaStreetZipKey, oaHousestreetKey } = await import(join(root, 'supabase/functions/get-address-report/geocode-cache.ts'));
   assert.equal(oaCitylessKey('2200 CALDWELL LN, DEL VALLE, TX 78617'), '2200 CALDWELL LN, TX 78617');
   assert.equal(oaCitylessKey('2200 CALDWELL LN, TX 78617'), null);
+  assert.equal(oaStreetZipKey('2200 CALDWELL LN, DEL VALLE, TX 78617'), 'CALDWELL LN, TX 78617');
+  assert.equal(oaStreetZipKey('2200 CALDWELL LN, TX 78617'), 'CALDWELL LN, TX 78617');
+  assert.equal(oaStreetZipKey('3521 RAIDER DR'), null);
+  assert.equal(oaHousestreetKey('2200 CALDWELL LN, DEL VALLE, TX 78617'), '2200 CALDWELL LN');
+  assert.equal(oaHousestreetKey('3521 RAIDER DR'), '3521 RAIDER DR');
   const pyKey = py(`${LOAD}
-print(json.dumps(oa.cityless_key("2200 CALDWELL LN, DEL VALLE, TX 78617")))
+print(json.dumps({
+  "c": oa.cityless_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
+  "sz": oa.street_zip_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
+  "hs": oa.housestreet_key("2200 CALDWELL LN, DEL VALLE, TX 78617"),
+}))
 `);
-  assert.equal(JSON.parse(pyKey), '2200 CALDWELL LN, TX 78617');
+  const d = JSON.parse(pyKey);
+  assert.equal(d.c, '2200 CALDWELL LN, TX 78617');
+  assert.equal(d.sz, 'CALDWELL LN, TX 78617');
+  assert.equal(d.hs, '2200 CALDWELL LN');
 });
 
 test('datasetRung uses the RPC hit, then exact table, then city-less table', async () => {
@@ -270,4 +296,13 @@ test('workflow timeout and demand-scope copy match the health recovery', () => {
   assert.match(yml, /geocodes ∪ dc_geocode_queue ∪ property_reports/);
   assert.match(yml, /upgrade-geocodes-from-oa.py/);
   assert.match(yml, /oa_demand_scope|demand-scope/);
+  const sql = readFileSync(join(root, 'docs/oa-health-recovery.sql'), 'utf8');
+  assert.match(sql, /function public\.oa_street_zip_key/);
+  assert.match(sql, /function public\.oa_housestreet_key/);
+  assert.match(sql, /function public\.oa_upsert_nap_rows/);
+  assert.match(sql, /street_zip_unique/);
+  assert.match(sql, /housestreet_unique/);
+  const idx = readFileSync(join(root, 'supabase/functions/get-address-report/index.ts'), 'utf8');
+  assert.match(idx, /await geocode\(supabase, address\)/);
+  assert.match(idx, /resolveGeocode\(/);
 });

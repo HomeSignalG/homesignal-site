@@ -205,14 +205,17 @@ function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [numb
   const e = (lng - homeLng) * MILES_PER_DEG_LAT * Math.cos((homeLat * Math.PI) / 180);
   return [Math.round(e * 1000) / 1000, Math.round(n * 1000) / 1000];
 }
-async function geocode(address: string): Promise<[number, number, string]> {
-  const q = new URLSearchParams({ address, benchmark: "Public_AR_Current", format: "json" });
-  const r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
-  const data = await r.json();
-  const matches = data?.result?.addressMatches ?? [];
-  if (!matches.length) throw new Error(`No geocoder match for: ${address}`);
-  const c = matches[0].coordinates;
-  return [Number(c.y), Number(c.x), matches[0].matchedAddress ?? address];
+async function geocode(supabase: ReturnType<typeof createClient>, address: string): Promise<[number, number, string]> {
+  // Same zero-fee ladder as ZIP-mode records: OpenAddresses, then Census. A failed
+  // resolve stays a 422 — the page still cannot invent a home pin.
+  const result = await resolveGeocode(
+    supabaseStore(supabase),
+    address,
+    canonicalAddr(address),
+    GEO_LADDER(supabase),
+  );
+  if (result.lat == null || result.lng == null) throw new Error(`No geocoder match for: ${address}`);
+  return [result.lat, result.lng, result.matched_address ?? address];
 }
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
@@ -948,7 +951,7 @@ async function handleRequest(req: Request): Promise<Response> {
   const radiusMi = Math.min(Math.max(Number(body.radius_mi) || 1, 0.25), MAX_RADIUS_MI);
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   let lat: number, lng: number, matched: string;
-  try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
+  try { [lat, lng, matched] = await geocode(supabase, address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
   // UNIT 4 — same bounded-deadline join as ZIP mode above, same module, one implementation.

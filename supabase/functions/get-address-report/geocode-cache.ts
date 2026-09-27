@@ -194,6 +194,20 @@ export function oaCitylessKey(addr: string): string | null {
   return m ? `${m[1]}, ${m[2]}` : null;
 }
 
+/** "NUM STREET, CITY, ST ZIP" → "STREET, ST ZIP". Lockstep with public.oa_street_zip_key. */
+export function oaStreetZipKey(addr: string): string | null {
+  const k = oaCitylessKey(addr) ?? String(addr);
+  if (!/, [A-Z]{2} \d{5}(?:-\d{4})?$/.test(k)) return null;
+  return k.replace(/^[0-9]+[A-Z]?(?:-[0-9]+[A-Z]?)?\s+/, "");
+}
+
+/** "NUM STREET, CITY, ST ZIP" → "NUM STREET". Lockstep with public.oa_housestreet_key. */
+export function oaHousestreetKey(addr: string): string | null {
+  const noZip = String(addr).replace(/, [A-Z]{2} \d{5}(?:-\d{4})?$/, "");
+  const hs = noZip.split(",")[0].trim();
+  return hs || null;
+}
+
 function napHit(data: { lat?: unknown; lng?: unknown; match_type?: unknown } | null, canonical: string) {
   if (!data || typeof data.lat !== "number" || typeof data.lng !== "number") return null;
   // Honour the row's stamped tier; fall back to the conservative parcel_centroid, never rooftop.
@@ -206,8 +220,9 @@ function napHit(data: { lat?: unknown; lng?: unknown; match_type?: unknown } | n
  *  canonicalAddr(). Returns the point AT THE TIER THE LOADER STAMPED ON THE ROW (match_type):
  *  OpenAddresses defaults to 'parcel_centroid' and is only 'rooftop' where the source gave an
  *  explicit rooftop signal — so precision is never overstated. A miss returns null → next rung.
- *  Lookup order: lookup_national_address_point (exact, then unique city-less), then the table
- *  eq on the filed key, then the city-less key the loader also stores.
+ *  Lookup order: lookup_national_address_point (exact, unique city-less, unique street+ZIP,
+ *  unique house+street), then the table eq on the filed key, then the city-less key the
+ *  loader also stores.
  *  (No commercial geocoder rung exists — the ladder is zero-fee: this dataset, then Census.) */
 // deno-lint-ignore no-explicit-any
 export function datasetRung(supabase: any, table: string, source = table): GeocoderRung {

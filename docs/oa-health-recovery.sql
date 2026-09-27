@@ -30,6 +30,51 @@ create index if not exists geocodes_cityless_idx
 revoke all on function public.oa_cityless_key(text) from public, anon, authenticated;
 grant execute on function public.oa_cityless_key(text) to service_role;
 
+-- ── street+ZIP key: drop house number and city → "STREET, ST ZIP" ─────────────────────────
+-- Used only when the match is UNIQUE. A street with many OA houses never rematches.
+create or replace function public.oa_street_zip_key(addr text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when k ~ ', [A-Z]{2} [0-9]{5}(-[0-9]{4})?$'
+    then regexp_replace(k, '^[0-9]+[A-Z]?(-[0-9]+[A-Z]?)?\s+', '')
+    else null
+  end
+  from (select public.oa_cityless_key(addr) as k) s
+$$;
+
+-- ── house+street key: "NUM STREET" with city / ST ZIP stripped ────────────────────────────
+-- Rematch path for filed keys that omitted city/state/ZIP ("3521 RAIDER DR"). Unique only,
+-- and the lookup requires a leading house number so a bare street name never pins a house.
+create or replace function public.oa_housestreet_key(addr text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select nullif(
+    trim(split_part(regexp_replace(coalesce(addr, ''), ', [A-Z]{2} [0-9]{5}(-[0-9]{4})?$', ''), ', ', 1)),
+    ''
+  )
+$$;
+
+create index if not exists nap_street_zip_idx
+  on public.national_address_points (public.oa_street_zip_key(canonical_addr));
+create index if not exists nap_housestreet_idx
+  on public.national_address_points (public.oa_housestreet_key(canonical_addr));
+create index if not exists geocodes_street_zip_idx
+  on public.geocodes (public.oa_street_zip_key(canonical_addr));
+create index if not exists geocodes_housestreet_idx
+  on public.geocodes (public.oa_housestreet_key(canonical_addr));
+
+revoke all on function public.oa_street_zip_key(text) from public, anon, authenticated;
+revoke all on function public.oa_housestreet_key(text) from public, anon, authenticated;
+grant execute on function public.oa_street_zip_key(text) to service_role;
+grant execute on function public.oa_housestreet_key(text) to service_role;
+
 -- ── demand ZIP/state pairs the loader should cover ───────────────────────────────────────
 create or replace function public.oa_demand_scope()
 returns table(zip text, state text)
@@ -94,6 +139,32 @@ begin
       select n.lat, n.lng, n.match_type
         from public.national_address_points n
        where public.oa_cityless_key(n.canonical_addr) = public.oa_cityless_key(p_canonical);
+    return;
+  end if;
+
+  if public.oa_street_zip_key(p_canonical) is not null then
+    select count(*) into hits
+      from public.national_address_points n
+     where public.oa_street_zip_key(n.canonical_addr) = public.oa_street_zip_key(p_canonical);
+    if hits = 1 then
+      return query
+        select n.lat, n.lng, n.match_type
+          from public.national_address_points n
+         where public.oa_street_zip_key(n.canonical_addr) = public.oa_street_zip_key(p_canonical);
+      return;
+    end if;
+  end if;
+
+  if public.oa_housestreet_key(p_canonical) ~ '^[0-9]' then
+    select count(*) into hits
+      from public.national_address_points n
+     where public.oa_housestreet_key(n.canonical_addr) = public.oa_housestreet_key(p_canonical);
+    if hits = 1 then
+      return query
+        select n.lat, n.lng, n.match_type
+          from public.national_address_points n
+         where public.oa_housestreet_key(n.canonical_addr) = public.oa_housestreet_key(p_canonical);
+    end if;
   end if;
 end;
 $$;
@@ -176,10 +247,61 @@ begin
       ) x
      where x.hits = 1
   ),
+  street_zip_unique as (
+    select x.canonical_addr, x.old_mt, x.old_src, x.old_lat, x.old_lng,
+           x.lat, x.lng, x.nap_mt, x.source_vintage
+      from (
+        select g.canonical_addr, g.match_type as old_mt, g.geocode_source as old_src,
+               g.lat as old_lat, g.lng as old_lng,
+               n.lat, n.lng, n.match_type as nap_mt, n.source_vintage,
+               count(*) over (partition by g.canonical_addr) as hits
+          from public.geocodes g
+          join public.national_address_points n
+            on public.oa_street_zip_key(n.canonical_addr) = public.oa_street_zip_key(g.canonical_addr)
+         where public.oa_street_zip_key(g.canonical_addr) is not null
+           and not exists (
+             select 1 from public.national_address_points n2
+              where n2.canonical_addr = g.canonical_addr
+           )
+           and not exists (
+             select 1 from cityless_unique c where c.canonical_addr = g.canonical_addr
+           )
+      ) x
+     where x.hits = 1
+  ),
+  housestreet_unique as (
+    select x.canonical_addr, x.old_mt, x.old_src, x.old_lat, x.old_lng,
+           x.lat, x.lng, x.nap_mt, x.source_vintage
+      from (
+        select g.canonical_addr, g.match_type as old_mt, g.geocode_source as old_src,
+               g.lat as old_lat, g.lng as old_lng,
+               n.lat, n.lng, n.match_type as nap_mt, n.source_vintage,
+               count(*) over (partition by g.canonical_addr) as hits
+          from public.geocodes g
+          join public.national_address_points n
+            on public.oa_housestreet_key(n.canonical_addr) = public.oa_housestreet_key(g.canonical_addr)
+         where public.oa_housestreet_key(g.canonical_addr) ~ '^[0-9]'
+           and not exists (
+             select 1 from public.national_address_points n2
+              where n2.canonical_addr = g.canonical_addr
+           )
+           and not exists (
+             select 1 from cityless_unique c where c.canonical_addr = g.canonical_addr
+           )
+           and not exists (
+             select 1 from street_zip_unique s where s.canonical_addr = g.canonical_addr
+           )
+      ) x
+     where x.hits = 1
+  ),
   matched as (
     select * from exact_hit
     union all
     select * from cityless_unique
+    union all
+    select * from street_zip_unique
+    union all
+    select * from housestreet_unique
   ),
   eligible as (
     select *
@@ -222,4 +344,57 @@ revoke all on function public.upgrade_geocodes_from_national_address_points() fr
 grant execute on function public.upgrade_geocodes_from_national_address_points() to service_role;
 
 comment on function public.upgrade_geocodes_from_national_address_points() is
-'Upgrade-only: copy national_address_points into geocodes when OA outranks the cache, or when an existing OA point moved. Never downgrades.';
+'Upgrade-only: copy national_address_points into geocodes when OA outranks the cache, or when an existing OA point moved. Exact, then unique city-less, unique street+ZIP, unique house+street. Never downgrades.';
+
+-- ── bulk NAP upsert for demand loads that cannot use the REST service-role path ───────────
+create or replace function public.oa_upsert_nap_rows(p_rows jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n integer;
+begin
+  insert into public.national_address_points
+    (canonical_addr, lat, lng, match_type, state, source, source_vintage, loaded_at)
+  select
+    x.canonical_addr,
+    x.lat,
+    x.lng,
+    case when x.match_type in ('rooftop', 'parcel_centroid') then x.match_type else 'parcel_centroid' end,
+    x.state,
+    x.source,
+    x.source_vintage,
+    coalesce(x.loaded_at, now())
+  from jsonb_to_recordset(coalesce(p_rows, '[]'::jsonb)) as x(
+    canonical_addr text,
+    lat double precision,
+    lng double precision,
+    match_type text,
+    state text,
+    source text,
+    source_vintage text,
+    loaded_at timestamptz
+  )
+  where x.canonical_addr is not null
+    and x.lat is not null
+    and x.lng is not null
+  on conflict (canonical_addr) do update
+    set lat = excluded.lat,
+        lng = excluded.lng,
+        match_type = excluded.match_type,
+        state = coalesce(excluded.state, public.national_address_points.state),
+        source = coalesce(excluded.source, public.national_address_points.source),
+        source_vintage = excluded.source_vintage,
+        loaded_at = excluded.loaded_at;
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+revoke all on function public.oa_upsert_nap_rows(jsonb) from public, anon, authenticated;
+grant execute on function public.oa_upsert_nap_rows(jsonb) to service_role;
+
+comment on function public.oa_upsert_nap_rows(jsonb) is
+'Bulk upsert into national_address_points. Service-role only. Additive merge; never deletes.';

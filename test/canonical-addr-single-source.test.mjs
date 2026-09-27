@@ -39,17 +39,19 @@ test('the production ladder is COMPOSED in exactly one place, and every consumer
   assert.match(probe, /from "\.\.\/supabase\/functions\/get-address-report\/canonical-addr\.ts"/);
 });
 
-test('no NEW Census geocoder: the callers are exactly the three that predate this change', () => {
+test('no NEW Census geocoder: address-mode home uses the production ladder, not a raw Census URL', () => {
   const callers = FILES.filter((f) => readFileSync(f, 'utf8').includes('geocoding.geo.census.gov/geocoder/locations'))
     .filter((f) => !f.startsWith('scripts/verify-geocodes'))   // the geofence VERIFIER, not a geocoder
     .sort();
   assert.deepEqual(callers, [
     // stateless consumer proxy for add-your-home (browser flow; no cache, no DB)
     'supabase/functions/geocode-address/index.ts',
-    // THE record ladder's Census rung
+    // THE record ladder's Census rung (shared by ZIP-mode records AND address-mode home)
     'supabase/functions/get-address-report/geocode-cache.ts',
-    // PRE-EXISTING, named not fixed: the report engine's address-mode geocode() of the
-    // REQUESTING USER'S home address (not of any record). Out of scope here.
-    'supabase/functions/get-address-report/index.ts',
   ]);
+  const idx = readFileSync('supabase/functions/get-address-report/index.ts', 'utf8');
+  assert.match(idx, /async function geocode\(supabase: ReturnType<typeof createClient>, address: string\)/);
+  assert.match(idx, /await geocode\(supabase, address\)/);
+  assert.match(idx, /productionLadder\(supabase, fetch\)/);
+  assert.doesNotMatch(idx, /geocoding\.geo\.census\.gov/);
 });
