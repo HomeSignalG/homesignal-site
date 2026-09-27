@@ -16,8 +16,10 @@ Only three things are substituted, and each at the narrowest seam:
                          runs. Rows round-trip through JSON, as the API returns them.
   * the Census TIGER download - the two load_boundaries() functions insert fixture polygons
                          with the SAME inserts and return the SAME shapes.
-  * the publisher registry - empty, so every RECOVERY fetch is refused as it is for a
-                         registry with no service_url (exercising SOURCE_EXCLUDED).
+  * the publisher registry - one entry, reg-down, whose publisher never answers (n3_pilot.http
+                         returns the timeout a real outage returns, exercising
+                         PUBLISHER_UNREACHABLE); every other RECOVERY fetch is refused as it is
+                         for a registry with no service_url (exercising SOURCE_EXCLUDED).
 Everything else - every SQL statement, every gate, every count - is production code.
 
 Target: N5_TEST_DSN (a THROWAWAY server). Refuses if a Supabase credential is visible.
@@ -128,7 +130,10 @@ class Env:
         S = importlib.reload(S)
         S.sql = self.n3.sql
         S.load_boundaries = shard_boundaries(S.sql, S.lit)
-        S.load_registry = lambda: {}
+        S.load_registry = lambda: {"reg-down": ("arcgis", {"registry_id": "reg-down",
+                                                            "service_url": "https://publisher.invalid/FeatureServer/0",
+                                                            "identity_fields": ["id"]})}
+        S.http = lambda *a, **k: (None, "URLError <urlopen error timed out>")
         try:
             rc = S.main() or 0
         except SystemExit as e:
@@ -180,12 +185,12 @@ def main():
        g == [{"state": "BUILDING", "snapshot_id": "n5-" + GEN}] and len(snap) == 1 and [s["z3"] for s in shards] == ["111", "112"],
        (g, len(snap), shards))
     ok("E2 open: the snapshot row carries its NOT NULL figures, and its checksum is the manifest total",
-       snap and snap[0]["sources"] == 2 and snap[0]["n_rows"] == 13 and snap[0]["projects"] == 12
+       snap and snap[0]["sources"] == 4 and snap[0]["n_rows"] == 16 and snap[0]["projects"] == 15
        and snap[0]["checksum"] == sum(s["checksum"] for s in shards), snap)
     ok("E3 open: every captured row carries the canonical NOT NULL fingerprints",
        R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s "
                "and (identity_hash is null or content_hash is null)", (GEN,)) == 0
-       and R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)) == 13)
+       and R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)) == 16)
     ok("E4 open refuses to re-open an existing generation (and writes nothing)",
        _raises(lambda: env.orchestrator("open").mode_open(), "already exists"))
 
@@ -214,7 +219,7 @@ def main():
        and R.q1(c, "select count(*) from geo.n5_association where generation_id=%s", (GEN,)) > 0)
     verdicts = {r["source_key"]: r["verdict"] for r in R.q(c,
                 "select source_key, verdict from geo.n5_generation_key_verdict where generation_id=%s", (GEN,))}
-    ok("E8 the shard persisted its verdicts; a key with cached geometry gets none",
+    ok("E8 the shard persisted its verdicts; a key with cached geometry, or whose publisher did not answer, gets none",
        verdicts == {"dev:P6": "NULL_COORD", "dev:P12": "MULTI_COORD_UNRESOLVED",
                     "dev:P8": "SOURCE_EXCLUDED", "dev:P10": "SOURCE_EXCLUDED"}, verdicts)
     ok("E9 work published EVERY prefix of the scope (incl. the shard-less 113) and recorded unresolved outcomes",
@@ -226,14 +231,19 @@ def main():
     ok("E10 every unresolved outcome is evidence-backed, one per class",
        unres == {"dev:P6": "POINT_REJECTED", "dev:P12": "POINT_REJECTED", "dev:P7": "GEOMETRY_INVALID",
                  "dev:P8": "SOURCE_EXCLUDED", "dev:P9": "NO_INTERSECTION_WITH_GENERATION_ZCTAS",
-                 "dev:P10": "SOURCE_EXCLUDED"}, unres)
+                 "dev:P10": "SOURCE_EXCLUDED", "dev:P13": "REGISTRY_NOAUTH",
+                 "dev:P14": "RECOVERY_PUBLISHER_UNREACHABLE", "dev:P15": "RECOVERY_PUBLISHER_UNREACHABLE"}, unres)
+    reach = {r["z3"]: r["st"] for r in R.q(c, "select z3, r->>'status' st from geo.n5_shard s, "
+             "jsonb_array_elements(s.detail->'recovery') r where s.generation_id=%s and r->>'registry_id'='reg-down'", (GEN,))}
+    ok("E10b control: the unreachable outcome comes from the shards' OWN recovery reports",
+       reach == {"111": "PUBLISHER_UNREACHABLE", "112": "PUBLISHER_UNREACHABLE"}, reach)
     ok("E11 building the new generation changed nothing Map 1 serves", R.map_snapshot(c) == pre)
 
     # ---------------------------------------------------------------- RECONCILE, READY, ACTIVATE
     env.orchestrator("reconcile").mode_reconcile()
     ok("E12 set-based reconciliation accounts for every expected key",
        R.q1(c, "select coalesce(sum(unaccounted),0) from geo.n5_generation_reconcile where generation_id=%s", (GEN,)) == 0
-       and R.q1(c, "select coalesce(sum(expected_keys),0) from geo.n5_generation_reconcile where generation_id=%s", (GEN,)) == 12)
+       and R.q1(c, "select coalesce(sum(expected_keys),0) from geo.n5_generation_reconcile where generation_id=%s", (GEN,)) == 15)
     env.orchestrator("ready").mode_ready()
     ok("E13 READY through the one completeness definition",
        R.q1(c, "select state from geo.n5_generation where generation_id=%s", (GEN,)) == "READY")
