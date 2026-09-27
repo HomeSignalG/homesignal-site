@@ -45,6 +45,10 @@ const CONCURRENCY = process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 
 // would report New England. Used when the full 12,722-ZIP walk does not fit the runner budget;
 // the receipt must then say STRIDE and the ZIP count, because a sample is not a census.
 const STRIDE = process.env.STRIDE ? parseInt(process.env.STRIDE, 10) : 0;
+// EVERY READ HAS A DEADLINE. fetch has none by default, so one hung connection holds its worker
+// forever and ten of them stall the walk with no output (run 34047642059 sat 75 minutes that
+// way). A timeout is counted as its own reason, so a slow production read reports as one.
+const REQ_TIMEOUT_MS = process.env.REQ_TIMEOUT_MS ? parseInt(process.env.REQ_TIMEOUT_MS, 10) : 90000;
 
 // The SHIPPED modules, loaded in the page's own order.
 globalThis.window = globalThis;
@@ -65,7 +69,7 @@ async function pageAll(table, col) {
   for (;;) {
     const url = `${SB}/rest/v1/${table}?select=${col}&order=${col}.asc&limit=1000`
       + (last ? `&${col}=gt.${encodeURIComponent(last)}` : '');
-    const r = await fetch(url, { headers: H });
+    const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(REQ_TIMEOUT_MS) });
     if (!r.ok) return null;
     const rows = await r.json();
     if (!rows.length) break;
@@ -113,6 +117,7 @@ async function oneZip(zip) {
     const r = await fetch(`${SB}/rest/v1/rpc/app_zip_projects_markers`, {
       method: 'POST', headers: H,
       body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
+      signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
     });
     if (!r.ok) {
       const body = (await r.text()).slice(0, 200);
@@ -120,7 +125,11 @@ async function oneZip(zip) {
       T.zips_unavailable++; return;
     }
     payload = await r.json();
-  } catch (e) { reason('threw:' + String(e && e.message).slice(0, 120)); T.zips_unavailable++; return; }
+  } catch (e) {
+    reason(e && e.name === 'TimeoutError' ? 'timeout_' + REQ_TIMEOUT_MS + 'ms'
+                                          : 'threw:' + String(e && e.message).slice(0, 120));
+    T.zips_unavailable++; return;
+  }
 
   const outcome = HS.zipAuthOutcome(payload);
   if (outcome !== 'complete') {

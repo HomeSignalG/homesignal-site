@@ -24,6 +24,10 @@ on:
         description: 'Optional: measure every Nth canonical ZIP (spatially spread sample)'
         required: false
         default: ''
+      concurrency:
+        description: 'Census: parallel RPC reads (default 10; lower it while another heavy job is running)'
+        required: false
+        default: '10'
       zips:
         description: 'Optional: skip the census and run the browser parity check on these ZIPs (comma-separated)'
         required: false
@@ -57,7 +61,7 @@ jobs:
         env:
           SAMPLE: ${{ github.event.inputs.sample }}
           STRIDE: ${{ github.event.inputs.stride }}
-          CONCURRENCY: '10'
+          CONCURRENCY: ${{ github.event.inputs.concurrency || '10' }}
         run: |
           set -o pipefail
           node scripts/residential-measure.mjs | tee /tmp/census.txt
