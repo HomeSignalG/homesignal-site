@@ -13,6 +13,7 @@ create or replace function public.oa_cityless_key(addr text)
 returns text
 language sql
 immutable
+set search_path = public
 as $$
   select case
     when addr ~ ', [^,]+, [A-Z]{2} [0-9]{5}(-[0-9]{4})?$'

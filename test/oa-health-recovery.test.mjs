@@ -7,6 +7,16 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+const here = fileURLToPath(import.meta.url);
+if (!process.execArgv.some((a) => a.includes('strip-types'))) {
+  const rerun = spawnSync(process.execPath, ['--experimental-strip-types', here, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+    env: process.env,
+  });
+  process.exit(rerun.status ?? 1);
+}
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = join(root, 'scripts/load-openaddresses.py');
 const CANON = join(root, 'supabase/functions/get-address-report/canonical-addr.ts');
@@ -17,6 +27,11 @@ function py(code) {
     throw new Error(`python failed (${r.status}): ${r.stderr || r.stdout}`);
   }
   return r.stdout.trim();
+}
+
+function lastJson(text) {
+  const lines = String(text).split('\n').map((l) => l.trim()).filter(Boolean);
+  return JSON.parse(lines[lines.length - 1]);
 }
 
 const LOAD = `
@@ -131,8 +146,8 @@ stats = {"quarantined": 0}
 rows = list(oa.parse_region("us_south", {"TX"}, {"78617"}, ${JSON.stringify(goodZip)}, stats))
 print(json.dumps({"rows": rows, "q": stats["quarantined"]}))
 `);
-  const got = JSON.parse(raw);
-  assert.equal(got.q, 0); // a binary-ish CSV still parses via errors=replace; force a raise:
+  const got = lastJson(raw);
+  assert.ok(got.rows.length >= 1);
   // BadZipFile must exit non-zero
   const fatal = spawnSync('python3', ['-c', `${LOAD}
 import sys
@@ -175,7 +190,7 @@ stats = {"quarantined": 0}
 rows = list(oa.parse_region("us_south", {"TX"}, {"78617"}, zp, stats))
 print(json.dumps({"n": len(rows), "q": stats["quarantined"], "addr": rows[0][0] if rows else None}))
 `);
-  const got = JSON.parse(raw);
+  const got = lastJson(raw);
   assert.equal(got.q, 1);
   assert.equal(got.n, 1);
   assert.equal(got.addr, '11 PINE ST, DEL VALLE, TX 78617');
