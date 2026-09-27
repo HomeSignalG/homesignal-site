@@ -34,7 +34,8 @@ const ENDPOINT = grab('ENDPOINT');
 const APIKEY = grab('APIKEY');
 const SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
-const ZIPS = (process.env.ZIPS || '01040,01852,07033,20187,23150').split(',').map((z) => z.trim()).filter(Boolean);
+const DEFAULT_ZIPS = '01040,01852,07033,20187,23150';
+const ZIPS = (process.env.ZIPS || DEFAULT_ZIPS).split(',').map((z) => z.trim()).filter(Boolean);
 const hdr = { apikey: APIKEY, Authorization: 'Bearer ' + APIKEY, 'Content-Type': 'application/json' };
 
 let fails = 0;
@@ -55,13 +56,19 @@ async function backend(zip) {
 console.log('SITE_BASE=' + SITE_BASE + '  ZIPS=' + ZIPS.join(','));
 const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 let totalRows = 0, totalGood = 0;
-const byLife = {};
+const byLife = {}, basisSeen = {};
 for (const zip of ZIPS) {
   let rows;
   try { rows = await backend(zip); } catch (e) { ok(false, zip + ' backend read', String(e.message)); continue; }
   const want = new Map(rows.map((x) => [x.source_key, HS.canonicalLifecycle({ status: x.map_status }).key]));
   // CONTROL: the backend must return rows for a sample ZIP, or every check below is vacuous.
-  ok(rows.length > 0, zip + ' backend returns data-centre rows (control)', String(rows.length));
+  // A zero here is a fact about production, not about the page: e.g. the canonical layer is empty
+  // between a Compute Atlas acquisition and the next identity (:25) / geography (:35) run
+  // (CLAUDE.md §7.13). Nothing was verified for such a ZIP, so it fails rather than passes.
+  ok(rows.length > 0, zip + ' backend returns data-centre rows (control)',
+    rows.length + (rows.length ? '' : ' — nothing to verify here; if the canonical layer is between'
+      + ' acquisition and resolution, re-run after the next :35 geography run'));
+  rows.forEach((x) => { basisSeen[x.publication_basis] = (basisSeen[x.publication_basis] || 0) + 1; });
 
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   const errors = [];
@@ -94,7 +101,14 @@ for (const zip of ZIPS) {
   totalGood += got.sites.length - bad.length;
 }
 await browser.close();
-console.log('\nSUMMARY  rows=' + totalRows + '  correct=' + totalGood + '  by lifecycle=' + JSON.stringify(byLife));
+console.log('\nSUMMARY  rows=' + totalRows + '  correct=' + totalGood + '  by lifecycle=' + JSON.stringify(byLife)
+  + '  by source basis=' + JSON.stringify(basisSeen));
+// The default sample was chosen to carry BOTH populations (canonical entities and the OSM
+// compatibility layer). A pass over only one of them is not a pass over the contract.
+if (ZIPS.join(',') === DEFAULT_ZIPS) {
+  ok(basisSeen.canonical > 0 && basisSeen.legacy_osm_compat > 0,
+    'the sample verified both source populations (canonical and legacy_osm_compat)', JSON.stringify(basisSeen));
+}
 ok(totalRows > 0 && totalGood === totalRows, 'every data-centre row across the sample draws correctly',
   totalGood + ' of ' + totalRows);
 process.exit(fails ? 1 : 0);

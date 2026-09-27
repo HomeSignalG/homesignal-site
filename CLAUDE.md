@@ -2729,6 +2729,10 @@ source a record came from, never unions sources, and never maps a lifecycle word
   - `scripts/probe-map1-dc-type-lifecycle.mjs` (`verify-map1-dc-type-lifecycle.yml`) checks the
     real page against the live RPC for the deterministic sample (01040, 01852, 07033, 20187,
     23150); dispatch it with `site_base=https://homesignal.net` to check what is live.
+    ⚠️ **It goes red between a Compute Atlas acquisition and the next identity (:25) and geography
+    (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
+    2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
+    returned 0 rows. That is production, not the page. Re-run it after the next :35.
   - ⚠️ `docs/map1-dc-publication.sql`'s header says *"every data-centre pin reaches that stage
     today; the page reads no lifecycle from this column"*. That was true when written and is
     false now. The file is the DDL of record and apply tooling reads it, so it is left as is.
