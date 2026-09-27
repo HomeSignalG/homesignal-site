@@ -1,0 +1,55 @@
+name: dc-geocode-variant-probe
+
+# ZERO-WRITE MEASUREMENT for step 8 (C4): the data-centre addresses the shared ladder could not
+# match, re-asked of the ladder's Census rung unchanged and under candidate line rewrites, with a
+# control set of already-matching addresses proving whether each rewrite is safe.
+#
+# Why a runner: the sandbox cannot reach the Census geocoder or the database; a GitHub-hosted runner
+# can. Same pattern as dc-geocode-probe.yml.
+#
+# WRITES NOTHING, by construction: inputs are read in a READ ONLY transaction, the script holds no
+# database credential at all, and evidence returns through this job's log.
+
+# DISPATCH-ONLY: the input step holds a database secret, and secret-holding jobs do not run on
+# pull_request (test/workflow-secret-exposure.test.mjs).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-geocode-variant-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Read inputs (READ ONLY transaction)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          PGOPTIONS='-c default_transaction_read_only=on' \
+            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off \
+                 -f docs/dc-geocode-variant-probe-inputs.sql > /tmp/variant-in.jsonl
+          grep -o '"kind" : "[a-z]*"' /tmp/variant-in.jsonl | sort | uniq -c
+
+      - name: Ask the Census rung, unchanged and rewritten (no database credential)
+        env:
+          PROBE_INPUT: /tmp/variant-in.jsonl
+        run: deno run --allow-net --allow-env=PROBE_INPUT --allow-read=/tmp scripts/dc-geocode-variant-probe.ts
