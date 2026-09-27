@@ -21,11 +21,13 @@
   .fsr .id { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
   .fsr .workspace { margin-top: 28px; }
   .fsr .workspace a { display: block; margin: 4px 0; }
+  .fsr-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 22px; }
+  .fsr-nav button[aria-current="page"] { font-weight: 700; }
   @media (max-width: 720px) {
     .fsr form { grid-template-columns: 1fr; }
   }
   @media print {
-    .fsr form, .fsr .actions, .fsr .workspace { display: none !important; }
+    .fsr form, .fsr .actions, .fsr .workspace, .fsr-nav, .fsr-scale { display: none !important; }
     body { background: #fff; }
   }
 </style>
@@ -34,40 +36,56 @@
 <div class="fsr">
   <div class="eyebrow">FUTURE SURROUNDINGS REPORT · NYC V1</div>
   <h1>What is on the record around this property</h1>
-  <p class="sub">New York City AddressPoint plus Department of Buildings ledgers. No scores, outlooks, or predicted effects.</p>
+  <p class="sub">New York City AddressPoint plus Department of Buildings ledgers. No scores, outlooks, or predicted effects. Signed paid pilots: 0. Verdict: NOT YET.</p>
 
-  <form id="fsrForm">
-    <div>
-      <label for="fsrAddress">Address</label>
-      <input id="fsrAddress" name="address" required autocomplete="street-address" placeholder="1 Centre Street">
-    </div>
-    <div>
-      <label for="fsrZip">ZIP</label>
-      <input id="fsrZip" name="zip" inputmode="numeric" pattern="[0-9]{5}" placeholder="10007">
-    </div>
-    <div>
-      <label for="fsrRadius">Radius</label>
-      <select id="fsrRadius" name="radius_mi">
-        <option value="0.25">0.25 mi</option>
-        <option value="0.5" selected>0.5 mi</option>
-        <option value="1">1 mi</option>
-      </select>
-    </div>
-    <button type="submit" class="btn primary" id="fsrGo">Build report</button>
-  </form>
+  <nav class="fsr-nav" aria-label="Report views">
+    <button type="button" class="btn" data-view="report" aria-current="page">Report</button>
+    <button type="button" class="btn" data-view="coverage">Coverage</button>
+    <button type="button" class="btn" data-view="listing">Listing</button>
+    <button type="button" class="btn" data-view="portfolio">Portfolio</button>
+    <button type="button" class="btn" data-view="usage">Usage</button>
+  </nav>
 
-  <div id="fsrStatus" class="note" hidden></div>
-  <div id="fsrOut" hidden></div>
+  <div id="fsrReportView">
+    <form id="fsrForm">
+      <div>
+        <label for="fsrAddress">Address</label>
+        <input id="fsrAddress" name="address" required autocomplete="street-address" placeholder="1 Centre Street">
+      </div>
+      <div>
+        <label for="fsrZip">ZIP</label>
+        <input id="fsrZip" name="zip" inputmode="numeric" pattern="[0-9]{5}" placeholder="10007">
+      </div>
+      <div>
+        <label for="fsrRadius">Radius</label>
+        <select id="fsrRadius" name="radius_mi">
+          <option value="0.25">0.25 mi</option>
+          <option value="0.5" selected>0.5 mi</option>
+          <option value="1">1 mi</option>
+        </select>
+      </div>
+      <button type="submit" class="btn primary" id="fsrGo">Build report</button>
+    </form>
 
-  <div class="workspace">
-    <h2>Recent reports</h2>
-    <p class="sub">This browser only. A share link rebuilds the report from the same buyer inputs.</p>
-    <div id="fsrRecent"></div>
+    <div id="fsrStatus" class="note" hidden></div>
+    <div id="fsrOut" hidden></div>
+
+    <div class="workspace">
+      <h2>Recent reports</h2>
+      <p class="sub">This browser only. A share link rebuilds the report from the same buyer inputs.</p>
+      <div id="fsrRecent"></div>
+    </div>
   </div>
+
+  <div id="fsrCoverageView" class="fsr-scale" hidden></div>
+  <div id="fsrListingView" class="fsr-scale" hidden></div>
+  <div id="fsrPortfolioView" class="fsr-scale" hidden></div>
+  <div id="fsrUsageView" class="fsr-scale" hidden></div>
 </div>
 
 <script src="lib/nyc-v1-report.js"></script>
 <script src="lib/nyc-v1-soda.js"></script>
+<script src="lib/fsr-scale.js"></script>
 <script>
 (function () {
   var form = document.getElementById('fsrForm');
@@ -75,6 +93,9 @@
   var out = document.getElementById('fsrOut');
   var recent = document.getElementById('fsrRecent');
   var KEY = 'hs_nyc_v1_reports';
+  var Scale = window.HSFsrScale;
+  var lastReport = null;
+  var currentView = 'report';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -85,6 +106,10 @@
   function setStatus(msg, show) {
     status.hidden = !show;
     status.textContent = msg || '';
+  }
+
+  function persist() {
+    return window.localStorage;
   }
 
   function remember(report) {
@@ -125,7 +150,120 @@
     }).toString();
   }
 
+  function showView(name) {
+    currentView = name;
+    document.getElementById('fsrReportView').hidden = name !== 'report';
+    document.getElementById('fsrCoverageView').hidden = name !== 'coverage';
+    document.getElementById('fsrListingView').hidden = name !== 'listing';
+    document.getElementById('fsrPortfolioView').hidden = name !== 'portfolio';
+    document.getElementById('fsrUsageView').hidden = name !== 'usage';
+    document.querySelectorAll('.fsr-nav button').forEach(function (btn) {
+      btn.setAttribute('aria-current', btn.getAttribute('data-view') === name ? 'page' : 'false');
+    });
+    if (name === 'coverage') paintCoverage();
+    if (name === 'listing') paintListing();
+    if (name === 'portfolio') paintPortfolio();
+    if (name === 'usage') paintUsage();
+  }
+
+  function paintCoverage() {
+    var matrix = Scale.coverageMatrix();
+    var html = '<h2>Coverage-quality matrix</h2>';
+    html += '<p class="sub">Assemblable markets: ' + esc(matrix.assemblable_market_ids.join(', ') || 'none') +
+      '. Signed paid pilots: ' + esc(matrix.signed_paid_pilots) + '. Verdict: ' + esc(matrix.verdict) + '.</p>';
+    html += '<table><thead><tr><th>Market</th><th>Assemblable</th><th>Geography</th><th>Publisher data</th></tr></thead><tbody>';
+    matrix.markets.forEach(function (m) {
+      var pubs = (m.publisher_data || []).map(function (p) {
+        return (p.source || p.dataset_id || '') + ' · ' + (p.classification || '');
+      }).join('; ');
+      html += '<tr><td>' + esc(m.market) + '</td><td>' + (m.assemblable ? 'yes' : 'no') + '</td>' +
+        '<td>' + esc((m.geography && (m.geography.source || m.geography.classification)) || '') + '</td>' +
+        '<td>' + esc(pubs) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div class="note">Seattle permits stay CLEARED WITH ATTRIBUTION. Seattle Addresses (MAF) is a federated ArcGIS pointer and stays HOLD. NYC V1 is the only assemblable market.</div>';
+    document.getElementById('fsrCoverageView').innerHTML = html;
+  }
+
+  function paintListing() {
+    var el = document.getElementById('fsrListingView');
+    if (!lastReport) {
+      el.innerHTML = '<h2>Listing-level summary</h2><p class="sub">Build a report first. The listing is derived only from that NYC V1 object.</p>';
+      return;
+    }
+    var sum = Scale.listingSummary(lastReport);
+    Scale.recordUse(persist(), { kind: 'listing', report_id: lastReport.report_id });
+    var html = '<h2>Listing-level summary</h2>';
+    html += '<p class="id">derived_from ' + esc(sum.derived_from) + '</p>';
+    html += '<div class="note"><b>' + esc(sum.listing.buyer_address) +
+      (sum.listing.buyer_zip ? ', ' + esc(sum.listing.buyer_zip) : '') + '</b><br>';
+    if (sum.listing.addresspointid) {
+      html += 'AddressPoint ' + esc(sum.listing.addresspointid) + ' · ' +
+        esc(sum.listing.published_address) + ' · nearby ' + esc(sum.nearby_count);
+    } else {
+      html += 'No AddressPoint match. Nearby 0.';
+    }
+    html += '</div>';
+    if (sum.nearest) {
+      html += '<p>Nearest on the record: ' + esc(sum.nearest.type) + ' · ' + esc(sum.nearest.address) +
+        ' at ' + esc(sum.nearest.distance_mi) + ' mi (' + esc(sum.nearest.source) + ').</p>';
+    }
+    html += '<div class="note">' + esc(sum.investigate) + '</div>';
+    el.innerHTML = html;
+  }
+
+  function paintPortfolio() {
+    var el = document.getElementById('fsrPortfolioView');
+    var list = Scale.listPortfolio(persist());
+    var sum = Scale.summarizePortfolio(persist());
+    var html = '<h2>Portfolio</h2>';
+    html += '<p class="sub">' + esc(sum.count) + ' stored reports. Unique AddressPoints: ' +
+      esc(sum.unique_addresspoints) + '. Nearby total: ' + esc(sum.nearby_total) +
+      '. Signed paid pilots: ' + esc(sum.signed_paid_pilots) + '.</p>';
+    if (!list.length) {
+      html += '<p>None stored in this browser. Add a built report from the Report view.</p>';
+    } else {
+      html += '<ul>';
+      list.forEach(function (x) {
+        var href = 'future-surroundings-report.html?' + new URLSearchParams({
+          address: x.address, zip: x.zip || '', radius_mi: String(x.radius_mi || 0.5)
+        }).toString();
+        html += '<li><a href="' + esc(href) + '">' + esc(x.address) + (x.zip ? ' ' + esc(x.zip) : '') +
+          '</a> · ' + esc((x.report_id || '').slice(0, 12)) +
+          ' · nearby ' + esc(x.nearby_count) +
+          ' <button type="button" class="btn" data-remove="' + esc(x.report_id) + '">Remove</button></li>';
+      });
+      html += '</ul>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-remove]').forEach(function (btn) {
+      btn.onclick = function () {
+        Scale.removeFromPortfolio(persist(), btn.getAttribute('data-remove'));
+        paintPortfolio();
+      };
+    });
+  }
+
+  function paintUsage() {
+    var sum = Scale.usageSummary(persist());
+    var html = '<h2>Report use</h2>';
+    html += '<div class="note"><b>Signed paid pilots: ' + esc(sum.signed_paid_pilots) +
+      '.</b> ' + esc(sum.note) + '</div>';
+    html += '<p>Local events: ' + esc(sum.events) + '. Distinct report ids: ' +
+      esc(sum.distinct_report_ids) + '. Verdict: ' + esc(sum.verdict) + '.</p>';
+    var kinds = Object.keys(sum.by_kind || {});
+    if (kinds.length) {
+      html += '<ul>';
+      kinds.forEach(function (k) {
+        html += '<li>' + esc(k) + ': ' + esc(sum.by_kind[k]) + '</li>';
+      });
+      html += '</ul>';
+    }
+    document.getElementById('fsrUsageView').innerHTML = html;
+  }
+
   function render(report) {
+    lastReport = report;
     var html = '';
     html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
     html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
@@ -171,21 +309,31 @@
       '<button type="button" class="btn" id="fsrPrint">Print / PDF</button>' +
       '<button type="button" class="btn" id="fsrShare">Copy share link</button>' +
       '<button type="button" class="btn" id="fsrJson">Download JSON</button>' +
+      '<button type="button" class="btn" id="fsrPortfolioAdd">Add to portfolio</button>' +
       '</div>';
 
     out.hidden = false;
     out.innerHTML = html;
-    document.getElementById('fsrPrint').onclick = function () { window.print(); };
+    document.getElementById('fsrPrint').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'print', report_id: report.report_id });
+      window.print();
+    };
     document.getElementById('fsrShare').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'share', report_id: report.report_id });
       navigator.clipboard.writeText(shareUrl(report));
     };
     document.getElementById('fsrJson').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'json', report_id: report.report_id });
       var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'future-surroundings-' + report.report_id.slice(0, 12) + '.json';
       a.click();
       URL.revokeObjectURL(a.href);
+    };
+    document.getElementById('fsrPortfolioAdd').onclick = function () {
+      Scale.addToPortfolio(persist(), report);
+      Scale.recordUse(persist(), { kind: 'portfolio_add', report_id: report.report_id });
     };
     remember(report);
   }
@@ -195,6 +343,7 @@
     out.hidden = true;
     return window.HSNycV1Soda.loadReport(address, zip, radius).then(function (report) {
       setStatus('', false);
+      Scale.recordUse(persist(), { kind: 'build', report_id: report.report_id });
       render(report);
       return report;
     }).catch(function (err) {
@@ -212,11 +361,17 @@
     if (zip) u.searchParams.set('zip', zip); else u.searchParams.delete('zip');
     u.searchParams.set('radius_mi', String(radius));
     history.replaceState({}, '', u);
+    showView('report');
     run(address, zip, radius);
+  });
+
+  document.querySelectorAll('.fsr-nav button').forEach(function (btn) {
+    btn.onclick = function () { showView(btn.getAttribute('data-view')); };
   });
 
   paintRecent();
   var q = new URLSearchParams(location.search);
+  if (q.get('view')) showView(q.get('view'));
   if (q.get('address')) {
     document.getElementById('fsrAddress').value = q.get('address');
     document.getElementById('fsrZip').value = q.get('zip') || '';

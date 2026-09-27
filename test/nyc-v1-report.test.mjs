@@ -150,7 +150,7 @@ ok(robots.includes('Disallow: /future-surroundings-report.html'), '5e robots dis
 const staged = execFileSync('python3', [join(root, 'scripts/stage_site.py'), '--src', root, '--list-only'], { encoding: 'utf8' })
   .split('\n').map((l) => l.trim()).filter(Boolean);
 ok(staged.includes('future-surroundings-report.html'), '5f page ships');
-ok(staged.includes('lib/nyc-v1-report.js') && staged.includes('lib/nyc-v1-soda.js'), '5g libraries ship');
+ok(staged.includes('lib/nyc-v1-report.js') && staged.includes('lib/nyc-v1-soda.js') && staged.includes('lib/fsr-scale.js'), '5g libraries ship');
 ok(existsSync(join(root, 'future-surroundings-report.html')), '5h template exists');
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');

@@ -8,3 +8,8 @@ project_id = "qwnnmljucajnexpxdgxr"
 
 [functions.edge-probe]
 verify_jwt = true
+
+# Allowlist JSON API. Not get-address-report. JWT stays on; this is not in the
+# workflow's --no-verify-jwt exception.
+[functions.get-future-surroundings-report]
+verify_jwt = true
