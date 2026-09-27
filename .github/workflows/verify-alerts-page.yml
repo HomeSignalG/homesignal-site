@@ -20,6 +20,7 @@ on:
       - 'lib/data.js'
       - 'lib/templates.js'
       - 'scripts/verify-alerts-page.mjs'
+      - 'scripts/lib/local-news-topic-gate.mjs'
       - '.github/workflows/verify-alerts-page.yml'
 
 jobs:
