@@ -89,6 +89,7 @@ jobs:
           }
           run_helper "${FN_DIR}/sources/geo-input.test.ts" "geo-input"
           run_helper "${FN_DIR}/geocode-cache.test.ts" "geocode-cache"
+          run_helper "supabase/functions/geocode-address/geocode-address.test.ts" "geocode-address"
 
       - name: Type-check the new geocoder helper (strict, must be clean)
         run: |

@@ -77,6 +77,7 @@ jobs:
             ("proxies Census onelineaddress",  "geocoding.geo.census.gov/geocoder/locations/onelineaddress" in s),
             ("benchmark Public_AR_Current",    "benchmark=Public_AR_Current" in s),
             ("exactly one outbound fetch",     len(re.findall(r"\bfetch\(", s)) == 1),
+            ("15s timeout",                    "AbortSignal.timeout(15000)" in s),
           ]
           bad = sum(0 if ok else 1 for _, ok in checks)
           for n, ok in checks: print(("PASS " if ok else "FAIL ") + n)

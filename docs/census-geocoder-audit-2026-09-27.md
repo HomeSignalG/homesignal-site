@@ -34,9 +34,7 @@
     6. ingest `scripts/phase0_land_use_yield.py`.
   - `verify-geocodes` uses a different endpoint, the reverse `geographies/coordinates` lookup.
 - **8. Production ladder:** `productionLadder()` in `geocode-cache.ts:215` is OpenAddresses (`national_address_points`) then Census. It is the only ladder, used by both Development and Data Center.
-- **9. Timeout:** 15 s (`AbortSignal.timeout(15000)`) in the ladder.
-  - `geocode-address` sets no timeout at all (`fetch(u)` at `geocode-address/index.ts:26`).
-  - `notice_geo.py` uses 12 s (`geocode_notice(..., timeout: int = 12)`).
+- **9. Timeout:** 15 s (`AbortSignal.timeout(15000)`) in the ladder, in `geocode-address`, and in ingest `adapters/census_geocode.py` (`CENSUS_TIMEOUT = 15`). Step 7 aligned the other callers to this.
 
 ## 10–18. The cache (`public.geocodes`)
 
@@ -230,3 +228,9 @@ Concurrency at kickoff (2026-09-27): `origin/main` fetched; no other open PR imp
 | 4 | Prefer the filed-ZIP Census candidate when several matches exist | Development takes `matches[0]`. Data Center rejects the same input as `REJECTED_AMBIGUOUS`. Prefer the candidate whose matched ZIP equals the trailing ZIP on the input. | [x] |
 | 5 | Persist fence outcome and failure class | `geofence_status` is unused; `diag` is dropped; fence rejections vanish. Write failure class on `review_reason`. Write `geofence_status` (`inside_zip` / `zip_mismatch` / `too_far`) on the cache row. | [x] |
 | 6 | Apply the shared fence to TABS | TABS is the one geocoding source that skips `fenceGeocode`. Point-scope TABS still quarantines (never synthesizes) when the fence rejects. | [x] |
+| 7 | Align the other Census callers (ingest + `geocode-address` timeout) | `geocode-address` had no timeout; ingest `notice_geo` cached transport as countywide; `build_address_map` treated a fetch fail as no-match. | [x] |
+| 8 | Deploy, then heal the live cache (assembled keys + failed TTL; no 41k blast) | Code on a branch does not change production until deploy. Cache healing is a separate, bounded write. | [ ] |
+| 9 | Same ambiguity rule in Development and Data Center | Development now prefers filed-ZIP; Data Center still rejects multi-match as `REJECTED_AMBIGUOUS`. | [ ] |
+| 10 | Allow an equal-tier Census refresh so first-write points are not frozen | `upsert_geocode_if_better` never replaces equal rank. | [ ] |
+| 11 | Turn `verify-geocodes` back on only after it finishes green | Last success 2026-07-23; last stored run 2026-08-06 failed. | [ ] |
+| 12 | Load OpenAddresses nationally (today it is three Texas counties) | 8,545 rows, all TX. Do not start this from a green step 7. | [ ] |
