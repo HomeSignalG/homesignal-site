@@ -3,6 +3,16 @@ name: residential-measure
 # The Residential before/after, measured through the REAL production read (the same
 # app_zip_projects_markers RPC the page performs) and the REAL shipped lib/ modules. Runs where
 # egress works. Read-only: it never writes to the database and never touches the site.
+#
+# Two jobs (2026-09-27):
+#   measure      the national census. Since 2026-09-27 it also measures the page's DRAW-TIME
+#                Residential check per ZIP and lifecycle slice, and fails if what is drawn differs
+#                from what the builder assigns. It prints the ZIPs the pre-fix page under-drew.
+#   draw-parity  a real browser on those ZIPs (or on `zips`), counting the Residential markers
+#                actually on the map against what the builder assigns
+#                (scripts/probe-map1-residential-parity.mjs). By default it serves the checked-out
+#                tree on localhost, so a branch is proven before it ships; point `site_base` at
+#                https://homesignal.net to read what is live.
 on:
   workflow_dispatch:
     inputs:
@@ -14,12 +24,50 @@ on:
         description: 'Optional: measure every Nth canonical ZIP (spatially spread sample)'
         required: false
         default: ''
+      zips:
+        description: 'Optional: skip the census and run the browser parity check on these ZIPs (comma-separated)'
+        required: false
+        default: ''
+      site_base:
+        description: 'Where the browser check loads the page from (default: the checked-out tree on localhost)'
+        required: false
+        default: ''
+      expect:
+        description: 'Browser check: "parity" fails on any inequality; "report" only prints (for reading production before a fix is live)'
+        required: false
+        default: 'parity'
 
 permissions:
   contents: read
 
 jobs:
   measure:
+    if: ${{ github.event.inputs.zips == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      affected: ${{ steps.census.outputs.zips }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Measure
+        id: census
+        env:
+          SAMPLE: ${{ github.event.inputs.sample }}
+          STRIDE: ${{ github.event.inputs.stride }}
+          CONCURRENCY: '10'
+        run: |
+          set -o pipefail
+          node scripts/residential-measure.mjs | tee /tmp/census.txt
+          grep '^AFFECTED_ZIPS=' /tmp/census.txt | tail -1 | sed 's/^AFFECTED_ZIPS=/zips=/' >> "$GITHUB_OUTPUT"
+
+  draw-parity:
+    needs: measure
+    # Runs on the census's affected ZIPs even when the census itself failed (a failure there is
+    # exactly when the browser receipt matters), and on its own when `zips` is given.
+    if: ${{ always() && (github.event.inputs.zips != '' || needs.measure.outputs.affected != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -27,9 +75,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Measure
+      # Installed in the PARENT of the checkout, so the site keeps no package.json.
+      - name: Install Playwright (chromium)
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Serve the checked-out tree
+        if: ${{ github.event.inputs.site_base == '' }}
+        run: |
+          python3 -m http.server 8099 >/tmp/http.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8099/homesignalmap.html >/dev/null && break; sleep 1; done
+          curl -sf -o /dev/null http://localhost:8099/homesignalmap.html
+      - name: Residential assigned = canonical = qualified = drawn
         env:
-          SAMPLE: ${{ github.event.inputs.sample }}
-          STRIDE: ${{ github.event.inputs.stride }}
-          CONCURRENCY: '10'
-        run: node scripts/residential-measure.mjs
+          SITE_BASE: ${{ github.event.inputs.site_base != '' && github.event.inputs.site_base || 'http://localhost:8099' }}
+          ZIPS: ${{ github.event.inputs.zips != '' && github.event.inputs.zips || needs.measure.outputs.affected }}
+          EXPECT: ${{ github.event.inputs.expect }}
+        run: node scripts/probe-map1-residential-parity.mjs

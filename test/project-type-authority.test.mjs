@@ -102,9 +102,10 @@ const HS = load(['lib/project-type.js', 'lib/map.js', 'lib/n5-radius.js', 'lib/r
 const REG = HS.CATEGORY_REGISTRY;
 const PENN = { type: 'Industrial', type_raw: 'Industrial', name: 'Pennhurst Data Centers', status: 'Proposed' };
 const zipModeType = (row) => {
-  const gate = HS.residentialGateDrops; HS.residentialGateDrops = undefined;   // Type, not membership
+  // Type, not membership: detach the builders' Residential gate (their one call site).
+  const gate = HS.residentialGateAtConstruction; HS.residentialGateAtConstruction = undefined;
   try { return HS.resolveTrackerMarker(HS.zipAuthSiteFromMarker({ lat: 40, lng: -75, project_ref: 'x' }, row)).typeKey; }
-  finally { HS.residentialGateDrops = gate; }
+  finally { HS.residentialGateAtConstruction = gate; }
 };
 ok(HS.canonicalProjectType(PENN).typeKey === 'datacenter', '4a Pennhurst (raw Industrial) → canonical datacenter');
 ok(HS.canonicalProjectType(PENN).label === REG.datacenter.label, '4b ...labelled from the registry ("Data center")');
