@@ -3687,6 +3687,26 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     A site ADAPTER (`residentialEvidenceFromSite`) reads the same three evidence fields off a
     report site so there is one contract, never a second copy. After: 1,666 routine + 340
     unresolved removed, 282 genuine developments kept, **0 bypassing**.
+  - 🛑 **CORRECTED 2026-09-27: "one contract" was not true. The draw-time check dropped records
+    the builder had qualified.** The adapter read the class field as `site.type_raw`. The ZIP-mode
+    builder carries it as `permit_class` (a data-centre-only field), and address mode doesn't carry
+    it at all. So a record qualified on its class field alone was built as Residential, then judged
+    UNRESOLVED in `render()` and never drawn.
+    - **Measured over all 12,722 ZIPs** (`residential-measure.yml` run `36347224473`; 12,016
+      measurable, 706 not measured, 0 unavailable): **19,838 Residential projects across 54 ZIPs
+      were built and not drawn.** Examples: 76227 (5,426), 75068 (4,108), 76226 (2,077). All
+      18,646 `denton-county-dev-permits` records were among them.
+    - **Fix (#1411):** both builders call `HS.residentialGateAtConstruction`. It records the fields
+      the rule judged (`type_raw`, `name`, `registry_id`) on the site as `residential_evidence`,
+      and the draw-time adapter returns that object. The rule and `permit_class` are unchanged.
+    - **After the fix, nationally:** in every ZIP and slice, built = qualified by the rule on the
+      full row = kept by `render()`'s check (shipped modules, not a browser). That is 49,551
+      projects: proposed 4,642 · approved 35,442 · operating 9,467.
+    - **Real browser, same run, on the 54 ZIPs:** the page drew 20,653 of 20,653 assigned
+      projects, where the pre-fix check drew 815. The count was taken from the page's own
+      Leaflet markers.
+    - **Why the census missed it:** it stopped at the builder and never ran `render()`'s check.
+      It now does, and fails when drawn ≠ assigned.
   - ⚖️ **FOUNDER RULING 2026-09-06 — source provenance MAY qualify a record, but only where the
     corpus is demonstrably bounded to a development class.** 8 granted, **each re-proved from its
     own production `type_raw` census** (austin-subdivision-cases, austin-site-plan-cases,
