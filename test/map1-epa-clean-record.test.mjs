@@ -55,9 +55,10 @@ const prevWindow = g.window;
 g.window = { HS: {} };
 new Function(readFileSync(join(root, 'lib/templates.js'), 'utf8')).call(g);
 const HS = g.window.HS;
+g.HS = HS;
 
 const envApi = (0, eval)(
-  '(function(){\n' +
+  '(function(HS){\n' +
   grabFn('frsRid') + '\n' +
   grabFn('tceqRn') + '\n' +
   grabFn('hasEnvRecord') + '\n' +
@@ -66,9 +67,9 @@ const envApi = (0, eval)(
   grabAssign('ENV_TONE_RANK') + '\n' +
   grabFn('envProgramMeaning') + '\n' +
   grabFn('envSignals') + '\n' +
-  'return { envSignals: envSignals, HS: (typeof HS!=="undefined"?HS:null) };\n' +
-  '})()'
-);
+  'return { envSignals: envSignals };\n' +
+  '})'
+)(HS);
 const envSignals = envApi.envSignals;
 
 const site = (over) => Object.assign({
