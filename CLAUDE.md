@@ -3256,15 +3256,32 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
   45s+grace, not taken off the write.** The join still waits for both planes — a BOUND, not
   independence — until Unit 3 splits `sites`.
 
-**Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
-sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+**Do not move those ~1,000 plant-only pages out of `indexable`.** That listing change was a
+founder decision, and on 2026-09-27 it was rejected: "nothing is being built" stays a listed
+answer. Core markers may still be added; the sitemap/robots set must not shrink for plants.
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
-### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+### ⛔ PHASE 2 · UNIT 1 LISTING CHANGE IS REJECTED (2026-09-27)
+**Do not unlist ~1,005 Map 1 pages just because they have plants and no new construction.**
+"Nothing is being built" is a valid advertised answer. Those pages stay listed. That was
+the old Unit 1 idea; it is rejected.
+
+- Live 2026-09-27: `app_refresh_zip` still stamps
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))`. **945** indexable rows have
+  `regulated facilities` ≥ 3 and `development projects` = 0; **0** such rows are unlisted.
+- The parked file `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` may still add
+  EPA-free CORE markers (`core_project_scan_status`, `core_records_present`). It **must not**
+  change `indexable`. Applying a splice that replaces the listing rule with
+  `((_nd+_nc)>0 and _ndp > 0)` is forbidden. Pinned by
+  `test/plant-only-map-pages-stay-listed.test.mjs` and `test/epa-phase2-core-markers.test.mjs`.
+- Standing answer already on file (`docs/development-tracker-source-of-truth.md` §6): a ZIP
+  with EPA facilities but no planning feed ships as a facilities-only page.
+
+### 🅿️ PHASE 2 · UNIT 1 CORE MARKERS ARE BUILT AND PARKED (2026-09-07) — listing is unchanged
 SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
-**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
-load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
-robots and coverage states are untouched. Full record: audit §14.
+**not applied**), pinned by `test/epa-phase2-core-markers.test.mjs`. Production still stamps
+the listing expressions above; the sitemap, robots and coverage states are untouched. Full
+record: audit §14. The 2026-09-07 draft's `indexable` rewrite is rejected; see the banner.
 
 - 🔑 **THE AUDIT'S OWN §10.2 RECOMMENDATION IS WRONG ON ITS `data_quality` HALF — do not
   implement it.** `data_quality` is not only a completeness claim, it is the **layout gate** in
@@ -3276,11 +3293,10 @@ robots and coverage states are untouched. Full record: audit §14.
   **Unit 1 therefore leaves `data_quality` alone** and gives core its own EPA-free markers —
   `core_project_scan_status` (`not_scanned` · `projects_found` · `no_qualifying_projects_found`)
   and `core_records_present`, both computed from `_has_report`/`_nd`/`_nc` only.
-- **What Unit 1 changes is `indexable`, and only `indexable`:**
-  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)`.
-  Stored-stamp measurement: **11,704 → 10,699, −1,005, sole cause the `_nfc >= 3` limb on
-  1,005 of 1,005, 0 pages newly advertised**, all 1,005 carrying a `development_reports` row.
-  *(The "1,004" above was an estimate; −1,005 is exact.)*
+- ⛔ **What Unit 1 must NOT change is `indexable`.** The 2026-09-07 draft would have rewritten
+  `((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))` → `((_nd+_nc)>0 and _ndp > 0)` and dropped
+  **1,005** advertised Map 1 pages (stored stamps 2026-09-07: 11,704 → 10,699, sole cause the
+  `_nfc >= 3` limb). **Rejected 2026-09-27.** Those pages stay listed.
 - ⚠️ **NAME THE INSTRUMENT WITH THE NUMBER — two correct readings disagree by 463.** The 766
   comes from the STORED stamps (`component_scores`, one self-consistent row read). Recomputing
   the same question live from `app_projects`/`app_changes` returns **303**, and again later
@@ -3291,7 +3307,7 @@ robots and coverage states are untouched. Full record: audit §14.
   would be a §11 false negative; pin-precision is `indexable`'s question, not completeness's.
 - **Community / Alerts pages are unaffected.** Their robots and sitemap entries come from
   **Rule F** at build time; `gen_zip_pages.py` fetches `indexable` and never reads it. The
-  −1,005 is entirely Map 1 / development pages, which stay real, reachable and fully rendered.
+  plant-only set is entirely Map 1 / development pages; they stay advertised.
 - **Unit order is forced:** doing §3's `data_quality` half first would break the CI pin
   `legacy: populated/facilities_only => pass` (`scripts/verify-coverage-state.mjs:64`) by
   construction. Unit 1 leaves that pin true; reworking `facilities_only` is Unit 2, the

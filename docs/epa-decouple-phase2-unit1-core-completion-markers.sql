@@ -8,6 +8,15 @@
 -- page is advertised as a development page, and no marker anywhere states core
 -- completeness on its own.
 --
+-- ⛔ REJECTED 2026-09-27 — DO NOT UNLIST PLANT-ONLY MAP PAGES.
+-- The original draft changed `indexable` from
+--   ((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3))
+-- to ((_nd+_nc)>0 and _ndp > 0), which would drop ~1,005 Map 1 pages that have
+-- EPA plants and no parcel-precise new construction. That idea is rejected.
+-- "Nothing is being built" is a valid listed answer. Those pages stay advertised.
+-- This file still adds EPA-free CORE markers. It MUST NOT change the indexable
+-- expression. Applying it must leave `_ndp > 0 or _nfc >= 3` in place.
+--
 -- Non-negotiable rules this unit satisfies (founder list, 2026-09-07):
 --   #1  EPA must not determine whether a ZIP page is considered complete.
 --   #8  EPA failures must never make a ZIP appear incomplete / stale / unprocessed.
@@ -109,8 +118,9 @@ do $splice$
 declare
   src   text;
   out_  text;
+  -- KEEP the listed-page rule. Plants with no new construction stay indexable.
   ka    text := E'    ((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3)),\n    _lat, _lng';
-  va    text := E'    ((_nd+_nc)>0 and _ndp > 0),\n'
+  va    text := E'    ((_nd+_nf+_nc)>0 and (_ndp > 0 or _nfc >= 3)),\n'
              || E'    case when not _has_report then ''not_scanned''\n'
              || E'         when _nd > 0 then ''projects_found''\n'
              || E'         else ''no_qualifying_projects_found'' end,\n'
@@ -179,20 +189,22 @@ begin
     from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname = 'public' and p.proname = 'app_refresh_zip';
 
-  -- (a) THE CORE INVARIANT: the indexability decision no longer mentions the EPA plane.
-  if position('((_nd+_nc)>0 and _ndp > 0),' in src) = 0 then
-    raise exception 'VERIFY FAILED: the EPA-free indexable expression is not present';
+  -- (a) REJECTED 2026-09-27: plant-only pages stay listed. "Nothing is being built"
+  --     is a valid advertised answer. The indexable expression must keep the
+  --     facility limb. Do not splice in ((_nd+_nc)>0 and _ndp > 0).
+  if position('(_ndp > 0 or _nfc >= 3)' in src) = 0 then
+    raise exception 'VERIFY FAILED: plant-only pages lost the indexable facility limb';
   end if;
-  if position('_nfc >= 3' in src) > 0 then
-    raise exception 'VERIFY FAILED: the EPA facility limb still gates indexable';
+  if position('((_nd+_nc)>0 and _ndp > 0),' in src) > 0 then
+    raise exception 'VERIFY FAILED: the rejected unlist expression is present on indexable';
   end if;
 
-  -- (b) The overlay must still MEASURE itself — this unit removes EPA from the
-  --     DECISION, never from the reporting.  _nfc still populates component_scores and
-  --     the return line; deleting those would be a different (and wrong) change.
+  -- (b) The overlay must still MEASURE itself. Keeping the listing limb, production
+  --     carries 7 `_nfc` references (the limb plus overlay self-reporting). Dropping
+  --     any of the reporting uses would be a different (and wrong) change.
   n_nf_index := (length(src) - length(replace(src, '_nfc', ''))) / 4;
-  if n_nf_index <> 6 then
-    raise exception 'VERIFY FAILED: expected 6 remaining _nfc references (overlay self-reporting), found %', n_nf_index;
+  if n_nf_index <> 7 then
+    raise exception 'VERIFY FAILED: expected 7 _nfc references (listing limb + overlay self-reporting), found %', n_nf_index;
   end if;
 
   -- (c) Neither new marker may be derivable from the EPA plane.
@@ -245,19 +257,17 @@ $verify$;
 -- materializer moves under the query:
 --
 --   app_community_meta rows                                    12,722
---   indexable = true, before                                   11,704
---   indexable = true, after  (_ndp > 0)                         10,699
---   pages LEAVING the advertised set                            -1,005
---   ... of which the sole cause is the _nfc >= 3 limb        1,005 / 1,005
+--   indexable = true (listing rule unchanged)                  stays
+--   pages LEAVING the advertised set                                 0
 --   pages ENTERING the advertised set                                0
---   all 1,005 currently carry a development_reports row      1,005 / 1,005
 --
--- WHAT THE 1,005 ARE: ZIP pages advertised as DEVELOPMENT pages that carry zero
--- parcel-precise development records and qualified on EPA facility count alone.  They
--- remain real, reachable pages and keep rendering their facility records unchanged;
--- they stop being advertised in sitemap.xml and stop being marked index-eligible on
--- homesignalmap.html.  That is a truthfulness correction, and it is a VISIBLE
--- sitemap/robots delta — the founder's call, which is why this file is parked.
+-- WHAT THE ~1,005 WERE IN THE REJECTED DRAFT: ZIP pages advertised as DEVELOPMENT
+-- pages that carry zero parcel-precise development records and qualified on EPA
+-- facility count alone. Live 2026-09-27: 945 such pages are indexable, 0 unlisted.
+-- They stay advertised. "Nothing is being built" is a valid listed answer. The
+-- original draft would have dropped them from sitemap.xml / homesignalmap.html
+-- index-eligibility; that idea is rejected (2026-09-27). This file is still
+-- parked for the CORE markers only.
 --
 -- WHAT THIS UNIT DELIBERATELY DOES **NOT** TOUCH, and why:
 --   * `data_quality` keeps its `_nf` limb.  It is not only a completeness claim — it is
