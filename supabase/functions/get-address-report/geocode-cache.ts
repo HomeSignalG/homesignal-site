@@ -221,6 +221,31 @@ export async function resolveGeocode(
  *  therefore always flagged for review. That is the correct, honest signal until a
  *  parcel/rooftop rung is added ahead of this one. Returns null on no match → the caller
  *  falls to the next rung, or (today, with only this rung) to a 'failed' result. */
+/** Trailing 5-digit ZIP on a one-line address or a Census matchedAddress. */
+export function trailingZip5(s: string): string | null {
+  return (s || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] ?? null;
+}
+
+export function censusMatchZip(m: { matchedAddress?: string; addressComponents?: { zip?: string } }): string | null {
+  const fromComp = String(m.addressComponents?.zip ?? "").match(/^(\d{5})/)?.[1];
+  return fromComp || trailingZip5(String(m.matchedAddress ?? ""));
+}
+
+/** Prefer the candidate whose matched ZIP equals the ZIP on the input. Fall back
+ *  to Census's first match when the input has no ZIP or no candidate agrees. */
+export function pickCensusMatch<T extends { matchedAddress?: string; addressComponents?: { zip?: string } }>(
+  matches: T[],
+  input: string,
+): T | undefined {
+  if (!matches.length) return undefined;
+  const filed = trailingZip5(input);
+  if (filed && matches.length > 1) {
+    const preferred = matches.find((m) => censusMatchZip(m) === filed);
+    if (preferred) return preferred;
+  }
+  return matches[0];
+}
+
 export function censusRung(fetchFn: typeof fetch): GeocoderRung {
   return {
     source: "census_onelineaddress",
@@ -245,9 +270,14 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
       } catch {
         throw new GeocodeTransportError("census response was not JSON");
       }
-      const matches = data?.result?.addressMatches ?? [];
+      const matches = (data?.result?.addressMatches ?? []) as {
+        coordinates?: { x?: unknown; y?: unknown };
+        matchedAddress?: string;
+        addressComponents?: { zip?: string };
+      }[];
       if (!matches.length) return null;
-      const m = matches[0] as { coordinates?: { x?: unknown; y?: unknown }; matchedAddress?: string };
+      const m = pickCensusMatch(matches, input);
+      if (!m) return null;
       const c = m.coordinates;
       return {
         lat: Number(c?.y),

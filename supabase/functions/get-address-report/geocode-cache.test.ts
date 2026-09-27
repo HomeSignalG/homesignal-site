@@ -8,6 +8,7 @@ import {
   FAILED_RETRY_TTL_MS,
   failedRowIsFresh,
   GeocodeTransportError,
+  pickCensusMatch,
   resolveGeocode,
   REVIEW_REASON_NO_MATCH,
   REVIEW_REASON_TRANSPORT,
@@ -58,6 +59,40 @@ function matches(...addrs: { addr: string; lat: number; lng: number }[]) {
       })),
     },
   };
+}
+
+eq("pick.zip_prefers_filed",
+  pickCensusMatch([
+    { matchedAddress: "3250 S LOCUST GROVE RD, KUNA, ID, 83642" },
+    { matchedAddress: "3250 S LOCUST GROVE RD, KUNA, ID, 83634" },
+  ], "3250 S Locust Grove Rd, Kuna, ID 83634")?.matchedAddress,
+  "3250 S LOCUST GROVE RD, KUNA, ID, 83634");
+eq("pick.no_zip_keeps_first",
+  pickCensusMatch([
+    { matchedAddress: "3400 W 500 N, IN, 46001" },
+    { matchedAddress: "3400 W 500 N, IN, 46002" },
+  ], "3400 W 500 N, IN")?.matchedAddress,
+  "3400 W 500 N, IN, 46001");
+eq("pick.components_zip",
+  pickCensusMatch([
+    { matchedAddress: "1 MAIN ST, A", addressComponents: { zip: "00000" } },
+    { matchedAddress: "1 MAIN ST, B", addressComponents: { zip: "43215" } },
+  ], "1 MAIN ST, Columbus, OH 43215")?.matchedAddress,
+  "1 MAIN ST, B");
+
+{
+  const rung = censusRung(async () => jsonResponse({
+    result: {
+      addressMatches: [
+        { matchedAddress: "3250 S LOCUST GROVE RD, KUNA, ID, 83642", coordinates: { x: -116.4, y: 43.5 } },
+        { matchedAddress: "3250 S LOCUST GROVE RD, KUNA, ID, 83634", coordinates: { x: -116.5, y: 43.4 } },
+      ],
+    },
+  }));
+  const hit = await rung.resolve("3250 S Locust Grove Rd, Kuna, ID 83634", "3250 S LOCUST GROVE RD");
+  eq("census.prefers_filed_zip_lat", hit?.lat, 43.4);
+  eq("census.prefers_filed_zip_addr", hit?.matched_address, "3250 S LOCUST GROVE RD, KUNA, ID, 83634");
+  eq("census.diag_still_counts_all", hit?.diag?.provider_candidates, 2);
 }
 
 const missRung = (source: string): GeocoderRung => ({
