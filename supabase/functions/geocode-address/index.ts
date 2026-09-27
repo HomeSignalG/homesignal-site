@@ -19,8 +19,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 // Source-gate literals: the n5 zero-write check reads THIS file and requires the
-// oneline URL, Public_AR_Current, and exactly one fetch(. The live URL is built
-// in logic.ts from the same host + benchmark; this wrapper is the one outbound
+// oneline URL, Public_AR_Current, and exactly one outbound fetch. The live URL
+// is built in logic.ts from the same host + benchmark; this wrapper is that
 // fetch and refuses any other host.
 const CENSUS = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
   + '?benchmark=Public_AR_Current&format=json&address=';

@@ -42,7 +42,7 @@ eq("pick.no_zip_keeps_first",
 }
 
 {
-  const tooShort = await handleGeocodeAddress("123 Main", async () => { throw new Error("must not fetch"); });
+  const tooShort = await handleGeocodeAddress("1 Main", async () => { throw new Error("must not fetch"); });
   eq("logic.short_is_null", tooShort, { body: { match: null }, status: 200 });
 }
 {
