@@ -2720,8 +2720,9 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
   the Other project chip hid all of them.
   - **Fixed as a mapping only:** `use_type` = `project_type`, `label` = `project_name`,
     `bucket` = `type` = `HS.canonicalLifecycle(map_status)`. No SQL, identity, dedupe, geography
-    or OSM change; `name` and `status` are kept. After: 1,816 of 1,816 Data center in their own
-    lifecycle, 0 Other project, 0 Lifecycle unknown.
+    or OSM change; `name` and `status` are kept. After, computed by running the shipped code over
+    those production rows: 1,816 of 1,816 Data center in their own lifecycle, 0 Other project,
+    0 Lifecycle unknown. Live on the 28-row sample, the probe below read 28 of 28.
   - 🔑 **WHY NO TEST SAW IT: the one positive control (`facility-lifecycle-unknown` 8q) called
     `HS.resolveMarker(site)` directly**, which does read `type` and `status`. The page never
     takes that path. Test the path the page takes; `test/map1-dc-site-shape.test.mjs` (28 real
@@ -2737,7 +2738,7 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
   - `docs/map1-dc-publication.sql`'s header said *"every data-centre pin reaches that stage
     today; the page reads no lifecycle from this column"*. True when written, false now; the
     comment is annotated. The edit is inert: every builder that reads the file still passes
-    `--check`, and the same `--check` fails when the function body changes.
+    `--check` (positive control: `build_map1.py --check` fails when the function body changes).
 
 ---
 

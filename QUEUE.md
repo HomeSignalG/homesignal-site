@@ -208,8 +208,9 @@ interaction is the root cause, and neither ruling is wrong.
     (the lifecycle key of `map_status`, via `HS.canonicalLifecycle`). Moving these pins out of
     *Other project* is the intended outcome. Measured on production over all 12,722 registry ZIPs:
     before the fix, **1,816 of 1,816** rows on 757 ZIP pages drew as Other project / Lifecycle
-    unknown with no name; after it, 1,816 of 1,816 draw as Data center in their own lifecycle
-    (Operating 1,481 · Approved 183 · Proposed 152). No SQL, identity, dedupe, geography or OSM
+    unknown with no name; after it (the shipped code run over those production rows), 1,816 of
+    1,816 draw as Data center in their own lifecycle (Operating 1,481 · Approved 183 · Proposed
+    152). The live probe read 28 of 28 on the deterministic sample. No SQL, identity, dedupe, geography or OSM
     change. (a) is the membership read #1315 replaced; see CLAUDE.md §7.09.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE

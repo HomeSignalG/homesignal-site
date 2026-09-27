@@ -17,7 +17,8 @@
 //
 // Env: SITE_BASE (default https://homesignal.net), ZIPS (default: the deterministic sample in
 // test/fixtures/map1-dc-zip-sample-2026-09-27.json — the first ZIP in collate "C" order for each
-// (map_status, source basis) group, plus the first carrying all three lifecycles).
+// (map_status, source basis) group, plus the first carrying all three lifecycles with at most
+// 10 rows).
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
