@@ -725,6 +725,10 @@ async function handleRequest(req: Request): Promise<Response> {
     // the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
     const geoStore = supabaseStore(supabase);
     const geoLadder = GEO_LADDER(supabase);
+    const noteFence = async (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => {
+      await supabase.from("geocodes").update({ geofence_status: status })
+        .eq("canonical_addr", canonicalAddr(input)).then(() => {}, () => {});
+    };
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
       geocode: async (a: string) => {
@@ -732,6 +736,9 @@ async function handleRequest(req: Request): Promise<Response> {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (tdlr-tabs.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      zipCentroid: { lat: clat, lng: clng },
+      reportZip: zip,
+      noteFence,
     });
     // TASK 1 — structured open-data permit/case records (Socrata), coverage-gated per registry entry.
     // Generic connector; adding a city is a jurisdiction-registry.json edit, never code here. Records
@@ -745,6 +752,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
     // permit/case layers (e.g. Salt Lake City building permits). Adding a jurisdiction is a
@@ -759,6 +767,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
       // the engine's standard centroid+radius ZIP approximation; records keep their own points.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
     // (e.g. Boston's data.boston.gov Approved Building Permits). Adding a jurisdiction is a
@@ -773,6 +782,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
     // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
@@ -786,6 +796,7 @@ async function handleRequest(req: Request): Promise<Response> {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals
     // (e.g. Philadelphia's phl.carto.com permits table). Adding a jurisdiction is a
@@ -801,6 +812,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");

@@ -312,6 +312,8 @@ export interface SocrataDeps {
   /** ZIP centroid of the report being built — required only by entries using
    *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
   zipCentroid?: { lat: number; lng: number } | null;
+  /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
+  noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
 
 // ───────────────────────────── engine entry point ─────────────────────────────
@@ -491,7 +493,7 @@ async function runEntry(
 // The geofence lives in ONE place — sources/geo-fence.ts. It used to be duplicated here
 // as GEOCODE_FENCE_MI_GEO/milesBetweenGeo "kept in lockstep" with arcgis.ts, which is exactly
 // the divergence this collapse removes.
-import { fenceGeocode } from "./geo-fence.ts";
+import { fenceGeocode, noteFenceOutcome } from "./geo-fence.ts";
 
 async function normalizeRow(
   row: Record<string, unknown>,
@@ -547,6 +549,7 @@ async function normalizeRow(
       // untrusted marker is never rendered. Source-supplied coords (the branch above) are
       // NEVER fenced.
       const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      await noteFenceOutcome(deps.noteFence, gi.input, verdict);
       if (!verdict.ok) {
         report.geocode_failures++;
         report.quarantined.push({ reason: verdict.reason, sample: address });

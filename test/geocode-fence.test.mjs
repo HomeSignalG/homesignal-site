@@ -29,14 +29,15 @@ const ok = (c, name, detail) => {
 // The connectors are TypeScript. Node >= 22.18 strips types on import, so these checks run the
 // SHIPPED code rather than a copy. On an older runtime fail loudly — a green run must mean the
 // assertions actually executed (CLAUDE.md: "an instrument must prove it ran").
-let ckanForZip, socrataForZip, arcgisForZip, cartoForZip, csvForZip, _clearCsvCache, fenceGeocode, GEOCODE_FENCE_MI;
+let ckanForZip, socrataForZip, arcgisForZip, cartoForZip, csvForZip, _clearCsvCache, fenceGeocode, GEOCODE_FENCE_MI, fenceStatusOf, refreshByRegistry;
 try {
   ({ ckanForZip } = await import(join(SRC, 'ckan.ts')));
   ({ socrataForZip } = await import(join(SRC, 'socrata.ts')));
   ({ arcgisForZip } = await import(join(SRC, 'arcgis.ts')));
   ({ cartoForZip } = await import(join(SRC, 'carto.ts')));
   ({ csvForZip, _clearCsvCache } = await import(join(SRC, 'csv.ts')));
-  ({ fenceGeocode, GEOCODE_FENCE_MI } = await import(join(SRC, 'geo-fence.ts')));
+  ({ fenceGeocode, GEOCODE_FENCE_MI, fenceStatusOf } = await import(join(SRC, 'geo-fence.ts')));
+  ({ refreshByRegistry } = await import(join(SRC, 'tdlr-tabs.ts')));
 } catch (err) {
   console.log('FAIL — import connectors (needs Node >= 22.18 type stripping)\n     ' + err.message);
   process.exit(1);
@@ -64,6 +65,9 @@ ok(fenceGeocode({ ...GOOD, matched_address: null }, '15202', PGH).ok === true,
   'a geocoder that states no ZIP fails OPEN on the ZIP half (cannot prove it wrong)');
 ok(fenceGeocode({ ...BAD, matched_address: null }, '15202', PGH).ok === false,
   '…but the distance half still rejects it — the two halves are independent');
+ok(fenceStatusOf(fenceGeocode(GOOD, '15202', PGH)) === 'inside_zip', 'fenceStatusOf inside_zip');
+ok(fenceStatusOf(fenceGeocode(BAD, '15202', PGH)) === 'zip_mismatch', 'fenceStatusOf zip_mismatch');
+ok(fenceStatusOf(fenceGeocode({ ...BAD, matched_address: null }, '15202', PGH)) === 'too_far', 'fenceStatusOf too_far');
 
 // ── per-connector drivers ──────────────────────────────────────────────────────────────
 const jsonFetch = (body) => (async () => new Response(JSON.stringify(body), { status: 200 }));
@@ -137,7 +141,7 @@ for (const [name, drive] of DRIVERS) {
 // ── the guard: a SIXTH connector cannot ship without the fence ─────────────────────────
 // Same shape as connector-option-surface.test.mjs. Any sources/*.ts that reaches deps.geocode
 // MUST route the result through the shared fence. This is what stops the divergence recurring.
-const EXEMPT = new Set(['geo-fence.ts', 'geo-input.ts', 'geo-input.test.ts', 'tdlr-tabs.ts', 'tceq-cr.ts']);
+const EXEMPT = new Set(['geo-fence.ts', 'geo-input.ts', 'geo-input.test.ts', 'tceq-cr.ts']);
 const files = readdirSync(SRC).filter((f) => f.endsWith('.ts') && !EXEMPT.has(f));
 let geocoders = 0;
 for (const f of files) {
@@ -149,7 +153,7 @@ for (const f of files) {
   ok(!/(const|let|var|function)\s+(GEOCODE_FENCE_MI_GEO|milesBetweenGeo)\b/.test(src),
     `GUARD: ${f} DEFINES no private fence copy (a mention in a comment is fine)`);
 }
-ok(geocoders === 5, `GUARD: all 5 geocoding connectors were actually checked (found ${geocoders})`,
+ok(geocoders === 6, `GUARD: all 6 geocoding sources were actually checked (found ${geocoders})`,
   'if this drops, a connector stopped geocoding or the file list changed — re-read before trusting a green run');
 
 // ── assemble opt-in: flagged entries send a complete one-liner, not the bare street ──
@@ -171,6 +175,44 @@ ok(geocoders === 5, `GUARD: all 5 geocoding connectors were actually checked (fo
   ok(seen[0] === '294 UNION AVENUE, Pittsburgh, PA 15202',
     'ckan geocode_assemble sends city+state+zip', `sent=${seen[0]}`);
   ok(r.sites[0]?.lat === GOOD.lat, 'ckan assemble still places a correct match');
+}
+
+// ── TABS uses the shared fence; a miss quarantines (never a synthetic point) ──
+{
+  const html = readFileSync(join(root, 'fixtures/tabs/TABS2024022676.html'), 'utf8');
+  const DEL = { lat: 30.209, lng: -97.645 }; // 78617
+  const TABS_GOOD = { lat: 30.21, lng: -97.64, matched_address: '2200 CALDWELL LN, DEL VALLE, TX, 78617', match_type: 'range' };
+  const notes = [];
+  const drive = (hit) => refreshByRegistry(['TABS2024022676'], {
+    fetch: async () => new Response(html, { status: 200 }),
+    geocode: async () => hit,
+    zipCentroid: DEL,
+    reportZip: '78617',
+    noteFence: (input, status) => { notes.push({ input, status }); },
+    delayMs: 0,
+  });
+  const bad = await drive(BAD);
+  ok(bad.sites.length === 0, 'TABS fenced match is quarantined (not emitted as a point)', JSON.stringify(bad.sites));
+  ok(JSON.stringify(bad.quarantined).includes('geofence') || JSON.stringify(bad.quarantined).includes('ZIP'),
+    'TABS quarantine names the fence', JSON.stringify(bad.quarantined).slice(0, 300));
+  ok(notes.some((n) => n.status === 'zip_mismatch'), 'TABS noteFence records zip_mismatch', JSON.stringify(notes));
+  notes.length = 0;
+  const good = await drive(TABS_GOOD);
+  ok(good.sites.length === 1 && good.sites[0].lat === TABS_GOOD.lat, 'TABS in-ZIP match still emits');
+  ok(notes.some((n) => n.status === 'inside_zip'), 'TABS noteFence records inside_zip', JSON.stringify(notes));
+}
+
+// ── connector noteFence on the five open-data drivers ──
+{
+  const notes = [];
+  const entry = { ...COMMON, registry_id: 'fence-ckan', platform: 'ckan', base_url: 'https://data.wprdc.org', resource_id: 'r1', dataset_url: 'https://data.wprdc.org/dataset/x', column_map: CM };
+  await ckanForZip('15202', COVER_PA, [entry], {
+    fetch: jsonFetch({ success: true, result: { records: [ROW] } }),
+    geocode: geocoder(BAD),
+    zipCentroid: PGH,
+    noteFence: (input, status) => { notes.push({ input, status }); },
+  });
+  ok(notes.some((n) => n.status === 'zip_mismatch'), 'ckan noteFence persists zip_mismatch', JSON.stringify(notes));
 }
 
 console.log(fails === 0 ? '\nAll geocode-fence assertions passed.' : `\n${fails} geocode-fence assertion(s) FAILED.`);

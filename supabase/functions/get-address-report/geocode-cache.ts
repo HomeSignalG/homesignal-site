@@ -63,6 +63,7 @@ export interface GeocodeResult {
   // the table.
   geocoded_at?: string;
   updated_at?: string;
+  geofence_status?: string | null;
   // Provider diagnostics for callers that must record provenance (the data-centre derived-
   // location batch). NEVER persisted by supabaseStore -- public.geocodes' contract is unchanged
   // -- and absent on a cache hit, because the cache stores no provider response.
@@ -183,6 +184,11 @@ export async function resolveGeocode(
     }
     if (!hit) continue;
     const clears = CLEARS_REVIEW.has(hit.match_type);
+    const nCand = hit.diag?.provider_candidates;
+    const candNote = nCand && nCand > 1 ? `candidates=${nCand}` : null;
+    const review = clears
+      ? candNote
+      : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade${candNote ? `; ${candNote}` : ""}`;
     resolved = {
       canonical_addr,
       input_address,
@@ -192,7 +198,7 @@ export async function resolveGeocode(
       matched_address: hit.matched_address,
       geocode_source: rung.source,
       needs_review: !clears,
-      review_reason: clears ? null : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade`,
+      review_reason: review,
       diag: hit.diag,
     };
     break;
@@ -332,7 +338,7 @@ export function productionLadder(supabase: any, fetchFn: typeof fetch): Geocoder
 // deno-lint-ignore no-explicit-any
 export function supabaseStore(supabase: any): GeocodeStore {
   const COLS =
-    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason,geocoded_at,updated_at";
+    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason,geofence_status,geocoded_at,updated_at";
   return {
     get: async (canonical_addr: string) => {
       const { data } = await supabase.from("geocodes").select(COLS).eq("canonical_addr", canonical_addr).maybeSingle();

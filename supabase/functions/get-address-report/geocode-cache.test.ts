@@ -298,6 +298,19 @@ const missRung = (source: string): GeocoderRung => ({
   eq("resolve.hit_persisted", store.puts, 1);
   eq("resolve.hit_lat", r.lat, 40.1);
 }
+{
+  const store = memStore();
+  const census: GeocoderRung = {
+    source: "census_onelineaddress",
+    resolve: async () => ({
+      lat: 43.4, lng: -116.5, match_type: "range_interpolated",
+      matched_address: "3250 S LOCUST GROVE RD, KUNA, ID, 83634",
+      diag: { provider_candidates: 2, provider_matched_addresses: ["83642", "83634"] },
+    }),
+  };
+  const r = await resolveGeocode(store, "3250 S Locust Grove Rd, Kuna, ID 83634", "3250 S LOCUST GROVE RD", [census]);
+  ok("resolve.candidates_on_reason", /candidates=2/.test(r.review_reason || ""), r.review_reason || "");
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) (globalThis as { process?: { exit(n: number): void } }).process?.exit(1);

@@ -31,7 +31,7 @@ import {
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
 import { browsingBucketFor, decisionFor, decisionEvidenceLevel } from "./decision.ts";
-import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
+import { fenceGeocode, filedZipOf, noteFenceOutcome } from "./geo-fence.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
@@ -111,6 +111,8 @@ export interface CkanDeps {
    *  Absent ⇒ that half fails open; the matched-ZIP half still applies. Source-supplied
    *  coordinates are NEVER fenced. */
   zipCentroid?: { lat: number; lng: number } | null;
+  /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
+  noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
   /** Polite page size. Default 1000. */
   pageSize?: number;
 }
@@ -276,6 +278,7 @@ async function normalizeRow(
       // A miss NULLS the coords — the record stays listed as an area item, the untrusted
       // marker is never rendered. Source-supplied coords (the branch above) are NEVER fenced.
       const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      await noteFenceOutcome(deps.noteFence, gi.input, verdict);
       if (!verdict.ok) {
         report.geocode_failures++;
         report.quarantined.push({ reason: verdict.reason, sample: address });
