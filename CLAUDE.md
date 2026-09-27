@@ -3249,6 +3249,10 @@ SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from t
 body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**
 Do not re-apply `docs/dev-refresh-collect-once-per-response.sql` after this file: that body still
 passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would restore the defect.
+- 🔑 **REVERSE COUPLING IS CUT.** Step (e) now writes the EPA plane when core is withheld
+  (same write-guard as step (d)). A shape-withheld row cannot iterate sites; it flags a
+  stale nonzero count as unavailable. The 74 ZIPs that presented old facilities as current
+  can recover, and they can no longer masquerade.
 - 🔑 **MISSING `epa.ok` FAIL-CLOSES TO FALSE.** The audit's latent case G coalesced a missing
   key to `true`, so a payload with no `epa` object was treated as a healthy retrieval. Both
   `dev_epa_write_refused` and the `facilities_unavailable` third branch now use

@@ -349,23 +349,65 @@ begin
     );
   get diagnostics n = row_count;
 
-  -- (e) MARK THE REST HANDLED. Every response in the set that step (d) did NOT write —
-  -- source-failure blocked, reduction-guard refused, shape-withheld — was nonetheless fully
-  -- evaluated above, its diagnostics recorded in (a)-(c) in THIS transaction. Advancing the
-  -- cursor here records that, and stores the per-ZIP EPA outcome (observability only).
-  -- It still touches no resident-facing column (not sites, counts, paywall, refreshed_at,
-  -- the facility plane or last_refresh_attempt_at), so the refusal
-  -- still leaves the ZIP stale and the fire side still retries it with a fresh request.
-  -- Atomic with (a)-(d): if anything above raised, this never commits either, and the
-  -- response is evaluated again on the next tick.
+  -- (e) MARK THE REST HANDLED, AND LET THE EPA PLANE MOVE WITHOUT CORE.
+  -- Every response that step (d) did not write — source-failure blocked, reduction-guard
+  -- refused, shape-withheld — was still fully evaluated. The cursor advances so it is not
+  -- replayed. CORE columns (refreshed_at, development counts/sites, paywall) stay put, so
+  -- the fire side still retries the ZIP.
+  --
+  -- REVERSE COUPLING (audit 2026-09-27): a core refusal used to freeze the facility layer
+  -- too, while facilities_unavailable stayed false. 74 ZIPs held a nonzero count, a
+  -- facility clock older than 14 days, and both clocks equal — old facility data presented
+  -- as current. When the payload has an array of sites, the EPA plane writes here under
+  -- the same write-guard as step (d). A shape-withheld row cannot iterate sites; it only
+  -- flags a stale nonzero count as unavailable.
   update public.development_reports d
      set last_collected_response_id = r.id,
-         -- Same outcome record as step (d). A core-guard refusal must still tell us what
-         -- EPA said for this ZIP; otherwise the 74 reverse-coupling ZIPs stay dark.
          epa_last_outcome = public.dev_epa_outcome_record(
                               r.content::jsonb->'epa', r.id,
                               public.dev_epa_write_refused(
-                                epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at))
+                                epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)),
+         sites = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then coalesce((select jsonb_agg(x order by o)
+                                    from jsonb_array_elements(d.sites) with ordinality t(x, o)
+                                   where not (x ? 'registry_id')), '[]'::jsonb)
+                        || coalesce((select jsonb_agg(x order by o)
+                                    from jsonb_array_elements(r.content::jsonb->'sites') with ordinality t(x, o)
+                                   where x ? 'registry_id'), '[]'::jsonb)
+                   else d.sites
+                 end,
+         counts = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then coalesce(d.counts, '{}'::jsonb) || jsonb_build_object(
+                          'facilities', coalesce((r.content::jsonb->'counts'->>'facilities')::int, 0))
+                   else d.counts
+                 end,
+         facilities_refreshed_at = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then now()
+                   else d.facilities_refreshed_at
+                 end,
+         facilities_unavailable = case
+                   when jsonb_typeof(r.content::jsonb->'sites') is distinct from 'array' then
+                     case when coalesce((d.counts->>'facilities')::int, 0) > 0
+                           and (d.facilities_refreshed_at is null
+                                or d.facilities_refreshed_at < now() - interval '7 days')
+                          then true
+                          else d.facilities_unavailable
+                     end
+                   when public.dev_epa_write_refused(
+                          epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at) then true
+                   when coalesce((r.content::jsonb->'counts'->>'facilities')::int, 0) > 0 then false
+                   when not (epa_ok and coalesce((r.content::jsonb->'epa'->>'ok')::boolean, false)) then true
+                   else false
+                 end
     from net._http_response r
    where r.id = any(_ids)
      and d.zip = (r.content::jsonb->>'zip')

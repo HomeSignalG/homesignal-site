@@ -77,52 +77,20 @@ function outcomeRecord(epa, responseId, writeRefused) {
   return { ...(epa && typeof epa === 'object' ? epa : {}), collected_at: 'NOW', response_id: responseId, write_refused: writeRefused };
 }
 
-function applyWrite({
-  epaOk, payload, cached, coreFreshDays, facilityFreshDays,
-  coreBlocked = false, explained = false, responseId = 1,
-}) {
-  if (!sitesIsArray(payload)) {
-    return {
-      withheld: true,
-      epa_last_outcome: outcomeRecord(payload.epa, responseId, epaWriteRefused({
-        epaOk, payload, cached, facilityFreshDays,
-      })),
-    };
-  }
-  if (coreBlocked) {
-    return {
-      withheld: true,
-      epa_last_outcome: outcomeRecord(payload.epa, responseId, epaWriteRefused({
-        epaOk, payload, cached, facilityFreshDays,
-      })),
-    };
-  }
-  if (coreFreshDays < 7
-      && (payload.counts.development ?? 0) === 0
-      && (cached.counts.development ?? 0) > 0
-      && !explained) {
-    return {
-      withheld: true,
-      epa_last_outcome: outcomeRecord(payload.epa, responseId, epaWriteRefused({
-        epaOk, payload, cached, facilityFreshDays,
-      })),
-    };
-  }
-
+function applyEpaPlane({ epaOk, payload, cached, facilityFreshDays, responseId, coreSites, withheld }) {
   const refused = epaWriteRefused({ epaOk, payload, cached, facilityFreshDays });
-  const coreSites = payload.sites.filter((s) => !(s && typeof s === 'object' && 'registry_id' in s));
   const facSites = refused
     ? cached.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s)
     : payload.sites.filter((s) => s && typeof s === 'object' && 'registry_id' in s);
   const reportEpaOk = payload.epa && payload.epa.ok !== undefined ? !!payload.epa.ok : false;
   return {
-    withheld: false,
+    withheld,
     sites: [...coreSites, ...facSites],
     counts: {
-      ...payload.counts,
+      ...(withheld ? cached.counts : payload.counts),
       facilities: refused ? (cached.counts.facilities ?? 0) : payload.counts.facilities,
     },
-    refreshed_at: 'NOW',
+    refreshed_at: withheld ? cached.refreshed_at ?? 'T0' : 'NOW',
     facilities_refreshed_at: refused ? cached.facilities_refreshed_at : 'NOW',
     facilities_unavailable:
       refused ? true
@@ -131,6 +99,36 @@ function applyWrite({
       : false,
     epa_last_outcome: outcomeRecord(payload.epa, responseId, refused),
   };
+}
+
+function applyWrite({
+  epaOk, payload, cached, coreFreshDays, facilityFreshDays,
+  coreBlocked = false, explained = false, responseId = 1,
+}) {
+  if (!sitesIsArray(payload)) {
+    const staleNonzero = (cached.counts.facilities ?? 0) > 0 && facilityFreshDays >= 7;
+    return {
+      withheld: true,
+      epa_last_outcome: outcomeRecord(payload.epa, responseId, epaWriteRefused({
+        epaOk, payload, cached, facilityFreshDays,
+      })),
+      facilities_unavailable: staleNonzero ? true : cached.facilities_unavailable,
+      counts: cached.counts,
+      facilities_refreshed_at: cached.facilities_refreshed_at,
+    };
+  }
+
+  const coreWithheld = coreBlocked || (
+    coreFreshDays < 7
+    && (payload.counts.development ?? 0) === 0
+    && (cached.counts.development ?? 0) > 0
+    && !explained
+  );
+  const coreSites = (coreWithheld ? cached.sites : payload.sites)
+    .filter((s) => !(s && typeof s === 'object' && 'registry_id' in s));
+  return applyEpaPlane({
+    epaOk, payload, cached, facilityFreshDays, responseId, coreSites, withheld: coreWithheld,
+  });
 }
 
 const proj = (id) => ({ label: `permit ${id}`, relevance: 'development', scope: 'point' });
@@ -276,6 +274,60 @@ console.log('\n== 2. the outcome is stored on EVERY evaluated response ==');
      unknownZero.facilities_unavailable === true);
 }
 
+console.log('\n== 2b. reverse coupling: core withhold does not freeze EPA ==');
+{
+  // The 74-ZIP shape: core refused (fresh core + unexplained development collapse),
+  // EPA healthy with a real count. Before, the whole row was frozen.
+  const out = applyWrite({
+    epaOk: true,
+    payload: {
+      sites: [fac(900)],
+      counts: { development: 0, facilities: 1 },
+      epa: { ok: true, radius_used: 3, raw_rows: 4, pre_cap: 1, kept: 1 },
+    },
+    cached: cachedRow,
+    coreFreshDays: 1,
+    facilityFreshDays: 20,
+  });
+  ok('R1. CORE GUARD 2 withhold still records the EPA outcome',
+     out.withheld === true && out.epa_last_outcome.raw_rows === 4);
+  ok('R1. …but a trusted EPA count still writes',
+     out.counts.facilities === 1 && out.facilities_refreshed_at === 'NOW');
+  ok('R1. …core count and core clock stay put',
+     out.counts.development === 2 && out.refreshed_at === 'T0');
+  ok('R1. …the count is not flagged unavailable (it just wrote)',
+     out.facilities_unavailable === false);
+}
+
+{
+  const out = applyWrite({
+    epaOk: true,
+    payload: { counts: { development: 0, facilities: 0 }, epa: { ok: false, reason: 'transient' } },
+    cached: cachedRow,
+    coreFreshDays: 1,
+    facilityFreshDays: 20,
+  });
+  ok('R2. shape-withheld + stale nonzero facility layer → flagged unavailable',
+     out.withheld === true && out.facilities_unavailable === true && out.counts.facilities === 3);
+}
+
+{
+  const out = applyWrite({
+    epaOk: true,
+    payload: {
+      sites: [proj(1), fac(900)],
+      counts: { development: 0, facilities: 1 },
+      epa: { ok: true },
+    },
+    cached: cachedRow,
+    coreFreshDays: 1,
+    facilityFreshDays: 20,
+    coreBlocked: true,
+  });
+  ok('R3. CORE GUARD 1 withhold still lets a trusted EPA write land',
+     out.withheld === true && out.counts.facilities === 1 && out.counts.development === 2);
+}
+
 console.log('\n== 3. engine emits pre_cap BEFORE the 40-cap ==');
 {
   ok('E1. pre_cap is taken from kept.length before the slice',
@@ -340,7 +392,48 @@ console.log('\n== 5. §1 PARITY: new body minus the named additions == supersede
          epa_last_outcome = public.dev_epa_outcome_record(
                               r.content::jsonb->'epa', r.id,
                               public.dev_epa_write_refused(
-                                epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at))
+                                epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)),
+         sites = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then coalesce((select jsonb_agg(x order by o)
+                                    from jsonb_array_elements(d.sites) with ordinality t(x, o)
+                                   where not (x ? 'registry_id')), '[]'::jsonb)
+                        || coalesce((select jsonb_agg(x order by o)
+                                    from jsonb_array_elements(r.content::jsonb->'sites') with ordinality t(x, o)
+                                   where x ? 'registry_id'), '[]'::jsonb)
+                   else d.sites
+                 end,
+         counts = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then coalesce(d.counts, '{}'::jsonb) || jsonb_build_object(
+                          'facilities', coalesce((r.content::jsonb->'counts'->>'facilities')::int, 0))
+                   else d.counts
+                 end,
+         facilities_refreshed_at = case
+                   when jsonb_typeof(r.content::jsonb->'sites') = 'array'
+                    and not public.dev_epa_write_refused(
+                              epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at)
+                   then now()
+                   else d.facilities_refreshed_at
+                 end,
+         facilities_unavailable = case
+                   when jsonb_typeof(r.content::jsonb->'sites') is distinct from 'array' then
+                     case when coalesce((d.counts->>'facilities')::int, 0) > 0
+                           and (d.facilities_refreshed_at is null
+                                or d.facilities_refreshed_at < now() - interval '7 days')
+                          then true
+                          else d.facilities_unavailable
+                     end
+                   when public.dev_epa_write_refused(
+                          epa_ok, r.content::jsonb, d.counts, d.facilities_refreshed_at) then true
+                   when coalesce((r.content::jsonb->'counts'->>'facilities')::int, 0) > 0 then false
+                   when not (epa_ok and coalesce((r.content::jsonb->'epa'->>'ok')::boolean, false)) then true
+                   else false
+                 end
     from net._http_response r`);
   const E_OLD = norm(`update public.development_reports d
      set last_collected_response_id = r.id
