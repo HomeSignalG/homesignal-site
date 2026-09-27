@@ -2,8 +2,9 @@
 
 **Date:** 2026-09-27
 **Audited tree:** `HomeSignalG/homesignal-site` `main` at `09f5cdb5fb275a9e8a6b5e9daf6e4f7f560afe9e` (working tree matched `origin/main`; clean before this document).
-**Companion repo:** `HomeSignalG/homesignal-ingest` — **still not readable.** A second attempt on 2026-09-27 (section 14) used the same GitHub app token (`gh` account `cursor`). The org repo list, `gh api repos/HomeSignalG/homesignal-ingest`, and `git ls-remote` all returned not-found. Meetings, Local News, email, and Bluesky/MAPS stay **HOLD**. They are not CLEARED, not ATTRIBUTION REQUIRED, and not EXCLUDE.
-**Scope:** Read-only. No production, Supabase, adapter, Map 1, `property.html`, `reports.html`, or `"Not for resale"` change.
+**Companion repo:** `HomeSignalG/homesignal-ingest` `main` at `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2` (2026-09-27, "Delete 3 inactive Box Elder placeholder feeds (founder) (#618)"). Continuation audit — ingest is readable in this session. Meetings / government notices (every live vendor family), Local News publishers, email output, and Bluesky/MAPS are **HOLD — TERMS/RIGHTS NOT ESTABLISHED**. NWS / `api.weather.gov` alert text is **CLEARED WITH ATTRIBUTION**. None of those families is **CLEARED FOR PAID REPORT** or **EXCLUDE**.
+**Scope:** Read-only. No production, Supabase, adapter, Map 1, `property.html`, `reports.html`, or `"Not for resale"` change. This pass did not change ingest product files.
+**Access history:** The first two passes on site PR #1397 could not read `homesignal-ingest` (site-only token, HTTP 404). That is a dated fact. This continuation completed the ingest-family analysis against the live checkout. A later authorized ingest session on 2026-09-27 re-measured `feeds.csv` on the same SHA and fetched CivicPlus corporate ToS/MSA; those pages do not clear or exclude tenant agendas (section 14). Site PR [#1397](https://github.com/HomeSignalG/homesignal-site/pull/1397) remote head at the time of that re-measure was still `8d3d1f8` (second-pass HOLD, ingest unread). This document also lives on ingest draft PR [#619](https://github.com/HomeSignalG/homesignal-ingest/pull/619).
 **Rule used throughout:** UNCLEAR is not YES. A missing terms statement is not a grant. A STOP sends the item to HOLD.
 
 This file is the authoritative matrix for whether an existing HomeSignal source may enter a paid Future Surroundings Report sold to brokerages, agents, relocation companies, portals, or a company such as Zillow or Rocket/Redfin.
@@ -12,16 +13,18 @@ This file is the authoritative matrix for whether an existing HomeSignal source 
 
 **NOT YET — blocking rights issues must be resolved** before a property-scoped Future Surroundings Report can be sold.
 
-A buyer-supplied address, and a HomeSignal-authored statement of what this audit has not cleared, are the only property-page inputs the evidence supports putting in a paid artifact today. Every path that actually answers "what is changing around this property" runs through at least one of: the unresolved `"Not for resale"` note on `get-address-report`, a jurisdiction connector wired without a recorded commercial-use grant, a geocoder or boundary set whose redistribution terms are not in Git, an OpenStreetMap obligation Git itself refused to treat as settled, or a publisher repo this audit could not read.
+A buyer-supplied address, and a HomeSignal-authored statement of what this audit has not cleared, are the only property-page inputs the evidence supports putting in a paid artifact today, plus two attributed publisher-text exceptions that still cannot be placed "near this property": Epoch AI text fields (section 6) and NWS alert text (section 14). Every path that actually answers "what is changing around this property" runs through at least one of: the unresolved `"Not for resale"` note on `get-address-report`, a jurisdiction connector wired without a recorded commercial-use grant, a geocoder or boundary set whose redistribution terms are not in Git, an OpenStreetMap obligation Git itself refused to treat as settled, a newspaper or vendor-portal record with no commercial grant, or a consumer email / MAPS post that reprints those records.
 
 Epoch AI's own text fields are distributable with credit under the publisher's current Creative Commons Attribution statement. They still cannot be sold as "near this property" until the coordinate and ZIP-membership step is cleared, because Epoch does not supply geometry.
+
+NWS / `api.weather.gov` alert text is public-domain open data, free for any lawful purpose, including commercial use, if HomeSignal identifies the NWS material, does not claim copyright in it, and does not imply a NOAA/NWS endorsement. It still cannot be sold as "near this property" when the placement step uses HomeSignal ZIP membership or a Census/ZCTA test. The rest of Local News is not this grant.
 
 ## 1. Git state
 
 | Repo | HEAD | Working tree vs `main` |
 |---|---|---|
 | `HomeSignalG/homesignal-site` | `09f5cdb5fb275a9e8a6b5e9daf6e4f7f560afe9e` — "Map 1 data-centre pins draw as Data center in their own lifecycle (field mapping fix) (#1393)", 2026-09-27 | Matched `origin/main`. Clean at the start of this audit. |
-| `HomeSignalG/homesignal-ingest` | **Unknown.** Second read on 2026-09-27: not in the token's org list; `gh api` and `git ls-remote` returned not-found. See section 14. | **Blocked.** |
+| `HomeSignalG/homesignal-ingest` | `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2` — "Delete 3 inactive Box Elder placeholder feeds (founder) (#618)", 2026-09-27 12:04:12 -0500. `feeds.csv` re-measured on this HEAD. The prior ingest SHA in this file (`43491f2`) is the tree the first readable pass used; #618 removed three inactive placeholder rows only. | Read. Section 14. Site `main` has since moved to `3542bf29c652fff1a75c86b2e5173172b019da01` (#1396, C7 receipt). That commit is not this ingest-family pass. |
 
 Open site PRs that could change provenance, address-report sources, Map 1 sources, or what a corporate output may include, if later merged. None of them are in the tree audited above.
 
@@ -58,13 +61,13 @@ Two production planes, plus caches and side outputs.
 
 **Plane A — `get-address-report`.** `supabase/functions/get-address-report/index.ts` assembles EPA FRS (`sources/epa-frs.ts`), EPA ECHO enrichment, TCEQ (`sources/tceq-cr.ts`), TDLR/TABS (`sources/tdlr-tabs.ts`), and the jurisdiction registry (`jurisdiction-registry.json`: arcgis 212, socrata 22, ckan 3, csv 1, carto 1, opendatasoft 1). Geocoding is OpenAddresses `national_address_points`, then the Census geocoder (`geocode-cache.ts`, comment at `index.ts` lines 94–96). Output is the JSON above, also cached in `development_reports` / `property_reports`. Map 1 (`homesignalmap.html`) reads those caches in ZIP mode and calls the function for address mode. `property.html` embeds Map 1 in an iframe (`homesignalmap.html?embed=1&lat=&lng=&radius=`). So Plane A is on the address dossier even though `property.html` does not call the function itself.
 
-**Plane B — materialized app tables.** `lib/data.js` `projects()` / `facilities()` read `app_projects_for_zip`. `changes()` reads `app_changes` and drops `category === 'Local News'`. `news()` reads that category only. `meetings()` reads `meetings`. `envRisk()` reads `app_environmental_risk`. `properties()` reads `app_properties` for a signed-in user. These feed `property.html`, `development.html`, `community` pages, alerts, the dashboard, and email/MAPS selection on the site. The materializer `app_refresh_zip` is applied SQL in this repo; the government-feed and local-news adapters that fill the upstream tables are in `homesignal-ingest`, which this audit could not open.
+**Plane B — materialized app tables.** `lib/data.js` `projects()` / `facilities()` read `app_projects_for_zip`. `changes()` reads `app_changes` and drops `category === 'Local News'`. `news()` reads that category only. `meetings()` reads `meetings`. `envRisk()` reads `app_environmental_risk`. `properties()` reads `app_properties` for a signed-in user. These feed `property.html`, `development.html`, `community` pages, alerts, the dashboard, and email/MAPS selection on the site. The materializer `app_refresh_zip` is applied SQL in this repo. The government-feed and local-news adapters that fill the upstream tables are in `homesignal-ingest` and were read in section 14.
 
 **Plane C — data centers on Map 1.** `lib/data.js` `nationalDataCenters` / `map1DcSite` and `homesignalmap.html` read `map1_dc_zip_members`. That function unions canonical rows (Compute Atlas and Epoch AI observations) with a separate OpenStreetMap compatibility set. DDL of record: `docs/map1-dc-publication.sql`, `docs/dc-osm-map1-apply.sql`. OSM is not in `dc_source`.
 
 **Not a report yet.** `reports.html` states that nothing is generated, previewed, or sold. It opens the existing Premium waitlist. There is no corporate PDF or paid API in this repo.
 
-**Email and Bluesky/MAPS.** Templates and generators are in `homesignal-ingest` (`docs/email-branding-audit.md`, `lib/maps-social-theme.js` comments). Not audited.
+**Email and Bluesky/MAPS.** Generators are in `homesignal-ingest`: `digest.py` / `digest_template.py` (notices, meetings, news, MAPS emails) and `bluesky/lib/compose.mjs` / `bluesky/lib/compose-maps.mjs` (ALERTS posts and MAPS posts). Audited in section 14. They reprint held source titles, or HomeSignal sentences built from held `app_projects` fields. They are not a second license.
 
 ## 4. Corporate Output Source Matrix
 
@@ -92,9 +95,10 @@ Commercial use, redistribution, and derived-data use are YES, NO, or UNCLEAR. Pa
 | OpenAddresses | `national_address_points.source` | Address points used as geocode rung 1. Receipt `docs/dc-geocode-no-match-receipt-2026-09-27.md`: 8,545 rows, all Texas, three files. | Internal lookup. Not a customer-visible layer by itself. Coordinates it produces become customer-visible pins. | Git: "free aggregation of government address-point data" and "no commercial geocoder." OpenAddresses' own README (fetched via search of the current repo docs, confirmed against the public project statement): processed data is **not relicensed**; each source keeps its own license. That per-source license is not stored on `national_address_points` beyond a source id string. | `docs/national-address-points-setup.sql`; `scripts/load-openaddresses.py` header | `https://github.com/openaddresses/openaddresses` license section | Per underlying source — **not recorded per loaded file** | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | A coordinate that entered through this table cannot be cleared for sale until that row's OpenAddresses source id is joined to that source's license. | PARTIAL | "Free" in Git means no fee. It does not mean the underlying address file allows resale. |
 | Census ZCTA boundaries / TIGER | `geo.zcta_boundary` inside `map1_dc_zip_members` and ZIP membership | Point-in-polygon ZIP membership | Data-center publication; N5 / ZIP geography | No license URL recorded in the SQL comments read for this audit. | `docs/map1-dc-publication.sql` `geo.zip_point_membership_in` / `geo.zcta_boundary` | none recorded | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Membership is a derived fact. Its input polygon's terms are not in Git. Edge points fail closed (`zcta_hits`). That is a correctness rule, not a license. | UNKNOWN | The polygon set is named. Its license is not. |
 | `zipcodes` PyPI v3.0.0 (bundled USPS centroids) | page-centroid pin, not a facility source | ZIP centroid used when a polygon is not applied (`ZIP_RADIUS_MI`) | Development-tracker ZIP pages; community build | Git pins the package and vintage. No license text for the USPS-derived file is stored. | `docs/development-tracker-source-of-truth.md` §7.1 | none recorded | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | ZCTA and USPS ZIP are not the same. Git already says to pick one and pin it. That pin is not a commercial license. | UNKNOWN | Vintage is known. Rights are not. |
-| CivicClerk, Legistar, Granicus, iQM2, CivicPlus, Utah PMN, other meeting feeds | upstream of `meetings`; also area notices inside `get-address-report` `devSites` | Meeting title, date, location, category, source URL, hearing flag | `lib/data.js` `meetings()` → alerts, community, dashboard. Area notices also enter the address report as `scope=area`. | Adapter terms are in `homesignal-ingest` (`docs/state-notice-portals.md` names `adapters/legistar.py`, `adapters/civicclerk.py`). **Repo not readable.** | `index.ts` comment listing those vendors; `docs/state-notice-portals.md` | none recorded in the site repo | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Vendor portal terms and agenda copyright were not read. Do not assume a public agenda page is a reseller license. | UNKNOWN | The site shows the rows. The license lives in a repo this audit could not open, or was never written down. |
-| Local News publishers | `app_changes.category = 'Local News'` | Title, `plain_language`, impacts, `source_ref` | `lib/data.js` `news()` only. Explicitly excluded from `changes()`, so it is not in the general "what's changing" feed. | Not in this repo. | `lib/data.js` `changes()` / `news()` comments, lines 482–504 | none | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Do not put Local News in the corporate real-estate report because it is ingested. Republication rights are a different question from government record display, and they were not found. | UNKNOWN | Separate pipeline, separate rights, ingest repo closed. |
-| Email digest and Bluesky / MAPS posts | ingest generators | Whatever the ingest template sends | Not generated in this repo | Not readable | `docs/email-branding-audit.md`; `lib/share-text.js`; `lib/maps-social-theme.js` | none | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | A corporate product must not reuse the consumer email or a MAPS post as the deliverable until those templates are audited in ingest. | UNKNOWN | Blocked on `homesignal-ingest`. |
+| CivicClerk, Legistar, Granicus, CivicPlus, iQM2, eScribe, CivicWeb, OnBase, NovusAgenda, Utah PMN, bespoke county/city sites | ingest `pipeline_type='government_notice'`; site `meetings` + `alerts` government_notice | Title, date, location, category, source URL, hearing flag; notices also store `description`; meetings store `agenda_summary` from the same description field | ingest adapters → `meetings` / `alerts` → `lib/data.js` `meetings()` and government-notice tiles; email reprints titles; lead notice items reprint a 200-character description | **No commercial grant in ingest.** The only adapter `LICENCE` constants in ingest are Compute Atlas and Epoch AI (`CC BY 4.0`). Meeting/notice adapters record fetch mechanics, not terms. Exclusive vendor buckets on ingest `8ef7221` `feeds.csv` (2,906 rows; 2,844 `government_notice`; 2,464 active; control `be-county-commission-agenda` present) are in section 14. PrimeGov / Municode / BoardDocs: **0** rows. | ingest `ingest.py` `build_payload` lines 3177–3214; `feeds.csv` header includes `feed_id` | Utah.gov disclaimer `https://www.utah.gov/support/disclaimer.html` (fetched 2026-09-27): copy/distribute for "personal or informational use" if unmodified. Granicus marketing-site ToS `https://granicus.com/trust-center/terms-of-use/` (fetched 2026-09-27, dated July 20, 2026) applies to **that website**, not to a county tenant RSS. Not used as a tenant-feed license. | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Do not treat a public agenda page, an empty copyright field, or Utah.gov "personal or informational" language as a commercial reseller license. One vendor's terms do not clear another jurisdiction on the same vendor. | PARTIAL | Ingest was read. No grant was found. Rights are jurisdiction-specific; none were collected per portal except the Utah.gov page, which is not a commercial grant. |
+| Local News publishers (Gold Master + `news_html`) | ingest Gold Master registry + `feeds.csv` `category='local_news'` except NWS | Resident-facing stored fields: title, `source_url`, publisher domain (`agency_name`), `published_at`, HomeSignal `subtopics`. No `alerts.description`, no image, no excerpt. | `scripts/ingest_local_news_registry.py` `build_rows` (lines 525–543) writes those fields only. Body blob is used to classify and resolve, then discarded from the public row (FD-C2). `lib/data.js` `news()` only. Email reprints the title, no news snippet. | **No commercial grant in ingest.** `scripts/check_source_policy.py` is an acquisition-mechanism gate, not a redistribution license. Gold Master workbook is a source registry, not a grant. Phase C1 study §1.9 is an engineering opinion, not a publisher grant. | ingest `feeds.csv`: 31 `local_news` rows, 22 marked active, 30 `news_html` + 1 NWS `html`. Registry `adapters/local_news_registry.json` `gold_master_version` `2.4`, workbook sha256 `2033cb5b20c9e882734582642cb08c2811d9c825b512b088fe91a2d0e1a5f158`. CLAUDE.md dated receipt: `alerts.description` empty on 21,992 stored `local_news` rows (2026-09-03). | none recorded per publisher | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Linking, headline display, excerpt use, factual extraction, summarization, and full-text are separate uses. None of the six is cleared for the newspaper corpus. See section 14. | PARTIAL | Ingest was read. The stored surface is title+link+date+publisher. That does not create a commercial grant. |
+| NWS / `api.weather.gov` alerts | ingest `be-news-weather-hazards`; Gold Master `nws_api` state endpoints | Alert headline and NWS description; NWS zone/county/SAME geography from the payload | `adapters/nws_weather.py`; registry handler `nws_api` in `scripts/ingest_local_news_registry.py`. Category `local_news`, civic-lens, recency-ranked. | Publisher text, fetched 2026-09-27. API docs: "open data, free to use for any purpose." Disclaimer `https://www.weather.gov/disclaimer`: information is in the public domain unless noted otherwise; may be used without charge for any lawful purpose if you do not claim it as your own, imply a NOAA/NWS endorsement, or present modified content as official. 17 U.S.C. § 403 notice required when a copyrighted work consists predominantly of NWS material. NWS name/logo are trademarks; logo needs a separate license. | `adapters/nws_weather.py` header (User-Agent required; no license constant). `feeds.csv` row `be-news-weather-hazards` source `https://api.weather.gov/alerts/active?area=UT`, `active=TRUE`. | `https://www.weather.gov/documentation/services-web-API`; `https://www.weather.gov/disclaimer` | YES — identify the NWS material; do not claim copyright in it; do not imply NOAA/NWS endorsement. Logo/name as a brand mark needs permission except as part of an unaltered NWS product. | YES for NWS's own alert text | YES for that text, with the identification/no-endorsement conditions | UNCLEAR once a HomeSignal geocode, ZCTA test, or "near this property" is attached | CLEARED WITH ATTRIBUTION | CLEARED WITH ATTRIBUTION | CLEARED WITH ATTRIBUTION | HOLD if the embed implies a NOAA affiliation or drops the NWS identification | Do not sell NWS text as a HomeSignal forecast. Do not use the NWS logo without a license. County/zone as NWS stated it is NWS geography; ZIP fan-out is HomeSignal's. | VERIFIED | Publisher pages were fetched. This grant is NWS only. It does not clear SLTrib, KSL, or any other Local News publisher. |
+| Email digest and Bluesky / MAPS posts | ingest generators | Consumer email body; Bluesky `post_text`; MAPS screenshot | `digest.py` / `digest_template.py`; `bluesky/lib/compose.mjs`; `bluesky/lib/compose-maps.mjs`; MAPS email reprints `social_posts.post_text` word for word | Not a source. HomeSignal chrome is first-party. The records inside are the families above. | `digest.py` `_payload_item` (titles; notice lead snippet from `description`; news snippet none); `digest.py` `render_maps_text` ("each post word for word"); `compose.mjs` lines 73–118 (verbatim title); `compose-maps.mjs` header (verbatim `app_projects` fields) | none | n/a for chrome; inherited for reprints | YES for HomeSignal-authored chrome only | YES for that chrome back to that customer | NO as a way to launder a held record | HOLD | HOLD | HOLD | HOLD | A corporate product must not reuse the consumer email or a MAPS post as the deliverable. Chrome (header, share line, mailing address, "HomeSignal is a public-records alert service") may be reused as HomeSignal's own words. | VERIFIED | The generators were read. They reprint held titles or held permit fields. |
 | `app_environmental_risk` | flood / wildfire / heat jsonb | `property.html` "Environmental risk for this parcel" | `lib/data.js` `envRisk()` | `source_ref` column exists (`docs/phase1-app-schema.sql`). No license. A 2026 architecture note recorded the table as empty at measurement time (`docs/multi-source-evidence-architecture.md`). Current population was not re-counted. The page copy says "flood-zone, wildfire and climate data we track" (`property.html`). | `property.html` risk block; `lib/data.js` `envRisk` | none | UNCLEAR | UNCLEAR | UNCLEAR | UNCLEAR | HOLD | HOLD | HOLD | HOLD | Failed or empty reads must not become a risk of zero. Provenance of the jsonb is not in Git. | UNKNOWN | The column exists. The publisher does not. |
 | `app_properties` score fields | `score`, `score_trend`, `value_outlook`, `insurance_outlook` | Shown on `property.html` vitals | User-scoped rows plus demo seed | No methodology in Git. Seed values are `demo: true` (`seed/delvalle.js`). `insurance_outlook` renders as `Stable` when the field is empty (`property.html`). | `docs/phase1-app-schema.sql` lines 51–57; `property.html` lines 259–262 | none | n/a | NO for sale as a fact | NO | NO | EXCLUDE | EXCLUDE | EXCLUDE | EXCLUDE | These are not sourced facts. The `Stable` fallback is an assertion the row did not make. | VERIFIED | Schema and UI were read. No method was found. See §8. |
 
@@ -110,8 +114,9 @@ Commercial use, redistribution, and derived-data use are YES, NO, or UNCLEAR. Pa
 | Epoch AI text fields | APPROVED to reproduce Epoch's own fields with credit. Not APPROVED to reproduce Epoch's estimate prose as a HomeSignal measurement. | APPROVED with credit | HOLD. `supplies_geometry` is false. The pin and the ZCTA membership are not Epoch's geometry. | APPROVED for the text fields with attribution in the payload. HOLD if coordinates, distance, or "near this property" are added. |
 | OpenStreetMap data-center features | HOLD | Display with the ODbL credit is what the consumer map does. A paid or white-label copy is HOLD. | HOLD | HOLD |
 | Census geocoder / OpenAddresses / ZCTA | The geocoder result is not the publisher's original file | HOLD | HOLD | HOLD |
-| Meetings / government notices | HOLD (ingest terms unread) | HOLD | HOLD | HOLD |
-| Local News | HOLD. Do not assume A is allowed. | HOLD | HOLD | HOLD |
+| Meetings / government notices | HOLD. Ingest adapters store title and (for notices) description / (for meetings) `agenda_summary`. No commercial grant. | HOLD | HOLD | HOLD |
+| Local News publishers | HOLD. Do not assume A is allowed. Resident-facing stored field is the title. | HOLD | HOLD | HOLD |
+| NWS alert text | CLEARED WITH ATTRIBUTION to reproduce NWS's own headline/description with identification and no endorsement | CLEARED WITH ATTRIBUTION with that credit | HOLD. Zone/county as NWS stated it is NWS's. ZIP membership and "near this property" are not derived-fact-cleared. | CLEARED WITH ATTRIBUTION for the text fields with the NWS identification in the payload. HOLD if coordinates, distance, or "near this property" are added from a HomeSignal geocode. |
 | Scores, outlooks, QoL, predictive `sowhat` | Not source records | EXCLUDE from corporate V1 | EXCLUDE from corporate V1 | EXCLUDE from corporate V1 |
 
 ## 5. Compute Atlas, Epoch AI, OpenStreetMap
@@ -133,8 +138,9 @@ Only the following may enter a paid artifact on the evidence in this file.
 1. **The address string the buyer supplied** for that report.
 2. **HomeSignal-authored clearance text**: which families above are HOLD or EXCLUDE, and that absence of a cleared feed is not a finding that nothing is changing.
 3. **Epoch AI publisher text fields**, and only those fields: project name, the address string Epoch stated, operator if Epoch stated it, and the cite URL. Each such field must carry attribution to Epoch AI under Creative Commons Attribution (Git records CC BY 4.0; the live page says Creative Commons Attribution without a version). This allowlist entry does **not** include coordinates, distance, "near this property", ZCTA membership, IT power, compute, cost, or timelines-as-forecast.
+4. **NWS / `api.weather.gov` alert text**, and only those fields: the headline and description NWS issued, plus the zone/county/SAME geography NWS attached to that alert. Each such field must identify the National Weather Service as the source, must not be claimed as HomeSignal-copyrighted, and must not imply a NOAA/NWS endorsement. This allowlist entry does **not** include the NWS logo (separate trademark license), a HomeSignal ZIP fan-out, a geocode, a distance, or "near this property".
 
-No permit, no hearing, no EPA or TCEQ fact, no OSM feature, no Compute Atlas pin, no local-news item, and no score is on this list.
+No permit, no hearing, no EPA or TCEQ fact, no OSM feature, no Compute Atlas pin, no newspaper local-news item, and no score is on this list.
 
 ## 7. Corporate Output Hold List
 
@@ -147,13 +153,14 @@ Held until a separate review resolves them. They do not enter the paid report by
 - OpenStreetMap data-center features, and any API or PDF that returns them together with CC BY rows.
 - Census geocoder output, OpenAddresses-derived coordinates, ZCTA membership, `zipcodes` v3.0.0 centroids.
 - Esri World Imagery and OSMF raster tiles.
-- Meetings and government notices (CivicClerk, Legistar, Granicus, and the other vendors named in `devSites`).
-- Local News (`app_changes` category `Local News`), including title and `plain_language`.
+- Meetings and government notices, **per vendor and per jurisdiction**: Utah PMN, CivicPlus, Legistar, CivicClerk, Granicus, CivicWeb, iQM2, eScribe, OnBase, NovusAgenda (inactive), and the 30 bespoke first-party hosts. Ingest was read; no commercial grant was found. Utah.gov permits personal/informational copy, not a recorded commercial reseller license. One tenant on a vendor is not a grant for the others.
+- Local News publisher corpus (`app_changes` category `Local News` except NWS): linking, headline, excerpt, factual extraction, summarization, and full-text are all HOLD. Ingest stores title + URL + date + publisher domain; that is not a grant.
+- Other `pipeline_type='news'` categories that email can reprint: `Stratos data center project`, `emerging_technology`, `global_best_practices` (31 `feeds.csv` rows on `8ef7221`). Same HOLD as newspaper Local News. Not NWS.
 - `app_environmental_risk`.
-- Email bodies and Bluesky/MAPS posts.
+- Email bodies and Bluesky/MAPS posts, because they reprint the held records above. HomeSignal-authored chrome in those templates is not itself held; the deliverable that contains the reprints is.
 - Epoch-derived **placement**: coordinates, distance, "near", and ZIP membership.
 - Any customer-facing field whose `source_ref` / `source_url` cannot be shown with the value.
-- `app_projects.impact_dimensions` and `plain_language` on non-news changes, wherever the prose is not a verbatim source field. The generator that writes them is not fully visible without ingest.
+- `app_projects.impact_dimensions` and `plain_language` on non-news changes, wherever the prose is not a verbatim source field. The generator is `homesignal_pipeline/core.py` `Scorer._plain` (ingest): templated HomeSignal sentences ("adds pressure on…", "with a lift to…"). That is first-party interpretive copy, not a publisher grant, and it is already EXCLUDE as heuristic prose in §8 / §9.
 
 ## 8. Corporate Output Exclude List
 
@@ -163,6 +170,7 @@ Held until a separate review resolves them. They do not enter the paid report by
 - **`HS.projectImpact` sentences** ("if approved", "may feel", "could see"). Heuristic copy in `lib/impact.js`. Exclude from corporate V1.
 - **"Effect at this address"** as a label on `property.html` when it prints `sowhat`. Where `sowhat` is the stored narrative or the impact sentence, it is not a sourced effect. Exclude that label and that prose from corporate V1. The factual fallback `factualSowhat` (type, status, developer joined) is a derived string from fields that are themselves HOLD; it is not excluded as fiction, and it is not allowlisted.
 - **A white-label or embed that removes CC BY or ODbL attribution.** The licenses Git names require the credit. Stripping it is outside those grants.
+- **NWS / NOAA logo or visual identifier** without a logo license (`https://www.weather.gov/logorequest`). Identifying alert text as National Weather Service data is required. Using the mark as a brand is a different permission.
 - **Epoch estimate figures** (IT power, compute, capital cost, coverage percentages) presented as HomeSignal measurements. Epoch describes them as estimates. They are not in the Map 1 contract. Exclude from corporate V1 even if a later review allows quoting them with credit and with Epoch's uncertainty.
 
 ## 9. HomeSignal-generated claims
@@ -172,7 +180,7 @@ Left in place on the consumer site. Classification for a future corporate report
 | Claim | What it is | Corporate V1 |
 |---|---|---|
 | Buyer address | Customer input | SAFE FACT |
-| Project name, official status word, filing date, applicant, record URL, when copied from a source field that is itself allowlisted | Sourced fact, if the source is allowlisted | SAFE FACT only for the Epoch text fields in §6. HOLD for every other source. |
+| Project name, official status word, filing date, applicant, record URL, when copied from a source field that is itself allowlisted | Sourced fact, if the source is allowlisted | SAFE FACT only for the Epoch text fields and the NWS alert text fields in §6. HOLD for every other source. |
 | Distance, "N miles", ZIP membership, "near this property", counts of nearby projects | Deterministic derivation from coordinates or polygons | SAFE DERIVED FACT only if every input is allowlisted. Today the inputs are HOLD, so the output is HOLD. |
 | `factualSowhat` (`lib/data.js`) when `sowhat_factual` is true | Deterministic join of type, status, developer | SAFE DERIVED FACT as a method. HOLD as content, because those fields are HOLD. |
 | Type bucket / lifecycle map (`lib/project-type.js`, server `map_status`) | Deterministic normalization | SAFE DERIVED FACT as a method. HOLD as content until the source status is allowlisted. Do not invent a stage when the source is silent; the code's `unknown` path is the honest one. |
@@ -197,8 +205,8 @@ Left in place on the consumer site. Classification for a future corporate report
 | Distance | HOLD | Requires a held coordinate. |
 | Filed / submitted date | HOLD | Permit/planning field. |
 | Applicant / developer | HOLD for permits. The Epoch operator string is allowlisted only as an Epoch-attributed text field, not as "the developer of a project near this home." |
-| Official source | IN V1 as an empty slot that must be filled whenever a future allowlisted fact is shown. No third-party URL is cleared except Epoch cite URLs attached to Epoch text fields. |
-| Government notices | HOLD | Ingest terms unread. |
+| Official source | IN V1 as an empty slot that must be filled whenever a future allowlisted fact is shown. No third-party URL is cleared except Epoch cite URLs attached to Epoch text fields, and the NWS alert URL attached to NWS text fields. |
+| Government notices | HOLD | Ingest adapters and Utah.gov terms were read. No commercial grant. |
 | Upcoming meetings / hearings | HOLD | Same. |
 | Public-comment windows | HOLD | Derived from meeting/notice rows. |
 | Roads / infrastructure changes | HOLD | DOT layers in the registry have no recorded grant. NDDOT work zones are EXCLUDE. |
@@ -224,7 +232,7 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 10. **Attribution can be lost in a white-label.** CC BY 4.0 and ODbL both require credit. `HS.map1DcCredits` exists for the consumer map. A brokerage embed that drops it is outside the grant.
 11. **A score is a status constant.** The Quality of Life Impact Score brand does not match the method the code comments describe.
 12. **"Stable" is a display default,** not an insurance fact.
-13. **Local News, email, and MAPS cannot be reconstructed** while `homesignal-ingest` is unreadable. Their presence in the consumer product is not a commercial clearance.
+13. **Local News publisher titles, email bodies, and MAPS posts were reconstructed from ingest and still have no commercial grant.** Their presence in the consumer product is not a commercial clearance. NWS alert text is the one Local News subset whose publisher currently states commercial use is allowed. Newspaper titles are not that subset.
 14. **`reports.html` does not yet sell a report.** There is no existing paid artifact whose rights were already approved.
 15. **Consumer terms forbid the visitor from reselling** (`privacy.html` line 53). That is HomeSignal's own acceptable-use rule for the current site. It is not, by itself, a source license. It does mean the current site and its address-report response are the wrong object to hand a brokerage as the product.
 16. **Publisher terms checked against Git did not reverse the recorded licence names.** Compute Atlas still says CC BY 4.0 including commercially. Epoch still says Creative Commons Attribution with credit. The Atlas page's facility count on 2026-09-27 (2,242 as of 2026-09-25) matches the count in the 2026-09-26 Git document. No "terms changed" finding is invented past the Epoch version-number gap (Git says 4.0; the live sentence does not).
@@ -236,7 +244,7 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 3. A written decision on OSM inside Compute Atlas, and a customer-visible way to exclude `osm`-typed evidence. Until then, Atlas pins stay held.
 4. Professional review of a paid product that returns ODbL rows and CC BY rows in one response.
 5. Redistribution terms for the Census geocoder, OpenAddresses source files actually loaded, and ZCTA polygons, before any distance, pin, or "near" claim.
-6. Read access to `homesignal-ingest` before meetings, notices, local news, email, or MAPS content is included. Section 14 records a second failed read. Those four families stay HOLD.
+6. Per-publisher **and per-jurisdiction** commercial terms for every Local News outlet, every other `pipeline_type='news'` publisher email can reprint (Stratos / emerging / GBP), and every meetings/notices vendor/tenant a V1 report would show. Ingest is readable; it still does not contain those grants. A CivicClerk (or Legistar, Granicus, CivicPlus) grant in one county would not clear the other tenants. CivicPlus corporate ToS/MSA are not that grant and are not a ban on county Customer Content. NWS is the exception already measured. Utah.gov "personal or informational" is not a substitute.
 7. Removal of score, outlook, QoL, and predictive prose from any corporate template. They stay on the consumer site.
 
 ## 13. Step 2 scope
@@ -246,7 +254,8 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 - the buyer-supplied address;
 - the "What we don't know yet" section, listing the HOLD and EXCLUDE families in this document in plain language;
 - an attribution line that is present and empty of third-party facts until a family moves from HOLD to APPROVED by a later audit;
-- Epoch AI text fields only if they are shown as a national, attributed Epoch list and are **not** filtered or placed by a HomeSignal geocode, distance, or ZCTA.
+- Epoch AI text fields only if they are shown as a national, attributed Epoch list and are **not** filtered or placed by a HomeSignal geocode, distance, or ZCTA;
+- NWS alert text only if it is shown as NWS-issued headline/description with NWS identification, no NOAA endorsement, and **not** filtered or placed by a HomeSignal geocode, distance, ZCTA, or ZIP fan-out.
 
 **Step 2 may not:**
 
@@ -254,52 +263,161 @@ Findings below are from Git or from a publisher page fetched for this audit. The
 - copy `development_reports`, `property_reports`, `app_projects`, `app_changes`, or `meetings` into it;
 - embed `homesignalmap.html` or current Map 1;
 - include a basemap from the current tile URLs;
-- include data-center pins, permit rows, EPA/TCEQ/TDLR rows, hearings, comment windows, local news, scores, outlooks, QoL, `sowhat`, or "Effect at this address";
+- include data-center pins, permit rows, EPA/TCEQ/TDLR rows, hearings, comment windows, newspaper local news, scores, outlooks, QoL, `sowhat`, or "Effect at this address";
 - remove or reword `"Not for resale"`;
 - change `property.html`, `reports.html`, Map 1, adapters, or Supabase.
 
 Step 2 is not the paid brokerage report. That report waits on §12.
 
-## 14. Second pass — Meetings, Local News, email, Bluesky/MAPS
+## 14. Continuation — Meetings, Local News, email, Bluesky/MAPS (ingest read)
 
-Requested classification set: **CLEARED**, **ATTRIBUTION REQUIRED**, **HOLD**, or **EXCLUDE**.
+Requested classification set: **CLEARED FOR PAID REPORT**, **CLEARED WITH ATTRIBUTION**, **DERIVED FACTS ONLY**, **HOLD — TERMS/RIGHTS NOT ESTABLISHED**, **EXCLUDE**.
 
-This pass did not open `homesignal-ingest`. No product file was changed. The four families are not reclassified from the section 4 rows except to state the new label explicitly. HOLD is the STOP outcome: the canonical generators were not read, so a CLEARED, ATTRIBUTION REQUIRED, or EXCLUDE decision would be a guess.
+This continuation opened `homesignal-ingest` `main` at `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2`. No product file was changed in either repo. Families are classified from the generators and from publisher pages fetched for this audit. Public, crawlable, already-ingested, or already-on-the-consumer-site is not a grant. UNCLEAR is still not YES.
+
+The first two passes on PR #1397 (same day, site-only token) could not see ingest and correctly left all four families on HOLD. That access receipt is retained. It is not current state. The ingest-family analysis is complete.
 
 ### Access receipt
 
 | Attempt | Result |
 |---|---|
-| `gh repo list HomeSignalG` | `homesignal-site`, `bedsheet`, `storyos-kids` only. No ingest repo. |
-| `gh api repos/HomeSignalG/homesignal-ingest` | HTTP 404, `Not Found` |
-| `git ls-remote https://github.com/HomeSignalG/homesignal-ingest.git HEAD` | `Repository not found` |
-| Token | `gh auth status`: logged in as `cursor` on github.com. This is the Cloud Agent app token. It can read `homesignal-site`. It cannot see the private ingest repo. |
-| Local checkout | No `homesignal-ingest` directory on this machine. |
+| This Cloud Agent workspace | `HomeSignalG/homesignal-ingest` checked out. Continuation re-measure on `origin/main` = `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2`. |
+| Control | `feeds.csv` **2,906** rows; header includes `feed_id`. `be-county-commission-agenda` is present. Exclusive vendor buckets below sum to 2,844 `government_notice` rows and 2,464 active. `adapters/epoch_ai.py` and `adapters/compute_atlas.py` still carry the only `LICENCE = "CC BY 4.0"` constants in `adapters/`. |
+| Drift since the first readable pass | `43491f2` → `8ef7221` is ingest #618: deleted three inactive Box Elder placeholders (`be-calendar-meetings`, `be-redevelopment`, `be-stratos-water-filings`). Those three had non-URL `source` cells. Empty `source` is now **222**; nohost is **0**. Active `government_notice` count is unchanged at **2,464**. |
+| Prior attempt (section 14, second pass) | Site-only GitHub app token. `gh api repos/HomeSignalG/homesignal-ingest` HTTP 404. Dated; superseded by this checkout. |
 
-### What the site repo proves, and what it does not
+### What ingest proves
 
-The site repo names the ingest files. It does not contain them.
+#### Meetings / government notices — HOLD
 
-| Family | Named in this repo | Present in this repo |
+`ingest.py::build_payload` writes, for meetings: `title`, `source_url`, `meeting_date`, `meeting_time`, `location`, `is_public_hearing`, `agenda_summary` (from `it["description"]`), `feed_id`. For alerts/notices: `title`, `source_url`, `published_at`, `category`, `agency_name`, `geographic_reference`. PMN detail enrichment (`ingest.py` around the "Description/Agenda" field map) folds notice description into the item before that write.
+
+`feeds.csv` on `8ef7221`: **2,844** `pipeline_type='government_notice'` rows, **2,464** active (control: 2,906 total rows; `be-county-commission-agenda` present). Target table: **1,965** meetings, **879** alerts. Source type: **2,531** html, **313** rss (the deleted `email` placeholder was `be-stratos-water-filings`). Host `www.utah.gov`: **680** (Utah PMN). Empty `source`: **222**.
+
+Exclusive vendor buckets (first match wins; sum = 2,844 / active 2,464):
+
+| Vendor / source family | How it was counted | All GN | Active | Active meetings | Active alerts | Paid-report class |
+|---|---|---:|---:|---:|---:|---|
+| Utah PMN | host `www.utah.gov` | 680 | 678 | 384 | 294 | **HOLD — TERMS/RIGHTS NOT ESTABLISHED**. Utah.gov disclaimer (fetched 2026-09-27) allows personal or informational copy if unmodified. Not a commercial reseller license. |
+| CivicPlus / AgendaCenter / CivicEngage RSS | host `civicplus.com`, or path contains `AgendaCenter` / `RSSFeed.aspx`. CivicEngage is the CivicPlus product name in some `status_notes`, not a separate host bucket. | 621 | 535 | 436 | 99 | **HOLD**. Adapter records fetch mechanics. No tenant license in Git. CivicPlus corporate ToS/MSA (fetched 2026-09-27) are not a county-agenda grant and are not NDDOT-shaped EXCLUDE. |
+| Legistar | host contains `legistar.com` or `legistar.` | 393 | 387 | 328 | 59 | **HOLD**. `adapters/legistar.py` has no `LICENCE`. |
+| CivicClerk | host contains `civicclerk.com` | 382 | 342 | 290 | 52 | **HOLD**. `adapters/civicclerk.py` has no `LICENCE`. |
+| empty `source` | `source` blank | 222 | 0 | 0 | 0 | Not a live source. |
+| Granicus | host contains `granicus.com` | 199 | 187 | 155 | 32 | **HOLD**. Granicus, Inc. marketing-site ToS (fetched 2026-09-27) applies to granicus.com, not a county `ViewPublisherRSS` tenant. Same class as Census Data API vs geocoder. Not used as a grant or as NDDOT-shaped EXCLUDE. |
+| Bespoke first-party county/city hosts | remainder after the named vendors | 147 | 146 | 120 | 26 | **HOLD**. 30 hosts (Tremonton, Lamar MS, Grafton NH, Rockingham NH, Hancock ME, El Paso TX Calendar.aspx, and others). Each jurisdiction keeps its own terms; none are in Git. |
+| CivicWeb | host `civicweb.net` | 76 | 73 | 63 | 10 | **HOLD**. |
+| iQM2 | host `iqm2.com` | 53 | 50 | 43 | 7 | **HOLD**. |
+| eScribe | host `escribemeetings.com` | 50 | 49 | 42 | 7 | **HOLD**. |
+| OnBase Agenda Online | path/host contains OnBase | 17 | 17 | 14 | 3 | **HOLD**. Johnson KS, Sarasota FL, Hamilton OH. |
+| NovusAgenda | host `novusagenda.com` | 4 | 0 | 0 | 0 | **HOLD** if ever activated. All four rows `active=FALSE`. |
+| PrimeGov | host `primegov.com` | 0 | 0 | 0 | 0 | No live row. Not classified as a source. |
+| Municode Meetings / BoardDocs | those hosts | 0 | 0 | 0 | 0 | No live row. |
+
+Adapters that produce those rows (`adapters/legistar.py`, `civicclerk.py`, `civicplus.py`, `civicplus_ical.py`, `iqm2.py`, `novusagenda.py`, `notice_list.py`, `eztask_agenda.py`, `brigham_agenda.py`, `city_events.py`, plus PMN parsers in `ingest.py`) document fetch URLs, date fields, and body-scoping. None records a license, terms URL, or commercial-use grant. A permissive page in one county would not clear the rest of that vendor.
+
+Utah.gov terms, fetched 2026-09-27 from `https://www.utah.gov/support/disclaimer.html` §5: anyone may "view, copy, or distribute" page content "for personal or informational use" if unmodified. The same paragraph says the State makes no warranty that the materials are free from copyright claims or other limits on free use. That is not a commercial reseller license.
+
+Granicus, Inc. marketing-site ToS, fetched 2026-09-27 from `https://granicus.com/trust-center/terms-of-use/` (page dated July 20, 2026): "this website", individual and private use, do not sell material "contained on this website." Same class as applying Census Data API terms to the geocoder. Not treated as a license or a ban on a county tenant's public RSS.
+
+CivicPlus, LLC Terms of Use, fetched 2026-09-27 from `https://www.civicplus.help/legal-center/docs/civicplus-terms-of-use` (page last revised March 20, 2026; TOU text dated November 1, 2022). Two facts, both quoted rather than synthesized:
+
+- §3 permits use of CivicPlus **proprietary websites** and their "Site Content" "solely for your non-commercial, personal purposes and/or to learn about CivicPlus Solutions." That sentence is about `civicplus.com` / the help Site, not a county AgendaCenter host.
+- §5: "Content included within the Solutions provided by CivicPlus belongs to the Authorities from which it originated."
+
+CivicPlus Master Services Agreement, fetched 2026-09-27 from `https://www.civicplus.help/legal-center/docs/master-services-agreement` (last updated May 2024), Ownership & Content Responsibility: "CivicPlus Property specifically excludes Customer Content." Customer Content includes text the Customer provides into a website, software, or module. The MSA commercial-exploitation ban is on **CivicPlus Property** (software, source, documentation, marks), not on the county's agenda text.
+
+Same class as Granicus marketing-site ToS and Census Data API vs geocoder. **Not used as a grant for paid redistribution of tenant agendas. Not used as EXCLUDE.** A web-search summary that collapsed those pages into "CivicPlus prohibits commercial redistribution of RSS" is the over-read this paragraph exists to block. Rights remain **jurisdiction-specific**; none of the 535 active CivicPlus tenants has a recorded commercial grant in Git.
+
+No ingest text was found that matches NDDOT's shape (publisher forbids commercial systematic compilation). So the family is **HOLD**, not EXCLUDE.
+
+State public-notice portals besides Utah PMN: **no second statewide PMN-shaped host** appears in the exclusive buckets. Bespoke first-party hosts include county notice pages (King WA `kingcounty.gov` council public-notices, Multnomah OR `www.multco.us` land-use notices) and they stay in the 30-host **HOLD** remainder. PrimeGov / Municode Meetings / BoardDocs remain **0** rows.
+
+#### Local News publishers — HOLD
+
+Two acquisition surfaces, both read:
+
+1. **Gold Master registry** (`adapters/local_news_registry.json`, `gold_master_version` `2.4`, workbook sha256 `2033cb5b20c9e882734582642cb08c2811d9c825b512b088fe91a2d0e1a5f158`). `scripts/ingest_local_news_registry.py` persists `title`, `source_url`, `agency_name` (publisher domain), geo stamp, `subtopics`. It does not write the body blob onto `alerts`. The module comment at the observability record says the capped blob is FD-C2 protected enrichment and must not leave that store.
+2. **`feeds.csv` `category='local_news'`**: **31** rows, **22** marked `active=TRUE`, **30** `news_html` + **1** NWS `html` (`be-news-weather-hazards`). `ingest.py::build_payload` uses title+blob only to classify subtopics and does not persist `description` on the news payload.
+
+What is stored vs what is not (registry `build_rows` lines 525–543 and the dated `alerts.description` receipt):
+
+| Use | What HomeSignal does today | Paid-report class |
 |---|---|---|
-| Email body | `digest_template.py`, `digest.py` (`docs/email-branding-audit.md`) | No. The branding audit describes logo and share-link fixes. It does not quote publisher licenses or the record text the digest inserts. |
-| Email share line | `lib/share-text.js` builds `HomeSignal daily briefing — <label>` plus a `homesignal.net` URL, and says that shape matches `digest_template.py::_share` | The share line is HomeSignal-authored. It does not show whether the rest of the email reprints permit titles, meeting titles, or news text. |
-| Meetings / government notices | `docs/state-notice-portals.md` names `adapters/legistar.py` and `adapters/civicclerk.py` in ingest | No adapter source and no vendor terms. |
-| Local News | `docs/local-news-phase-a-evidence-report.md` says the feed-drift audit is `homesignal-ingest/docs/local-news-feed-drift-audit-2026-07-24.md` | That file is not here. `lib/data.js` `news()` only shows the read of `app_changes` where `category = 'Local News'`. |
-| Bluesky / MAPS | `lib/maps-social-theme.js` and `lib/maps-capture-binding.js` say `post_text` and the draft are written by `homesignal-ingest` `bluesky/generate-maps.mjs` | The post body generator is not in this repo. |
+| Linking (`source_url`) | Stored and shown. | **HOLD — TERMS/RIGHTS NOT ESTABLISHED**. A link is still a publisher locator. No outlet grant in Git. |
+| Headline display (`title`) | Stored; email and the news tile reprint it. | **HOLD**. Ingesting a headline is not permission to sell it. |
+| Excerpt / snippet | Not stored on `alerts.description`. Email news `snippet = None`. | **HOLD**. Absence of an excerpt is not a grant to add one. |
+| Factual extraction | HomeSignal `subtopics` from title+blob. Blob does not land on the public row. | **HOLD** as a sold "fact from this article." The classifier is first-party method; the input is a held publisher work. Not **DERIVED FACTS ONLY** until the underlying article is allowlisted. |
+| Summarization | No generated article summary is stored or mailed. | **HOLD**. None to sell; writing one later would be a new use. |
+| Full-text redistribution | Body blob is FD-C2 enrichment and must not leave that store. | **HOLD**. Selling the body would be a new, heavier use. Not done today. |
+| Images | No image field is written on the Local News alert row. | **HOLD** if later added. |
+
+Dated ingest receipt (`CLAUDE.md`, 2026-09-03): `alerts.description` empty on all **21,992** stored `local_news` rows then measured. This pass did not re-count production.
+
+`scripts/check_source_policy.py` is the first-party acquisition gate. Its docstring says Government Notices, Meetings, and every other category are out of scope, and that the Gold Master exception is an allowlist of **URLs**, not a redistribution license.
+
+`docs/local-news-phase-c1-replay-study.md` §1.9: "RSS summaries/excerpts are publisher-syndicated for exactly this use — low risk. Full scraped bodies stored durably = republication posture." That is an engineering copyright opinion. It is not a publisher grant. The recommended storage choice (no full body on the public table) is already the production shape. It does not clear selling the title.
+
+No newspaper, TV, or digital-native publisher in the registry or in `feeds.csv` has a stored commercial-use grant. Family decision: **HOLD — TERMS/RIGHTS NOT ESTABLISHED**.
+
+`pipeline_type='news'` on the same SHA is **62** rows, not 31: **31** `local_news` + **13** `emerging_technology` + **9** `Stratos data center project` + **9** `global_best_practices`. Control: 2,906 total rows; 2,844 `government_notice` + 62 `news` = 2,906. Email (`digest.py` topic groups) can reprint titles from all four news categories. The extra 31 rows are first-party publisher RSS (SLTrib, KSL, FOX 13, ABC4, Deseret, Cache Valley, Yale e360, Carbon Brief, and others). **None has a stored commercial grant.** They inherit the same **HOLD** as Local News publishers. They are not NWS. They are not a second Local News clearance.
+
+#### NWS / `api.weather.gov` — CLEARED WITH ATTRIBUTION
+
+This is a **subset** of Local News, not a reclassification of the family.
+
+- Ingest source: `feeds.csv` `be-news-weather-hazards` → `https://api.weather.gov/alerts/active?area=UT`, plus Gold Master `nws_api` state endpoints (`adapters/nws_weather.py`; registry handler in `ingest_local_news_registry.py`).
+- API docs, fetched 2026-09-27, `https://www.weather.gov/documentation/services-web-API`: "All of the information presented via the API is intended to be open data, free to use for any purpose."
+- Disclaimer, fetched 2026-09-27, `https://www.weather.gov/disclaimer`: NWS Web page information is in the public domain unless noted otherwise, and "may be used without charge for any lawful purpose" if you do not (1) claim it as your own, (2) imply a NOAA/NWS endorsement, or (3) modify it and present it as official. 17 U.S.C. § 403 notice is required when a copyrighted work consists predominantly of NWS material. NWS name and logo are trademarks.
+
+That is the **CLEARED WITH ATTRIBUTION** showing: commercial use is stated, credit/identification is required, endorsement is forbidden. It does not include HomeSignal ZIP membership, a geocode, or "near this property." It does not include the NWS logo. Placement via HomeSignal ZIP/geocode remains **HOLD** (not a derived-fact clearance).
+
+#### Email output — HOLD — TERMS/RIGHTS NOT ESTABLISHED
+
+`digest.py::_payload_item` puts the stored `title` on every notices, meetings, and news line. Lead government-notice items also take a 200-character `description` snippet. News items take no snippet (`snippet = None`). `digest.py::render_maps_text` prints each MAPS `post_text` "word for word." Footer chrome (`MAILING_ADDRESS`, "HomeSignal is a public-records alert service.", unsubscribe, share URL) is HomeSignal-authored.
+
+The share line in the site repo (`lib/share-text.js`) is HomeSignal-authored. It does not clear the body.
+
+A paid report that is the consumer email, or that copies that email, reprints held titles. **HOLD — TERMS/RIGHTS NOT ESTABLISHED** as a deliverable. The channel inherits the underlying record. Chrome alone is first-party and may be reused as HomeSignal's own words. No extra publisher ban on email or automated republication was found in ingest; that absence is not a grant.
+
+#### Bluesky / MAPS output — HOLD — TERMS/RIGHTS NOT ESTABLISHED
+
+Two composers, both read:
+
+- `bluesky/lib/compose.mjs` (ALERTS): "Facts stay VERBATIM — the title, date and place are quoted from the record; only the framing around them is ours." The title is clamped into `post_text` and into the embed description.
+- `bluesky/lib/compose-maps.mjs` (MAPS): "Every fact emitted here is a VERBATIM field of the project row." Inputs are `app_projects` fields from the jurisdiction registry and EPA FRS — both HOLD in section 4. The screenshot is Map 1 (basemap and pins HOLD). Founder rule: the MAPS email **is** the post.
+
+HomeSignal framing ("Coming up in …", "See map:", date-first prefix) is first-party. The facts inside are not. **HOLD** as a deliverable (inherits the underlying source). Not EXCLUDE: nothing in ingest forbids HomeSignal from writing its own sentence once the underlying record is allowlisted. No extra social-media redistribution ban was found in ingest; that absence is not a grant.
 
 ### Classification
 
 | Family | Class | Paid web | PDF | Paid API | White-label | Reason |
 |---|---|---|---|---|---|---|
-| Meetings / government notices | **HOLD** | HOLD | HOLD | HOLD | HOLD | Agenda and notice text is produced by ingest adapters that were not read. A public meeting page is not, by itself, a recorded commercial grant. |
-| Local News | **HOLD** | HOLD | HOLD | HOLD | HOLD | Publisher republication terms are not in this repo. Ingesting a headline is not permission to sell it. |
-| Email output | **HOLD** | HOLD | HOLD | HOLD | HOLD | `digest_template.py` was not read. The HomeSignal-authored share line in `lib/share-text.js` does not clear the digest body. |
-| Bluesky / MAPS output | **HOLD** | HOLD | HOLD | HOLD | HOLD | `bluesky/generate-maps.mjs` was not read. Whether a post reprints a source record, and under what credit, is unknown. |
+| Meetings / government notices (every live vendor) | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | HOLD | HOLD | HOLD | HOLD | Title and notice description / meeting `agenda_summary` are stored. No adapter records a commercial grant. Utah.gov is personal/informational. A public meeting page is not a reseller license. Jurisdiction-specific; one tenant is not the vendor. |
+| Local News publishers | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | HOLD | HOLD | HOLD | HOLD | Linking, headline, excerpt, extraction, summarization, and full-text are all uncleared. Stored surface is title+URL+date+publisher. |
+| NWS / `api.weather.gov` alert text | **CLEARED WITH ATTRIBUTION** | CLEARED WITH ATTRIBUTION | CLEARED WITH ATTRIBUTION | CLEARED WITH ATTRIBUTION | HOLD if NOAA affiliation is implied or NWS identification is dropped | Publisher states open data, any lawful purpose, public domain, with identification and no-endorsement conditions. Not a property-proximity grant. |
+| Email output | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | HOLD | HOLD | HOLD | HOLD | Channel. Body reprints held titles (and MAPS `post_text`). Chrome is HomeSignal's. |
+| Bluesky / MAPS output | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | HOLD | HOLD | HOLD | HOLD | Channel. ALERTS posts quote the record title. MAPS posts quote held `app_projects` fields and photograph Map 1. |
 
-None of the four is CLEARED. None is ATTRIBUTION REQUIRED. None is EXCLUDE. ATTRIBUTION REQUIRED would mean the evidence shows commercial use is allowed if credit is kept. EXCLUDE would mean the evidence shows the material must not be sold. Neither showing was available.
+None of the four requested families is **CLEARED FOR PAID REPORT**. None is **EXCLUDE**. None is **DERIVED FACTS ONLY**. **CLEARED WITH ATTRIBUTION** is used only for NWS alert text, where the publisher's current pages state commercial use with identification.
 
-Unblock: grant this Cloud Agent read access to `HomeSignalG/homesignal-ingest` (private-repo permission on the GitHub app), then re-run this section against that repo's `main` HEAD. Until that read exists, these four families stay out of the corporate allowlist in section 6.
+Unblock for the HOLD families: collect per-publisher / per-vendor **and per-jurisdiction** commercial and redistribution terms, the same work section 12 already requires for the jurisdiction registry. Ingest being readable does not substitute for that review. NWS does not need that review for its own text fields; it still needs a placement review before anyone writes "near this property."
+
+## 15. Git receipts (this continuation)
+
+| Fact | Evidence |
+|---|---|
+| Ingest `origin/main` at re-measure | `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2` — "Delete 3 inactive Box Elder placeholder feeds (founder) (#618)". Local `main` on the first readable pass was `43491f2`; #618 is the only drift, and it deleted three **inactive** placeholders. Active GN **2,464** unchanged. |
+| Site `main` after the original audit tree | Original audit tree `09f5cdb`. Site `main` later `3542bf29c652fff1a75c86b2e5173172b019da01` (#1396, C7 receipt). That commit is not an ingest-family input. |
+| Site PR #1397 remote (second pass, ingest unread) | Branch `cursor/corporate-output-source-rights-audit-2026-09-27`, head `8d3d1f8eb6334ede297825952e59c9e5e4964eff`, title still "Corporate output source-rights audit (2026-09-27)", draft, MERGEABLE. Commit message: "Meetings, Local News, email, and Bluesky/MAPS stay HOLD because homesignal-ingest is still unreadable." CI on that head: structural / isolation / unit / browser **SUCCESS**. The remote file was **not** independently rewritten after `8d3d1f8`. |
+| Audit file independently changed? | Site `main` does not contain this file (404). Site PR branch remote blob at `8d3d1f8` is the second-pass HOLD text. This continuation lives on ingest PR #619 and, if a later site-write session copies it, on #1397. |
+| Exclusive vendor re-measure (this session) | `git show 8ef7221:feeds.csv`. Control: **2,906** rows; header has `feed_id`; `be-county-commission-agenda` present. GN **2,844** / active **2,464**. Exclusive buckets sum **2,844 / 2,464**. Utah PMN 680/678 · CivicPlus 621/535 · Legistar 393/387 · CivicClerk 382/342 · empty 222/0 · Granicus 199/187 · bespoke 147/146 (30 hosts) · CivicWeb 76/73 · iQM2 53/50 · eScribe 50/49 · OnBase 17/17 · NovusAgenda 4/0 · PrimeGov 0 · Municode/BoardDocs 0. |
+| Adapter license constants | `rg LICENCE adapters/` still matches only `adapters/epoch_ai.py` and `adapters/compute_atlas.py` (`CC BY 4.0`). |
+| CivicPlus pages fetched this session | ToS `https://www.civicplus.help/legal-center/docs/civicplus-terms-of-use` · MSA `https://www.civicplus.help/legal-center/docs/master-services-agreement`. Quoted in §14. Not a tenant grant. Not EXCLUDE. |
+| NWS disclaimer re-fetched this session | `https://www.weather.gov/disclaimer` still states public domain / any lawful purpose / no copyright claim / no endorsement / §403 / logo separate. Classification unchanged. |
+| This environment's writable repo | Cloud environment `repos` list is `HomeSignalG/homesignal-ingest` only. Site clone at `/tmp/homesignal-site` can read #1397; a prior `git push` to `homesignal-site` returned `403` for `cursor[bot]`. |
+| Product files | **0** ingest or site product files changed by this audit. Diff is this document. |
+
+**Next step (not taken here):** a session with write access to `homesignal-site` copies this file onto `cursor/corporate-output-source-rights-audit-2026-09-27` and updates PR #1397. Do not change the product. Do not sell the report. The remaining unblock is still §12 — per-jurisdiction terms — plus the `"Not for resale"` review.
 
 ## Appendix A — Jurisdiction registry (240)
 
