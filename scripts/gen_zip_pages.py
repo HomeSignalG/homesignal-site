@@ -21,8 +21,12 @@ document exists and whether it may be indexed are separate decisions.
 
 Rule F (unchanged): >= 3 legitimate non-weather Alerts items across Local News journalism,
 Government Notices and forward-dated Upcoming Meetings. Weather displays but never counts.
+
+Rule D: >= 3 publishable Development entities from the compact ingest plane
+(`data/development_seo_plane.json`). The site does not re-decide materiality. A ZIP
+absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 """
-import argparse, hashlib, html, json, os, re, sys, time, urllib.parse, urllib.request
+import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
@@ -40,6 +44,11 @@ STEP = 1000
 # including weather. Same cap, different populations - the SSR list is a subset.
 LN_CAP, GN_CAP, UM_CAP = 20, 10, 12
 RULE_F_MIN = 3                               # >= 3 legitimate non-weather items
+RULE_D_MIN = 3                               # >= 3 publishable Development entities
+# Production freshness: a missing or stale plane must fail the Pages build, never
+# silently treat Rule D as empty (that would noindex the 776 Development pages
+# while the job stayed green). Fixtures may opt out with --allow-missing-dev-plane.
+RULE_D_PLANE_MAX_AGE_HOURS = 36
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
@@ -161,8 +170,119 @@ def safe_url(u):
     return u.strip() if p.scheme in ("http", "https") and p.netloc else None
 
 
+def annotate_dev_plane(path):
+    """Run the ONE site Type/lifecycle authority over the raw ingest plane.
+
+    lib/project-type.js owns canonical Development Type and lifecycle labels.
+    This helper only invokes that file through scripts/annotate-dev-seo-ssr.mjs.
+    It does not copy classifier rules into Python.
+    """
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    adapter = os.path.join(root, "scripts", "annotate-dev-seo-ssr.mjs")
+    authority = os.path.join(root, "lib", "project-type.js")
+    if not os.path.isfile(adapter):
+        sys.exit("ERROR: missing scripts/annotate-dev-seo-ssr.mjs")
+    if not os.path.isfile(authority):
+        sys.exit("ERROR: missing lib/project-type.js")
+    # Written to a temp file, never beside the input: the input sits in the repo tree
+    # (data/ in production, test/fixtures/ in tests) and a generated file there can be
+    # committed by accident. load_dev_plane() deletes it after reading.
+    fd, out = tempfile.mkstemp(prefix="dev_seo_plane_", suffix=".ssr.json")
+    os.close(fd)
+    try:
+        r = subprocess.run(
+            ["node", adapter, "--in", path, "--out", out],
+            capture_output=True, text=True, timeout=120,
+        )
+    except FileNotFoundError:
+        sys.exit("ERROR: node is required to annotate Rule D cards via lib/project-type.js")
+    if r.returncode != 0:
+        sys.exit(f"ERROR: annotate-dev-seo-ssr failed: {(r.stderr or r.stdout).strip()}")
+    if not os.path.isfile(out) or os.path.getsize(out) == 0:
+        sys.exit("ERROR: annotate-dev-seo-ssr wrote nothing")
+    return out
+
+
+def _plane_age_hours(generated_at, now=None):
+    """Hours since generated_at. None if the stamp is missing or unparseable."""
+    raw = str(generated_at or "").strip()
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    return (now - stamp.astimezone(timezone.utc)).total_seconds() / 3600.0
+
+
+def load_dev_plane(path, *, required=True, now=None):
+    """Read the compact Development SEO plane.
+
+    Production (required=True): a missing, unreadable, unstamped or stale plane
+    is a hard error. It must never become {} — that would silently drop Rule D
+    indexability while Pages stayed green. Fixtures may pass required=False to
+    exercise the no-plane case explicitly.
+    """
+    if not path or not os.path.isfile(path):
+        if required:
+            sys.exit("ERROR: Rule D plane missing — refusing to silently drop "
+                     "Development indexability")
+        return {}
+    annotated = annotate_dev_plane(path)
+    try:
+        with open(annotated, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    finally:
+        os.remove(annotated)
+    if required:
+        age = _plane_age_hours(raw.get("generated_at"), now=now)
+        if age is None:
+            sys.exit("ERROR: Rule D plane has no parseable generated_at — "
+                     "refusing to treat an undated snapshot as current")
+        if age > RULE_D_PLANE_MAX_AGE_HOURS:
+            sys.exit(f"ERROR: Rule D plane is stale ({age:.1f}h > "
+                     f"{RULE_D_PLANE_MAX_AGE_HOURS}h) — refusing to silently "
+                     "drop Development indexability")
+    if raw.get("ssr_authority") != "lib/project-type.js":
+        sys.exit("ERROR: annotated plane is not from lib/project-type.js")
+    zips = raw.get("zips") or {}
+    out = {}
+    for z, rec in zips.items():
+        if not ZIP_RE.match(str(z)) or not isinstance(rec, dict):
+            continue
+        if rec.get("held") or rec.get("geography_outcome") == "not_measured":
+            out[z] = {"rule_d": False, "count": None, "entities": []}
+            continue
+        ents = []
+        for e in (rec.get("representative_entities") or [])[:RULE_D_MIN]:
+            if not isinstance(e, dict):
+                continue
+            name = str(e.get("name") or "").strip()
+            url = safe_url(e.get("source_url"))
+            if not name or not url:
+                continue
+            item = {"title": name, "url": url,
+                    "type": str(e.get("type_label") or "").strip(),
+                    "lifecycle": str(e.get("lifecycle_label") or "").strip(),
+                    "date": ""}
+            day = str(e.get("date") or "")[:10]
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", day):
+                item["date"] = day
+            ents.append(item)
+        count = rec.get("meaningful_entity_count")
+        ok = (rec.get("rule_d") is True
+              and isinstance(count, int) and count >= RULE_D_MIN
+              and len(ents) >= RULE_D_MIN)
+        out[z] = {"rule_d": ok, "count": count if isinstance(count, int) else 0,
+                  "entities": ents if ok else []}
+    return out
+
+
 def assemble(d, now_iso):
-    """zip -> {name, state, county, dev_indexable, ln[], gn[], um[], counts, rule_f}."""
+    """zip -> {name, state, county, dev_indexable, ln[], gn[], um[], counts, rule_f, rule_d}."""
     zips = list(d["zips"])
     meta = {m["zip"]: m for m in d["meta"]}
     agency = {}
@@ -240,12 +360,17 @@ def assemble(d, now_iso):
             keep.append(m)
         return keep[:UM_CAP]                      # the page's own .slice(0, 12)
 
+    plane = d.get("_dev_plane") or {}
     pages = {}
     for z in zips:
         mt = meta.get(z, {})
+        rec = plane.get(z) or {}
         pages[z] = {"zip": z, "name": mt.get("name") or z, "state": mt.get("state") or "",
                     "county": mt.get("county") or "", "dev_indexable": bool(mt.get("indexable")),
-                    "ln": [], "gn": [], "um": []}
+                    "ln": [], "gn": [], "um": [],
+                    "rule_d": bool(rec.get("rule_d")),
+                    "rule_d_count": rec.get("count") if rec.get("count") is not None else 0,
+                    "dev_entities": list(rec.get("entities") or [])}
     for c in d["changes"]:
         p = pages.get(c.get("zip"))
         if p is None:                                      # off-registry (e.g. removed 80249)
@@ -314,6 +439,29 @@ def link_siblings(pages):
 
 
 # ---------------------------------------------------------------- render
+def _dev_items(items):
+    """Rule D cards. Omitted entirely when the plane did not qualify the ZIP —
+    this function never invents an absence sentence."""
+    if not items:
+        return ""
+    li = []
+    for it in items:
+        t, u = esc(it.get("title") or ""), safe_url(it.get("url"))
+        if not t or not u:
+            continue
+        bits = [x for x in (it.get("type"), it.get("lifecycle")) if x]
+        when = esc(it.get("date") or "")
+        inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>'
+        if bits:
+            inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
+        if when:
+            inner += f" <time>{when}</time>"
+        li.append(f"<li>{inner}</li>")
+    if not li:
+        return ""
+    return f'<section class="zsec"><h2>Development</h2><ul>' + "".join(li) + "</ul></section>"
+
+
 def _items(items, heading, empty, kind):
     if not items:
         return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
@@ -332,16 +480,22 @@ OG_IMAGE = f"{BASE}/og-default.png"
 def render(p, built):
     z, name, st = p["zip"], p["name"], p["state"]
     label = f"{name}, {st}" if st else name
-    title = f"{label} — local government notices, meetings & news | HomeSignal"
     if p["rule_f"]:
+        title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"Government notices, upcoming public meetings and local news for ZIP {z} "
                 f"({label}): {p['n_gn']} notices, {p['n_um']} upcoming meetings, "
                 f"{p['n_ln_journalism']} local news items on record.")
+    elif p.get("rule_d"):
+        title = f"{label} — development records | HomeSignal"
+        desc = (f"Development records on file for ZIP {z} ({label}): "
+                f"{p.get('rule_d_count') or len(p.get('dev_entities') or [])} "
+                f"distinct projects compiled from official sources.")
     else:
+        title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"HomeSignal tracks government notices, public meetings and local news for "
                 f"ZIP {z} ({label}). No qualifying records on file yet — checks repeat "
                 f"automatically.")
-    robots = "index, follow" if p["rule_f"] else "noindex, follow"
+    robots = "index, follow" if (p["rule_f"] or p.get("rule_d")) else "noindex, follow"
     canon = f"{BASE}/community/{z}/"
     ln_show = [x for x in p["ln"] if not x["weather"]][:LN_CAP]
     wx = [x for x in p["ln"] if x["weather"]][:3]
@@ -350,6 +504,9 @@ def render(p, built):
                  "date": (m.get("meeting_date") or "")[:10]} for m in um_show]
 
     county_bit = f" in {esc(p['county'])} County" if p["county"] else ""
+    lead = ("Development records, government notices, public meetings and local news"
+            if p.get("rule_d") else
+            "Government notices, public meetings and local news")
     # Usable links in the INITIAL HTML (Step 12). Internal, crawlable, no JavaScript: the
     # ZIP's own development/map page and the site root. Deliberately NOT the legacy
     # community.html?zip= URL — that page canonicalises here, so linking to it from here
@@ -375,8 +532,9 @@ def render(p, built):
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
-        f'<p>Government notices, public meetings and local news that apply to the whole of '
+        f'<p>{lead} that apply to the whole of '
         f'ZIP {esc(z)}{county_bit}.</p></header>'
+        + _dev_items(p.get("dev_entities") or [])
         + _items(p["gn"][:GN_CAP], "Government notices",
                  "No government notices on file for this ZIP yet.", "gn")
         + _items(um_items, "Upcoming public meetings",
@@ -596,6 +754,12 @@ def main():
     ap.add_argument("--out", default="_site")
     ap.add_argument("--fixture", help="read data from a JSON fixture instead of the network")
     ap.add_argument("--now", help="ISO instant for the forward-meeting window (determinism)")
+    ap.add_argument("--dev-plane", default=None,
+                    help="compact Development SEO plane JSON (Rule D). "
+                         "Production: missing/stale is a hard error.")
+    ap.add_argument("--allow-missing-dev-plane", action="store_true",
+                    help="fixture-only: a missing plane is {} (no Rule D). "
+                         "Refused in production.")
     a = ap.parse_args()
     t0 = time.time()
     DEADLINE[0] = t0 + FETCH_BUDGET
@@ -605,6 +769,25 @@ def main():
         d = json.load(open(a.fixture, encoding="utf-8"))
     else:
         d = fetch_data(_anon_key(), now_iso)
+
+    if a.allow_missing_dev_plane and not a.fixture:
+        sys.exit("ERROR: --allow-missing-dev-plane is fixture-only")
+    plane_path = a.dev_plane
+    if plane_path is None and a.fixture:
+        sibling = os.path.join(os.path.dirname(os.path.abspath(a.fixture)),
+                               "development_seo_plane.json")
+        if os.path.isfile(sibling):
+            plane_path = sibling
+    if plane_path is None:
+        plane_path = os.path.join(os.path.dirname(__file__), "..", "data",
+                                  "development_seo_plane.json")
+    # Fixtures skip the freshness clock (their generated_at is pinned). They
+    # still annotate through lib/project-type.js when a plane file is present.
+    # Production requires a current plane; missing/stale is a hard error.
+    plane_required = not a.fixture
+    if a.fixture and a.allow_missing_dev_plane:
+        plane_required = False
+    d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required)
 
     zips = d["zips"]
     if len(zips) != len(set(zips)):
@@ -617,13 +800,16 @@ def main():
     if len(pages) != len(zips):
         sys.exit(f"ERROR: assembled {len(pages)} pages for {len(zips)} canonical ZIPs")
     npass = sum(1 for p in pages.values() if p["rule_f"])
+    ndpass = sum(1 for p in pages.values() if p.get("rule_d"))
     stats = build(pages, a.out, zips, now_iso[:10])
-    indexable = sorted(z for z, p in pages.items() if p["rule_f"])
+    indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
     sm = reconcile_sitemap(a.out, indexable)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
     print(f"rule F fail    : {len(pages) - npass}")
+    print(f"rule D pass    : {ndpass}")
+    print(f"indexable      : {len(indexable)} (Rule F OR Rule D)")
     print(f"artifact bytes : {stats['bytes']} ({stats['bytes']/1048576:.1f} MB)")
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
@@ -644,6 +830,7 @@ def main():
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
                "rule_f_fail": len(pages) - npass,
+               "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"]},

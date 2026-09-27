@@ -103,6 +103,9 @@ for (const t of INTERNAL_TREES) {
 for (const f of ['lib/generated/transitions.sql', 'lib/generated/transitions.mjs', 'lib/generated/versions.mjs']) {
   check(`2c build artifact ${f} is not shipped`, !set.has(f), `${f} is still in the artifact`);
 }
+check('2d Development SEO plane is build-input, not a public artifact',
+      !set.has('data/development_seo_plane.json'),
+      'the compact Rule D plane must stay in the checkout; Pages reads it at generate time');
 
 // ------------------------------------------------------------------- §3 FAIL-CLOSED
 // The load-bearing section: files nobody has named must not ship.

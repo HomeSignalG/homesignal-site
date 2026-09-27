@@ -58,7 +58,10 @@ on:
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/site-artifact-contract.test.mjs'
+      - 'test/dev-seo-ssr-type-adapter.test.mjs'
       - 'test/fixtures/zip-pages.json'
+      - 'test/fixtures/development_seo_plane.json'
+      - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
@@ -67,7 +70,10 @@ on:
       - 'test/bsky-did-document.test.mjs'
       - '.well-known/did.json'
       - 'scripts/gen_zip_pages.py'
+      - 'scripts/annotate-dev-seo-ssr.mjs'
       - 'scripts/prove-zip-pages.mjs'
+      - 'lib/project-type.js'
+      - 'test/dev-seo-ssr-type-adapter.test.mjs'
       # The pure control-resolution core the proof runs on, and now also the producer of the
       # membership the DEPLOYED twin reads. A lib-only change that never ran this build could
       # ship an artifact whose controls file the live monitor cannot use.
@@ -79,9 +85,11 @@ on:
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
+      - 'test/fixtures/development_seo_plane.json'
+      - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   schedule:
-    - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F
+    - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F or Rule D
 
 permissions:
   contents: read
@@ -111,6 +119,33 @@ jobs:
           # named there, so internal files fail CLOSED instead of shipping by default.
           python3 scripts/stage_site.py --src . --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
 
+      - name: Fetch the published Rule D plane
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          URL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-plane.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$URL" -o data/development_seo_plane.json; then
+            echo "ERROR: could not fetch the published Rule D plane — refusing to treat Rule D as empty"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          from datetime import datetime, timezone
+          p = json.load(open("data/development_seo_plane.json"))
+          if p.get("identity") != "base_project_key":
+              sys.exit("ERROR: fetched plane identity is not base_project_key")
+          raw = p.get("generated_at") or ""
+          try:
+              ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+          except ValueError:
+              sys.exit("ERROR: fetched plane has no parseable generated_at")
+          age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
+          if age > 36:
+              sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > 36h)")
+          print("fetched Rule D plane generated_at", raw, "age_h", round(age, 2),
+                "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"))
+          PY
+
       - name: Generate one document per canonical ZIP
         run: |
           set -euo pipefail
@@ -136,8 +171,8 @@ jobs:
           sm = open('_site/sitemap.xml', encoding='utf-8').read()
           zips = re.findall(r'<loc>[^<]*/community/(\d{5})/</loc>', sm)
           assert not re.search(r'community\.html\?zip=', sm), 'legacy community URL still advertised'
-          assert sorted(zips) == man['indexable_zips'], 'sitemap != Rule F pass set'
-          assert len(zips) == man['rule_f_pass'], 'sitemap count != Rule F pass count'
+          assert sorted(zips) == man['indexable_zips'], 'sitemap != indexable set (Rule F OR Rule D)'
+          assert len(zips) == len(man['indexable_zips']), 'sitemap count != indexable count'
           # INVERTED 2026-09-19, and it is the SAME rule this gate already states one line
           # up: the advertised set must BE the index-eligible set. This line used to guard
           # the development half's PRESENCE under page-purpose separation, which assumed the
@@ -150,7 +185,8 @@ jobs:
           assert 'homesignalmap.html?zip=' not in sm, \
               'noindex development URLs are still advertised in the sitemap'
           assert man['sitemap_dev_urls_removed'] >= 0, 'manifest must record the removal count'
-          print(f"sitemap reconciled: {len(zips)} community URLs == rule_f_pass {man['rule_f_pass']}")
+          print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
+                f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
           git status --porcelain | grep -E '^\?\?\s+community/' && \
@@ -279,6 +315,7 @@ jobs:
           print('documents       :', m['documents'])
           print('rule F pass     :', m['rule_f_pass'])
           print('rule F fail     :', m['rule_f_fail'])
+          print('rule D pass     :', m.get('rule_d_pass'))
           print('indexable zips  :', len(m['indexable_zips']))
           print('html files      :', n)
           print('uncompressed    : %.1f MB' % (tot/1048576))
