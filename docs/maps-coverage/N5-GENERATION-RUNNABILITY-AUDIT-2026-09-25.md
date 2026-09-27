@@ -5,6 +5,31 @@
 output-identical (see CLAUDE.md §7.13). What is not runnable is the *lifecycle* that builds a
 new generation on top of them.
 
+## Outcome (2026-09-27) — the generation ran end to end and is serving
+
+The status line above is the dated receipt of 2026-09-25. **`n5-national-2026-09-25` is ACTIVE
+since 2026-09-27 15:00:49Z**, with `legacy-phase1-2026-09-01` SUPERSEDED as its predecessor.
+
+| | before (legacy) | after (N5) |
+|---|---:|---|
+| membership rows | 901,465 · fp `1936506161376757` | **905,390 · fp `1945248397386972`** (= candidate) |
+| markers | 1,004,080 | **1,012,663** |
+| ZIP status rows | 12,719 | **12,722** |
+
+- **Newly visible:** 68,575 (ZIP, project) pairs · **66,491 projects · 2,618 ZIPs**
+  (`geo.n5_generation_entries`). Largest: 97503 (1,825 new), 97502 (1,331), 40207 (792); each
+  checked through `app_zip_projects_markers` → `boundary_complete`, markers 1,852 / 1,528 / 837.
+- **Left Map 1: 64,130 projects** = 57,307 no longer in `public.app_projects` (pruned by their
+  sources) + 6,691 re-created after the 2026-09-25 22:01Z cutoff (not in the frozen snapshot; the
+  next generation recovers them) + 131 `POINT_REJECTED` + 1 `NO_INTERSECTION_WITH_GENERATION_ZCTAS`.
+- **Lifecycle defects fixed on the way, each at the cause:** a lost 524 response proven from state
+  rather than re-sent (#1372, #1378) · a publish budget sized to the largest prefix (#1380) ·
+  the candidate probe served through the boundary envelope (Part E) · unresolved accounting
+  for registry-less keys and unreachable publishers (#1392, Part F). READY's INV-1 refusal of
+  17 keys was correct and is what found the last one.
+- Runs: shards → publish 584/584 prefixes · unresolved `36327003496` · READY `36327594215` ·
+  activate dispatched 15:00Z.
+
 ## How this was found
 
 1. The first production `open` (`n5-generation.yml` run `36172375498`, generation
