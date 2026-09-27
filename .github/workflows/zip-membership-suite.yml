@@ -30,6 +30,8 @@ on:
       - 'test/dc_osm_layer_pg/**'
       - 'docs/dc-map1-address-check.sql'
       - 'test/dc_map1_address_check_pg/**'
+      - 'docs/dc-address-check-monitor.sql'
+      - 'test/dc_address_check_monitor_pg/**'
       - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
@@ -54,6 +56,8 @@ on:
       - 'test/dc_osm_layer_pg/**'
       - 'docs/dc-map1-address-check.sql'
       - 'test/dc_map1_address_check_pg/**'
+      - 'docs/dc-address-check-monitor.sql'
+      - 'test/dc_address_check_monitor_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -228,3 +232,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_map1_address_check_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/addrcheck.log
+      - name: Daily address-check monitor (snapshot equals the view; every failure class fires; rides pipeline_health_tick) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_address_check_monitor_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/addrmonitor.log
