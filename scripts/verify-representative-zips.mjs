@@ -186,7 +186,9 @@ async function verifyZipPage(page, spec, cached) {
         const mk = window.__HS_RESOLVE_TRACKER ? window.__HS_RESOLVE_TRACKER(s) : {};
         const want = (window.HS && window.HS.canonicalLifecycle)
           ? window.HS.canonicalLifecycle({ status: s.status }).key : null;
-        return { key: s.source_key, type: mk.typeKey, life: mk.lifecycle, want: want, named: !!s.label };
+        return { key: s.source_key, type: mk.typeKey, life: mk.lifecycle, want: want, named: !!s.label,
+                 // the fields HS.map1DcSite has filled since 2026-09-27; absent = an older build served
+                 shaped: s.bucket !== undefined && s.use_type !== undefined };
       });
       return {
         sites,
@@ -343,8 +345,14 @@ async function verifyZipPage(page, spec, cached) {
     }
 
     // DATA-CENTRE TYPE + LIFECYCLE, on the page's own resolver. Not exercised on a ZIP the
-    // contract returns no data-centre row for — said, never counted as a pass over zero.
-    if (st.dcResolved.length) {
+    // contract returns no data-centre row for — a SKIP, never a pass over zero. Also a SKIP when
+    // the SERVED page predates the site-shape fix (none of its rows carries bucket/use_type):
+    // this workflow runs on the merge push, before Pages deploys, and lib/data.js carries no
+    // cache key — so an old build is deploy lag, not a finding. The mapping's shape itself is
+    // pinned offline (test/map1-dc-site-shape.test.mjs).
+    if (st.dcResolved.length && !st.dcResolved.some((d) => d.shaped)) {
+      skip('data-centre pins', `served page predates the Map 1 data-centre site-shape fix (${st.dcResolved.length} row(s) without bucket/use_type) — re-run after the Pages deploy`);
+    } else if (st.dcResolved.length) {
       const badDc = st.dcResolved.filter((d) => d.type !== 'datacenter' || !d.want || d.life !== d.want || !d.named);
       if (badDc.length) {
         fail('data-centre pins', `${badDc.length} of ${st.dcResolved.length} do not draw as a named Data center in `
@@ -353,7 +361,7 @@ async function verifyZipPage(page, spec, cached) {
         pass('data-centre pins', `${st.dcResolved.length} national data-centre pin(s): Data center, lifecycle = map_status, named`);
       }
     } else {
-      pass('data-centre pins', 'not exercised — no national data-centre row on this ZIP');
+      skip('data-centre pins', 'not exercised — no national data-centre row on this ZIP');
     }
 
     if (expect.badges && st.countyBadges < 1) {

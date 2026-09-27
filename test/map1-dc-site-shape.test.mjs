@@ -218,8 +218,11 @@ const AUTH = { zip: '00000', mode: 'development', status: 'boundary_complete', p
     '§7a the mapping fills the fields the page classifies from: use_type, label, bucket and type');
   ok(/HS\.canonicalLifecycle\(\{\s*status:\s*r\.map_status\s*\}\)/.test(body),
     '§7b the lifecycle comes from map_status through the ONE lifecycle vocabulary');
-  ok(!/type:\s*'datacenter'/.test(body) && !/normalized_status\s*\)/.test(body),
-    '§7c no Type literal in the lifecycle slot, and the lifecycle is not re-derived from normalized_status');
+  // normalized_status may appear ONLY as its own passthrough; any other use (e.g. feeding the
+  // lifecycle vocabulary) is the lifecycle being re-derived from it.
+  const normUses = (body.match(/normalized_status/g) || []).length;
+  ok(!/type:\s*'datacenter'/.test(body) && normUses === 2 && /normalized_status: r\.normalized_status,/.test(body),
+    '§7c no Type literal in the lifecycle slot, and normalized_status is only passed through, never used for the lifecycle', normUses);
   const P = stripJs(read('homesignalmap.html'));
   ok((P.match(/\.map\(HS\.map1DcSite\)/g) || []).length === 1 && /resolveTrackerMarker/.test(P),
     '§7d the page maps the contract rows through HS.map1DcSite once and classifies through resolveTrackerMarker');
