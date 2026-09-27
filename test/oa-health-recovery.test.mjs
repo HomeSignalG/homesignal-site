@@ -62,6 +62,20 @@ print(json.dumps([oa.canonical_addr(x) for x in [${quoted}]]))
   assert.deepEqual(pyOut, tsOut);
 });
 
+test('assemble fills a blank OA region from the collection-path state', () => {
+  const raw = py(`${LOAD}
+print(json.dumps({
+  "with_region": oa.assemble({"number":"10","street":"Oak Avenue","city":"Del Valle","region":"TX","postcode":"78617"}),
+  "fallback": oa.assemble({"number":"721","street":"Franklin Avenue","city":"Faribault","region":"","postcode":"55021"}, "MN"),
+  "no_state": oa.assemble({"number":"10","street":"Oak Avenue","city":"X","region":"","postcode":"78617"}, ""),
+}))
+`);
+  const d = JSON.parse(raw);
+  assert.equal(d.with_region, '10 Oak Avenue, Del Valle, TX 78617');
+  assert.equal(d.fallback, '721 Franklin Avenue, Faribault, MN 55021');
+  assert.equal(d.no_state, '10 Oak Avenue, X, 78617');
+});
+
 test('merge_scope uses demand pairs unless ZIPS/STATES override', () => {
   const raw = py(`${LOAD}
 pairs = [("78617","TX"),("98104","WA"),("02108","MA")]

@@ -329,12 +329,13 @@ def download(url: str, dest: Path) -> None:
     print(f"  ✓ {dest.stat().st_size / 1e6:.1f} MB", flush=True)
 
 
-def assemble(row: dict) -> str | None:
+def assemble(row: dict, fallback_region: str = "") -> str | None:
     """Build the address in the SAME shape a filed record uses ("NUM STREET, CITY, REGION ZIP"),
-    WITHOUT unit — filed street addresses carry no unit, so including it would guarantee a miss."""
+    WITHOUT unit — filed street addresses carry no unit, so including it would guarantee a miss.
+    Some OA members leave region blank; use the collection path state so the key still has ST ZIP."""
     g = lambda *ks: next((str(row[k]).strip() for k in ks if row.get(k) not in (None, "")), "")
     num, street = g("number", "NUMBER"), g("street", "STREET")
-    city, region = g("city", "CITY"), g("region", "REGION")
+    city, region = g("city", "CITY"), g("region", "REGION") or str(fallback_region or "").strip()
     postcode = g("postcode", "POSTCODE")
     if not (num and street and postcode):
         return None
@@ -354,7 +355,7 @@ def parse_member(zf: zipfile.ZipFile, name: str, zips: set[str]):
             pc = (row.get("postcode") or row.get("POSTCODE") or "").strip()[:5]
             if pc not in zips:
                 continue
-            addr = assemble(row)
+            addr = assemble(row, state)
             if not addr:
                 continue
             try:
