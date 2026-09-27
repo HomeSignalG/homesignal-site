@@ -3258,9 +3258,21 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 
 **Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+
+⛔ **DECIDED 2026-09-27 — THE FOUNDER REJECTED IT. EPA-only ZIPs STAY INDEXABLE.** Verbatim:
+*"Do not unlist ~1,005 map pages just because they have plants and no new construction.
+'Nothing is being built' is a valid answer. Those pages stay listed. This was the old Unit 1
+idea; it is rejected."* The `_nfc >= 3` limb of `indexable` stays. Checked live the same day:
+`app_refresh_zip` still carries it and none of Unit 1's markers; 11,696 of 12,722 ZIPs are
+indexable. **Do not re-propose "EPA presence manufactures completeness" as a reason to
+unlist a page** — a ZIP with regulated facilities and no new construction is an honest,
+useful page, and its answer is "nothing is being built".
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
-### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+### ⛔ PHASE 2 · UNIT 1 IS REJECTED (founder, 2026-09-27) — built and parked 2026-09-07, never applied
+The parked SQL now raises `PHASE 2 UNIT 1 IS REJECTED` as its first executable statement, so
+running it changes nothing (pinned by checks 0/0b in its test; weakening the raise fails
+them). The record below is kept as the dated receipt of what was proposed.
 SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
 **not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
 load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
