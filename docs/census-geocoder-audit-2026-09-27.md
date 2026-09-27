@@ -215,3 +215,18 @@ The cached-failure and no-retry design is the next target, because until it chan
 
 - Original measuring session: 28 read-only GET requests to Census through `pg_net` (sandbox proxy 403s Census; the database's own HTTP path does not). Those rows land in `net._http_response` and are purged automatically. One scratch test file, reset afterwards.
 - This write-up: read-only SQL listed above; GitHub Actions metadata for `verify-geocodes`; grep of both repos. **No Census request. No production write. No code, migration, deploy, or re-geocode.**
+
+## 36. Health plan (this session)
+
+Implement in this order. Cross a step off only when the code, the offline tests, and the commit for that step are done. Then start the next step. Do **not** national-load OpenAddresses. Do **not** re-enable `verify-geocodes` until it can finish green. Do **not** force-refresh the 41,111 cached failures in one batch.
+
+Concurrency at kickoff (2026-09-27): `origin/main` fetched; no other open PR implements Census *health*. This branch is PR #1420. **GENUINE GAP.**
+
+| # | Step | Why | Done |
+|---|---|---|---|
+| 1 | Distinguish Census transport errors from no-match; do not cache transients | `censusRung` ignores `r.ok`. A timeout, HTTP 503, and a genuine miss all become the same sticky `failed` row. | [ ] |
+| 2 | Retry cached `failed` rows after a 7-day TTL | 0 of 41,111 failed rows have ever been updated. A success outranks `failed` (−1) and will upgrade; a re-fail must bump `updated_at` so the TTL does not re-hit Census on every refresh. | [ ] |
+| 3 | Assemble complete addresses for bare-street connectors | ~31,000 of 41,111 failures are bare-street input (74% fail). New assembled keys heal on first use. City-safe; county stays city-less (Pierce); Boulder stays unflagged (address already concatenates city+state). Wire the same opt-in into ckan/carto/csv. | [ ] |
+| 4 | Prefer the filed-ZIP Census candidate when several matches exist | Development takes `matches[0]`. Data Center rejects the same input as `REJECTED_AMBIGUOUS`. Prefer the candidate whose matched ZIP equals the trailing ZIP on the input. | [ ] |
+| 5 | Persist fence outcome and failure class | `geofence_status` is unused; `diag` is dropped; fence rejections vanish. Write failure class on `review_reason`. Write `geofence_status` (`inside_zip` / `zip_mismatch` / `too_far`) on the cache row. | [ ] |
+| 6 | Apply the shared fence to TABS | TABS is the one geocoding source that skips `fenceGeocode`. Point-scope TABS still quarantines (never synthesizes) when the fence rejects. | [ ] |

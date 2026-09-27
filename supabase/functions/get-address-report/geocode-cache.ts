@@ -89,6 +89,28 @@ export interface GeocodeStore {
   put: (row: GeocodeResult & { provider_vintage?: string }) => Promise<void>;
 }
 
+/** A geocoder transport failure (timeout, HTTP 5xx/4xx, non-JSON body). Distinct from a
+ *  completed lookup that found no match. Transport must NOT be persisted as match_type=
+ *  'failed' — that row would stick forever and never be retried. */
+export class GeocodeTransportError extends Error {
+  readonly kind = "transport" as const;
+  readonly status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "GeocodeTransportError";
+    this.status = status;
+  }
+}
+
+export function isGeocodeTransportError(e: unknown): e is GeocodeTransportError {
+  if (e instanceof GeocodeTransportError) return true;
+  if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) return true;
+  return false;
+}
+
+export const REVIEW_REASON_NO_MATCH = "census_no_match";
+export const REVIEW_REASON_TRANSPORT = "census_transport (not cached)";
+
 /** The write-once read-through cache. Hit → stored row; miss → run ladder in order,
  *  classify, set needs_review, persist, return. Never throws for a geocode miss — a
  *  failed resolve is a first-class result (match_type='failed', needs_review=true), so
@@ -118,14 +140,25 @@ export async function resolveGeocode(
     matched_address: null,
     geocode_source: "none",
     needs_review: true,
-    review_reason: "no geocoder rung resolved this address",
+    review_reason: REVIEW_REASON_NO_MATCH,
   };
 
+  // A rung returns null on a COMPLETED miss (HTTP 200, no match / dataset miss) → try the
+  // next rung. A transport error is not a miss: swallow it so the page does not break, but
+  // remember it so we do not persist a sticky 'failed' when Census never answered.
+  let sawTransport = false;
   for (const rung of ladder) {
-    // A rung returns null on a miss (no match or API error) → try the next rung. This is how the
-    // ladder degrades safely: the zero-fee dataset rung (OpenAddresses parcel_centroid) →
-    // Census (range_interpolated), ending at interpolation rather than ever hard-erroring.
-    const hit = await rung.resolve(input_address, canonical_addr).catch(() => null);
+    let hit: Awaited<ReturnType<GeocoderRung["resolve"]>> = null;
+    try {
+      hit = await rung.resolve(input_address, canonical_addr);
+    } catch (e) {
+      if (isGeocodeTransportError(e) || e instanceof Error) {
+        sawTransport = true;
+        continue;
+      }
+      sawTransport = true;
+      continue;
+    }
     if (!hit) continue;
     const clears = CLEARS_REVIEW.has(hit.match_type);
     resolved = {
@@ -143,8 +176,11 @@ export async function resolveGeocode(
     break;
   }
 
-  // Persist even a failure, so the review queue captures it and we don't re-hit a dead
-  // address every refresh. Never let a cache-write error break the caller.
+  // Persist a genuine no-match so we don't re-hit a dead address every refresh. Do NOT
+  // persist a transport failure — the next call must try Census again.
+  if (resolved.match_type === "failed" && sawTransport) {
+    return { ...resolved, review_reason: REVIEW_REASON_TRANSPORT };
+  }
   await store.put({ ...resolved, provider_vintage: opts?.providerVintage }).catch(() => {});
   return resolved;
 }
@@ -162,20 +198,34 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
     source: "census_onelineaddress",
     resolve: async (input: string) => {
       const q = new URLSearchParams({ address: input, benchmark: "Public_AR_Current", format: "json" });
-      const r = await fetchFn(
-        `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`,
-        { signal: AbortSignal.timeout(15000) },
-      );
-      const data = await r.json();
+      let r: Response;
+      try {
+        r = await fetchFn(
+          `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "census fetch failed";
+        throw new GeocodeTransportError(msg);
+      }
+      if (!r.ok) {
+        throw new GeocodeTransportError(`census HTTP ${r.status}`, r.status);
+      }
+      let data: { result?: { addressMatches?: unknown[] } };
+      try {
+        data = await r.json();
+      } catch {
+        throw new GeocodeTransportError("census response was not JSON");
+      }
       const matches = data?.result?.addressMatches ?? [];
       if (!matches.length) return null;
-      const m = matches[0];
+      const m = matches[0] as { coordinates?: { x?: unknown; y?: unknown }; matchedAddress?: string };
       const c = m.coordinates;
       return {
-        lat: Number(c.y),
-        lng: Number(c.x),
+        lat: Number(c?.y),
+        lng: Number(c?.x),
         match_type: "range_interpolated" as MatchType,
-        matched_address: (m.matchedAddress as string) ?? input,
+        matched_address: m.matchedAddress ?? input,
         // Behaviour unchanged (first match, as before); the count is RECORDED so a caller that
         // must not act on an ambiguous match can see that there was more than one.
         diag: {

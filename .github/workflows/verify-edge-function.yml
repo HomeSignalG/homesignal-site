@@ -74,15 +74,21 @@ jobs:
       - name: Run geocoder helper tests (offline)
         run: |
           set -o pipefail
-          out="$(deno run "${FN_DIR}/sources/geo-input.test.ts")"
-          printf '%s\n' "$out"
-          if printf '%s\n' "$out" | grep -q '^FAIL '; then
-            echo "::error::geo-input helper tests reported failures"; exit 1
-          fi
-          if ! printf '%s\n' "$out" | grep -qE ', 0 failed$'; then
-            echo "::error::did not observe a clean test summary (', 0 failed')"; exit 1
-          fi
-          echo "geo-input helper tests passed"
+          run_helper() {
+            local file="$1" label="$2"
+            local out
+            out="$(deno run "${file}")"
+            printf '%s\n' "$out"
+            if printf '%s\n' "$out" | grep -q '^FAIL '; then
+              echo "::error::${label} helper tests reported failures"; exit 1
+            fi
+            if ! printf '%s\n' "$out" | grep -qE ', 0 failed$'; then
+              echo "::error::${label}: did not observe a clean test summary (', 0 failed')"; exit 1
+            fi
+            echo "${label} helper tests passed"
+          }
+          run_helper "${FN_DIR}/sources/geo-input.test.ts" "geo-input"
+          run_helper "${FN_DIR}/geocode-cache.test.ts" "geocode-cache"
 
       - name: Type-check the new geocoder helper (strict, must be clean)
         run: |
