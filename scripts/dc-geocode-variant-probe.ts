@@ -7,7 +7,7 @@
 // rather than a copy of its HTTP request, means a variant that matches here matches in production.
 //
 // WHAT IT DECIDES: nothing. The rewrites below are CANDIDATES, measured so a shared-policy change
-// (dc_geocodable_site_address) can be proposed on evidence. Each candidate is judged two ways:
+// (the shared geocodability policy) can be proposed on evidence. Each candidate is judged two ways:
 //   RECOVERED  failed queries it changes that then match;
 //   SAFE       control queries (ones that already match) it changes that still match within 25 m of
 //              the stored point. A candidate that moves a control is not a fix, whatever it recovers.
