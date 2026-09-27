@@ -215,9 +215,15 @@ console.log('\n9. lib/data.js carries the same distinction on its own contract')
   // 9h — the fields Map 1 classifies from (trackerSiteItem): lifecycle in bucket/type, Type in
   // use_type, name in label. Until 2026-09-27 none were set, and every pin drew as Other project /
   // Lifecycle unknown while 9g passed.
-  ok(propRes.length === 1 && propRes[0].bucket === 'proposed' && propRes[0].type === 'proposed'
-     && propRes[0].use_type === 'datacenter' && propRes[0].label === 'NTT Ashburn VA9 Data Center',
-    '9h the mapped site carries the lifecycle (bucket, type), the Type (use_type) and the name (label)');
+  const mapped = HS.map1DcSite(prop);
+  ok(mapped.bucket === 'proposed' && mapped.type === 'proposed' && mapped.use_type === 'datacenter'
+     && mapped.label === 'NTT Ashburn VA9 Data Center',
+    '9h the Map 1 site carries the lifecycle (bucket, type), the Type (use_type) and the name (label)');
+  // 9i — nationalDataCenters returns the app_projects shape the card templates read: `type` is the
+  // category again, so its factual summary is unchanged ("datacenter · proposed — NTT").
+  ok(propRes.length === 1 && propRes[0].type === 'datacenter' && propRes[0].bucket === 'proposed'
+     && propRes[0].sowhat === 'datacenter · proposed — NTT',
+    '9i nationalDataCenters keeps the app_projects shape: type is the category, the summary unchanged', propRes[0] && propRes[0].sowhat);
 }
 
 console.log('\n10. The raw table stays blocked and the approved RPC stays the only door');
