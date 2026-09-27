@@ -36,6 +36,7 @@ import type {
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
+import { buildGeocodeInput } from "./geo-input.ts";
 import {
   coverageMatches,
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
@@ -52,6 +53,9 @@ export interface CsvRegistryEntry {
   /** Human landing page; the record_url fallback when no per-row URL is derivable. */
   dataset_url: string;
   jurisdiction: string;
+  /** OPT-IN: assemble a COMPLETE one-line address before geocoding instead of sending the
+   *  bare address column. Absent/false ⇒ prior behavior. */
+  geocode_assemble?: boolean;
   coverage: { state: string; county?: string }[];
   column_map: ColumnMap;
   type_map?: Record<string, string>;
@@ -296,14 +300,17 @@ async function normalizeRow(
   if (lat != null && lng != null) {
     geoPrecision = "point"; scope = "point";
   } else if (address && deps.geocode) {
-    const g = await deps.geocode(address);
-    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
+    const gi = entry.geocode_assemble
+      ? buildGeocodeInput({ rawAddress: address, jurisdiction: entry.jurisdiction, state: entry.coverage[0]?.state, zipColValue: valOrNull(readCol(row, cm.zip)), reportZip })
+      : { input: address, filedZip: filedZipOf(readCol(row, cm.zip), reportZip) };
+    const g = await deps.geocode(gi.input);
+    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: gi.input }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
       // GEOFENCE (anti-fabrication) — the shared implementation, identical across all five
       // connectors. Census range-interpolation can match the same street name in another
       // city/state. A miss NULLS the coords — the record stays listed as an area item, the
       // untrusted marker is never rendered. Source-supplied coords are NEVER fenced.
-      const verdict = fenceGeocode(g, filedZipOf(readCol(row, cm.zip), reportZip), deps.zipCentroid);
+      const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
       if (!verdict.ok) {
         report.geocode_failures++;
         report.quarantined.push({ reason: verdict.reason, sample: address });

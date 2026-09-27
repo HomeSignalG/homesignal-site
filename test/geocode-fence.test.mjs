@@ -152,5 +152,26 @@ for (const f of files) {
 ok(geocoders === 5, `GUARD: all 5 geocoding connectors were actually checked (found ${geocoders})`,
   'if this drops, a connector stopped geocoding or the file list changed — re-read before trusting a green run');
 
+// ── assemble opt-in: flagged entries send a complete one-liner, not the bare street ──
+{
+  const seen = [];
+  const geocode = async (a) => { seen.push(a); return GOOD; };
+  const cityEntry = {
+    jurisdiction: 'City of Pittsburgh',
+    coverage: COVER_PA,
+    type_map: { PAA: 'Development' },
+    status_to_bucket: { approved: ['Active - Issued'] },
+    geocode_assemble: true,
+    column_map: CM,
+  };
+  const r = await ckanForZip('15202', COVER_PA, [{
+    ...cityEntry, registry_id: 'assemble-ckan', platform: 'ckan',
+    base_url: 'https://data.wprdc.org', resource_id: 'r1', dataset_url: 'https://data.wprdc.org/dataset/x',
+  }], { fetch: jsonFetch({ success: true, result: { records: [ROW] } }), geocode, zipCentroid: PGH });
+  ok(seen[0] === '294 UNION AVENUE, Pittsburgh, PA 15202',
+    'ckan geocode_assemble sends city+state+zip', `sent=${seen[0]}`);
+  ok(r.sites[0]?.lat === GOOD.lat, 'ckan assemble still places a correct match');
+}
+
 console.log(fails === 0 ? '\nAll geocode-fence assertions passed.' : `\n${fails} geocode-fence assertion(s) FAILED.`);
 process.exit(fails === 0 ? 0 : 1);

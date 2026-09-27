@@ -47,6 +47,21 @@ const _STATES = new Set([
   "OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
 ]);
 
+const _STATE_NAMES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+  "Virginia","Washington","West Virginia","Wisconsin","Wyoming","District of Columbia",
+];
+const _TRAILING_STATE = new RegExp(`,\\s*(?:${_STATE_NAMES.join("|")})\\s*$`, "i");
+
+function stripTrailingStateName(name: string): string {
+  return name.replace(_TRAILING_STATE, "").trim();
+}
+
 function trailingZip(s: string): string | null {
   const m = s.match(_ZIP5_TRAILING);
   return m ? m[1] : null;
@@ -61,11 +76,14 @@ export function cityFromJurisdiction(j?: string | null): string | null {
   const s = (j || "").trim();
   if (!s) return null;
   const cityOf = s.match(/^(?:City|Town|Village|Borough|Township)\s+of\s+(.+)$/i);
-  if (cityOf) return cityOf[1].trim();
+  if (cityOf) return stripTrailingStateName(cityOf[1].trim());
+  // "Louisville Metro, Kentucky" is a city-equivalent, not a multi-city county.
+  const metro = s.match(/^(.+?)\s+Metro(?:,\s*.+)?$/i);
+  if (metro && !/\b(county|parish)\b/i.test(s)) return stripTrailingStateName(metro[1].trim());
   // county / district / authority / parenthetical vendor tags → not a city
   if (/\b(county|parish|borough|district|authority|region|metro)\b/i.test(s)) return null;
   if (/[()]/.test(s)) return null;
-  return s;   // a bare place name ("Fort Worth", "Anaheim")
+  return stripTrailingStateName(s);   // a bare place name ("Fort Worth", "Anaheim")
 }
 
 /** Does the address already END with a "<ST> <ZIP>" (an already-complete one-line address,
