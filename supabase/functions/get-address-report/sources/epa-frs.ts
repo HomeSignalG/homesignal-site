@@ -135,11 +135,10 @@ export async function frsAt(
     const r = await fetchImpl(`${FRS_ENDPOINT}?${q}`, {
       signal: AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs))),
     });
-    // 5xx AND 429: a rate-limit is a refusal to answer, not an answer of zero. Observed live
-    // 2026-08-13 — the atlanta-dense health probe took a 429 while rural took a 200.
-    if (r.status >= 500 || r.status === 429) return TRANSIENT;
-    // Any other non-2xx is likewise not an answer. A 404/403 must not read as "no facilities".
-    if (r.status < 200 || r.status >= 300) return TRANSIENT;
+    // Probe and ingest now agree: only HTTP 200 is an answer. A 204 / other 2xx used to
+    // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
+    // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
+    if (r.status !== 200) return TRANSIENT;
     const text = await r.text();
     // Escape any backslash that isn't a valid JSON escape so JSON.parse survives FRS payloads.
     const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\"));

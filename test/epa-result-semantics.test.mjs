@@ -126,6 +126,13 @@ function recorder(handler) {
     ok(out.ok === false, `5d. HTTP ${code} → ok:FALSE (a non-2xx is not "no facilities")`);
   }
 }
+{
+  // Probe requires HTTP 200. A 204 used to be "2xx → parse empty → silent zero".
+  const f = recorder(() => res(204, ''));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'transient',
+    '5e. HTTP 204 → ok:FALSE (only 200 is an answer; aligns with the probe)');
+}
 
 // ── 6. malformed / unparseable payload → NOT a zero ───────────────────────────────────────────
 {

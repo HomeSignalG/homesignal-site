@@ -3273,6 +3273,23 @@ passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would re
 - The engine now emits `pre_cap` (product-filtered count before `MAX_FACILITIES=40`) so a ZIP at
   exactly 40 can be told apart from a cap-hit after the next deploy.
 
+### ✅ EPA PROBE HARVEST MATCHES THE INGEST ENVELOPE (2026-09-27) — PARKED
+SQL of record: **`docs/epa-frs-probe-schema-align.sql`**, a CREATE OR REPLACE of
+`epa_frs_probe_tick` only. Pinned by `test/epa-probe-schema-align.test.mjs`. **Not applied.**
+`docs/epa-frs-probe-migration.sql` remains the table + original function + cron; do not
+re-apply it after this file or the loose `"Results" and not "Error"` harvest returns.
+- 🔑 **`{"Results":{}}` IS NOT HEALTHY.** The live probe called a body ok on HTTP 200 + the
+  text `"Results"` + no `"Error"`. Ingest used to accept any 2xx and any parseable JSON.
+  Both treated an empty Results object as a successful answer. The engine now schema-fails
+  that shape; this file makes the probe fail it too. `ok` requires HTTP 200 AND `"Results"`
+  AND (`"FRSFacility"` OR `"Facilities"`) AND no `"Error"`. Still text-matched, never
+  jsonb-cast (FRS unescaped backslashes).
+- Official FRS wraps in Results. A bare `{FRSFacility:[…]}` still counts as retrieval on
+  ingest and still fails the probe. That split is deliberate: the probe asks the official
+  envelope; ingest accepts the list it can use.
+- Ingest `frsAt` now treats any status other than 200 as transient (was any non-2xx). A 204
+  used to fall through to parse and become a schema miss or, before that, a silent zero.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
