@@ -20,6 +20,7 @@ Canonical audit blob `docs/corporate-output-source-rights-audit-2026-09-27.md` i
 | OpenAddresses `national_address_points` | Unchanged: **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | **HOLD**. Not in the allowlist. |
 | TIGER/Line 2025 ZCTA as official ZIP or proximity | Unchanged | **HOLD**. Not in the allowlist. |
 | NYC Geoclient / Geosupport API | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | **HOLD**. Registration and app keys are a different instrument from the published AddressPoint table. |
+| AddressPoint ArcGIS FeatureServer / nycmaps-nyc hub | **HOLD — TERMS/RIGHTS NOT ESTABLISHED** | **HOLD**. Different distribution from the Socrata view. |
 | Property Address Directory `bc8t-ecyu` | Not classified | Not used. |
 
 Nothing in this file is **CLEARED FOR PAID REPORT** as a national product stamp. The NYC V1 allowlist is the first configuration that can be assembled entirely from cleared publisher data and cleared geography.
@@ -46,11 +47,17 @@ Fetched 2026-09-27 from `https://data.cityofnewyork.us/api/views/uf93-f8nk.json`
 - no `licenseId` field
 - description: "Address points were developed to supplement the address information supplied by the CSCL centerline."
 - `the_geom` is a point column; cached non-null count 967,871; cached null count 0
+- `rights` is `['read']` — the Socrata public-audience flag. It is not a license. The two DOB views carry the same flag.
 - other published fields include `addresspointid`, `house_number`, `house_number_suffix`, `street_name`, `full_street_name`, `zipcode`, `boroughcode`, `bin`, `address_status`
+- match keys on this date: `house_number`, `street_name`, `full_street_name`, and `boroughcode` each have 967,871 non-null values; `zipcode` has 4 nulls
+
+The cleared fetch path is this NYC Open Data view, `https://data.cityofnewyork.us/api/views/uf93-f8nk.json` and its SODA table `https://data.cityofnewyork.us/resource/uf93-f8nk.json`. It is not the ArcGIS FeatureServer named in OpenAddresses, and it is not `https://nycmaps-nyc.hub.arcgis.com/datasets/nyc::address-point/about` (linked from the view description). Those two distributions stay **HOLD**.
 
 The older OpenAddresses path `g6pj-hd8k` ("NYC Address Points") returned HTTP 404 on this date. Current OpenAddresses `sources/us/ny/city_of_new_york.json` now names this view: website `https://data.cityofnewyork.us/City-Government/AddressPoint/uf93-f8nk`, data `https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/AddressPoint_view/FeatureServer/0`. That JSON is CC0 source metadata. It is not a relicense of the points. HomeSignal's loaded `national_address_points` table is still the 8,545 Texas rows recorded earlier. Those rows are not this view.
 
 PAD `bc8t-ecyu` was fetched the same day. It is a DCP file blob (`pad.zip`), not the point table used here. It is not classified.
+
+A buyer-supplied "1 Centre Street" matches a published point on this date: `addresspointid` 1001387, `house_number` 1, `street_name` CENTRE, `full_street_name` CENTRE ST, `zipcode` 10007, `boroughcode` 1, `the_geom` `[-74.003758107366, 40.712980288068]`. That is a field match. It is not a Geoclient call.
 
 ## The statute
 
@@ -59,6 +66,8 @@ This is the same instrument #1410 applied to the two DOB views. AddressPoint is 
 Local Law 11 of 2012, Administrative Code § 23-502(d):
 
 "Such public data sets shall be made available without any registration requirement, license requirement or restrictions on their use provided that the department may require a third party providing to the public any public data set, or application utilizing such data set, to explicitly identify the source and version of the public data set, and a description of any modifications made to such public data set."
+
+§ 23-501(b) defines data and says the term "shall include geographic information system data." AddressPoint `the_geom` is that class. The same sentence excludes image files (designs, drawings, maps, photos). This table is a point dataset, not a scanned map.
 
 § 23-501(g) defines a public data set and excludes withheld portions, deliberative material, and "materials subject to copyright, patent, trademark, confidentiality agreements or trade secret protection."
 
@@ -113,6 +122,7 @@ It may not contain:
 - OpenAddresses `national_address_points`
 - ZCTA / TIGER/Line membership as official ZIP or proximity
 - NYC Geoclient or Geosupport API output
+- the ArcGIS AddressPoint FeatureServer or the nycmaps-nyc hub page
 - EPA FRS / ECHO, TCEQ, TDLR/TABS
 - any other `jurisdiction-registry.json` entry
 - Compute Atlas, OpenStreetMap, or Epoch placement
@@ -120,6 +130,18 @@ It may not contain:
 - scores, outlooks, Quality of Life scoring, predictive `sowhat` prose, or "Effect at this address"
 
 NWS alert text remains **CLEARED WITH ATTRIBUTION** as national attributed text. It is not in this property-proximity allowlist.
+
+## Usefulness of this market
+
+Live SODA counts, 2026-09-27:
+
+| Dataset | Published rows | Rows with publisher coordinates | Allowlisted type and coordinates |
+|---|---|---|---|
+| AddressPoint `uf93-f8nk` | 967,871 | 967,871 (`the_geom` nulls: 0) | n/a — this is the property coordinate |
+| `nyc-dob-permit-issuance` `ipu4-2q9a` | 3,990,687 | 3,983,266 | 754,011 (`permit_type` in NB/DM/AL/FO) |
+| `nyc-dobnow-approved-permits` `rbx6-tga4` | 1,006,422 | 999,963 | 316,643 (`work_type` in General Construction, Structural, Foundation, Earth Work, Full Demolition) |
+
+A first paid report that answers what Department of Buildings activity is changing around a New York City property can be built from those counts without Census, OpenAddresses, ZCTA, Atlas, OSM, Local News, or any other registry entry.
 
 ## What this does not do
 
