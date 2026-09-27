@@ -5,6 +5,8 @@
 // Run under Deno (CI) OR Node 22: `node --experimental-strip-types geocode-cache.test.ts`.
 import {
   censusRung,
+  FAILED_RETRY_TTL_MS,
+  failedRowIsFresh,
   GeocodeTransportError,
   resolveGeocode,
   REVIEW_REASON_NO_MATCH,
@@ -25,14 +27,21 @@ function ok(name: string, cond: boolean, detail?: string) {
   else { fail++; console.log(`FAIL ${name}${detail ? `\n     ${detail}` : ""}`); }
 }
 
-function memStore(seed?: GeocodeResult): GeocodeStore & { rows: Map<string, GeocodeResult>; puts: number } {
+function memStore(seed?: GeocodeResult): GeocodeStore & { rows: Map<string, GeocodeResult>; puts: number; touches: number } {
   const rows = new Map<string, GeocodeResult>();
   if (seed) rows.set(seed.canonical_addr, seed);
   const store = {
     rows,
     puts: 0,
+    touches: 0,
     get: async (k: string) => rows.get(k) ?? null,
-    put: async (row: GeocodeResult) => { store.puts++; rows.set(row.canonical_addr, row); },
+    put: async (row: GeocodeResult) => { store.puts++; rows.set(row.canonical_addr, { ...row, updated_at: new Date().toISOString() }); },
+    touchFailed: async (k: string) => {
+      const row = rows.get(k);
+      if (!row || row.match_type !== "failed") return;
+      store.touches++;
+      rows.set(k, { ...row, updated_at: new Date().toISOString() });
+    },
   };
   return store;
 }
@@ -137,13 +146,109 @@ const missRung = (source: string): GeocoderRung => ({
     geocode_source: "none",
     needs_review: true,
     review_reason: REVIEW_REASON_NO_MATCH,
+    updated_at: new Date().toISOString(),
   };
   const store = memStore(cached);
   let calls = 0;
   const census: GeocoderRung = { source: "census_onelineaddress", resolve: async () => { calls++; return null; } };
   const r = await resolveGeocode(store, "1 MAIN ST", "1 MAIN ST", [census]);
-  eq("resolve.cached_failed_still_returned", r.match_type, "failed");
-  eq("resolve.cached_failed_no_rung_yet", calls, 0);
+  eq("resolve.fresh_failed_still_returned", r.match_type, "failed");
+  eq("resolve.fresh_failed_no_rung", calls, 0);
+}
+{
+  const staleIso = new Date(Date.now() - FAILED_RETRY_TTL_MS - 1000).toISOString();
+  const cached: GeocodeResult = {
+    canonical_addr: "1 MAIN ST",
+    input_address: "1 MAIN ST",
+    lat: null,
+    lng: null,
+    match_type: "failed",
+    matched_address: null,
+    geocode_source: "none",
+    needs_review: true,
+    review_reason: REVIEW_REASON_NO_MATCH,
+    updated_at: staleIso,
+  };
+  const store = memStore(cached);
+  let calls = 0;
+  const census: GeocoderRung = {
+    source: "census_onelineaddress",
+    resolve: async () => {
+      calls++;
+      return { lat: 40.2, lng: -83.2, match_type: "range_interpolated", matched_address: "1 MAIN ST, OH" };
+    },
+  };
+  const r = await resolveGeocode(store, "1 MAIN ST", "1 MAIN ST", [census]);
+  eq("resolve.stale_failed_retries", calls, 1);
+  eq("resolve.stale_failed_upgrades", r.match_type, "range_interpolated");
+  eq("resolve.stale_failed_lat", r.lat, 40.2);
+}
+{
+  const staleIso = new Date(Date.now() - FAILED_RETRY_TTL_MS - 1000).toISOString();
+  const cached: GeocodeResult = {
+    canonical_addr: "DEAD END",
+    input_address: "DEAD END",
+    lat: null,
+    lng: null,
+    match_type: "failed",
+    matched_address: null,
+    geocode_source: "none",
+    needs_review: true,
+    review_reason: REVIEW_REASON_NO_MATCH,
+    updated_at: staleIso,
+  };
+  const store = memStore(cached);
+  let calls = 0;
+  const census: GeocoderRung = { source: "census_onelineaddress", resolve: async () => { calls++; return null; } };
+  await resolveGeocode(store, "DEAD END", "DEAD END", [census]);
+  eq("resolve.stale_nomatch_retried", calls, 1);
+  ok("resolve.stale_nomatch_touched", store.touches >= 1, `touches=${store.touches}`);
+  const after = store.rows.get("DEAD END");
+  ok("resolve.stale_nomatch_fresh_again", !!after && failedRowIsFresh(after), after?.updated_at);
+  calls = 0;
+  await resolveGeocode(store, "DEAD END", "DEAD END", [census]);
+  eq("resolve.touched_failed_skips_next", calls, 0);
+}
+{
+  const staleIso = new Date(Date.now() - FAILED_RETRY_TTL_MS - 1000).toISOString();
+  const cached: GeocodeResult = {
+    canonical_addr: "1 MAIN ST",
+    input_address: "1 MAIN ST",
+    lat: null,
+    lng: null,
+    match_type: "failed",
+    matched_address: null,
+    geocode_source: "none",
+    needs_review: true,
+    review_reason: REVIEW_REASON_NO_MATCH,
+    updated_at: staleIso,
+  };
+  const store = memStore(cached);
+  const census: GeocoderRung = {
+    source: "census_onelineaddress",
+    resolve: async () => { throw new GeocodeTransportError("timeout"); },
+  };
+  const r = await resolveGeocode(store, "1 MAIN ST", "1 MAIN ST", [census]);
+  eq("resolve.stale_transport_reason", r.review_reason, REVIEW_REASON_TRANSPORT);
+  ok("resolve.stale_transport_touches", store.touches >= 1, `touches=${store.touches}`);
+}
+{
+  const now = Date.parse("2026-09-27T22:00:00Z");
+  ok("ttl.fresh_failed", failedRowIsFresh({
+    canonical_addr: "x", input_address: "x", lat: null, lng: null, match_type: "failed",
+    matched_address: null, geocode_source: "none", needs_review: true, review_reason: "census_no_match",
+    updated_at: "2026-09-27T21:00:00Z",
+  }, now));
+  ok("ttl.stale_failed", !failedRowIsFresh({
+    canonical_addr: "x", input_address: "x", lat: null, lng: null, match_type: "failed",
+    matched_address: null, geocode_source: "none", needs_review: true, review_reason: "census_no_match",
+    updated_at: "2026-09-01T22:00:00Z",
+  }, now));
+  ok("ttl.success_always_fresh", failedRowIsFresh({
+    canonical_addr: "x", input_address: "x", lat: 1, lng: 2, match_type: "range_interpolated",
+    matched_address: "x", geocode_source: "census_onelineaddress", needs_review: true, review_reason: null,
+    updated_at: "2026-01-01T00:00:00Z",
+  }, now));
 }
 {
   const store = memStore();

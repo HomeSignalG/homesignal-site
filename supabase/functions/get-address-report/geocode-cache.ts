@@ -58,6 +58,11 @@ export interface GeocodeResult {
   geocode_source: string;
   needs_review: boolean;
   review_reason: string | null;
+  // Last write / last TTL retry. Used to decide whether a cached 'failed' row is
+  // still fresh. Absent on older callers and on in-memory results that never read
+  // the table.
+  geocoded_at?: string;
+  updated_at?: string;
   // Provider diagnostics for callers that must record provenance (the data-centre derived-
   // location batch). NEVER persisted by supabaseStore -- public.geocodes' contract is unchanged
   // -- and absent on a cache hit, because the cache stores no provider response.
@@ -87,6 +92,23 @@ export interface GeocoderRung {
 export interface GeocodeStore {
   get: (canonical_addr: string) => Promise<GeocodeResult | null>;
   put: (row: GeocodeResult & { provider_vintage?: string }) => Promise<void>;
+  /** Bump updated_at on a failed row. Needed because upsert_geocode_if_better will
+   *  not overwrite failed→failed (equal rank), so a TTL retry that still misses
+   *  (or hits transport) would otherwise re-query Census on every refresh. */
+  touchFailed?: (canonical_addr: string) => Promise<void>;
+}
+
+/** Cached failures older than this are retried. Fresh failures stay cached so a
+ *  genuine no-match is not re-sent to Census on every report refresh. */
+export const FAILED_RETRY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function failedRowIsFresh(row: GeocodeResult, nowMs = Date.now()): boolean {
+  if (row.match_type !== "failed") return true;
+  const raw = row.updated_at || row.geocoded_at;
+  if (!raw) return false;
+  const t = Date.parse(raw);
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t < FAILED_RETRY_TTL_MS;
 }
 
 /** A geocoder transport failure (timeout, HTTP 5xx/4xx, non-JSON body). Distinct from a
@@ -128,7 +150,7 @@ export async function resolveGeocode(
   // downgrade, and there is no delete/refresh gap where the row goes missing.
   if (!opts?.forceRefresh) {
     const cached = await store.get(canonical_addr).catch(() => null);
-    if (cached) return cached;
+    if (cached && failedRowIsFresh(cached)) return cached;
   }
 
   let resolved: GeocodeResult = {
@@ -177,11 +199,17 @@ export async function resolveGeocode(
   }
 
   // Persist a genuine no-match so we don't re-hit a dead address every refresh. Do NOT
-  // persist a transport failure — the next call must try Census again.
+  // persist a transport failure as a new 'failed' — that would look like a no-match.
+  // If this call skipped a stale cached failure, touch it so a down Census is not
+  // re-queried on the next refresh.
   if (resolved.match_type === "failed" && sawTransport) {
+    await store.touchFailed?.(canonical_addr).catch(() => {});
     return { ...resolved, review_reason: REVIEW_REASON_TRANSPORT };
   }
   await store.put({ ...resolved, provider_vintage: opts?.providerVintage }).catch(() => {});
+  if (resolved.match_type === "failed") {
+    await store.touchFailed?.(canonical_addr).catch(() => {});
+  }
   return resolved;
 }
 
@@ -274,11 +302,15 @@ export function productionLadder(supabase: any, fetchFn: typeof fetch): Geocoder
 // deno-lint-ignore no-explicit-any
 export function supabaseStore(supabase: any): GeocodeStore {
   const COLS =
-    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason";
+    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason,geocoded_at,updated_at";
   return {
     get: async (canonical_addr: string) => {
       const { data } = await supabase.from("geocodes").select(COLS).eq("canonical_addr", canonical_addr).maybeSingle();
       return (data as GeocodeResult) ?? null;
+    },
+    touchFailed: async (canonical_addr: string) => {
+      await supabase.from("geocodes").update({ updated_at: new Date().toISOString() })
+        .eq("canonical_addr", canonical_addr).eq("match_type", "failed");
     },
     put: async (row) => {
       // THE IMPROVEMENT GUARD lives in SQL: upsert_geocode_if_better() inserts a new address,
