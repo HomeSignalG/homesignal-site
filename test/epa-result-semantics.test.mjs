@@ -139,12 +139,44 @@ function recorder(handler) {
   ok(out.ok === false, '6b. empty body → ok:FALSE');
 }
 {
-  // Unexpected schema: valid JSON, no Results envelope. Parsed fine, so retrieval SUCCEEDED and
-  // the row list is genuinely empty — an authoritative zero. Pinned so the behaviour is deliberate.
+  // Unexpected schema: valid JSON, no recognized FRS envelope. Parsed is not "answered".
+  // The 2026-09-27 audit measured this as SILENT-ZERO SCHEMA RISK (test 6c used to accept it).
   const f = recorder(() => res(200, JSON.stringify({ SomethingElse: true })));
   const out = await frsFacilities(41.5, -112.0, 3, f);
-  ok(out.ok === true && out.rows.length === 0,
-    '6c. valid JSON with no Results envelope → ok:true, 0 rows (parsed; deliberate)');
+  ok(out.ok === false && out.reason === 'schema' && out.rows.length === 0,
+    '6c. valid JSON with no Results envelope → ok:FALSE, reason:schema (not a zero)');
+}
+
+const SCHEMA_BODIES = [
+  ['empty object', '{}'],
+  ['Results empty object', JSON.stringify({ Results: {} })],
+  ['Results unexpected key', JSON.stringify({ Results: { Unexpected: [] } })],
+  ['JSON null', 'null'],
+  ['JSON array', '[]'],
+  ['JSON string', '"text"'],
+  ['FRSFacility object not array', JSON.stringify({ Results: { FRSFacility: { RegistryId: '1' } } })],
+  ['FRSFacility null', JSON.stringify({ Results: { FRSFacility: null } })],
+];
+for (const [label, text] of SCHEMA_BODIES) {
+  const f = recorder(() => res(200, text));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'schema' && out.rows.length === 0 && out.radius_used === null,
+    `6c+. ${label} → ok:FALSE, reason:schema (audit silent-zero matrix)`);
+}
+{
+  // A recognized empty list is still an AUTHORITATIVE zero — do not over-correct.
+  const f = recorder(() => res(200, JSON.stringify({ Results: { FRSFacility: [] } })));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 0 && out.radius_used === 3,
+    '6c++. Results.FRSFacility=[] is the recognized empty answer → ok:true, authoritative zero');
+}
+{
+  // Schema miss is not retried (same body) and does not shrink the circle.
+  const f = recorder(() => res(200, '{}'));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.attempts === 1 && f.seen.join(',') === '3',
+    '6c+++. schema miss: one attempt at the requested radius, then stop',
+    `attempts=${out.attempts} seen=${f.seen.join(',')}`);
 }
 {
   // The v13 defect: FRS emits invalid JSON escapes. The repair runs BEFORE parse, so this must

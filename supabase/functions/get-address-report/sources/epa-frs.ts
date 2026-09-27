@@ -18,7 +18,11 @@
 // an authoritative zero.
 //
 // The fix is to REPORT what happened instead of inferring it: every retrieval returns an outcome
-// carrying `ok`, so a zero is authoritative only when `ok` is true.
+// carrying `ok`, so a zero is authoritative only when `ok` is true. `ok` further requires a
+// RECOGNIZED FRS envelope — parsed JSON that is not `{ Results: { FRSFacility|Facilities: [] } }`
+// (or a process-limit Error, or a bare FRSFacility array) is `ok:false, reason:"schema"`.
+// The 2026-09-27 audit measured `{}`, `{"Results":{}}`, scalars and a non-array FRSFacility
+// all coming back as `ok:true, rows=0` (SILENT-ZERO SCHEMA RISK).
 //
 // THE DISTINCTION THIS MODULE EXISTS TO PRESERVE — four outcomes, never conflated:
 //   ok:true  + rows>0            → EPA answered, facilities found.
@@ -45,18 +49,24 @@
 // read preserves the stored facility layer and renders the count UNKNOWN, exactly like a 429.
 // `reason:"deadline"` is observability only; nothing switches on it.
 
-/** One attempt at one radius. `tooBig` = FRS's process-limit refusal (shrink; retrying is futile). */
-export type FrsAttempt = { ok: boolean; tooBig: boolean; rows: Record<string, unknown>[] };
+/** One attempt at one radius. `tooBig` = FRS's process-limit refusal (shrink; retrying is futile).
+ *  `schema` = HTTP 2xx JSON that is not a recognized FRS envelope. Not a zero; do not retry. */
+export type FrsAttempt = {
+  ok: boolean;
+  tooBig: boolean;
+  schema: boolean;
+  rows: Record<string, unknown>[];
+};
 
 /** The result of the whole back-off sequence. `ok:false` must NEVER be persisted as zero. */
 export type FrsOutcome = {
-  /** true = FRS answered and the payload parsed. Only then is `rows.length === 0` authoritative. */
+  /** true = FRS answered AND the payload is a recognized FRS envelope. Only then is `rows.length === 0` authoritative. */
   ok: boolean;
   rows: Record<string, unknown>[];
   /** the radius that actually answered; null when nothing did */
   radius_used: number | null;
   /** null on success; else why the sequence gave up — for logs and for the cache guard */
-  reason: "process_limit" | "transient" | "deadline" | null;
+  reason: "process_limit" | "transient" | "deadline" | "schema" | null;
   /** how many HTTP attempts were made (observability: a 1 means it worked first try) */
   attempts: number;
 };
@@ -75,6 +85,37 @@ export function frsRadii(radiusMi: number): number[] {
 }
 
 type FetchLike = (input: string, init?: unknown) => Promise<Response>;
+
+const TRANSIENT: FrsAttempt = { ok: false, tooBig: false, schema: false, rows: [] };
+const SCHEMA: FrsAttempt = { ok: false, tooBig: false, schema: true, rows: [] };
+const TOO_BIG: FrsAttempt = { ok: false, tooBig: true, schema: false, rows: [] };
+
+/**
+ * A recognized FRS envelope is one of:
+ *   { Results: { FRSFacility: <array> } }
+ *   { Results: { Facilities: <array> } }
+ *   { Results: { Error: … } }          — process-limit refusal, not a zero
+ *   { FRSFacility: <array> }           — bare list, no Results wrapper
+ * Anything else that parsed — `{}`, `{"Results":{}}`, a scalar, an array, FRSFacility
+ * as an object/null — is NOT an answer. The 2026-09-27 audit measured those as
+ * `ok:true, rows=0` (SILENT-ZERO SCHEMA RISK). Test 6c used to pin that as deliberate.
+ */
+export function recognizedFrsPayload(data: unknown): FrsAttempt {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return SCHEMA;
+  const obj = data as Record<string, unknown>;
+  const res = obj.Results;
+  if (res && typeof res === "object" && !Array.isArray(res)) {
+    const r = res as Record<string, unknown>;
+    if (r.Error) return TOO_BIG;
+    const list = r.FRSFacility ?? r.Facilities;
+    if (Array.isArray(list)) return { ok: true, tooBig: false, schema: false, rows: list };
+    return SCHEMA;
+  }
+  if (Array.isArray(obj.FRSFacility)) {
+    return { ok: true, tooBig: false, schema: false, rows: obj.FRSFacility as Record<string, unknown>[] };
+  }
+  return SCHEMA;
+}
 
 // One FRS query at a fixed radius; tooBig = FRS process-limit refusal (shrink), transient = retry.
 export async function frsAt(
@@ -96,21 +137,15 @@ export async function frsAt(
     });
     // 5xx AND 429: a rate-limit is a refusal to answer, not an answer of zero. Observed live
     // 2026-08-13 — the atlanta-dense health probe took a 429 while rural took a 200.
-    if (r.status >= 500 || r.status === 429) return { ok: false, tooBig: false, rows: [] };
+    if (r.status >= 500 || r.status === 429) return TRANSIENT;
     // Any other non-2xx is likewise not an answer. A 404/403 must not read as "no facilities".
-    if (r.status < 200 || r.status >= 300) return { ok: false, tooBig: false, rows: [] };
+    if (r.status < 200 || r.status >= 300) return TRANSIENT;
     const text = await r.text();
     // Escape any backslash that isn't a valid JSON escape so JSON.parse survives FRS payloads.
-    const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")) as Record<string, unknown>;
-    const res = data?.Results as Record<string, unknown> | undefined;
-    if (res?.Error) return { ok: false, tooBig: true, rows: [] };          // process-limit refusal
-    const rows = (res?.FRSFacility ?? res?.Facilities ?? data?.FRSFacility ?? []) as Record<
-      string,
-      unknown
-    >[];
-    return { ok: true, tooBig: false, rows: Array.isArray(rows) ? rows : [] };
+    const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\"));
+    return recognizedFrsPayload(data);
   } catch (_e) {
-    return { ok: false, tooBig: false, rows: [] };                          // network/parse → transient
+    return TRANSIENT;                          // network/parse → transient
   }
 }
 
@@ -132,7 +167,7 @@ export async function frsFacilities(
 ): Promise<FrsOutcome> {
   const now = opts.now ?? (() => Date.now());
   const deadlineAt = opts.deadlineAt;
-  let reason: "process_limit" | "transient" | "deadline" | null = null;
+  let reason: "process_limit" | "transient" | "deadline" | "schema" | null = null;
   let attempts = 0;
   for (const rad of frsRadii(radiusMi)) {
     let transientExhausted = false;
@@ -153,8 +188,12 @@ export async function frsFacilities(
         timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
       }
       attempts++;
-      const { ok, tooBig, rows } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
+      const { ok, tooBig, schema, rows } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
       if (ok) return { ok: true, rows, radius_used: rad, reason: null, attempts };
+      if (schema) {
+        // Same body will come back on retry. Not a zero, not a reason to shrink the circle.
+        return { ok: false, rows: [], radius_used: null, reason: "schema", attempts };
+      }
       if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
       reason = "transient";                            // else transient → retry the same radius
       transientExhausted = attempt === 2;              // ...but only at THIS radius (see below)
