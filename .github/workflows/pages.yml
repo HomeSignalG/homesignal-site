@@ -132,10 +132,16 @@ jobs:
             echo "ERROR: could not fetch the published Rule D plane — refusing to treat Rule D as empty"
             exit 1
           fi
+          CURL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-cities.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$CURL" -o data/development_seo_cities.json; then
+            echo "ERROR: could not fetch the published city pages' data — refusing to drop city pages"
+            exit 1
+          fi
           python3 - <<'PY'
           import json, sys
           from datetime import datetime, timezone
           p = json.load(open("data/development_seo_plane.json"))
+          c = json.load(open("data/development_seo_cities.json"))
           if p.get("identity") != "base_project_key":
               sys.exit("ERROR: fetched plane identity is not base_project_key")
           raw = p.get("generated_at") or ""
@@ -146,11 +152,13 @@ jobs:
           age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
           if age > 36:
               sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > 36h)")
-          if not isinstance(p.get("cities"), dict):
-              sys.exit("ERROR: fetched plane has no cities section — refusing to drop city pages")
+          if not isinstance(c.get("cities"), dict):
+              sys.exit("ERROR: fetched city data has no cities object — refusing to drop city pages")
+          if c.get("generated_at") != raw:
+              sys.exit(f"ERROR: city data is from run {c.get('generated_at')}, plane from {raw}")
           print("fetched Rule D plane generated_at", raw, "age_h", round(age, 2),
                 "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"),
-                "city_n", len(p["cities"]))
+                "city_n", len(c["cities"]))
           PY
 
       - name: Generate one document per canonical ZIP

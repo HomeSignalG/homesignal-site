@@ -218,7 +218,33 @@ def _plane_age_hours(generated_at, now=None):
     return (now - stamp.astimezone(timezone.utc)).total_seconds() / 3600.0
 
 
-def load_dev_plane(path, *, required=True, now=None, cities_out=None):
+def _merge_cities_doc(path, cities_path, required):
+    """City pages' data is published as its own object (ingest: seo/development-seo-cities.json)
+    because one object would sit near the bucket's size cap. It belongs to exactly one plane:
+    a cities document from another run is refused, never mixed in. Returns the path to read."""
+    if not cities_path or not os.path.isfile(cities_path):
+        if required and cities_path:
+            sys.exit("ERROR: city pages' data file missing — refusing to silently drop every "
+                     "city page")
+        return path, None
+    with open(path, encoding="utf-8") as fh:
+        plane = json.load(fh)
+    with open(cities_path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    if (doc.get("generated_at") != plane.get("generated_at")
+            or doc.get("identity") != plane.get("identity")):
+        sys.exit(f"ERROR: city data generated_at {doc.get('generated_at')!r} does not match the "
+                 f"plane's {plane.get('generated_at')!r} — refusing to mix two runs")
+    if not isinstance(doc.get("cities"), dict):
+        sys.exit("ERROR: city data has no cities object")
+    plane["cities"] = doc["cities"]
+    fd, merged = tempfile.mkstemp(prefix="dev_seo_plane_merged_", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(plane, fh)
+    return merged, merged
+
+
+def load_dev_plane(path, *, required=True, now=None, cities_out=None, cities_path=None):
     """Read the compact Development SEO plane.
 
     Production (required=True): a missing, unreadable, unstamped or stale plane
@@ -235,7 +261,12 @@ def load_dev_plane(path, *, required=True, now=None, cities_out=None):
             sys.exit("ERROR: Rule D plane missing — refusing to silently drop "
                      "Development indexability")
         return {}
-    annotated = annotate_dev_plane(path)
+    src, merged = _merge_cities_doc(path, cities_path, required)
+    try:
+        annotated = annotate_dev_plane(src)
+    finally:
+        if merged:
+            os.remove(merged)
     try:
         with open(annotated, encoding="utf-8") as fh:
             raw = json.load(fh)
@@ -968,6 +999,10 @@ def main():
     ap.add_argument("--dev-plane", default=None,
                     help="compact Development SEO plane JSON (Rule D). "
                          "Production: missing/stale is a hard error.")
+    ap.add_argument("--dev-cities", default=None,
+                    help="city pages' data JSON published beside the plane "
+                         "(default: data/development_seo_cities.json). Production: missing, or "
+                         "from a different run than the plane, is a hard error.")
     ap.add_argument("--allow-missing-dev-plane", action="store_true",
                     help="fixture-only: a missing plane is {} (no Rule D). "
                          "Refused in production.")
@@ -998,8 +1033,18 @@ def main():
     plane_required = not a.fixture
     if a.fixture and a.allow_missing_dev_plane:
         plane_required = False
+    cities_path = a.dev_cities
+    if cities_path is None and a.fixture:
+        sibling = os.path.join(os.path.dirname(os.path.abspath(a.fixture)),
+                               "development_seo_cities.json")
+        if os.path.isfile(sibling):
+            cities_path = sibling
+    if cities_path is None and not a.fixture:
+        cities_path = os.path.join(os.path.dirname(__file__), "..", "data",
+                                   "development_seo_cities.json")
     cities = {}
-    d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required, cities_out=cities)
+    d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required, cities_out=cities,
+                                     cities_path=cities_path)
 
     zips = d["zips"]
     if len(zips) != len(set(zips)):

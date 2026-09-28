@@ -151,6 +151,31 @@ print("LOADED")`;
      'a production plane without a cities section fails the build');
 }
 
+// ---- 6b. the published form: cities in their own file, from the same run ----------------
+function buildSplit(cityDocPatch = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'citysplit-'));
+  writeFileSync(join(dir, 'zip-pages.json'), readFileSync(FIX, 'utf8'));
+  const { cities, ...zipPlane } = JSON.parse(JSON.stringify(PLANE));
+  writeFileSync(join(dir, 'development_seo_plane.json'), JSON.stringify(zipPlane));
+  writeFileSync(join(dir, 'development_seo_cities.json'), JSON.stringify({
+    version: '1.0.0', identity: zipPlane.identity, generated_at: zipPlane.generated_at,
+    cities, ...cityDocPatch }));
+  const o = mkdtempSync(join(tmpdir(), 'city-'));
+  const r = spawnSync('python3', [GEN, '--fixture', join(dir, 'zip-pages.json'), '--out', o,
+    '--now', '2026-09-28T00:00:00'], { encoding: 'utf8' });
+  return { r, o };
+}
+{
+  const { r, o } = buildSplit();
+  ok(r.status === 0 && readFileSync(join(o, 'city', 'ma', 'amherst', 'index.html'), 'utf8') === city,
+     'a separate cities file from the same run builds the identical city page');
+}
+{
+  const { r } = buildSplit({ generated_at: '2026-09-27T00:00:00Z' });
+  ok(r.status !== 0 && /does not match the plane/.test(r.stderr + r.stdout),
+     'a cities file from a different run fails the build');
+}
+
 // ---- 7. determinism --------------------------------------------------------------------
 const again = readFileSync(join(build(), 'city', 'ma', 'amherst', 'index.html'), 'utf8');
 ok(again === city, 'two builds of the same input write byte-identical city pages');
