@@ -1,0 +1,37 @@
+name: tiger-zcta-vintage-watch
+
+# PARKED. Health-plan Step 5 (2026-09-28). Census TIGER/ZCTA vintage watch.
+#
+# Dispatch only. There is deliberately no `schedule:` — a new scheduled job is
+# gated by the autonomy envelope until the founder arms it. This workflow does
+# nothing until a human dispatches it.
+#
+# It does not download the 505 MB national archive, does not load polygons, does
+# not apply DDL, and does not activate an N5 generation. It holds no database
+# secret. The runner GETs two HTML directory listings and Range-GETs the first
+# 64 bytes of the pinned zip (liveness), then compares against
+# scripts/tiger_zcta_authority.py. A newer year is a failed watch (report),
+# never a load.
+#
+# Founder lock 2026-09-27: Do not unlist ~1,005 map pages just because they have
+# plants and no new construction. 'Nothing is being built' is a valid answer.
+# Those pages stay listed. This was the old Unit 1 idea; it is rejected.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tiger-zcta-vintage-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare live Census TIGER listings to the checksum authority
+        run: python3 scripts/tiger_zcta_vintage_watch.py
