@@ -43,10 +43,9 @@ SNAPSHOT = "phase1-2026-09-01"
 DERIVATION_VERSION = 1
 CANON_SRID = 4269                    # the archive's own CRS, both sides. No transform.
 
-TIGER_URL = ("https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/"
-             "tl_2025_us_zcta520.zip")
-TIGER_SHA256 = "e87129634eefe8719ef06ce4cfdf6588520be2e359360e590aaae90e4afb1911"
-EXPECTED_NATIONAL_FEATURES = 33791
+from tiger_zcta_authority import (  # noqa: E402  - one archive identity, not re-typed
+    TIGER_URL, TIGER_SHA256, EXPECTED_NATIONAL_FEATURES, refuse_unless_pinned,
+)
 
 # One batch registry, so a second prefix is configuration rather than a second
 # copy of the loader. Every list here is an ACCEPTED CONTROL: the run stops rather
@@ -459,9 +458,8 @@ def mode_zcta():
     sha = hashlib.sha256(blob).hexdigest()
     say("archive bytes", f"{len(blob):,}")
     say("archive sha256", sha)
-    if sha != TIGER_SHA256:
-        raise SystemExit(f"STOP: TIGER sha256 changed. expected {TIGER_SHA256}")
-    say("sha256 matches the B1/N2A pin", "yes")
+    refuse_unless_pinned(sha)
+    say("sha256 matches the TIGER checksum authority", "yes")
     say("download seconds", round(time.time() - t0, 1))
 
     zf = zipfile.ZipFile(io.BytesIO(blob))

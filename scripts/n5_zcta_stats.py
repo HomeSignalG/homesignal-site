@@ -28,9 +28,12 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from n3_pilot import TIGER_URL, TIGER_SHA256, UA  # noqa: E402
+from n3_pilot import UA  # noqa: E402
+from tiger_zcta_authority import (  # noqa: E402  - one archive identity, not re-typed
+    TIGER_URL, EXPECTED_NATIONAL_FEATURES, refuse_unless_pinned,
+)
 
-EXPECTED_FEATURES = 33791
+EXPECTED_FEATURES = EXPECTED_NATIONAL_FEATURES
 # Measured bytes-per-vertex, from three independent live samples of real stored geometry
 # (2026-09-02): zcta_boundary UT/ID 16.022 - n3_zcta_scratch TX/MD 16.038 - ctdot
 # polygons 16.490. PostGIS stores geometry uncompressed (pg_column_size 34,936 vs
@@ -58,10 +61,9 @@ def main():
     with urllib.request.urlopen(req, timeout=1800) as r:
         blob = r.read()
     sha = hashlib.sha256(blob).hexdigest()
-    if sha != TIGER_SHA256:
-        raise SystemExit(f"STOP: TIGER sha256 changed; expected {TIGER_SHA256} got {sha}")
+    refuse_unless_pinned(sha)
     say("archive bytes", f"{len(blob):,}")
-    say("sha256 matches the B1/N2A/N3/N4/N5 pin", "yes")
+    say("sha256 matches the TIGER checksum authority", "yes")
 
     zf = zipfile.ZipFile(io.BytesIO(blob))
     base = next(n for n in zf.namelist() if n.endswith(".shp"))[:-4]

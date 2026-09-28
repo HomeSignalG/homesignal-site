@@ -49,7 +49,9 @@ PROJECT_REF = "qwnnmljucajnexpxdgxr"
 SNAPSHOT = "phase1-2026-09-01"
 REGISTRY = "supabase/functions/get-address-report/jurisdiction-registry.json"
 
-TIGER_URL = "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/tl_2025_us_zcta520.zip"
+from tiger_zcta_authority import (  # noqa: E402  - one archive identity, not re-typed
+    TIGER_URL, refuse_unless_pinned,
+)
 
 PROBE_TIMEOUT = 45
 POLITE = 0.4
@@ -183,8 +185,10 @@ def step0_zcta():
     t0 = time.time()
     blob = get(TIGER_URL, timeout=1800)
     sha = hashlib.sha256(blob).hexdigest()
+    refuse_unless_pinned(sha)
     say("bytes", f"{len(blob):,}")
     say("sha256", sha)
+    say("sha256 matches the TIGER checksum authority", "yes")
     say("download seconds", round(time.time() - t0, 1))
 
     zf = zipfile.ZipFile(io.BytesIO(blob))

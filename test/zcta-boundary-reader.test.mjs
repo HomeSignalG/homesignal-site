@@ -42,7 +42,8 @@ ok(!/EXPECTED_INSCOPE\s*=\s*56\b/.test(py),
   '1a EXPECTED_INSCOPE is no longer the 56-feature Box Elder count');
 ok(/EXPECTED_INSCOPE\s*=\s*EXPECTED_NATIONAL_FEATURES/.test(py),
   '1b ...it is the national count, and the two names are pinned to one number');
-ok(/EXPECTED_NATIONAL_FEATURES\s*=\s*33791/.test(py), '1c the archive count is still 33,791');
+ok(/from tiger_zcta_authority import/.test(py) && /EXPECTED_NATIONAL_FEATURES/.test(py),
+  '1c the archive count is imported from the TIGER checksum authority, not re-typed');
 ok(!/ST_MakeEnvelope/.test(py),
   '1d the INSERT is no longer filtered by the Box Elder envelope — that clause is why '
   + 'production has 56 rows', (loader.match(/.{0,60}ST_MakeEnvelope.{0,60}/) || [])[0]);

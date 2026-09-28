@@ -37,9 +37,10 @@ import zipfile
 
 # ---------------------------------------------------------------- pinned inputs
 
-TIGER_URL = ("https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/"
-             "tl_2025_us_zcta520.zip")
-TIGER_VINTAGE = "TIGER/Line 2025 (2020 Census ZCTA delineation)"
+from tiger_zcta_authority import (  # one archive identity — URL, sha256, vintage, count
+    TIGER_URL, TIGER_SHA256, TIGER_VINTAGE, EXPECTED_NATIONAL_FEATURES,
+    refuse_unless_pinned,
+)
 
 # NATIONAL as of PCM-3. There is no selection envelope any more.
 #
@@ -56,7 +57,6 @@ CANONICAL_18 = ("84301,84302,84306,84307,84309,84311,84312,84313,84314,84316,"
                 "84324,84329,84330,84331,84334,84336,84337,84340").split(",")
 CANONICAL_18_FP = "7d87c66ec88a258926ecea776d1b6f50"
 
-EXPECTED_NATIONAL_FEATURES = 33791          # TIGERweb returnCountOnly, twice
 # DELIBERATELY THE SAME NUMBER. In-scope used to be the 56 features intersecting the Box
 # Elder envelope; with no envelope, in-scope IS the national set. They are kept as two
 # names because they answer two questions — "did we read the whole archive" and "how many
@@ -512,8 +512,11 @@ def main():
     if mode == "load" and not (expect_sha and expect_fp):
         raise SystemExit("load mode requires EXPECT_SHA256 and EXPECT_GEOID_FP "
                          "recorded by a prior validate run")
+    if mode == "load":
+        refuse_unless_pinned(expect_sha)
 
     data, sha = acquire()
+    refuse_unless_pinned(sha)
     prj, n_dbf, n_shp, n_null, picked = extract(data, keep_wkt=(mode == "load"))
 
     srid = crs_from_prj(prj)

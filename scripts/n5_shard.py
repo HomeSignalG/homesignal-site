@@ -30,8 +30,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import (  # noqa: E402  - one implementation, imported not re-derived
     sql, http, esri, lit, read_dbf, read_shp_polygons, rings_to_multipolygon_wkt,
     SQLPayloadTooLarge,
-    paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL, TIGER_SHA256,
-    CANON_SRID, UA, STATS,
+    paths_to_multilinestring_wkt, rings_to_wkt, PROJECT_REF, TIGER_URL,
+    CANON_SRID, UA, STATS, EXPECTED_NATIONAL_FEATURES, refuse_unless_pinned,
 )
 
 SNAPSHOT = os.environ.get("SNAPSHOT", "phase1-2026-09-01").strip()
@@ -176,16 +176,17 @@ def tiger_index():
     with urllib.request.urlopen(req, timeout=1800) as r:
         blob = r.read()
     sha = hashlib.sha256(blob).hexdigest()
-    if sha != TIGER_SHA256:
-        raise SystemExit(f"STOP: TIGER sha256 changed; expected {TIGER_SHA256} got {sha}")
+    refuse_unless_pinned(sha)
     zf = zipfile.ZipFile(io.BytesIO(blob))
     base = next(n for n in zf.namelist() if n.endswith(".shp"))[:-4]
     prj = " ".join(zf.read(base + ".prj").decode("latin-1").split()).upper()
     if "NORTH_AMERICAN_1983" not in prj and "NAD83" not in prj:
         raise SystemExit("STOP: unexpected .prj; refusing to guess a CRS")
     n_rec, _fields, rows = read_dbf(zf.read(base + ".dbf"))
-    if n_rec != 33791:
-        raise SystemExit(f"STOP: national ZCTA feature count moved: {n_rec} != 33791")
+    if n_rec != EXPECTED_NATIONAL_FEATURES:
+        raise SystemExit(
+            f"STOP: national ZCTA feature count moved: {n_rec} != {EXPECTED_NATIONAL_FEATURES}"
+        )
     idx = {}
     for i, row in enumerate(rows):
         if row is None:
