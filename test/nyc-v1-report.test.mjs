@@ -464,5 +464,54 @@ ok(!/\bDurable\b/.test(read('docs/future-surroundings-report-checkpoint-2026-09-
 ok(existsSync(join(root, 'docs/corporate-output-report-id-guarantee-2026-09-28.md')),
   '8h the guarantee is written down');
 
+// The product presents the page and the JSON API as the same report, and report_id is a
+// hash of JSON.stringify in INSERTION ORDER. So the two implementations must build the
+// object identically, not merely equivalently. They did not: `window_start` sat in a
+// different position in each file, and the same records fingerprinted differently.
+// Comparing the ids is the only assertion that sees that, because every field matched.
+const API = await import('../supabase/functions/get-future-surroundings-report/allowlist.ts');
+const parityInput = () => ({
+  address: '1 Centre Street', zip: '10007', radius_mi: 0.5, address_points: [centre],
+  issuance: [issuanceNear], dobnow: [dobnowNear], filings: [filingNear],
+  versions: { addresspoint: 'v1', issuance: 'v1', dobnow: 'v1', filings: 'v1' },
+  row_cap_per_dataset: 5000, retrieved_at: '2026-09-28T00:00:00.000Z',
+  generated_at: '2026-09-28T00:00:00.000Z'
+});
+const browserHit = await V1.assembleReport(parityInput());
+const apiHit = await API.assembleReport(parityInput());
+ok(browserHit.report_id === apiHit.report_id,
+  '8i the page and the API fingerprint the same records identically',
+  { browser: browserHit.report_id, api: apiHit.report_id });
+ok(JSON.stringify(Object.keys(browserHit.data_state)) === JSON.stringify(Object.keys(apiHit.data_state)),
+  '8j data_state is built in the same key order on both surfaces',
+  { browser: Object.keys(browserHit.data_state), api: Object.keys(apiHit.data_state) });
+
+// A miss is the path where the two most easily drift, because neither queries anything.
+const missInput = () => Object.assign(parityInput(), {
+  address: '1 Nowhere Street', issuance: [], dobnow: [], filings: []
+});
+const browserMiss = await V1.assembleReport(missInput());
+const apiMiss = await API.assembleReport(missInput());
+ok(browserMiss.report_id === apiMiss.report_id,
+  '8k a miss fingerprints identically on both surfaces too',
+  { browser: browserMiss.report_id, api: apiMiss.report_id });
+ok(browserMiss.data_state.row_cap_per_dataset === apiMiss.data_state.row_cap_per_dataset,
+  '8l both surfaces report the same read depth on a miss',
+  { browser: browserMiss.data_state.row_cap_per_dataset, api: apiMiss.data_state.row_cap_per_dataset });
+
+// 8i–8l compare assembleReport against assembleReport, so they cannot see a divergence
+// in how the two loadReport functions CALL it — which is exactly where the miss paths
+// drifted. Every call site in both files has to pass the read depth, or the same miss
+// fingerprints differently on the two surfaces.
+[['lib/nyc-v1-soda.js', soda], ['supabase/functions/get-future-surroundings-report/allowlist.ts', fnSrc]]
+  .forEach(([name, src]) => {
+    const calls = src.match(/assembleReport\(\{[\s\S]*?\n( *)\}\)/g) || [];
+    ok(calls.length >= 2, '8q ' + name + ' has assembleReport call sites to check', calls.length);
+    const missingCap = calls.filter((c) => !/row_cap_per_dataset/.test(c));
+    ok(missingCap.length === 0,
+      '8r every assembleReport call in ' + name + ' states the read depth',
+      missingCap.map((c) => c.slice(0, 90)));
+  });
+
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

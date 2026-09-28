@@ -560,9 +560,12 @@ export async function assembleReport(input: {
     data_state: {
       host: 'data.cityofnewyork.us',
       datasets: [DATASETS.addresspoint.id, DATASETS.issuance.id, DATASETS.dobnow.id, DATASETS.filings.id],
+      // Key order is load-bearing: report_id is a hash of JSON.stringify in insertion
+      // order, so this block must stay byte-identical to lib/nyc-v1-report.js or the two
+      // surfaces fingerprint the same records differently. Pinned by 8i.
       window_days: RECENT_DAYS,
-      row_cap_per_dataset: input.row_cap_per_dataset ?? null,
       window_start: isoDate(new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()),
+      row_cap_per_dataset: input.row_cap_per_dataset ?? null,
       coverage,
       coverage_complete: coverageComplete,
       silent_datasets: silent,
@@ -609,6 +612,7 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       dobnow: [],
       filings: [],
       versions,
+      row_cap_per_dataset: ROW_CAP,
       retrieved_at: retrievedAt,
     });
   }
@@ -624,6 +628,7 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       dobnow: [],
       filings: [],
       versions,
+      row_cap_per_dataset: ROW_CAP,
       retrieved_at: retrievedAt,
     });
   }
