@@ -258,12 +258,16 @@ export function bbox(lat: number, lng: number, radiusMi: number) {
   return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
 }
 
-// One view stores dates as text MM/DD/YYYY, the others as ISO timestamps.
+// One view stores dates as text MM/DD/YYYY, the others as ISO timestamps. The ISO
+// ones are Socrata floating timestamps and carry no zone, which Date.parse then reads
+// as local time: east of UTC that reports the permit a day early. They are pinned to
+// UTC so the date a buyer reads does not depend on where this code runs.
 function parseDateMs(raw: string): number {
   const s = String(raw || '');
   if (!s) return NaN;
   const us = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (us) return Date.parse(us[3] + '-' + us[1] + '-' + us[2]);
+  if (/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(s)) return Date.parse(s + 'Z');
   return Date.parse(s);
 }
 

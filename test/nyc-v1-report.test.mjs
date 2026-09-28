@@ -304,6 +304,17 @@ const cov = V1.coverageFor(
 ok(cov.fetched === 3, '7a coverage counts what the publisher returned', cov);
 ok(cov.oldest === '2025-12-15' && cov.newest === '2026-03-01',
   '7b coverage reach spans both date formats', cov);
+// Node parses MM/DD/YYYY on its own, but as local midnight, so east of UTC the
+// reported day slips back one. The explicit branch is what makes the two formats
+// comparable. Asserting only under the runner's own zone cannot see that.
+const tzWas = process.env.TZ;
+for (const tz of ['UTC', 'America/New_York', 'Asia/Tokyo', 'Pacific/Kiritimati']) {
+  process.env.TZ = tz;
+  ok(V1.isoDate('03/01/2026') === '2026-03-01' && V1.isoDate('2026-03-01T00:00:00.000') === '2026-03-01',
+    '7b2 both date formats read as the same calendar day in ' + tz,
+    { us: V1.isoDate('03/01/2026'), iso: V1.isoDate('2026-03-01T00:00:00.000') });
+}
+if (tzWas === undefined) delete process.env.TZ; else process.env.TZ = tzWas;
 ok(cov.capped === true, '7c hitting the row cap is recorded, not hidden', cov);
 ok(V1.coverageFor([{ d: '03/01/2026' }], 'd', 3).capped === false,
   '7d a short read is not reported as capped');
