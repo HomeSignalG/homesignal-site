@@ -311,6 +311,21 @@
   }
   // Read seam for the (later, schema-gated) conversion-stamp step.
   HS.referral = function () { return LS.get('referral', null); };
+  // Which page type this visit entered through (HS.entryFrom, lib/data.js), once per
+  // browser tab session. HS.logEvent stamps it on every event, so an address lookup or
+  // an alert sign-up can be counted against the page type Search Console reports on.
+  function captureEntry() {
+    try {
+      if (SS.get('entry')) return;
+      if (typeof HS.entryFrom !== 'function') return;
+      SS.set('entry', JSON.stringify(HS.entryFrom(location.pathname, document.referrer, location.host)));
+    } catch (e) { /* attribution must never break the page */ }
+  }
+  // lib/data.js carries no cache key, so a warm browser can pair this shell.js with an
+  // older lib/data.js that has no HS.logEvent. A sign-up that saved must still say so.
+  function logEvent(type, payload) {
+    try { if (typeof HS.logEvent === 'function') HS.logEvent(type, payload); } catch (e) { /* never */ }
+  }
   // Compact provenance token for a conversion row's `source` column, alongside the
   // existing hand-set tokens ('homepage_zip', 'contact_page'). Prefixed 'ref:' so
   // analytics can tell referral-attributed rows from page-provenance rows at a
@@ -1775,6 +1790,7 @@
       const sub = $('optinSub'); if (sub) sub.textContent = "Couldn't save — please try again.";
       return;
     }
+    logEvent('alert_signup_area', { zip_code: info.zip, community_id: info.communityId });
     const box = $('hsOptin');
     if (box) box.innerHTML = '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Emailing you development &amp; hearings for '
       + HS.esc(info.zip) + '.</div><div style="color:var(--ink-3,#5a6b63);margin-top:4px">Unsubscribe anytime.</div>';
@@ -1846,6 +1862,7 @@
     // (4) Read it back: the control says what DELIVERY will do, never what we hoped.
     const st = await HS.mapsZipEmailState(zip);
     if (!st.subscribed) throw friendlyError('Your sign-up did not save — please try again.');
+    logEvent('alert_signup_maps', { zip_code: zip, community_id: zc.id });
     paintTopbar();
     return st;
   }
@@ -2017,6 +2034,7 @@
       if (m) m.textContent = "Couldn't save your alerts — please try again. (" + ((e && e.message) || 'save error') + ')';
       return;
     }
+    logEvent('alert_signup_topics', { topic: TCUR });
     HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
     $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
@@ -2384,6 +2402,7 @@
 
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
+    captureEntry();             // which page type this visit entered through
     await injectShell();
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
