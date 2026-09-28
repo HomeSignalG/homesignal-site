@@ -409,12 +409,15 @@ def parse_cities(raw_cities, zips_plane):
 
 
 # ---------------------------------------------------------------- project pages (plan step 12)
-# Identity is base_project_key = source_key|source_seq, where source_key is
-# '<connector>:<registry_id>:<case>' (homesignal-site docs/project-identity-audit-2026-09-28.md).
+# Identity is base_project_key = source_key|source_seq (docs/project-identity-audit-2026-09-28.md).
+# source_key is what the connector wrote: arcgis:<registry_id>:<case>, or
+# <socrata|ckan|carto|csv>:<host>:<dataset>:<case>. The producer reads the case out of it; the
+# site only checks the key ends with that case.
 # The producer (ingest) decides which projects get a page: FEATURED projects only (a card on a
 # Rule D ZIP page or a city page) whose key is durable. The site re-checks the record is
 # consistent with its own key and builds the URL; it never decides membership.
-PROJECT_KEY_RE = re.compile(r"^[a-z0-9_-]+:([a-z0-9]+(?:-[a-z0-9]+)*):(.+)\|([0-9]+)$", re.S)
+PROJECT_KEY_RE = re.compile(r"^(arcgis|socrata|ckan|carto|csv):(.+)\|([0-9]+)$", re.S)
+REGISTRY_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PROJECT_PATH_RE = re.compile(r"^/project/[a-z0-9]+(?:-[a-z0-9]+)*/(?:[a-z0-9]+(?:-[a-z0-9]+)*-)?[0-9a-f]{8}/$")
 PROJECT_SLUG_MAX = 60
 
@@ -444,8 +447,8 @@ def parse_projects(raw_projects):
         m = PROJECT_KEY_RE.match(str(key))
         if not m or not isinstance(r, dict):
             sys.exit(f"ERROR: malformed project key or record in the plane: {key!r}")
-        reg, case = m.group(1), m.group(2)
-        if str(r.get("registry_id") or "") != reg or str(r.get("case") or "") != case:
+        reg, case = str(r.get("registry_id") or ""), str(r.get("case") or "")
+        if not REGISTRY_ID_RE.match(reg) or not case or not m.group(2).endswith(":" + case):
             sys.exit(f"ERROR: project {key!r} registry_id/case disagree with its key")
         name = str(r.get("name") or "").strip()
         url = safe_url(r.get("source_url"))

@@ -47,7 +47,10 @@ const CASES = {
   'https://permits.example.gov/r/8': 'SUB-8',
   'https://permits.example.gov/r/9': 'TH-9',
 };
-const keyFor = (url) => `arcgis:town-permits:${CASES[url]}|1`;
+// One card uses the host:dataset key shape Socrata, CKAN, Carto and CSV write.
+const keyFor = (url) => (url.endsWith('/r/6')
+  ? `socrata:data.town.gov:ab12-cd34:${CASES[url]}|1`
+  : `arcgis:town-permits:${CASES[url]}|1`);
 
 function makeInputs({ mutate } = {}) {
   const plane = JSON.parse(JSON.stringify(BASE_PLANE));
@@ -119,7 +122,7 @@ const p1 = pathOf('https://permits.example.gov/r/1');
 ok(existsSync(join(out, ...p1.split('/').filter(Boolean), 'index.html')), `the shared project has a page at ${p1}`);
 ok(man.project_pages.length === nProjects, `the manifest lists all ${nProjects} project pages`);
 ok(JSON.stringify(man.project_pages) === JSON.stringify(Object.keys(docs.projectsDoc.projects)
-  .map((k) => { const [, reg, cs] = k.match(/^[^:]+:([^:]+):(.+)\|1$/); return expectedPath(reg, cs, k); }).sort()),
+  .map((k) => expectedPath('town-permits', docs.projectsDoc.projects[k].case, k)).sort()),
    'every page is at the documented URL');
 const smProj = [...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
 ok(JSON.stringify(smProj) === JSON.stringify(man.project_pages), 'the sitemap advertises exactly the project pages');
@@ -136,6 +139,8 @@ ok(p1.startsWith('/project/town-permits/bld-2026-0001-'), 'the URL is the source
 const p5 = pathOf('https://permits.example.gov/r/5');
 ok(p5.startsWith('/project/town-permits/bld-2026-0001-') && p5 !== p1,
    'two record numbers that slug alike get different URLs');
+ok(existsSync(join(out, ...pathOf('https://permits.example.gov/r/6').split('/').filter(Boolean), 'index.html')),
+   'a key of the host:dataset shape gets its page too');
 ok(pathOf('https://permits.example.gov/r/2').startsWith('/project/town-permits/civ-2026-002-'),
    'punctuation in a record number collapses to hyphens');
 
