@@ -77,6 +77,15 @@ beginning with a 2 — i.e. every cutoff this century.
 Every one of the 64,239 is an ISO-formatted row. This is not a rounding error at the
 boundary: nine of every ten permits the consumer path calls recent are not.
 
+**There is a green test over this and it cannot see the defect.**
+`test/socrata-text-date-recency.test.ts` passes, and it is a real test — it pins that the
+substring comparison is emitted, that `{cutoff}` is substituted at request time rather than
+frozen, that the older broken ISO comparison is gone rather than merely accompanied, and
+that a blank `recency_expr` falls back to a filter rather than to none. Every one of those
+is about **substitution**. None is about whether the expression the substitution produces
+selects the right rows. It would pass unchanged if the key were pure noise, which for
+88,238 rows it is. Do not read its green as coverage of this finding.
+
 **Why it was not fixed here.** `ipu4-2q9a` is on the NYC V1 allowlist, but
 `get-address-report` is on the EXCLUDE list and contributes nothing to the sold report —
 see `docs/corporate-output-source-rights-audit-2026-09-27.md`. The paid path reads the same
