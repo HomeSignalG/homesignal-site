@@ -329,6 +329,8 @@ does not substitute centroid proximity for membership.
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+  Named-ZIP READY coverage for those 3 is now parked/gated (`docs/n5-named-zip-status-coverage.sql`,
+  dispatch-only `n5-missing-zip-status.yml`). Parking is not taking the live write. Do not activate.
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 

@@ -1,0 +1,27 @@
+# Parked named-ZIP READY coverage for 94128 / 95219 / 99128 (Step 7).
+# Dispatch-only. Offline pins only. No database secret, no apply, no schedule.
+#
+# Standing founder lock (2026-09-27):
+# "Do not unlist ~1,005 map pages just because they have plants and no new
+#  construction. 'Nothing is being built' is a valid answer. Those pages stay
+#  listed. This was the old Unit 1 idea; it is rejected."
+# The `_nfc >= 3` limb of indexable STAYS. This workflow never assigns
+# indexable and never activates a generation.
+
+name: n5 missing ZIP status (parked)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Named-ZIP READY coverage (parked checker)
+        run: python3 scripts/n5_missing_zip_status.py
+      - name: Structural pins
+        run: node test/n5-missing-zip-status.test.mjs
