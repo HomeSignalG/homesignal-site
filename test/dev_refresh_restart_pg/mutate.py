@@ -12,6 +12,13 @@ MUTATIONS = {
     'heal-never-fires': ('where d.last_collected_response_id >\n', 'where false and d.last_collected_response_id >\n'),
     # every cursor is pulled to the counter, not only stale ones
     'heal-touches-every-cursor': ('where d.last_collected_response_id >\n', 'where d.last_collected_response_id >= 0 or 0 >\n'),
+    # --- batch cap (docs/dev-refresh-collect-batch-cap.sql) ---
+    # the newest answers are taken first, so the oldest can age out of the window unseen
+    'cap-newest-first': ('  order by c.id\n  limit 16) e;', '  order by c.id desc\n  limit 16) e;'),
+    # a larger cap, consistently everywhere the file names it
+    'cap-is-17': ('limit 16) e;', 'limit 17) e;', 3),
+    # the cap text is kept but the LIMIT is gone
+    'cap-without-limit': ('  order by c.id\n  limit 16) e;', '  order by c.id\n  ) e;'),
 }
 name, path = sys.argv[1], sys.argv[2]
 a, b, *n = MUTATIONS[name]
