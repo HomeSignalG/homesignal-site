@@ -218,13 +218,17 @@ def _plane_age_hours(generated_at, now=None):
     return (now - stamp.astimezone(timezone.utc)).total_seconds() / 3600.0
 
 
-def load_dev_plane(path, *, required=True, now=None):
+def load_dev_plane(path, *, required=True, now=None, cities_out=None):
     """Read the compact Development SEO plane.
 
     Production (required=True): a missing, unreadable, unstamped or stale plane
     is a hard error. It must never become {} — that would silently drop Rule D
     indexability while Pages stayed green. Fixtures may pass required=False to
     exercise the no-plane case explicitly.
+
+    cities_out: a dict to fill with the plane's validated city section (SEO plan
+    step 9). In production the section must be present: a plane without it would
+    silently remove every city page while the build stayed green.
     """
     if not path or not os.path.isfile(path):
         if required:
@@ -278,7 +282,80 @@ def load_dev_plane(path, *, required=True, now=None):
               and len(ents) >= RULE_D_MIN)
         out[z] = {"rule_d": ok, "count": count if isinstance(count, int) else 0,
                   "entities": ents if ok else []}
+    if cities_out is not None:
+        raw_cities = raw.get("cities")
+        if raw_cities is None and required:
+            sys.exit("ERROR: Rule D plane has no cities section — refusing to silently "
+                     "drop every city page")
+        cities_out.update(parse_cities(raw_cities or {}, out))
     return out
+
+
+CITY_KEY_RE = re.compile(r"^([a-z]{2})/([a-z0-9]+(?:-[a-z0-9]+)*)$")
+CITY_MIN_RULE_D_ZIPS = 2                     # the producer's bar, re-asserted here
+CITY_REP_CAP = 12
+
+
+def parse_cities(raw_cities, zips_plane):
+    """Validate the plane's city section against the ZIP half of the SAME plane.
+
+    The site does not decide which cities exist — the producer does, from the same
+    entities Rule D counts. What the site does refuse is an inconsistent plane: a city
+    that names a ZIP as a Rule D pass which the ZIP half says is not, is a producer
+    defect, and the build fails rather than publishing a page it cannot vouch for.
+    """
+    cities = {}
+    for key, c in sorted(raw_cities.items()):
+        m = CITY_KEY_RE.match(str(key))
+        if not m or not isinstance(c, dict):
+            sys.exit(f"ERROR: malformed city key or record in the plane: {key!r}")
+        st, slug = m.group(1).upper(), m.group(2)
+        if str(c.get("state") or "") != st or str(c.get("slug") or "") != slug:
+            sys.exit(f"ERROR: city {key} state/slug disagree with its key")
+        place = str(c.get("place") or "").strip()
+        zips = [z for z in (c.get("zips") or []) if ZIP_RE.match(str(z))]
+        rule_d_zips = [z for z in (c.get("rule_d_zips") or []) if ZIP_RE.match(str(z))]
+        held = [z for z in (c.get("held_zips") or []) if ZIP_RE.match(str(z))]
+        n = c.get("meaningful_entity_count")
+        if not place or not zips or not isinstance(n, int) or n < 1:
+            sys.exit(f"ERROR: city {key} lacks a place, ZIPs or a count")
+        if len(rule_d_zips) < CITY_MIN_RULE_D_ZIPS:
+            sys.exit(f"ERROR: city {key} has {len(rule_d_zips)} Rule D ZIPs "
+                     f"(< {CITY_MIN_RULE_D_ZIPS}) — the producer's bar was not met")
+        for z in rule_d_zips:
+            if z not in zips or not (zips_plane.get(z) or {}).get("rule_d"):
+                sys.exit(f"ERROR: city {key} counts {z} as Rule D but the ZIP plane does not")
+        facts_total = c.get("facts_total")
+        if facts_total != n:
+            sys.exit(f"ERROR: city {key} mix covers {facts_total} projects, count says {n}")
+        mixes = {}
+        for mk in ("type_mix", "lifecycle_mix"):
+            mix = [{"label": str(x.get("label") or "").strip(), "n": x.get("n")}
+                   for x in (c.get(mk) or []) if isinstance(x, dict)]
+            if not mix or any(not x["label"] or not isinstance(x["n"], int) for x in mix):
+                sys.exit(f"ERROR: city {key} has a malformed {mk}")
+            if sum(x["n"] for x in mix) != n:
+                sys.exit(f"ERROR: city {key} {mk} sums to {sum(x['n'] for x in mix)}, not {n}")
+            mixes[mk] = mix
+        reps = []
+        for e in (c.get("representative_entities") or [])[:CITY_REP_CAP]:
+            if not isinstance(e, dict):
+                continue
+            name = str(e.get("name") or "").strip()
+            url = safe_url(e.get("source_url"))
+            if not name or not url:
+                continue
+            day = str(e.get("date") or "")[:10]
+            reps.append({"title": name, "url": url,
+                         "type": str(e.get("type_label") or "").strip(),
+                         "lifecycle": str(e.get("lifecycle_label") or "").strip(),
+                         "date": day if re.match(r"^\d{4}-\d{2}-\d{2}$", day) else "",
+                         "zip": e.get("zip") if ZIP_RE.match(str(e.get("zip") or "")) else ""})
+        cities[key] = {"key": key, "state": st, "slug": slug, "place": place, "zips": zips,
+                       "rule_d_zips": rule_d_zips, "held_zips": held, "count": n,
+                       "type_mix": mixes["type_mix"], "lifecycle_mix": mixes["lifecycle_mix"],
+                       "reps": reps}
+    return cities
 
 
 def assemble(d, now_iso):
@@ -529,6 +606,16 @@ def render(p, built):
                         for s in sibs)
         links += (f'<nav class="zsib" aria-label="More ZIP codes in this county">'
                   f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
+    # UP to the city page (SEO plan step 10: City -> ZIP -> Project). Only a city page
+    # that exists is linked; its own class, for the same reason as zsib above.
+    cts = p.get("cities") or []
+    if cts:
+        items = "".join(
+            f'<li><a href="{esc(city_path(c))}">Development across {esc(c["place"])}, '
+            f'{esc(c["state"])}</a> <span class="quiet">{c["count"]} projects in '
+            f'{len(c["zips"])} ZIP codes</span></li>' for c in cts)
+        links += (f'<nav class="zcity" aria-label="City development pages">'
+                  f'<h2>City development</h2><ul>{items}</ul></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
@@ -628,6 +715,122 @@ def render(p, built):
         "</body>\n</html>\n")
 
 
+# ---------------------------------------------------------------- city pages (plan step 9)
+def city_path(c):
+    return f"/city/{c['state'].lower()}/{c['slug']}/"
+
+
+def link_cities(pages, cities):
+    """Attach each city page to the ZIP pages it groups (the ZIP -> city up-link)."""
+    for key in sorted(cities):
+        c = cities[key]
+        for z in c["zips"]:
+            if z in pages:
+                pages[z].setdefault("cities", []).append(c)
+
+
+def _mix(items, heading):
+    li = "".join(f"<li>{esc(x['label'])} <span class=\"quiet\">{x['n']}</span></li>"
+                 for x in items)
+    return f'<section class="zsec"><h2>{esc(heading)}</h2><ul>{li}</ul></section>'
+
+
+def render_city(c, pages, built):
+    """One city Development page. Static HTML, no scripts: everything it says is in the
+    plane, and every project links to its official source record."""
+    place, st, n = c["place"], c["state"], c["count"]
+    label = f"{place}, {st}"
+    nz = len(c["zips"])
+    # A held ZIP (boundary not yet measured) is named on the page but never counted, so
+    # the sentences say how many ZIP codes the count actually covers.
+    counted = nz - len([z for z in c["held_zips"] if z in c["zips"]])
+    across = (f"the {nz} ZIP codes named {place}" if counted == nz else
+              f"{counted} of the {nz} ZIP codes named {place}")
+    top = ", ".join(f"{x['label'].lower()} {x['n']}" for x in c["type_mix"][:3])
+    title = f"Development in {label} — {n} projects on record | HomeSignal"
+    desc = (f"{n} development projects on file across {counted} ZIP codes in {label}, "
+            f"compiled from official records ({top}).")
+    canon = f"{BASE}{city_path(c)}"
+    reps = []
+    for it in c["reps"]:
+        bits = [x for x in (it.get("type"), it.get("lifecycle")) if x]
+        inner = f'<a href="{esc(it["url"])}" rel="nofollow noopener">{esc(it["title"])}</a>'
+        if bits:
+            inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
+        if it.get("date"):
+            inner += f' <time>{esc(it["date"])}</time>'
+        if it.get("zip") and it["zip"] in pages:
+            inner += f' <a href="/community/{esc(it["zip"])}/">ZIP {esc(it["zip"])}</a>'
+        reps.append(f"<li>{inner}</li>")
+    zli = []
+    for z in c["zips"]:
+        pg = pages.get(z)
+        if not pg:
+            continue
+        note = ""
+        if z in c["held_zips"]:
+            note = ' <span class="quiet">not yet measured — not counted</span>'
+        elif pg.get("rule_d"):
+            note = f' <span class="quiet">{pg.get("rule_d_count")} projects</span>'
+        zli.append(f'<li><a href="/community/{esc(z)}/">{esc(pg["name"])}</a>{note}</li>')
+    body = (
+        f'<main id="hs-ssr"><header><p class="eyebrow">City development</p>'
+        f'<h1>Development in {esc(label)}</h1>'
+        f'<p>{n} distinct development projects on file across {esc(across)}. A project '
+        f'that appears in more than one of these ZIP codes is counted once.</p></header>'
+        + _mix(c["type_mix"], "Project types")
+        + _mix(c["lifecycle_mix"], "Where projects stand")
+        + (f'<section class="zsec"><h2>Recent projects</h2><ul>{"".join(reps)}</ul></section>'
+           if reps else "")
+        + f'<nav class="zsib" aria-label="ZIP codes in {esc(place)}">'
+          f'<h2>ZIP codes in {esc(label)}</h2><ul>{"".join(zli)}</ul></nav>'
+        + f'<p class="quiet">ZIP codes are grouped by the place name on their HomeSignal '
+          f'page, which follows the postal name and can differ from city limits. Compiled '
+          f'from official public records on <time datetime="{esc(built)}">{esc(built)}</time>. '
+          f'Every project links to its source record; nothing on this page is generated '
+          f'or inferred.</p>'
+        + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
+          '<a href="/how-it-works.html">How HomeSignal works</a></nav>'
+        + '</main>')
+    return (
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+        '<meta charset="UTF-8">\n<base href="/">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        '<meta name="robots" content="index, follow">\n'
+        f"<title>{esc(title)}</title>\n"
+        f'<meta name="description" content="{esc(desc)}">\n'
+        f'<link rel="canonical" href="{esc(canon)}">\n'
+        f'<meta property="og:type" content="website">\n'
+        f'<meta property="og:site_name" content="HomeSignal">\n'
+        f'<meta property="og:locale" content="en_US">\n'
+        f'<meta property="og:title" content="{esc(title)}">\n'
+        f'<meta property="og:description" content="{esc(desc)}">\n'
+        f'<meta property="og:url" content="{esc(canon)}">\n'
+        f'<meta property="og:image" content="{esc(OG_IMAGE)}">\n'
+        f'<meta name="twitter:card" content="summary_large_image">\n'
+        '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; '
+        "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
+        '<link rel="stylesheet" href="/app.css?v=20814d85">\n</head>\n'
+        f'<body data-nav="city">\n{body}\n</body>\n</html>\n')
+
+
+def build_cities(cities, pages, out_dir, built):
+    written = 0
+    for key in sorted(cities):
+        c = cities[key]
+        if not CITY_KEY_RE.match(key):
+            sys.exit(f"ERROR: city key refused: {key!r}")
+        missing = [z for z in c["zips"] if z not in pages]
+        if missing:
+            sys.exit(f"ERROR: city {key} names non-canonical ZIPs {missing[:5]}")
+        d = os.path.join(out_dir, "city", c["state"].lower(), c["slug"])
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, "index.html"), "wb").write(render_city(c, pages, built).encode("utf-8"))
+        written += 1
+    return written
+
+
 # ---------------------------------------------------------------- sitemap (in-artifact)
 SITEMAP_LEGACY_RE = re.compile(
     r"[ \t]*<url>\s*<loc>[^<]*community\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
@@ -653,7 +856,7 @@ def _url_el(loc):
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
 
-def reconcile_sitemap(out_dir, indexable):
+def reconcile_sitemap(out_dir, indexable, city_paths=()):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -692,6 +895,10 @@ def reconcile_sitemap(out_dir, indexable):
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
     block = "\n".join(_url_el(f"{BASE}/community/{z}/") for z in zips)
+    # City pages (plan step 9) exist only when they qualify, so every one is indexable.
+    cps = sorted(city_paths)
+    if cps:
+        block += "\n" + "\n".join(_url_el(f"{BASE}{cp}") for cp in cps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -702,7 +909,7 @@ def reconcile_sitemap(out_dir, indexable):
         # are stated rather than omitted: main() reads them unconditionally, and a missing
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
-        return {"removed": 0, "removed_dev": 0, "added": len(zips)}
+        return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
@@ -715,6 +922,9 @@ def reconcile_sitemap(out_dir, indexable):
     n = len(re.findall(r"<loc>[^<]*/community/(\d{5})/</loc>", txt))
     if n != len(zips):
         sys.exit(f"ERROR: sitemap carries {n} community URLs for {len(zips)} indexable ZIPs")
+    nc = len(re.findall(r"<loc>[^<]*/city/[a-z]{2}/[a-z0-9-]+/</loc>", txt))
+    if nc != len(cps):
+        sys.exit(f"ERROR: sitemap carries {nc} city URLs for {len(cps)} city pages")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -723,7 +933,7 @@ def reconcile_sitemap(out_dir, indexable):
     # returns 200. Fail the build rather than ship it.
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
-    return {"removed": removed, "removed_dev": removed_dev, "added": len(zips)}
+    return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps)}
 
 
 # ---------------------------------------------------------------- build + gates
@@ -787,7 +997,8 @@ def main():
     plane_required = not a.fixture
     if a.fixture and a.allow_missing_dev_plane:
         plane_required = False
-    d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required)
+    cities = {}
+    d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required, cities_out=cities)
 
     zips = d["zips"]
     if len(zips) != len(set(zips)):
@@ -799,23 +1010,27 @@ def main():
     pages = assemble(d, now_iso)
     if len(pages) != len(zips):
         sys.exit(f"ERROR: assembled {len(pages)} pages for {len(zips)} canonical ZIPs")
+    link_cities(pages, cities)
     npass = sum(1 for p in pages.values() if p["rule_f"])
     ndpass = sum(1 for p in pages.values() if p.get("rule_d"))
     stats = build(pages, a.out, zips, now_iso[:10])
     indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
-    sm = reconcile_sitemap(a.out, indexable)
+    ncity = build_cities(cities, pages, a.out, now_iso[:10])
+    city_paths = sorted(city_path(c) for c in cities.values())
+    sm = reconcile_sitemap(a.out, indexable, city_paths)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
     print(f"rule F fail    : {len(pages) - npass}")
     print(f"rule D pass    : {ndpass}")
     print(f"indexable      : {len(indexable)} (Rule F OR Rule D)")
+    print(f"city pages     : {ncity}")
     print(f"artifact bytes : {stats['bytes']} ({stats['bytes']/1048576:.1f} MB)")
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
           f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
-          f"+{sm['added']} /community/<zip>/ URLs")
+          f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs")
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
@@ -833,7 +1048,8 @@ def main():
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
                "sitemap_community_urls": sm["added"],
-               "sitemap_dev_urls_removed": sm["removed_dev"]},
+               "sitemap_dev_urls_removed": sm["removed_dev"],
+               "city_pages": city_paths, "sitemap_city_urls": sm["cities"]},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

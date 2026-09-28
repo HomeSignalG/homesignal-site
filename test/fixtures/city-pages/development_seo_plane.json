@@ -1,0 +1,231 @@
+{
+ "version": "1.1.0",
+ "rule": "D",
+ "threshold": 3,
+ "identity": "base_project_key",
+ "generated_at": "2026-09-28T00:00:00Z",
+ "lock_n": 5,
+ "eligible_n": 3,
+ "held_n": 1,
+ "zips": {
+  "01002": {
+   "geography_outcome": "complete",
+   "meaningful_entity_count": 3,
+   "rule_d": true,
+   "representative_entities": [
+    {
+     "id": "e1",
+     "name": "Olympia Place Apartments",
+     "source_url": "https://permits.example.gov/r/1",
+     "status": "Proposed",
+     "type": "Residential",
+     "date": "2026-09-01"
+    },
+    {
+     "id": "e2",
+     "name": "Kendrick Park Library Expansion",
+     "source_url": "https://permits.example.gov/r/2",
+     "status": "Approved",
+     "type": "Civic/Public",
+     "date": "2026-08-20"
+    },
+    {
+     "id": "e3",
+     "name": "North Pleasant Street Reconstruction",
+     "source_url": "https://permits.example.gov/r/3",
+     "status": "Proposed",
+     "type": "Utility",
+     "date": "2026-08-10"
+    }
+   ]
+  },
+  "01003": {
+   "geography_outcome": "complete",
+   "meaningful_entity_count": 3,
+   "rule_d": true,
+   "representative_entities": [
+    {
+     "id": "e4",
+     "name": "UMass Student Housing Phase 2",
+     "source_url": "https://permits.example.gov/r/4",
+     "status": "Approved",
+     "type": "Residential",
+     "date": "2026-07-15"
+    },
+    {
+     "id": "e5",
+     "name": "Mixed-use building <script>alert(1)</script>",
+     "source_url": "https://permits.example.gov/r/5",
+     "status": "Proposed",
+     "type": "Development",
+     "date": "2026-07-01"
+    },
+    {
+     "id": "e6",
+     "name": "Research Lab Addition",
+     "source_url": "https://permits.example.gov/r/6",
+     "status": "Operating",
+     "type": "Industrial",
+     "date": "2026-06-01"
+    }
+   ]
+  },
+  "01004": {
+   "geography_outcome": "not_measured",
+   "meaningful_entity_count": null,
+   "rule_d": false,
+   "held": true
+  },
+  "01007": {
+   "geography_outcome": "complete",
+   "meaningful_entity_count": 3,
+   "rule_d": true,
+   "representative_entities": [
+    {
+     "id": "e7",
+     "name": "Belchertown Solar Farm",
+     "source_url": "https://permits.example.gov/r/7",
+     "status": "Proposed",
+     "type": "Utility",
+     "date": "2026-05-01"
+    },
+    {
+     "id": "e8",
+     "name": "Jabish Brook Subdivision",
+     "source_url": "https://permits.example.gov/r/8",
+     "status": "Proposed",
+     "type": "Residential",
+     "date": "2026-04-01"
+    },
+    {
+     "id": "e9",
+     "name": "Town Hall Renovation",
+     "source_url": "https://permits.example.gov/r/9",
+     "status": "Approved",
+     "type": "Civic/Public",
+     "date": "2026-03-01"
+    }
+   ]
+  }
+ },
+ "cities": {
+  "ma/amherst": {
+   "state": "MA",
+   "place": "Amherst",
+   "slug": "amherst",
+   "zips": [
+    "01002",
+    "01003",
+    "01004"
+   ],
+   "rule_d_zips": [
+    "01002",
+    "01003"
+   ],
+   "held_zips": [
+    "01004"
+   ],
+   "meaningful_entity_count": 7,
+   "facts": [
+    [
+     "Civic/Public",
+     "Kendrick Park Library Expansion",
+     "Approved",
+     1
+    ],
+    [
+     "Development",
+     "Mixed-use building <script>alert(1)</script>",
+     "Proposed",
+     1
+    ],
+    [
+     "Development",
+     "Single family dwelling",
+     "Proposed",
+     1
+    ],
+    [
+     "Industrial",
+     "Research Lab Addition",
+     "Operating",
+     1
+    ],
+    [
+     "Residential",
+     "Olympia Place Apartments",
+     "Proposed",
+     1
+    ],
+    [
+     "Residential",
+     "UMass Student Housing Phase 2",
+     "Approved",
+     1
+    ],
+    [
+     "Utility",
+     "North Pleasant Street Reconstruction",
+     "Proposed",
+     1
+    ]
+   ],
+   "representative_entities": [
+    {
+     "id": "e1",
+     "name": "Olympia Place Apartments",
+     "source_url": "https://permits.example.gov/r/1",
+     "status": "Proposed",
+     "type": "Residential",
+     "date": "2026-09-01",
+     "zip": "01002"
+    },
+    {
+     "id": "e2",
+     "name": "Kendrick Park Library Expansion",
+     "source_url": "https://permits.example.gov/r/2",
+     "status": "Approved",
+     "type": "Civic/Public",
+     "date": "2026-08-20",
+     "zip": "01002"
+    },
+    {
+     "id": "e3",
+     "name": "North Pleasant Street Reconstruction",
+     "source_url": "https://permits.example.gov/r/3",
+     "status": "Proposed",
+     "type": "Utility",
+     "date": "2026-08-10",
+     "zip": "01002"
+    },
+    {
+     "id": "e4",
+     "name": "UMass Student Housing Phase 2",
+     "source_url": "https://permits.example.gov/r/4",
+     "status": "Approved",
+     "type": "Residential",
+     "date": "2026-07-15",
+     "zip": "01003"
+    },
+    {
+     "id": "e5",
+     "name": "Mixed-use building <script>alert(1)</script>",
+     "source_url": "https://permits.example.gov/r/5",
+     "status": "Proposed",
+     "type": "Development",
+     "date": "2026-07-01",
+     "zip": "01003"
+    },
+    {
+     "id": "e6",
+     "name": "Research Lab Addition",
+     "source_url": "https://permits.example.gov/r/6",
+     "status": "Operating",
+     "type": "Industrial",
+     "date": "2026-06-01",
+     "zip": "01003"
+    }
+   ]
+  }
+ }
+}

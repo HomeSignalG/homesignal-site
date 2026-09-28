@@ -61,6 +61,8 @@ on:
       - 'test/dev-seo-ssr-type-adapter.test.mjs'
       - 'test/fixtures/zip-pages.json'
       - 'test/fixtures/development_seo_plane.json'
+      - 'test/city-pages.test.mjs'
+      - 'test/fixtures/city-pages/**'
       - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   pull_request:
@@ -86,6 +88,8 @@ on:
       - 'test/community-page-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
       - 'test/fixtures/development_seo_plane.json'
+      - 'test/city-pages.test.mjs'
+      - 'test/fixtures/city-pages/**'
       - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   schedule:
@@ -142,8 +146,11 @@ jobs:
           age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
           if age > 36:
               sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > 36h)")
+          if not isinstance(p.get("cities"), dict):
+              sys.exit("ERROR: fetched plane has no cities section — refusing to drop city pages")
           print("fetched Rule D plane generated_at", raw, "age_h", round(age, 2),
-                "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"))
+                "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"),
+                "city_n", len(p["cities"]))
           PY
 
       - name: Generate one document per canonical ZIP
@@ -185,11 +192,20 @@ jobs:
           assert 'homesignalmap.html?zip=' not in sm, \
               'noindex development URLs are still advertised in the sitemap'
           assert man['sitemap_dev_urls_removed'] >= 0, 'manifest must record the removal count'
+          # CITY PAGES (plan step 9): every city document written is advertised, and only those.
+          import os
+          written = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                           for r, _, fs in os.walk('_site/city') if 'index.html' in fs)
+          cities = re.findall(r'<loc>https://homesignal\.net(/city/[a-z]{2}/[a-z0-9-]+/)</loc>', sm)
+          assert written == man['city_pages'], 'city documents != manifest city_pages'
+          assert sorted(cities) == man['city_pages'], 'sitemap city URLs != city pages written'
+          assert len(cities) == len(set(cities)), 'duplicate city URL in the sitemap'
+          print(f"city pages reconciled: {len(written)} documents == sitemap {len(cities)}")
           print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+community/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -225,7 +241,8 @@ jobs:
                   actual.add(os.path.relpath(os.path.join(root, f), '_site').replace(os.sep, '/'))
           # everything the build legitimately ADDS to the staged contract
           def generated(p):
-              return p == 'zip-pages-manifest.json' or p.startswith('community/')
+              return (p == 'zip-pages-manifest.json' or p.startswith('community/')
+                      or p.startswith('city/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
@@ -252,13 +269,17 @@ jobs:
             echo 'ERROR: community/ is tracked in git — generated output must never be committed'
             exit 1
           fi
+          if git ls-files --error-unmatch city/ >/dev/null 2>&1; then
+            echo 'ERROR: city/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
           echo "git is clean of generated ZIP documents"
 
       - name: Offline gates for the generated documents
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
-          for t in zip-pages-seo zip-pages-no-point community-page-contract; do
+          for t in zip-pages-seo zip-pages-no-point community-page-contract city-pages; do
             echo "--- test/$t.test.mjs"
             node "test/$t.test.mjs" | tail -3
           done
