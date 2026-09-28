@@ -774,7 +774,8 @@ def render_city(c, pages, built):
             note = f' <span class="quiet">{pg.get("rule_d_count")} projects</span>'
         zli.append(f'<li><a href="/community/{esc(z)}/">{esc(pg["name"])}</a>{note}</li>')
     body = (
-        f'<main id="hs-ssr"><header><p class="eyebrow">City development</p>'
+        f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · '
+        f'City development</p>'
         f'<h1>Development in {esc(label)}</h1>'
         f'<p>{n} distinct development projects on file across {esc(across)}. A project '
         f'that appears in more than one of these ZIP codes is counted once.</p></header>'
