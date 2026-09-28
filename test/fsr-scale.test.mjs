@@ -231,6 +231,23 @@ const cpMissing = sold.filter((id) => !checkpoint.includes(id));
 ok(cpMissing.length === 0,
   '9y6 the checkpoint names every dataset the sold report actually reads', cpMissing);
 
+// Shipping the page made a new misreading available: the launch table now has rows marked
+// Done, and a reader skimming it can take "deployed" for "launched". It is not. A published
+// artifact nobody can find, at no price, is not a sale, and the verdict turns on the sale.
+// So the two gates that are actually load-bearing must still be recorded as unmet for as
+// long as no customer exists.
+const launchTable = (checkpoint.split('## What is between here and a launch')[1] || '')
+  .split('\n## ')[0];
+ok(launchTable.length > 0, '9y7 the checkpoint still states what stands between here and a launch');
+if (matrix.signed_paid_pilots === 0) {
+  const priceRow = (launchTable.match(/^\| A price \|.*$/m) || [''])[0];
+  const customerRow = (launchTable.match(/^\| A customer \|.*$/m) || [''])[0];
+  ok(/There is none/.test(priceRow) && !/\*\*Done\.\*\*/.test(priceRow),
+    '9y8 with no customer, the checkpoint still records that nothing can be charged for', priceRow);
+  ok(/\*\*0\*\*/.test(customerRow) && /NOT YET/.test(customerRow) && !/\*\*Done\.\*\*/.test(customerRow),
+    '9y9 with no customer, the checkpoint still holds the verdict at NOT YET', customerRow);
+}
+
 ok(matrix.markets.filter((m) => m.assemblable).length === 1,
   '9y exactly one market is assemblable');
 ok(!CLASSES.slice(0, 1).some((c) => JSON.stringify(matrix).includes(c)),

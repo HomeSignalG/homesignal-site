@@ -133,18 +133,20 @@ Steps 2–13 are closed for the NYC V1 allowlist as recorded above. Remaining ga
 ## What is between here and a launch
 
 No plan step is outstanding. What remains is not engineering work that was skipped — it is
-the set of deliberate acts that turn a built artifact into a sold one, and none of them is
-an agent's to take. Measured against the tree on 2026-09-28:
+the set of deliberate acts that turn a built artifact into a sold one. Measured against the
+tree on 2026-09-28:
 
 | Gate | State | Whose act |
 |---|---|---|
-| Merge to `main` | Not merged. Everything is on `cursor/nyc-pilot-geography-rights-dbc1` (PR #1424). `pages / deploy` runs only on `main`, so nothing is live. | Founder |
-| Deploy the edge function | Never deployed. `.github/workflows/deploy-edge-functions.yml` is `workflow_dispatch` only, deliberately manual, and has never been dispatched for `get-future-surroundings-report`. Until it is, the JSON API does not exist in production. | Founder |
-| A way in | The page is staged by `scripts/stage_site.py`, so a merge would publish it at `/future-surroundings-report.html` — but **no page links to it and it is not in `sitemap.xml`.** A buyer cannot find it. Whether that stays true is a decision, not an oversight. | Founder |
+| Merge to `main` | **Done.** PR #1424 merged at `478e002`; `pages / deploy` green on `main`. | — |
+| Deploy the page | **Done.** `https://homesignal.net/future-surroundings-report.html` returns 200, and `lib/nyc-v1-report.js`, `lib/nyc-v1-soda.js`, and `lib/fsr-scale.js` are byte-identical to the repo. The page reads the City's views from the browser, so the report works without the edge function. | — |
+| Deploy the edge function | **Not deployed.** `POST /functions/v1/get-future-surroundings-report` returns `404 NOT_FOUND`. `.github/workflows/deploy-edge-functions.yml` is `workflow_dispatch` only and has never been dispatched for this slug, so the JSON API of Step 13 does not exist in production. It needs `gh workflow run deploy-edge-functions.yml -f function=get-future-surroundings-report`. | Founder |
+| A way in | **Not done, and a decision rather than an oversight.** The page is published, but no page links to it and it is not in `sitemap.xml`. A buyer cannot find it without the URL. | Founder |
 | A price | There is none. No Stripe, no checkout, no payment path anywhere in the tree. Nothing can be charged for. | Founder |
 | A customer | `signed_paid_pilots` is **0** and the count is shipped on the page. Step 15 holds the verdict at **NOT YET** until one real sale happens. | Founder |
 
-The first four are reversible decisions. The fifth is the one the audit actually gates on:
+Deploying the page did not move the verdict and was never going to. A published artifact
+nobody can find, at no price, is not a sale. The last row is the one the audit gates on:
 the verdict moves when a customer is sold an artifact built only from the allowlist, and
 not before. Nothing in this repository may raise the pilot count or change the verdict in
 anticipation of that.
