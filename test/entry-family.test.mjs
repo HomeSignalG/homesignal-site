@@ -60,7 +60,7 @@ ok(HS.eventRow('x'.repeat(100)).event_type.length === 64, 'event type capped at 
 
 // 4. logEvent writes one row in live mode, nothing in seed mode, and never throws.
 const store = (m) => ({ getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } });
-global.location = { origin: 'https://homesignal.net', pathname: '/homesignalmap.html', search: '?addr=1+Main+St' };
+global.location = { origin: 'https://homesignal.net', hostname: 'homesignal.net', pathname: '/homesignalmap.html', search: '?addr=1+Main+St' };
 global.sessionStorage = store({ 'hs:entry': JSON.stringify({ family: 'city', path: '/city/tx/austin/' }) });
 global.localStorage = store({});
 const inserts = [];
@@ -77,6 +77,16 @@ ok(r0.entry_family === 'city' && r0.entry_path === '/city/tx/austin/' && r0.zip_
    'live mode: the row carries the stored entry and the ZIP');
 ok(r0.page_url === 'https://homesignal.net/homesignalmap.html', 'page_url drops the query string (no address is stored)');
 ok(/^s[a-z0-9]+$/.test(r0.session_id || ''), 'an anonymous session id is set');
+// The browser tests serve the site from 127.0.0.1 against the production database.
+for (const h of ['127.0.0.1', 'localhost', 'homesignal.github.io', '']) {
+  global.location.hostname = h;
+  HS.logEvent('property_lookup', {});
+}
+global.location.hostname = 'homesignal.net';
+ok(inserts.length === 1, 'a page served from anywhere but homesignal.net writes nothing (test runs stay out of the numbers)');
+HS.logEvent('property_lookup', {});
+ok(inserts.length === 2, 'control: homesignal.net still writes');
+inserts.pop();
 global.window.HS_CONFIG.DATA_SOURCE = 'seed';
 let threw = false;
 try { HS.logEvent('property_lookup', {}); } catch (err) { threw = true; }
