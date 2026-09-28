@@ -16,6 +16,9 @@
 --     admits: 8,369 placements served, 1,014 inside, 7,355 OUTSIDE, on 1,918 ZIP pages;
 --     and 69 true members (inside the polygon, beyond 5 mi) on 25 ZIP pages were NEVER
 --     served. Both directions of the defect, in one function.
+--     ⚠️ DATED 2026-09-22 — do not rewrite the 8,369 / 1,014 / 7,355 / 69 figures. The
+--     12,013 is the Fix-29-era admitted set (pre-activation). Serving 2026-09-28 on
+--     n5-national-2026-09-25: 12,016 boundary_complete + 706 not_measured + 0 unknown.
 --   * FACILITY plane (development_reports.sites points that are not development): 216,221
 --     points, 103,724 OUTSIDE their ZIP's boundary. Every one draws a TYPE pin — the shipped
 --     resolver (lib/map.js HS.resolveMarker, overlay-on-Type + dual identity) maps the only

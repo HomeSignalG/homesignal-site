@@ -11,6 +11,10 @@
 //   Cross-tab with ZERO contradictory rows: maps_zip_geography_status 'boundary_complete'
 //   holds for exactly the 12,013 canonical ZIPs carrying a polygon, 'not_measured' for
 //   exactly the 706 that do not (3 more carry a polygon but no status row -> 'unknown').
+//   ⚠️ DATED 2026-09-15. Serving 2026-09-28 on n5-national-2026-09-25: those three
+//   (94128, 95219, 99128) now have serving status boundary_complete, so complete = 12,016
+//   and unknown = 0. The UNKNOWN fixture below stays: the fail-closed unknown branch is
+//   a contract even while production currently has no occupant.
 //
 // SCOPE. This is a MEMBERSHIP gate, not a containment test and not a classifier change.
 // A ZIP that HAS geography keeps today's behaviour exactly, including a national record near
@@ -35,6 +39,8 @@ const LIB  = readFileSync(new URL('../lib/zip-authoritative.js', import.meta.url
 // Real producer shapes (measured 2026-09-04/15 against app_zip_projects_markers).
 const NOT_MEASURED = { zip: '01004', mode: 'authoritative', status: 'not_measured',
                        projects: null, markers: null };
+// Production 2026-09-28 no longer returns unknown for 94128 (it is measured_zero).
+// The shape is kept so nationalPlaneAdmitted still refuses an unread state.
 const UNKNOWN      = { zip: '94128', mode: 'authoritative', status: 'unknown',
                        projects: null, markers: null };
 const COMPLETE     = { zip: '78617', mode: 'authoritative', status: 'boundary_complete',

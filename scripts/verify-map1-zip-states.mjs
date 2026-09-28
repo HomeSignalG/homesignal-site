@@ -36,11 +36,17 @@ const ok = (c, name, detail) => {
 const PRODUCER_RPC = 'app_zip_projects_markers';
 
 // CANDIDATES, not fixtures. Deliberately MORE than four and redundant per state, so one ZIP
-// graduating (exactly what happened to 08005) costs coverage nothing. Measured 2026-09-15:
-// 12,013 of 12,722 canonical ZIPs are boundary_complete, 706 not_measured and just 3 unknown —
-// so `pending` is the scarce state and carries all three of its live members.
+// graduating (exactly what happened to 08005) costs coverage nothing. Do NOT restore
+// hardcoded kinds. Measured 2026-09-28 on serving n5-national-2026-09-25: 12,016 of 12,722
+// canonical ZIPs are boundary_complete, 706 not_measured, 0 unknown — so `pending` is
+// currently unoccupied. Do not invent a pending ZIP; the live gate already fails loudly via
+// `COVERAGE: no candidate ZIP is currently in the` when a kind has no live member (tests
+// 6a/6b). 94128 / 95219 now resolve as measured_zero (project_count 0); 99128 as
+// authoritative (project_count 1). They stay in the pool so one graduating still costs
+// coverage nothing for those two states.
 const CANDIDATES = [
-  '94128', '95219', '99128',   // unknown  -> pending        (all 3 that exist)
+  '94128', '95219', '99128',   // 2026-09-15: unknown -> pending. 2026-09-28: measured_zero /
+                               // measured_zero / authoritative. Kept as redundant coverage.
   '01004',                     // not_measured
   '01001',                     // boundary_complete, projects > 0 -> authoritative
   '01009', '08005',            // boundary_complete, projects = 0 -> measured_zero

@@ -4,12 +4,20 @@
 // database. scripts/verify-map1-zip-states.mjs is a live gate; the mapping it selects its
 // assertions with is a pure function and belongs where a unit test can reach it.
 //
-// THE STATES, and what the producer says for each (measured 2026-09-15 over all 12,722
-// canonical ZIPs via public.app_zip_projects_markers):
-//   'unknown'           -> pending         3 ZIPs   no geo.maps_zip_geography_status row yet
+// THE STATES, and what the producer says for each. Mapping is UNCHANGED (unknown still
+// -> pending). Standing totals measured 2026-09-28 over all 12,722 canonical ZIPs via
+// geo.n5_serving_status on serving generation n5-national-2026-09-25, corroborated by
+// public.app_zip_projects_markers(..., p_authoritative := true):
+//   'unknown'           -> pending         0 ZIPs   currently unoccupied (do not invent a
+//                                                   pending ZIP; the live gate's COVERAGE
+//                                                   path is what fires if this stays 0)
 //   'not_measured'      -> not_measured  706 ZIPs   measured deliberately as not-measured
 //   'boundary_complete' -> authoritative           project_count > 0
-//   'boundary_complete' -> measured_zero           project_count = 0   (12,013 complete in total)
+//   'boundary_complete' -> measured_zero           project_count = 0   (12,016 complete in total)
+// The 2026-09-15 receipt (3 unknown / 12,013 complete) is the pre-activation set. The three
+// that were unknown then — 94128, 95219, 99128 — now resolve as measured_zero / measured_zero
+// / authoritative (project_count 0 / 0 / 1). kindFromProducer({status:'unknown'}) still maps
+// to pending so the fail-closed unknown branch remains a contract.
 
 /**
  * @returns one of 'pending' | 'authoritative' | 'not_measured' | 'measured_zero', or

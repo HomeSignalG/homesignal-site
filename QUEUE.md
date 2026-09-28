@@ -273,6 +273,10 @@ does not substitute centroid proximity for membership.
   anon-executable**, so it cannot gate an anonymous page load. The substitute is sound because it was
   cross-tabbed with **zero contradictory rows**: `boundary_complete` holds for exactly the 12,013
   canonical ZIPs carrying a polygon, `not_measured` for exactly the 706 that do not.
+  ⚠️ DATED Fix 29 receipt (2026-09-15) — do not rewrite those numbers. Serving 2026-09-28 on
+  `n5-national-2026-09-25`: boundary_complete **12,016** · not_measured **706** · unknown **0**
+  over all 12,722 canonical ZIPs, still zero contradictory rows (complete_without_polygon 0 ·
+  not_measured_with_polygon 0). The +3 are 94128, 95219, 99128.
 - **Gated at the DATA boundary, not by hiding markers.** A refused record never becomes a site, so it
   cannot reach `render()`, `MAP_SITES`, the counts, the three map views, the ODbL credit or
   `__HS_SITES`. A hidden marker is still a site the page has accepted as belonging to the ZIP, and
@@ -325,10 +329,14 @@ does not substitute centroid proximity for membership.
   · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
   change · no Fix 30/31 work.
 - 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
-  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
-  obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
-  architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
-  706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+    with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
+    obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
+    architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
+    706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+    ⚠️ DATED on the three-ZIP item — as of 2026-09-28 all three HAVE a serving `geo.n5_serving_status`
+    row (`boundary_complete`). RPC `app_zip_projects_markers(..., p_authoritative := true)`:
+    94128 / 95219 measured_zero (`project_count` 0 / 0); 99128 authoritative (`project_count` 1).
+    The 685/706 architecture finding is unchanged and is still not taken.
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 

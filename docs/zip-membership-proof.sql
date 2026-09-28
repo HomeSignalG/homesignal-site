@@ -19,6 +19,9 @@ select count(*) total,
 --    12,016 with boundary · 1,083 served · 1,083 inside · 0 outside · 1,083 true members · 0 missed.
 --    (Before, national_dc_for_zip(zip, 5) over the 12,013 admitted ZIPs: 8,369 / 1,014 / 7,355 /
 --    69 missed on 25 ZIPs.)
+--    ⚠️ The 12,013 is the Fix-29-era admitted set (status row missing on 94128/95219/99128).
+--    Do not rewrite those before-figures. The 12,016-with-boundary after-state already
+--    matches serving 2026-09-28 (geo.n5_serving_status boundary_complete = 12,016).
 with canon as (select c.zip, b.geom from public.canonical_zip_registry c
                  left join geo.zcta_boundary b on b.zcta5 = c.zip),
 served as (select c.zip, r.source_key, r.lat, r.lng, r.zip_membership, c.geom

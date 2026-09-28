@@ -21,6 +21,10 @@ let n = 0, bad = 0;
 const ok = (c, m) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m); } };
 
 // ── 1 · the four real shapes, verbatim from production 2026-09-15 ───────────────────────────
+// 94128 is the unknown SHAPE. Production 2026-09-28 returns measured_zero for that ZIP
+// (boundary_complete, project_count 0). Keep the unknown → pending mapping: pending is
+// currently unoccupied in production; do not invent a pending ZIP and do not drop this
+// branch. The live gate's COVERAGE path is what fires if a kind has no live member.
 ok(kindFromProducer({ zip: '94128', mode: 'authoritative', status: 'unknown', projects: null, markers: null })
    === 'pending', '1a: status "unknown" (no producer row) is the PENDING state');
 ok(kindFromProducer({ zip: '01004', mode: 'authoritative', status: 'not_measured', projects: null, markers: null })
@@ -88,6 +92,9 @@ ok(/every candidate ZIP resolved to a known producer state/.test(GATE),
    '6c: an unresolvable producer read is its own reported failure');
 
 // ── 7 · the candidate pool still covers all four states ──────────────────────────────────────
+// Do NOT restore hardcoded kinds. Pending is currently unoccupied in production (unknown = 0
+// as of 2026-09-28); the live gate already fails loudly via `COVERAGE: no candidate ZIP is
+// currently in the` (6a/6b). Do not invent a pending ZIP to occupy it.
 const pool = (CODE.match(/const CANDIDATES = \[([\s\S]*?)\]/) || [])[1] || '';
 const zips = pool.match(/'\d{5}'/g) || [];
 ok(zips.length >= 4, '7a: the candidate pool is populated', );
@@ -137,6 +144,18 @@ ok(/INFRASTRUCTURE: \$\{c\.zip\} reported a failed load/.test(GATE) && /NOTHING 
    '9f: a failed load is reported as INFRASTRUCTURE, never as a contract result');
 ok(/if \(m\.loadFailed\) \{[\s\S]{0,400}?continue;/.test(CODE),
    '9g: …and the state assertions are SKIPPED rather than run against a page that never loaded');
+
+// ── 10 · STANDING TOTALS ARE 12,016 COMPLETE, PENDING CURRENTLY UNOCCUPIED ───────────────────
+// Comments, not executable mapping. The 2026-09-15 "exactly the 12,013" figure is a dated
+// receipt; the standing claim on this branch is 12,016 / 706 / 0 unknown.
+const KIND_SRC = readFileSync(new URL('../scripts/lib/zip-state-kind.mjs', import.meta.url), 'utf8');
+const LIB = readFileSync(new URL('../lib/zip-authoritative.js', import.meta.url), 'utf8');
+ok(/12,016/.test(KIND_SRC) && /currently unoccupied/.test(KIND_SRC),
+   '10a: zip-state-kind standing comment names 12,016 complete and currently-unoccupied pending');
+ok(!/exactly the 12,013 canonical ZIPs that carry/.test(LIB),
+   '10b: zip-authoritative standing comment is not the pre-activation 12,013 wording');
+ok(/12,016/.test(LIB),
+   '10c: zip-authoritative standing comment names 12,016 polygon/complete ZIPs');
 
 console.log(`\n${n - bad}/${n} passed`);
 if (bad) process.exit(1);

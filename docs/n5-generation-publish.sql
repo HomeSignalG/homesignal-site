@@ -1197,6 +1197,9 @@ begin
   --     already redundant: enabled-and-verified = 12,013 ZIPs = exactly the 12,013
   --     boundary_complete ZIPs of the serving generation (0 either way; the 64 disabled rows
   --     are all not boundary_complete). So deriving it changes no output today, and after
+  --     ⚠️ DATED 2026-09-25 measurement — do not rewrite it, and do not change the C3
+  --     regexp_replace below. Serving 2026-09-28 on n5-national-2026-09-25:
+  --     boundary_complete 12,016 · not_measured 706 · unknown 0.
   --     this the serving generation alone decides. The table is RETAINED, unread by any
   --     serving path, as the historical record of the legacy rollout.
   def := pg_get_functiondef('public.app_projects_for_zip(text,text)'::regprocedure);

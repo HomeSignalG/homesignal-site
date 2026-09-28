@@ -2172,7 +2172,11 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   from the serving generation. Measured 2026-09-25: enabled-and-verified = the 12,013
   boundary_complete ZIPs exactly (0 either way), so no output changes today. The table stays as
   the historical rollout record; only the diagnostic `refresh_maps_zip_export` (no readers)
-  still reads it.
+  still reads it. ⚠️ DATED RECEIPT — do not rewrite the 2026-09-25 measurement. After N5
+  activation 2026-09-27, serving generation `n5-national-2026-09-25` reads (measured
+  2026-09-28 over all 12,722 canonical_zip_registry ZIPs via `geo.n5_serving_status`):
+  boundary_complete **12,016** · not_measured **706** · unknown **0**. The +3 are 94128,
+  95219, 99128, which had no serving-status row on 2026-09-25.
 - **Publication scope = shard prefixes ∪ every canonical prefix** (`geo.n5_generation_publish_scope`).
   Shards alone would leave **40 prefixes / 445 ZIPs** with no status; **442** of those serve a
   measured zero today and would regress to 'unknown' on activation.
@@ -2210,6 +2214,10 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     and the 25 s timeout unchanged. **Same answers, byte for byte, on 6 recorded ZIP reads**
     (97702 dev + facility, 01004 not_measured, 01009 zero projects, 94128 no status row, 28451 the
     largest at 8.8 MB), and the public PostgREST call for 97702 returns the same 996,316 bytes.
+    ⚠️ DATED RECEIPT of the 2026-09-26 apply sample — do not rewrite it. As of 2026-09-28,
+    94128 HAS a serving-status row: `boundary_complete`, `project_count=0` (measured_zero),
+    via `app_zip_projects_markers('94128','development',true)`. 95219 is the same shape;
+    99128 is `boundary_complete` with `project_count=1` (authoritative).
   - **Measured after:** 97702 3,221 ms / 128,931 blocks read → **69 ms / 0 read**; 28451 → 576 ms
     (before, four large ZIPs in one call ran past 60 s); the public call for 97702 used 82 ms of
     database time and read 0 blocks (before: mean 4,553 ms, ~119,000 blocks read per call).
