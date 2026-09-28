@@ -202,6 +202,28 @@ const docRefs = JSON.stringify(matrix).match(/docs\/[a-z0-9-]+\.md/g) || [];
 ok(docRefs.length > 0, '9w the matrix cites evidence files', docRefs.length);
 docRefs.forEach((d) => ok(existsSync(join(root, d)), '9x cited evidence exists on disk: ' + d));
 
+// A drafted clearance request is the one artifact that could be mistaken for a grant:
+// it is written in the language of permission and lives beside the evidence files. So
+// the market it names must still be held, and it must say on its face that it is unsent.
+const REQUESTS = [['cambridge', 'docs/corporate-output-cambridge-clearance-request-2026-09-28.md']];
+REQUESTS.forEach(([marketId, path]) => {
+  ok(existsSync(join(root, path)), '9y0 the drafted request for ' + marketId + ' is on disk');
+  const doc = read(path);
+  ok(/NOT SENT/.test(doc), '9y1 the ' + marketId + ' request states on its face that it was not sent');
+  const market = matrix.markets.find((m) => m.id === marketId);
+  ok(market && !market.assemblable,
+    '9y2 drafting a request did not make ' + marketId + ' assemblable');
+  const clsOf = [market && market.geography, ...((market && market.publisher_data) || [])]
+    .filter(Boolean).map((d) => d.classification || '');
+  ok(clsOf.length > 0 && clsOf.every((c) => /^HOLD|^EXCLUDE/.test(c)),
+    '9y3 every ' + marketId + ' object is still held while consent is unanswered', clsOf);
+  const marketIds = [market.geography, ...(market.publisher_data || [])]
+    .filter((d) => d && d.dataset_id).map((d) => d.dataset_id);
+  ok(marketIds.length > 0, '9y4 the ' + marketId + ' entry names datasets to check', marketIds);
+  const reached = Scale.apiCapability().datasets.filter((id) => marketIds.includes(id));
+  ok(reached.length === 0, '9y5 no ' + marketId + ' dataset reached the sold allowlist', reached);
+});
+
 ok(matrix.markets.filter((m) => m.assemblable).length === 1,
   '9y exactly one market is assemblable');
 ok(!CLASSES.slice(0, 1).some((c) => JSON.stringify(matrix).includes(c)),
