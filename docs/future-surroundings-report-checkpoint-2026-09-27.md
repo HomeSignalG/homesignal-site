@@ -56,7 +56,7 @@ It answers what Department of Buildings activity is on the record around a match
 | Step | Status |
 |---|---|
 | 4 Build the report from the NYC V1 allowlist | **Done** |
-| 5 Durable `report_id` tied to data state | **Done** (SHA-256 of the canonical object) |
+| 5 `report_id` tied to data state | **Done** (SHA-256 over the object, minus `report_id` and `generated_at`). Not "durable": it is not unique per issuance, is not reproducible by re-running the address later, and is not a signature — see `docs/corporate-output-report-id-guarantee-2026-09-28.md` |
 | 6 Share link and print/PDF | **Done** (query rebuild + browser print) |
 | 7 Canonical commercial JSON | **Done** (download the assembled object) |
 | 8 Minimal workspace | **Done** (session list of recent reports) |

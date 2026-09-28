@@ -316,7 +316,15 @@
   function render(report) {
     lastReport = report;
     var html = '';
+    // Saying only what the hash can carry. It fingerprints this content, so it answers
+    // "are these two files the same report". It is not a signature, it is not unique to
+    // one issuance, and re-running this address later will not reproduce it.
     html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
+    html += '<p class="sub">A fingerprint of the records below. It is not a receipt and'
+      + ' not a signature. Two reports with the same id hold the same data; re-running this'
+      + ' address later gives a different id, because the City\u2019s records move. To'
+      + ' check it, take the downloaded JSON as delivered, remove <code>report_id</code>'
+      + ' and <code>generated_at</code>, and SHA-256 what is left.</p>';
     html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
 
     if (report.status === 'address_miss' || !report.property) {

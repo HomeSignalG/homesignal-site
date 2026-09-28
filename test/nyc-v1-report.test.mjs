@@ -415,5 +415,54 @@ ok(/ipu4-2q9a, w9ak-ipjd/.test(silentHtml) && /contributed/.test(silentHtml),
 ok(!/contributed/.test(completeHtml),
   '7o1 a report with no silent source does not invent one', completeHtml);
 
+// §8 — what report_id may be claimed to do. The page prints it to a buyer, so each
+// sentence it prints is pinned to the mechanism. Recorded in
+// docs/corporate-output-report-id-guarantee-2026-09-28.md.
+const idBase = (over) => Object.assign({
+  address: '1 Centre Street', zip: '10007', radius_mi: 0.5, address_points: [centre],
+  issuance: [issuanceNear], dobnow: [], filings: [],
+  versions: { addresspoint: 'v1', issuance: 'v1', dobnow: 'v1', filings: 'v1' },
+  row_cap_per_dataset: 5000, retrieved_at: '2026-09-28T00:00:00.000Z',
+  generated_at: '2026-09-28T00:00:00.000Z'
+}, over || {});
+const idA = await V1.assembleReport(idBase());
+
+// The check the page tells the buyer to run, run the way a third party would: parse the
+// delivered JSON, drop the two excluded fields, hash the rest. No HomeSignal code.
+const { createHash } = await import('node:crypto');
+const rederived = (() => {
+  const o = JSON.parse(JSON.stringify(idA));
+  delete o.report_id;
+  delete o.generated_at;
+  return createHash('sha256').update(JSON.stringify(o)).digest('hex');
+})();
+ok(rederived === idA.report_id,
+  '8a the verification the page describes actually reproduces the id');
+
+ok((await V1.assembleReport(idBase({ generated_at: '2027-01-01T00:00:00.000Z' }))).report_id === idA.report_id,
+  '8b unchanged data issued later keeps the same id, so it is not a receipt');
+// canonicalize is exported, so its contract is what a re-derivation depends on: it must
+// drop both excluded fields from a finished report, not only from the pre-hash draft.
+const canon = JSON.parse(V1.canonicalize(idA));
+ok(!('report_id' in canon) && !('generated_at' in canon),
+  '8b2 canonicalize drops both excluded fields from a finished report', Object.keys(canon).slice(-4));
+ok((await V1.assembleReport(idBase({ versions: { addresspoint: 'v1', issuance: 'v2', dobnow: 'v1', filings: 'v1' } }))).report_id !== idA.report_id,
+  '8c a moved publisher version changes the id');
+ok((await V1.assembleReport(idBase({ issuance: [] }))).report_id !== idA.report_id,
+  '8d a record leaving the radius changes the id');
+
+// The page must not describe the id as something it is not.
+const idAt = pageSrc.indexOf("report_id ' + esc(report.report_id)");
+ok(idAt !== -1, '8e0 the page prints the id where the claim can be checked');
+const idClaim = pageSrc.slice(idAt, idAt + 900);
+ok(/fingerprint/.test(idClaim) && /not a receipt/.test(idClaim) && /not a signature/.test(idClaim),
+  '8e the page calls it a fingerprint and denies both a receipt and a signature', idClaim);
+ok(/different id/.test(idClaim),
+  '8f the page warns that re-running the address later gives a different id', idClaim);
+ok(!/\bDurable\b/.test(read('docs/future-surroundings-report-checkpoint-2026-09-27.md')),
+  '8g the checkpoint no longer calls the id durable');
+ok(existsSync(join(root, 'docs/corporate-output-report-id-guarantee-2026-09-28.md')),
+  '8h the guarantee is written down');
+
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');
 process.exit(fails ? 1 : 0);
