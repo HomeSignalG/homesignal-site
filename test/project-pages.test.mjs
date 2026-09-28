@@ -287,6 +287,31 @@ print("LOADED")`;
      'project pages link to the second guide');
 }
 
+// ---- 10. family sitemaps (plan step 14) ---------------------------------------------------
+{
+  const fam = {};
+  for (const n of ['zip-alerts', 'zip-development', 'city', 'project', 'guide']) {
+    const f = join(out, 'sitemaps', `${n}.xml`);
+    ok(existsSync(f), `sitemaps/${n}.xml is written`);
+    fam[n] = [...readFileSync(f, 'utf8').matchAll(/<loc>https:\/\/homesignal\.net([^<]+)<\/loc>/g)].map((m) => m[1]);
+    ok(fam[n].length === man.family_sitemaps[n], `${n}: the manifest records its count (${fam[n].length})`);
+  }
+  ok(JSON.stringify([...fam.project].sort()) === JSON.stringify(man.project_pages), 'the project family is exactly the project pages');
+  ok(JSON.stringify([...fam.city].sort()) === JSON.stringify(man.city_pages), 'the city family is exactly the city pages');
+  ok(JSON.stringify([...fam.guide].sort()) === JSON.stringify(man.guide_pages), 'the guide family is exactly the guides');
+  ok(fam['zip-development'].includes('/community/01002/') && !fam['zip-alerts'].includes('/community/01002/'),
+     'a Rule-D-only ZIP is in the development family and not the alerts family');
+  const mainGen = new Set([...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/(?:community|city|project|guides)\/[^<]+)<\/loc>/g)].map((m) => m[1]));
+  const union = new Set(Object.values(fam).flat());
+  ok(union.size === mainGen.size && [...union].every((u) => mainGen.has(u)),
+     `together the families cover exactly sitemap.xml's generated URLs (${union.size})`);
+  const robots = readFileSync(join(root, 'robots.txt'), 'utf8');
+  ok(['zip-alerts', 'zip-development', 'city', 'project', 'guide']
+    .every((n) => robots.includes(`Sitemap: https://homesignal.net/sitemaps/${n}.xml`)) &&
+     robots.includes('Sitemap: https://homesignal.net/sitemap.xml'),
+     'robots.txt lists sitemap.xml and every family sitemap');
+}
+
 // ---- 8. determinism --------------------------------------------------------------------
 ok(read(build(makeInputs()).out, p1) === pg1, 'two builds of the same input write byte-identical project pages');
 

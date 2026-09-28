@@ -1370,6 +1370,30 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
             "projects": len(pps), "guides": len(gps)}
 
 
+# ---------------------------------------------------------------- family sitemaps (plan step 14)
+# Search Console reports indexing per SUBMITTED sitemap, so one sitemap per page family is what
+# lets it measure each family separately. These are ADDITIONAL to sitemap.xml, which is
+# unchanged; every URL in them is also in sitemap.xml. The two ZIP families overlap on
+# purpose: a ZIP that passes both Rule F and Rule D is in both, so each rule is measured
+# over the whole set of pages it qualifies.
+SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide")
+
+
+def write_family_sitemaps(out_dir, families):
+    d = os.path.join(out_dir, "sitemaps")
+    os.makedirs(d, exist_ok=True)
+    counts = {}
+    for name in SITEMAP_FAMILIES:
+        paths = sorted(families.get(name) or [])
+        body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                + "".join(_url_el(f"{BASE}{p}") + "\n" for p in paths)
+                + "</urlset>\n")
+        open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(body)
+        counts[name] = len(paths)
+    return counts
+
+
 # ---------------------------------------------------------------- build + gates
 def build(pages, out_dir, canonical, built):
     canon = set(canonical)
@@ -1484,6 +1508,10 @@ def main():
     project_paths = sorted(pr["path"] for pr in projects.values())
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10])
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths)
+    fam = write_family_sitemaps(a.out, {
+        "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
+        "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
+        "city": city_paths, "project": project_paths, "guide": guide_paths})
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
@@ -1500,6 +1528,7 @@ def main():
           f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs")
+    print("family sitemaps : " + ", ".join(f"{k} {v}" for k, v in fam.items()))
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
@@ -1520,7 +1549,8 @@ def main():
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
-               "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"]},
+               "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
+               "family_sitemaps": fam},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

@@ -239,11 +239,27 @@ jobs:
           assert sorted(guides) == man['guide_pages'], 'sitemap guide URLs != guide pages written'
           assert len(gwritten) == 2, f'expected the two guides, found {gwritten}'
           print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
+          # FAMILY SITEMAPS (plan step 14): each family is exactly its own set, and together
+          # they cover exactly the generated URLs sitemap.xml advertises.
+          main_gen = set(re.findall(r'<loc>https://homesignal\.net(/(?:community|city|project|guides)/[^<]+)</loc>', sm))
+          fam_union = set()
+          expect = {'zip-alerts': None, 'zip-development': None, 'city': man['city_pages'],
+                    'project': man['project_pages'], 'guide': man['guide_pages']}
+          for name, want in expect.items():
+              fx = open(f'_site/sitemaps/{name}.xml', encoding='utf-8').read()
+              locs = re.findall(r'<loc>https://homesignal\.net([^<]+)</loc>', fx)
+              assert len(locs) == len(set(locs)) == man['family_sitemaps'][name], f'{name} count'
+              if want is not None:
+                  assert sorted(locs) == want, f'{name} sitemap != its pages'
+              assert set(locs) <= main_gen, f'{name} advertises a URL sitemap.xml does not'
+              fam_union |= set(locs)
+          assert fam_union == main_gen, 'family sitemaps do not cover sitemap.xml exactly'
+          print("family sitemaps reconciled:", man['family_sitemaps'])
           print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -281,7 +297,7 @@ jobs:
           def generated(p):
               return (p == 'zip-pages-manifest.json' or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
-                      or p.startswith('guides/'))
+                      or p.startswith('guides/') or p.startswith('sitemaps/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
