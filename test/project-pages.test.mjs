@@ -147,6 +147,7 @@ ok(pathOf('https://permits.example.gov/r/2').startsWith('/project/town-permits/c
 // ---- 3. cards link to the page and keep the record -------------------------------------
 const z1 = readFileSync(join(out, 'community', '01002', 'index.html'), 'utf8');
 ok(z1.includes(`<a href="${p1}">Olympia Place Apartments</a>`), 'a ZIP card links the name to its project page');
+ok(!/ld\+json/.test(z1), 'the generated ZIP document carries no structured data (PS-001)');
 ok(z1.includes('<a href="https://permits.example.gov/r/1" rel="nofollow noopener">official record</a>'),
    '...and keeps the official record beside it');
 const city = read(out, '/city/ma/amherst/');
@@ -185,23 +186,113 @@ const xss = Object.entries(docs.projectsDoc.projects).find(([, v]) => v.name.inc
 const pgx = read(out, expectedPath('town-permits', xss[1].case, xss[0]));
 ok(!pgx.includes('<script>alert(1)</script>') && pgx.includes('&lt;script&gt;alert(1)&lt;/script&gt;'),
    'a hostile project name is escaped and still shown');
-ok(!/<script[\s>]/i.test(pg1) && pg1.includes("script-src 'none'"), 'a project page ships no script and refuses one');
+ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<script type="application/ld+json">' &&
+   pg1.includes("script-src 'none'"),
+   'a project page ships no executable script and refuses one (its one script element is inert structured data)');
 
 // ---- 6. inbound links -------------------------------------------------------------------
 {
-  const orphan = makeInputs({ mutate: (d) => {
+  // Kept pages (founder, 2026-09-28): a project no card links to keeps its page, linked
+  // from its ZIP's project list. A project on no canonical ZIP can be linked from nowhere.
+  const kept = makeInputs({ mutate: (d) => {
     d.projectsDoc.projects['arcgis:town-permits:ORPHAN-1|1'] = { registry_id: 'town-permits',
       case: 'ORPHAN-1', name: 'Nobody Links Here', type: 'Residential', status: 'Proposed',
       source_url: 'https://permits.example.gov/r/99', zips: ['01002'] };
   } });
-  const b = build(orphan);
-  ok(b.r.status !== 0 && /would have no link from any ZIP or city page/.test(b.r.stderr + b.r.stdout),
-     'a project page no card links to fails the build');
-  orphan.projectsDoc.projects['arcgis:town-permits:ORPHAN-1|1'].held = true;
-  const h = build(orphan);
-  ok(h.r.status === 0 && existsSync(join(h.out, 'project', 'town-permits')) &&
-     readdirSync(join(h.out, 'project', 'town-permits')).length === nProjects + 1,
-     'a HELD project keeps its page while its source is checked');
+  const b = build(kept);
+  const po = expectedPath('town-permits', 'ORPHAN-1', 'arcgis:town-permits:ORPHAN-1|1');
+  ok(b.r.status === 0 && existsSync(join(b.out, ...po.split('/').filter(Boolean), 'index.html')),
+     'a project no card links to keeps its page');
+  const list = read(b.out, '/community/01002/projects/');
+  ok(list.includes(`<a href="${po}">Nobody Links Here</a>`) && list.includes(`<a href="${p1}">`),
+     "the ZIP's project list links every project page on that ZIP, kept or featured");
+  ok(/<meta name="robots" content="noindex, follow">/.test(list) &&
+     list.includes('<link rel="canonical" href="https://homesignal.net/community/01002/projects/">'),
+     'the list is followed but not indexed');
+  const smk = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
+  ok(!smk.includes('/projects/') && smk.includes(po), 'the list is in no sitemap; the kept page is');
+  const zk = readFileSync(join(b.out, 'community', '01002', 'index.html'), 'utf8');
+  ok(/<nav class="zproj" aria-label="Projects on record"><a href="\/community\/01002\/projects\/">All \d+ projects on record in 01002<\/a><\/nav>/.test(zk),
+     'the ZIP page links to its project list');
+  const zkNav = zk.match(/<nav class="zsec">[\s\S]*?<\/nav>/)[0];
+  ok(!zkNav.includes('/projects/'), 'the first zsec nav (read by the live proof) is unchanged');
+  const lost = makeInputs({ mutate: (d) => {
+    d.projectsDoc.projects['arcgis:town-permits:ORPHAN-2|1'] = { registry_id: 'town-permits',
+      case: 'ORPHAN-2', name: 'On No Page', type: 'Residential', status: 'Proposed',
+      source_url: 'https://permits.example.gov/r/98', zips: ['99999'] };
+  } });
+  const bl = build(lost);
+  ok(bl.r.status !== 0 && /would have no link from any ZIP or city page/.test(bl.r.stderr + bl.r.stdout),
+     'a project on no canonical ZIP page fails the build');
+  lost.projectsDoc.projects['arcgis:town-permits:ORPHAN-2|1'].held = true;
+  const h = build(lost);
+  ok(h.r.status !== 0 && /names no canonical ZIP/.test(h.r.stderr + h.r.stdout),
+     'even HELD, a project on no canonical ZIP gets no page');
+}
+
+// ---- 11. kept pages, address, dates, source name, breadcrumbs, lastmod (2026-09-28) -------
+{
+  const KK = 'arcgis:phoenix-building-permits:T971680|1';
+  const docs2 = makeInputs({ mutate: (d) => {
+    d.projectsDoc.projects[KK] = { registry_id: 'phoenix-building-permits', case: 'T971680',
+      name: 'Roosevelt Row Lofts </script><script>alert(1)</script>', type: 'Residential',
+      status: 'Proposed', source_url: 'https://permits.example.gov/r/97', zips: ['01002'],
+      address: '27 W Lewis Ave', date: '2025-03-10', date_kind: 'filed',
+      tracked: false, as_of: '2026-08-02', changed_on: '2026-08-03' };
+    d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].address = '1 Olympia Dr';
+    d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].changed_on = '2026-09-20';
+  } });
+  const b = build(docs2);
+  ok(b.r.status === 0, `a document with the new fields builds (${(b.r.stderr || '').trim().slice(-200)})`);
+  const pk = read(b.out, expectedPath('phoenix-building-permits', 'T971680', KK));
+  const pa = read(b.out, p1);
+  ok(/<title>Olympia Place Apartments, 1 Olympia Dr — [^<]+ \(2026\) \| HomeSignal<\/title>/.test(pa),
+     'the title carries the address and the year of the date on record');
+  ok(pa.includes('<p class="addr">1 Olympia Dr, ') && pa.includes('<dt>Address</dt><dd>1 Olympia Dr</dd>'),
+     'the address is under the name and in the facts');
+  ok(/<p>[^<]*·[^<]*<span class="quiet">as of <time datetime="2026-09-28">Sep 28, 2026<\/time><\/span><\/p>/.test(pa) &&
+     pa.includes('<dt>Status as of</dt><dd><time datetime="2026-09-28">Sep 28, 2026</time></dd>'),
+     'a tracked page shows the day its status was read, beside the status');
+  ok(!pa.includes('no longer tracks'), 'a tracked page carries no notice');
+  ok(/<p class="notice" role="note" style="[^"]+">HomeSignal no longer tracks this project\./.test(pk) &&
+     pk.includes('<dt>Last recorded status</dt>') && pk.includes('<dt>Last seen</dt><dd><time datetime="2026-08-02">Aug 2, 2026</time></dd>') &&
+     !pk.includes('<dt>Where it stands</dt>'),
+     'a page no longer tracked says so and shows its last recorded status and when it was seen');
+  ok(/<meta name="robots" content="index, follow">/.test(pk), 'and stays indexable');
+  ok(pk.includes('<dt>Source</dt><dd>City of Phoenix <span class="quiet">(phoenix-building-permits)</span></dd>') &&
+     pa.includes('<dt>Source</dt><dd>town-permits</dd>'),
+     "the source is its publisher's name from the registry; an unknown id is shown as it is");
+  const ld = pk.match(/<script type="application\/ld\+json">([^<]*)<\/script>/);
+  ok(ld && !/<\/script><script>alert/.test(pk), 'a hostile name cannot close the structured-data block');
+  const crumbs = ld ? JSON.parse(ld[1]) : null;
+  const items = crumbs ? crumbs.itemListElement : [];
+  ok(crumbs && crumbs['@type'] === 'BreadcrumbList' && items.length === 4 &&
+     items.map((x) => x.position).join() === '1,2,3,4' &&
+     items[0].item === 'https://homesignal.net/' && items[1].item === 'https://homesignal.net/city/ma/amherst/' &&
+     items[2].item === 'https://homesignal.net/community/01002/' &&
+     items[3].item === `https://homesignal.net${expectedPath('phoenix-building-permits', 'T971680', KK)}` &&
+     items[3].name.includes('</script>'),
+     'breadcrumbs: Home › City › ZIP › Project, with the name as data');
+  const lm = (xml, path) => (xml.match(new RegExp(`<loc>https://homesignal\\.net${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</loc>\\n    <lastmod>([^<]+)</lastmod>`)) || [])[1];
+  const sm2 = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
+  const fam2 = readFileSync(join(b.out, 'sitemaps', 'project.xml'), 'utf8');
+  ok(lm(sm2, p1) === '2026-09-20' && lm(fam2, p1) === '2026-09-20',
+     'the sitemaps give a project the day its facts last changed');
+  ok(lm(sm2, pathOf('https://permits.example.gov/r/2')) === '2026-09-28',
+     'a record without changed_on falls back to the plane day');
+  ok(!/<loc>https:\/\/homesignal\.net\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
+     'ZIP pages carry no lastmod (no honest per-page change date exists for them yet)');
+  const list = read(b.out, '/community/01002/projects/');
+  ok(list.includes('(no longer tracked)') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
+     'the list marks a page no longer tracked and shows addresses');
+  for (const [what, m] of [
+    ['a non-boolean tracked flag', (r) => { r.tracked = 'no'; }],
+    ['a malformed as_of', (r) => { r.as_of = '28/09/2026'; }],
+  ]) {
+    const bad = makeInputs({ mutate: (d) => { m(d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')]); } });
+    const bb = build(bad);
+    ok(bb.r.status !== 0, `${what} fails the build`);
+  }
 }
 
 // ---- 7. inconsistent input fails -------------------------------------------------------

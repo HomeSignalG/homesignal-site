@@ -117,3 +117,28 @@ while a 5% sample found 428. Under the database collation, punctuation sorts dif
 codepoint order, so the range can be empty (claims rule 9). An earlier "0 of 23 keys renamed with a
 longer suffix" used the same range and is **not relied on here**; the per-source retention check in
 section 3 replaced it. Use `like 'prefix%'` on a sample, or `collate "C"`, for prefix questions.
+
+## Addendum, 2026-09-28: kept pages, addresses and dates (founder: "go with steps 1 and 2")
+
+A project page is no longer removed when its project leaves the ZIP or city cards. The
+producer (homesignal-ingest `buildProjects`) carries every page forward; the site renders
+three new optional fields and defaults each one, so a projects document without them builds
+exactly as before:
+
+- `tracked` (default true). False once the project has left HomeSignal's data too. The page
+  then says "HomeSignal no longer tracks this project", shows the last recorded status and
+  the day it was last seen, and stays indexable. It never says the record was removed:
+  many sources are read only for a recent window, so leaving our data is not evidence the
+  county deleted anything.
+- `as_of` (default: the plane's day). The day the status was read. Shown beside the status.
+- `changed_on` (default: `as_of`). The day the page's facts last changed; it is the
+  project's `<lastmod>` in `sitemap.xml` and `sitemaps/project.xml`. Never the build day.
+- `address`: shown under the name, in the facts, and in the title (founder: "addresses need
+  to be shown").
+
+Every project page is linked from its ZIP's list, `/community/<zip>/projects/`
+(`noindex, follow`, in no sitemap), so a page keeps an inbound link after its card goes.
+The source is shown by its publisher's name from `jurisdiction-registry.json`
+(`jurisdiction`), with the id beside it. Each project page carries one BreadcrumbList
+(Home › City › ZIP › Project); the public ZIP document still carries no structured data
+(PS-001, now asserted on the ZIP renderer and on its output).
