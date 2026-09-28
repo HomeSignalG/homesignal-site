@@ -101,6 +101,14 @@ export function annotatePlane(plane, HS) {
       out.cities[key] = annotateCity(HS, city);
     }
   }
+  // Project pages (SEO plan step 12): each record is one raw entity, labelled by the same
+  // two calls as a card.
+  if (plane.projects && typeof plane.projects === 'object') {
+    out.projects = {};
+    for (const [key, rec] of Object.entries(plane.projects)) {
+      out.projects[key] = annotateEntity(HS, rec);
+    }
+  }
   out.ssr_authority = 'lib/project-type.js';
   return out;
 }

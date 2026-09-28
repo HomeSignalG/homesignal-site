@@ -63,6 +63,7 @@ on:
       - 'test/fixtures/development_seo_plane.json'
       - 'test/city-pages.test.mjs'
       - 'test/fixtures/city-pages/**'
+      - 'test/project-pages.test.mjs'
       - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   pull_request:
@@ -90,6 +91,7 @@ on:
       - 'test/fixtures/development_seo_plane.json'
       - 'test/city-pages.test.mjs'
       - 'test/fixtures/city-pages/**'
+      - 'test/project-pages.test.mjs'
       - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   schedule:
@@ -137,11 +139,17 @@ jobs:
             echo "ERROR: could not fetch the published city pages' data — refusing to drop city pages"
             exit 1
           fi
+          PURL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-projects.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$PURL" -o data/development_seo_projects.json; then
+            echo "ERROR: could not fetch the published project pages' data — refusing to drop project pages"
+            exit 1
+          fi
           python3 - <<'PY'
           import json, sys
           from datetime import datetime, timezone
           p = json.load(open("data/development_seo_plane.json"))
           c = json.load(open("data/development_seo_cities.json"))
+          pj = json.load(open("data/development_seo_projects.json"))
           if p.get("identity") != "base_project_key":
               sys.exit("ERROR: fetched plane identity is not base_project_key")
           raw = p.get("generated_at") or ""
@@ -156,9 +164,14 @@ jobs:
               sys.exit("ERROR: fetched city data has no cities object — refusing to drop city pages")
           if c.get("generated_at") != raw:
               sys.exit(f"ERROR: city data is from run {c.get('generated_at')}, plane from {raw}")
+          if not isinstance(pj.get("projects"), dict) or not pj["projects"]:
+              sys.exit("ERROR: fetched project data has no projects — refusing to drop project pages")
+          if pj.get("generated_at") != raw:
+              sys.exit(f"ERROR: project data is from run {pj.get('generated_at')}, plane from {raw}")
           print("fetched Rule D plane generated_at", raw, "age_h", round(age, 2),
                 "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"),
-                "city_n", len(c["cities"]))
+                "city_n", len(c["cities"]), "project_n", len(pj["projects"]),
+                "project_held", (pj.get("census") or {}).get("held_sources"))
           PY
 
       - name: Generate one document per canonical ZIP
@@ -209,11 +222,20 @@ jobs:
           assert sorted(cities) == man['city_pages'], 'sitemap city URLs != city pages written'
           assert len(cities) == len(set(cities)), 'duplicate city URL in the sitemap'
           print(f"city pages reconciled: {len(written)} documents == sitemap {len(cities)}")
+          # PROJECT PAGES (plan step 12): every project document written is advertised, only those.
+          pwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                            for r, _, fs in os.walk('_site/project') if 'index.html' in fs)
+          projs = re.findall(r'<loc>https://homesignal\.net(/project/[a-z0-9-]+/[a-z0-9-]+/)</loc>', sm)
+          assert pwritten == man['project_pages'], 'project documents != manifest project_pages'
+          assert sorted(projs) == man['project_pages'], 'sitemap project URLs != project pages written'
+          assert len(projs) == len(set(projs)), 'duplicate project URL in the sitemap'
+          assert pwritten, 'no project pages written'
+          print(f"project pages reconciled: {len(pwritten)} documents == sitemap {len(projs)}")
           print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -250,7 +272,7 @@ jobs:
           # everything the build legitimately ADDS to the staged contract
           def generated(p):
               return (p == 'zip-pages-manifest.json' or p.startswith('community/')
-                      or p.startswith('city/'))
+                      or p.startswith('city/') or p.startswith('project/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
@@ -281,13 +303,17 @@ jobs:
             echo 'ERROR: city/ is tracked in git — generated output must never be committed'
             exit 1
           fi
+          if git ls-files --error-unmatch project/ >/dev/null 2>&1; then
+            echo 'ERROR: project/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
           echo "git is clean of generated ZIP documents"
 
       - name: Offline gates for the generated documents
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
-          for t in zip-pages-seo zip-pages-no-point community-page-contract city-pages; do
+          for t in zip-pages-seo zip-pages-no-point community-page-contract city-pages project-pages; do
             echo "--- test/$t.test.mjs"
             node "test/$t.test.mjs" | tail -3
           done
