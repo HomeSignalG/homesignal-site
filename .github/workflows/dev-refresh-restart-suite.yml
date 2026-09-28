@@ -1,0 +1,65 @@
+name: dev-refresh-restart-suite
+
+# dev_refresh_collect()'s restart heal (docs/dev-refresh-collect-restart-heal.sql) against a
+# DISPOSABLE Postgres 17 (production is 17). The suite first proves the LIVE function
+# (rebuilt by build_live.py and fingerprinted to production) shows the restart stall, then
+# that the migration, applied twice, fixes it, then that every prohibited change is caught.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-refresh-collect-restart-heal.sql'
+      - 'docs/dev-refresh-collect-once-per-response.sql'
+      - 'test/dev_refresh_restart_pg/**'
+      - '.github/workflows/dev-refresh-restart-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-refresh-collect-restart-heal.sql'
+      - 'docs/dev-refresh-collect-once-per-response.sql'
+      - 'test/dev_refresh_restart_pg/**'
+      - '.github/workflows/dev-refresh-restart-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_refresh_restart_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The live function stalls after a restart; the heal fixes it; every prohibited change is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_refresh_restart_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_refresh_restart_pg/run.sh 2>&1 | grep -v NOTICE
