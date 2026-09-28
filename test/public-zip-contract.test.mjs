@@ -43,8 +43,9 @@ ok(/^RULE_F_MIN = 3\b/m.test(gen), 'A-017 RULE_F_MIN is still 3');
 ok(/p\["rule_f_count"\] = p\["n_ln_journalism"\] \+ p\["n_gn"\] \+ p\["n_um"\]/.test(gen),
   'A-017 the Rule F count is journalism + government notices + capped meetings');
 ok(/p\["rule_f"\] = p\["rule_f_count"\] >= RULE_F_MIN/.test(gen), 'A-017 ...and the threshold is that constant');
-ok(/robots = "index, follow" if p\["rule_f"\] else "noindex, follow"/.test(gen),
-  'A-017 the generator writes index,follow on a pass and noindex,FOLLOW on a fail');
+ok(/robots = "index, follow" if \(p\["rule_f"\] or p\.get\("rule_d"\)\) else "noindex, follow"/.test(gen),
+  'A-017 the generator writes index,follow on Rule F OR Rule D and noindex,FOLLOW otherwise');
+ok(/^RULE_D_MIN = 3\b/m.test(gen), 'A-017 RULE_D_MIN is still 3');
 // Read the generator's actual line first: it is an f-string,
 // f'<meta name="robots" content="{robots}" id="robots-meta">\n'
 ok(/<meta name="robots" content="\{robots\}" id="robots-meta">/.test(gen),

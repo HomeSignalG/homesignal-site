@@ -138,6 +138,17 @@ const CORE_GRID = [
 ok('6. projects_found always implies core_records_present',
    CORE_GRID.every((c) => scanStatus(c) !== 'projects_found' || coreRecords(c) === true));
 
+// 0 — REJECTED (founder, 2026-09-27): EPA-only ZIPs stay indexable. The file is kept as
+// the dated record, and it must refuse to run: the rejection is the FIRST executable
+// statement, ahead of every DDL/DML statement, so running it end to end changes nothing.
+{
+  const firstStmt = sql.search(/\b(alter|update|create|insert|delete|drop|execute)\b/i);
+  const guardAt = sql.indexOf("raise exception 'PHASE 2 UNIT 1 IS REJECTED");
+  ok('0. SQL: the file refuses to run — the rejection raise exists', guardAt >= 0);
+  ok('0b. SQL: ... and it precedes every statement that could change anything',
+     guardAt >= 0 && firstStmt > guardAt);
+}
+
 // ───────────────────── structural pins on the SQL of record ─────────────────────
 
 // 7 — the new expression, and the removed limb.
