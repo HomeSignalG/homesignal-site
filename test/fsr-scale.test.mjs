@@ -137,38 +137,75 @@ ok(!/from ['"].*get-address-report/.test(allow), '13j allowlist does not import 
 ok(/data\.cityofnewyork\.us/.test(allow) && /uf93-f8nk/.test(allow), '13k allowlist stays on NYC Socrata');
 ok(/FORBIDDEN_HOST_RE/.test(allow) && /arcgis/.test(allow), '13l allowlist forbids ArcGIS hosts');
 
-const camDoc = read('docs/corporate-output-cambridge-pilot-attempt-2026-09-28.md');
-ok(/Commercial Use Prohibited/.test(camDoc), '9p Cambridge evidence quotes the prohibition');
-ok(/HOLD — TERMS\/RIGHTS NOT ESTABLISHED/.test(camDoc), '9q Cambridge evidence records the HOLD');
-ok(!/CLEARED WITH ATTRIBUTION\*\* \|/.test(camDoc.split('## Decision')[1].split('##')[0]),
-  '9r Cambridge decision table clears nothing');
+// §9 — the classification invariants, checked against the matrix and the shipped
+// allowlist rather than against the prose of the evidence files. Asserting that a
+// document I wrote contains a phrase I put in it proves nothing; these would actually
+// catch a wrong decision.
+const CLASSES = [
+  'CLEARED FOR PAID REPORT',
+  'CLEARED WITH ATTRIBUTION',
+  'DERIVED FACTS ONLY',
+  'HOLD — TERMS/RIGHTS NOT ESTABLISHED',
+  'EXCLUDE'
+];
 
-const filingsDoc = read('docs/corporate-output-nyc-dobnow-job-filings-2026-09-28.md');
-ok(/w9ak-ipjd/.test(filingsDoc) && /CLEARED WITH ATTRIBUTION/.test(filingsDoc), '9s filings evidence clears the view');
-ok(/postcode/.test(filingsDoc) && /applicant/.test(filingsDoc), '9t filings evidence explains the ZIP field choice');
-ok(/ic3t-wcy2/.test(filingsDoc) && /2020-05-21/.test(filingsDoc), '9u filings evidence rejects the stale BIS view');
+// Every classification anywhere in the matrix is one of the five in force. Catches an
+// invented or misspelled label, which prose matching cannot.
+const allClasses = [];
+matrix.markets.forEach((m) => {
+  if (m.geography && m.geography.classification) allClasses.push(m.geography.classification);
+  (m.publisher_data || []).forEach((d) => { if (d.classification) allClasses.push(d.classification); });
+});
+const badClass = allClasses.filter((c) => !CLASSES.includes(c));
+ok(badClass.length === 0, '9p every classification in the matrix is one of the five in force', badClass);
+ok(allClasses.length >= 12, '9q the matrix actually carries classifications to check', allClasses.length);
 
-const bisDoc = read('docs/corporate-output-nyc-bis-window-defect-2026-09-28.md');
-ok(/ipu4-2q9a/.test(bisDoc) && /1990/.test(bisDoc), '9v BIS defect evidence names the view and the stale window');
-ok(/\*\*0\*\*/.test(bisDoc) && /\*\*55\*\*/.test(bisDoc), '9w BIS defect evidence states the measured before and after');
-ok(/floating_timestamp/.test(bisDoc) && /text/.test(bisDoc), '9x BIS defect evidence explains the text date column');
-ok(/This is not a rights finding/.test(bisDoc) && /classification moved/.test(bisDoc),
-  '9y BIS defect evidence does not claim a rights change');
-ok(/NOT YET/.test(bisDoc) && /signed_paid_pilots` is 0/.test(bisDoc),
-  '9z BIS defect evidence leaves the verdict and the pilot count alone');
-ok(/12,621/.test(bisDoc) && /substring/.test(bisDoc),
-  '9aa BIS defect evidence measures the older substring convention it did not reuse');
-ok(/not\*\* fixed here/.test(bisDoc) && /get-address-report/.test(bisDoc),
-  '9ab BIS defect evidence records the get-address-report finding without changing it');
+// Step 14, as a test rather than a promise: nothing HOLD or EXCLUDE may reach the
+// sold allowlist, and everything in the sold allowlist must be cleared in the matrix.
+const sold = Scale.apiCapability().datasets;
+const heldIds = new Set();
+const clearedIds = new Set();
+matrix.markets.forEach((m) => {
+  const note = (d) => {
+    if (!d || !d.dataset_id) return;
+    if (/^HOLD|^EXCLUDE/.test(d.classification || '')) heldIds.add(d.dataset_id);
+    if (/^CLEARED/.test(d.classification || '')) clearedIds.add(d.dataset_id);
+  };
+  note(m.geography);
+  (m.publisher_data || []).forEach(note);
+});
+const leaked = sold.filter((id) => heldIds.has(id));
+ok(leaked.length === 0, '9r no HOLD or EXCLUDE dataset reaches the sold allowlist', leaked);
+const unbacked = sold.filter((id) => !clearedIds.has(id));
+ok(unbacked.length === 0, '9s every sold dataset is cleared in the matrix', unbacked);
+ok(heldIds.size >= 4, '9t the matrix is actually holding datasets back', heldIds.size);
 
-const coverageDoc = read('docs/corporate-output-coverage-matrix-2026-09-27.md');
-ok(/federated_href/.test(coverageDoc) && /TRANSPO_MAFDAP_PV/.test(coverageDoc),
-  '9h coverage evidence records Seattle MAF ArcGIS pointer');
-ok(/The additional-market choice is: \*\*none\*\*/.test(coverageDoc), '9i no second market is forced');
+// The SODA client is the only thing that can reach the network, so the sold allowlist
+// and the client's allowlist must be the same set. A drift here is how an uncleared
+// view would ship.
+const sodaSrc = read('lib/nyc-v1-soda.js');
+const sodaAllowed = (sodaSrc.match(/var ALLOWED = \{([^}]*)\}/) || [, ''])[1]
+  .match(/'([a-z0-9]{4}-[a-z0-9]{4})'/g) || [];
+ok(sodaAllowed.length === sold.length
+  && sold.every((id) => sodaAllowed.includes("'" + id + "'")),
+  '9u the client allowlist and the sold allowlist are the same set',
+  { sodaAllowed, sold });
 
-const scaleDoc = read('docs/corporate-output-fsr-scale-2026-09-27.md');
-ok(/signed_paid_pilots` is \*\*0\*\*/.test(scaleDoc), '10c scale evidence keeps signed at 0');
-ok(/get-future-surroundings-report/.test(scaleDoc), '13m scale evidence names the new function');
+// Every non-assemblable market states why, and every market points at an evidence file
+// that exists. The file has to be on disk; its wording is not the test's business.
+matrix.markets.filter((m) => !m.assemblable).forEach((m) => {
+  const why = (m.hold || []).length > 0
+    || /HOLD|EXCLUDE|not opened|not cleared/i.test(JSON.stringify(m.geography || {}) + (m.note || ''));
+  ok(why, '9v ' + m.id + ' records why it is not assemblable');
+});
+const docRefs = JSON.stringify(matrix).match(/docs\/[a-z0-9-]+\.md/g) || [];
+ok(docRefs.length > 0, '9w the matrix cites evidence files', docRefs.length);
+docRefs.forEach((d) => ok(existsSync(join(root, d)), '9x cited evidence exists on disk: ' + d));
+
+ok(matrix.markets.filter((m) => m.assemblable).length === 1,
+  '9y exactly one market is assemblable');
+ok(!CLASSES.slice(0, 1).some((c) => JSON.stringify(matrix).includes(c)),
+  '9z no family is CLEARED FOR PAID REPORT');
 
 const staged = execFileSync('python3', [join(root, 'scripts/stage_site.py'), '--src', root, '--list-only'], { encoding: 'utf8' })
   .split('\n').map((l) => l.trim()).filter(Boolean);
