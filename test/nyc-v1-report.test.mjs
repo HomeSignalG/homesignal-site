@@ -75,6 +75,35 @@ const nearby = V1.nearbyFromPublisherRows(
 ok(nearby.length === 1 && nearby[0].case_number === 'JOB1', '2a only allowlisted nearby issuance', nearby);
 ok(nearby[0].distance_mi > 0 && nearby[0].distance_mi < 0.5, '2b distance is HomeSignal arithmetic');
 ok(nearby[0].record_url === 'https://data.cityofnewyork.us/d/ipu4-2q9a', '2c dataset-precision URL');
+ok(nearby[0].stage === 'Permit issued' && nearby[0].date_label === 'Issued', '2d issuance rows carry a stage');
+
+const filingNear = {
+  job_type: 'New Building',
+  filing_status: 'Plan Examiner Review',
+  filing_date: '2026-09-01T00:00:00.000',
+  house_no: '4',
+  street_name: 'CENTRE',
+  latitude: '40.7133',
+  longitude: '-74.0040',
+  job_filing_number: 'M0001-I1',
+  postcode: '10007',
+  zip: '11050'
+};
+const filingWithdrawn = Object.assign({}, filingNear, {
+  job_filing_number: 'M0002-I1',
+  filing_status: 'Filing Withdrawn'
+});
+const filingWrongType = Object.assign({}, filingNear, {
+  job_filing_number: 'M0003-I1',
+  job_type: 'Alteration'
+});
+
+const withFilings = V1.nearbyFromPublisherRows([], [], coords, 0.5, [filingNear, filingWithdrawn, filingWrongType]);
+ok(withFilings.length === 1 && withFilings[0].case_number === 'M0001-I1', '2e only allowlisted filings', withFilings);
+ok(withFilings[0].stage === 'Filed' && withFilings[0].date_label === 'Filed', '2f filings are staged as Filed');
+ok(withFilings[0].zip === '10007', '2g filing ZIP is postcode, not the applicant zip');
+ok(withFilings[0].record_url === 'https://data.cityofnewyork.us/d/w9ak-ipjd', '2h filing record URL');
+ok(!withFilings.some((r) => /Withdrawn/i.test(r.status)), '2i withdrawn filings are not listed as work');
 
 const report = await V1.assembleReport({
   address: '1 Centre Street',
@@ -102,6 +131,11 @@ ok(!/How it impacts you|value_outlook|Quality of Life Impact Score/.test(soldBod
   '3f sold fields have no outlook / impact-score labels');
 ok(report.exclusions.some(function (x) { return /Effect at this address/.test(x); }),
   '3f2 exclusions name Effect at this address instead of using it as a label');
+ok(report.data_state.datasets.join(',') === 'uf93-f8nk,ipu4-2q9a,rbx6-tga4,w9ak-ipjd',
+  '3i data_state names the four allowlisted views', report.data_state.datasets);
+ok(report.attribution.some(function (a) { return a.dataset === 'w9ak-ipjd' && /Filing Withdrawn/.test(a.modifications); }),
+  '3j filings attribution states the withdrawn drop');
+ok(report.nearby_matched === 1 && report.nearby_truncated === false, '3k report states matched count and truncation');
 
 const again = await V1.assembleReport({
   address: '1 Centre Street',
@@ -135,6 +169,11 @@ ok(Soda.sodaUrl('resource', 'uf93-f8nk', { $limit: '1' }).indexOf('https://data.
 let threw = false;
 try { Soda.sodaUrl('resource', 'bc8t-ecyu', {}); } catch (_e) { threw = true; }
 ok(threw, '4e PAD / other views are rejected');
+ok(Soda.sodaUrl('resource', 'w9ak-ipjd', {}).indexOf('https://data.cityofnewyork.us/resource/w9ak-ipjd.json') === 0,
+  '4f filings view is on the allowlist');
+let threwIc3t = false;
+try { Soda.sodaUrl('resource', 'ic3t-wcy2', {}); } catch (_e) { threwIc3t = true; }
+ok(threwIc3t, '4g the stale BIS filings view is rejected');
 
 const page = read('future-surroundings-report.html');
 ok(/data\.cityofnewyork\.us/.test(page) && !/geocoding\.geo\.census\.gov/.test(page), '5a page CSP/connect is Socrata only');
@@ -152,6 +191,53 @@ const staged = execFileSync('python3', [join(root, 'scripts/stage_site.py'), '--
 ok(staged.includes('future-surroundings-report.html'), '5f page ships');
 ok(staged.includes('lib/nyc-v1-report.js') && staged.includes('lib/nyc-v1-soda.js') && staged.includes('lib/fsr-scale.js'), '5g libraries ship');
 ok(existsSync(join(root, 'future-surroundings-report.html')), '5h template exists');
+
+// The publisher's row window must be the same window the report keeps. An unordered
+// window returns the oldest rows, the recency filter drops them all, and the dataset
+// silently contributes nothing.
+const seen = [];
+const realFetch = globalThis.fetch;
+globalThis.fetch = (url) => {
+  seen.push(String(url));
+  return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+};
+await Soda.fetchIssuance(['10007']);
+await Soda.fetchFilings(['10007']);
+globalThis.fetch = realFetch;
+
+// URLSearchParams encodes spaces as '+', which decodeURIComponent leaves alone.
+const readQuery = (u) => decodeURIComponent(String(u || '').replace(/\+/g, '%20'));
+const issUrl = readQuery(seen.find((u) => u.includes('ipu4-2q9a')));
+const filUrl = readQuery(seen.find((u) => u.includes('w9ak-ipjd')));
+const floor = Soda.windowFloor();
+
+ok(V1.RECENT_DAYS === 365, '6a the report window is a named constant', V1.RECENT_DAYS);
+ok(/^\d{4}-\d{2}-\d{2}$/.test(floor), '6b window floor is a date literal', floor);
+ok(issUrl.includes("issuance_date::floating_timestamp >= '" + floor + "'"),
+  '6c BIS query is floored to the report window', issUrl);
+ok(issUrl.includes('$order=issuance_date::floating_timestamp DESC'),
+  '6d BIS query is ordered newest first, not an arbitrary row window', issUrl);
+ok(issUrl.includes('issuance_date is not null'), '6e BIS query skips rows with no issuance date', issUrl);
+ok(filUrl.includes("filing_date >= '" + floor + "'"), '6f filings query is floored to the same window', filUrl);
+ok(filUrl.includes('$order=filing_date DESC'), '6g filings query is ordered newest first', filUrl);
+
+const soda = read('lib/nyc-v1-soda.js');
+ok(!/\$limit: '200'/.test(soda), '6h the row cap is a named constant, not a literal per query');
+ok((soda.match(/windowFloor\(\)/g) || []).length >= 4,
+  '6i all three record queries request the window', (soda.match(/windowFloor\(\)/g) || []).length);
+ok(report.data_state.window_days === 365 && report.data_state.row_cap_per_dataset === null,
+  '6j report discloses the window it kept', report.data_state);
+ok(report.attribution.every((a) => /last 365 days/.test(a.modifications) || a.dataset === 'uf93-f8nk'),
+  '6k every record view discloses the recency filter as a modification',
+  report.attribution.map((a) => a.dataset + ':' + /last 365 days/.test(a.modifications)));
+ok(/text/.test(report.attribution.find((a) => a.dataset === 'ipu4-2q9a').modifications),
+  '6l BIS attribution states the date column is text');
+
+const fnSrc = read('supabase/functions/get-future-surroundings-report/allowlist.ts');
+ok(/issuance_date::floating_timestamp >= /.test(fnSrc) && /issuance_date::floating_timestamp DESC/.test(fnSrc),
+  '6m the API applies the same BIS floor and order as the browser');
+ok(/window_days: RECENT_DAYS/.test(fnSrc), '6n the API discloses the window too');
+ok(!/\$limit: '200'/.test(fnSrc), '6o the API row cap is a named constant');
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

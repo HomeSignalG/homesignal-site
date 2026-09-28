@@ -3,7 +3,7 @@
 // Do not import get-address-report, geocode-address, Census, ArcGIS, or OSM.
 
 export const HOST = 'https://data.cityofnewyork.us';
-export const ALLOWED = new Set(['uf93-f8nk', 'ipu4-2q9a', 'rbx6-tga4']);
+export const ALLOWED = new Set(['uf93-f8nk', 'ipu4-2q9a', 'rbx6-tga4', 'w9ak-ipjd']);
 export const FORBIDDEN_HOST_RE =
   /geocoding\.geo\.census\.gov|geoclient\.nyc\.gov|geosupport|openaddresses|arcgis\.com|openstreetmap\.org|tile\.openstreetmap|get-address-report/i;
 
@@ -16,6 +16,19 @@ const DOBNOW_TYPES: Record<string, 1> = {
   'Earth Work': 1,
   'Full Demolition': 1,
 };
+const FILING_TYPES: Record<string, 1> = { 'New Building': 1, 'Full Demolition': 1 };
+// A filing the publisher marks withdrawn is not pending work. It is not listed as such.
+const FILING_DEAD_STATUS: Record<string, 1> = { 'filing withdrawn': 1 };
+const NEARBY_CAP = 50;
+// The report only lists records dated inside this window, and every record query
+// requests the same window. An unordered row window returns the publisher's oldest
+// rows, which this filter then drops, and the view goes silently empty.
+const RECENT_DAYS = 365;
+const ROW_CAP = 200;
+
+function windowFloor(): string {
+  return new Date(Date.now() - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
+}
 
 const SUFFIX: Record<string, string> = {
   STREET: 'ST', STREETS: 'ST', ST: 'ST',
@@ -64,6 +77,12 @@ const DATASETS = {
     name: 'DOB NOW: Build – Approved Permits',
     publisher: 'New York City Department of Buildings, on NYC Open Data',
     registry_id: 'nyc-dobnow-approved-permits',
+  },
+  filings: {
+    id: 'w9ak-ipjd',
+    name: 'DOB NOW: Build – Job Application Filings',
+    publisher: 'New York City Department of Buildings, on NYC Open Data',
+    registry_id: 'nyc-dobnow-job-filings',
   },
 };
 
@@ -255,7 +274,7 @@ function issuanceRow(r: Record<string, unknown>, home: { lat: number; lng: numbe
   if (!isFinite(lat) || !isFinite(lng)) return null;
   const dist = milesBetween(home.lat, home.lng, lat, lng);
   if (dist > radiusMi) return null;
-  if (!withinDays(String(r.issuance_date || ''), 365)) return null;
+  if (!withinDays(String(r.issuance_date || ''), RECENT_DAYS)) return null;
   const en = toEN(home.lat, home.lng, lat, lng);
   return {
     source: DATASETS.issuance.registry_id,
@@ -263,7 +282,9 @@ function issuanceRow(r: Record<string, unknown>, home: { lat: number; lng: numbe
     case_number: String(r.job__ || ''),
     type: String(r.permit_type || ''),
     status: String(r.permit_status || ''),
-    issued: String(r.issuance_date || ''),
+    stage: 'Permit issued',
+    date: String(r.issuance_date || ''),
+    date_label: 'Issued',
     address: [r.house__, r.street_name].filter(Boolean).join(' '),
     zip: String(r.zip_code || ''),
     lat,
@@ -282,7 +303,7 @@ function dobnowRow(r: Record<string, unknown>, home: { lat: number; lng: number 
   if (!isFinite(lat) || !isFinite(lng)) return null;
   const dist = milesBetween(home.lat, home.lng, lat, lng);
   if (dist > radiusMi) return null;
-  if (!withinDays(String(r.issued_date || ''), 365)) return null;
+  if (!withinDays(String(r.issued_date || ''), RECENT_DAYS)) return null;
   const en = toEN(home.lat, home.lng, lat, lng);
   return {
     source: DATASETS.dobnow.registry_id,
@@ -290,7 +311,9 @@ function dobnowRow(r: Record<string, unknown>, home: { lat: number; lng: number 
     case_number: String(r.job_filing_number || r.work_permit || ''),
     type: String(r.work_type || ''),
     status: String(r.permit_status || ''),
-    issued: String(r.issued_date || ''),
+    stage: 'Permit approved',
+    date: String(r.issued_date || ''),
+    date_label: 'Issued',
     address: [r.house_no, r.street_name].filter(Boolean).join(' '),
     zip: String(r.zip_code || ''),
     lat,
@@ -302,11 +325,43 @@ function dobnowRow(r: Record<string, unknown>, home: { lat: number; lng: number 
   };
 }
 
+function filingRow(r: Record<string, unknown>, home: { lat: number; lng: number }, radiusMi: number) {
+  if (!r || !FILING_TYPES[String(r.job_type || '')]) return null;
+  if (FILING_DEAD_STATUS[String(r.filing_status || '').toLowerCase()]) return null;
+  const lat = Number(r.latitude);
+  const lng = Number(r.longitude);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  const dist = milesBetween(home.lat, home.lng, lat, lng);
+  if (dist > radiusMi) return null;
+  if (!withinDays(String(r.filing_date || ''), RECENT_DAYS)) return null;
+  const en = toEN(home.lat, home.lng, lat, lng);
+  return {
+    source: DATASETS.filings.registry_id,
+    dataset_id: DATASETS.filings.id,
+    case_number: String(r.job_filing_number || ''),
+    type: String(r.job_type || ''),
+    status: String(r.filing_status || ''),
+    stage: 'Filed',
+    date: String(r.filing_date || ''),
+    date_label: 'Filed',
+    address: [r.house_no, r.street_name].filter(Boolean).join(' '),
+    // postcode is the job-site ZIP. `zip` on this view is the applicant's ZIP.
+    zip: String(r.postcode || ''),
+    lat,
+    lng,
+    distance_mi: dist,
+    east_mi: en[0],
+    north_mi: en[1],
+    record_url: HOST + '/d/' + DATASETS.filings.id,
+  };
+}
+
 export function nearbyFromPublisherRows(
   issuance: Record<string, unknown>[],
   dobnow: Record<string, unknown>[],
   home: { lat: number; lng: number },
   radiusMi: number,
+  filings?: Record<string, unknown>[],
 ) {
   const out: ReturnType<typeof issuanceRow>[] = [];
   for (const r of issuance || []) {
@@ -317,8 +372,12 @@ export function nearbyFromPublisherRows(
     const row = dobnowRow(r, home, radiusMi);
     if (row) out.push(row);
   }
+  for (const r of filings || []) {
+    const row = filingRow(r, home, radiusMi);
+    if (row) out.push(row);
+  }
   out.sort((a, b) => (a && b ? a.distance_mi - b.distance_mi : 0));
-  return out.filter(Boolean).slice(0, 50);
+  return out.filter(Boolean);
 }
 
 function viewVersion(meta: { id?: string; viewLastModified?: number; rowsUpdatedAt?: number } | null): string {
@@ -366,7 +425,9 @@ export async function assembleReport(input: {
   address_points?: Record<string, unknown>[];
   issuance?: Record<string, unknown>[];
   dobnow?: Record<string, unknown>[];
+  filings?: Record<string, unknown>[];
   versions?: Record<string, string>;
+  row_cap_per_dataset?: number;
   retrieved_at?: string;
   generated_at?: string;
 }) {
@@ -376,9 +437,10 @@ export async function assembleReport(input: {
   if (radiusMi > 1) radiusMi = 1;
   const match = matchAddressPoint(input.address_points || [], parsed);
   const home = match.point ? pointCoords(match.point) : null;
-  const nearby = (match.status === 'ok' && home)
-    ? nearbyFromPublisherRows(input.issuance || [], input.dobnow || [], home, radiusMi)
+  const matched = (match.status === 'ok' && home)
+    ? nearbyFromPublisherRows(input.issuance || [], input.dobnow || [], home, radiusMi, input.filings || [])
     : [];
+  const nearby = matched.slice(0, NEARBY_CAP);
 
   const retrieved = input.retrieved_at || '';
   const views = [
@@ -392,13 +454,19 @@ export async function assembleReport(input: {
       key: 'issuance' as const,
       version: input.versions && input.versions.issuance,
       retrieved_at: retrieved,
-      modifications: 'Selected permit_type, permit_status, issuance_date, house__, street_name, gis_latitude, gis_longitude, job__, zip_code. Kept NB/DM/AL/FO with publisher coordinates inside the stated radius.',
+      modifications: 'Selected permit_type, permit_status, issuance_date, house__, street_name, gis_latitude, gis_longitude, job__, zip_code. Kept NB/DM/AL/FO with publisher coordinates inside the stated radius, issued in the last ' + RECENT_DAYS + ' days. Ordered newest first on issuance_date read as a timestamp, because the publisher stores that column as text.',
     },
     {
       key: 'dobnow' as const,
       version: input.versions && input.versions.dobnow,
       retrieved_at: retrieved,
-      modifications: 'Selected work_type, permit_status, issued_date, house_no, street_name, latitude, longitude, job_filing_number, zip_code. Kept General Construction, Structural, Foundation, Earth Work, Full Demolition with publisher coordinates inside the stated radius.',
+      modifications: 'Selected work_type, permit_status, issued_date, house_no, street_name, latitude, longitude, job_filing_number, zip_code. Kept General Construction, Structural, Foundation, Earth Work, Full Demolition with publisher coordinates inside the stated radius, issued in the last ' + RECENT_DAYS + ' days.',
+    },
+    {
+      key: 'filings' as const,
+      version: input.versions && input.versions.filings,
+      retrieved_at: retrieved,
+      modifications: 'Selected job_type, filing_status, filing_date, house_no, street_name, latitude, longitude, job_filing_number, postcode. Kept New Building and Full Demolition with publisher coordinates inside the stated radius, filed in the last ' + RECENT_DAYS + ' days, and dropped filings the publisher marks Filing Withdrawn.',
     },
   ];
 
@@ -424,6 +492,8 @@ export async function assembleReport(input: {
     radius_mi: radiusMi,
     property,
     nearby,
+    nearby_matched: matched.length,
+    nearby_truncated: matched.length > nearby.length,
     attribution: views.map((v) => {
       const meta = DATASETS[v.key];
       return {
@@ -438,7 +508,9 @@ export async function assembleReport(input: {
     investigate: INVESTIGATE,
     data_state: {
       host: 'data.cityofnewyork.us',
-      datasets: [DATASETS.addresspoint.id, DATASETS.issuance.id, DATASETS.dobnow.id],
+      datasets: [DATASETS.addresspoint.id, DATASETS.issuance.id, DATASETS.dobnow.id, DATASETS.filings.id],
+      window_days: RECENT_DAYS,
+      row_cap_per_dataset: input.row_cap_per_dataset ?? null,
       versions: input.versions || {},
     },
   };
@@ -451,7 +523,7 @@ export async function assembleReport(input: {
 export async function loadReport(address: string, zip: string, radiusMi: number) {
   const parsed = parseBuyerAddress(address, zip);
   const retrievedAt = new Date().toISOString();
-  const [apMeta, issMeta, dobMeta, addressPoints] = await Promise.all([
+  const [apMeta, issMeta, dobMeta, addressPoints, filMeta] = await Promise.all([
     getJson(sodaUrl('view', 'uf93-f8nk', {})),
     getJson(sodaUrl('view', 'ipu4-2q9a', {})),
     getJson(sodaUrl('view', 'rbx6-tga4', {})),
@@ -462,11 +534,13 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
         $limit: '50',
       }))
       : Promise.resolve([]),
+    getJson(sodaUrl('view', 'w9ak-ipjd', {})),
   ]);
   const versions = {
     addresspoint: viewVersion(apMeta),
     issuance: viewVersion(issMeta),
     dobnow: viewVersion(dobMeta),
+    filings: viewVersion(filMeta),
   };
   const match = matchAddressPoint(addressPoints || [], parsed);
   if (match.status !== 'ok') {
@@ -478,6 +552,7 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       address_points: addressPoints || [],
       issuance: [],
       dobnow: [],
+      filings: [],
       versions,
       retrieved_at: retrievedAt,
     });
@@ -492,6 +567,7 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       address_points: addressPoints || [],
       issuance: [],
       dobnow: [],
+      filings: [],
       versions,
       retrieved_at: retrievedAt,
     });
@@ -510,12 +586,22 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
     zips.push(String(match.point.zipcode));
   }
   const inList = zips.slice(0, 20).map(quote).join(',');
-  const [issuance, dobnow] = await Promise.all([
+  const [issuance, dobnow, filings] = await Promise.all([
     inList
       ? getJson(sodaUrl('resource', 'ipu4-2q9a', {
         $select: 'permit_type,permit_status,issuance_date,house__,street_name,gis_latitude,gis_longitude,job__,zip_code',
-        $where: "permit_type in('NB','DM','AL','FO') AND gis_latitude is not null AND gis_longitude is not null AND zip_code in(" + inList + ')',
-        $limit: '200',
+        // issuance_date is a text column on this view, so it is read as a timestamp
+        // to filter and order. A lexical sort mixes MM/DD/YYYY and ISO values.
+        $where: [
+          "permit_type in('NB','DM','AL','FO')",
+          'gis_latitude is not null',
+          'gis_longitude is not null',
+          'zip_code in(' + inList + ')',
+          'issuance_date is not null',
+          "issuance_date::floating_timestamp >= '" + windowFloor() + "'",
+        ].join(' AND '),
+        $order: 'issuance_date::floating_timestamp DESC',
+        $limit: String(ROW_CAP),
       }))
       : Promise.resolve([]),
     getJson(sodaUrl('resource', 'rbx6-tga4', {
@@ -526,10 +612,20 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
         'longitude is not null',
         'latitude between ' + box.minLat + ' and ' + box.maxLat,
         'longitude between ' + box.minLng + ' and ' + box.maxLng,
+        "issued_date >= '" + windowFloor() + "'",
       ].join(' AND '),
-      $limit: '200',
+      $limit: String(ROW_CAP),
       $order: 'issued_date DESC',
     })),
+    // postcode is the job-site ZIP. `zip` on this view is the applicant's ZIP.
+    inList
+      ? getJson(sodaUrl('resource', 'w9ak-ipjd', {
+        $select: 'job_type,filing_status,filing_date,house_no,street_name,latitude,longitude,job_filing_number,postcode',
+        $where: "job_type in('New Building','Full Demolition') AND latitude is not null AND longitude is not null AND postcode in(" + inList + ") AND filing_date >= '" + windowFloor() + "'",
+        $limit: String(ROW_CAP),
+        $order: 'filing_date DESC',
+      }))
+      : Promise.resolve([]),
   ]);
   return assembleReport({
     parsed,
@@ -539,7 +635,9 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
     address_points: addressPoints || [],
     issuance,
     dobnow,
+    filings,
     versions,
+    row_cap_per_dataset: ROW_CAP,
     retrieved_at: retrievedAt,
   });
 }
@@ -550,9 +648,9 @@ export function capability() {
     version: 'nyc-v1',
     market: 'nyc-v1',
     host: 'data.cityofnewyork.us',
-    datasets: ['uf93-f8nk', 'ipu4-2q9a', 'rbx6-tga4'],
+    datasets: ['uf93-f8nk', 'ipu4-2q9a', 'rbx6-tga4', 'w9ak-ipjd'],
     signed_paid_pilots: 0,
     verdict: 'NOT YET',
-    note: 'POST { address, zip, radius_mi }. The function fetches only those three NYC Open Data views.',
+    note: 'POST { address, zip, radius_mi }. The function fetches only those four NYC Open Data views.',
   };
 }

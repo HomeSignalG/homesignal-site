@@ -32,6 +32,7 @@ That condition is met for **New York City V1**. Evidence: `docs/corporate-output
 | NYC AddressPoint `uf93-f8nk` | **CLEARED WITH ATTRIBUTION** | Property coordinate when the buyer-supplied address matches a published point |
 | `nyc-dob-permit-issuance` (`ipu4-2q9a`) | **CLEARED WITH ATTRIBUTION** | Nearby work, only when publisher lat/lng are present |
 | `nyc-dobnow-approved-permits` (`rbx6-tga4`) | **CLEARED WITH ATTRIBUTION** | Nearby work, only when publisher lat/lng are present |
+| `nyc-dobnow-job-filings` (`w9ak-ipjd`), added 2026-09-28 | **CLEARED WITH ATTRIBUTION** | Work filed but not yet permitted, only when publisher lat/lng are present (`docs/corporate-output-nyc-dobnow-job-filings-2026-09-28.md`) |
 | Distance, pin, "near this property" | HomeSignal arithmetic over those two NYC Open Data coordinates | **APPROVED** inside this allowlist only |
 
 Census geocoder, OpenAddresses, ZCTA-as-proximity, Geoclient, the ArcGIS AddressPoint FeatureServer, Atlas, OSM, Local News, meetings, scores, and every other registry entry stay **HOLD** or **EXCLUDE** and are not in the allowlist.
@@ -68,13 +69,31 @@ Evidence: `docs/corporate-output-coverage-matrix-2026-09-27.md` and `docs/corpor
 
 | Step | Status |
 |---|---|
-| 9 Coverage-quality matrix and additional markets | **Done for measurement**. NYC V1 is the only assemblable market. Seattle MAF `ctqe-m6xd` is a federated ArcGIS pointer and stays **HOLD**. |
+| 9 Coverage-quality matrix and additional markets | **Done for measurement**. NYC V1 is the only assemblable market. Seattle MAF `ctqe-m6xd` is a federated ArcGIS pointer and stays **HOLD**. Cambridge, MA was worked on 2026-09-28 and stays **HOLD** on an express commercial-use prohibition. Coverage inside NYC was deepened with `w9ak-ipjd`. |
 | 10 Sign 3–5 paid pilots and instrument use | **Done for instrumentation**. `signed_paid_pilots` is **0**. Customers were not invented. |
 | 11 Listing-level summary | **Done**. Derived only from an NYC V1 report object. |
 | 12 Portfolio | **Done**. Browser store of NYC V1 reports. |
-| 13 API / large-platform scale | **Done**. `get-future-surroundings-report` fetches only `data.cityofnewyork.us` views `uf93-f8nk`, `ipu4-2q9a`, `rbx6-tga4`. |
+| 13 API / large-platform scale | **Done**. `get-future-surroundings-report` fetches only `data.cityofnewyork.us` views `uf93-f8nk`, `ipu4-2q9a`, `rbx6-tga4`, `w9ak-ipjd`. |
 
 Steps 14 and 15 remain standing rules.
+
+### Allowlisted is not the same as contributing
+
+Evidence: `docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`.
+
+`ipu4-2q9a` was cleared, named in `data_state`, credited in `attribution`, and listing zero
+rows. Its SODA window was unordered, so it returned the publisher's oldest rows — 1990 to
+2022 for the ZIP group around 1 Centre Street — and the report's 365-day filter dropped all
+200 of them. 161 permits existed inside the window in those ZIPs; the report showed none.
+
+The window is now one named constant shared by the row filter and every record query, all
+three record views are floored and ordered newest first, and the report discloses both
+`window_days` and `row_cap_per_dataset` so `nearby_matched` is read as a floor rather than a
+census. Pinned by `test/nyc-v1-report.test.mjs` 6a–6o.
+
+No classification moved. Checking that each cleared dataset actually reaches the artifact is
+part of Step 14, not a separate step: a report that credits a source it never read is not an
+artifact built from the allowlist.
 
 ## Audit §12 status against the first report
 

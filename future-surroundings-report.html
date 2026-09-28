@@ -206,7 +206,14 @@
     html += '</div>';
     if (sum.nearest) {
       html += '<p>Nearest on the record: ' + esc(sum.nearest.type) + ' · ' + esc(sum.nearest.address) +
-        ' at ' + esc(sum.nearest.distance_mi) + ' mi (' + esc(sum.nearest.source) + ').</p>';
+        ' at ' + esc(sum.nearest.distance_mi) + ' mi — ' + esc(sum.nearest.stage) +
+        ', ' + esc(sum.nearest.status) + ' (' + esc(sum.nearest.source) + ').</p>';
+    }
+    var stages = Object.keys(sum.by_stage || {});
+    if (stages.length) {
+      html += '<p>By stage: ' + stages.map(function (s) {
+        return esc(s) + ' ' + esc(sum.by_stage[s]);
+      }).join(' · ') + '</p>';
     }
     html += '<div class="note">' + esc(sum.investigate) + '</div>';
     el.innerHTML = html;
@@ -262,6 +269,18 @@
     document.getElementById('fsrUsageView').innerHTML = html;
   }
 
+  // The JSON keeps the publisher's date string verbatim. Only the display is
+  // normalized, because one view stores dates as text MM/DD/YYYY and another as
+  // an ISO timestamp.
+  function showDate(raw) {
+    var s = String(raw || '');
+    var iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    var us = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (us) return us[3] + '-' + us[1] + '-' + us[2];
+    return s;
+  }
+
   function render(report) {
     lastReport = report;
     var html = '';
@@ -279,15 +298,26 @@
         '. Pin ' + esc(p.lat) + ', ' + esc(p.lng) + '. Radius ' + esc(report.radius_mi) + ' mi.</div>';
 
       if (!report.nearby.length) {
-        html += '<p>No allowlisted Department of Buildings rows with publisher coordinates in that radius in the last 365 days.</p>';
+        html += '<p>No allowlisted Department of Buildings rows with publisher coordinates in that radius in the last ' +
+          esc((report.data_state && report.data_state.window_days) || 365) + ' days.</p>';
       } else {
         html += '<h2>Department of Buildings records near this property</h2>';
-        html += '<table><thead><tr><th>Distance</th><th>On the record</th><th>Status</th><th>Issued</th><th>Source</th></tr></thead><tbody>';
+        if (report.nearby_truncated) {
+          html += '<p class="sub">Showing the ' + esc(report.nearby.length) + ' closest of ' +
+            esc(report.nearby_matched) + ' allowlisted records in this radius.</p>';
+        }
+        html += '<p class="sub">Records dated in the last ' +
+          esc((report.data_state && report.data_state.window_days) || 365) + ' days. Each dataset is read ' +
+          esc((report.data_state && report.data_state.row_cap_per_dataset) || 200) +
+          ' rows at a time, newest first, so this count is a floor and not a census of the radius.</p>';
+        html += '<table><thead><tr><th>Distance</th><th>On the record</th><th>Stage</th><th>Status</th><th>Date</th><th>Source</th></tr></thead><tbody>';
         report.nearby.forEach(function (row) {
           html += '<tr><td>' + esc(row.distance_mi) + ' mi (' + esc(row.east_mi) + ' E, ' + esc(row.north_mi) + ' N)</td>' +
             '<td>' + esc(row.type) + ' · ' + esc(row.address) + (row.zip ? ' ' + esc(row.zip) : '') +
             '<br><a href="' + esc(row.record_url) + '">' + esc(row.case_number || row.dataset_id) + '</a></td>' +
-            '<td>' + esc(row.status) + '</td><td>' + esc(row.issued) + '</td>' +
+            '<td>' + esc(row.stage) + '</td>' +
+            '<td>' + esc(row.status) + '</td>' +
+            '<td>' + esc(row.date_label) + ' ' + esc(showDate(row.date)) + '</td>' +
             '<td>' + esc(row.source) + '</td></tr>';
         });
         html += '</tbody></table>';

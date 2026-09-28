@@ -73,6 +73,13 @@ ok(sea && !sea.assemblable && /HOLD/.test(sea.geography.classification), '9d Sea
 ok(sea.geography.assetType === 'federated_href', '9e Seattle MAF is federated_href');
 ok(/FeatureServer/.test(sea.geography.access_points.join(' ')), '9f Seattle MAF points at ArcGIS');
 ok(sea.publisher_data[0].classification === 'CLEARED WITH ATTRIBUTION', '9g Seattle permits stay cleared');
+const cam = matrix.markets.find((m) => m.id === 'cambridge');
+ok(cam && !cam.assemblable, '9k Cambridge is not assemblable');
+ok(/HOLD/.test(cam.geography.classification), '9l Cambridge geography is HOLD despite the PDDL label');
+ok(cam.hold.some((h) => /Commercial Use Prohibited/i.test(h)), '9m Cambridge HOLD names the prohibition');
+ok(cam.publisher_data.every((p) => /HOLD/.test(p.classification)), '9n Cambridge permits are HOLD too');
+ok(nyc.publisher_data.some((p) => p.dataset_id === 'w9ak-ipjd' && p.classification === 'CLEARED WITH ATTRIBUTION'),
+  '9o NYC coverage includes the cleared filings view');
 
 const store = Scale.memoryStore();
 const listing = Scale.listingSummary(report);
@@ -108,7 +115,9 @@ ok(!Scale.validateApiRequest({ address: '1 Centre Street', lat: 40.7 }).ok, '13b
 ok(!Scale.validateApiRequest({ address: '1 Centre Street', market: 'seattle' }).ok, '13c Seattle market rejected');
 ok(!Scale.validateApiRequest({ address: '1 Centre Street', geocode: true }).ok, '13d geocode field rejected');
 ok(!Scale.validateApiRequest({ zip: '10007' }).ok, '13e address required');
-ok(Scale.apiCapability().datasets.join(',') === 'uf93-f8nk,ipu4-2q9a,rbx6-tga4', '13f capability names three views');
+ok(Scale.apiCapability().datasets.join(',') === 'uf93-f8nk,ipu4-2q9a,rbx6-tga4,w9ak-ipjd',
+  '13f capability names the four allowlisted views');
+ok(!Scale.validateApiRequest({ address: '1 Centre Street', market: 'cambridge' }).ok, '13o Cambridge market rejected');
 ok(Scale.apiCapability().signed_paid_pilots === 0, '13g capability signed pilots stay 0');
 
 const page = read('future-surroundings-report.html');
@@ -127,6 +136,26 @@ ok(!/get-address-report|geocode-address|geocoding\.geo\.census\.gov/.test(api),
 ok(!/from ['"].*get-address-report/.test(allow), '13j allowlist does not import get-address-report');
 ok(/data\.cityofnewyork\.us/.test(allow) && /uf93-f8nk/.test(allow), '13k allowlist stays on NYC Socrata');
 ok(/FORBIDDEN_HOST_RE/.test(allow) && /arcgis/.test(allow), '13l allowlist forbids ArcGIS hosts');
+
+const camDoc = read('docs/corporate-output-cambridge-pilot-attempt-2026-09-28.md');
+ok(/Commercial Use Prohibited/.test(camDoc), '9p Cambridge evidence quotes the prohibition');
+ok(/HOLD — TERMS\/RIGHTS NOT ESTABLISHED/.test(camDoc), '9q Cambridge evidence records the HOLD');
+ok(!/CLEARED WITH ATTRIBUTION\*\* \|/.test(camDoc.split('## Decision')[1].split('##')[0]),
+  '9r Cambridge decision table clears nothing');
+
+const filingsDoc = read('docs/corporate-output-nyc-dobnow-job-filings-2026-09-28.md');
+ok(/w9ak-ipjd/.test(filingsDoc) && /CLEARED WITH ATTRIBUTION/.test(filingsDoc), '9s filings evidence clears the view');
+ok(/postcode/.test(filingsDoc) && /applicant/.test(filingsDoc), '9t filings evidence explains the ZIP field choice');
+ok(/ic3t-wcy2/.test(filingsDoc) && /2020-05-21/.test(filingsDoc), '9u filings evidence rejects the stale BIS view');
+
+const bisDoc = read('docs/corporate-output-nyc-bis-window-defect-2026-09-28.md');
+ok(/ipu4-2q9a/.test(bisDoc) && /1990/.test(bisDoc), '9v BIS defect evidence names the view and the stale window');
+ok(/\*\*0\*\*/.test(bisDoc) && /\*\*55\*\*/.test(bisDoc), '9w BIS defect evidence states the measured before and after');
+ok(/floating_timestamp/.test(bisDoc) && /text/.test(bisDoc), '9x BIS defect evidence explains the text date column');
+ok(/This is not a rights finding/.test(bisDoc) && /classification moved/.test(bisDoc),
+  '9y BIS defect evidence does not claim a rights change');
+ok(/NOT YET/.test(bisDoc) && /signed_paid_pilots` is 0/.test(bisDoc),
+  '9z BIS defect evidence leaves the verdict and the pilot count alone');
 
 const coverageDoc = read('docs/corporate-output-coverage-matrix-2026-09-27.md');
 ok(/federated_href/.test(coverageDoc) && /TRANSPO_MAFDAP_PV/.test(coverageDoc),
