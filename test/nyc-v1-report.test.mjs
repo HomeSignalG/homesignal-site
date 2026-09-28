@@ -529,6 +529,36 @@ ok(browserMiss.data_state.row_cap_per_dataset === apiMiss.data_state.row_cap_per
   '8l both surfaces report the same read depth on a miss',
   { browser: browserMiss.data_state.row_cap_per_dataset, api: apiMiss.data_state.row_cap_per_dataset });
 
+// §8m — a miss is a finding only if every candidate was read. Street matching runs on
+// whatever AddressPoint returns, so a capped candidate read can report a real address as
+// absent: measured live, house_number '1' with no ZIP has 1,328 points citywide and the
+// arbitrary 50 the report used to read did not include Centre Street.
+const AP_CAP = Soda.ROW_CAP;
+// Scoped to the function body. Slicing from its name to the end of the file also sees
+// the record queries, which use ROW_CAP anyway, so the check passed while this one
+// still read 50.
+const apBody = (soda.match(/function fetchAddressPoints\(parsed\) \{[\s\S]*?\n  \}/) || [''])[0];
+ok(apBody.length > 0, '8m0 the candidate query is where the assertion can read it');
+ok(/\$limit: String\(ROW_CAP\)/.test(apBody) && !/\$limit: '\d+'/.test(apBody),
+  '8m the candidate read is capped at the same depth as the record reads', apBody.slice(-200));
+ok(AP_CAP > 2235,
+  '8m2 that depth exhausts the most-shared house number in the city (15, 2,235 points)', AP_CAP);
+ok(report.data_state.address_points_capped === false && report.data_state.address_point_candidates === 1,
+  '8n a small candidate read is reported complete', report.data_state.address_point_candidates);
+
+const cappedCandidates = [];
+for (let i = 0; i < 3; i++) cappedCandidates.push(Object.assign({}, centre, { street_name: 'OTHER' + i }));
+const cappedMiss = await V1.assembleReport({
+  address: '1 Nowhere Street', zip: '10007', radius_mi: 0.5,
+  address_points: cappedCandidates, issuance: [], dobnow: [], filings: [],
+  versions: { addresspoint: 'v' }, row_cap_per_dataset: 3, retrieved_at: 'r', generated_at: 'g'
+});
+ok(cappedMiss.status === 'address_miss' && cappedMiss.data_state.address_points_capped === true,
+  '8o a capped candidate read is flagged, so the miss is not presented as a finding',
+  cappedMiss.data_state);
+ok(/Could not be determined/.test(pageSrc) && /address_points_capped/.test(pageSrc),
+  '8p the page says the address could not be determined rather than claiming no match');
+
 // 8i–8l compare assembleReport against assembleReport, so they cannot see a divergence
 // in how the two loadReport functions CALL it — which is exactly where the miss paths
 // drifted. Every call site in both files has to pass the read depth, or the same miss

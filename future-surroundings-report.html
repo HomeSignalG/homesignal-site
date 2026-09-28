@@ -83,8 +83,8 @@
   <div id="fsrUsageView" class="fsr-scale" hidden></div>
 </div>
 
-<script src="lib/nyc-v1-report.js?v=79e05c97"></script>
-<script src="lib/nyc-v1-soda.js?v=863b1f48"></script>
+<script src="lib/nyc-v1-report.js?v=fb620ded"></script>
+<script src="lib/nyc-v1-soda.js?v=33a0a6c8"></script>
 <script src="lib/fsr-scale.js?v=9829eee6"></script>
 <script>
 (function () {
@@ -328,7 +328,17 @@
     html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
 
     if (report.status === 'address_miss' || !report.property) {
-      html += '<div class="miss"><b>No AddressPoint match.</b> This report does not guess a rooftop and does not call the Census geocoder, OpenAddresses, or Geoclient.</div>';
+      // A miss only means "not on the record" if every candidate was read. If the
+      // candidate read was capped, the right point may just not be in the rows, and
+      // saying "no match" would state a finding the report does not have.
+      if (report.data_state && report.data_state.address_points_capped) {
+        html += '<div class="miss"><b>Could not be determined.</b> This house number has more'
+          + ' published address points than this report reads (' + esc(report.data_state.address_point_candidates)
+          + '), so a match cannot be ruled out. Add a ZIP or borough and run it again. This is'
+          + ' not a finding that the address is absent.</div>';
+      } else {
+        html += '<div class="miss"><b>No AddressPoint match.</b> This report does not guess a rooftop and does not call the Census geocoder, OpenAddresses, or Geoclient.</div>';
+      }
     } else if (report.status === 'address_ambiguous') {
       html += '<div class="miss"><b>More than one AddressPoint matched.</b> Add a ZIP or borough. The report does not pick a building.</div>';
     } else {

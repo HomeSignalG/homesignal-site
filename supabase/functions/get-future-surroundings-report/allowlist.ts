@@ -490,6 +490,13 @@ export async function assembleReport(input: {
     : [];
   const nearby = matched.slice(0, NEARBY_CAP);
 
+  // A miss is only honest if every candidate was looked at. If the AddressPoint read hit
+  // its cap, the right point may simply not be among the rows, and "no match" is then a
+  // guess rather than a finding.
+  const candidates = (input.address_points || []).length;
+  const candidatesCapped = !!input.row_cap_per_dataset
+    && candidates >= input.row_cap_per_dataset;
+
   const rowCap = input.row_cap_per_dataset || 0;
   const coverage: Record<string, ReturnType<typeof coverageFor>> = {};
   coverage[DATASETS.issuance.id] = coverageFor(input.issuance, 'issuance_date', rowCap);
@@ -575,6 +582,8 @@ export async function assembleReport(input: {
       window_days: RECENT_DAYS,
       window_start: windowStartIso(RECENT_DAYS),
       row_cap_per_dataset: input.row_cap_per_dataset ?? null,
+      address_point_candidates: candidates,
+      address_points_capped: candidatesCapped,
       coverage,
       coverage_complete: coverageComplete,
       silent_datasets: silent,
@@ -598,7 +607,11 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       ? getJson(sodaUrl('resource', 'uf93-f8nk', {
         $select: 'the_geom,addresspointid,house_number,street_name,full_street_name,zipcode,boroughcode',
         $where: 'house_number=' + quote(parsed.house) + (parsed.zip ? ' AND zipcode=' + quote(parsed.zip) : ''),
-        $limit: '50',
+        // Street matching runs on these rows, so they have to be all of them. Reading 50
+        // meant house_number '1' with no ZIP returned an arbitrary 50 of 1,328 points and
+        // missed Centre Street entirely. See lib/nyc-v1-soda.js for why this is not
+        // narrowed with a server-side `like` on the street.
+        $limit: String(ROW_CAP),
       }))
       : Promise.resolve([]),
     getJson(sodaUrl('view', 'w9ak-ipjd', {})),
