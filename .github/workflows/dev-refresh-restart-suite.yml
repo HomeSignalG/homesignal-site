@@ -4,10 +4,13 @@ name: dev-refresh-restart-suite
 # DISPOSABLE Postgres 17 (production is 17). The suite first proves the LIVE function
 # (rebuilt by build_live.py and fingerprinted to production) shows the restart stall, then
 # that the migration, applied twice, fixes it, then that every prohibited change is caught.
+# Since 2026-09-28 it also proves the batch cap (docs/dev-refresh-collect-batch-cap.sql)
+# on top of the heal, the same way.
 on:
   pull_request:
     paths:
       - 'docs/dev-refresh-collect-restart-heal.sql'
+      - 'docs/dev-refresh-collect-batch-cap.sql'
       - 'docs/dev-refresh-collect-once-per-response.sql'
       - 'test/dev_refresh_restart_pg/**'
       - '.github/workflows/dev-refresh-restart-suite.yml'
@@ -15,6 +18,7 @@ on:
     branches: [main]
     paths:
       - 'docs/dev-refresh-collect-restart-heal.sql'
+      - 'docs/dev-refresh-collect-batch-cap.sql'
       - 'docs/dev-refresh-collect-once-per-response.sql'
       - 'test/dev_refresh_restart_pg/**'
       - '.github/workflows/dev-refresh-restart-suite.yml'
