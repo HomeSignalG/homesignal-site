@@ -369,6 +369,36 @@ ok(missCov.data_state.silent_datasets.length === 0,
 ok(report.data_state.window_start === V1.isoDate(new Date(Date.now() - 365 * 86400000).toISOString()),
   '7l the report names the date its window starts', report.data_state.window_start);
 
+// The query floor, the advertised date, and the row filter are three statements of the
+// same boundary, and they must agree at the boundary itself. They did not: a permit
+// dated exactly window_start was fetched by the query and then dropped by the filter,
+// while the page went on naming that date as the start of its coverage.
+ok(Soda.windowFloor() === V1.windowStartIso(V1.RECENT_DAYS),
+  '7l2 the query floor is the same value the report advertises',
+  { query: Soda.windowFloor(), advertised: V1.windowStartIso(V1.RECENT_DAYS) });
+const boundary = await V1.assembleReport({
+  address: '1 Centre Street', zip: '10007', radius_mi: 0.5, address_points: [centre],
+  issuance: [Object.assign({}, issuanceNear, {
+    issuance_date: Soda.windowFloor() + 'T00:00:00.000', job__: 'EDGE'
+  })],
+  dobnow: [], filings: [], versions: { addresspoint: 'v' },
+  row_cap_per_dataset: 5000, retrieved_at: 'r', generated_at: 'g'
+});
+ok(boundary.nearby_matched === 1,
+  '7l3 a record dated exactly window_start is listed, not fetched and silently dropped',
+  { matched: boundary.nearby_matched, window_start: boundary.data_state.window_start });
+const beforeWindow = await V1.assembleReport({
+  address: '1 Centre Street', zip: '10007', radius_mi: 0.5, address_points: [centre],
+  issuance: [Object.assign({}, issuanceNear, {
+    issuance_date: V1.windowStartIso(366) + 'T00:00:00.000', job__: 'OLD'
+  })],
+  dobnow: [], filings: [], versions: { addresspoint: 'v' },
+  row_cap_per_dataset: 5000, retrieved_at: 'r', generated_at: 'g'
+});
+ok(beforeWindow.nearby_matched === 0,
+  '7l4 the day before the window still falls outside it, so the floor did not just move',
+  beforeWindow.nearby_matched);
+
 const pageSrc = read('future-surroundings-report.html');
 ok(!/Records dated in the last/.test(pageSrc),
   '7m the page no longer claims a window it may not have covered');

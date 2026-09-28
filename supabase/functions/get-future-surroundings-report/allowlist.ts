@@ -29,8 +29,16 @@ const RECENT_DAYS = 365;
 // rather than the report implying coverage it does not have.
 const ROW_CAP = 5000;
 
+// The one definition of where the window starts. The SODA queries floor on a calendar
+// date, the response advertises a calendar date, and the row filter keeps rows — all
+// three must be the same expression, or a record dated on the advertised start day is
+// fetched and then dropped.
+export function windowStartIso(days = RECENT_DAYS, now = Date.now()): string {
+  return new Date(now - days * 86400000).toISOString().slice(0, 10);
+}
+
 function windowFloor(): string {
-  return new Date(Date.now() - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
+  return windowStartIso(RECENT_DAYS);
 }
 
 const SUFFIX: Record<string, string> = {
@@ -302,8 +310,9 @@ function withinDays(isoOrUs: string, days: number, now = Date.now()): boolean {
   if (!isoOrUs) return false;
   const t = parseDateMs(isoOrUs);
   if (!isFinite(t)) return false;
-  const ms = (days || 365) * 86400000;
-  return now - t <= ms && t <= now + 86400000;
+  const d = isoDate(isoOrUs);
+  if (!d) return false;
+  return d >= windowStartIso(days || RECENT_DAYS, now) && t <= now + 86400000;
 }
 
 function issuanceRow(r: Record<string, unknown>, home: { lat: number; lng: number }, radiusMi: number) {
@@ -564,7 +573,7 @@ export async function assembleReport(input: {
       // order, so this block must stay byte-identical to lib/nyc-v1-report.js or the two
       // surfaces fingerprint the same records differently. Pinned by 8i.
       window_days: RECENT_DAYS,
-      window_start: isoDate(new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()),
+      window_start: windowStartIso(RECENT_DAYS),
       row_cap_per_dataset: input.row_cap_per_dataset ?? null,
       coverage,
       coverage_complete: coverageComplete,
