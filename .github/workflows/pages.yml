@@ -231,11 +231,19 @@ jobs:
           assert len(projs) == len(set(projs)), 'duplicate project URL in the sitemap'
           assert pwritten, 'no project pages written'
           print(f"project pages reconciled: {len(pwritten)} documents == sitemap {len(projs)}")
+          # GUIDE PAGES (plan step 13): a fixed, small set; every one written is advertised.
+          gwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                            for r, _, fs in os.walk('_site/guides') if 'index.html' in fs)
+          guides = re.findall(r'<loc>https://homesignal\.net(/guides/[a-z0-9-]+/)</loc>', sm)
+          assert gwritten == man['guide_pages'], 'guide documents != manifest guide_pages'
+          assert sorted(guides) == man['guide_pages'], 'sitemap guide URLs != guide pages written'
+          assert len(gwritten) == 2, f'expected the two guides, found {gwritten}'
+          print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
           print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city|project)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -272,7 +280,8 @@ jobs:
           # everything the build legitimately ADDS to the staged contract
           def generated(p):
               return (p == 'zip-pages-manifest.json' or p.startswith('community/')
-                      or p.startswith('city/') or p.startswith('project/'))
+                      or p.startswith('city/') or p.startswith('project/')
+                      or p.startswith('guides/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
@@ -305,6 +314,10 @@ jobs:
           fi
           if git ls-files --error-unmatch project/ >/dev/null 2>&1; then
             echo 'ERROR: project/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
+          if git ls-files --error-unmatch guides/ >/dev/null 2>&1; then
+            echo 'ERROR: guides/ is tracked in git — generated output must never be committed'
             exit 1
           fi
           echo "git is clean of generated ZIP documents"

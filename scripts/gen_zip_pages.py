@@ -954,7 +954,8 @@ def render_city(c, pages, built):
           f'Every project links to its source record; nothing on this page is generated '
           f'or inferred.</p>'
         + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
-          '<a href="/how-it-works.html">How HomeSignal works</a></nav>'
+          '<a href="/how-it-works.html">How HomeSignal works</a> · '
+          f'<a href="{GUIDE_WHAT}">What is being built near me?</a></nav>'
         + '</main>')
     return (
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
@@ -1074,7 +1075,8 @@ def render_project(pr, pages, built):
           f'<time datetime="{esc(built)}">{esc(built)}</time>. The name, record number, date '
           f'and status are the source\'s own; nothing on this page is generated or inferred.</p>'
         + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
-          '<a href="/how-it-works.html">How HomeSignal works</a></nav>'
+          '<a href="/how-it-works.html">How HomeSignal works</a> · '
+          f'<a href="{GUIDE_CHECK}">How to check proposed development near a house</a></nav>'
         + '</main>')
     return (_head(title, desc, canon, og_type="article")
             + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
@@ -1096,6 +1098,155 @@ def build_projects(projects, pages, out_dir, built):
         written += 1
         nbytes += len(h)
     return written, nbytes
+
+
+# ---------------------------------------------------------------- guide pages (plan step 13)
+# A small, fixed set of pages built around real research questions — never one page per
+# keyword or per place (the plan's "avoid doorway-page patterns"). Each gives plain guidance
+# and a real HomeSignal lookup path that works with no script: a GET form that opens the
+# Development map for a ZIP, and the map's own address search. The lists on them (city pages,
+# recent proposals) come from the same plane the city and project pages are built from.
+GUIDE_WHAT = "/guides/what-is-being-built-near-me/"
+GUIDE_CHECK = "/guides/check-proposed-development-near-a-house/"
+GUIDE_RECENT_N = 12
+
+
+def _zip_form(label_id):
+    return (f'<form class="zsec" action="/homesignalmap.html" method="get" role="search">'
+            f'<label for="{label_id}">Your ZIP code</label> '
+            f'<input id="{label_id}" name="zip" inputmode="numeric" pattern="[0-9]{{5}}" '
+            f'maxlength="5" required placeholder="e.g. 78704"> '
+            f'<button type="submit">Open the Development map</button></form>'
+            f'<p>Have a street address? <a href="/homesignalmap.html">Search it on the Development '
+            f'map</a> and choose how far around it to look.</p>')
+
+
+def _guide_nav(here):
+    other = [(GUIDE_WHAT, "What is being built near me?"),
+             (GUIDE_CHECK, "How do I check proposed development near a house?")]
+    li = "".join(f'<li><a href="{u}">{esc(t)}</a></li>' for u, t in other if u != here)
+    return f'<nav class="zsec" aria-label="Guides"><h2>More guides</h2><ul>{li}</ul></nav>'
+
+
+def _page(title, desc, path, body_html, built):
+    body = (body_html
+            + f'<p class="quiet">Updated <time datetime="{esc(built)}">{esc(built)}</time>. '
+              f'Every project HomeSignal shows links to the official record it came from.</p>'
+            + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
+              '<a href="/how-it-works.html">How HomeSignal works</a></nav></main>')
+    return (_head(title, desc, f"{BASE}{path}", og_type="article")
+            + f'<body data-nav="guide">\n{body}\n</body>\n</html>\n')
+
+
+def render_guide_what(cities, built):
+    by_state = {}
+    for c in sorted(cities.values(), key=lambda c: (c["state"], c["place"])):
+        by_state.setdefault(c["state"], []).append(c)
+    city_html = ""
+    if by_state:
+        groups = "".join(
+            f'<h3>{esc(st)}</h3><ul>' + "".join(
+                f'<li><a href="{city_path(c)}">{esc(c["place"])}</a> '
+                f'<span class="quiet">{c["count"]} projects</span></li>' for c in cs) + '</ul>'
+            for st, cs in sorted(by_state.items()))
+        nc = sum(len(v) for v in by_state.values())
+        city_html = (f'<section class="zsec"><h2>Browse development by city</h2>'
+                     f'<p>{nc} {"city has" if nc == 1 else "cities have"} enough development '
+                     f'on record for a page of {"its" if nc == 1 else "their"} own.</p>'
+                     f'{groups}</section>')
+    body = (
+        '<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · Guide</p>'
+        '<h1>What is being built near me?</h1>'
+        '<p>Most construction leaves a public record before work starts: a permit application, '
+        'a site plan, a zoning case or a public hearing notice. HomeSignal collects those '
+        'official records and maps them by ZIP code, so you can see what is proposed, approved '
+        'and already built near you.</p></header>'
+        + _zip_form("zipWhat")
+        + '<section class="zsec"><h2>What you will see</h2>'
+          '<p>Each project is sorted by where it stands:</p><ul>'
+          '<li><strong>Proposed</strong> — filed, under review, or waiting for a hearing.</li>'
+          '<li><strong>Approved</strong> — permitted or approved, and may not be built yet.</li>'
+          '<li><strong>Operating / built</strong> — finished or in use.</li>'
+          '<li><strong>Lifecycle unknown</strong> — the record does not say.</li></ul>'
+          '<p>And by what kind of project it is: data center, industrial, residential, roads '
+          '&amp; infrastructure, commercial, civic &amp; public, or other. Each one links to the '
+          'record it came from, so you can read the details for yourself.</p></section>'
+        + '<section class="zsec"><h2>Where the records come from</h2>'
+          '<p>City and county building permits, site plans and subdivision plats, zoning and '
+          'rezoning cases, planning hearings, and state transportation projects, read from the '
+          'governments that publish them.</p></section>'
+        + '<section class="zsec"><h2>What the map cannot tell you</h2><ul>'
+          '<li>Coverage depends on what your city or county publishes online. An empty map does '
+          'not mean nothing is planned.</li>'
+          '<li>Records appear after they are filed. A project that is only being discussed will '
+          'not be in any record yet.</li>'
+          '<li>For anything that matters to a decision, confirm with your city or county '
+          'planning department.</li></ul></section>'
+        + city_html
+        + _guide_nav(GUIDE_WHAT))
+    return _page("What is being built near me? Check development by ZIP code | HomeSignal",
+                 "Look up proposed, approved and recently built development near you from "
+                 "official permits, site plans and zoning cases, mapped by ZIP code.",
+                 GUIDE_WHAT, body, built)
+
+
+def render_guide_check(projects, pages, built):
+    recent = sorted((pr for pr in projects.values()
+                     if not pr["held"] and pr["lifecycle"] == "Proposed" and pr["date"]),
+                    key=lambda pr: (pr["date"], pr["key"]), reverse=True)[:GUIDE_RECENT_N]
+    rec_html = ""
+    if recent:
+        li = []
+        for pr in recent:
+            z = next((z for z in pr["zips"] if z in pages), None)
+            where = f' <span class="quiet">{esc(pages[z]["name"])}, {esc(pages[z]["state"])}</span>' if z else ""
+            li.append(f'<li><a href="{pr["path"]}">{esc(pr["title"])}</a>{where} '
+                      f'<time>{esc(pr["date"])}</time></li>')
+        rec_html = (f'<section class="zsec"><h2>Recently filed proposals</h2><p>A sample of the '
+                    f'newest proposed projects on HomeSignal. Each page shows the official record, '
+                    f'where the project is and what it is.</p><ul>{"".join(li)}</ul></section>')
+    body = (
+        '<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · Guide</p>'
+        '<h1>How do I check proposed development near a house?</h1>'
+        '<p>Before you buy, rent or build, it helps to know what is planned nearby. Five checks '
+        'cover most of it.</p></header>'
+        + '<section class="zsec"><h2>1. Find out who decides</h2><p>Land inside city limits is '
+          'usually governed by the city; land outside them by the county. Their planning and '
+          'zoning departments hold the applications, and state transportation departments list '
+          'road projects.</p></section>'
+        + '<section class="zsec"><h2>2. Look up the address</h2><p>Use HomeSignal\'s '
+          'Development map. Start with projects marked Proposed: those are the ones still '
+          'being decided.</p>'
+        + _zip_form("zipCheck") + '</section>'
+        + '<section class="zsec"><h2>3. Read the official record</h2><p>Open each project\'s '
+          'record. Look at the status, the dates, what is being built and how big it is. A '
+          'rezoning or a site plan says more about what is coming than a single building '
+          'permit.</p></section>'
+        + '<section class="zsec"><h2>4. Look for hearings and comment windows</h2><p>Many '
+          'proposals go before a planning commission or council, with public notice beforehand. '
+          'HomeSignal ZIP pages list government notices and upcoming public meetings where your '
+          'local government publishes them. A hearing is where residents can speak.</p></section>'
+        + '<section class="zsec"><h2>5. Ask the planning department</h2><p>Plans that have not '
+          'been filed will not be in any record. The city or county planning desk can tell you '
+          'about pre-application meetings, the future land-use map and what the zoning allows '
+          'on nearby lots.</p></section>'
+        + rec_html
+        + _guide_nav(GUIDE_CHECK))
+    return _page("How to check proposed development near a house | HomeSignal",
+                 "Five checks for what is planned near a home: who decides, the address lookup, "
+                 "the official record, public hearings, and the planning department.",
+                 GUIDE_CHECK, body, built)
+
+
+def build_guides(cities, projects, pages, out_dir, built):
+    written = []
+    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, built)),
+                        (GUIDE_CHECK, render_guide_check(projects, pages, built))):
+        d = os.path.join(out_dir, *path.strip("/").split("/"))
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, "index.html"), "wb").write(html_.encode("utf-8"))
+        written.append(path)
+    return written
 
 
 # ---------------------------------------------------------------- sitemap (in-artifact)
@@ -1123,7 +1274,7 @@ def _url_el(loc):
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
 
-def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=()):
+def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=()):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -1171,6 +1322,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=()):
     pps = sorted(project_paths)
     if pps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{pp}") for pp in pps)
+    gps = sorted(guide_paths)
+    if gps:
+        block += "\n" + "\n".join(_url_el(f"{BASE}{gp}") for gp in gps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1182,7 +1336,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=()):
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
         return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps),
-                "projects": len(pps)}
+                "projects": len(pps), "guides": len(gps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
@@ -1201,6 +1355,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=()):
     npj = len(re.findall(r"<loc>[^<]*/project/[a-z0-9-]+/[a-z0-9-]+/</loc>", txt))
     if npj != len(pps):
         sys.exit(f"ERROR: sitemap carries {npj} project URLs for {len(pps)} project pages")
+    ngd = len(re.findall(r"<loc>[^<]*/guides/[a-z0-9-]+/</loc>", txt))
+    if ngd != len(gps):
+        sys.exit(f"ERROR: sitemap carries {ngd} guide URLs for {len(gps)} guide pages")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -1210,7 +1367,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=()):
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
-            "projects": len(pps)}
+            "projects": len(pps), "guides": len(gps)}
 
 
 # ---------------------------------------------------------------- build + gates
@@ -1325,7 +1482,8 @@ def main():
     city_paths = sorted(city_path(c) for c in cities.values())
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10])
     project_paths = sorted(pr["path"] for pr in projects.values())
-    sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths)
+    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10])
+    sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
@@ -1341,7 +1499,7 @@ def main():
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
           f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
-          f"+{sm['projects']} /project/ URLs")
+          f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs")
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
@@ -1361,7 +1519,8 @@ def main():
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
-               "project_pages": project_paths, "sitemap_project_urls": sm["projects"]},
+               "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
+               "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"]},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

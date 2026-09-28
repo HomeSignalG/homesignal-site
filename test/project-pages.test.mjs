@@ -251,6 +251,42 @@ print("LOADED")`;
      'a fixture without project data writes no project page and cards link to the record as before');
 }
 
+// ---- 9. guide pages (plan step 13) -----------------------------------------------------
+{
+  const W = '/guides/what-is-being-built-near-me/';
+  const C = '/guides/check-proposed-development-near-a-house/';
+  const gw = read(out, W);
+  const gc = read(out, C);
+  ok(JSON.stringify(man.guide_pages) === JSON.stringify([C, W].sort()), 'the manifest lists exactly the two guides');
+  const smG = [...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/guides\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+  ok(JSON.stringify(smG) === JSON.stringify([C, W].sort()) && man.sitemap_guide_urls === 2,
+     'the sitemap advertises exactly the two guides');
+  for (const [p, g] of [[W, gw], [C, gc]]) {
+    ok(/<meta name="robots" content="index, follow">/.test(g) && g.includes(`<link rel="canonical" href="https://homesignal.net${p}">`),
+       `${p} is indexable and self-canonical`);
+    ok(g.includes('<form class="zsec" action="/homesignalmap.html" method="get" role="search">') &&
+       /<input id="[a-zA-Z]+" name="zip"/.test(g), `${p} has a ZIP lookup that works with no script`);
+    ok(g.includes('<a href="/homesignalmap.html">Search it on the Development map</a>'),
+       `${p} points to the address search`);
+    ok(!/<script[\s>]/i.test(g) && g.includes("script-src 'none'"), `${p} ships no script`);
+  }
+  ok(gw.includes(`<a href="${C}">`) && gc.includes(`<a href="${W}">`), 'the guides link to each other');
+  ok(gw.includes('<a href="/city/ma/amherst/">Amherst</a> <span class="quiet">7 projects</span>') &&
+     gw.includes('1 city has enough development'), 'the first guide lists every city page, counted');
+  const proposed = Object.entries(docs.projectsDoc.projects)
+    .filter(([, v]) => v.status === 'Proposed' && v.date)
+    .sort((a, b) => (b[1].date + b[0] > a[1].date + a[0] ? 1 : -1));
+  const recentLinks = [...gc.matchAll(/<li><a href="(\/project\/[^"]+)">/g)].map((m) => m[1]);
+  ok(recentLinks.length > 0 && recentLinks.length === Math.min(12, proposed.length),
+     `the second guide lists the newest proposals (${recentLinks.length})`);
+  ok(JSON.stringify(recentLinks) === JSON.stringify(proposed.slice(0, 12)
+    .map(([k, v]) => expectedPath('town-permits', v.case, k))),
+     'newest first, only proposals, each linking to its project page');
+  ok(city.includes(`<a href="${W}">What is being built near me?</a>`), 'city pages link to the first guide');
+  ok(pg1.includes(`<a href="${C}">How to check proposed development near a house</a>`),
+     'project pages link to the second guide');
+}
+
 // ---- 8. determinism --------------------------------------------------------------------
 ok(read(build(makeInputs()).out, p1) === pg1, 'two builds of the same input write byte-identical project pages');
 
