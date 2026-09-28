@@ -98,6 +98,18 @@ const filingWrongType = Object.assign({}, filingNear, {
   job_type: 'Alteration'
 });
 
+const dobnowNear = {
+  work_type: 'General Construction',
+  permit_status: 'Permit Issued',
+  issued_date: '2026-03-01T00:00:00.000',
+  house_no: '3',
+  street_name: 'CENTRE',
+  latitude: '40.7132',
+  longitude: '-74.0039',
+  job_filing_number: 'M0002-I1',
+  zip_code: '10007'
+};
+
 const withFilings = V1.nearbyFromPublisherRows([], [], coords, 0.5, [filingNear, filingWithdrawn, filingWrongType]);
 ok(withFilings.length === 1 && withFilings[0].case_number === 'M0001-I1', '2e only allowlisted filings', withFilings);
 ok(withFilings[0].stage === 'Filed' && withFilings[0].date_label === 'Filed', '2f filings are staged as Filed');
@@ -201,8 +213,13 @@ globalThis.fetch = (url) => {
   seen.push(String(url));
   return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
 };
-await Soda.fetchIssuance(['10007']);
-await Soda.fetchFilings(['10007']);
+// Called the way loadReport calls them: with a bounding box, not a ZIP list. Passing
+// the wrong shape used to still emit a query, so the assertions below check the box
+// numbers appear rather than only that a floor is present somewhere.
+const testBox = V1.bbox(coords.lat, coords.lng, 0.5);
+await Soda.fetchIssuance(testBox);
+await Soda.fetchFilings(testBox);
+await Soda.fetchIssuance(null);
 globalThis.fetch = realFetch;
 
 // URLSearchParams encodes spaces as '+', which decodeURIComponent leaves alone.
@@ -221,6 +238,23 @@ ok(issUrl.includes('issuance_date is not null'), '6e BIS query skips rows with n
 ok(filUrl.includes("filing_date >= '" + floor + "'"), '6f filings query is floored to the same window', filUrl);
 ok(filUrl.includes('$order=filing_date DESC'), '6g filings query is ordered newest first', filUrl);
 
+// Records are nearby because of the publisher's coordinates, not because of a ZIP text
+// field. Measured at 1 Centre Street, the ZIP route missed 2 in-radius records in 10006.
+ok(issUrl.includes('gis_latitude::number between ' + testBox.minLat + ' and ' + testBox.maxLat)
+  && issUrl.includes('gis_longitude::number between ' + testBox.minLng + ' and ' + testBox.maxLng),
+  '6q BIS query is scoped on cast publisher coordinates', issUrl);
+ok(filUrl.includes('latitude::number between ' + testBox.minLat + ' and ' + testBox.maxLat),
+  '6r filings query is scoped on cast publisher coordinates', filUrl);
+ok(!/zip_code in\(/.test(issUrl) && !/postcode in\(/.test(filUrl),
+  '6s neither record query decides nearness by a ZIP field', issUrl + ' || ' + filUrl);
+ok(!/undefined|NaN/.test(issUrl + filUrl),
+  '6t no query ships an undefined bound', issUrl + ' || ' + filUrl);
+ok(seen.filter((u) => u.includes('ipu4-2q9a')).length === 1,
+  '6u a missing box queries nothing rather than querying the whole city',
+  seen.filter((u) => u.includes('ipu4-2q9a')).length);
+ok(!seen.some((u) => u.includes('within_circle')),
+  '6v the ZIP round trip is gone, not merely unused');
+
 // The repo's older instrument for this column rebuilds a sort key with substring().
 // That assumes one date format. This column holds two, and on the 17,237 ISO-formatted
 // rows the substring positions admit 12,621 permits from 1993-2006 as recent.
@@ -229,6 +263,13 @@ ok(!/substring\(issuance_date/.test(issUrl),
 
 const soda = read('lib/nyc-v1-soda.js');
 ok(!/\$limit: '200'/.test(soda), '6h the row cap is a named constant, not a literal per query');
+// The cap is only honest if it clears the densest window a buyer can ask for. The
+// worst case measured against the live views is 3,390 rows (1 mi, lower Manhattan);
+// anything at or below that silently truncates exactly where coverage matters most.
+const DENSEST_MEASURED_WINDOW = 3390;
+ok(Soda.ROW_CAP > DENSEST_MEASURED_WINDOW,
+  '6h2 the row cap clears the densest window measured against the live views',
+  { row_cap: Soda.ROW_CAP, densest_measured: DENSEST_MEASURED_WINDOW });
 ok((soda.match(/windowFloor\(\)/g) || []).length >= 4,
   '6i all three record queries request the window', (soda.match(/windowFloor\(\)/g) || []).length);
 ok(report.data_state.window_days === 365 && report.data_state.row_cap_per_dataset === null,
@@ -244,6 +285,124 @@ ok(/issuance_date::floating_timestamp >= /.test(fnSrc) && /issuance_date::floati
   '6m the API applies the same BIS floor and order as the browser');
 ok(/window_days: RECENT_DAYS/.test(fnSrc), '6n the API discloses the window too');
 ok(!/\$limit: '200'/.test(fnSrc), '6o the API row cap is a named constant');
+const fnRowCap = Number((fnSrc.match(/const ROW_CAP = (\d+);/) || [])[1]);
+ok(fnRowCap === Soda.ROW_CAP,
+  '6o2 the API reads the same depth as the browser, so the two cannot disagree on coverage',
+  { api: fnRowCap, browser: Soda.ROW_CAP });
+ok(/gis_latitude::number between/.test(fnSrc) && !/zip_code in\(/.test(fnSrc),
+  '6w the API scopes on coordinates too, not on zip_code');
+ok(!/within_circle/.test(fnSrc), '6x the API no longer makes the ZIP round trip');
+
+// §7 — the contribution guard. The defect that started this was a view that was
+// allowlisted, credited, and returning nothing, and no test could see it because every
+// assertion fed synthetic rows to the row shaper. These assert on the coverage record.
+const cov = V1.coverageFor(
+  [{ d: '03/01/2026' }, { d: '2025-12-15T00:00:00.000' }, { d: '' }],
+  'd',
+  3
+);
+ok(cov.fetched === 3, '7a coverage counts what the publisher returned', cov);
+ok(cov.oldest === '2025-12-15' && cov.newest === '2026-03-01',
+  '7b coverage reach spans both date formats', cov);
+ok(cov.capped === true, '7c hitting the row cap is recorded, not hidden', cov);
+ok(V1.coverageFor([{ d: '03/01/2026' }], 'd', 3).capped === false,
+  '7d a short read is not reported as capped');
+ok(V1.coverageFor([], 'd', 3).fetched === 0 && V1.coverageFor([], 'd', 3).oldest === '',
+  '7e an empty read reports zero, not a guessed range');
+
+const silentReport = await V1.assembleReport({
+  address: '1 Centre Street',
+  zip: '10007',
+  radius_mi: 0.5,
+  address_points: [centre],
+  issuance: [],
+  dobnow: [dobnowNear],
+  filings: [],
+  versions: { addresspoint: 'v', issuance: 'v', dobnow: 'v', filings: 'v' },
+  row_cap_per_dataset: 5000,
+  retrieved_at: 'r',
+  generated_at: 'g'
+});
+ok(silentReport.data_state.silent_datasets.join(',') === 'ipu4-2q9a,w9ak-ipjd',
+  '7f a view that returned nothing is named, not quietly credited',
+  silentReport.data_state.silent_datasets);
+ok(silentReport.data_state.coverage_complete === true,
+  '7g returning nothing is not the same as being capped');
+ok(silentReport.data_state.coverage['rbx6-tga4'].fetched === 1,
+  '7h the view that did contribute is counted');
+
+const cappedReport = await V1.assembleReport({
+  address: '1 Centre Street',
+  zip: '10007',
+  radius_mi: 0.5,
+  address_points: [centre],
+  issuance: [issuanceNear],
+  dobnow: [dobnowNear],
+  filings: [filingNear],
+  versions: { addresspoint: 'v', issuance: 'v', dobnow: 'v', filings: 'v' },
+  row_cap_per_dataset: 1,
+  retrieved_at: 'r',
+  generated_at: 'g'
+});
+ok(cappedReport.data_state.coverage_complete === false,
+  '7i a capped read makes coverage incomplete, so the page cannot claim the full window');
+ok(cappedReport.data_state.silent_datasets.length === 0,
+  '7j capped is not silent');
+
+const missCov = await V1.assembleReport({
+  address: '1 Nowhere Street', zip: '10007', address_points: [centre], issuance: [], dobnow: []
+});
+ok(missCov.data_state.silent_datasets.length === 0,
+  '7k a miss queries nothing, so nothing is reported silent');
+
+ok(report.data_state.window_start === V1.isoDate(new Date(Date.now() - 365 * 86400000).toISOString()),
+  '7l the report names the date its window starts', report.data_state.window_start);
+
+const pageSrc = read('future-surroundings-report.html');
+ok(!/Records dated in the last/.test(pageSrc),
+  '7m the page no longer claims a window it may not have covered');
+
+// Grepping the page for these strings only proves the branch was written, not that it
+// is ever reached. The disclosure is the product, so it is run against real reports.
+const noteSrc = (pageSrc.match(/\n( *)(function coverageNote\(report\) \{[\s\S]*?\n\1\})/) || [])[2];
+ok(!!noteSrc, '7n0 the page exposes a coverage note to test');
+const coverageNote = new Function(
+  'esc',
+  noteSrc + '\n return coverageNote;'
+)((s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[c]));
+
+const fullReport = await V1.assembleReport({
+  address: '1 Centre Street',
+  zip: '10007',
+  radius_mi: 0.5,
+  address_points: [centre],
+  issuance: [issuanceNear],
+  dobnow: [dobnowNear],
+  filings: [filingNear],
+  versions: { addresspoint: 'v', issuance: 'v', dobnow: 'v', filings: 'v' },
+  row_cap_per_dataset: 5000,
+  retrieved_at: 'r',
+  generated_at: 'g'
+});
+const completeHtml = coverageNote(fullReport);
+ok(/Every allowlisted/.test(completeHtml) && !/Partial coverage/.test(completeHtml),
+  '7n a complete read is stated as complete', completeHtml);
+ok(completeHtml.includes(fullReport.data_state.window_start),
+  '7n1 a complete read names the date it reaches back to', completeHtml);
+
+const cappedHtml = coverageNote(cappedReport);
+ok(/Partial coverage/.test(cappedHtml) && !/Every allowlisted/.test(cappedHtml),
+  '7n2 a capped read is stated as partial, not as the full window', cappedHtml);
+ok(/ipu4-2q9a/.test(cappedHtml) && /reaches back to/.test(cappedHtml),
+  '7n3 a capped read names which set was truncated and how far it got', cappedHtml);
+
+const silentHtml = coverageNote(silentReport);
+ok(/ipu4-2q9a, w9ak-ipjd/.test(silentHtml) && /contributed/.test(silentHtml),
+  '7o the page tells the buyer which credited source contributed nothing', silentHtml);
+ok(!/contributed/.test(completeHtml),
+  '7o1 a report with no silent source does not invent one', completeHtml);
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

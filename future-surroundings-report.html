@@ -83,8 +83,8 @@
   <div id="fsrUsageView" class="fsr-scale" hidden></div>
 </div>
 
-<script src="lib/nyc-v1-report.js?v=8b913d46"></script>
-<script src="lib/nyc-v1-soda.js?v=f7a94347"></script>
+<script src="lib/nyc-v1-report.js?v=8e3925e1"></script>
+<script src="lib/nyc-v1-soda.js?v=b816b021"></script>
 <script src="lib/fsr-scale.js?v=9829eee6"></script>
 <script>
 (function () {
@@ -281,6 +281,38 @@
     return s;
   }
 
+  // States the coverage the report actually achieved, not the window it asked for.
+  // If a dataset hit the row cap, its real reach is named instead of the window.
+  function coverageNote(report) {
+    var ds = report.data_state || {};
+    var cov = ds.coverage || {};
+    var ids = Object.keys(cov);
+    var html = '';
+    if (ds.coverage_complete && ids.length) {
+      html += '<p class="sub">Every allowlisted Department of Buildings record the publisher'
+        + ' places inside this radius, dated ' + esc(ds.window_start) + ' or later ('
+        + esc(ds.window_days) + ' days). Records are matched on the publisher\u2019s own'
+        + ' coordinates, not on a ZIP field.</p>';
+    } else {
+      var capped = ids.filter(function (id) { return cov[id].capped; });
+      html += '<p class="sub"><b>Partial coverage.</b> ' + esc(capped.length) + ' of '
+        + esc(ids.length) + ' record sets returned more rows than this report reads, so for'
+        + ' those the radius is covered only back to the date shown, not the full '
+        + esc(ds.window_days) + ' days:</p><ul class="sub">';
+      capped.forEach(function (id) {
+        html += '<li>' + esc(id) + ' \u2014 reaches back to ' + esc(cov[id].oldest)
+          + ' (' + esc(cov[id].fetched) + ' rows read)</li>';
+      });
+      html += '</ul>';
+    }
+    if ((ds.silent_datasets || []).length) {
+      html += '<p class="miss"><b>' + esc(ds.silent_datasets.join(', ')) + '</b> returned no'
+        + ' records in this radius and window. That is credited above but contributed'
+        + ' nothing to this report.</p>';
+    }
+    return html;
+  }
+
   function render(report) {
     lastReport = report;
     var html = '';
@@ -300,16 +332,14 @@
       if (!report.nearby.length) {
         html += '<p>No allowlisted Department of Buildings rows with publisher coordinates in that radius in the last ' +
           esc((report.data_state && report.data_state.window_days) || 365) + ' days.</p>';
+        html += coverageNote(report);
       } else {
         html += '<h2>Department of Buildings records near this property</h2>';
         if (report.nearby_truncated) {
           html += '<p class="sub">Showing the ' + esc(report.nearby.length) + ' closest of ' +
             esc(report.nearby_matched) + ' allowlisted records in this radius.</p>';
         }
-        html += '<p class="sub">Records dated in the last ' +
-          esc((report.data_state && report.data_state.window_days) || 365) + ' days. Each dataset is read ' +
-          esc((report.data_state && report.data_state.row_cap_per_dataset) || 200) +
-          ' rows at a time, newest first, so this count is a floor and not a census of the radius.</p>';
+        html += coverageNote(report);
         html += '<table><thead><tr><th>Distance</th><th>On the record</th><th>Stage</th><th>Status</th><th>Date</th><th>Source</th></tr></thead><tbody>';
         report.nearby.forEach(function (row) {
           html += '<tr><td>' + esc(row.distance_mi) + ' mi (' + esc(row.east_mi) + ' E, ' + esc(row.north_mi) + ' N)</td>' +

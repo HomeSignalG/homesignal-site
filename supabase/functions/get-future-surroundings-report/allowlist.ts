@@ -24,7 +24,10 @@ const NEARBY_CAP = 50;
 // requests the same window. An unordered row window returns the publisher's oldest
 // rows, which this filter then drops, and the view goes silently empty.
 const RECENT_DAYS = 365;
-const ROW_CAP = 200;
+// Sized so a single request exhausts the window even at 1 mi in the densest part of
+// the city (measured: 3,390 rows). If it ever binds, data_state.coverage records it
+// rather than the report implying coverage it does not have.
+const ROW_CAP = 5000;
 
 function windowFloor(): string {
   return new Date(Date.now() - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
@@ -255,13 +258,45 @@ export function bbox(lat: number, lng: number, radiusMi: number) {
   return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
 }
 
+// One view stores dates as text MM/DD/YYYY, the others as ISO timestamps.
+function parseDateMs(raw: string): number {
+  const s = String(raw || '');
+  if (!s) return NaN;
+  const us = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (us) return Date.parse(us[3] + '-' + us[1] + '-' + us[2]);
+  return Date.parse(s);
+}
+
+export function isoDate(raw: string): string {
+  const t = parseDateMs(raw);
+  if (!isFinite(t)) return '';
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+// What the report actually retrieved from a view, as opposed to what it asked for.
+export function coverageFor(
+  rows: Record<string, unknown>[] | undefined,
+  dateField: string,
+  rowCap: number,
+) {
+  const list = rows || [];
+  const dates: string[] = [];
+  list.forEach((r) => {
+    const d = isoDate(String((r || {})[dateField] || ''));
+    if (d) dates.push(d);
+  });
+  dates.sort();
+  return {
+    fetched: list.length,
+    capped: !!rowCap && list.length >= rowCap,
+    oldest: dates[0] || '',
+    newest: dates[dates.length - 1] || '',
+  };
+}
+
 function withinDays(isoOrUs: string, days: number, now = Date.now()): boolean {
   if (!isoOrUs) return false;
-  let t = Date.parse(isoOrUs);
-  if (!isFinite(t) && /^\d{2}\/\d{2}\/\d{4}$/.test(isoOrUs)) {
-    const p = isoOrUs.split('/');
-    t = Date.parse(p[2] + '-' + p[0] + '-' + p[1]);
-  }
+  const t = parseDateMs(isoOrUs);
   if (!isFinite(t)) return false;
   const ms = (days || 365) * 86400000;
   return now - t <= ms && t <= now + 86400000;
@@ -442,6 +477,18 @@ export async function assembleReport(input: {
     : [];
   const nearby = matched.slice(0, NEARBY_CAP);
 
+  const rowCap = input.row_cap_per_dataset || 0;
+  const coverage: Record<string, ReturnType<typeof coverageFor>> = {};
+  coverage[DATASETS.issuance.id] = coverageFor(input.issuance, 'issuance_date', rowCap);
+  coverage[DATASETS.dobnow.id] = coverageFor(input.dobnow, 'issued_date', rowCap);
+  coverage[DATASETS.filings.id] = coverageFor(input.filings, 'filing_date', rowCap);
+  const coverageComplete = Object.keys(coverage).every((id) => !coverage[id].capped);
+  // A record view that is on the allowlist, credited in the attribution, and returned
+  // nothing at all is the defect this field exists to surface.
+  const silent = (match.status === 'ok' && home)
+    ? Object.keys(coverage).filter((id) => coverage[id].fetched === 0)
+    : [];
+
   const retrieved = input.retrieved_at || '';
   const views = [
     {
@@ -511,6 +558,10 @@ export async function assembleReport(input: {
       datasets: [DATASETS.addresspoint.id, DATASETS.issuance.id, DATASETS.dobnow.id, DATASETS.filings.id],
       window_days: RECENT_DAYS,
       row_cap_per_dataset: input.row_cap_per_dataset ?? null,
+      window_start: isoDate(new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()),
+      coverage,
+      coverage_complete: coverageComplete,
+      silent_datasets: silent,
       versions: input.versions || {},
     },
   };
@@ -574,21 +625,10 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
   }
   const radius = radiusMi || 0.5;
   const box = bbox(home.lat, home.lng, radius);
-  const meters = Math.round(radius * 1609.344);
-  const zipRows = await getJson(sodaUrl('resource', 'uf93-f8nk', {
-    $select: 'zipcode',
-    $where: 'within_circle(the_geom,' + home.lat + ',' + home.lng + ',' + meters + ')',
-    $group: 'zipcode',
-    $limit: '50',
-  }));
-  const zips = (zipRows || []).map((r: { zipcode?: string }) => String(r.zipcode || '')).filter((z: string) => /^\d{5}$/.test(z));
-  if (match.point && match.point.zipcode && zips.indexOf(String(match.point.zipcode)) === -1) {
-    zips.push(String(match.point.zipcode));
-  }
-  const inList = zips.slice(0, 20).map(quote).join(',');
   const [issuance, dobnow, filings] = await Promise.all([
-    inList
-      ? getJson(sodaUrl('resource', 'ipu4-2q9a', {
+    // Scoped on the publisher's own coordinates, which is what the report claims to use.
+    // Scoping by zip_code trusted a text field the publisher does not always get right.
+    getJson(sodaUrl('resource', 'ipu4-2q9a', {
         $select: 'permit_type,permit_status,issuance_date,house__,street_name,gis_latitude,gis_longitude,job__,zip_code',
         // issuance_date is a text column on this view, so it is read as a timestamp
         // to filter and order. A lexical sort mixes MM/DD/YYYY and ISO values.
@@ -596,14 +636,14 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
           "permit_type in('NB','DM','AL','FO')",
           'gis_latitude is not null',
           'gis_longitude is not null',
-          'zip_code in(' + inList + ')',
+          'gis_latitude::number between ' + box.minLat + ' and ' + box.maxLat,
+          'gis_longitude::number between ' + box.minLng + ' and ' + box.maxLng,
           'issuance_date is not null',
           "issuance_date::floating_timestamp >= '" + windowFloor() + "'",
         ].join(' AND '),
         $order: 'issuance_date::floating_timestamp DESC',
         $limit: String(ROW_CAP),
-      }))
-      : Promise.resolve([]),
+    })),
     getJson(sodaUrl('resource', 'rbx6-tga4', {
       $select: 'work_type,permit_status,issued_date,house_no,street_name,latitude,longitude,job_filing_number,zip_code,work_permit',
       $where: [
@@ -617,15 +657,21 @@ export async function loadReport(address: string, zip: string, radiusMi: number)
       $limit: String(ROW_CAP),
       $order: 'issued_date DESC',
     })),
-    // postcode is the job-site ZIP. `zip` on this view is the applicant's ZIP.
-    inList
-      ? getJson(sodaUrl('resource', 'w9ak-ipjd', {
-        $select: 'job_type,filing_status,filing_date,house_no,street_name,latitude,longitude,job_filing_number,postcode',
-        $where: "job_type in('New Building','Full Demolition') AND latitude is not null AND longitude is not null AND postcode in(" + inList + ") AND filing_date >= '" + windowFloor() + "'",
-        $limit: String(ROW_CAP),
-        $order: 'filing_date DESC',
-      }))
-      : Promise.resolve([]),
+    // postcode is still selected because it is the job-site ZIP and `zip` is the
+    // applicant's, but coordinates decide whether a record is nearby.
+    getJson(sodaUrl('resource', 'w9ak-ipjd', {
+      $select: 'job_type,filing_status,filing_date,house_no,street_name,latitude,longitude,job_filing_number,postcode',
+      $where: [
+        "job_type in('New Building','Full Demolition')",
+        'latitude is not null',
+        'longitude is not null',
+        'latitude::number between ' + box.minLat + ' and ' + box.maxLat,
+        'longitude::number between ' + box.minLng + ' and ' + box.maxLng,
+        "filing_date >= '" + windowFloor() + "'",
+      ].join(' AND '),
+      $limit: String(ROW_CAP),
+      $order: 'filing_date DESC',
+    })),
   ]);
   return assembleReport({
     parsed,
