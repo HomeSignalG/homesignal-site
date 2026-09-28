@@ -40,6 +40,59 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-28 — 🔴 FINDING (RECORDED, NOT FIXED): the BIS `recency_expr` admits permits back to 1989 — 89.6% of what it returns is not recent
+
+**This is a finding, not authorised work.** Per Rule 16 it is filed as its own item rather
+than folded into the Future Surroundings Report checkpoint, whose scope is fixed and whose
+sold artifact does not touch this code path. **Nothing here has been changed.** Fixing it
+needs founder authorisation because it is a live consumer surface.
+
+**Where:** `supabase/functions/get-address-report/jurisdiction-registry.json`, the
+`socrata` entry for dataset `ipu4-2q9a` (NYC DOB Permit Issuance, BIS legacy):
+
+```
+"recency_expr": "(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'"
+```
+
+**What it assumed.** `issuance_date` is a *text* column. The convention dated 2026-08-02
+reformats it into a sortable `YYYYMMDD` key by slicing the parts out of `MM/DD/YYYY`. That
+was correct when every value in the column had that shape.
+
+**What the column is now.** The publisher has been writing ISO values into it. Measured
+against the live view 2026-09-28: **3,990,689 rows total — 3,881,514 `MM/DD/YYYY` and
+88,238 `YYYY-MM-DD…`.** The slice positions mean nothing on the second shape. For
+`2026-03-01T00:00:00.000` the expression builds the key `3-01206-`, and because the
+comparison is lexical and `3` sorts above `2`, that key clears **any** `{cutoff_compact}`
+beginning with a 2 — i.e. every cutoff this century.
+
+**What that costs, measured 2026-09-28 at a 365-day cutoff (`20250928`):**
+
+| | rows |
+|---|---|
+| admitted by `recency_expr` | 71,681 |
+| genuinely inside the 365-day window | 7,442 |
+| **over-included** | **64,239 (89.6% of what it returns)** |
+| oldest permit the expression admits | **1989-05-11** |
+
+Every one of the 64,239 is an ISO-formatted row. This is not a rounding error at the
+boundary: nine of every ten permits the consumer path calls recent are not.
+
+**Why it was not fixed here.** `ipu4-2q9a` is on the NYC V1 allowlist, but
+`get-address-report` is on the EXCLUDE list and contributes nothing to the sold report —
+see `docs/corporate-output-source-rights-audit-2026-09-27.md`. The paid path reads the same
+column with a cast (`issuance_date::floating_timestamp`) and is unaffected; the reasoning,
+and the rejected option of reusing this convention, is written up in
+`docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`. Routing around a defect in a
+second implementation is not resolving it, so it is recorded here against the surface that
+still has it.
+
+**Proposed remedy (NOT AUTHORISED, NOT STARTED).** Replace the substring key with
+`issuance_date::floating_timestamp >= '{cutoff_iso}'`, which is verified working on this
+view in both `$where` and `$order`. Note `date_extract_y` is **not** available on a text
+column here — it returns HTTP 400 on type mismatch. Any other registry entry whose
+`recency_expr` slices a text date has the same exposure the moment its publisher changes
+format; that sweep is also unstarted and unauthorised.
+
 ### 2026-09-20 — DECISION HISTORY: code landed on the branch; deploy + backfill separately gated
 
 **State:** implementation complete and COMMITTED on
