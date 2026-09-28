@@ -124,6 +124,8 @@ const sqlFams = (sql.match(/entry_family in \(([^)]*)\)/) || [])[1] || '';
 ok(sqlFams.replace(/[\s']/g, '') === HS.PAGE_FAMILIES.join(','), 'SQL CHECK lists exactly HS.PAGE_FAMILIES');
 ok(/revoke all on function public\.hs_seo_family_conversions\(integer\) from anon, authenticated;/.test(sql),
    'report function is revoked from anon and authenticated by name');
+ok(/order by coalesce\(e\.entry_family, '\(not recorded\)'\) collate "C";/.test(sql) && !/order by \d+ collate/.test(sql.replace(/--[^\n]*/g, '')),
+   'the report sorts by the column with a pinned collation, not by a position number');
 ok(/has_table_privilege\('anon', 'public\.events', 'select'\)/.test(sql), 'SQL refuses to commit if anon could read events');
 
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }

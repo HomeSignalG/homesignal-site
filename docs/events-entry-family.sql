@@ -55,7 +55,8 @@ as $fn$
   where e.created_at >= now() - make_interval(days => greatest(coalesce(p_days, 28), 1))
     and (e.event_type = 'property_lookup' or e.event_type like 'alert\_signup\_%')
   group by 1
-  order by 1 collate "C";
+  -- Sort by the expression itself: "order by 1 collate ..." would collate the number 1.
+  order by coalesce(e.entry_family, '(not recorded)') collate "C";
 $fn$;
 
 revoke all on function public.hs_seo_family_conversions(integer) from public;
