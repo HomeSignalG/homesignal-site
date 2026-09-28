@@ -136,6 +136,7 @@ const REQUIRED = [
   'index.html', '404.html', 'app.css', 'shell.js', 'config.js', 'share.js',
   'robots.txt', 'sitemap.xml', 'CNAME', '.nojekyll', 'favicon.svg', 'og-default.png',
   '.well-known/did.json',     // Bluesky feed generator DID document
+  'google59e1ae3ef6b75e3a.html', // Google Search Console verification (removing it un-verifies the site)
   'partials/shell.html', 'seed/delvalle.js', 'assets/acquisition-video-producer.js',
   // production page families
   'community.html',        // ZIP / community
