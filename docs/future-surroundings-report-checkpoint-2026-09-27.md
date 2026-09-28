@@ -86,10 +86,22 @@ rows. Its SODA window was unordered, so it returned the publisher's oldest rows 
 2022 for the ZIP group around 1 Centre Street — and the report's 365-day filter dropped all
 200 of them. 161 permits existed inside the window in those ZIPs; the report showed none.
 
-The window is now one named constant shared by the row filter and every record query, all
-three record views are floored and ordered newest first, and the report discloses both
-`window_days` and `row_cap_per_dataset` so `nearby_matched` is read as a floor rather than a
-census. Pinned by `test/nyc-v1-report.test.mjs` 6a–6o.
+The window is now one named constant shared by the row filter and every record query, and
+all three record views are floored and ordered newest first. Pinned by
+`test/nyc-v1-report.test.mjs` 6a–6p.
+
+**That fix stopped the silence but not the overstatement, and the page was corrected again
+the same day.** Evidence: the `## The page was still claiming a window it did not have`
+section of PR #1424. Disclosing `row_cap_per_dataset` and calling `nearby_matched` a floor
+was not honest enough: the page still told the buyer it listed records "dated in the last
+365 days" while the real coverage at 1 Centre Street was 53 days, with 1,233 in-radius
+records never read. All three record queries are now scoped on the publisher's own
+coordinates rather than on a ZIP field, the row cap is sized above the densest window
+measured live, and the report carries `data_state.coverage`, `coverage_complete`, and
+`silent_datasets` so the page states the reach it achieved instead of the window it asked
+for. Pinned by `test/nyc-v1-report.test.mjs` §7.
+
+No classification moved.
 
 No classification moved. Checking that each cleared dataset actually reaches the artifact is
 part of Step 14, not a separate step: a report that credits a source it never read is not an
@@ -117,6 +129,30 @@ Steps 2–13 are closed for the NYC V1 allowlist as recorded above. Remaining ga
 2. Keep the audit verdict **NOT YET** until a customer is actually sold an allowlisted artifact (Step 15 — standing rule).
 3. Signed paid pilots remain **0**. A later sale, not this file, can move that count.
 4. Additional markets remain **OPEN**. A later evidence file has to clear both publisher data and geography before a second market is assemblable.
+
+## What is between here and a launch
+
+No plan step is outstanding. What remains is not engineering work that was skipped — it is
+the set of deliberate acts that turn a built artifact into a sold one, and none of them is
+an agent's to take. Measured against the tree on 2026-09-28:
+
+| Gate | State | Whose act |
+|---|---|---|
+| Merge to `main` | Not merged. Everything is on `cursor/nyc-pilot-geography-rights-dbc1` (PR #1424). `pages / deploy` runs only on `main`, so nothing is live. | Founder |
+| Deploy the edge function | Never deployed. `.github/workflows/deploy-edge-functions.yml` is `workflow_dispatch` only, deliberately manual, and has never been dispatched for `get-future-surroundings-report`. Until it is, the JSON API does not exist in production. | Founder |
+| A way in | The page is staged by `scripts/stage_site.py`, so a merge would publish it at `/future-surroundings-report.html` — but **no page links to it and it is not in `sitemap.xml`.** A buyer cannot find it. Whether that stays true is a decision, not an oversight. | Founder |
+| A price | There is none. No Stripe, no checkout, no payment path anywhere in the tree. Nothing can be charged for. | Founder |
+| A customer | `signed_paid_pilots` is **0** and the count is shipped on the page. Step 15 holds the verdict at **NOT YET** until one real sale happens. | Founder |
+
+The first four are reversible decisions. The fifth is the one the audit actually gates on:
+the verdict moves when a customer is sold an artifact built only from the allowlist, and
+not before. Nothing in this repository may raise the pilot count or change the verdict in
+anticipation of that.
+
+Two recorded items are open and unauthorised, and neither blocks a launch of this report:
+the `get-address-report` recency over-inclusion filed in `QUEUE.md`, which is a consumer
+surface outside the sold path, and whether to sort keys before hashing `report_id`
+(`docs/corporate-output-report-id-guarantee-2026-09-28.md`).
 
 Listing, portfolio, and API reuse the same NYC V1 geography, provenance, rights, and report logic. They do not call `get-address-report`.
 

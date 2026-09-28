@@ -224,6 +224,13 @@ REQUESTS.forEach(([marketId, path]) => {
   ok(reached.length === 0, '9y5 no ' + marketId + ' dataset reached the sold allowlist', reached);
 });
 
+// The checkpoint names the NYC V1 inputs in a table a reader trusts. It has already
+// drifted once from the code beside it, so the ids are compared rather than read.
+const checkpoint = read('docs/future-surroundings-report-checkpoint-2026-09-27.md');
+const cpMissing = sold.filter((id) => !checkpoint.includes(id));
+ok(cpMissing.length === 0,
+  '9y6 the checkpoint names every dataset the sold report actually reads', cpMissing);
+
 ok(matrix.markets.filter((m) => m.assemblable).length === 1,
   '9y exactly one market is assemblable');
 ok(!CLASSES.slice(0, 1).some((c) => JSON.stringify(matrix).includes(c)),
