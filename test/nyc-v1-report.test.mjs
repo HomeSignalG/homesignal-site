@@ -221,6 +221,12 @@ ok(issUrl.includes('issuance_date is not null'), '6e BIS query skips rows with n
 ok(filUrl.includes("filing_date >= '" + floor + "'"), '6f filings query is floored to the same window', filUrl);
 ok(filUrl.includes('$order=filing_date DESC'), '6g filings query is ordered newest first', filUrl);
 
+// The repo's older instrument for this column rebuilds a sort key with substring().
+// That assumes one date format. This column holds two, and on the 17,237 ISO-formatted
+// rows the substring positions admit 12,621 permits from 1993-2006 as recent.
+ok(!/substring\(issuance_date/.test(issUrl),
+  '6p BIS query does not use the substring key, which is wrong on this column now', issUrl);
+
 const soda = read('lib/nyc-v1-soda.js');
 ok(!/\$limit: '200'/.test(soda), '6h the row cap is a named constant, not a literal per query');
 ok((soda.match(/windowFloor\(\)/g) || []).length >= 4,

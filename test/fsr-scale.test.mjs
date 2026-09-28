@@ -156,6 +156,10 @@ ok(/This is not a rights finding/.test(bisDoc) && /classification moved/.test(bi
   '9y BIS defect evidence does not claim a rights change');
 ok(/NOT YET/.test(bisDoc) && /signed_paid_pilots` is 0/.test(bisDoc),
   '9z BIS defect evidence leaves the verdict and the pilot count alone');
+ok(/12,621/.test(bisDoc) && /substring/.test(bisDoc),
+  '9aa BIS defect evidence measures the older substring convention it did not reuse');
+ok(/not\*\* fixed here/.test(bisDoc) && /get-address-report/.test(bisDoc),
+  '9ab BIS defect evidence records the get-address-report finding without changing it');
 
 const coverageDoc = read('docs/corporate-output-coverage-matrix-2026-09-27.md');
 ok(/federated_href/.test(coverageDoc) && /TRANSPO_MAFDAP_PV/.test(coverageDoc),

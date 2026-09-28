@@ -74,6 +74,51 @@ Verified against a 20-ZIP group, the largest the client builds: 932 rows, HTTP 2
 `dobrundate` is the only real `calendar_date` on the view, but it is the DOB extract run
 date, not the date the permit was issued. It was not used for the window.
 
+## Why not the existing repo convention
+
+This repo already hit this class of defect on this exact column on 2026-08-02, in the
+`get-address-report` socrata connector, and adopted a different instrument: a `recency_expr`
+that rebuilds a sortable key out of `substring` calls
+(`docs/source-registry.md`, `test/socrata-text-date-recency.test.ts`). That expression is
+live in `supabase/functions/get-address-report/jurisdiction-registry.json` for
+`nyc-dob-permit-issuance`:
+
+```
+(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'
+```
+
+It was not reused here, because it assumes the column holds one format and the column no
+longer does. Measured on NB/DM/AL/FO, whole view:
+
+| | rows | admitted by `substring` | admitted by the cast | actually in the window |
+|---|---|---|---|---|
+| `MM/DD/YYYY` | 734,132 | 2,736 | 2,736 | 2,736 |
+| `YYYY-MM-DD…` | 17,237 | **12,621** | 0 | **0** |
+| neither pattern | 0 | — | — | — |
+
+On the `MM/DD/YYYY` rows the two agree exactly. On the 17,237 ISO-formatted rows the
+substring positions land in the wrong place and produce a key that usually sorts *above* the
+cutoff, so stale rows are admitted as recent:
+
+```
+'1994-06-10' -> substring key '6-10194-'   '6-10194-' >= '20250928' -> true
+'2004-09-21' -> substring key '9-21204-'   '9-21204-' >= '20250928' -> true
+'2005-12-30' -> substring key '2-30205-'   '2-30205-' >= '20250928' -> false
+```
+
+Not one of those 17,237 rows is genuinely dated inside the window. The cast admits none of
+them and fails on none of them: of 751,369 non-null values, the number that are text but
+null once cast is **0**. It reads both formats and invents nothing.
+
+So the two surfaces are wrong in opposite directions. This report was silently
+*under*-including — 0 of 161. The `get-address-report` registry entry is silently
+*over*-including 12,621 permits from 1993–2006 as recent.
+
+That second finding is recorded here and is **not** fixed here. `get-address-report` is
+**EXCLUDE** from the sold report and its output is not part of this allowlist, so changing
+its window would be an uninstructed change to a consumer surface. It is written down beside
+the audit rather than routed around, and the call on it belongs to the founder.
+
 ## What changed
 
 - `RECENT_DAYS = 365` is now one named constant, shared by the row filter and by every
