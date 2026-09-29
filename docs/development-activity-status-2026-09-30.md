@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that adds the Order D baseline driver.
+Last updated: 2026-09-30, in the PR that records the Order D apply and pilot.
 
 ## Master steps (plan "Master Step Plan")
 
@@ -51,9 +51,10 @@ Last updated: 2026-09-30, in the PR that adds the Order D baseline driver.
   33 SQL checks with 21 prohibited mutations all killed (Postgres 16 local, 17 in CI), 29 structural
   pins. Production receipt: design doc §8.
 - D. National change baseline — **in progress.** Driver, per-ZIP cursor with a capacity gate, and the
-  per-source evidence view are built and proven in `docs/dev-change-baseline.sql`
-  (`docs/development-activity-change-baseline-2026-09-30.md`); not struck until it is merged, applied,
-  and the baseline run over the 12,722 ZIPs has completed. The run needs the operator's verified
+  per-source evidence view are merged (#1463, `a952139`), applied to production 2026-09-29 18:11Z (migration
+  `dev_change_baseline_d1_20260930`) and fingerprint-verified; a nine-ZIP pilot measured storage (1,968 B per
+  identity) and time (~0.29 ms per row; the two largest ZIPs 3.5 s and 5.8 s). Receipt: design doc §9. Not
+  struck until the baseline run over the 12,722 ZIPs has completed. The run needs the operator's verified
   free-disk figure (decision 7 below); a development source can be labelled only ERROR or UNKNOWN until
   the two gaps in decision 8 close.
 - ~~E. Change-detection tests~~ — **done with C** (all 11 cases, `test/dev_change_ledger_pg/`; map in
@@ -110,9 +111,11 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    existing surfaces, so it is not made without a go.
 5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
-7. **Free disk for the national baseline.** The database is 17 GB; the baseline adds an estimated
-   ~2 GB live plus write churn. The driver refuses to run without the provider's verified free-disk
-   figure (≥ 2,048 MB + the ledger budget). Only the founder can read that figure from the dashboard.
+7. **Free disk for the national baseline — and the go to run it.** The database is 17 GB. The pilot
+   measured 1,968 B per identity, so the baseline adds about 1.8–2.2 GB live plus write churn. The driver
+   refuses to run without the provider's verified free-disk figure (≥ 2,048 MB + the ledger budget).
+   Suggested budget 3,500 MB, so the gate needs ≥ 5,548 MB; because WAL is outside the budget I would want
+   ≥ ~8.5 GB verified free. Only the founder can read that figure from the dashboard.
 8. **Source-health labels — the workbook was supplied 2026-09-29 and settles the definitions, not the gaps.**
    Its contract (Instructions rows 509–580) defines HEALTHY / STALE / ERROR / VERIFIED ZERO / UNKNOWN / N/A /
    PAUSED at (ZIP × feed family) grain and forbids inventing an SLA. For the development family it records
