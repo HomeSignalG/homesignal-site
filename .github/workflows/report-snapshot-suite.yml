@@ -1,13 +1,20 @@
 name: report-snapshot-suite
 
-# DURABLE REPORT SNAPSHOTS (docs/report-snapshot.sql; Development Activity plan Order F).
-# Runs the SHIPPED SQL against a DISPOSABLE Postgres: the database mints report_id, content_hash must
-# be the SHA-256 of the stored body, the body is kept byte for byte, a snapshot is immutable, only the
-# one writer can store one, and nothing is readable or writable by anon or authenticated. Then it
-# applies the file a second time (nothing may change) and runs every prohibited mutation of the SQL,
-# each of which MUST fail the suite.
-# The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs) run in
-# unit-tests.yml with every other offline suite.
+# DURABLE REPORT SNAPSHOTS (docs/report-snapshot.sql; Development Activity plan Order F) and their
+# PRIVACY BOUNDARY (docs/report-private-context.sql; F2, founder decision 2026-09-29): the immutable
+# snapshot holds permanent intelligence only, and the customer-entered street address lives in a separate,
+# deletable private context that is purged 90 days after the last thing needing it (at once on a verified
+# privacy request).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres, twice over:
+#   1. the private layer — retention clock, purge in place, audit log, lock-down — then every prohibited
+#      mutation of that SQL, each of which MUST fail the suite;
+#   2. the snapshot — the database mints report_id, content_hash must be the SHA-256 of the stored body,
+#      the body is kept byte for byte, a snapshot is immutable, nothing private can enter it, purging the
+#      private context leaves it byte-identical; the exact Order F table that is live in production
+#      upgrades to a fresh-install shape (and is refused if a report is stored); then every prohibited
+#      mutation, each of which MUST fail the suite.
+# The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
+# test/report-private-context-structure.test.mjs) run in unit-tests.yml with every other offline suite.
 #
 # This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
 # address the disposable container.
@@ -16,8 +23,11 @@ on:
   pull_request:
     paths:
       - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
       - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
       - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-private-context-structure.test.mjs'
       - 'test/report-snapshot.test.mjs'
       - 'supabase/functions/_shared/report-snapshot.ts'
       - '.github/workflows/report-snapshot-suite.yml'
@@ -25,7 +35,9 @@ on:
     branches: [main]
     paths:
       - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
       - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -39,7 +51,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -62,7 +74,17 @@ jobs:
           fi
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
-      - name: The shipped table passes; it applies twice; every prohibited mutation is killed
+      - name: The private context passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpc.log
+      - name: The shipped snapshot passes; it applies twice; the Order F table upgrades; every prohibited mutation is killed
         env:
           PGHOST: localhost
           PGPORT: '5432'

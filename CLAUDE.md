@@ -239,6 +239,25 @@ storage-optimization decision involving development, regulatory or environmental
 
 **Governing principle: CURRENT PRODUCT STATE MAY CHANGE. HISTORICAL EVIDENCE MUST SURVIVE.**
 
+### What this rule does NOT cover — customer-entered private context (founder decision, 2026-09-29)
+
+**Permanent intelligence survives. Customer-entered private context does not become permanent merely because it
+generated that intelligence.** A street address a brokerage typed, its normalized form, the exact property
+coordinates, any identifier that resolves to one address, and any client-identifying detail are **customer context,
+not historical intelligence**. They must never be written into an immutable or append-only table — not a report
+snapshot's body, not its inputs, not a property-key column, and not a value derived from them (a distance or an
+east / north offset measured from the property recovers it to within a metre).
+
+- They live only in the deletable `public.report_private_context` layer, kept while a report, a property Follow or an
+  account relationship needs them, purged **no more than 90 days after the last need ends** (immediately on a verified
+  privacy request or a legal requirement), and purged **in place** so the permanent snapshot that references them by
+  an opaque id stays whole.
+- Rule 10 above is not weakened by this: the report snapshot stays immutable, and what survives a purge is exactly
+  the project intelligence, evidence, identities, observations, change history and issuance record.
+- Read `docs/report-private-context-contract-2026-09-30.md` before touching a stored report, the report engine
+  (Order G) or anything that reads a customer-entered address. Its §6 lists the gates that must be closed before a
+  real customer report is stored.
+
 ---
 
 ## 0. The prime directive: communities are DATA, not code
