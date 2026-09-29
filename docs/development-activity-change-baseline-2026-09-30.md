@@ -265,14 +265,21 @@ free-disk figure)` from the Supabase SQL tool, then `dev_change_finish_run`. Eve
 Stop reasons seen: `max_zips`, `time`, and finally `none_due` with `baseline_complete = true`. `ledger_budget`
 and `busy` were never reached in production (the budget stop is still proven only in the disposable suite).
 
-**The free-disk figure was a derived lower bound, not a dashboard reading in MB.** The founder's screenshot of the
-project home page showed "Disk 51%" and no size. With the measured `pg_database_size` (18,296,196,243 B) as a
-floor for used space and 51.5% as the ceiling for the rounded 51%, free space is at least
-`used × 0.485 / 0.515 ≈ 17.2 GB`; **16,000 MB was passed to the gate, and 15,000 MB once the ledger had grown
-by about 1 GB**. That rests on the percentage being used ÷ provisioned for the volume that holds the database.
-It also contradicts the 24 GB provisioned figure recorded on 2026-09-25 (51% of 24 GB is 12.2 GB, less than the
-database), so the provisioned size must now be larger; **that size is unverified and should be confirmed from
-Settings → Compute and Disk.** The ledger budget was never close: the ledger peaked at 1.93 GB against 3,500 MB.
+**The free-disk figure passed to the gate was a derived lower bound, and a dashboard reading taken afterwards
+bears it out.** When the run started, the only reading was the project home page's "Disk 51%" with no size.
+With the measured `pg_database_size` (18,296,196,243 B) as a floor for used space and 51.5% as the ceiling for
+the rounded 51%, free space is at least `used × 0.485 / 0.515 ≈ 17.2 GB`; **16,000 MB was passed to the gate,
+and 15,000 MB once the ledger had grown by about 1 GB**.
+
+*Read afterwards (Settings → Infrastructure, about 19:46Z, 12 minutes after the run finished):* **Disk 57%,
+DATABASE 18.8 GB, WAL 1.1 GB, SYSTEM 207.1 MB.** The dashboard's "GB" are GiB (`pg_database_size` at that
+moment, 20,163,071,123 B, is 18.78 GiB). Used is therefore about 20.1 GiB, so the volume is about **35 GiB**
+(34.8–35.8 allowing for the rounded percentage) and about **15 GiB is free**. The provisioned size itself was
+below the fold of the screenshot, so it is derived and not read. It replaces the 24 GB recorded on 2026-09-25.
+Against what was passed: free space was about 17 GiB at the start (above 16,000) and about 15.2 GiB at the end
+(above 15,000), so **the figures were true throughout, but the final margin was only about 0.5 GiB**, thinner
+than intended: 1 GB was subtracted when the ledger had already grown by more than that and WAL was not counted.
+The ledger budget was never close: the ledger peaked at 1.93 GB against 3,500 MB.
 
 **Result, reconciled exactly.**
 
@@ -334,8 +341,32 @@ this run, all `is_baseline = false`.** Measured:
   against the pilot's 0.29: the copies path, which is most of the rows, costs more than a first sighting. The
   longest single ZIP overshot a tick's time cap by about 11 s (a tick checks its clock between ZIPs), which is
   why the caps were lowered from 45 s to 30–35 s to stay under the tool's 60 s limit.
-- **Not measured:** WAL attributable to the ledger, the HOT-update ratio, and the effect on resident-facing
-  read latency while the run was in progress (nothing was reported, but nothing was measured).
+- **Not measured:** WAL attributable to the ledger (the dashboard shows 1.1 GB of WAL for the whole database
+  afterwards) and the HOT-update ratio.
+
+**Load on the database while it ran (Supabase logs, 10-minute buckets, UTC).** Read afterwards, because it was
+not checked beforehand, and it shows the run **overlapped the tail of another heavy workload that I did not
+look for before starting.**
+
+- **The daily `verify-communities` workflow** (event `schedule`, run `18:38:11Z` to `19:01:54Z`, success) is the
+  likely source: a Linux browser client (user agent `Mozilla/5.0 (X11; Linux x86_64)`) made about **232,000
+  `/rest/v1` requests between 18:30 and 19:07** (the match to the workflow is by time and shape, not proven).
+  Over 18:40–19:00 that is 101,936 and 104,083 requests per bucket, against 300–400 in the buckets before it.
+- **That load caused the API timeouts, and it started before my run.** From 18:44 to 19:00 the `authenticator`
+  role hit the 8 s statement timeout **190 times** (up to 54 in one minute), with 178 API responses of 5xx across
+  18:40–19:10. This is the saturation this file already warns about for full-corpus verifiers.
+- **My run began at 18:57:04Z, inside the last four minutes of that.** Two `authenticator` timeouts at 18:58 and
+  eleven at 19:00 fall in the overlap, and **I cannot separate what my ticks added from what the verifier was
+  already doing** (it produced 7–54 per active minute from 18:44). I should have checked for a running verifier
+  before starting.
+- **After the verifier ended (19:07) and while my ticks continued to 19:34:** 0 responses of 5xx, average origin
+  time 62–97 ms and p95 184–261 ms against 60–89 ms and 175–328 ms before the storm, and no `authenticator`
+  timeouts. Traffic in those buckets was low (283–846 requests per 10 minutes), so this is weak evidence that
+  the run itself did not degrade the API, not strong evidence.
+- Two `postgres`-role timeouts: one at 19:01, inside the run and not attributed; one at 19:38, which is my own
+  full-table `count(distinct source_key)` that the SQL tool gave up on at 60 s and the database cancelled at 120 s.
+- The dashboard's compute chart showed CPU at 100% across this window (current CPU 21% at 19:46Z). It cannot be
+  split between the verifier and the run either.
 
 **State left in production.** The ledger is baselined for all 12,722 ZIPs. **Nothing detects a change from here**:
 no job is scheduled (status file, decision 9). An ordinary run may now re-observe only ZIPs re-materialised

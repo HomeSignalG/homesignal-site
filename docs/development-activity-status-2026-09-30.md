@@ -56,8 +56,9 @@ Last updated: 2026-09-30, in the PR that records the national baseline run (Orde
   observed, 0 errors, 932,969 identities and 922,244 events (counts reconcile exactly to the runs), ledger 1.93 GB
   (2,071 B per identity). Receipts: design doc §9 (apply and pilot) and §10 (the run). **Two things the run
   did not settle:** 959 of the events are cross-copy disagreements typed as changes instead of first detections
-  (decision 10), and the free-disk figure was a lower bound derived from the dashboard's "Disk 51%", not a
-  reading in MB (decision 7). No change is detected from here on until a recurring job exists (decision 9). A
+  (decision 10), and the run overlapped the last minutes of the daily `verify-communities` load, during which
+  the API had statement timeouts that I cannot attribute between the two (design doc §10; decision 9 carries the
+  scheduling consequence). No change is detected from here on until a recurring job exists (decision 9). A
   development source can be labelled only ERROR or UNKNOWN until the two gaps in decision 8 close.
 - ~~E. Change-detection tests~~ — **done with C** (all 11 cases, `test/dev_change_ledger_pg/`; map in
   the design doc §4). One case is proven only in part, and stays so until sources supply proven
@@ -113,13 +114,12 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    existing surfaces, so it is not made without a go.
 5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
-7. ~~Free disk for the national baseline — and the go to run it.~~ Go given 2026-09-29 and the run is done.
-   **Still open, and smaller:** the figure passed to the gate was **derived, not read** — the dashboard's
-   "Disk 51%" together with the measured database size gives at least ~17 GB free, and 16,000 then 15,000 MB was
-   passed (design doc §10). It rests on an assumption about what that percentage measures, and it disagrees
-   with the 24 GB provisioned size recorded on 2026-09-25, so **please confirm the provisioned disk size and the
-   free space from Settings → Compute and Disk**. Nothing is now at risk from the run: the database is 20.16 GB
-   and the ledger 1.93 GB.
+7. ~~Free disk for the national baseline — and the go to run it.~~ Go given 2026-09-29 and the run is done. The
+   figure passed to the gate was derived from the dashboard's "Disk 51%" (16,000, then 15,000 MB); a reading
+   taken afterwards (Disk 57%: database 18.8 GiB, WAL 1.1 GiB, system 207 MiB) puts the volume at about 35 GiB
+   with about 15 GiB free, so the figures were true throughout, with a final margin of only ~0.5 GiB (design doc
+   §10). The 35 GiB is derived from the percentage, not read from the size setting. The 24 GB recorded on
+   2026-09-25 is superseded. Headroom is ample for now (database 20.16 GB, ledger 1.93 GB).
 8. **Source-health labels — the workbook was supplied 2026-09-29 and settles the definitions, not the gaps.**
    Its contract (Instructions rows 509–580) defines HEALTHY / STALE / ERROR / VERIFIED ZERO / UNKNOWN / N/A /
    PAUSED at (ZIP × feed family) grain and forbids inventing an SLA. For the development family it records
@@ -130,7 +130,10 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    engineering change in the refresh's lane. The view exposes the evidence; details in the Order D design doc §8.
 9. **A recurring observation job.** Without one the ledger never detects a change after the baseline.
    Arming a `pg_cron` job is a new scheduled job and waits for a go. Decision 10 should be settled first,
-   because an ordinary run re-observes ZIP copies and would meet the same disagreements.
+   because an ordinary run re-observes ZIP copies and would meet the same disagreements. **It must also keep
+   clear of the daily `verify-communities` run**, which starts at a different time each day (17:10, 17:44,
+   20:07 and 18:38Z on 09-26 to 09-29), lasts 22–47 minutes, and on 09-29 drove the API to 190 statement
+   timeouts on its own.
 10. **Cross-copy disagreements are typed as changes (found by the national baseline).** 959 events (563
     `status_changed`, 396 `source_record_updated`) on 863 multi-ZIP identities were written as changes although
     they are differences between ZIP copies materialised at different times, none of them seen during the run;
