@@ -196,6 +196,51 @@ the exact problem `QUEUE.md` exists to end.
 
 ---
 
+
+## Permanent historical intelligence — preserve the longitudinal asset
+
+**HomeSignal's longitudinal development history is a core company data asset. Current product
+state may change; historical evidence must survive.** This rule governs every ingest,
+deduplication, classification, refresh, archive, retirement, merge, cleanup, migration and
+storage-optimization decision involving development, regulatory or environmental records.
+
+1. **Never destroy historical observations or change events.** Customer-facing removal,
+   archival, source retirement, disappearance from current source data, or cleanup must not
+   delete the historical record.
+2. **Preserve before-and-after evidence.** A meaningful change must retain the prior facts,
+   new facts, changed fields, observation time, publisher/source evidence and the applicable
+   derivation/facts version.
+3. **Retrieval is not real-world change.** Refresh timestamps, collection times, parser changes,
+   classifier changes, ZIP rematerialization and other technical metadata must never be reported
+   as project change.
+4. **Maintain durable source-record identity.** A source record must remain linkable across
+   observations. ZIP-page copies are memberships/attributes, not separate real-world projects.
+5. **Build toward permanent canonical real-world project lineage.** Filing, zoning, approval,
+   permit, construction, completion, environmental, enforcement and related records that are
+   proven to concern the same real-world development must be linkable under a HomeSignal-minted,
+   immutable canonical project ID. **Do not infer or merge lineage without sufficient evidence.**
+6. **Identity decisions must be auditable and reversible.** Preserve the evidence and
+   rule/version used to link, separate, merge or supersede entities. Correct an identity
+   decision without deleting the underlying observations or prior decision history.
+7. **Archive does not mean delete.** A project may leave the active/customer-facing dataset or
+   move to an inactive/archive state, but its observations, events, source lineage and canonical
+   identity remain available for historical analysis.
+8. **Classification is versioned history.** Preserve source-native values plus the HomeSignal
+   classification and rule/version used at the time. A future classifier change must not rewrite
+   what the source said or fabricate a historical real-world event.
+9. **Environmental and regulatory lineage must be preservable.** EPA, state environmental,
+   enforcement, contamination, fine/penalty, permit, remediation and similar events must be
+   capable of linking to the relevant canonical project/facility when the evidence supports
+   that relationship.
+10. **No cleanup may sacrifice the longitudinal asset.** If a proposed migration,
+    deduplication, retention policy, archive process or storage optimization would overwrite,
+    collapse or delete historical evidence, **STOP and surface the conflict before
+    implementation.**
+
+**Governing principle: CURRENT PRODUCT STATE MAY CHANGE. HISTORICAL EVIDENCE MUST SURVIVE.**
+
+---
+
 ## 0. The prime directive: communities are DATA, not code
 
 **We are scaling to 100+ communities (goal: all ~3,144 U.S. counties). A new
