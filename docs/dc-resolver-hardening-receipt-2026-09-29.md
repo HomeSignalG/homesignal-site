@@ -1,6 +1,6 @@
 # Resolver hardening — receipt, 2026-09-29
 
-**Status: v1 applied to production 2026-09-29 19:00–19:02 UTC. v2 (below) fixes a false alarm v1 raised at its first tick; v2 is proven on the stand-in and applied after the merge — see "Found after applying".**
+**Status: applied to production. v1 at 2026-09-29 19:00–19:02 UTC; v2 (which fixes a false alarm v1 raised at its first tick) at 19:47:10 UTC — see "Found after applying" and "v2 applied and read back".**
 
 **What ships:** `docs/dc-resolver-hardening.sql`, plus edits to `docs/dc-marker-loss-watcher.sql` and
 `docs/dc-address-check-monitor.sql`. It closes the three gaps the step 12 and 13 receipts recorded and did not fix.
@@ -123,6 +123,25 @@ right after today's acquisitions (Compute Atlas 2,249 records at 16:07, Epoch da
 receipt called the leftover timeline entities "not the driver". **That conclusion rested on one day's step and is not
 safe:** the run time may cross a threshold cumulatively, or something else changed at 16:07–16:35. It is unproven
 either way and is left open.
+
+## v2 applied and read back (2026-09-29 19:47 UTC, outside the :18–:45 resolver window)
+
+- **Applied** as migration `dc_resolvers_v2_history_survives_reschedule` (ledger `20260929194710`). The stored text is the
+  committed file byte for byte: md5 `4ca8903cecbb774ed03f981ab0ef8095`, 11,439 characters, both sides.
+- **The upgrade was in place.** The live monitor went from 31,733 to 31,412 characters and now holds the v2 marker once,
+  the v1 marker **0** times, `'dc_resolvers',` once, `'dc_address_check',` once and the anchor once. Grants are still
+  `{postgres=X, service_role=X}`. Nothing else had been spliced after v1 (its length was unchanged since v1), so the
+  foreign-splice guard did not fire.
+- **First evaluation, 19:47:30 (run by hand, the same call the hourly job makes):** `dc_resolvers` **ok** —
+  *"dc-resolve-canonical ok 19:25Z slowest 33s, dc-resolve-geography ok 19:37Z slowest 137s, dc-resolve-on-acquisition ok
+  19:46Z slowest 23s; anon/authenticated cannot run any resolver"*. It reads the history across the reschedule, which is
+  the case v1 got wrong. `dc_address_check` also ok (snapshot 09-29 11:50, 1,817 markers). The only failing check is
+  `digest_delivery` (newest delivery 09-27 22:00, unrelated).
+- **The 300 s ceiling is proven in production, not only on a stand-in:** the 19:35 geography run **succeeded in 137.2 s**,
+  past the 120 s that had cancelled its three previous runs. The claim that a separate statement ahead of the call
+  raises the limit under real pg_cron 1.6.4 was, before this, measured only on 1.6.2 locally.
+- **Headroom, stated plainly:** 137 s is 46% of the 300 s ceiling, and the run time rose from ~102 s to >120 s in one day.
+  The `slow` class alerts at 200 s. What drives the growth is open (see above).
 
 ## Not done, and why
 
