@@ -92,3 +92,37 @@ identifier lacked, and it is pinned by a check that fails without it.
 
 `docs/report-snapshot.sql` ends with the two statements that remove it. Rolling back **deletes stored reports**,
 so it is only appropriate before the first real one is issued.
+
+## 7. Production receipt (2026-09-29 21:16Z)
+
+Merged as #1475 (`76dca60`), all six checks green on the head. Applied with `apply_migration` as
+`report_snapshot_f1_20260930` (ledger version `20260929211614`; ledger 616 → 617 rows).
+
+Before the apply (read from production): no `report_snapshot` table, no `report_snapshot_*` function,
+`server_encoding` UTF8, `gen_random_uuid()` and `sha256(bytea)` present.
+
+Read back after:
+
+- **The stored migration text is the file.** md5 of the stored statements `545d7d94977ce606e0524e0922b6a096`,
+  equal to the md5 of `docs/report-snapshot.sql` on `main`.
+- **Table:** exists, owner `postgres`, RLS on, 0 policies, ACL `{postgres=arwdDxtm/postgres,service_role=r/postgres}`,
+  8 columns as specified (`body_bytes` generated stored).
+- **Privileges, asked of the database (`has_table_privilege`):** `anon` and `authenticated` hold none of select,
+  insert, update, delete, truncate; `service_role` holds select only.
+- **Functions:** `report_snapshot_issue(text,text,text,jsonb,text)` is `security definer` with
+  `search_path=public, pg_temp`; both functions are executable by `service_role` only (`has_function_privilege`
+  false for `anon` and `authenticated`).
+- **Constraints:** primary key plus the five checks (`hash_matches_body`, `body_is_object`, `version_named`,
+  `inputs_object`, `key_named`). **Triggers:** `report_snapshot_no_update_delete`, `report_snapshot_no_truncate`.
+
+**Behaviour on production, in a block that always rolls back** (the table is immutable, so a stored test row could
+never be removed; the block ends by raising, and the result is read out of the error message). Expected hashes were
+computed outside the database. All 13 results were as required: a valid issue returns a v4 `report_id` and a
+`generated_at`; the same content issued twice gives a second `report_id` (2 rows, 1 distinct `content_hash`); a
+multibyte body hashes as UTF-8; a wrong hash, an upper-case copy of the right hash and a non-object body are each
+refused by the table; update, delete and truncate are each refused as immutable; the stored body equals the text sent
+byte for byte (`body_bytes` 7). **Afterwards the table holds 0 rows.**
+
+What this receipt does not show: the two API roles were checked through the database's own privilege functions,
+not by calling the REST endpoint as each role; and nothing was run as `service_role`. Nothing calls the writer yet
+(Order G), so no path exists by which either matters today.
