@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records the reportable-events view applied to production (decision 10 option (a)).
+Last updated: 2026-09-30, in the PR that builds the durable report snapshot (Order F).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -65,7 +65,11 @@ Last updated: 2026-09-30, in the PR that records the reportable-events view appl
   the design doc §4). One case is proven only in part, and stays so until sources supply proven
   identifiers: linked source rows of one project are proven for ZIP copies of a record, not for
   cross-record lineage.
-- F. Durable `report_id` + `content_hash` — open.
+- F. Durable `report_id` + `content_hash` — **built, in review** (`docs/report-snapshot.sql`, `docs/report-snapshot-contract-2026-09-30.md`).
+  Not struck until it is merged and applied. When done it will mean: a table that stores a report, a database-minted
+  `report_id` per stored snapshot, a `content_hash` that the database checks, and a shared module — **and nothing
+  calls the writer until Order G**; the legacy NYC page and API are untouched (R6). Two questions it leaves for
+  Orders J and L: whose report it is, and how long a stored customer address may be kept.
 - G. Deploy / smoke the canonical commercial API — open (national path required).
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.

@@ -1,0 +1,74 @@
+name: report-snapshot-suite
+
+# DURABLE REPORT SNAPSHOTS (docs/report-snapshot.sql; Development Activity plan Order F).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres: the database mints report_id, content_hash must
+# be the SHA-256 of the stored body, the body is kept byte for byte, a snapshot is immutable, only the
+# one writer can store one, and nothing is readable or writable by anon or authenticated. Then it
+# applies the file a second time (nothing may change) and runs every prohibited mutation of the SQL,
+# each of which MUST fail the suite.
+# The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs) run in
+# unit-tests.yml with every other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
+# address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'test/report_snapshot_pg/**'
+      - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-snapshot.test.mjs'
+      - 'supabase/functions/_shared/report-snapshot.ts'
+      - '.github/workflows/report-snapshot-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'test/report_snapshot_pg/**'
+      - '.github/workflows/report-snapshot-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The shipped table passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_snapshot_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rs.log
