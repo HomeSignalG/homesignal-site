@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records F2 (the privacy boundary of the report snapshot) as applied to production.
+Last updated: 2026-09-30, in the PR that builds the Order G national report engine (built and proven; not yet deployed).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -87,12 +87,19 @@ Last updated: 2026-09-30, in the PR that records F2 (the privacy boundary of the
   §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
   of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
   boundary-test checklist (§8.4).
-- G. Deploy / smoke the canonical commercial API — open (national path required). **Go given 2026-09-29 under one
-  rule: Order G may build the national report engine, but no production path may permanently write a brokerage-entered
-  exact address into the immutable snapshot, and no real customer report is stored until the five gates in
-  `docs/report-private-context-contract-2026-09-30.md` §6 are closed** (two are proven, three are open: an engine that
-  emits the split, the Follow / Changes Since Report surface, and arming the purge). §8 of that file is the checklist
-  for the engine.
+- G. Deploy / smoke the canonical commercial API — **in progress: the national engine is built and proven, deployment and
+  smoke are the next step.** **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
+  production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
+  customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
+  (three are now proven, two are open: the Follow / Changes Since Report surface, and arming the purge).
+  `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
+  commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
+  JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
+  source's records to a customer only if that source is on a written clearance list, which is empty** — so today every
+  customer report is LIMITED COVERAGE with no records, and the internal view is the only one that shows records (labelled
+  HOLD, never storable). Proof: 117 + 85 + 59 offline checks, 28 checks storing the engine's real output through the real
+  Postgres writer, 107 mutations all killed. **Not built, by design:** entitlement, quota, idempotency and rate limiting
+  (Orders H, L, M), the "Things to Review" section, per-ZIP source-applicability measurement.
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
 - J. Secure stored-report delivery — open.
