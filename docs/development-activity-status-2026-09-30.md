@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records the durable report snapshot (Order F) as applied to production.
+Last updated: 2026-09-30, in the PR that builds the privacy boundary of the report snapshot (F2).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -71,10 +71,23 @@ Last updated: 2026-09-30, in the PR that records the durable report snapshot (Or
   `docs/report-snapshot.sql` + `docs/report-snapshot-contract-2026-09-30.md`. It means: a table that stores a
   report, a database-minted `report_id` per stored snapshot, a `content_hash` that the database checks, and a shared
   module — **and nothing calls the writer until Order G**; the table holds 0 rows; the legacy NYC page and API are
-  untouched (R6). Production receipt: contract doc §7. Two questions it leaves for Orders J and L: whose report it
-  is, and how long a stored customer address may be kept (open founder decision, needed before the first real
-  report is stored).
-- G. Deploy / smoke the canonical commercial API — open (national path required).
+  untouched (R6). Production receipt: contract doc §7. **Its `inputs` and `property_key` columns could have held a
+  customer's address; they are removed by F2 below.**
+- F2. Privacy boundary of the report snapshot — **built, in review** (founder decision 2026-09-29; not struck until it
+  is merged and applied). `docs/report-private-context.sql` (new, deletable) + `docs/report-snapshot.sql` (changed) +
+  `docs/report-private-context-contract-2026-09-30.md`. It means: the exact street address never enters the immutable
+  snapshot; it lives in a separate private context kept while a report, a Follow or an account needs it, purged in
+  place 90 days after the last need ends (at once on a verified privacy request or a legal requirement), with an
+  append-only audit; the snapshot keeps its `report_id`, hash, body and time when the address is purged. Measured
+  first: the legacy report shape would have stored the typed address, the exact property point and per-record offsets
+  that recover the point to within a metre (contract §2). **Nothing is applied to production yet.** Apply order:
+  `report-private-context.sql`, then `report-snapshot.sql` (fails closed unless the snapshot table is empty).
+- G. Deploy / smoke the canonical commercial API — open (national path required). **Go given 2026-09-29 under one
+  rule: Order G may build the national report engine, but no production path may permanently write a brokerage-entered
+  exact address into the immutable snapshot, and no real customer report is stored until the five gates in
+  `docs/report-private-context-contract-2026-09-30.md` §6 are closed** (two are proven, three are open: an engine that
+  emits the split, the Follow / Changes Since Report surface, and arming the purge). §8 of that file is the checklist
+  for the engine.
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
 - J. Secure stored-report delivery — open.
@@ -158,3 +171,12 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     event, needed before the recurring job because an ordinary run re-observes ZIP copies and would meet the same
     disagreements, which the view would then show. It is a change to the Order C writer, so it waits for a go.
     Also undecided: an ordinary-run event on an identity that later becomes non-comparable stays reportable.
+11. ~~Retention and privacy of a brokerage-entered address~~ — **decided by the founder 2026-09-29.** Not permanent
+    intelligence; kept only while a report, Follow or account relationship needs it; purged no more than 90 days
+    after the last need ends; earlier on a verified privacy request or legal requirement; the permanent record
+    survives the purge. Built as F2. **Defaults taken in F2 that the founder may change** (contract §7): distances
+    from the subject are private-derived and not stored (D-1); a ZIP stays permanent (D-2); the purge keeps a
+    tombstone row with no personal data (D-3); the `report` need stays open until Orders J and L close it (D-4);
+    `label` is the one optional free-text field (D-5); unknown private fields are refused (D-6). **Still to do
+    before the first real report is stored:** the purge batch is not scheduled (a new scheduled job waits for its
+    own go), the overdue-purge lag is not yet a monitor check, and backups are outside this unit.
