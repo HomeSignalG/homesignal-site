@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Future Surroundings Report</title>
+<title>HomeSignal Development Activity</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://data.cityofnewyork.us; form-action 'self'">
 <link rel="stylesheet" href="app.css?v=20814d85">
 <style>
@@ -21,7 +21,12 @@
   .fsr .id { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
   .fsr .workspace { margin-top: 28px; }
   .fsr .workspace a { display: block; margin: 4px 0; }
+  .fsr .scope { margin: 0 0 6px; }
+  .fsr details.fingerprint { margin: 12px 0; }
+  .fsr details.fingerprint summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
   .fsr-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 22px; }
+  /* `.fsr-nav { display: flex }` above would win over the UA `[hidden]` rule. */
+  .fsr-nav[hidden] { display: none; }
   .fsr-nav button[aria-current="page"] { font-weight: 700; }
   @media (max-width: 720px) {
     .fsr form { grid-template-columns: 1fr; }
@@ -34,11 +39,16 @@
 </head>
 <body>
 <div class="fsr">
-  <div class="eyebrow">FUTURE SURROUNDINGS REPORT · NYC V1</div>
-  <h1>What is on the record around this property</h1>
-  <p class="sub">New York City AddressPoint plus Department of Buildings ledgers. No scores, outlooks, or predicted effects. Signed paid pilots: 0. Verdict: NOT YET.</p>
+  <div class="eyebrow">HOMESIGNAL DEVELOPMENT ACTIVITY · NEW YORK CITY</div>
+  <h1>Development activity on the record near this property</h1>
+  <p class="scope"><b>Planned, approved, permitted and changing development found in HomeSignal's covered official sources.</b></p>
+  <p class="sub">This report focuses on development activity and change. It is not an inventory of existing schools, parks, businesses, buildings, or neighborhood amenities. No scores, outlooks, or predicted effects.</p>
 
-  <nav class="fsr-nav" aria-label="Report views">
+  <!-- HomeSignal's own working views (coverage, listing, portfolio, usage) carry pilot and
+       verdict bookkeeping that is not for a client. They stay out of the customer report and
+       are reached with ?audience=internal. This is presentation, not access control. -->
+  <div id="fsrInternalBanner" class="note" hidden><b>Internal view.</b> Not for clients.</div>
+  <nav class="fsr-nav" aria-label="Internal views" hidden>
     <button type="button" class="btn" data-view="report" aria-current="page">Report</button>
     <button type="button" class="btn" data-view="coverage">Coverage</button>
     <button type="button" class="btn" data-view="listing">Listing</button>
@@ -96,6 +106,14 @@
   var Scale = window.HSFsrScale;
   var lastReport = null;
   var currentView = 'report';
+  // The customer report is the default audience. ?audience=internal opens HomeSignal's own
+  // working views. That is presentation, not access control: nothing in them is secret.
+  var INTERNAL = new URLSearchParams(location.search).get('audience') === 'internal';
+  // Standard client disclosure, verbatim from the plan (Step 7). It rides in the rendered
+  // report so print and PDF carry it too.
+  var DISCLOSURE = 'HomeSignal summarizes selected official public records available to its covered sources. It may not include every project or change and is not a substitute for independent property, municipal, title, zoning, legal, inspection, or other professional due diligence.';
+  document.querySelector('.fsr-nav').hidden = !INTERNAL;
+  document.getElementById('fsrInternalBanner').hidden = !INTERNAL;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -151,6 +169,8 @@
   }
 
   function showView(name) {
+    // A customer never lands on an internal view, whatever the URL says.
+    if (!INTERNAL && name !== 'report') name = 'report';
     currentView = name;
     document.getElementById('fsrReportView').hidden = name !== 'report';
     document.getElementById('fsrCoverageView').hidden = name !== 'coverage';
@@ -316,15 +336,6 @@
   function render(report) {
     lastReport = report;
     var html = '';
-    // Saying only what the hash can carry. It fingerprints this content, so it answers
-    // "are these two files the same report". It is not a signature, it is not unique to
-    // one issuance, and re-running this address later will not reproduce it.
-    html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
-    html += '<p class="sub">A fingerprint of the records below. It is not a receipt and'
-      + ' not a signature. Two reports with the same id hold the same data; re-running this'
-      + ' address later gives a different id, because the City\u2019s records move. To'
-      + ' check it, take the downloaded JSON as delivered, remove <code>report_id</code>'
-      + ' and <code>generated_at</code>, and SHA-256 what is left.</p>';
     html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
 
     if (report.status === 'address_miss' || !report.property) {
@@ -337,10 +348,10 @@
           + '), so a match cannot be ruled out. Add a ZIP or borough and run it again. This is'
           + ' not a finding that the address is absent.</div>';
       } else {
-        html += '<div class="miss"><b>No AddressPoint match.</b> This report does not guess a rooftop and does not call the Census geocoder, OpenAddresses, or Geoclient.</div>';
+        html += '<div class="miss"><b>No match for this address.</b> The City’s published address points do not include it, and this report does not guess a location. Check the spelling, or add a ZIP or borough, and run it again.</div>';
       }
     } else if (report.status === 'address_ambiguous') {
-      html += '<div class="miss"><b>More than one AddressPoint matched.</b> Add a ZIP or borough. The report does not pick a building.</div>';
+      html += '<div class="miss"><b>More than one published address matched.</b> Add a ZIP or borough. The report does not pick a building.</div>';
     } else {
       var p = report.property;
       html += '<div class="note"><b>On the record:</b> ' + esc(p.house_number + ' ' + p.full_street_name) +
@@ -379,15 +390,31 @@
         esc(a.version) + '. Modifications: ' + esc(a.modifications) + '</li>';
     });
     html += '</ul></div>';
-    html += '<div class="excl"><b>This report excludes</b><ul>';
-    report.exclusions.forEach(function (x) { html += '<li>' + esc(x) + '</li>'; });
-    html += '</ul></div>';
+    html += '<div class="note disclosure">' + esc(DISCLOSURE) + '</div>';
+    // The exclusions are a rights-gate record (which stacks this report does not call).
+    // They stay in the JSON; only HomeSignal's own view lists them.
+    if (INTERNAL) {
+      html += '<div class="excl"><b>This report excludes</b><ul>';
+      report.exclusions.forEach(function (x) { html += '<li>' + esc(x) + '</li>'; });
+      html += '</ul></div>';
+    }
+    // Saying only what the hash can carry. It fingerprints this content, so it answers
+    // "are these two files the same report". It is not a signature, it is not unique to
+    // one issuance, and re-running this address later will not reproduce it. It sits in a
+    // collapsed advanced block at the end, not ahead of the records.
+    html += '<details class="fingerprint"><summary>Report fingerprint (advanced)</summary>';
+    html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
+    html += '<p class="sub">A fingerprint of the records above. It is not a receipt and'
+      + ' not a signature. Two reports with the same id hold the same data; re-running this'
+      + ' address later gives a different id, because the City’s records move. To'
+      + ' check it, take the downloaded JSON as delivered, remove <code>report_id</code>'
+      + ' and <code>generated_at</code>, and SHA-256 what is left.</p></details>';
 
     html += '<div class="actions">' +
       '<button type="button" class="btn" id="fsrPrint">Print / PDF</button>' +
       '<button type="button" class="btn" id="fsrShare">Copy share link</button>' +
       '<button type="button" class="btn" id="fsrJson">Download JSON</button>' +
-      '<button type="button" class="btn" id="fsrPortfolioAdd">Add to portfolio</button>' +
+      (INTERNAL ? '<button type="button" class="btn" id="fsrPortfolioAdd">Add to portfolio</button>' : '') +
       '</div>';
 
     out.hidden = false;
@@ -409,7 +436,8 @@
       a.click();
       URL.revokeObjectURL(a.href);
     };
-    document.getElementById('fsrPortfolioAdd').onclick = function () {
+    var portfolioAdd = document.getElementById('fsrPortfolioAdd');
+    if (portfolioAdd) portfolioAdd.onclick = function () {
       Scale.addToPortfolio(persist(), report);
       Scale.recordUse(persist(), { kind: 'portfolio_add', report_id: report.report_id });
     };

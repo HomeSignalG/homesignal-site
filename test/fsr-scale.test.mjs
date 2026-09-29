@@ -126,7 +126,35 @@ ok(/data-view="portfolio"/.test(page) && /data-view="usage"/.test(page), '14b pa
 ok(/lib\/fsr-scale\.js/.test(page), '14c page loads the scale library');
 ok(!/get-address-report|homesignalmap|openstreetmap|value_outlook|Effect at this address/.test(page),
   '14d page source stays off HOLD/EXCLUDE surfaces');
-ok(/Signed paid pilots: 0/.test(page), '14e page states signed pilots are 0');
+// The pilot count and verdict are HomeSignal's own bookkeeping (audit Step 15). They are
+// not client copy, so the customer report must not carry them. They still live in the
+// internal view painters, so this reads the static markup with scripts and styles removed,
+// and checks the gating separately. The browser suite (fsr-audience.browser.test.mjs)
+// drives the rendered page.
+const staticMarkup = page.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
+ok(!/Signed paid pilots|Verdict|NOT YET/.test(staticMarkup),
+  '14e the customer markup carries no pilot or verdict copy');
+ok(/<nav class="fsr-nav"[^>]*\shidden[\s>]/.test(page),
+  '14e2 the internal nav is hidden in the markup itself, not only by script');
+ok(/\.fsr-nav\[hidden\]\s*\{\s*display:\s*none/.test(page),
+  '14e3 the nav rule that sets display:flex is overridden for [hidden], or hidden would not hide it');
+ok(/get\('audience'\) === 'internal'/.test(page) && /if \(!INTERNAL && name !== 'report'\) name = 'report'/.test(page),
+  '14e4 a customer cannot reach an internal view whatever the URL says');
+ok(/Signed paid pilots: ' \+ esc\(sum\.signed_paid_pilots\)/.test(page) && /Verdict: ' \+ esc\(matrix\.verdict\)/.test(page),
+  '14e5 the internal views still state the pilot count and the verdict');
+ok(/<title>HomeSignal Development Activity<\/title>/.test(page)
+  && !/<title>[^<]*Future Surroundings/.test(page)
+  && !/class="eyebrow">[^<]*(FUTURE SURROUNDINGS|NYC V1)/.test(page),
+  '14e6 the customer-visible product name is Development Activity');
+const scopeSentence = "Planned, approved, permitted and changing development found in HomeSignal's covered official sources.";
+const scopeSupport = 'This report focuses on development activity and change. It is not an inventory of existing schools, parks, businesses, buildings, or neighborhood amenities.';
+ok(staticMarkup.includes(scopeSentence) && staticMarkup.includes(scopeSupport),
+  '14e7 the plan’s scope statement is on the page verbatim');
+const disclosure = 'HomeSignal summarizes selected official public records available to its covered sources. It may not include every project or change and is not a substitute for independent property, municipal, title, zoning, legal, inspection, or other professional due diligence.';
+ok(page.includes(disclosure), '14e8 the standard client disclosure is in the page verbatim');
+const planDoc = read('docs/development-activity-plan-2026-09-28.md');
+ok(planDoc.includes(scopeSentence) && planDoc.includes(scopeSupport) && planDoc.includes(disclosure),
+  '14e9 every one of those three sentences is the plan’s own text, not a paraphrase');
 
 const api = read('supabase/functions/get-future-surroundings-report/index.ts');
 const allow = read('supabase/functions/get-future-surroundings-report/allowlist.ts');
