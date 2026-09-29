@@ -94,6 +94,13 @@ production run, and written up. Everything before that fetch was sunk cost.
 **Do not ask permission for work you have already verified.** Verifying first and asking after
 spends the full cost and ships nothing; that ordering is the thing this grant exists to fix.
 
+⚖️ **MERGE IS NOT A GATE (founder, 2026-09-29: "you can merge on your own and you do not need
+to ask me").** Squash-merge your own PRs without asking once CI is green on the current head
+and there is no conflict. Never merge with red, held (`action_required`) or unrun checks. The
+stop lists elsewhere in this file still stand: secrets/PII/subscriber data, destructive or
+non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
+approval step only, not the verification before it.
+
 **Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
 
 1. **`jurisdiction-registry.json` only.** No other file.
