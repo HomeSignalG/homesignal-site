@@ -431,3 +431,17 @@ now grants USAGE to all three roles and checks it as a control before the refusa
 - Applying it to production changes nothing anyone sees: it has no reader yet. Expected reading once applied:
   all four production runs so far are baseline runs except one ordinary smoke run that wrote **0** events, so
   **0 of the 922,244 events are reportable today** (137 + 34,725 + 887,382 = 922,244, all in baseline runs).
+
+**Production receipt (2026-09-29).** Merged as #1470 (`93a6a1f`); applied 20:32:33Z by `apply_migration`, name
+`dev_change_reportable_d2_20260930`, ledger version `20260929203233`. Measured after the apply, each beside its control:
+
+- **The stored migration text is the file, byte for byte:** md5 `3c033912e17097e1e66fc42ac44f8a4e` on both sides
+  (the file is 5,867 bytes, 5,864 characters).
+- **Definition and lock-down:** 19 columns in the ledger's order; `reloptions` `{security_invoker=true}`; ACL
+  `{postgres=arwdDxtm/postgres, service_role=r/postgres}`; `anon` and `authenticated` cannot select; `service_role`
+  can select and cannot insert. The Order C tables and every other object are untouched (the migration creates one view).
+- **Reading: 0 reportable events.** The control that makes the zero mean something: the same join with the
+  opposite condition finds **922,244** events in baseline runs, of which exactly **959 carry `is_baseline = false`**
+  (the cross-copy differences of §10), and **0** events name no run. The run counters agree: 922,244 events written
+  by baseline runs, 0 by ordinary ones.
+- Nothing reads the view yet, so no page, email or report changed.
