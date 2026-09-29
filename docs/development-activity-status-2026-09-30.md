@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that builds the privacy boundary of the report snapshot (F2).
+Last updated: 2026-09-30, in the PR that records F2 (the privacy boundary of the report snapshot) as applied to production.
 
 ## Master steps (plan "Master Step Plan")
 
@@ -73,15 +73,20 @@ Last updated: 2026-09-30, in the PR that builds the privacy boundary of the repo
   module — **and nothing calls the writer until Order G**; the table holds 0 rows; the legacy NYC page and API are
   untouched (R6). Production receipt: contract doc §7. **Its `inputs` and `property_key` columns could have held a
   customer's address; they are removed by F2 below.**
-- F2. Privacy boundary of the report snapshot — **built, in review** (founder decision 2026-09-29; not struck until it
-  is merged and applied). `docs/report-private-context.sql` (new, deletable) + `docs/report-snapshot.sql` (changed) +
+- ~~F2. Privacy boundary of the report snapshot~~ — **done** (founder decision 2026-09-29). Merged as #1480
+  (`023b4bf`) and applied to production 2026-09-29 22:22–22:23Z (migrations `report_private_context_f2a_20260930`,
+  ledger `20260929222229`, and `report_snapshot_f2b_20260930`, ledger `20260929222315`; stored text md5-equal to both
+  files). `docs/report-private-context.sql` (new, deletable) + `docs/report-snapshot.sql` (changed) +
   `docs/report-private-context-contract-2026-09-30.md`. It means: the exact street address never enters the immutable
   snapshot; it lives in a separate private context kept while a report, a Follow or an account needs it, purged in
   place 90 days after the last need ends (at once on a verified privacy request or a legal requirement), with an
   append-only audit; the snapshot keeps its `report_id`, hash, body and time when the address is purged. Measured
   first: the legacy report shape would have stored the typed address, the exact property point and per-record offsets
-  that recover the point to within a metre (contract §2). **Nothing is applied to production yet.** Apply order:
-  `report-private-context.sql`, then `report-snapshot.sql` (fails closed unless the snapshot table is empty).
+  that recover the point to within a metre (contract §2). All four tables hold 0 rows and **nothing calls the writer**;
+  the purge is written and tested but **not scheduled**. Production receipt and a rolled-back behaviour probe: contract
+  §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
+  of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
+  boundary-test checklist (§8.4).
 - G. Deploy / smoke the canonical commercial API — open (national path required). **Go given 2026-09-29 under one
   rule: Order G may build the national report engine, but no production path may permanently write a brokerage-entered
   exact address into the immutable snapshot, and no real customer report is stored until the five gates in
