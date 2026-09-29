@@ -4,6 +4,8 @@ This records a founder ruling and the read-only audit that followed it. It super
 
 Nothing here changes runtime behavior. The proposed sequence in §6 is a proposal, not an approval.
 
+> **Superseded in part, 2026-09-30.** The founder supplied an updated plan (`docs/development-activity-plan-2026-09-30.md`) that adopts this ruling, and six further rulings (`docs/development-activity-founder-rulings-2026-09-30.md`). The sequence to follow is now Order A–P in `docs/development-activity-status-2026-09-30.md`; the R0–R20 proposal in §6 below is **not** followed. §1 (the ruling) and §3–§5 (the audits) remain the dated record. The U02 work mentioned here was reverted and never merged.
+
 ## 1. The ruling (founder, 2026-09-29, verbatim in scope)
 
 > Do not architect HomeSignal Development Activity by city or by "market." There is no NYC-only product concept. HomeSignal's geographic product universe is the existing canonical set of 12,722 ZIP-code pages.
