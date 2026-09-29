@@ -118,9 +118,27 @@ ok(/from n5_publish import publish_prefix/.test(orch) && /geo\.n5_gen_publish_pr
 const ready = (orch.split('def mode_ready(')[1] || '').split('\ndef ')[0];
 ok(/n5_generation_mark_ready/.test(ready) && !/update geo\.n5_generation/.test(ready),
   'READY is decided by geo.n5_generation_mark_ready, never a raw UPDATE');
-for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready']) {
+for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready', 'ready', 'auto_finish']) {
   const body = (orch.split(`def ${fn}(`)[1] || '').split('\ndef ')[0];
-  ok(body && !/n5_generation_activate/.test(body), `${fn} can never activate`);
+  ok(body && !/n5_generation_activate/.test(body), `${fn} never calls the activation gate directly`);
+}
+for (const fn of ['mode_publish', 'publish_pending', 'mode_ready', 'ready']) {
+  const body = (orch.split(`def ${fn}(`)[1] || '').split('\ndef ')[0];
+  ok(body && !/\bactivate\(/.test(body), `${fn} can never activate`);
+}
+// AUTO LIFECYCLE (founder instruction 2026-09-29): the unattended `work` tick may reach
+// activation, but ONLY through activate() -> geo.n5_generation_activate, and ONLY when
+// AUTO_LIFECYCLE is on and no explicit GENERATION was given.
+{
+  const work = (orch.split('def mode_work(')[1] || '').split('\ndef ')[0];
+  ok(/auto = AUTO_LIFECYCLE and not GENERATION/.test(work), 'auto is off unless AUTO_LIFECYCLE=1 and no GENERATION');
+  ok(/if auto:\n\s+auto_finish\(gen\)/.test(work), 'mode_work finishes a build only under auto');
+  const acts = work.match(/\bactivate\(/g) || [];
+  ok(acts.length === 1 && /if auto:[\s\S]*?activate\(pending\[0\]\)/.test(work),
+    'mode_work activates only a READY generation, only under auto');
+  const fin = (orch.split('def auto_finish(')[1] || '').split('\ndef ')[0];
+  ok(fin.indexOf('ready(gen)') > -1 && fin.indexOf('ready(gen)') < fin.indexOf('activate(gen)'),
+    'auto_finish goes through READY before activate');
 }
 
 // ── `open` writes the snapshot's NOT NULL fingerprints with the CANONICAL expressions ──
@@ -132,7 +150,7 @@ for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready'])
   const hashes = (t) => (t.match(/decode\(md5\([\s\S]*?\),'hex'\)/g) || [])
     .map((h) => h.replace(/\s+/g, ' '));
   const canonHashes = hashes(canon.slice(canon.indexOf('ins_identity as ('), canon.indexOf('ins_report as (')));
-  const openBody = (orch.split('def mode_open(')[1] || '').split('\ndef ')[0];
+  const openBody = (orch.split('def open_generation(')[1] || '').split('\ndef ')[0];
   const capture = openBody.slice(openBody.indexOf('insert into preservation.app_project_identity'));
   ok(canonHashes.length === 2, 'the canonical capture defines exactly identity_hash and content_hash');
   ok(/identity_hash, content_hash\)/.test(capture), '`open` names both NOT NULL fingerprint columns');
