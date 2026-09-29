@@ -138,6 +138,10 @@ were the only live members of that state.
 - Offline pins `10a`-`10g` in `test/map1-zip-state-kind-resolution.test.mjs`; three mutations of
   the verifier (gap may be pending, fake need not fire, any state may be synthetic) each fail it
   on exit code.
+- **First run from `main` after the merge and the Part G apply** (`verify-map1-zip-states` #94,
+  run `36647946914`, 2026-09-29 23:58Z): `LIVE ZIP-STATE GATE: PASS`. 94128 and 95219 read
+  measured_zero and 99128 authoritative. The synthetic pending case replaced 1 development-geography
+  request on 94128 and passed.
 
 ## 6. Not changed
 
