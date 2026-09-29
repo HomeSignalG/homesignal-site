@@ -1,3 +1,8 @@
+// GENERATED FILE. Do not edit it.
+// It is lib/nyc-v1-soda.js copied byte for byte under this header, so the edge function and
+// the page run one report engine. Change lib/nyc-v1-soda.js, then run
+//   node scripts/sync-fsr-engine.mjs
+// test/fsr-engine-one-source.test.mjs fails if this copy is stale.
 // NYC V1 SODA client. The only allowed host is data.cityofnewyork.us.
 // The only allowed views are uf93-f8nk, ipu4-2q9a, rbx6-tga4, w9ak-ipjd.
 (function (root) {

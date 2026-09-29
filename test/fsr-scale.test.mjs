@@ -162,8 +162,12 @@ ok(/from '\.\/allowlist\.ts'/.test(api), '13h API imports local allowlist only')
 ok(!/get-address-report|geocode-address|geocoding\.geo\.census\.gov/.test(api),
   '13i API index does not call the held stack');
 ok(!/from ['"].*get-address-report/.test(allow), '13j allowlist does not import get-address-report');
-ok(/data\.cityofnewyork\.us/.test(allow) && /uf93-f8nk/.test(allow), '13k allowlist stays on NYC Socrata');
-ok(/FORBIDDEN_HOST_RE/.test(allow) && /arcgis/.test(allow), '13l allowlist forbids ArcGIS hosts');
+// The hosts and views live in the shared engine now, not in allowlist.ts. Read the copy the
+// API loads (engine/), which test/fsr-engine-one-source.test.mjs holds byte-identical to lib/.
+const engineSoda = read('supabase/functions/get-future-surroundings-report/engine/nyc-v1-soda.js');
+const engineReport = read('supabase/functions/get-future-surroundings-report/engine/nyc-v1-report.js');
+ok(/data\.cityofnewyork\.us/.test(engineSoda) && /uf93-f8nk/.test(engineSoda), '13k the API engine stays on NYC Socrata');
+ok(/FORBIDDEN_HOST_RE/.test(engineReport) && /arcgis/.test(engineReport), '13l the API engine forbids ArcGIS hosts');
 
 // §9 — the classification invariants, checked against the matrix and the shipped
 // allowlist rather than against the prose of the evidence files. Asserting that a
