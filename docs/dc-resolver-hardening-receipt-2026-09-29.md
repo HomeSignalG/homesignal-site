@@ -1,6 +1,6 @@
 # Resolver hardening — receipt, 2026-09-29
 
-**Status: written and proven on a disposable stand-in. NOT applied to production.** Applying it needs a go.
+**Status: v1 applied to production 2026-09-29 19:00–19:02 UTC. v2 (below) fixes a false alarm v1 raised at its first tick; v2 is proven on the stand-in and applied after the merge — see "Found after applying".**
 
 **What ships:** `docs/dc-resolver-hardening.sql`, plus edits to `docs/dc-marker-loss-watcher.sql` and
 `docs/dc-address-check-monitor.sql`. It closes the three gaps the step 12 and 13 receipts recorded and did not fix.
@@ -82,6 +82,47 @@ anon and authenticated directly). `postgres` (the cron user) and `service_role` 
   un-prefixed command and accepts it. `test/dc-resolver-hardening-structure.test.mjs`: 17 checks, including that no
   function in these files sets `statement_timeout` inside itself.
 - The repo's whole offline unit suite: 266 files, all passed.
+
+## Found after applying (2026-09-29, same day) — a false alarm of mine, and a real failure it landed on
+
+**Applied** at 19:00:33, 19:01:02 and 19:01:25 UTC (ledger `20260929190033` / `…190102` / `…190125`). The stored text of all
+three is byte-for-byte the committed file (md5 `3f35b938…`, `cc87fc0f…`, `e5316fa5…`). Read back: the geography job
+runs `set statement_timeout = '300s'; select public.dc_resolve_serialized('geography')`; anon and authenticated cannot
+run any of the four resolver functions; the monitor carries each check once.
+
+**The 19:10:00 tick reported `dc_resolvers` failing:** *"dc-resolve-canonical has no successful run since ever;
+dc-resolve-geography has no successful run since ever."* The monitor recorded a notification at 19:10:00
+(`last_notified_at`; whether the mail arrived was not read from here).
+
+- **Cause (mine): `cron.schedule()` issues a new jobid on every reschedule**, and v1 matched a job's history on jobid
+  alone. Applying the 300 s ceiling rescheduled the jobs (jobids 63/62 → 66/65), so the check saw zero rows for two jobs
+  that had history (canonical alone had **164** earlier runs under its old jobid). **My stand-in test never rescheduled a job**, so it could not fail on this: the same
+  "a fixture that only builds the working shape" defect this repo already names. It now does (H3b, H6).
+- **For canonical the alarm was false. For geography it was right about the outcome and wrong about the reason:**
+  geography **really had not succeeded since 15:35** (last success 15:35:00, 101.7 s). Its runs at **16:35, 17:35 and
+  18:35 each timed out at exactly 120.0 s** ("canceling statement due to statement timeout"). The 3 h limit would have
+  fired on its own at about 18:35–19:10. v1 said "since ever" instead of "since 15:36".
+- **v2** matches history on the job's id **or** the command text it ran (`job_run_details.command`), over the last 7 days,
+  so a reschedule cannot erase it. It **upgrades v1 in place** and refuses if anything else was spliced after it.
+  Stand-in: **48 checks**. It reproduces the defect (H6: v1 false-alarms after a reschedule), proves v2 removes it, proves
+  a foreign splice after v1 refuses the upgrade and changes nothing, and proves each job's pattern names only its own
+  resolver. The v1 fixture is pinned to production's ledger md5.
+  - **Mutation results, on exit code:** matching on jobid only, no 7-day bound, either pattern too broad, the
+    foreign-splice guard removed, the upgrade path replaced by a fresh insert, and the already-current short-circuit
+    removed each failed the run. **One survives, by construction:** deleting the "v1 must be gone" post-condition —
+    no input reaches it, because a second v1 block is refused earlier. It is kept as a backstop, like the two
+    unreachable ones named in the step 13 monitor-lock record.
+  - A first "remove the foreign-splice guard" mutation was itself wrong (it made the guard always refuse, which broke
+    a clean upgrade and still looked like a kill). Redone so it truly removes the guard: killed by the named assertion.
+- **What was not rescued by luck:** without the guard, upgrading over a foreign block **silently deletes it** (the
+  replacement covers everything up to the anchor). The guard is load-bearing.
+
+**Geography is now the live problem, and it is not what the step 13 receipt concluded.** The three timeouts started
+right after today's acquisitions (Compute Atlas 2,249 records at 16:07, Epoch data centres 93 and timelines 545 at
+16:28). Yesterday's identical-shaped acquisition (+546 timeline entities) left geography at 101–108 s, which is why the step 13
+receipt called the leftover timeline entities "not the driver". **That conclusion rested on one day's step and is not
+safe:** the run time may cross a threshold cumulatively, or something else changed at 16:07–16:35. It is unproven
+either way and is left open.
 
 ## Not done, and why
 

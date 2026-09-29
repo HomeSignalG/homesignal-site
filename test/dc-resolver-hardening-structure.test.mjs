@@ -9,7 +9,9 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const read = (f) => readFileSync(join(ROOT, f), 'utf8');
 const stripSql = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
 
-const SQL = stripSql(read('docs/dc-resolver-hardening.sql'));
+const RAW = read('docs/dc-resolver-hardening.sql');   // the markers are SQL comments inside string literals, which stripSql would eat
+const SQL = stripSql(RAW);
+const RAWBLOCK = (RAW.match(/_block\s+text := \$blk\$([\s\S]*?)\$blk\$;/) || [, ''])[1];
 const BLOCK = (SQL.match(/_block\s+text := \$blk\$([\s\S]*?)\$blk\$;/) || [, ''])[1];
 ok(BLOCK.length > 1500 && SQL.length > BLOCK.length, '0: the monitor block is located (positive control)');
 
@@ -27,9 +29,9 @@ ok(/select 'dc_resolvers',\s*\(q\.problems = ''\),\s*true,/.test(BLOCK),
   'C1: the check is ALERTABLE unconditionally — an absent job or empty history is a failure, never a quiet pass');
 ok(!/\b(insert into (?!_eval)|update |delete from|create |drop )/i.test(BLOCK.replace(/insert into _eval/g, '')),
   'C2: the block only reads (pg_cron history, cron.job, grants) and writes nothing but its own _eval row');
-ok(/values \('dc-resolve-canonical',\s*interval '3 hours',\s*120\)/.test(BLOCK)
-   && /\('dc-resolve-geography',\s*interval '3 hours',\s*300\)/.test(BLOCK)
-   && /\('dc-resolve-on-acquisition', interval '10 minutes', 120\)/.test(BLOCK),
+ok(/values \('dc-resolve-canonical',\s*interval '3 hours',\s*120,/.test(BLOCK)
+   && /\('dc-resolve-geography',\s*interval '3 hours',\s*300,/.test(BLOCK)
+   && /\('dc-resolve-on-acquisition', interval '10 minutes', 120,/.test(BLOCK),
   'C3: the measured limits — hourly jobs 3 h (one failed run is not an alert), watcher 10 min; statement limits 120 / 300 / 120');
 ok(/\(s\.limit_s \* 2 \/ 3\) as warn_s/.test(BLOCK) && /p\.slowest_s > p\.warn_s/.test(BLOCK),
   'C4: slow = more than 2/3 of the job\'s own limit (80 s of 120, 200 s of 300)');
@@ -37,8 +39,16 @@ ok(/d\.status = 'succeeded'\) as last_ok/.test(BLOCK) && /d\.status = 'succeeded
   'C5: only SUCCEEDED runs count as health, and slowness looks at the last 24 h only');
 ok(/when p\.jobid is null then 'job ' \|\| p\.jobname \|\| ' is not scheduled'/.test(BLOCK)
    && /when not p\.active then 'job ' \|\| p\.jobname \|\| ' is disabled'/.test(BLOCK)
-   && /coalesce\(to_char\(p\.last_ok[^)]*\) \|\| ' UTC', 'ever'\)/.test(BLOCK),
+   && /coalesce\('since ' \|\| to_char\(p\.last_ok[^)]*\) \|\| ' UTC', 'in the last 7 days'\)/.test(BLOCK),
   'C6: absent, disabled and never-succeeded each fail and say so');
+// v2: a reschedule must not erase the history (cron.schedule() issues a NEW jobid; v1 matched on jobid alone and
+// false-alarmed at the first tick after the apply)
+ok(/where d\.start_time > _now - interval '7 days'\s+and \(d\.jobid = j\.jobid or d\.command ~ s\.cmd_re\)/.test(BLOCK),
+  'C8: history is matched on the job id OR the command it ran, over the last 7 days — a reschedule cannot erase it');
+ok(/dc_resolve_canonical\|dc_resolve_serialized\\\(\.canonical\.\\\)/.test(BLOCK)
+   && /dc_resolve_geography\|dc_resolve_serialized\\\(\.geography\.\\\)/.test(BLOCK)
+   && /'dc_resolve_on_acquisition'\)/.test(BLOCK),
+  'C9: each job\'s command pattern names its OWN resolver only, in both the step 3 form and the serialized form');
 const fnList = ['public.dc_resolve_canonical(boolean, boolean)', 'public.dc_resolve_geography(boolean)',
                 'public.dc_resolve_serialized(text)', 'public.dc_resolve_on_acquisition()'];
 ok(fnList.every((f) => BLOCK.includes("('" + f + "')")) && /values \('anon'\), \('authenticated'\)/.test(BLOCK)
@@ -47,9 +57,17 @@ ok(fnList.every((f) => BLOCK.includes("('" + f + "')")) && /values \('anon'\), \
 
 // ── splice discipline (same as steps 12 and 13) ───────────────────────────────────────────────────
 ok(SQL.includes("_anchor text := 'insert into public.pipeline_health_check as c ('")
-   && /expected exactly 1 — refusing to splice/.test(SQL) && /dc_resolvers already present — nothing to do/.test(SQL)
+   && /expected exactly 1 — refusing to splice/.test(SQL) && /dc_resolvers v2 already present — nothing to do/.test(SQL)
    && /splice did not take/.test(SQL),
   'S1: one anchor, fail closed, idempotent, re-read after the splice');
+ok(/_mark1  text := '  -- DC RESOLVERS \(hardening, 2026-09-29\)\.'/.test(RAW)
+   && /_mark2  text := '  -- DC RESOLVERS \(v2, 2026-09-29\)\.'/.test(RAW)
+   && /something else sits between the v1 dc_resolvers block and the anchor — refusing to upgrade/.test(RAW)
+   && /insert into _eval', ''\)\)\) \/ length\('insert into _eval'\) <> 1/.test(RAW)
+   && /position\(_mark1 in _def\) > 0\s+or/.test(RAW),
+  'S2: a v1 block is UPGRADED in place; anything else spliced after it refuses the upgrade, and v1 must be gone afterwards');
+ok(/-- DC RESOLVERS \(v2, 2026-09-29\)\./.test(RAWBLOCK) && !/DC RESOLVERS \(hardening/.test(RAWBLOCK),
+  'S3: the block carries the v2 marker and never the v1 one, so the two can be told apart in the live definition');
 
 // ── the timeout lives in the job command, in the two files of record ──────────────────────────────
 const WATCH = stripSql(read('docs/dc-marker-loss-watcher.sql'));

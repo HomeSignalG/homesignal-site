@@ -112,5 +112,9 @@ resolver runs that today waits for :25. Every resolver run now goes through one 
 - **Its run time is not driven by the leftover Epoch timeline entities.** The 09-28 timeline acquisition
   added 546 of them (2,163 → 2,709 of 5,584 live entities) and geography stayed at 101–108 s, the same as
   before. The earlier climb (1.2 s on 09-22 → 91 s on 09-27) has flattened.
+  - **Corrected 2026-09-29: that was one day's evidence and it did not hold.** After the 09-29 acquisitions
+    (16:07 Atlas, 16:28 Epoch, +545 timeline entities again) geography timed out at 120.0 s at 16:35, 17:35 and
+    18:35 (last success 15:35, 101.7 s). Whether the timeline entities are the cause is unproven, but "flattened" was
+    wrong. See `dc-resolver-hardening-receipt-2026-09-29.md`.
 - **Not fixed here:** the headroom (about 12–20 s) needs its own measured fix, and a failing resolver job
   should page. See the step 12 receipt's gap note.
