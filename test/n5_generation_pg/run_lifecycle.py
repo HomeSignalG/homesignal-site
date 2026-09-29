@@ -261,6 +261,57 @@ def main():
     ok("E16 'newly visible' is derivable: the new generation minus the legacy one",
        entries == [("11102", "dev:P4"), ("11201", "dev:P3"), ("11301", "dev:P11")], entries)
 
+    # ---------------------------------------------------------------- AUTO LIFECYCLE + KEEP TWO
+    # Production protects the legacy capture (founder ruling 2026-09-01); mirror that here.
+    R.q(c, "insert into preservation.protected_snapshot (snapshot_id, reason, authorized_by) "
+           "values ('phase1', 'fixture: mirrors production', 'founder')")
+    legacy_before = (R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (R.LEGACY,)),
+                     R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='phase1'"))
+    gen_before = (R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN,)),
+                  R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)))
+
+    def auto_tick(prefix):
+        O = env.orchestrator("work", GENERATION="", AUTO_LIFECYCLE="1", AUTO_OPEN_MIN_HOURS="0")
+        O.AUTO_PREFIX = prefix
+        env.patch_publish()
+        O.mode_work()
+        return O
+
+    auto_tick("gen-auto-b-")
+    g2 = R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'")
+    ok("E17 one unattended tick opened, built, READY'd and activated a new generation",
+       g2 and g2.startswith("gen-auto-b-")
+       and R.q1(c, "select predecessor_generation_id from geo.n5_generation where generation_id=%s", (g2,)) == GEN
+       and R.refs(c, "11101") == ["dev:P1", "dev:P2", "dev:P5"] and R.refs(c, "11201") == ["dev:P3"], g2)
+    ok("E18 keep two: the predecessor was kept whole, and nothing else was due",
+       (R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN,)),
+        R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)))
+       == gen_before and gen_before[0] > 0 and gen_before[1] > 0, gen_before)
+
+    auto_tick("gen-auto-c-")
+    g3 = R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'")
+    ok("E19 a second unattended tick activated a third generation, the second as its predecessor",
+       g3 and g3.startswith("gen-auto-c-")
+       and R.q1(c, "select predecessor_generation_id from geo.n5_generation where generation_id=%s", (g3,)) == g2, g3)
+    ok("E20 keep two: the generation two back lost its build rows AND its capture",
+       R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (GEN,)) == 0
+       and R.q1(c, "select count(*) from geo.n5_association where generation_id=%s", (GEN,)) == 0
+       and R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)) == 0
+       and R.q1(c, "select state from geo.n5_generation where generation_id=%s", (GEN,)) == "SUPERSEDED")
+    ok("E21 the kept predecessor is whole (control: the same counts the retired one had)",
+       R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (g2,)) == gen_before[0]
+       and R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (g2,)) == gen_before[1])
+    ok("E22 the PROTECTED legacy capture and its build rows are untouched",
+       (R.q1(c, "select count(*) from geo.zip_authoritative_membership where generation_id=%s", (R.LEGACY,)),
+        R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='phase1'")) == legacy_before
+       and legacy_before[0] > 0 and legacy_before[1] > 0, legacy_before)
+    ok("E23 Map 1 serves the third generation correctly",
+       R.refs(c, "11101") == ["dev:P1", "dev:P2", "dev:P5"] and R.refs(c, "11102") == ["dev:P2", "dev:P4"]
+       and R.refs(c, "11201") == ["dev:P3"] and R.refs(c, "11301") == ["dev:P11"])
+    O = env.orchestrator("work", GENERATION="", AUTO_LIFECYCLE="1")
+    ok("E24 retirement is idempotent: a second pass finds nothing to do",
+       O.retire_superseded() == 0)
+
     c.close()
     R.drop_db("n5gen_e2e")
     print("=" * 60)

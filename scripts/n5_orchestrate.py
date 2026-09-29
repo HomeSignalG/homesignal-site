@@ -344,7 +344,10 @@ def mode_work():
         if pending:
             # A READY generation left by an earlier tick (its activate was deferred or lost).
             activate(pending[0])
+            retire_superseded()
             return 0
+        # Catch-up, and before any open: an old build's space is reusable by the next one.
+        retire_superseded()
     gen = GENERATION or discover_building()
     if not gen and auto:
         gen = auto_open()
@@ -448,7 +451,73 @@ def auto_finish(gen):
         return 0
     ready(gen)
     activate(gen)
+    retire_superseded()
     return 0
+
+
+# RETENTION (founder, 2026-09-29: "keep 2"). Keep the serving generation and its predecessor,
+# which is the rollback target and the baseline "newly visible" is measured against; the
+# database's own discard refuses both anyway. Every OTHER superseded generation is retired:
+# its build rows (geo.n5_generation_discard, the one existing rule) and then its capture in
+# preservation.app_project_identity, which discard does not touch (~1.1 GiB each).
+# NEVER a protected snapshot: phase1-2026-09-01 is protected by founder ruling (2026-09-01)
+# and the table's guard_frozen trigger refuses the delete regardless; a generation built on
+# it is excluded here entirely, geo rows included. Never a FAILED generation either - a
+# failure is left for a human to read before it is discarded.
+# A DELETE does not shrink the database; autovacuum makes the space reusable, and the next
+# build's inserts into the same tables reuse it, so measured size stops growing by a build a
+# day. The auto-open disk check stays on the measured figure, which errs on the safe side.
+RETIRE_CANDIDATES_SQL = """
+select g.generation_id, g.snapshot_id,
+       exists (select 1 from geo.zip_authoritative_membership m
+                where m.generation_id = g.generation_id) as has_rows,
+       exists (select 1 from preservation.app_project_identity i
+                where i.snapshot_id = g.snapshot_id) as has_snapshot
+  from geo.n5_generation g
+ where g.state = 'SUPERSEDED'
+   and exists (select 1 from geo.n5_generation s where s.state = 'ACTIVE')
+   and g.generation_id is distinct from
+       (select s.predecessor_generation_id from geo.n5_generation s
+         where s.state in ('ACTIVE', 'ACTIVE_LEGACY'))
+   and not exists (select 1 from preservation.protected_snapshot p
+                    where p.snapshot_id = g.snapshot_id)
+   and not exists (select 1 from geo.n5_generation o
+                    where o.snapshot_id = g.snapshot_id and o.generation_id <> g.generation_id)
+ order by g.opened_at;"""
+
+
+def _verify_discarded(gen):
+    return (f"select not exists (select 1 from geo.zip_authoritative_membership "
+            f"where generation_id={lit(gen)}) and not exists (select 1 from geo.n5_association "
+            f"where generation_id={lit(gen)}) ok;")
+
+
+def _verify_snapshot_gone(snap):
+    return (f"select not exists (select 1 from preservation.app_project_identity "
+            f"where snapshot_id={lit(snap)}) ok;")
+
+
+def retire_superseded():
+    """Retire every superseded generation outside the kept two. Idempotent: a generation
+    whose rows and snapshot are already gone is skipped, so a lost response or a killed run
+    is finished by the next tick."""
+    done = 0
+    for r in sql(RETIRE_CANDIDATES_SQL, "retire candidates", read_only=True):
+        gen, snap = r["generation_id"], r["snapshot_id"]
+        if not (r["has_rows"] or r["has_snapshot"]):
+            continue  # already retired on an earlier tick
+        if r["has_rows"]:
+            heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",
+                  verify=_verify_discarded(gen))
+            say("retired build rows", gen)
+        if r["has_snapshot"]:
+            heavy(f"delete from preservation.app_project_identity where snapshot_id={lit(snap)};",
+                  "retire snapshot", verify=_verify_snapshot_gone(snap))
+            say("retired snapshot", snap)
+        done += 1
+    if not done:
+        say("retention", "nothing to retire (keeping the serving build and its predecessor)")
+    return done
 
 
 def shards_unfinished(gen):

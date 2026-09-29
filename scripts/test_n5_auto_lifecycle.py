@@ -67,6 +67,7 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
     o.unpublished_prefixes = lambda gen: [] if complete else ["100"]
     o.ready = fake_ready
     o.activate = lambda gen: log.append(("activate", gen))
+    o.retire_superseded = lambda: log.append(("retire",))
     return log
 
 
@@ -77,7 +78,7 @@ def old(h, state="ACTIVE"):
 # 1. a READY generation is activated first, and the tick does nothing else
 log = world(ready=["g-ready"])
 o.mode_work()
-check("READY left over -> activated", log == [("activate", "g-ready")])
+check("READY left over -> activated, then keep-two retirement", log == [("activate", "g-ready"), ("retire",)])
 
 # 2. two READY -> hard stop
 log = world(ready=["a", "b"])
@@ -96,7 +97,7 @@ for name, kw in [("newest build younger than 20 h", dict(newest=old(5.0))),
                                                         free=2048.0 + o.BUILD_RESERVE_MB - 1))]:
     log = world(**kw)
     rc = o.mode_work()
-    check(f"no open: {name}", rc == 0 and log == [])
+    check(f"no open: {name}", rc == 0 and log == [("retire",)])
 
 # 3b. boundaries: exactly 20 h and exactly floor + reserve both open
 log = world(newest=old(o.AUTO_OPEN_MIN_HOURS), free=2048.0 + o.BUILD_RESERVE_MB)
@@ -106,28 +107,28 @@ check("opens at exactly 20 h and exactly floor + reserve", ("open", TODAY) in lo
 # 3c. a normal day opens today's name and starts working it in the same tick
 log = world(newest=old(30.0))
 o.mode_work()
-check("opens today's generation", log[:2] == [("open", TODAY), ("publish", TODAY)])
+check("retires first, then opens today's generation", log[:3] == [("retire",), ("open", TODAY), ("publish", TODAY)])
 check("a fresh build is not finished in the same tick", ("ready", TODAY) not in log)
 
 # 3d. an empty catalog (no generation at all) still opens
 log = world(newest=None)
 o.mode_work()
-check("opens when no generation exists yet", log and log[0] == ("open", TODAY))
+check("opens when no generation exists yet", ("open", TODAY) in log)
 
 # 4. finish: complete -> READY then ACTIVATE; incomplete -> neither
 log = world(building=["g1"], complete=True)
 o.mode_work()
 check("complete build -> READY then ACTIVATE",
-      log == [("publish", "g1"), ("ready", "g1"), ("activate", "g1")])
+      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("activate", "g1"), ("retire",)])
 log = world(building=["g1"], complete=False)
 o.mode_work()
-check("incomplete build -> no READY, no ACTIVATE", log == [("publish", "g1")])
+check("incomplete build -> no READY, no ACTIVATE", log == [("retire",), ("publish", "g1")])
 
 # 4b. complete but the tick is out of time -> deferred, not rushed
 log = world(building=["g1"], complete=True)
 o.T_START = time.time() - o.FINISH_START_LIMIT_S - 1
 o.mode_work()
-check("complete but late in the tick -> deferred", log == [("publish", "g1")])
+check("complete but late in the tick -> deferred", log == [("retire",), ("publish", "g1")])
 
 # 5. READY refusal stops before ACTIVATE
 log = world(building=["g1"], complete=True, ready_raises=True)
@@ -141,13 +142,13 @@ check("READY refusal -> ACTIVATE never called", ("activate", "g1") not in log)
 # 6. auto off / explicit GENERATION -> the old behaviour exactly
 log = world(auto=False, ready=["g-ready"], newest=old(30.0))
 o.mode_work()
-check("auto off: no activate, no open", log == [])
+check("auto off: no activate, no open, no retirement", log == [])
 log = world(auto=False, building=["g1"], complete=True)
 o.mode_work()
 check("auto off: complete build is NOT finished", log == [("publish", "g1")])
 log = world(generation="g-explicit", ready=["g-ready"], complete=True)
 o.mode_work()
-check("explicit GENERATION: auto path ignored", log == [("publish", "g-explicit")])
+check("explicit GENERATION: auto path ignored (no retirement either)", log == [("publish", "g-explicit")])
 
 # 7. structure: one disk definition, and the gates stay behind heavy(..., verify=)
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
@@ -160,6 +161,16 @@ wf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".githu
 check("schedule ticks run with AUTO_LIFECYCLE=1",
       "AUTO_LIFECYCLE: ${{ github.event_name == 'schedule' && '1'" in wf)
 check("the 2,048 MB floor is not overridden in the workflow", "DISK_FLOOR_MB:" not in wf)
+
+# 8. keep two: the candidate rule is the founder's, and it never reaches a protected capture
+rsql = o.RETIRE_CANDIDATES_SQL
+check("retires only SUPERSEDED generations (never FAILED, never serving)", "g.state = 'SUPERSEDED'" in rsql)
+check("keeps the serving generation's predecessor", "predecessor_generation_id" in rsql)
+check("never a protected snapshot", "preservation.protected_snapshot" in rsql)
+check("never a snapshot another generation shares", "o.snapshot_id = g.snapshot_id" in rsql)
+check("the discard and the snapshot delete both go through heavy(..., verify=)",
+      'heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",\n                  verify=' in src
+      and '"retire snapshot", verify=' in src)
 
 print(f"\n{len(FAILS)} failure(s)")
 sys.exit(1 if FAILS else 0)
