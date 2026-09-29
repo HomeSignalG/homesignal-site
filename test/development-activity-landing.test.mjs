@@ -12,9 +12,10 @@
 //   3. NO SECOND VISUAL LANGUAGE. Every colour literal in the page already exists in app.css and
 //      every var(--token) it names is defined there.
 //   4. NOTHING PROMISES WHAT DOES NOT EXIST. The free-evaluation and $79 checkout buttons are
-//      inert until entitlement and checkout ship (plan sections 18 and 25), the page is noindex
-//      and undeployed, and those two facts are tied together: the day the page ships, the inert
-//      buttons fail this file.
+//      inert until entitlement and checkout ship (plan sections 18 and 25). The page IS deployed
+//      (founder, 2026-09-29) but DARK: noindex, linked from nowhere, not in the sitemap. Those
+//      facts are tied together: the page may be discoverable (indexed, linked or in the sitemap)
+//      only once the buttons are live, so launching out of order fails this file.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -142,11 +143,17 @@ const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join(
 ok(!/href="[^"]*(checkout|lemonsqueezy|stripe|billing|subscribe)/i.test(markup) && !/lemonsqueezy|stripe|checkout/i.test(scriptCode),
   'the page links to no checkout or payment processor and its code calls none');
 ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the inert buttons are not wired to sign-in, which would imply an entitlement that is not there');
-ok(noindex || shipped, 'while pre-launch the page is noindex');
-ok(!(shipped && cta.some((c) => /aria-disabled="true"/.test(c.tag))),
-  'TRIPWIRE: if this page is ever deployed (stage_site.py allowlist), its commerce buttons must be live, not inert');
-ok(!(inSitemap && noindex), 'TRIPWIRE: a noindex page must not be advertised in the sitemap');
-ok(!shipped && !inSitemap, 'PRE-LAUNCH STATE (delete this check as the launch step): the page is not in the deploy allowlist or the sitemap', { shipped, inSitemap });
+const inert = cta.some((c) => /aria-disabled="true"/.test(c.tag));
+const otherSources = ['index.html', 'about.html', 'contact.html', 'how-it-works.html', 'privacy.html', 'terms.html', 'dashboard.html', 'alerts.html',
+  'development.html', 'properties.html', 'property.html', 'reports.html', 'community.html', 'homesignalmap.html', 'partials/shell.html', 'shell.js',
+  'sitemap.xml', 'scripts/gen_zip_pages.py', 'lib/community-page.js'];
+const linkedFrom = otherSources.filter((f) => { try { return read(f).includes(PAGE); } catch (e) { return false; } });
+ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_site.py allowlist, so it publishes');
+ok(noindex, 'the page is noindex (dark: reachable by URL, not discoverable by search)');
+ok(!(inert && !noindex), 'TRIPWIRE: a page with inert commerce buttons must stay noindex');
+ok(!(inSitemap && (noindex || inert)), 'TRIPWIRE: the page enters the sitemap only when it is indexable and its commerce buttons are live', { inSitemap, noindex, inert });
+ok(!(inert && linkedFrom.length), 'TRIPWIRE: nothing in the site links to the page while its commerce buttons are inert', linkedFrom);
+ok(!inSitemap && linkedFrom.length === 0, 'DEPLOYED DARK: not in the sitemap and linked from no shipped page or script', { inSitemap, linkedFrom });
 ok(!/HS\.data\.(projects|facilities)|from\('app_projects'\)|rpc\(/.test(noComments), 'the sample reads no production project data: it is labelled illustrative and shows no real record');
 ok(/Sample Development Activity report\. The property, projects, distances and dates below are illustrative entries, not records for a real address\./.test(text), 'the sample is labelled illustrative in plain words');
 

@@ -53,6 +53,7 @@ ROOT_FILES = (
     'community.html',
     'contact.html',
     'dashboard.html',
+    'development-activity.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
