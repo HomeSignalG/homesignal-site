@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that first adds this file.
+Last updated: 2026-09-30, in the PR that adds Order C (the first version of this file merged as #1459).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -45,10 +45,16 @@ Last updated: 2026-09-30, in the PR that first adds this file.
   byte-identical to the upload, added in the PR that merges this file.
 - B. ~~Audit national identity/lineage~~ —
   `docs/development-activity-audit-b-identity-lineage-2026-09-30.md`, merged with this file.
-- C. Durable observation/delta layer — **next; needs the founder's go** (adds a new table;
-  site `CLAUDE.md` §3 stop list). Constraints are in the audit, §5 and §6.
-- D. National change baseline — open (depends on C).
-- E. Change-detection tests — open (depends on C, D).
+- C. Durable observation/delta layer — **built and tested; NOT struck yet.** Founder go given
+  2026-09-30. `docs/dev-change-ledger.sql` + `docs/development-activity-change-layer-2026-09-30.md`;
+  33 SQL checks with 21 prohibited mutations all killed, 29 structural pins. It is struck when it is
+  merged **and** applied to production (then recorded here).
+- D. National change baseline — **next.** Batch driver + per-ZIP cursor, source-health/freshness
+  state, and the baseline run over the 12,722 ZIPs. Depends on C being applied.
+- E. Change-detection tests — **written with C** (all 11 cases, `test/dev_change_ledger_pg/`;
+  map in the design doc §4), so this is struck with C. The one case proven only in part: linked
+  source rows of one project are proven for ZIP copies of a record, not for cross-record lineage
+  (no source-proven identifiers exist yet).
 - F. Durable `report_id` + `content_hash` — open.
 - G. Deploy / smoke the canonical commercial API — open (national path required).
 - H. Remove the quota bypass — open.
@@ -97,5 +103,5 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    publisher evidence only, no new classifier key. Confirm at Step 5.
 4. **`Decided` lifecycle mismatch** (above): the fix changes what residents see on
    existing surfaces, so it is not made without a go.
-5. **Order C schema.** A new table is a schema addition; founder go required.
+5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
