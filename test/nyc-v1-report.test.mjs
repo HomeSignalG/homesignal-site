@@ -280,23 +280,18 @@ ok(report.attribution.every((a) => /last 365 days/.test(a.modifications) || a.da
 ok(/text/.test(report.attribution.find((a) => a.dataset === 'ipu4-2q9a').modifications),
   '6l BIS attribution states the date column is text');
 
-// The API runs the same engine as the page: the files under the function's engine/ directory
-// are generated copies of lib/ (scripts/sync-fsr-engine.mjs), and test/fsr-engine-one-source
-// proves they are byte-identical and that the function holds no report logic of its own. These
-// read the copy the API actually loads, so a query regression on either surface fails here.
-const fnSoda = read('supabase/functions/get-future-surroundings-report/engine/nyc-v1-soda.js');
-const fnReport = read('supabase/functions/get-future-surroundings-report/engine/nyc-v1-report.js');
-ok(/issuance_date::floating_timestamp >= /.test(fnSoda) && /issuance_date::floating_timestamp DESC/.test(fnSoda),
+const fnSrc = read('supabase/functions/get-future-surroundings-report/allowlist.ts');
+ok(/issuance_date::floating_timestamp >= /.test(fnSrc) && /issuance_date::floating_timestamp DESC/.test(fnSrc),
   '6m the API applies the same BIS floor and order as the browser');
-ok(/window_days: RECENT_DAYS/.test(fnReport), '6n the API discloses the window too');
-ok(!/\$limit: '200'/.test(fnSoda), '6o the API row cap is a named constant');
-const fnRowCap = Number((fnSoda.match(/var ROW_CAP = (\d+);/) || [])[1]);
+ok(/window_days: RECENT_DAYS/.test(fnSrc), '6n the API discloses the window too');
+ok(!/\$limit: '200'/.test(fnSrc), '6o the API row cap is a named constant');
+const fnRowCap = Number((fnSrc.match(/const ROW_CAP = (\d+);/) || [])[1]);
 ok(fnRowCap === Soda.ROW_CAP,
   '6o2 the API reads the same depth as the browser, so the two cannot disagree on coverage',
   { api: fnRowCap, browser: Soda.ROW_CAP });
-ok(/gis_latitude::number between/.test(fnSoda) && !/zip_code in\(/.test(fnSoda),
+ok(/gis_latitude::number between/.test(fnSrc) && !/zip_code in\(/.test(fnSrc),
   '6w the API scopes on coordinates too, not on zip_code');
-ok(!/within_circle/.test(fnSoda), '6x the API no longer makes the ZIP round trip');
+ok(!/within_circle/.test(fnSrc), '6x the API no longer makes the ZIP round trip');
 
 // §7 — the contribution guard. The defect that started this was a view that was
 // allowlisted, credited, and returning nothing, and no test could see it because every
@@ -568,7 +563,7 @@ ok(/Could not be determined/.test(pageSrc) && /address_points_capped/.test(pageS
 // in how the two loadReport functions CALL it — which is exactly where the miss paths
 // drifted. Every call site in both files has to pass the read depth, or the same miss
 // fingerprints differently on the two surfaces.
-[['lib/nyc-v1-soda.js', soda], ['supabase/functions/get-future-surroundings-report/engine/nyc-v1-soda.js', fnSoda]]
+[['lib/nyc-v1-soda.js', soda], ['supabase/functions/get-future-surroundings-report/allowlist.ts', fnSrc]]
   .forEach(([name, src]) => {
     const calls = src.match(/assembleReport\(\{[\s\S]*?\n( *)\}\)/g) || [];
     ok(calls.length >= 2, '8q ' + name + ' has assembleReport call sites to check', calls.length);
