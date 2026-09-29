@@ -191,4 +191,33 @@ ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied befor
   ok(/n5-generation-publish-part-f\.sql/.test(wf), 'the executable suite runs when Part F changes');
 }
 
+// ── Part G is Part D's D11 function, verbatim — the status/boundary agreement check ──────
+// Fix 3 (2026-09-29): a canonical ZIP's status must be the one its boundary implies, not
+// merely present. canonical_zip_without_status caught the legacy shape (94128 / 95219 / 99128
+// had no row); this catches a boundary-bearing ZIP published as not_measured, and the reverse.
+{
+  const partD = readFileSync('docs/n5-generation-publish-part-d.sql', 'utf8');
+  const partG = readFileSync('docs/n5-generation-publish-part-g.sql', 'utf8');
+  const slice = (t) => {
+    const i = t.indexOf('create or replace function geo.n5_generation_publish_problems(');
+    const end = 'revoke all on function geo.n5_generation_publish_problems(text, text[]) from public;';
+    const j = t.indexOf(end, i);
+    return i < 0 || j < 0 ? '' : t.slice(i, j + end.length);
+  };
+  const d11 = slice(partD);
+  ok(d11.length > 3000, 'Part D carries the completeness function (control)');
+  ok(slice(partG) === d11, 'Part G applies exactly Part D\'s completeness function');
+  ok(/'canonical_zip_without_status'/.test(d11), 'the presence check is still there');
+  ok(/'canonical_zip_status_disagrees_with_boundary'/.test(d11)
+     && /from geo\.zcta_boundary b where b\.zcta5 = r\.zip/.test(d11)
+     && /then 'boundary_complete' else 'not_measured' end\)/.test(d11),
+    'the status must equal what geo.zcta_boundary implies, in BOTH directions');
+  ok(/^begin;$/m.test(partG) && /^commit;$/m.test(partG) && (partG.match(/raise exception 'part G/g) || []).length === 2,
+    'Part G is one transaction, fail-closed before and after');
+  ok(/n5-generation-publish-part-g\.sql/.test(wf), 'the executable suite runs when Part G changes');
+  const prestate = readFileSync('test/n5_generation_pg/fixture_prestate.sql', 'utf8');
+  ok(/create table geo\.zcta_boundary \(/.test(prestate),
+    'the fixture carries geo.zcta_boundary, so the suite runs the check against real rows');
+}
+
 console.log(`n5-generation-publish: ${n} structural checks passed`);

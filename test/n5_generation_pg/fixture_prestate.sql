@@ -214,6 +214,14 @@ create table geo.maps_zip_geography_status (
   completed_at timestamptz, run_id text, note text, cutover boolean not null default false,
   generation_id text);
 
+-- the Census ZCTA polygons as production holds them (TIGER 2025, one row per ZCTA). Part G's
+-- completeness check compares every status row against this table; columns read back 2026-09-29.
+create table geo.zcta_boundary (
+  zcta5 text not null, geom geometry(MultiPolygon,4269) not null,
+  source_vintage text not null, source_url text not null, source_checksum text not null,
+  loaded_at timestamptz not null default now(),
+  constraint zcta_boundary_load_pkey primary key (zcta5));
+
 -- ---------------------------------------------------------------- public inputs
 create table public.canonical_zip_registry (
   zip text not null primary key, gold_master_version text not null, workbook_sha256 text not null,
