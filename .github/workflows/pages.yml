@@ -184,7 +184,7 @@ jobs:
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           test -f _site/zip-pages-manifest.json
-          DOCS=$(find _site/community -mindepth 2 -name index.html | wc -l)
+          DOCS=$(find _site/community -mindepth 2 -maxdepth 2 -name index.html | wc -l)
           echo "generated documents: $DOCS"
           # every generated path is a 5-digit canonical ZIP directory, nothing else
           BAD=$(find _site/community -mindepth 1 -maxdepth 1 -type d \

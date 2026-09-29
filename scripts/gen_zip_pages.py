@@ -336,7 +336,8 @@ def load_dev_plane(path, *, required=True, now=None, cities_out=None, cities_pat
         if raw_projects is None and required:
             sys.exit("ERROR: Rule D plane has no projects section — refusing to silently "
                      "drop every project page")
-        projects_out.update(parse_projects(raw_projects or {}))
+        projects_out.update(parse_projects(raw_projects or {},
+                                           plane_day=str(raw.get("generated_at") or "")[:10]))
     return out
 
 
@@ -420,6 +421,26 @@ PROJECT_KEY_RE = re.compile(r"^(arcgis|socrata|ckan|carto|csv):(.+)\|([0-9]+)$",
 REGISTRY_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PROJECT_PATH_RE = re.compile(r"^/project/[a-z0-9]+(?:-[a-z0-9]+)*/(?:[a-z0-9]+(?:-[a-z0-9]+)*-)?[0-9a-f]{8}/$")
 PROJECT_SLUG_MAX = 60
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# The human name of each source's publisher ("City of Austin"), from the connector registry
+# the engine reads. A source missing from it is shown by its id, never guessed.
+REGISTRY_FILE = os.path.join(os.path.dirname(__file__), "..", "supabase", "functions",
+                             "get-address-report", "jurisdiction-registry.json")
+_SOURCE_NAMES = {}
+
+
+def source_name(registry_id):
+    if not _SOURCE_NAMES:
+        with open(REGISTRY_FILE, encoding="utf-8") as fh:
+            reg = json.load(fh)
+        for k, v in reg.items():
+            if k.startswith("_") or not isinstance(v, list):
+                continue
+            for e in v:
+                if isinstance(e, dict) and e.get("registry_id") and e.get("jurisdiction"):
+                    _SOURCE_NAMES[str(e["registry_id"])] = str(e["jurisdiction"]).strip()
+        _SOURCE_NAMES.setdefault("", "")
+    return _SOURCE_NAMES.get(str(registry_id), "") or str(registry_id)
 
 
 def project_slug(case):
@@ -438,10 +459,16 @@ def project_path(registry_id, case, key):
     return f"/project/{registry_id}/{slug + '-' if slug else ''}{h8}/"
 
 
-def parse_projects(raw_projects):
+def parse_projects(raw_projects, plane_day=""):
     """Validate the projects section. A record that disagrees with its own key, or two keys
     that would share a URL, is a producer defect: the build fails rather than publishing a
-    page nobody can vouch for."""
+    page nobody can vouch for.
+
+    Kept pages (founder, 2026-09-28): a project keeps its page after it leaves the cards.
+    `tracked` is false once it has left HomeSignal's data too; its facts are then the last
+    ones seen, on `as_of`. `as_of` is the day the status was read; `changed_on` the day the
+    page's facts last changed (the sitemap's lastmod). Both default to the plane's own day,
+    so a projects document written before these fields existed builds unchanged."""
     projects, by_path = {}, {}
     for key, r in sorted(raw_projects.items()):
         m = PROJECT_KEY_RE.match(str(key))
@@ -460,6 +487,14 @@ def parse_projects(raw_projects):
         if len(zips) != len(r.get("zips") or []):
             sys.exit(f"ERROR: project {key!r} carries a malformed ZIP")
         day = str(r.get("date") or "")[:10]
+        tracked = r.get("tracked", True)
+        if not isinstance(tracked, bool):
+            sys.exit(f"ERROR: project {key!r} has a non-boolean tracked flag")
+        as_of = str(r.get("as_of") or plane_day)[:10]
+        changed_on = str(r.get("changed_on") or as_of)[:10]
+        for label, v in (("as_of", as_of), ("changed_on", changed_on)):
+            if v and not DAY_RE.match(v):
+                sys.exit(f"ERROR: project {key!r} has a malformed {label} {v!r}")
         path = project_path(reg, case, key)
         if not PROJECT_PATH_RE.match(path):
             sys.exit(f"ERROR: project {key!r} built an unsafe path {path!r}")
@@ -473,14 +508,18 @@ def parse_projects(raw_projects):
             "date": day if re.match(r"^\d{4}-\d{2}-\d{2}$", day) else "",
             "date_kind": str(r.get("date_kind") or "").strip(),
             "held": r.get("held") is True,
+            "address": str(r.get("address") or "").strip(),
+            "tracked": tracked, "as_of": as_of, "changed_on": changed_on,
+            "source": source_name(reg),
         }
     return projects
 
 
 def link_projects(pages, cities, projects):
-    """Point each ZIP and city card at its project page, and prove every project page the
-    producer featured is actually linked from a page this build writes. A held project
-    (the re-key guard carried its previous page) is exempt: its source is being checked."""
+    """Point each ZIP and city card at its project page, list every project page on its ZIP
+    pages' project lists, and prove every project page is linked from a page this build
+    writes. Kept pages (a project that has left the cards) are linked from those lists
+    only, so a page never loses its last inbound link when a newer project takes its card."""
     inbound = set()
     for p in pages.values():
         for it in p.get("dev_entities") or []:
@@ -494,11 +533,17 @@ def link_projects(pages, cities, projects):
             if pr:
                 it["project"] = pr["path"]
                 inbound.add(pr["key"])
+    from_cards = len(inbound)
+    for k, pr in projects.items():
+        for z in pr["zips"]:
+            if z in pages:
+                pages[z].setdefault("project_list", []).append(k)
+                inbound.add(k)
     orphans = [k for k, pr in projects.items() if not pr["held"] and k not in inbound]
     if orphans:
         sys.exit(f"ERROR: {len(orphans)} project page(s) would have no link from any ZIP or city "
                  f"page, e.g. {orphans[:3]} — the plane and its pages disagree")
-    return len(inbound)
+    return from_cards
 
 
 def assemble(d, now_iso):
@@ -778,6 +823,13 @@ def render(p, built):
             f'{len(c["zips"])} ZIP codes</span></li>' for c in cts)
         links += (f'<nav class="zcity" aria-label="City development pages">'
                   f'<h2>City development</h2><ul>{items}</ul></nav>')
+    # Every project page on this ZIP, including ones that have left the cards above. Its
+    # own class: the first `zsec` nav is the one prove-zip-pages-live.mjs reads.
+    npl = len(p.get("project_list") or [])
+    if npl:
+        links += (f'<nav class="zproj" aria-label="Projects on record"><a href="'
+                  f'{project_list_path(z)}">All {npl} project{"s" if npl != 1 else ""} on record '
+                  f'in {esc(z)}</a></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
@@ -996,12 +1048,12 @@ def build_cities(cities, pages, out_dir, built):
     return written
 
 
-def _head(title, desc, canon, og_type="website"):
+def _head(title, desc, canon, og_type="website", robots="index, follow", ld=None):
     return (
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
         '<meta charset="UTF-8">\n<base href="/">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        '<meta name="robots" content="index, follow">\n'
+        f'<meta name="robots" content="{robots}">\n'
         f"<title>{esc(title)}</title>\n"
         f'<meta name="description" content="{esc(desc)}">\n'
         f'<link rel="canonical" href="{esc(canon)}">\n'
@@ -1016,70 +1068,179 @@ def _head(title, desc, canon, og_type="website"):
         '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; '
         "base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; "
         "style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'\">\n"
+        + (_ld_json(ld) if ld else "")
         + APP_CSS_LINK + '</head>\n')
 
 
+def _ld_json(obj):
+    """Structured data for search engines. A JSON data block is never executed, so the
+    page still ships no script (CSP script-src 'none' stays). '<' is escaped so no value
+    can close the element."""
+    body = json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    body = body.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return f'<script type="application/ld+json">{body}</script>\n'
+
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def human_day(day):
+    """2026-09-28 -> Sep 28, 2026. Anything else is returned unchanged."""
+    if not DAY_RE.match(str(day or "")):
+        return str(day or "")
+    y, m, d = day.split("-")
+    return f"{MONTHS[int(m) - 1]} {int(d)}, {y}"
+
+
+def project_list_path(z):
+    return f"/community/{z}/projects/"
+
+
 def render_project(pr, pages, built):
-    """One project page. Static HTML, no scripts. Everything it states is in the plane: the
-    source's own name, record number, date and status, labelled by lib/project-type.js, and
-    the official record it came from. Location is the ZIP pages the project is on."""
+    """One project page. Static HTML; its only script element is inert structured data.
+    Everything it states is in the plane: the source's own name, address, record number,
+    date and status, labelled by lib/project-type.js, and the official record it came from.
+    Location is the ZIP pages the project is on. `as_of` is the day the status was read;
+    a project HomeSignal no longer tracks says so, and shows the last status it had."""
     zips = [z for z in pr["zips"] if z in pages]
     first = pages[zips[0]]
     where = f"{first['name']}, {first['state']}" if first.get("state") else first["name"]
     kind = pr["type"] or "Development project"
-    title = f"{pr['title']} — {kind}, {where} | HomeSignal"
+    year = pr["date"][:4] if pr["date"] else ""
+    addr = pr["address"]
+    named = pr["title"]
+    if addr and addr.lower() not in named.lower():
+        named = f"{named}, {addr}"
+    title = f"{named} — {kind} in {where}" + (f" ({year})" if year else "") + " | HomeSignal"
     when = f" Date on record: {pr['date']}" + (f" ({pr['date_kind']})" if pr["date_kind"] else "") \
         + "." if pr["date"] else ""
-    desc = (f"{pr['title']}: {kind.lower()} on the official record in {where}, "
-            f"{pr['lifecycle'].lower()}.{when} Linked to its source record.")
+    at = f" at {addr}" if addr else ""
+    status_word = "last recorded as" if not pr["tracked"] else ""
+    desc = (f"{pr['title']}: {kind.lower()}{at} in {where}, "
+            f"{(status_word + ' ') if status_word else ''}{pr['lifecycle'].lower()}.{when} "
+            f"Linked to its source record.")
     canon = f"{BASE}{pr['path']}"
+    as_of = human_day(pr["as_of"])
+    as_of_el = (f'<time datetime="{esc(pr["as_of"])}">{esc(as_of)}</time>' if pr["as_of"] else "")
     facts = []
+    if addr:
+        facts.append(("Address", esc(addr)))
     if pr["type"]:
         facts.append(("Type", esc(pr["type"])))
-    facts.append(("Where it stands", esc(pr["lifecycle"])))
+    facts.append(("Where it stands" if pr["tracked"] else "Last recorded status",
+                  esc(pr["lifecycle"])))
+    if as_of_el:
+        facts.append(("Status as of" if pr["tracked"] else "Last seen", as_of_el))
     if pr["date"]:
         d = f'<time datetime="{esc(pr["date"])}">{esc(pr["date"])}</time>'
         if pr["date_kind"]:
             d += f' <span class="quiet">({esc(pr["date_kind"])})</span>'
         facts.append(("Date on record", d))
     facts.append(("Record number", esc(pr["case"])))
-    facts.append(("Source", esc(pr["registry_id"])))
+    src_id = (f' <span class="quiet">({esc(pr["registry_id"])})</span>'
+              if pr["source"] != pr["registry_id"] else "")
+    facts.append(("Source", esc(pr["source"]) + src_id))
     facts.append(("Official record",
                   f'<a href="{esc(pr["url"])}" rel="nofollow noopener">View the source record</a>'))
     dl = "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts)
     zli = "".join(f'<li><a href="/community/{esc(z)}/">{esc(pages[z]["name"])}</a></li>'
                   for z in zips)
-    seen, cli = set(), []
+    seen, cli, city_crumb = set(), [], None
     for z in zips:
         for c in pages[z].get("cities") or []:
             if c["key"] in seen:
                 continue
             seen.add(c["key"])
+            if city_crumb is None:
+                city_crumb = (f'{c["place"]}, {c["state"]}', city_path(c))
             cli.append(f'<a href="{city_path(c)}">Development across '
                        f'{esc(c["place"])}, {esc(c["state"])}</a>')
     city_nav = (f'<nav class="zcity" aria-label="City development">{" · ".join(cli)}</nav>'
                 if cli else "")
+    # Home > City > ZIP > Project, the same path the page's own links follow.
+    crumbs = [("HomeSignal", "/")]
+    if city_crumb:
+        crumbs.append(city_crumb)
+    crumbs.append((first["name"], f"/community/{zips[0]}/"))
+    crumbs.append((pr["title"], pr["path"]))
+    ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
+          "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
+                               "item": f"{BASE}{u}"} for i, (n, u) in enumerate(crumbs)]}
+    crumb_nav = ('<nav class="zcrumb" aria-label="Breadcrumb">'
+                 + " › ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in crumbs[:-1])
+                 + '</nav>')
+    status_line = f'<p>{esc(kind)} · {esc(pr["lifecycle"])}' + (
+        f' <span class="quiet">as of {as_of_el}</span>' if (as_of_el and pr["tracked"]) else "") + '</p>'
+    notice = ""
+    if not pr["tracked"]:
+        # Inline style: app.css is shared and frozen ("do not restyle"); the page CSP allows
+        # inline styles. The notice must read as a status change, not as body text.
+        notice = (f'<p class="notice" role="note" style="border-left:4px solid #b45309;'
+                  f'background:#fff7ed;padding:12px 14px;margin:14px 0">'
+                  f'HomeSignal no longer tracks this project. '
+                  f'Its last recorded status was <strong>{esc(pr["lifecycle"])}</strong>'
+                  + (f', as of {as_of_el}' if as_of_el else "")
+                  + f'. <a href="{esc(pr["url"])}" rel="nofollow noopener">Check the official '
+                    f'record</a> for its current status.</p>')
+    src = esc(pr["source"])
+    footer = (f'Status as of {as_of_el}, from {src}\'s public records. ' if pr["tracked"] and as_of_el
+              else f'Last seen in {src}\'s public records on {as_of_el}. ' if as_of_el else "")
     body = (
-        f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · '
+        f'<main id="hs-ssr">{crumb_nav}<header><p class="eyebrow"><a href="/">HomeSignal</a> · '
         f'Development project</p>'
         f'<h1>{esc(pr["title"])}</h1>'
-        f'<p>{esc(kind)} · {esc(pr["lifecycle"])}</p></header>'
-        f'<section class="zsec"><h2>On the record</h2><dl>{dl}</dl></section>'
+        + (f'<p class="addr">{esc(addr)}, {esc(where)}</p>' if addr else "")
+        + status_line + '</header>'
+        + notice
+        + f'<section class="zsec"><h2>On the record</h2><dl>{dl}</dl></section>'
         f'<section class="zsec"><h2>Where it is</h2>'
         f'<p>On the HomeSignal page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
         f'<ul>{zli}</ul>'
         f'<p><a href="/homesignalmap.html?zip={esc(zips[0])}">See it on the Development map</a></p>'
         f'</section>'
         + city_nav
-        + f'<p class="quiet">Compiled from official public records on '
-          f'<time datetime="{esc(built)}">{esc(built)}</time>. The name, record number, date '
+        + f'<p class="quiet">{footer}The name, address, record number, date '
           f'and status are the source\'s own; nothing on this page is generated or inferred.</p>'
         + '<nav class="zsec"><a href="/">HomeSignal home</a> · '
           '<a href="/how-it-works.html">How HomeSignal works</a> · '
           f'<a href="{GUIDE_CHECK}">How to check proposed development near a house</a></nav>'
         + '</main>')
-    return (_head(title, desc, canon, og_type="article")
+    return (_head(title, desc, canon, og_type="article", ld=ld)
             + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+
+
+def render_project_list(z, keys, projects, pages):
+    """Every project page on one ZIP, newest first. It exists so a project that has left
+    the ZIP page's cards keeps a link; it is a list, not content, so it is not indexed
+    (noindex, follow) and is not in any sitemap."""
+    p = pages[z]
+    label = f"{p['name']}, {p['state']}" if p.get("state") else p["name"]
+    rows = sorted((projects[k] for k in keys), key=lambda pr: (pr["date"], pr["key"]), reverse=True)
+    li = []
+    for pr in rows:
+        bits = [x for x in (pr["type"], pr["lifecycle"]) if x]
+        inner = f'<a href="{esc(pr["path"])}">{esc(pr["title"])}</a>'
+        if pr["address"]:
+            inner += f' <span class="addr">{esc(pr["address"])}</span>'
+        if bits:
+            inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
+        if pr["date"]:
+            inner += f' <time datetime="{esc(pr["date"])}">{esc(pr["date"])}</time>'
+        if not pr["tracked"]:
+            inner += ' <span class="quiet">(no longer tracked)</span>'
+        li.append(f"<li>{inner}</li>")
+    title = f"Development projects on record in {z} · {label} | HomeSignal"
+    desc = (f"Every development project HomeSignal has a page for in ZIP {z} ({label}), "
+            f"newest first, each linked to its official record.")
+    body = (f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · '
+            f'<a href="/community/{esc(z)}/">{esc(z)}</a></p>'
+            f'<h1>Development projects on record in {esc(z)} · {esc(label)}</h1>'
+            f'<p>{len(rows)} project{"s" if len(rows) != 1 else ""}, newest first.</p></header>'
+            f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
+            f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
+            f'<a href="/">HomeSignal home</a></nav></main>')
+    return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="noindex, follow")
+            + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
 
 def build_projects(projects, pages, out_dir, built):
@@ -1096,6 +1257,15 @@ def build_projects(projects, pages, out_dir, built):
         h = render_project(pr, pages, built).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
+        nbytes += len(h)
+    for z in sorted(pages):
+        keys = pages[z].get("project_list")
+        if not keys:
+            continue
+        d = os.path.join(out_dir, *project_list_path(z).strip("/").split("/"))
+        os.makedirs(d, exist_ok=True)
+        h = render_project_list(z, keys, projects, pages).encode("utf-8")
+        open(os.path.join(d, "index.html"), "wb").write(h)
         nbytes += len(h)
     return written, nbytes
 
@@ -1269,12 +1439,19 @@ SITEMAP_DEV_RE = re.compile(
     r"[ \t]*<url>\s*<loc>[^<]*homesignalmap\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
 
 
-def _url_el(loc):
-    return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n"
+def _url_el(loc, lastmod=None):
+    """lastmod is the day the page's facts last changed, never the build day: a lastmod
+    that moves every day tells Google nothing, and it learns to ignore it."""
+    lm = f"    <lastmod>{lastmod}</lastmod>\n" if lastmod and DAY_RE.match(lastmod) else ""
+    return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n{lm}"
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
 
-def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=()):
+SITEMAP_MAX_URLS = 50000        # the sitemaps.org limit for one file
+
+
+def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=(),
+                      lastmod=None):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -1321,7 +1498,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     # one is indexable.
     pps = sorted(project_paths)
     if pps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}") for pp in pps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", (lastmod or {}).get(pp)) for pp in pps)
     gps = sorted(guide_paths)
     if gps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{gp}") for gp in gps)
@@ -1379,15 +1556,18 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide")
 
 
-def write_family_sitemaps(out_dir, families):
+def write_family_sitemaps(out_dir, families, lastmod=None):
     d = os.path.join(out_dir, "sitemaps")
     os.makedirs(d, exist_ok=True)
     counts = {}
     for name in SITEMAP_FAMILIES:
         paths = sorted(families.get(name) or [])
+        if len(paths) > SITEMAP_MAX_URLS:
+            sys.exit(f"ERROR: sitemaps/{name}.xml would list {len(paths)} URLs, over the "
+                     f"{SITEMAP_MAX_URLS} limit for one file — split it before publishing")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-                + "".join(_url_el(f"{BASE}{p}") + "\n" for p in paths)
+                + "".join(_url_el(f"{BASE}{p}", (lastmod or {}).get(p)) + "\n" for p in paths)
                 + "</urlset>\n")
         open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(body)
         counts[name] = len(paths)
@@ -1507,11 +1687,14 @@ def main():
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10])
     project_paths = sorted(pr["path"] for pr in projects.values())
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10])
-    sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths)
+    project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
+    sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
+                           lastmod=project_lastmod)
     fam = write_family_sitemaps(a.out, {
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
-        "city": city_paths, "project": project_paths, "guide": guide_paths})
+        "city": city_paths, "project": project_paths, "guide": guide_paths},
+        lastmod=project_lastmod)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
@@ -1520,7 +1703,9 @@ def main():
     print(f"indexable      : {len(indexable)} (Rule F OR Rule D)")
     print(f"city pages     : {ncity}")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
-          f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card)")
+          f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
+          f"{sum(1 for p in projects.values() if not p['tracked'])} no longer tracked; "
+          f"{sum(1 for p in pages.values() if p.get('project_list'))} ZIP project lists)")
     print(f"artifact bytes : {stats['bytes']} ({stats['bytes']/1048576:.1f} MB)")
     print(f"avg html bytes : {stats['avg']}")
     print(f"max html bytes : {stats['max']} (zip {stats['max_zip']})")
