@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records Order C as applied (Order C merged as #1461).
+Last updated: 2026-09-30, in the PR that adds the Order D baseline driver.
 
 ## Master steps (plan "Master Step Plan")
 
@@ -50,8 +50,11 @@ Last updated: 2026-09-30, in the PR that records Order C as applied (Order C mer
   `20260929172018`). `docs/dev-change-ledger.sql` + `docs/development-activity-change-layer-2026-09-30.md`;
   33 SQL checks with 21 prohibited mutations all killed (Postgres 16 local, 17 in CI), 29 structural
   pins. Production receipt: design doc §8.
-- D. National change baseline — **next.** Batch driver + per-ZIP cursor, source-health/freshness
-  state, and the baseline run over the 12,722 ZIPs. Depends on C being applied.
+- D. National change baseline — **in progress.** Driver, per-ZIP cursor with a capacity gate, and the
+  per-source evidence view are built and proven in `docs/dev-change-baseline.sql`
+  (`docs/development-activity-change-baseline-2026-09-30.md`); not struck until it is merged, applied,
+  and the baseline run over the 12,722 ZIPs has completed. The run needs the operator's verified
+  free-disk figure (decision 7 below); health labels need the workbook's thresholds (decision 8).
 - ~~E. Change-detection tests~~ — **done with C** (all 11 cases, `test/dev_change_ledger_pg/`; map in
   the design doc §4). One case is proven only in part, and stays so until sources supply proven
   identifiers: linked source rows of one project are proven for ZIP copies of a record, not for
@@ -106,3 +109,11 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    existing surfaces, so it is not made without a go.
 5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
+7. **Free disk for the national baseline.** The database is 17 GB; the baseline adds an estimated
+   ~2 GB live plus write churn. The driver refuses to run without the provider's verified free-disk
+   figure (≥ 2,048 MB + the ledger budget). Only the founder can read that figure from the dashboard.
+8. **Source-health labels.** The workbook names HEALTHY / STALE / ERROR / VERIFIED ZERO / UNKNOWN /
+   N/A / PAUSED; its thresholds are not in the repository and are not invented. The view exposes the
+   evidence; a report cannot call a source healthy or stale until the rule is supplied.
+9. **A recurring observation job.** Without one the ledger never detects a change after the baseline.
+   Arming a `pg_cron` job is a new scheduled job and waits for a go.
