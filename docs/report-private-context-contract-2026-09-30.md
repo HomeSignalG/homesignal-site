@@ -155,7 +155,9 @@ writer, so that is the current state; this document is the checklist for turning
    permit site, the record's own address is legitimately in the body and the trigger will refuse it (fail closed). The
    writer needs an allow-list of record addresses before such a report can be stored.
 4. **Test the boundary on the engine's own output:** assemble reports for subject addresses that are not project sites
-   and assert the body contains none of the private values and none of the subject-relative keys.
+   and assert the body contains none of the private values, **no fragment of the address** (house number with street
+   name, the street line alone), and none of the subject-relative keys. The database backstop matches whole values only
+   (§9).
 5. Make Changes Since Report read the body and `dev_change_event_reportable` only.
 6. Not store a real customer report until §6 is closed.
 
@@ -164,6 +166,10 @@ writer, so that is the current state; this document is the checklist for turning
 - The containment trigger matches **values it was given**. It cannot catch a paraphrase, a value the engine did not
   put in the private context, or a number derived from the private point (§2) — `report_snapshot_pg` X07 pins that
   last one on purpose. The primary control is structural (two objects, one hand-off), not the scan.
+- It matches **whole values**. A body that carries only a **fragment** of the address — the street line without the city
+  and ZIP the context holds — is accepted (`report_snapshot_pg` X07b; found on the production probe, §12). Order G's
+  engine must not emit any part of the subject address, and its boundary test (§8.4) has to look for fragments, not only
+  whole values.
 - Comparison ignores case, runs of whitespace, commas and periods; it does not expand "St" to "Street".
 - A value shorter than three characters, and a coordinate with fewer than five decimals, are not scanned.
 - A subject that is itself a public record's address is refused (fail closed), §8.3.
@@ -176,7 +182,7 @@ writer, so that is the current state; this document is the checklist for turning
 
 - `test/report_private_context_pg` — 52 checks, applies twice with an identical definition, **51 prohibited mutations,
   all killed by a named check, none by a suite crash**.
-- `test/report_snapshot_pg` — 65 checks; applies twice; **upgrades the exact Order F table that is live in production**
+- `test/report_snapshot_pg` — 66 checks; applies twice; **upgrades the exact Order F table that is live in production**
   (`f1_applied.sql`, md5 `545d7d94…`) to a shape identical to a fresh install, and **refuses, changing nothing, when a
   report is stored**; **54 prohibited mutations, all killed by a named check**.
 - `test/report-snapshot.test.mjs` — 38 checks on the module against a stand-in database; `test/report_snapshot_module_mutants.py`
@@ -190,3 +196,83 @@ writer, so that is the current state; this document is the checklist for turning
 Order matters: **`docs/report-private-context.sql` first, then `docs/report-snapshot.sql`** (its foreign key points at
 the first). The snapshot file fails closed unless `report_snapshot` is empty (it was, at 0 rows, when this was
 written). Both are idempotent. Rollback of the snapshot file first, then the private file (footers of both).
+
+## 12. Production receipt (2026-09-29 22:22–22:23Z, founder-directed schema change on an empty table)
+
+Merged as #1480 (`023b4bf`). Applied with `apply_migration` from the committed files, in the order above.
+
+| step | migration name | ledger version | stored text |
+|---|---|---|---|
+| 1 | `report_private_context_f2a_20260930` | `20260929222229` | md5 `4ff525069649fd2595e8cbdc8e38b39d`, 25,562 bytes — equal to `docs/report-private-context.sql` |
+| 2 | `report_snapshot_f2b_20260930` | `20260929222315` | md5 `6c109fa158539e64f4c7015f251c8826`, 17,383 bytes — equal to `docs/report-snapshot.sql` |
+
+**Before:** `report_snapshot` 0 rows, Order F shape (`inputs`, `property_key`, the five-argument writer), no private
+objects. The upgrade refuses unless the table is empty, and it was.
+
+**Read back after the apply (`execute_sql`, not the apply's own success message):**
+- `report_snapshot` has exactly eight columns — `report_id, content_hash, report_version, generated_at, private_context_id,
+  engine_inputs, body, body_bytes`. `inputs` and `property_key` are gone.
+- The foreign key is `FOREIGN KEY (private_context_id) REFERENCES report_private_context(context_id)`, with no cascade.
+- Row level security is on for all four tables. `anon`/`authenticated`/`public` hold **0** table grants and **0**
+  function grants on any of them. `service_role` holds SELECT on the snapshot, need and event tables and **nothing** on
+  the private table (`{postgres=arwdDxtm/postgres}`).
+- All 15 `report_private_context_*` and `report_snapshot_*` functions are executable by `postgres` and `service_role`
+  only. The eight that carry logic (seven in the private layer, plus the snapshot writer) are `SECURITY DEFINER` with
+  `search_path=public, pg_temp`; the other seven are trigger and helper functions. One `report_snapshot_issue` exists,
+  `(text,text,text,jsonb,jsonb)`; the Order F writer is gone.
+- Triggers: three on `report_snapshot` (no update/delete, no truncate, containment), two each on the need and event
+  tables, one on the private table (no delete or reopen — deliberately no truncate trigger, see the SQL comment).
+- After everything below: 0 rows in all four tables, no pg_cron job mentions `report_private_context`, and the retention
+  check reads `contexts_total=0` with all six invariants and the lag row at 0. The migration ledger went 618 → 620.
+
+**Behaviour probe on production, rolled back** (a `DO` block that always raises at the end, so nothing is kept; the
+synthetic address "1 Probe Test Lane, Nowhereville" is not a real property). Everything below happened inside it:
+
+- Issue with a private context: a `report_id` and a `private_context_id` were returned, one `report` need opened whose
+  reference is that `report_id`, the private values were readable through `report_private_context_read`, and the stored
+  body and engine inputs held none of them.
+- The boundary refused (SQLSTATE `23514`) an address in the body, the same address in different case and spacing, the
+  **full** address in `engine_inputs`, a full-precision coordinate, a property key and the label. The message named the
+  field and never the value. An unknown field (a client name) was refused by the private layer (`22023`). **The
+  refusals left nothing behind:** 0 extra contexts, 0 extra snapshots.
+- Retention: a purge while a need was open and a purge before the clock ran out were both refused (`55000`); closing the
+  last need put `purge_due_at` exactly 90 days after `last_needed_at`; opening a Follow need cleared the clock and closing
+  it started it again; the batch purged an expired context (`retention_expired` — the expiry was simulated by moving
+  `purge_due_at` a minute into the past inside the rolled-back transaction, since 90 days cannot be waited out); a
+  `verified_privacy_request` purge
+  worked at once with a need still open; a second purge returned `false` and wrote no second event; a purged context
+  could not be reopened (`55000`).
+- After both purges, every private value was null, the read returned the state and nothing else, and **both stored
+  snapshots were byte-identical** (row md5 before = after) with their foreign keys still resolving.
+- Update or delete of a snapshot, delete of a context, update of a purged context, update of an event and delete of
+  a need were each refused (`P0001`). The audit trail for the expired context read `created, need_opened:report,
+  need_closed:report, grace_started, need_opened:follow, grace_cleared, need_closed:follow, grace_started,
+  purged:retention_expired`.
+
+**What the probe found, and what I got wrong doing it:**
+- Its **first** complete run reported one case not refused: a `engine_inputs` value containing "1 probe test lane".
+  That was my test input — it left out the city the private address holds, so it was a **fragment**, not the value. The
+  database matches whole values (§9), so accepting it is consistent with the documented limit; but the limit did not say
+  "fragment", and the suite did not pin it. Both are fixed here: §9 and §8.4 say it, and `report_snapshot_pg` X07b pins
+  it (the suite is now 66 checks, 54 of 54 mutations still killed). I re-ran the probe with the full address in
+  `engine_inputs` and it was refused (`23514`).
+- The same first run also read `fk_still_resolves: false` and `open_needs_after_purge: 1`. Both were the leaked extra
+  snapshot from that one non-refusal (3 snapshots against my assertion of 2; one open `report` need on its context), not
+  a separate defect. The second run, with the input corrected, read `true` and `0`.
+- Three probe runs happened, not one: the first aborted on a clash between one of my variable names and a column name
+  before it reached any check; the second is the one that found the fragment; the third is clean. All three rolled back.
+- Side effect that does not roll back: the identity sequence behind `report_private_context_event.event_id` advanced
+  (sequences are not transactional), so the first real event will not be number 1. Nothing references those numbers.
+
+**What CI found on the receipt PR (#1481), and the fix:** the `snapshot` check went red on the first run although both
+suites read "0 failed" (52 and 66 checks). The mutation loop printed the first four failures of each killed mutation as
+`grep | sed | cut | head -4` under `set -o pipefail`; when a mutation failed 34 checks, `head` exited while `cut` was still
+writing, `cut` died with "Broken pipe" and the script ended. It is a race, which is why #1480's run passed: replayed
+in isolation the old form exited non-zero on **80 of 1,500** runs and the form that reads to the end (`sed -n '1,4p'`)
+on **0 of 1,500**. Fixed in both harnesses (`report_snapshot_pg/run.sh`, `report_private_context_pg/run.sh`); nothing
+about what is checked changed (52 + 66 checks, 51 + 54 = 105 mutations, all killed, 0 survived). The same
+`| head -4` line exists in other suites' harnesses that belong to other work; they are not touched here.
+
+**Not done, on purpose** (each needs its own go): the purge batch is not scheduled; the overdue-purge lag is not a
+pipeline-monitor check; nothing calls the writer; the owner column, and what closes a `report` need, belong to Orders J
+and L; backups are outside this unit (§9).

@@ -84,7 +84,9 @@ insert into _k values
   ('leak_lat',   $b${"property":{"lat":40.712980288068},"nearby":[]}$b$, '8ac335f06606c7020e9ae00f4f97f7ddada53a1a97288155e0ea2e159b14bf45'),
   ('leak_lng',   $b${"property":{"lng":-74.003758107366},"nearby":[]}$b$, '8f432ddbfb66d5c811bc4e2dd7a62b5a03e8788281dc259522bf0d4ad564c77b'),
   -- subject-relative offsets: with the records' own coordinates they recover the property exactly, and the database cannot see them
-  ('derived',    $b${"product":"HomeSignal Development Activity","nearby":[{"lat":40.7132,"lng":-74.0039,"distance_mi":0.05,"east_mi":0.03,"north_mi":0.04}]}$b$, '2e52574a7bc86fb51ea68219b64240ce3a7620a036f092278557df0aefbb80c6');
+  ('derived',    $b${"product":"HomeSignal Development Activity","nearby":[{"lat":40.7132,"lng":-74.0039,"distance_mi":0.05,"east_mi":0.03,"north_mi":0.04}]}$b$, '2e52574a7bc86fb51ea68219b64240ce3a7620a036f092278557df0aefbb80c6'),
+  -- the street line alone: a FRAGMENT of the address, not a value the private context holds
+  ('partial',    $b${"buyer":{"street":"1 Centre Street"},"nearby":[]}$b$, '7cfca62e54ce87e76888b90bb380220ac8dfc0e2cd9feeaf346c0a7f88fb305a');
 
 -- the private contexts the customer would have entered
 create temp table _pv (name text primary key, j jsonb);
@@ -280,6 +282,9 @@ select pg_temp._ck('X06b a private value shorter than 3 characters (here the lab
 select pg_temp._ck('X07 KNOWN LIMIT, pinned on purpose: offsets measured FROM the property (distance_mi, east_mi, north_mi) are derived from the private point and, with each record''s own coordinates, recover it exactly — and the database CANNOT see them. It accepts such a body; the shared module refuses those keys before the database is called, and the engine must never emit them. If this check starts failing, the backstop got better: update it deliberately.',
   pg_temp._issue(pg_temp._b('derived'), pg_temp._h('derived'), 'engine-v1', '{"zip":"10007"}', pg_temp._p('p0')) = 'ok',
   null);
+select pg_temp._ck('X07b KNOWN LIMIT, pinned on purpose (found on the production probe, 2026-09-30): the database matches WHOLE private values. A body carrying only a FRAGMENT of the address — the street line "1 Centre Street" without the city and ZIP the context holds — is accepted. The engine must never emit any part of the subject address; Order G''s boundary test has to look for fragments, not only whole values. If this check starts failing, the backstop got better: update it deliberately.',
+  pg_temp._issue(pg_temp._b('partial'), pg_temp._h('partial'), 'engine-v1', '{"zip":"10007"}', pg_temp._p('addr')) = 'ok',
+  pg_temp._issue(pg_temp._b('partial'), pg_temp._h('partial'), 'engine-v1', '{"zip":"10007"}', pg_temp._p('addr')));
 select pg_temp._ck('X08 the private argument goes through the private layer''s own validation before anything is stored: an array, an empty object, and a client name / email / phone are all refused, and nothing is stored',
   pg_temp._issue(pg_temp._b('clean'), pg_temp._h('clean'), 'engine-v1', '{"zip":"10007"}', '[]') = '22023'
   and pg_temp._issue(pg_temp._b('clean'), pg_temp._h('clean'), 'engine-v1', '{"zip":"10007"}', '{}') = '23514'

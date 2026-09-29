@@ -64,7 +64,7 @@ separate, deletable private context; the snapshot references it by an opaque id.
 
 ## 4. Proof
 
-See `docs/report-private-context-contract-2026-09-30.md` §10 for the full inventory. In short: 65 database checks on
+See `docs/report-private-context-contract-2026-09-30.md` §10 for the full inventory. In short: 66 database checks on
 the snapshot and 52 on the private layer (hashes computed outside the database), both applying twice with an identical
 definition, **105 prohibited mutations all killed by a named check**; the upgrade of the exact Order F table that is
 live in production, and its refusal when a report is stored; 38 module checks and 23 module mutations; 87 structural
