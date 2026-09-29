@@ -40,6 +40,37 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
+
+**Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
+boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`.
+
+- **Why they were omitted:** each is the ONLY canonical ZIP in its ZIP3 prefix (941, 952, 991).
+  The legacy generation's writer (`scripts/n5_unit_a_shadow.py`, retired) built only prefixes
+  that had a phase-1 shard (`select_prefixes()` reads `n5_shard where state='done'`), and wrote
+  `boundary_complete` only for the boundaries it loaded. None of the three prefixes had a phase-1
+  shard, and the separate `not_measured` backfill covered only ZIPs with no boundary. So nothing
+  wrote them: legacy = 12,013 + 706 = **12,719** of 12,722.
+- **The presence half was already repaired** by the generation path (#1336 / #1350): scope =
+  shard prefixes ∪ every canonical prefix, and READY / ACTIVATE refuse on
+  `canonical_zip_without_status`. Both national generations carry 12,722 rows.
+- **Serving since 2026-09-27 15:00Z**, re-measured 2026-09-29 on `n5-national-2026-09-27`:
+  94128 `boundary_complete` 0 · 95219 `boundary_complete` 0 · 99128 `boundary_complete` 1.
+  `app_zip_geography_state`: 12,016 authoritative + 706 not_measured + **0 pending**.
+- **Correct, not just present:** membership was recomputed from the generation's candidate
+  geometry and matches on all three. 94128's 32 source-stated projects all lie 1.0-13.6 km outside
+  its polygon; 95219's one point inside is an unresolved `GEOMETRY_INVALID` record, correctly
+  withheld; 99128's member is a WSDOT line that crosses the polygon.
+- **What this change adds (Part G):** READY / ACTIVATE now also refuse a status that disagrees
+  with `geo.zcta_boundary` (`canonical_zip_status_disagrees_with_boundary`). The publisher labels a
+  ZIP from the TIGER file the loader downloads, so a skipped shape would have published a
+  boundary-bearing ZIP as `not_measured` and passed every existing check. Measured before
+  applying: 0 disagreements in every generation.
+- **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
+  failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
+  only live members of that state. It now asserts the three resolve to a measured state, and
+  exercises the pending contract by handing the live page the producer's exact `unknown` answer.
+
 ### 2026-09-28 — 🔴 FINDING (RECORDED, NOT FIXED): the BIS `recency_expr` admits permits back to 1989 — 89.6% of what it returns is not recent
 
 **This is a finding, not authorised work.** Per Rule 16 it is filed as its own item rather
@@ -387,7 +418,8 @@ does not substitute centroid proximity for membership.
   · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
   change · no Fix 30/31 work.
 - 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
-  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
+  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128 — ✅ closed by FIX 3, 2026-09-29,
+  entry at the top of the resume point); page-eligibility for the 21
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.

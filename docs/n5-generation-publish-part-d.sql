@@ -729,6 +729,19 @@ as $$
              where not exists (select 1 from geo.maps_zip_geography_status st
                                 where st.generation_id = p_generation_id and st.zip = r.zip))
     union all
+    -- A status row that EXISTS can still be the wrong one. The publisher writes
+    -- boundary_complete only where the loader made a polygon resident, so a shape the loader
+    -- skipped would publish a ZIP that HAS a boundary as not_measured, and the presence check
+    -- above would pass. geo.zcta_boundary is the same pinned TIGER 2025 ZCTA file (33,791
+    -- polygons), read from a different carrier. Part G, 2026-09-29.
+    select 'canonical_zip_status_disagrees_with_boundary',
+           (select count(*) from public.canonical_zip_registry r
+              join geo.maps_zip_geography_status st
+                on st.generation_id = p_generation_id and st.zip = r.zip
+             where st.status is distinct from
+                   case when exists (select 1 from geo.zcta_boundary b where b.zcta5 = r.zip)
+                        then 'boundary_complete' else 'not_measured' end)
+    union all
     select 'boundary_scratch_residue',
            (select count(*) from geo.n5_gen_zcta z where z.generation_id = p_generation_id)
     union all

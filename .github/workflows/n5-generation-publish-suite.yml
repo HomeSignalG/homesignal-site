@@ -21,6 +21,7 @@ on:
       - 'docs/n5-generation-publish.sql'
       - 'docs/n5-generation-publish-part-d.sql'
       - 'docs/n5-generation-publish-part-f.sql'
+      - 'docs/n5-generation-publish-part-g.sql'
       - 'docs/map1-zip-read-char5.sql'
       - 'docs/map1-zip-read-char5.rollback.sql'
       - 'test/n5_generation_pg/**'
@@ -120,6 +121,10 @@ jobs:
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
         run: node test/n5-generation-publish.test.mjs
+
+      - name: Part G is exactly what its generator writes from Part D (no hand edits)
+        if: always()
+        run: python3 test/n5_generation_pg/build_part_g.py --check
 
       - name: Publish the receipt
         if: always()
