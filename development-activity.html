@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- PRE-LAUNCH. noindex while the plan's launch blockers are open (100126 plan, section 25):
-     the free-evaluation entitlement and the $79/month checkout do not exist yet. Remove this
-     tag, add the page to scripts/stage_site.py's allowlist and to sitemap STATIC only when those
-     ship. Until then the page is repo-only: stage_site.py is an allowlist, so it is not deployed. -->
+<!-- DEPLOYED DARK (founder, 2026-09-29: "deploy"). The page is served at this URL but is noindex,
+     linked from nowhere in the site, and absent from the sitemap, because the plan's launch blockers
+     are still open (100126 plan, section 25): the free-evaluation entitlement and the $79/month
+     checkout do not exist yet, so the commerce buttons are inert. To LAUNCH: make those buttons
+     live, remove this noindex tag, add the page to sitemap STATIC (scripts/gen_sitemap.py) and link
+     it. test/development-activity-landing.test.mjs fails if any of that is done out of order. -->
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://homesignal.net/development-activity.html">
 <title>HomeSignal — Development Activity</title>
