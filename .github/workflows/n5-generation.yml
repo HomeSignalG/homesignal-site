@@ -9,12 +9,14 @@
 # records its unresolved outcomes. Everything it writes belongs to the BUILDING generation,
 # which Map 1 never reads; the database refuses writes to any other generation.
 #
-# ⛔ IT CANNOT ACTIVATE A GENERATION. `activate` is manual-dispatch only and even then the
-# decision belongs to geo.n5_generation_activate(), which re-derives every condition and
-# raises. A green run of this workflow means work advanced — never that production moved.
-#
-# The scheduled job runs MODE=work only. With no BUILDING generation it is a clean no-op,
-# so the schedule costs one short job and reports honestly rather than red.
+# AUTO LIFECYCLE (founder instruction 2026-09-29: "swap automatically once checks pass").
+# A scheduled tick, or a dispatch with auto=1, runs MODE=work with AUTO_LIFECYCLE=1: it opens
+# the next national generation when none is building (at most one per 20 h, only with a whole
+# build's disk above the floor) and, once a build is complete, calls READY then ACTIVATE.
+# Both decisions belong to geo.n5_generation_mark_ready() / geo.n5_generation_activate(),
+# which re-derive every condition and raise on any gap — a refusal turns the tick red and
+# the generation stays where it is. The database's pg_cron also dispatches this workflow
+# hourly with auto=1, because GitHub's own schedule drops ticks on this repo.
 name: n5-generation
 
 on:
@@ -49,6 +51,10 @@ on:
         description: 'rollback / fail: why (required for those modes)'
         required: false
         default: ''
+      auto:
+        description: '1 = work tick also opens the next build and runs READY/activate when complete'
+        required: false
+        default: ''
 
 concurrency:
   # ONE orchestrator at a time. This is belt-and-braces, not the control: geo.n5_claim_shard
@@ -79,12 +85,14 @@ jobs:
           MAX_SHARDS: ${{ github.event.inputs.max_shards || '200' }}
           CHUNKS: ${{ github.event.inputs.chunks }}
           REASON: ${{ github.event.inputs.reason }}
+          AUTO_LIFECYCLE: ${{ github.event_name == 'schedule' && '1' || github.event.inputs.auto || '' }}
           MAX_SECONDS: '3000'
-          # PROVISIONED disk, verified from the Supabase dashboard 2026-09-25 after the resize
-          # to 24 GB (binary: the dashboard shows pg_database_size 11,612 MB as 11.35 GB), minus
-          # the 206 MB System share the free-disk formula does not subtract. Without this the
-          # scripts' 11,607 MB default yields a NEGATIVE free figure and every shard halts
-          # DISK_FLOOR. The 2,048 MB floor (DISK_FLOOR_MB) is unchanged. Update on any resize.
-          DISK_TOTAL_MB: '24370'
+          # PROVISIONED disk, read from the Supabase dashboard 2026-09-29: 36 GB (binary - the
+          # dashboard's 19.99 GB "used" equals pg_database_size 18.78 GiB + WAL 1.00 GiB, so
+          # 36 GB = 36,864 MiB), minus a 512 MiB margin for the System share the formula does
+          # not subtract. It was 24,370 (the 2026-09-25 24 GB reading); left stale, the next
+          # build would have seen ~4 GB free and halted at the floor. The 2,048 MB floor
+          # (DISK_FLOOR_MB) is unchanged. The disk autoscales: update this on any resize.
+          DISK_TOTAL_MB: '36352'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py
