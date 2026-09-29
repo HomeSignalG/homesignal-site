@@ -34,6 +34,8 @@ on:
       - 'test/dc_address_check_monitor_pg/**'
       - 'docs/dc-marker-loss-watcher.sql'
       - 'test/dc_marker_loss_pg/**'
+      - 'docs/dc-resolver-hardening.sql'
+      - 'test/dc_resolver_hardening_pg/**'
       - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
@@ -62,6 +64,8 @@ on:
       - 'test/dc_address_check_monitor_pg/**'
       - 'docs/dc-marker-loss-watcher.sql'
       - 'test/dc_marker_loss_pg/**'
+      - 'docs/dc-resolver-hardening.sql'
+      - 'test/dc_resolver_hardening_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -256,3 +260,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_marker_loss_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/markerloss.log
+      - name: Resolver hardening (dc_resolvers health check fires on every failure class; resolvers closed to anon/authenticated; timeout semantics) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_resolver_hardening_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/resolverhardening.log

@@ -40,7 +40,7 @@ ok(/where r\.id in \(select c\.acquisition_run_id from public\.dc_current_observ
 
 // ── the jobs ──────────────────────────────────────────────────────────────────────────────────────
 ok(SQL.includes("cron.schedule('dc-resolve-canonical', '25 * * * *', $c$select public.dc_resolve_serialized('canonical')$c$)")
-   && SQL.includes("cron.schedule('dc-resolve-geography', '35 * * * *', $c$select public.dc_resolve_serialized('geography')$c$)")
+   && /cron\.schedule\('dc-resolve-geography', '35 \* \* \* \*',\s*\$c\$set statement_timeout = '300s'; select public\.dc_resolve_serialized\('geography'\)\$c\$\)/.test(SQL)
    && SQL.includes("cron.schedule('dc-resolve-on-acquisition', '*/2 * * * *', 'select public.dc_resolve_on_acquisition()')"),
   'J1: the hourly resolvers keep their :25/:35 schedules through the lock; the watcher runs every 2 minutes');
 // the drift guard must accept exactly what the DDL of record schedules, or a replay of step 3a/3b is refused

@@ -20,11 +20,12 @@ ok((snap.match(/public\.dc_map1_address_check\b/g) || []).length === 1 && /as ma
   'W1: the snapshot reads the step 11 view exactly once (materialized), so it cannot disagree with it');
 ok(!/dc_map1_address_check\b|map1_dc_zip_members|canonical_zip_registry/.test(block) && /public\.dc_address_check_daily/.test(block),
   'W2: the hourly check reads only the daily snapshots — it never walks 12,722 ZIPs inside the monitor');
-ok(/cron\.schedule\('dc-address-check-snapshot', '50 11 \* \* \*',\s*'select public\.dc_address_check_snapshot\(\)'\)/.test(SQL),
+ok(/cron\.schedule\('dc-address-check-snapshot', '50 11 \* \* \*',\s*\$c\$set statement_timeout = '300s'; select public\.dc_address_check_snapshot\(\)\$c\$\)/.test(SQL),
   'W3: the snapshot runs daily at 11:50 UTC (after the 10:45 geocode and the :25/:35 resolvers; outside 13:35-15:11 acquisitions)');
 ok(/perform cron\.unschedule\(j\.jobid\) from cron\.job j where j\.jobname = 'dc-address-check-snapshot'/.test(SQL),
   'W4: re-applying replaces the job by id (works on pg_cron and on the stand-in stub) instead of adding a second one');
-ok(/set local statement_timeout = '300s'/.test(snap), 'W5: the 36.8 s walk has its own 300 s ceiling, not the 120 s database default');
+ok(!/statement_timeout/.test(snap),
+  'W5a: the function does not try to raise its own limit — a SET inside a running statement re-arms nothing (measured), so the ceiling lives in the job command (W3)');
 
 // ── the thresholds are the measured ones ──────────────────────────────────────────────────────────
 ok(/l\.taken_at < _now - interval '26 hours'/.test(block), 'T1: stale at 26h (daily job, pg_cron punctual)');

@@ -55,7 +55,6 @@ declare
   t0 timestamptz := clock_timestamp();
   r  public.dc_address_check_daily;
 begin
-  set local statement_timeout = '300s';
   with s as materialized (select layer, check_state, reason_code from public.dc_map1_address_check)
   insert into public.dc_address_check_daily
   select now(),
@@ -103,8 +102,11 @@ begin
     return;
   end if;
   perform cron.unschedule(j.jobid) from cron.job j where j.jobname = 'dc-address-check-snapshot';
+  -- The 300 s ceiling is a SEPARATE STATEMENT in front of the call. A SET inside the function (or a function
+  -- SET clause) does not re-arm the timer of the statement already running: measured on pg_cron 1.6 / Postgres
+  -- 16 under a 2 s limit, only "set statement_timeout = ...; select fn()" completed (test/dc_resolver_hardening_pg).
   perform cron.schedule('dc-address-check-snapshot', '50 11 * * *',
-                        'select public.dc_address_check_snapshot()');
+                        $c$set statement_timeout = '300s'; select public.dc_address_check_snapshot()$c$);
 end
 $cron$;
 
