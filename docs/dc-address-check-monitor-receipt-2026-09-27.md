@@ -73,3 +73,22 @@ The change is additive:
 
 It changes no pin, no resolver and no resident-facing surface. After the apply, one manual snapshot seeds the
 baseline, so the check is measured at once rather than at 11:50 tomorrow.
+
+## Applied and verified in production
+
+- **Applied 2026-09-27 19:10:52 UTC** as migration `dc_address_check_monitor` (ledger `20260927191052`), from
+  main `06d9381`, after the monitor's own 19:10 run and outside the :18–:45 resolver window.
+- **The splice was one clean insertion.** The monitor went from md5 `32d1ed06…` (20,520 characters) to
+  `87ac7af3…` (23,964 characters). Cutting the 3,444 inserted characters back out gives `32d1ed06…` byte for
+  byte. Grants are still `{postgres=X, service_role=X}`, and SECURITY DEFINER and search_path are unchanged.
+- **First snapshot, taken by hand at 19:11:25 (44.6 s):**
+  - 1,817 markers (972 canonical, 845 OSM): 796 checked, 229 no clean match, 792 not checkable, 0 pending,
+    0 invariant breaks, queue 0.
+  - 7/7 decision functions fingerprinted, none missing; admission gate `2c05d65a…`, verdict `09bbb34f…`.
+- **First monitor run after it, 20:10:** 15 checks (was 14), all updated. `dc_address_check` ok, reading
+  "baseline (no previous snapshot)". 0 failing checks and no alert sent.
+- **First scheduled snapshot, 2026-09-28 11:50:00 (47.1 s):** identical to the baseline on every count. The
+  monitor reads "definitions and admission unchanged", and no alert has fired since the apply.
+
+**Gap found in use:** no health check watches the resolver jobs themselves. `dc-resolve-geography` was
+cancelled by the 120 s statement timeout at 2026-09-28 20:35 and nothing alerted (see the step 13 receipt).
