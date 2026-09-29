@@ -71,7 +71,7 @@ The view reads only the failure kinds that belong to a source (`fetch_failed`, `
 source's health, and are excluded (D13f). The `retired` kind is how the gap stays visible when the
 refresh drops a source's cached records but the ledger — by design — keeps them.
 
-## 4. Storage and time — an ESTIMATE until the pilot measures it
+## 4. Storage and time — the ESTIMATE made before the pilot (measured values: §9)
 
 Inputs, each measured 2026-09-29: ledger rows average **685 B** (project) and **641 B** (event) in
 `pg_column_size` terms; `app_projects` holds 2,925,014 development rows; a 1/32 sample of source keys
@@ -85,8 +85,7 @@ for development). About 92 % are comparable (audit B), and only comparable recor
   autovacuum; and each daily re-observation rewrites every observed record once. WAL for the baseline is
   therefore several GB in total, recycled as checkpoints complete. **The ledger byte budget does not
   count WAL**; the pilot reports it.
-- **Time:** the canary took 28–33 ms for ZIPs of 41–123 rows; the largest ZIP (28451, 14,664 rows) has
-  not been timed. The pilot times ZIPs across the size range including that one.
+- **Time:** the canary took 28–33 ms for ZIPs of 41–123 rows. **Measured since by the pilot: §9.**
 
 The suggested ledger budget for the national baseline is ≈ 1.5× the live-size estimate; the operator
 figure it must be paired with is `2,048 MB + budget`. **Both numbers are settled by the pilot, not
@@ -181,3 +180,78 @@ applied the contract on that date, **not a rule this repository adopts**.
 4. **What can be labelled today:** ERROR and UNKNOWN only. STALE needs an approved SLA and a freshness source
    field (a product decision). HEALTHY needs per-source *success* logging, which the refresh does not do (an
    engineering change to `dev_refresh_collect`, in the refresh's owner's lane, not this ledger's).
+
+## 9. Production receipt and pilot (2026-09-29)
+
+**Applied 18:11Z** as migration `dev_change_baseline_d1_20260930` (ledger version `20260929181142`) from the
+merged file (#1463, `a952139`; sha256 `4dd70d2f…`, 19,307 bytes, byte-identical to what CI tested).
+Preflight: Order C intact, none of the new objects present, `dev_change_project` had no storage parameter,
+registry and meta both 12,722 rows.
+
+**Verified by fingerprint, not by eye.** The driver's `md5(prosrc)` `59ce03a97d78…` and length 5,599 equal the
+values computed from the file before applying; the stored migration text has md5 `f365a441…` and 19,299
+characters, equal to the file; all ten Order C functions are unchanged (`dev_change_observe_zip`
+`17b45b9c4b93` / 8,074). Also read back: RLS on the cursor, `fillfactor=80` on the project table, the view has
+`security_invoker=true` and exactly the 18 evidence columns, no privilege of any kind for anon /
+authenticated / PUBLIC on the cursor, the view or any `dev_change_` function (11 functions), `service_role`
+holds select/insert/update on the cursor (never delete/truncate) and select only on the view.
+
+**Smoke test of the deployed driver.** A baseline run with no free-disk figure was refused (`CAPACITY GATE:
+p_verified_free_disk_mb is unset, need >= 3048`), and so was a figure one MB short (3,047); both wrote nothing.
+An ordinary run over the real registry and meta join ran in 0.04 s, observed nothing (no ZIP had been observed)
+and reported all 12,722 ZIPs never observed. A fourth test, meant to show the ledger-budget stop, proved
+nothing: the ledger was 512 KB, below the 1 MB minimum budget, so the stop never tripped. That behaviour is
+verified only in the disposable suite (D08).
+
+**Pilot: nine ZIPs, one baseline run, called through `dev_change_observe_zip` directly.** It could not go
+through `dev_change_tick`, because a baseline tick correctly refuses to run without the operator's verified
+free-disk figure, which nobody has yet supplied; the pilot wrote about 70 MB, the size Order C's canary
+already established as acceptable. So the pilot measures the ledger writer, **not the driver's loop** — that
+is proven only in the disposable suite.
+
+| ZIP | dev rows read | new identities | events | time |
+|---|---:|---:|---:|---:|
+| 39217 | 0 | 0 | 0 | 19.5 ms |
+| 01068 | 3 | 3 | 3 | 11.5 ms |
+| 01252 | 15 | 6 | 3 | 11.3 ms |
+| 01009 | 79 | 24 | 9 | 35.9 ms |
+| 01013 | 414 | 81 | 18 | 163.3 ms |
+| 02109 | 807 | 174 | 61 | 322.7 ms |
+| 05401 | 3,209 | 3,200 | 3,195 | 1,344.7 ms |
+| 28451 | 13,925 | 13,925 | 13,925 | 3,454.5 ms |
+| 57105 | 19,793 | 17,894 | 17,511 | 5,759.3 ms |
+| **total** | **38,245** | **35,307** | **34,725** | **11.1 s** |
+
+**Correctness, each against an independent source.** Rows read (38,245) equals the independent count from
+`app_projects` for those ZIPs; 184 facility rows sit in the same ZIPs and none were read (a positive control
+for the facility exclusion); the run's counters equal the sums; all 34,725 events are `first_detected`,
+baseline, not material; no identity has two events; none sits on a non-comparable record; the 35,307
+identities split into 34,725 comparable and **582 `sibling_records`** (no event, 1.65%); every observation
+count is 1, so **change-ready is 0**, as the cold-start rule requires; two identities appear on more than one
+pilot ZIP and were kept as one. Database growth (69,492,736 bytes) equals the two ledger tables' growth exactly.
+
+**Measured, and what it replaces**
+
+- **Storage: 1,968 bytes per identity** (project 1,094 with its indexes; event 889 with its indexes;
+  69.5 MB for 35,307 identities). With the national identity count still an estimate (about 0.9–1.1 M),
+  that is **about 1.8–2.2 GB live**, in line with §4's estimate of ≈ 2 GB.
+- **Time: about 0.29 ms per row** overall (0.25 ms on 28451, 0.42 ms on 05401). The two largest ZIPs took
+  3.45 s and 5.76 s: under PostgREST's 8 s and far under the 120 s statement timeout, so no ZIP is a timing
+  risk for one tick. At these rates 2.9 M rows is roughly 15–20 minutes of function time, **before** the cost
+  of the copies path (below).
+- **Not measured:** the update path — nationally a record averages about 2.9 ZIP copies, but the pilot's
+  ZIPs are far apart and rewrote only 3 project rows, so neither the cost of the copies path nor the HOT
+  ratio (2 of 3 updates) is measured. WAL: the log position advanced 83.2 MB while the pilot ran (34 s), but that
+  counts every writer on the database, so it is an upper bound (≈ 1.2× the data), not the ledger's own.
+
+**What the national baseline still needs** (nothing here has been started): the operator's verified free-disk
+figure, and a ledger byte budget. From these measurements: a budget of **3,500 MB** (≈ 1.6× the upper live
+estimate, covering dead tuples, which `pg_total_relation_size` counts) makes the gate ask for **≥ 5,548 MB**
+(2,048 floor + 3,500). Because WAL is not in the budget and the pilot bounds it at ≈ 1.2× the data, plus the
+copies path's rewrites, **I would want ≥ ~8.5 GB of verified free disk** before starting. That is a
+recommendation; the gate itself enforces only the 5,548 MB.
+
+**State left in production:** the ledger holds 35,455 identities and 34,862 events (the canary's 148 / 137 plus
+this pilot's). They are real baseline rows and stay. The cursor is empty, because the pilot bypassed the
+driver; when the national baseline reaches these nine ZIPs it will re-observe them, which is idempotent for
+unchanged records and gives a record a second observation only if its ZIP was re-materialised in between.

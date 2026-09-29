@@ -113,8 +113,11 @@ e. **The `Decided` lifecycle mismatch** — flagged in the audit, not changed.
 - 46 of 5,782 multi-ZIP records disagreed between copies in the sample; rule 2 handles them,
   and the cause is *consistent with* read-time skew, not proven to be the only one.
 - Through PostgREST the authenticator's 8 s `statement_timeout` applies. The production canary took
-  28–33 ms for ZIPs of 41–123 rows; the largest ZIP (28451, 14,664 rows) was **not** timed, so
-  whether it fits under 8 s is unmeasured. Order D's driver should call the function from a direct
+  28–33 ms for ZIPs of 41–123 rows; the largest ZIP (28451, 14,664 rows) was **not** timed then. It
+  was timed in the Order D pilot (2026-09-29): 3.45 s for its 13,925 development rows in `app_projects` (plus 19
+  facility rows, which the ledger skips; the 14,664 quoted earlier is the ingest repo's count of
+  serving-membership rows, a different set that was not reconciled to this one), and 5.76 s for 57105, the largest by report count — both under 8 s
+  (`development-activity-change-baseline-2026-09-30.md` §9). Order D's driver should call the function from a direct
   database connection or pg_cron and measure the largest ZIPs before relying on REST.
 
 ## 7. Apply and rollback
