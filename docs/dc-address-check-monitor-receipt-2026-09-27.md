@@ -15,6 +15,9 @@ health monitor.
 - A full walk of `public.dc_map1_address_check` over 12,722 ZIP pages takes **36.8 s** in production. That is
   too heavy to run inside the hourly monitor, so pg_cron job `dc-address-check-snapshot` takes it once a day
   into `public.dc_address_check_daily`. The job has its own 300 s ceiling (the database default is 120 s).
+  - **Corrected 2026-09-29:** that ceiling was set inside the function, where it does nothing (a SET in a running
+    statement re-arms no timer; measured on Postgres 16 and on pg_cron 1.6). It never showed, because the snapshot
+    takes 44–47 s. The ceiling now lives in the job command; see `dc-resolver-hardening-receipt-2026-09-29.md`.
 - **11:50 UTC** is chosen from measurements:
   - it comes after the daily geocode run (10:45);
   - it comes after the 11:25/11:35 resolvers;
