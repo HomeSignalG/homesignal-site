@@ -2161,6 +2161,38 @@ fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
 `app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
 still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
 
+- ⚖️ **2026-09-29 — MAP 1 REBUILDS ITSELF, ONCE A DAY, AND SWITCHES ONLY WHEN EVERY CHECK
+  PASSES** (founder: "swap automatically once check pasees"; "keep 2"). Nobody dispatches runs.
+  - **Trigger:** pg_cron job 69 `n5-generation-dispatch` (`47 * * * *`) POSTs a
+    `workflow_dispatch` of `n5-generation.yml` with `mode=work, max_shards=200, auto=1`, using
+    `vault.github_actions_pat` (the digest's credential; its fine-grained token
+    `homesignal-dashboard-dispatch` was given `homesignal-site` Actions read/write on
+    2026-09-29 — test dispatch HTTP 204, run `36636442855`). GitHub's own `17 * * * *`
+    schedule stays as a second trigger; it drops ticks on this repo, pg_cron does not.
+  - **The unattended tick** (`AUTO_LIFECYCLE=1`, no `GENERATION`; #1476): activates a READY
+    generation left by an earlier tick; else opens `n5-national-<UTC date>` when nothing is
+    BUILDING — at most one per 20 h, never after a FAILED newest build, and only with free disk
+    ≥ the 2,048 MB floor + 3,500 MB (the shard's own `disk_free_mb`); works shards and publishes;
+    once the build is complete, calls `geo.n5_generation_mark_ready` then
+    `geo.n5_generation_activate` through `heavy(..., verify=)`. **The database gates still
+    decide**: a refusal turns the tick red and the generation stays where it is.
+  - **Keep two** (founder, 2026-09-29): after every activation, and at the start of each tick,
+    `retire_superseded()` discards every SUPERSEDED generation except the serving one's
+    predecessor (`geo.n5_generation_discard`) and deletes its capture from
+    `preservation.app_project_identity` (~1.1 GiB each; discard does not touch it). Never a
+    FAILED generation, never a generation on a PROTECTED snapshot: `phase1-2026-09-01` is
+    protected (founder ruling 2026-09-01) and `guard_frozen` refuses the delete anyway, so
+    `legacy-phase1-2026-09-01` and its capture stay. A DELETE does not shrink the database;
+    autovacuum makes the space reusable and the next build's inserts reuse it.
+    Proven on a disposable Postgres through the real orchestrator (`run_lifecycle.py` E17-E24:
+    two unattended ticks build and switch two generations; the one two back loses its rows and
+    capture; the predecessor and the protected legacy capture are untouched); 4 of 4 breaks fail it.
+  - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
+    build with no progress for 6 h, on no build running while the serving map was captured
+    > 72 h ago, and on two builds in flight at once.
+  - **Disk:** `DISK_TOTAL_MB` is `36352` (dashboard 2026-09-29: 36 GB; one build ≈ 2.9 GiB).
+    The disk autoscales; **update the constant on any resize**, or the open check reads stale.
+
 - ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
   (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores
   it exactly).** READY passed on the first attempt — no INV-1 gap, confirming the Part F fix.
