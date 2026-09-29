@@ -114,7 +114,8 @@ e. **The `Decided` lifecycle mismatch** — still flagged, still changes what re
    can only re-observe ZIPs the baseline already covered.
 4. Verify against production before calling it done: every canonical ZIP has a cursor row with
    `status = 'ok'`; ledger events are all `first_detected` and `is_baseline`; row counts reconcile to the
-   runs' counters.
+   runs' counters. (On 2026-09-29 the "all `first_detected` and `is_baseline`" part did **not** hold: 959 events
+   were cross-copy disagreements typed as changes — §10.)
 
 ## 7. Apply and rollback
 
@@ -255,3 +256,87 @@ recommendation; the gate itself enforces only the 5,548 MB.
 this pilot's). They are real baseline rows and stay. The cursor is empty, because the pilot bypassed the
 driver; when the national baseline reaches these nine ZIPs it will re-observe them, which is idempotent for
 unchanged records and gives a record a second observation only if its ZIP was re-materialised in between.
+
+## 10. The national baseline run (2026-09-29)
+
+Run `c87c0d90-2231-4d47-a321-d82317d02737`, purpose "national baseline", **started 18:57:04Z, finished
+19:34:45Z (37 min 41 s wall clock)**, driven by about 50 calls to `dev_change_tick(run, 500, 30–45 s, 3,500 MB,
+free-disk figure)` from the Supabase SQL tool, then `dev_change_finish_run`. Every tick reported `zip_errors 0`.
+Stop reasons seen: `max_zips`, `time`, and finally `none_due` with `baseline_complete = true`. `ledger_budget`
+and `busy` were never reached in production (the budget stop is still proven only in the disposable suite).
+
+**The free-disk figure was a derived lower bound, not a dashboard reading in MB.** The founder's screenshot of the
+project home page showed "Disk 51%" and no size. With the measured `pg_database_size` (18,296,196,243 B) as a
+floor for used space and 51.5% as the ceiling for the rounded 51%, free space is at least
+`used × 0.485 / 0.515 ≈ 17.2 GB`; **16,000 MB was passed to the gate, and 15,000 MB once the ledger had grown
+by about 1 GB**. That rests on the percentage being used ÷ provisioned for the volume that holds the database.
+It also contradicts the 24 GB provisioned figure recorded on 2026-09-25 (51% of 24 GB is 12.2 GB, less than the
+database), so the provisioned size must now be larger; **that size is unverified and should be confirmed from
+Settings → Compute and Disk.** The ledger budget was never close: the ledger peaked at 1.93 GB against 3,500 MB.
+
+**Result, reconciled exactly.**
+
+| | before | this run | after (counted) |
+|---|---:|---:|---:|
+| identities (`dev_change_project`) | 35,455 | +897,514 | **932,969** |
+| events (`dev_change_event`) | 34,862 | +887,382 | **922,244** |
+| ZIPs observed | 0 (cursor empty) | 12,722 | 12,722 |
+| development rows read | 38,573 (canary + pilot) | 2,925,376 | 2,963,949 |
+
+The run's counters equal the sums of the cursor (`rows_read` 2,925,376), and identities and events each equal
+the earlier total plus the run's own. The run also recorded `observations_accepted` 1,331,306 and `rows_skipped`
+0. On average a new identity was read from about 3.3 ZIP rows (2,925,376 ÷ 897,514).
+
+**Checks from §6 step 4, each against production.**
+
+- Every one of the **12,722** canonical ZIPs has a cursor row with `status = 'ok'` and a `first_ok_at`; **0**
+  cursor rows are not ok, **0** sit outside the registry, **0** registry ZIPs lack an `app_community_meta` row.
+  The run is finished and no run is open.
+- 921,285 events are `first_detected` and baseline, **one per identity that has any event**. The other 11,684
+  identities have no event at all, and they are exactly the non-comparable ones: 9,031 `sibling_records` and
+  2,653 `non_durable_key_basis`, none change-ready (9,031 + 2,653 = 11,684).
+- **Independent count, a sample and not the whole table.** For 60 registry ZIPs chosen by `md5(zip)` (48 with
+  development rows, 12 empty; 25,483 rows), `app_projects` rows equal the cursor's `rows_read` in 60 of 60,
+  and distinct `source_key` equals both the ledger's identities and the cursor's `identities_seen` in 60 of 60
+  (24,924 keys). A whole-table `count(distinct source_key)` over `app_projects` was tried and timed out at the
+  tool's 60 s limit, so the national identity total has **not** been checked against an independent full count.
+
+**One check failed: 959 events are not baseline first detections.** §6 step 4 said all ledger events should be
+`first_detected` and baseline. 959 are not: **563 `status_changed` and 396 `source_record_updated`, all written by
+this run, all `is_baseline = false`.** Measured:
+
+- They sit on **863 identities, every one of which has two or more ZIP copies** (0 single-ZIP). Their
+  `observed_at` values run from 2026-08-25 to 2026-09-29 18:44Z, and **none is after the run started**, so they
+  are disagreements between ZIP copies that were materialised at different times, not changes seen during the run.
+- Which registries: Missoula addresses-with-permits (status progressing across copies, e.g. Approved →
+  Operating, Proposed → Approved), Arlington issued-permits (address, name and submitted_at all differ, which
+  reads like different records sharing one key rather than an update; an inference, not verified), Boone
+  County KY planning-board actions, Pierce County PALS permits, MDOT STIP projects, Fort Worth development
+  permits.
+- **114 of the 959 sit on identities that are non-comparable**, which the Order C rule says should produce no
+  change event. 102 identities are affected. Not diagnosed here.
+- The stored project row is **never older than its latest event** (0 of 863), and for 358 of them a later copy
+  agreed with the stored state, which is consistent with the copies path applying only newer materialisations;
+  what looks wrong is the typing of a disagreement between copies as a change.
+- **Nothing was deleted or rewritten.** The ledger is append-only (the event-immutability trigger), and deleting
+  would be a destructive change. Two ways to handle it, for a decision (status file, decision 10): a reader
+  rule that never counts an event whose run is a baseline run (no ledger change, reversible), or a reviewed
+  change to `dev_change_observe_zip` so that copies which disagree inside a baseline run resolve to the newest
+  materialisation without writing a change event.
+
+**Measured, replacing the estimates.**
+
+- **Storage: 2,071 bytes per identity** (1,932,328,960 B reported by the last tick ÷ 932,969), against the
+  pilot's 1,968 and §4's estimate of about 2 GB. Database growth over the run was 1,866,874,880 B
+  (18,296,196,243 → 20,163,071,123), which matches the ledger's growth (1.93 GB minus the roughly 70 MB already
+  there) to within about 0.3%.
+- **Time: at most 0.77 ms per row** (2,261 s of wall clock ÷ 2,925,376 rows, gaps between my calls included),
+  against the pilot's 0.29: the copies path, which is most of the rows, costs more than a first sighting. The
+  longest single ZIP overshot a tick's time cap by about 11 s (a tick checks its clock between ZIPs), which is
+  why the caps were lowered from 45 s to 30–35 s to stay under the tool's 60 s limit.
+- **Not measured:** WAL attributable to the ledger, the HOT-update ratio, and the effect on resident-facing
+  read latency while the run was in progress (nothing was reported, but nothing was measured).
+
+**State left in production.** The ledger is baselined for all 12,722 ZIPs. **Nothing detects a change from here**:
+no job is scheduled (status file, decision 9). An ordinary run may now re-observe only ZIPs re-materialised
+since their last observation.

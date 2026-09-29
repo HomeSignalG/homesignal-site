@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records the Order D apply and pilot.
+Last updated: 2026-09-30, in the PR that records the national baseline run (Order D).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -50,13 +50,15 @@ Last updated: 2026-09-30, in the PR that records the Order D apply and pilot.
   `20260929172018`). `docs/dev-change-ledger.sql` + `docs/development-activity-change-layer-2026-09-30.md`;
   33 SQL checks with 21 prohibited mutations all killed (Postgres 16 local, 17 in CI), 29 structural
   pins. Production receipt: design doc §8.
-- D. National change baseline — **in progress.** Driver, per-ZIP cursor with a capacity gate, and the
-  per-source evidence view are merged (#1463, `a952139`), applied to production 2026-09-29 18:11Z (migration
-  `dev_change_baseline_d1_20260930`) and fingerprint-verified; a nine-ZIP pilot measured storage (1,968 B per
-  identity) and time (~0.29 ms per row; the two largest ZIPs 3.5 s and 5.8 s). Receipt: design doc §9. Not
-  struck until the baseline run over the 12,722 ZIPs has completed. The run needs the operator's verified
-  free-disk figure (decision 7 below); a development source can be labelled only ERROR or UNKNOWN until
-  the two gaps in decision 8 close.
+- ~~D. National change baseline~~ — **done.** Driver, per-ZIP cursor with a capacity gate, and the
+  per-source evidence view merged as #1463 (`a952139`) and applied to production 2026-09-29 18:11Z (migration
+  `dev_change_baseline_d1_20260930`). The **national baseline ran 2026-09-29 18:57–19:34Z**: all 12,722 ZIPs
+  observed, 0 errors, 932,969 identities and 922,244 events (counts reconcile exactly to the runs), ledger 1.93 GB
+  (2,071 B per identity). Receipts: design doc §9 (apply and pilot) and §10 (the run). **Two things the run
+  did not settle:** 959 of the events are cross-copy disagreements typed as changes instead of first detections
+  (decision 10), and the free-disk figure was a lower bound derived from the dashboard's "Disk 51%", not a
+  reading in MB (decision 7). No change is detected from here on until a recurring job exists (decision 9). A
+  development source can be labelled only ERROR or UNKNOWN until the two gaps in decision 8 close.
 - ~~E. Change-detection tests~~ — **done with C** (all 11 cases, `test/dev_change_ledger_pg/`; map in
   the design doc §4). One case is proven only in part, and stays so until sources supply proven
   identifiers: linked source rows of one project are proven for ZIP copies of a record, not for
@@ -111,11 +113,13 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    existing surfaces, so it is not made without a go.
 5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
-7. **Free disk for the national baseline — and the go to run it.** The database is 17 GB. The pilot
-   measured 1,968 B per identity, so the baseline adds about 1.8–2.2 GB live plus write churn. The driver
-   refuses to run without the provider's verified free-disk figure (≥ 2,048 MB + the ledger budget).
-   Suggested budget 3,500 MB, so the gate needs ≥ 5,548 MB; because WAL is outside the budget I would want
-   ≥ ~8.5 GB verified free. Only the founder can read that figure from the dashboard.
+7. ~~Free disk for the national baseline — and the go to run it.~~ Go given 2026-09-29 and the run is done.
+   **Still open, and smaller:** the figure passed to the gate was **derived, not read** — the dashboard's
+   "Disk 51%" together with the measured database size gives at least ~17 GB free, and 16,000 then 15,000 MB was
+   passed (design doc §10). It rests on an assumption about what that percentage measures, and it disagrees
+   with the 24 GB provisioned size recorded on 2026-09-25, so **please confirm the provisioned disk size and the
+   free space from Settings → Compute and Disk**. Nothing is now at risk from the run: the database is 20.16 GB
+   and the ledger 1.93 GB.
 8. **Source-health labels — the workbook was supplied 2026-09-29 and settles the definitions, not the gaps.**
    Its contract (Instructions rows 509–580) defines HEALTHY / STALE / ERROR / VERIFIED ZERO / UNKNOWN / N/A /
    PAUSED at (ZIP × feed family) grain and forbids inventing an SLA. For the development family it records
@@ -125,4 +129,14 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    freshness field for the family — a product decision; (b) per-source success logging in the refresh — an
    engineering change in the refresh's lane. The view exposes the evidence; details in the Order D design doc §8.
 9. **A recurring observation job.** Without one the ledger never detects a change after the baseline.
-   Arming a `pg_cron` job is a new scheduled job and waits for a go.
+   Arming a `pg_cron` job is a new scheduled job and waits for a go. Decision 10 should be settled first,
+   because an ordinary run re-observes ZIP copies and would meet the same disagreements.
+10. **Cross-copy disagreements are typed as changes (found by the national baseline).** 959 events (563
+    `status_changed`, 396 `source_record_updated`) on 863 multi-ZIP identities were written as changes although
+    they are differences between ZIP copies materialised at different times, none of them seen during the run;
+    114 sit on identities the ledger itself marks non-comparable. Nothing was deleted (the ledger is append-only).
+    Two options, details in design doc §10: **(a)** a reader rule that never counts events whose run is a baseline
+    run — no ledger change, reversible, my recommendation for the report reader; **(b)** a reviewed change to
+    `dev_change_observe_zip` so copies that disagree resolve to the newest materialisation without a change
+    event, needed before the recurring job if the same shape appears in ordinary runs. It is a change to the
+    Order C writer, so it waits for a go.
