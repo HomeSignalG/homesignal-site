@@ -40,9 +40,14 @@
 --      call fits inside the database statement timeout (120 s for postgres) — call it from a
 --      direct connection or pg_cron, never through PostgREST (8 s).
 --   6. NO SCHEDULE IS ARMED HERE. Arming a recurring job is a separate reviewed act.
---   7. source health is EVIDENCE, not a label. The HEALTHY / STALE / ERROR words are defined by
---      the founder's workbook; its thresholds are not in this repository and are not invented
---      here. The view exposes the numbers those labels are computed from.
+--   7. source health is EVIDENCE, not a label. The HEALTHY / STALE / ERROR / VERIFIED ZERO / UNKNOWN
+--      words are defined by the founder's Maps workbook (Instructions, MEASUREMENT CONTRACT), at
+--      (ZIP x feed family) grain, and its CHANGE CONTROL forbids an agent redefining them. For the
+--      development family that contract records NO approved freshness SLA (SLA_UNDEFINED) and NO
+--      freshness source field ("submitted_at is a filing date, not source freshness"), and the
+--      refresh logs failures but not successes. So no label is computed here and no threshold is
+--      invented: the view exposes the counts, over the windows the workbook itself uses (24 hours
+--      and 14 days), from which the workbook's own audit assigned ERROR and UNKNOWN.
 --
 -- ADDITIVE ONLY. Creates one table, one view and one function; sets one storage parameter
 -- (fillfactor) on the ledger's own project table so its frequent whole-table rewrites can be
@@ -238,9 +243,12 @@ with led as (
          count(*) filter (where p.non_comparable_reason = 'non_durable_key_basis')  as non_durable_key_basis,
          min(p.first_observed_at)                                        as first_observed_at,
          max(p.last_observed_at)                                         as last_observed_at,
+         -- The newest FILING date among the source's records (never a future placeholder). It is
+         -- NOT a freshness field: the workbook's Feed Registry states submitted_at is a filing date,
+         -- not source freshness. It is here so a person can see a source whose newest filing is years old.
          max(case when p.facts->>'submitted_at' ~ '^\d{4}-\d{2}-\d{2}$'
                    and (p.facts->>'submitted_at')::date <= current_date
-                  then (p.facts->>'submitted_at')::date end)             as newest_publisher_date
+                  then (p.facts->>'submitted_at')::date end)             as newest_filing_date
     from public.dev_change_project p
    group by p.registry_id
 ), fail as (
@@ -248,7 +256,10 @@ with led as (
          count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '24 hours')                       as fetch_failures_24h,
          count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '24 hours')  as blocked_24h,
          count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '24 hours')                       as truncated_24h,
-         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '7 days')                         as fetch_failures_7d,
+         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '14 days')                        as fetch_failures_14d,
+         count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '14 days')   as blocked_14d,
+         count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '14 days')                        as truncated_14d,
+         count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated') and f.seen_at > now() - interval '14 days') as zips_failed_14d,
          max(f.seen_at) filter (where f.kind = 'fetch_failed')                                                             as last_fetch_failure_at,
          bool_or(f.kind = 'retired')                                                                                       as retired_ever
     from public.dev_refresh_source_failures f
@@ -261,11 +272,16 @@ select coalesce(l.registry_id, f.registry_id)      as registry_id,
        coalesce(l.change_ready, 0)                 as change_ready,
        coalesce(l.sibling_records, 0)              as sibling_records,
        coalesce(l.non_durable_key_basis, 0)        as non_durable_key_basis,
-       l.first_observed_at, l.last_observed_at, l.newest_publisher_date,
+       l.first_observed_at,
+       l.last_observed_at,           -- the newest retrieval instant carried by the source's records: NOT proof the source itself was fetched
+       l.newest_filing_date,
        coalesce(f.fetch_failures_24h, 0)           as fetch_failures_24h,
        coalesce(f.blocked_24h, 0)                  as blocked_24h,
        coalesce(f.truncated_24h, 0)                as truncated_24h,
-       coalesce(f.fetch_failures_7d, 0)            as fetch_failures_7d,
+       coalesce(f.fetch_failures_14d, 0)           as fetch_failures_14d,
+       coalesce(f.blocked_14d, 0)                  as blocked_14d,
+       coalesce(f.truncated_14d, 0)                as truncated_14d,
+       coalesce(f.zips_failed_14d, 0)              as zips_failed_14d,
        f.last_fetch_failure_at,
        coalesce(f.retired_ever, false)             as retired_ever
   from led l

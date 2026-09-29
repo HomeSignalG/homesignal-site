@@ -82,8 +82,13 @@ const labelScan = (t) => [...(t.match(/'(HEALTHY|STALE|VERIFIED ZERO|PAUSED)'/gi
 const labels = labelScan(SQL);
 ok(labelScan("select 'ERROR', 'healthy'").length === 2 && labelScan("status in ('ok', 'error')").length === 0,
   '6-control: the label scan sees the workbook words and does not see the cursor\'s lowercase status');
-ok(labels.length === 0 && /thresholds are not in this repository/.test(RAW),
-  '6: the view carries no HEALTHY/STALE/ERROR label — those thresholds live in the founder\'s workbook, which this repo does not hold', labels.join(','));
+ok(labels.length === 0 && /SLA_UNDEFINED/.test(RAW) && /CHANGE CONTROL/.test(RAW),
+  '6: the view carries no HEALTHY/STALE/ERROR label — the workbook defines them, records NO approved SLA for the development family (SLA_UNDEFINED) and forbids an agent redefining them', labels.join(','));
+const freshCols = (t) => [...t.matchAll(/\bas\s+([a-z_0-9]*fresh[a-z_0-9]*)/gi)].map((m) => m[1]);
+ok(freshCols('select 1 as newest_freshness, 2 as ok_col').length === 1 && freshCols(VIEW).length === 0 && /\bas newest_filing_date\b/.test(VIEW),
+  '6c: no view column is called freshness — a filing date (submitted_at) is not a freshness field, and the column says so by name');
+ok(/interval '24 hours'/.test(VIEW) && /interval '14 days'/.test(VIEW) && !/interval '7 days'/.test(VIEW),
+  '6d: the only evidence windows are the two the workbook itself uses (24 hours and 14 days)');
 // One CASE block at a time: a regex that spans the whole view would pair a date guard with an
 // unrelated `interval` in a later FILTER clause.
 const caseBlocks = (t) => t.match(/\bcase\s+when[\s\S]*?\bend\b/gi) || [];

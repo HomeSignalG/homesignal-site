@@ -74,7 +74,18 @@ MUTATIONS = {
     # the 24 hour window is a 7 day window
     'view_window_widened': [(
         "interval '24 hours'", "interval '7 days'", 3)],
-    # a future placeholder date counts as the source's newest publisher date
+    # the 14 day window is really 7 days (a second, invented window instead of the workbook's)
+    'view_14d_is_7d': [(
+        "interval '14 days'", "interval '7 days'", 4)],
+    # the affected-ZIP count ignores the window (a ZIP that failed 20 days ago is still counted)
+    'zips_ignore_window': [(
+        "count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated') and f.seen_at > now() - interval '14 days')",
+        "count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated'))", 1)],
+    # the affected-ZIP count includes retirements (not a fetch failure)
+    'zips_count_retired': [(
+        "count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated') and f.seen_at > now() - interval '14 days')",
+        "count(distinct f.zip) filter (where f.seen_at > now() - interval '14 days')", 1)],
+    # a future placeholder date counts as the source's newest filing date
     'view_future_dates': [(
         "                   and (p.facts->>'submitted_at')::date <= current_date\n", "", 1)],
     # ---- lock-down -------------------------------------------------------------------------------------------

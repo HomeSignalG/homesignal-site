@@ -348,11 +348,12 @@ values
 insert into public.dev_refresh_source_failures (zip, registry_id, reason, blocked_update, seen_at, kind) values
   ('91001', 'src-h', 'r', false, now() - interval '1 hour',  'fetch_failed'),
   ('91001', 'src-h', 'r', true,  now() - interval '2 hours', 'fetch_failed'),
-  ('91001', 'src-h', 'r', true,  now() - interval '3 days',  'fetch_failed'),
-  ('91001', 'src-h', 'r', true,  now() - interval '10 days', 'fetch_failed'),
+  ('91002', 'src-h', 'r', true,  now() - interval '3 days',  'fetch_failed'),
+  ('91003', 'src-h', 'r', true,  now() - interval '10 days', 'fetch_failed'),
+  ('91005', 'src-h', 'r', true,  now() - interval '20 days', 'fetch_failed'),   -- outside 14 days: counts nowhere, and its ZIP is not counted
   ('91001', 'src-h', 'r', false, now() - interval '1 hour',  'truncated'),
-  ('91001', 'src-h', 'r', false, now() - interval '3 days',  'truncated'),
-  ('91001', 'src-h', 'r', false, now() - interval '20 days', 'retired'),
+  ('91004', 'src-h', 'r', false, now() - interval '3 days',  'truncated'),
+  ('91006', 'src-h', 'r', false, now() - interval '5 days',  'retired'),          -- a retirement is not a fetch failure and its ZIP is not counted
   ('91001', '(whole-report fire)', 'HTTP 503', false, now() - interval '1 hour', 'fire_http_error'),
   ('91001', '(whole-report fire)', 'HTTP 503', false, now() - interval '2 hours', 'fire_http_error'),
   ('91001', '(whole-report fire)', 'x', false, now() - interval '2 hours', 'fire_failed'),
@@ -361,24 +362,25 @@ select pg_temp._ck('D13a the source with ledger rows and failures reports exact 
   (select identities = 4 and comparable = 2 and change_ready = 1 and sibling_records = 1 and non_durable_key_basis = 1
       and first_observed_at = pg_temp._t(5) and last_observed_at = pg_temp._t(33)
      from public.dev_change_source_health where registry_id = 'src-h'));
-select pg_temp._ck('D13b its newest PUBLISHER date ignores a future placeholder (2199) and a null: it is 2026-09-01',
-  (select newest_publisher_date = date '2026-09-01' from public.dev_change_source_health where registry_id = 'src-h'));
-select pg_temp._ck('D13c failure evidence: 2 fetch failures and 1 blocked and 1 truncation in 24 h, 3 fetch failures in 7 days, retired once, last failure about an hour ago',
-  (select fetch_failures_24h = 2 and blocked_24h = 1 and truncated_24h = 1 and fetch_failures_7d = 3 and retired_ever
+select pg_temp._ck('D13b its newest FILING date ignores a future placeholder (2199) and a null: it is 2026-09-01',
+  (select newest_filing_date = date '2026-09-01' from public.dev_change_source_health where registry_id = 'src-h'));
+select pg_temp._ck('D13c failure evidence over the workbook''s windows: in 24 h 2 fetch failures, 1 blocked, 1 truncation; in 14 days 4 fetch failures, 3 blocked, 2 truncations across 4 ZIPs; retired; last failure about an hour ago',
+  (select fetch_failures_24h = 2 and blocked_24h = 1 and truncated_24h = 1
+      and fetch_failures_14d = 4 and blocked_14d = 3 and truncated_14d = 2 and zips_failed_14d = 4 and retired_ever
       and last_fetch_failure_at between now() - interval '61 minutes' and now() - interval '59 minutes'
      from public.dev_change_source_health where registry_id = 'src-h'));
 select pg_temp._ck('D13d a source with failures and no ledger rows still appears, with zero identities and the failure counted',
   (select identities = 0 and fetch_failures_24h = 1 and blocked_24h = 1 and first_observed_at is null
      from public.dev_change_source_health where registry_id = 'src-x'));
 select pg_temp._ck('D13e a source with ledger rows and no failures reports zero failures, no last failure and not retired',
-  (select identities = 1 and fetch_failures_24h = 0 and fetch_failures_7d = 0 and last_fetch_failure_at is null and not retired_ever
+  (select identities = 1 and fetch_failures_24h = 0 and fetch_failures_14d = 0 and zips_failed_14d = 0 and last_fetch_failure_at is null and not retired_ever
      from public.dev_change_source_health where registry_id = 'src-y'));
 select pg_temp._ck('D13f the whole-report fire failures are a pipeline fault under a pseudo source and are NOT any source''s health',
   not exists (select 1 from public.dev_change_source_health where registry_id = '(whole-report fire)'));
-select pg_temp._ck('D13g the view exposes exactly the evidence columns and no health label or threshold',
+select pg_temp._ck('D13g the view exposes exactly the evidence columns and no health label or threshold (and no column named freshness: a filing date is not a freshness field)',
   (select array_agg(attname::text order by attnum) = array['registry_id', 'identities', 'comparable', 'change_ready', 'sibling_records',
-      'non_durable_key_basis', 'first_observed_at', 'last_observed_at', 'newest_publisher_date', 'fetch_failures_24h', 'blocked_24h',
-      'truncated_24h', 'fetch_failures_7d', 'last_fetch_failure_at', 'retired_ever']
+      'non_durable_key_basis', 'first_observed_at', 'last_observed_at', 'newest_filing_date', 'fetch_failures_24h', 'blocked_24h',
+      'truncated_24h', 'fetch_failures_14d', 'blocked_14d', 'truncated_14d', 'zips_failed_14d', 'last_fetch_failure_at', 'retired_ever']
      from pg_attribute where attrelid = 'public.dev_change_source_health'::regclass and attnum > 0 and not attisdropped));
 
 -- ---- D14  the ledger vocabulary is unchanged by the driver -------------------------------------------------------
