@@ -264,6 +264,15 @@ synthetic address "1 Probe Test Lane, Nowhereville" is not a real property). Eve
 - Side effect that does not roll back: the identity sequence behind `report_private_context_event.event_id` advanced
   (sequences are not transactional), so the first real event will not be number 1. Nothing references those numbers.
 
+**What CI found on the receipt PR (#1481), and the fix:** the `snapshot` check went red on the first run although both
+suites read "0 failed" (52 and 66 checks). The mutation loop printed the first four failures of each killed mutation as
+`grep | sed | cut | head -4` under `set -o pipefail`; when a mutation failed 34 checks, `head` exited while `cut` was still
+writing, `cut` died with "Broken pipe" and the script ended. It is a race, which is why #1480's run passed: replayed
+in isolation the old form exited non-zero on **80 of 1,500** runs and the form that reads to the end (`sed -n '1,4p'`)
+on **0 of 1,500**. Fixed in both harnesses (`report_snapshot_pg/run.sh`, `report_private_context_pg/run.sh`); nothing
+about what is checked changed (52 + 66 checks, 51 + 54 = 105 mutations, all killed, 0 survived). The same
+`| head -4` line exists in other suites' harnesses that belong to other work; they are not touched here.
+
 **Not done, on purpose** (each needs its own go): the purge batch is not scheduled; the overdue-purge lag is not a
 pipeline-monitor check; nothing calls the writer; the owner column, and what closes a `report` need, belong to Orders J
 and L; backups are outside this unit (§9).

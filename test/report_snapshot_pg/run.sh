@@ -99,7 +99,10 @@ while IFS= read -r name; do
 suite errored|f|"
   n_fail=$(fails_of "$out")
   if [ "$n_fail" -gt 0 ]; then
-    echo "KILLED   $name — $n_fail check(s) failed:"; grep '|f|' <<<"$out" | sed 's/^/    /' | cut -c1-200 | head -4
+    # print the first four failures. NOT `| head -4`: under pipefail, head exits after four lines while
+    # cut is still writing, cut dies with "Broken pipe", and the run ends (measured: 80 of 1,500 runs).
+    # `sed -n 1,4p` reads to the end, so nothing upstream is ever cut off.
+    echo "KILLED   $name — $n_fail check(s) failed:"; { grep '|f|' <<<"$out" || true; } | cut -c1-200 | sed -n '1,4s/^/    /p'
   else
     echo "SURVIVED $name — the suite cannot see this regression"; status=1
   fi
