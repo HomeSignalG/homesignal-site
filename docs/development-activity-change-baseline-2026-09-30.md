@@ -329,7 +329,7 @@ this run, all `is_baseline = false`.** Measured:
   would be a destructive change. Two ways to handle it, for a decision (status file, decision 10): a reader
   rule that never counts an event whose run is a baseline run (no ledger change, reversible), or a reviewed
   change to `dev_change_observe_zip` so that copies which disagree inside a baseline run resolve to the newest
-  materialisation without writing a change event.
+  materialisation without writing a change event. **The founder chose the first (2026-09-29); it is built in §11.**
 
 **Measured, replacing the estimates.**
 
@@ -371,3 +371,63 @@ look for before starting.**
 **State left in production.** The ledger is baselined for all 12,722 ZIPs. **Nothing detects a change from here**:
 no job is scheduled (status file, decision 9). An ordinary run may now re-observe only ZIPs re-materialised
 since their last observation.
+
+## 11. Decision 10 option (a): the reportable-events view (2026-09-29)
+
+The founder answered decision 10 with "follow your recommendation", which is option (a): **a reader rule on the
+run, with no change to the ledger and none to the writer.** `dev_change_observe_zip` is untouched, nothing is
+deleted or re-typed, and the 959 events stay in the ledger as the true observations they are.
+
+**Pre-implementation statement.**
+
+- *Canonical truth path:* `public.app_projects` → `dev_change_observe_zip` (the ledger's only writer) →
+  `dev_change_event` → **`dev_change_event_reportable`** → the report reader (Order G, not built).
+- *Decision owner for "may this event be shown as a change":* the view, in `docs/dev-change-reportable.sql`.
+- *Shortcut check:* a scan of `lib/`, `scripts/`, `supabase/`, `partials/`, `bluesky/`, the root pages and every
+  `docs/*.sql` finds `dev_change_event` named only by the ledger, this view and the baseline driver (which uses
+  it once, to measure its size for the capacity gate). Nothing else reads it, and the structural test fails if
+  anything does, so a reader cannot quietly re-derive the rule.
+- *Concurrency check:* no open or recent PR or branch implements the same outcome.
+
+**The rule and why it is on the run.** An event is reportable when the run named by **its own** `run_id` is not
+a baseline run. Three tempting alternatives are each wrong, and each has a prohibited mutation that the suite
+kills:
+
+- *`where not is_baseline`.* The 959 events carry `is_baseline = false` even though they were written inside a
+  baseline run, so this rule would show them. The suite reproduces that exact shape with the real writer (one
+  record on two ZIPs, copies materialised at different times, met in one baseline run) and checks the writer
+  typed it as `status_changed` first, so the control is real.
+- *The record's first (or last) run.* A record first seen by an ordinary run and later met again inside a
+  baseline run keeps its ordinary `first_detected` event; a record baselined once and changed in an ordinary run
+  keeps that change. Judging by either run of the record gets one of those wrong.
+- *A left join.* An event that names no run cannot be classified, so it is not shown.
+
+The view carries the event's own 19 columns, in the ledger's order, and adds no fact of its own. It does not
+filter on `event_type` or `material`: hero eligibility stays the reader's decision (Step 3A).
+
+**Proof.** `test/dev_change_reportable_pg`: 22 checks against a disposable Postgres (baseline first sightings,
+a new record, a publisher-status change, a derived-only change, the cross-copy shape, a run-less event, the
+first-run/last-run trap, exact totals of 10 events and 4 reportable, the column list, no write path, and the
+lock-down including real reads as `anon`, `authenticated` and `service_role`); the file applies twice with an
+identical definition and refuses to apply without the Order C ledger; **14 prohibited mutations, all killed**.
+`test/dev-change-reportable-structure.test.mjs`: 29 pins, and eight mutations of the pins themselves each turned
+the test red. Local run on Postgres 16; the workflow `dev-change-reportable-suite.yml` runs it on 17 and holds
+no Supabase credential.
+
+**Two things the suite made me correct in my own harness.** The stand-in `service_role` needed BYPASSRLS (the
+ledger tables have RLS on with no policy, as in Supabase), and a freshly created schema gives the API roles no
+USAGE, so the first version refused `anon` at the *schema* and would have passed for the wrong reason. The suite
+now grants USAGE to all three roles and checks it as a control before the refusal check.
+
+**What this does not settle (stated, not hidden).**
+
+- An **ordinary** run re-observes ZIP copies too, so the same cross-copy differences can appear there as change
+  events, and this view would show them. Whether the writer should resolve copies that disagree to the newest
+  materialisation without an event is option (b), a change to the Order C writer. **It must be settled before
+  the recurring job is armed** (status file, decisions 9 and 10).
+- 114 of the 959 sit on identities the ledger marks non-comparable. Those are excluded here only because they
+  were written by the baseline run. An ordinary-run event on an identity that *later* becomes non-comparable
+  would still be reportable. Not decided here.
+- Applying it to production changes nothing anyone sees: it has no reader yet. Expected reading once applied:
+  all four production runs so far are baseline runs except one ordinary smoke run that wrote **0** events, so
+  **0 of the 922,244 events are reportable today** (137 + 34,725 + 887,382 = 922,244, all in baseline runs).

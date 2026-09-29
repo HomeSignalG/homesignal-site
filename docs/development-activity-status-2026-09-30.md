@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records the national baseline run (Order D).
+Last updated: 2026-09-30, in the PR that builds the reportable-events view (decision 10 option (a)).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -56,7 +56,8 @@ Last updated: 2026-09-30, in the PR that records the national baseline run (Orde
   observed, 0 errors, 932,969 identities and 922,244 events (counts reconcile exactly to the runs), ledger 1.93 GB
   (2,071 B per identity). Receipts: design doc §9 (apply and pilot) and §10 (the run). **Two things the run
   did not settle:** 959 of the events are cross-copy disagreements typed as changes instead of first detections
-  (decision 10), and the run overlapped the last minutes of the daily `verify-communities` load, during which
+  (decision 10: the reader rule is built, `dev_change_event_reportable`, design doc §11; the writer question
+  remains), and the run overlapped the last minutes of the daily `verify-communities` load, during which
   the API had statement timeouts that I cannot attribute between the two (design doc §10; decision 9 carries the
   scheduling consequence). No change is detected from here on until a recurring job exists (decision 9). A
   development source can be labelled only ERROR or UNKNOWN until the two gaps in decision 8 close.
@@ -138,8 +139,13 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     `status_changed`, 396 `source_record_updated`) on 863 multi-ZIP identities were written as changes although
     they are differences between ZIP copies materialised at different times, none of them seen during the run;
     114 sit on identities the ledger itself marks non-comparable. Nothing was deleted (the ledger is append-only).
-    Two options, details in design doc §10: **(a)** a reader rule that never counts events whose run is a baseline
-    run — no ledger change, reversible, my recommendation for the report reader; **(b)** a reviewed change to
+    **Option (a) chosen by the founder 2026-09-29 and built in this PR:** the view
+    `public.dev_change_event_reportable` (`docs/dev-change-reportable.sql`, design doc §11) is the one definition
+    of which events may be shown as changes — only those written by an ordinary run; no ledger change, no
+    writer change, reversible. A reader must select from it, never from `dev_change_event`; a structural test
+    fails if anything else names the raw table. **Not yet applied to production** (apply follows the merge; it has
+    no reader, so nothing visible changes). **Still open — option (b):** a reviewed change to
     `dev_change_observe_zip` so copies that disagree resolve to the newest materialisation without a change
-    event, needed before the recurring job if the same shape appears in ordinary runs. It is a change to the
-    Order C writer, so it waits for a go.
+    event, needed before the recurring job because an ordinary run re-observes ZIP copies and would meet the same
+    disagreements, which the view would then show. It is a change to the Order C writer, so it waits for a go.
+    Also undecided: an ordinary-run event on an identity that later becomes non-comparable stays reportable.

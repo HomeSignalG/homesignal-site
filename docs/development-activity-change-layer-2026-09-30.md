@@ -98,7 +98,10 @@ c. **Source health, freshness, the batch driver, the cursor and the national bas
    Order D. `observe_zip` is idempotent per ZIP and ready to be driven.
 d. **The reader and any customer copy** — later units. Reading rule for them: a record is a
    "What Changed Recently" candidate only if `change_ready` and the event is `material`; otherwise
-   the report says **Recent Official Activity** (Step 3A).
+   the report says **Recent Official Activity** (Step 3A). **A reader selects from
+   `public.dev_change_event_reportable`, never from `dev_change_event`:** the view is the one definition of
+   which events may be shown as changes (an ordinary run's events only; a baseline run's are excluded, which
+   removes the 959 cross-copy differences the national baseline typed as changes). Baseline design doc §11.
 e. **The `Decided` lifecycle mismatch** — flagged in the audit, not changed.
 
 ## 6. Known limits (stated, not hidden)
