@@ -30,6 +30,7 @@ on:
       - 'scripts/n5_shard.py'
       - 'scripts/n3_pilot.py'
       - 'scripts/test_heavy_gateway.py'
+      - 'scripts/test_n5_auto_lifecycle.py'
       - 'scripts/n5_candidate_bounding.py'
       - '.github/workflows/n5-generation-publish-suite.yml'
       - '.github/workflows/n5-generation.yml'
@@ -111,6 +112,10 @@ jobs:
       - name: Run the gateway-timeout guard (a lost 524 response is proven, never re-sent)
         if: always()
         run: python3 scripts/test_heavy_gateway.py
+
+      - name: Run the auto-lifecycle guard (open daily, READY then ACTIVATE only when complete)
+        if: always()
+        run: python3 scripts/test_n5_auto_lifecycle.py
 
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
