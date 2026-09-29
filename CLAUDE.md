@@ -2161,6 +2161,22 @@ fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
 `app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
 still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
 
+- ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
+  (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores
+  it exactly).** READY passed on the first attempt — no INV-1 gap, confirming the Part F fix.
+  - **Serving == candidate:** membership **911,527**, fp `1958341294288126` · markers
+    **1,018,870** · status **12,722**. The pre-switch serving fp re-measured equal to the value
+    recorded at the first activation (`1945248397386972`), so nothing moved underneath.
+  - **Newly visible: 9,966 projects · 633 ZIPs** (`geo.n5_generation_entries`), led by
+    miami-building-permits 4,157 and tempe-building-permits 3,100 — the sources whose rows were
+    re-created after the 09-25 cutoff. 85282 / 33133 / 33127 render 1,184 / 2,494 / 1,558 markers,
+    all `boundary_complete`.
+  - **Left: 3,831 projects** = 3,751 no longer in `public.app_projects` + 60 re-created after this
+    build's cutoff (2026-09-27 16:59:37Z; the next generation recovers them) + 20 `POINT_REJECTED`.
+  - Operationally: GitHub's hourly schedule dropped several ticks; the build was driven by
+    dispatches plus the ticks that did fire. `open` got a 524 and committed — fixed for the next
+    open by #1398 (open now proves a lost response from state).
+
 - ✅ **SUPERSEDED 2026-09-27 — THE GENERATION PATH RAN END TO END AND MAP 1 NOW SERVES
   `n5-national-2026-09-25` (ACTIVE since 15:00:49Z; `legacy-phase1-2026-09-01` is SUPERSEDED and
   recorded as its predecessor, so `rollback` restores it exactly).** The heading and the ⛔ bullet
