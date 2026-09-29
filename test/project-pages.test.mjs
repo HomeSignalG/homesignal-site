@@ -295,6 +295,65 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   }
 }
 
+// ---- 12. more projects on the same ZIP page (2026-09-29) --------------------------------
+{
+  // Related projects are the other project pages on the same ZIP page(s): the site's
+  // geography, never a distance.
+  const rel = [...pg1.matchAll(/<section class="zsec"><h2>More projects in ([^<]+)<\/h2><ul>([\s\S]*?)<\/ul>/g)];
+  ok(rel.length === 1 && rel[0][1] === 'these ZIP codes', 'a project on two ZIP pages lists more projects from both');
+  const links = rel.length ? [...rel[0][2].matchAll(/<li><a href="(\/project\/[^"]+)">/g)].map((m) => m[1]) : [];
+  const onZips = Object.entries(docs.projectsDoc.projects)
+    .filter(([k, v]) => k !== keyFor('https://permits.example.gov/r/1') && v.zips.some((z) => ['01002', '01003'].includes(z)));
+  ok(links.length === Math.min(6, onZips.length) && links.length > 0,
+     `it lists up to 6 of them (${links.length} of ${onZips.length})`);
+  ok(!links.includes(p1), 'it never lists itself');
+  ok(links.every((l) => man.project_pages.includes(l)), 'every link is a project page this build wrote');
+  const byPath = Object.fromEntries(Object.entries(docs.projectsDoc.projects)
+    .map(([k, v]) => [expectedPath('town-permits', v.case, k), v.date || '']));
+  const dates = links.map((l) => byPath[l]);
+  ok(dates.every((d, i) => i === 0 || dates[i - 1] >= d), 'newest date on record first');
+  ok(!/\bmiles?\b|\bnearby\b|\bnearest\b|radius/i.test(rel[0] ? rel[0][0] : 'x'),
+     'the section makes no distance claim');
+  // A project alone on its ZIP page gets no section; a kept project is listed after tracked ones.
+  const solo = makeInputs({ mutate: (d) => {
+    // 01004 carries no other project.
+    d.projectsDoc.projects[keyFor('https://permits.example.gov/r/1')].zips = ['01004'];
+    d.projectsDoc.projects['arcgis:town-permits:GONE-9|1'] = { registry_id: 'town-permits', case: 'GONE-9',
+      name: 'Gone Project', type: 'Residential', status: 'Proposed', source_url: 'https://permits.example.gov/r/77',
+      zips: ['01002'], date: '2026-09-27', tracked: false, as_of: '2026-09-01' };
+  } });
+  const bs = build(solo);
+  if (bs.r.status !== 0) console.error(bs.r.stderr.slice(-400));
+  const alone = read(bs.out, p1);
+  ok(bs.r.status === 0 && alone.includes('<h1>Olympia Place Apartments</h1>') && !alone.includes('More projects in'),
+     'a project alone on its ZIP page gets no section');
+  const other = Object.entries(solo.projectsDoc.projects).find(([k, v]) => v.zips.includes('01002') && !k.includes('GONE'));
+  const po = read(bs.out, expectedPath('town-permits', other[1].case, other[0]));
+  const items = [...po.matchAll(/<li><a href="\/project\/[^"]+">[^<]*<\/a>[\s\S]*?<\/li>/g)].map((m) => m[0]);
+  const gone = items.findIndex((x) => x.includes('Gone Project'));
+  ok(gone >= 0 && items.slice(gone + 1).every((x) => x.includes('(no longer tracked)')) &&
+     items.slice(0, gone).every((x) => !x.includes('(no longer tracked)')),
+     'projects no longer tracked come after tracked ones, even when newer');
+}
+
+{
+  // More than 6 others: the list stops at 6 and points to the ZIP's full list.
+  const many = makeInputs({ mutate: (d) => {
+    for (let i = 0; i < 8; i++) {
+      d.projectsDoc.projects[`arcgis:town-permits:MANY-${i}|1`] = { registry_id: 'town-permits', case: `MANY-${i}`,
+        name: `Many ${i}`, type: 'Residential', status: 'Proposed', source_url: `https://permits.example.gov/m/${i}`,
+        zips: ['01007'], date: `2026-08-0${i + 1}` };
+    }
+  } });
+  const bm = build(many);
+  const pm = read(bm.out, expectedPath('town-permits', 'MANY-0', 'arcgis:town-permits:MANY-0|1'));
+  const sec = (pm.match(/<h2>More projects in [^<]+<\/h2><ul>([\s\S]*?)<\/ul>([\s\S]*?)<\/section>/) || []);
+  const n = sec[1] ? (sec[1].match(/<li>/g) || []).length : 0;
+  const onZip = Object.values(many.projectsDoc.projects).filter((v) => v.zips.includes('01007')).length;
+  ok(n === 6 && sec[2] && sec[2].includes(`<a href="/community/01007/projects/">All ${onZip} projects on record in 01007</a>`),
+     `more than 6 others: 6 listed and a link to all ${onZip} on the ZIP's list (${n})`);
+}
+
 // ---- 7. inconsistent input fails -------------------------------------------------------
 {
   const bad = makeInputs({ mutate: (d) => {

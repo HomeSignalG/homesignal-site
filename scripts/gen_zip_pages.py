@@ -1096,7 +1096,28 @@ def project_list_path(z):
     return f"/community/{z}/projects/"
 
 
-def render_project(pr, pages, built):
+RELATED_CAP = 6
+
+
+def related_projects(pr, pages, projects, cap=RELATED_CAP):
+    """Other project pages on the same ZIP page(s), for "More projects in ...". ZIP
+    membership is the site's geography (never a distance: the project data carries no
+    coordinates, and generated pages make no distance claim). Tracked projects first, then
+    newest date on record, then key, so the list is deterministic."""
+    seen, out = {pr["key"]}, []
+    for z in pr["zips"]:
+        for k in (pages.get(z) or {}).get("project_list") or []:
+            if k in seen or k not in projects:
+                continue
+            seen.add(k)
+            out.append(projects[k])
+    out.sort(key=lambda o: o["key"])
+    out.sort(key=lambda o: o["date"], reverse=True)
+    out.sort(key=lambda o: 0 if o["tracked"] else 1)
+    return out[:cap], len(out)
+
+
+def render_project(pr, pages, built, projects=None):
     """One project page. Static HTML; its only script element is inert structured data.
     Everything it states is in the plane: the source's own name, address, record number,
     date and status, labelled by lib/project-type.js, and the official record it came from.
@@ -1198,6 +1219,7 @@ def render_project(pr, pages, built):
         f'<ul>{zli}</ul>'
         f'<p><a href="/homesignalmap.html?zip={esc(zips[0])}">See it on the Development map</a></p>'
         f'</section>'
+        + _related_section(pr, zips, first, pages, projects)
         + city_nav
         + f'<p class="quiet">{footer}The name, address, record number, date '
           f'and status are the source\'s own; nothing on this page is generated or inferred.</p>'
@@ -1207,6 +1229,36 @@ def render_project(pr, pages, built):
         + '</main>')
     return (_head(title, desc, canon, og_type="article", ld=ld)
             + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+
+
+def _related_section(pr, zips, first, pages, projects):
+    if not projects:
+        return ""
+    rel, total = related_projects(pr, pages, projects)
+    if not rel:
+        return ""
+    where = esc(first["name"]) if len(zips) == 1 else "these ZIP codes"
+    li = []
+    for o in rel:
+        bits = [x for x in (o["type"], o["lifecycle"]) if x]
+        inner = f'<a href="{esc(o["path"])}">{esc(o["title"])}</a>'
+        if o["address"]:
+            inner += f' <span class="addr">{esc(o["address"])}</span>'
+        if bits:
+            inner += f' <span class="quiet">{esc(" · ".join(bits))}</span>'
+        if o["date"]:
+            inner += f' <time datetime="{esc(o["date"])}">{esc(o["date"])}</time>'
+        if not o["tracked"]:
+            inner += ' <span class="quiet">(no longer tracked)</span>'
+        li.append(f"<li>{inner}</li>")
+    more = ""
+    if total > len(rel):
+        more = (f'<p><a href="{project_list_path(zips[0])}">All {total + 1} projects on record '
+                f'in {esc(zips[0])}</a></p>') if len(zips) == 1 else (
+               "<p>" + " · ".join(f'<a href="{project_list_path(z)}">All projects on record in '
+                                   f'{esc(z)}</a>' for z in zips) + "</p>")
+    return (f'<section class="zsec"><h2>More projects in {where}</h2><ul>{"".join(li)}</ul>'
+            f'{more}</section>')
 
 
 def render_project_list(z, keys, projects, pages):
@@ -1254,7 +1306,7 @@ def build_projects(projects, pages, out_dir, built):
             sys.exit(f"ERROR: project {key!r} names no canonical ZIP ({missing[:5]})")
         d = os.path.join(out_dir, *pr["path"].strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
-        h = render_project(pr, pages, built).encode("utf-8")
+        h = render_project(pr, pages, built, projects).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
