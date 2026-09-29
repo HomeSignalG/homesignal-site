@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PRE-LAUNCH. noindex while the plan's launch blockers are open (100126 plan, section 25):
+     the free-evaluation entitlement and the $79/month checkout do not exist yet. Remove this
+     tag, add the page to scripts/stage_site.py's allowlist and to sitemap STATIC only when those
+     ship. Until then the page is repo-only: stage_site.py is an allowlist, so it is not deployed. -->
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://homesignal.net/development-activity.html">
+<title>HomeSignal — Development Activity</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=20814d85">
+<style>
+  /* Page-scoped, additive. Every rule is prefixed .da / .da- so nothing here can touch another page,
+     and every colour, radius and font is an existing app.css token. No new visual language. */
+  [hidden]{display:none!important}
+  .da{max-width:980px}
+  .da section{padding:46px 0;border-top:1px solid var(--line-2)}
+  .da section.da-first{border-top:0;padding-top:10px}
+  .da h1{font-size:36px;letter-spacing:-.025em;line-height:1.12;margin:8px 0 16px;max-width:780px}
+  .da h2{font-size:22px;letter-spacing:-.015em;line-height:1.28;margin:0 0 14px}
+  .da h3{font-size:15px;letter-spacing:-.01em;margin:0 0 6px}
+  .da p{font-size:15px;color:var(--ink-2);line-height:1.62;margin:0 0 12px;max-width:680px}
+  .da-eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+  .da-lede{font-size:17px!important;max-width:700px!important}
+  .da-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:22px 0 8px}
+  .da-link{color:var(--green);font-size:14.5px;font-weight:600;text-decoration:none}
+  .da-link:hover{text-decoration:underline}
+  .da-muted{font-size:13px!important;color:var(--ink-3)!important;margin:0!important}
+  .da-cue{font-size:15px!important;font-weight:700;color:var(--ink)!important;margin:26px 0 8px!important}
+  .da-soon{display:block;font-size:12px;color:var(--ink-3);margin-top:6px}
+  .da-off[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+  .da-off[aria-disabled="true"]:hover{background:var(--green)}
+  .da a:focus-visible,.da button:focus-visible,.da input:focus-visible,.da-card:focus-visible,.da-mk:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+  /* coverage check */
+  .da-lab{display:block;font-size:12.5px;font-weight:700;margin:0 0 6px}
+  .da-field{max-width:560px}
+  .da-result{margin:14px 0 0!important;padding:13px 16px;border-radius:12px;font-size:14px!important;max-width:620px!important;line-height:1.55}
+  .da-result b{display:block;font-size:12px;letter-spacing:.06em;margin-bottom:3px}
+  .da-result.in{background:var(--green-tint);border:1px solid #cbe7d5;color:var(--green-deep)}
+  .da-result.out{background:var(--amber-tint);border:1px solid #f0dcbd;color:var(--amber)}
+  .da-result.err{background:#f7f9f7;border:1px solid var(--line);color:var(--ink-2)}
+  .da-result small{display:block;margin-top:6px;font-size:12.5px;opacity:.85}
+
+  /* sample report */
+  .da-cap{font-size:13px!important;color:var(--ink-3)!important;margin:0 0 12px!important;max-width:none!important}
+  .da-report{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow-sm);padding:26px 28px}
+  .da-rhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 24px;padding-bottom:18px;border-bottom:1px solid var(--line-2)}
+  .da-rhead .da-addr{font-size:17px;font-weight:700;letter-spacing:-.01em;text-transform:uppercase;margin:6px 0 2px}
+  .da-rhead .da-side{text-align:right;font-size:13px;color:var(--ink-2)}
+  .da-rhead .da-side b{display:block;color:var(--ink);font-size:13.5px}
+  .da-rsec{padding:20px 0;border-bottom:1px solid var(--line-2)}
+  .da-rsec:last-child{border-bottom:0;padding-bottom:0}
+  .da-rlab{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:0 0 12px}
+  .da-metrics{display:flex;flex-wrap:wrap;gap:14px 40px}
+  .da-metric b{display:block;font-size:30px;letter-spacing:-.02em;line-height:1.1}
+  .da-metric span{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+  .da-recent{font-size:13.5px!important;margin:14px 0 0!important;max-width:none!important}
+
+  .da-scanrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 12px}
+  .da-scanrow .da-k{flex:0 0 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+  .da-scanrow .da-k em{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;font-size:12.5px;color:var(--ink-3)}
+  .da-chip{cursor:pointer;background:#fff;padding:6px 10px}
+  .da-chip:hover{background:#f7f9f7}
+  .da-chip[aria-pressed="true"]{background:var(--green-tint);border-color:var(--green);color:var(--green-deep)}
+  .da-stagelink{font-size:12.5px;font-weight:600;color:var(--ink);text-decoration:none;background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:999px}
+  .da-stagelink:hover{background:var(--green-tint)}
+  .da-stagelink b{color:var(--green);margin-left:4px}
+  .da-status{font-size:13px!important;color:var(--ink-2)!important;margin:4px 0 0!important;min-height:20px;max-width:none!important}
+
+  .da-plotwrap{display:flex;flex-wrap:wrap;gap:8px 32px;align-items:center}
+  .da-plot{width:100%;max-width:340px;height:auto;flex:none}
+  .da-plotside{flex:1;min-width:220px}
+  .da-plotside p{font-size:13.5px!important;margin:0 0 8px!important}
+  .da-legend{list-style:none;margin:10px 0 0;padding:0;font-size:12.5px;color:var(--ink-2)}
+  .da-legend li{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+  .da-legend svg{flex:none}
+  .da-mk{cursor:pointer;transition:opacity .15s ease}
+  .da-mk.dim{opacity:.16}
+  .da-mk text{font-family:var(--font);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .da-mk.sel .da-shape{stroke-width:3}
+
+  #daStages{padding-top:0}
+  .da-stage{padding:20px 0 4px;border-top:1px solid var(--line-2)}
+  #daStages .da-stage:first-child{border-top:0}
+  .da-stagehead{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+  .da-stagehead h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:0}
+  .da-stagehead span{font-size:12.5px;color:var(--ink-3)}
+  .da-empty{font-size:13px!important;color:var(--ink-3)!important;margin:0 0 16px!important}
+  .da-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:16px}
+  .da-card{border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:#fff;cursor:pointer}
+  .da-card:hover{border-color:var(--line)}
+  .da-card.sel{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+  .da-card h4{font-size:14.5px;letter-spacing:-.01em;margin:0 0 8px;display:flex;gap:9px;align-items:flex-start}
+  .da-num{flex:none;width:20px;height:20px;border-radius:50%;background:#eef1ee;color:var(--ink-2);font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+  .da-tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px}
+  .da-tag{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px;border:1px solid var(--line);color:var(--ink-2);background:#fff}
+  .da-tag i{font-style:normal;font-weight:500;color:var(--ink-3);margin-right:4px}
+  .da-s-approved{background:var(--green-tint);border-color:#cbe7d5;color:var(--green-deep)}
+  .da-s-permitted{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
+  .da-s-permitted i{color:#cbe7d5}
+  .da-s-proposed{background:#fff;border:1px dashed var(--amber);color:var(--amber)}
+  .da-s-proposed i{color:var(--amber);opacity:.8}
+  .da-card p{font-size:13px!important;margin:0 0 5px!important;max-width:none!important}
+  .da-card .da-src{color:var(--ink-3)!important;font-size:12.5px!important;margin:8px 0 0!important}
+
+  /* section layouts */
+  .da-cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+  .da-cols2{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+  .da-list{margin:0 0 12px;padding-left:20px;max-width:680px}
+  .da-list li{font-size:14.5px;color:var(--ink-2);margin-bottom:6px;line-height:1.55}
+  .da-def{margin:0;max-width:680px}
+  .da-def dt{font-size:14.5px;font-weight:700;margin:14px 0 2px}
+  .da-def dd{margin:0;font-size:14.5px;color:var(--ink-2);line-height:1.55}
+  .da-example{border-left:3px solid var(--line);padding:2px 0 2px 18px;margin:8px 0 18px;max-width:640px}
+  .da-example .da-x{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin:0 0 4px!important}
+  .da-price.da-sm{font-size:26px;letter-spacing:-.02em}
+  .da-price{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:4px 0 6px}
+  .da-price small{font-size:16px;font-weight:600;color:var(--ink-2);letter-spacing:0}
+  .da-band{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green);margin:0 0 6px!important}
+  .da-enterprise{margin-top:34px;padding-top:26px;border-top:1px solid var(--line-2)}
+  .da-final{text-align:left}
+  @media(max-width:900px){
+    .da-cols3,.da-cols2{grid-template-columns:1fr}
+    .da-cols2{gap:32px}
+  }
+  @media(max-width:620px){
+    .da h1{font-size:29px}
+    .da h2{font-size:20px}
+    .da section{padding:36px 0}
+    .da-report{padding:18px 16px}
+    .da-rhead .da-side{text-align:left}
+    .da-price{font-size:34px}
+  }
+</style>
+</head>
+<body data-nav="">
+<template id="hs-content">
+  <div class="page da">
+
+    <!-- 4. HERO -->
+    <section class="da-first" id="hero">
+      <div class="da-eyebrow">HomeSignal Development Activity</div>
+      <h1>Know what’s changing around a property before your client does.</h1>
+      <p class="da-lede">HomeSignal shows development that is proposed, approved, permitted and under construction around a property—organized from covered official sources into one client-ready Development Activity report.</p>
+      <div class="da-actions">
+        <div>
+          <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
+          <span class="da-soon">Opens at launch.</span>
+        </div>
+        <a class="da-link" href="#sample">See a sample report →</a>
+        <a class="da-link" href="#coverage" id="daHeroCheck">Check coverage →</a>
+      </div>
+      <p class="da-muted">No credit card required · For real-estate agents and brokerages</p>
+      <p class="da-cue">Scan by Type. Understand the Stage.</p>
+      <p>HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.</p>
+    </section>
+
+    <!-- 5. COVERAGE, visible before signup -->
+    <section id="coverage">
+      <h2>Check Development Activity coverage</h2>
+      <label class="da-lab" for="daCoverInput">Enter property address or ZIP</label>
+      <div class="field da-field">
+        <input id="daCoverInput" type="text" autocomplete="off" placeholder="123 Main St, Austin, TX  or  78617" onkeydown="if(event.key==='Enter')document.getElementById('daCoverBtn').click()">
+        <button class="mbtn" type="button" id="daCoverBtn">Check coverage</button>
+      </div>
+      <p class="da-result err" id="daCoverResult" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <!-- 7. PRODUCT PREVIEW: the report's real information hierarchy, sample entries -->
+    <section id="sample">
+      <p class="da-cap">Sample Development Activity report. The property, projects, distances and dates below are illustrative entries, not records for a real address. In a real report every project links to its official source.</p>
+      <div class="da-report" id="daReport">
+        <div class="da-rhead">
+          <div>
+            <div class="da-eyebrow">HomeSignal Development Activity</div>
+            <div class="da-addr">1234 Sample Street</div>
+            <div class="da-muted">Sample property</div>
+          </div>
+          <div class="da-side">
+            <b>Sample Realty · Agent Name</b>
+            Generated <span id="daGenerated"></span>
+          </div>
+        </div>
+
+        <div class="da-rsec" id="daActivity">
+          <div class="da-rlab">Recent Official Activity</div>
+          <div class="da-metrics" id="daMetrics"></div>
+          <p class="da-recent" id="daRecent"></p>
+        </div>
+
+        <div class="da-rsec" id="daScan">
+          <div class="da-scanrow" role="group" aria-label="Type filter">
+            <div class="da-k">Type<em>What kind of development is it?</em></div>
+            <div id="daTypeChips" style="display:contents"></div>
+          </div>
+          <div class="da-scanrow" role="group" aria-label="Stage sections">
+            <div class="da-k">Stage<em>How far along is it?</em></div>
+            <div id="daStageLinks" style="display:contents"></div>
+          </div>
+          <p class="da-status" id="daFilterStatus" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="da-rsec" id="daMap">
+          <div class="da-rlab">Development Activity Map</div>
+          <div class="da-plotwrap">
+            <svg class="da-plot" id="daPlot" viewBox="0 0 360 360" role="img" aria-label="Development activity within 0.5 miles of the sample property"></svg>
+            <div class="da-plotside">
+              <p><b>Development activity within 0.5 miles of this property</b></p>
+              <p>Only tracked development/project activity is shown.</p>
+              <ul class="da-legend" id="daLegend"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="da-rsec" id="daStages"></div>
+
+        <div class="da-rsec">
+          <div class="da-rlab">Official Evidence &amp; Coverage</div>
+          <p class="da-muted">Sources · published timing · status · freshness · limitations · official links</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. CORE DIFFERENTIATION -->
+    <section>
+      <h2>Your MLS tells you about the property.<br>HomeSignal tells you what’s changing around it.</h2>
+      <p>Your client can see the house.</p>
+      <p>You know the neighborhood.</p>
+      <p>But it can be much harder to know that a residential project has been proposed nearby, a commercial project was approved, a permit was issued down the road, or infrastructure work is moving forward.</p>
+      <p>That’s the gap HomeSignal Development Activity is built to fill.</p>
+    </section>
+
+    <!-- 9. WHAT THE REPORT ANSWERS + Type / Stage -->
+    <section>
+      <h2>See development before it becomes obvious</h2>
+      <p>Enter a property address and HomeSignal organizes Development Activity found in its covered official sources around that property.</p>
+      <h3 style="margin-top:26px">Scan by Type. Understand the Stage.</h3>
+      <p>Quickly isolate Residential, Commercial, Industrial, Data Center, Roads &amp; Infrastructure, or Civic &amp; Public activity—and see whether each project is proposed, approved, permitted, or under construction.</p>
+      <div class="da-cols2" style="margin:18px 0 6px">
+        <div>
+          <h3>Type — what kind of development is it?</h3>
+          <ul class="da-list">
+            <li>Residential</li>
+            <li>Commercial</li>
+            <li>Industrial</li>
+            <li>Data Center</li>
+            <li>Roads &amp; Infrastructure</li>
+            <li>Civic &amp; Public</li>
+            <li>Other Project only as a fallback when no more specific Type is supported</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Stage — how far along is it?</h3>
+          <ul class="da-list">
+            <li>Approved / Coming</li>
+            <li>Proposed / Under Review</li>
+            <li>Permitted / Under Construction</li>
+          </ul>
+          <p style="margin-top:14px">Select a Type and see it across every Stage, without scrolling through each one.</p>
+        </div>
+      </div>
+      <p style="margin-top:26px;font-weight:700;color:var(--ink)">The report helps the agent understand:</p>
+      <dl class="da-def">
+        <dt>Approved / Coming</dt>
+        <dd>Projects that have moved beyond the proposal stage and have publisher evidence supporting the stronger status.</dd>
+        <dt>Proposed / Under Review</dt>
+        <dd>Applications and projects that are still being considered.</dd>
+        <dt>Permitted / Under Construction</dt>
+        <dd>Projects shown here only when official evidence explicitly supports permit or construction status.</dd>
+        <dt>Things to Review With Your Client</dt>
+        <dd>Nearby official records that may warrant a client conversation or further investigation.</dd>
+        <dt>Official Evidence &amp; Coverage</dt>
+        <dd>The source, published timing, status, freshness, limitations and official links behind the report.</dd>
+        <dt>Keep Watching</dt>
+        <dd>Continue monitoring the property for meaningful official changes.</dd>
+      </dl>
+    </section>
+
+    <!-- 10. WHAT HOMESIGNAL INTENTIONALLY DOES NOT DO -->
+    <section>
+      <h2>Not another neighborhood report</h2>
+      <p>HomeSignal is intentionally different.</p>
+      <p>We don’t try to tell an experienced agent where the nearest school is, what restaurants are nearby, where the grocery store is, or what the neighborhood is like.</p>
+      <p>You already know your market.</p>
+      <p>HomeSignal focuses on information that is much harder to keep track of: what’s being planned, approved, permitted and changed around the property.</p>
+      <p class="da-muted">This report focuses on development activity and change. It is not an inventory of existing schools, parks, businesses, buildings or neighborhood amenities.</p>
+    </section>
+
+    <!-- 11. BUILT FOR THE CLIENT CONVERSATION -->
+    <section>
+      <h2>Built for the client conversation</h2>
+      <div class="da-cols3">
+        <div>
+          <h3>For buyers</h3>
+          <p>Before an offer or during due diligence, use Development Activity to identify nearby projects the client may want to understand before making a decision.</p>
+        </div>
+        <div>
+          <h3>For listings</h3>
+          <p>Before going to market, see Development Activity buyers may discover and prepare the seller for questions before they arise.</p>
+        </div>
+        <div>
+          <h3>For agents</h3>
+          <p>Instead of searching multiple government websites and interpreting disconnected records, start with one property-centered report and open the official evidence when something needs closer review.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12. EVIDENCE AND TRUST + 13. CLIENT-CONVERSATION EXAMPLE -->
+    <section>
+      <h2>Don’t just tell your client. Show them the record.</h2>
+      <p>HomeSignal organizes information from covered official sources and keeps the supporting evidence connected to the project.</p>
+      <p>Each supported project should make the underlying facts easy to reach, including where available: project, HomeSignal Type, distance, lifecycle / publisher status, published timing, latest supported change or event, and the official source.</p>
+      <div class="da-example">
+        <p class="da-x">Instead of:</p>
+        <p>“I heard they’re building apartments somewhere over there.”</p>
+      </div>
+      <div class="da-example">
+        <p class="da-x">Give the client:</p>
+        <p style="margin:0;font-weight:700;color:var(--ink)">0.3 mi · Residential · APPROVED / COMING</p>
+        <p style="margin:0">186-unit project approved</p>
+        <p style="margin:0">Review published project details and construction timing.</p>
+        <p style="margin:0;color:var(--ink-3)">Official source →</p>
+      </div>
+      <h3 style="font-size:17px">Clear enough for your client. Sourced enough for you.</h3>
+    </section>
+
+    <!-- 16. PRICING + 17. ENTERPRISE -->
+    <section id="pricing">
+      <h2>Simple, transparent pricing</h2>
+      <div class="da-cols2">
+        <div>
+          <p class="da-band">Start Free</p>
+          <div class="da-price da-sm">20 Development Activity reports free</div>
+          <p>No credit card required.</p>
+          <div>
+            <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
+            <span class="da-soon">Opens at launch.</span>
+          </div>
+          <p class="da-muted" style="margin-top:14px!important">Individual accounts receive 20 individual evaluation reports. Brokerage evaluation accounts share 20 reports across their invited evaluation users.</p>
+        </div>
+        <div>
+          <p class="da-band">New Member Price</p>
+          <div class="da-price">$79<small>/month</small></div>
+          <p>100 new Development Activity reports each month</p>
+          <ul class="da-list">
+            <li>Reopen existing reports without using another report.</li>
+            <li>Share existing reports with clients.</li>
+            <li>Download or print existing reports.</li>
+            <li>Cancel anytime.</li>
+          </ul>
+          <div>
+            <button type="button" class="mbtn da-off" data-cta="join" aria-disabled="true">Join for $79/month</button>
+            <span class="da-soon">Opens at launch.</span>
+          </div>
+        </div>
+      </div>
+      <div class="da-enterprise">
+        <h3>Need access for a brokerage, team, or organization?</h3>
+        <p><a class="da-link" href="contact.html" id="daEnterprise">Contact us for Enterprise Pricing →</a></p>
+        <p class="da-muted">Enterprise Pricing is for organizations requiring arrangements beyond the standard self-service account.</p>
+      </div>
+    </section>
+
+    <!-- 20. FINAL CONVERSION -->
+    <section class="da-final">
+      <h2>You know what’s there.<br>HomeSignal shows you what’s changing.</h2>
+      <p>Start with 20 Development Activity reports free. No credit card required.</p>
+      <div class="da-actions" style="margin-top:14px">
+        <div>
+          <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
+          <span class="da-soon">Opens at launch.</span>
+        </div>
+        <a class="da-link" href="#coverage">Check coverage →</a>
+      </div>
+    </section>
+
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
+<script src="lib/templates.js?v=ec3b1cb1"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=f7ec5a9a"></script>
+<script>
+/* Development Activity landing page.
+   Two behaviours, both built on existing HomeSignal code:
+   (1) COVERAGE CHECK. Reuses HS.data.isCovered (the same authority the shell's "Add a zip code" uses)
+       and, for an address, the same geocode-address edge function the shell's "Add an address" uses.
+       It can prove exactly two things: the ZIP is inside the HomeSignal ZIP network, or it is not.
+       It does NOT classify Report-Ready / Change-Ready / Limited Coverage: that preflight does not exist
+       yet (frozen plan, Master Step 10), so this page never claims it.
+   (2) SAMPLE REPORT. A structural sample with illustrative entries. Type and Stage are separate fields;
+       the Type filter narrows the same list across all three Stage sections. Stage labels are display
+       groupings only and create no lifecycle value (founder ruling R2). Every count is computed from
+       the entries below, so the numbers on the page cannot disagree with the list.
+   The three commerce buttons are deliberately inert (aria-disabled): the 20-report entitlement and the
+   $79/month checkout are launch blockers (plan sections 18 and 25). */
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- coverage check
+  function coverageResult(kind, headline, body, note) {
+    var box = document.getElementById('daCoverResult');
+    box.className = 'da-result ' + kind;
+    box.textContent = '';
+    if (headline) { var b = document.createElement('b'); b.textContent = headline; box.appendChild(b); }
+    box.appendChild(document.createTextNode(body));
+    if (note) { var s = document.createElement('small'); s.textContent = note; box.appendChild(s); }
+    box.hidden = false;
+  }
+  async function resolveZip(raw) {
+    if (/^\d{5}$/.test(raw)) return { zip: raw, matched: null };
+    if (raw.length < 8 || raw.indexOf(' ') < 0) return { bad: true };
+    var m = null;
+    try {
+      var r = await HS.sb().functions.invoke('geocode-address', { body: { address: raw } });
+      if (r.error) return { unavailable: true };
+      m = (r.data && r.data.match) || null;
+    } catch (e) { return { unavailable: true }; }
+    if (!m || !m.zip) return { nomatch: true };
+    return { zip: String(m.zip).slice(0, 5), matched: m.matchedAddress || raw };
+  }
+  async function checkCoverage() {
+    var input = document.getElementById('daCoverInput'), btn = document.getElementById('daCoverBtn');
+    var raw = input.value.trim();
+    if (!raw) { coverageResult('err', '', 'Enter a property address or a 5-digit ZIP.'); return; }
+    btn.disabled = true;
+    try {
+      var z = await resolveZip(raw);
+      if (z.bad) { coverageResult('err', '', 'Enter a full street address, or a 5-digit ZIP.'); return; }
+      if (z.unavailable) { coverageResult('err', '', 'The address service couldn’t be reached. Try again in a minute. This is not a coverage result.'); return; }
+      if (z.nomatch) { coverageResult('err', '', 'We couldn’t confirm that address against U.S. Census records. Try a different spelling, or add the city or ZIP.'); return; }
+      var covered;
+      try { covered = await HS.data.isCovered(z.zip); } catch (e) { covered = null; }
+      if (covered === null) { coverageResult('err', '', 'The coverage check couldn’t be reached. Try again in a minute. This is not a coverage result.'); return; }
+      var where = (z.matched ? z.matched + ' · ' : '') + 'ZIP ' + z.zip;
+      if (covered) {
+        coverageResult('in', 'INSIDE THE PRODUCT NETWORK', where + '. Source depth and report readiness vary by property.',
+          'This check does not determine report-ready or change-ready status.');
+      } else {
+        coverageResult('out', 'OUTSIDE COVERAGE', where + '. The property resolves outside HomeSignal’s canonical 12,722-ZIP product network.');
+      }
+    } finally { btn.disabled = false; }
+  }
+
+  // ---------------------------------------------------------------- sample report
+  var TYPES = [
+    { key: 'all', label: 'All' },
+    { key: 'residential', label: 'Residential' },
+    { key: 'commercial', label: 'Commercial' },
+    { key: 'industrial', label: 'Industrial' },
+    { key: 'datacenter', label: 'Data Center' },
+    { key: 'infrastructure', label: 'Roads & Infrastructure' },
+    { key: 'civic', label: 'Civic & Public' },
+    { key: 'other', label: 'Other Project' }   // fallback Type: its chip renders only when an entry carries it
+  ];
+  var STAGES = [
+    { key: 'approved',  label: 'Approved / Coming' },
+    { key: 'proposed',  label: 'Proposed / Under Review' },
+    { key: 'permitted', label: 'Permitted / Under Construction' }
+  ];
+  // Illustrative entries. dist is miles from the sample property; angle only positions the plot marker.
+  var ITEMS = [
+    { n: 1, type: 'residential',    stage: 'approved',  dist: 0.3, angle: 35,  date: '2026-09-24', title: '186-unit project approved',                    status: 'Approved',                        review: 'Review published project details and construction timing.', source: 'County Planning Commission' },
+    { n: 2, type: 'commercial',     stage: 'approved',  dist: 0.4, angle: 160, date: '2026-09-17', title: 'Retail building site plan approved',           status: 'Site plan approved',              review: 'Review the approved site plan and timing.',                 source: 'City Planning Department' },
+    { n: 3, type: 'civic',          stage: 'approved',  dist: 0.5, angle: 250, date: '2026-09-10', title: 'School expansion approved',                    status: 'Approved',                        review: 'Review published project details and schedule.',            source: 'School District Board' },
+    { n: 4, type: 'residential',    stage: 'proposed',  dist: 0.2, angle: 100, date: '2026-09-22', title: 'Subdivision application under review',        status: 'Application under review',        review: 'Review application and hearing schedule.',                  source: 'City Planning Department' },
+    { n: 5, type: 'infrastructure', stage: 'proposed',  dist: 0.4, angle: 330, date: '2026-09-19', title: 'Planning application under review',            status: 'Application under review',        review: 'Review application and agency schedule.',                   source: 'State Transportation Department' },
+    { n: 6, type: 'industrial',     stage: 'proposed',  dist: 0.3, angle: 205, date: '2026-09-15', title: 'Warehouse site-plan application filed',        status: 'Application filed',               review: 'Review application and hearing schedule.',                  source: 'County Planning Commission' },
+    { n: 7, type: 'datacenter',     stage: 'proposed',  dist: 0.5, angle: 65,  date: '2026-09-12', title: 'Rezoning application for a data center campus', status: 'Rezoning application under review', review: 'Review application and hearing schedule.',               source: 'County Planning Commission' },
+    { n: 8, type: 'residential',    stage: 'permitted', dist: 0.4, angle: 292, date: '2026-09-20', title: 'Townhome building permits issued',             status: 'Permit issued',                   review: 'Review permit details and construction timing.',            source: 'City Building Department' },
+    { n: 9, type: 'infrastructure', stage: 'permitted', dist: 0.2, angle: 355, date: '2026-09-08', title: 'Road widening under construction',             status: 'Construction started',            review: 'Review project details and construction schedule.',         source: 'State Transportation Department' }
+  ];
+  var state = { type: 'all', sel: null };
+  var NS = 'http://www.w3.org/2000/svg';
+  var ITEM_BY = {};
+  var chips = {}, stageEls = {};
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function svg(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function labelOf(list, key) { for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i].label; return key; }
+  function fmt(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+  function count(pred) { return ITEMS.filter(pred).length; }
+
+  // A stage marker is drawn by shape AND outline, never colour alone:
+  // approved = solid circle, proposed = dashed hollow circle, permitted = solid square.
+  function markerShape(stage, r) {
+    if (stage === 'permitted') return svg('rect', { class: 'da-shape', x: -r, y: -r, width: r * 2, height: r * 2, rx: 3, fill: '#0f5c37', stroke: '#0f5c37', 'stroke-width': 2 });
+    if (stage === 'proposed') return svg('circle', { class: 'da-shape', r: r, fill: '#fff', stroke: '#c47a1a', 'stroke-width': 2, 'stroke-dasharray': '3 2.5' });
+    return svg('circle', { class: 'da-shape', r: r, fill: '#157a49', stroke: '#157a49', 'stroke-width': 2 });
+  }
+  function markerInk(stage) { return stage === 'proposed' ? '#c47a1a' : '#fff'; }
+
+  function buildActivity() {
+    var m = document.getElementById('daMetrics');
+    STAGES.forEach(function (s) {
+      var d = el('div', 'da-metric');
+      d.appendChild(el('b', '', String(count(function (i) { return i.stage === s.key; }))));
+      d.appendChild(el('span', '', s.label));
+      m.appendChild(d);
+    });
+    var latest = ITEMS.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
+    document.getElementById('daRecent').textContent = 'Most recent: ' + labelOf(TYPES, latest.type) + ' — ' + latest.title + ' · ' + latest.dist.toFixed(1) + ' mi · ' + fmt(latest.date);
+    document.getElementById('daGenerated').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function buildScan() {
+    var host = document.getElementById('daTypeChips');
+    TYPES.forEach(function (t) {
+      if (t.key === 'other' && !count(function (i) { return i.type === 'other'; })) return;
+      var b = el('button', 'wchip da-chip', t.label);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', t.key === 'all' ? 'true' : 'false');
+      b.dataset.type = t.key;
+      b.addEventListener('click', function () { state.type = t.key; apply(); });
+      chips[t.key] = b;
+      host.appendChild(b);
+    });
+    var sl = document.getElementById('daStageLinks');
+    STAGES.forEach(function (s) {
+      var a = el('a', 'da-stagelink', s.label);
+      a.href = '#daStage-' + s.key;
+      var c = el('b', '', '');
+      a.appendChild(c);
+      stageEls[s.key] = { navCount: c };
+      sl.appendChild(a);
+    });
+  }
+
+  function buildPlot() {
+    var p = document.getElementById('daPlot'), C = 180, R = 150;
+    [1, 0.5].forEach(function (f) { p.appendChild(svg('circle', { cx: C, cy: C, r: R * f, fill: 'none', stroke: '#e4e8e4', 'stroke-width': 1, 'stroke-dasharray': f === 1 ? '' : '2 4' })); });
+    p.appendChild(svg('line', { x1: C - R, y1: C, x2: C + R, y2: C, stroke: '#eef1ee', 'stroke-width': 1 }));
+    p.appendChild(svg('line', { x1: C, y1: C - R, x2: C, y2: C + R, stroke: '#eef1ee', 'stroke-width': 1 }));
+    var t = svg('text', { x: C + R - 4, y: C - 8, 'text-anchor': 'end', 'font-size': 10, fill: '#83918a', 'font-family': 'inherit' });
+    t.textContent = '0.5 mi';
+    p.appendChild(t);
+    var subj = svg('g', {});
+    subj.appendChild(svg('rect', { x: C - 7, y: C - 7, width: 14, height: 14, fill: '#16211c', transform: 'rotate(45 ' + C + ' ' + C + ')' }));
+    var st = svg('text', { x: C, y: C + 24, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#16211c', 'font-family': 'inherit' });
+    st.textContent = 'Property';
+    subj.appendChild(st);
+    p.appendChild(subj);
+    ITEMS.forEach(function (it) {
+      var r = (it.dist / 0.5) * R, th = it.angle * Math.PI / 180;
+      var g = svg('g', { class: 'da-mk', tabindex: '0', role: 'button', transform: 'translate(' + (C + r * Math.cos(th)).toFixed(1) + ' ' + (C - r * Math.sin(th)).toFixed(1) + ')' });
+      g.setAttribute('aria-label', 'Project ' + it.n + ': ' + it.title + ', ' + labelOf(TYPES, it.type) + ', ' + labelOf(STAGES, it.stage) + ', ' + it.dist.toFixed(1) + ' miles');
+      g.appendChild(markerShape(it.stage, 11));
+      var tx = svg('text', { fill: markerInk(it.stage) });
+      tx.textContent = String(it.n);
+      g.appendChild(tx);
+      g.addEventListener('click', function () { select(it.n); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(it.n); } });
+      p.appendChild(g);
+      it.mk = g;
+    });
+    var lg = document.getElementById('daLegend');
+    STAGES.forEach(function (s) {
+      var li = el('li');
+      var sv = svg('svg', { width: 24, height: 24, viewBox: '-12 -12 24 24', 'aria-hidden': 'true' });
+      sv.appendChild(markerShape(s.key, 8));
+      li.appendChild(sv);
+      li.appendChild(document.createTextNode(s.label));
+      lg.appendChild(li);
+    });
+  }
+
+  function buildStages() {
+    var host = document.getElementById('daStages');
+    STAGES.forEach(function (s) {
+      var sec = el('div', 'da-stage');
+      sec.id = 'daStage-' + s.key;
+      var head = el('div', 'da-stagehead');
+      head.appendChild(el('h3', '', s.label));
+      var cnt = el('span', '', '');
+      head.appendChild(cnt);
+      sec.appendChild(head);
+      var empty = el('p', 'da-empty', '');
+      empty.hidden = true;
+      sec.appendChild(empty);
+      var cards = el('div', 'da-cards');
+      ITEMS.filter(function (i) { return i.stage === s.key; }).forEach(function (it) {
+        var c = el('article', 'da-card');
+        c.tabIndex = 0;
+        c.dataset.n = String(it.n);
+        c.dataset.type = it.type;
+        c.dataset.stage = it.stage;
+        var h = el('h4');
+        h.appendChild(el('span', 'da-num', String(it.n)));
+        h.appendChild(document.createTextNode(it.title));
+        c.appendChild(h);
+        var tags = el('div', 'da-tags');
+        var ts = el('span', 'da-tag da-s-' + it.stage);
+        ts.appendChild(el('i', '', 'Stage'));
+        ts.appendChild(document.createTextNode(s.label));
+        var tt = el('span', 'da-tag');
+        tt.appendChild(el('i', '', 'Type'));
+        tt.appendChild(document.createTextNode(labelOf(TYPES, it.type)));
+        tags.appendChild(ts); tags.appendChild(tt);
+        tags.appendChild(el('span', 'da-tag', it.dist.toFixed(1) + ' mi'));
+        c.appendChild(tags);
+        c.appendChild(el('p', '', 'Publisher status: ' + it.status + ' · ' + fmt(it.date)));
+        c.appendChild(el('p', '', it.review));
+        c.appendChild(el('p', 'da-src', it.source + ' · Official source →'));
+        c.addEventListener('click', function () { select(it.n); });
+        c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(it.n); } });
+        it.card = c;
+        cards.appendChild(c);
+      });
+      sec.appendChild(cards);
+      stageEls[s.key].count = cnt;
+      stageEls[s.key].empty = empty;
+      stageEls[s.key].cards = cards;
+      host.appendChild(sec);
+    });
+  }
+
+  function select(n) {
+    state.sel = state.sel === n ? null : n;
+    ITEMS.forEach(function (it) {
+      var on = it.n === state.sel;
+      it.card.classList.toggle('sel', on);
+      it.mk.classList.toggle('sel', on);
+    });
+  }
+
+  // One function decides what is shown: the same Type predicate hides cards and dims markers.
+  function apply() {
+    var t = state.type, tl = labelOf(TYPES, t);
+    var match = function (it) { return t === 'all' || it.type === t; };
+    ITEMS.forEach(function (it) {
+      var on = match(it);
+      it.card.hidden = !on;
+      it.mk.classList.toggle('dim', !on);
+      it.mk.setAttribute('aria-hidden', on ? 'false' : 'true');
+      it.mk.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    if (state.sel && !match(ITEM_BY[state.sel])) select(state.sel);
+    Object.keys(chips).forEach(function (k) { chips[k].setAttribute('aria-pressed', k === t ? 'true' : 'false'); });
+    var total = 0, parts = [];
+    STAGES.forEach(function (s) {
+      var n = count(function (i) { return i.stage === s.key && match(i); });
+      total += n;
+      stageEls[s.key].navCount.textContent = String(n);
+      stageEls[s.key].count.textContent = n + (n === 1 ? ' project' : ' projects');
+      stageEls[s.key].empty.hidden = n > 0;
+      stageEls[s.key].empty.textContent = n > 0 ? '' : 'No ' + tl + ' projects in this stage in this sample.';
+      stageEls[s.key].cards.hidden = n === 0;
+      parts.push(s.label + ' ' + n);
+    });
+    document.getElementById('daFilterStatus').textContent = t === 'all'
+      ? 'Showing all ' + total + ' projects across the three Stage sections.'
+      : 'Showing ' + total + ' ' + tl + (total === 1 ? ' project' : ' projects') + ' across the three Stage sections: ' + parts.join(' · ') + '.';
+  }
+
+  function init() {
+    ITEMS.forEach(function (it) { ITEM_BY[it.n] = it; });
+    buildActivity(); buildScan(); buildPlot(); buildStages(); apply();
+    document.getElementById('daCoverBtn').addEventListener('click', checkCoverage);
+    document.getElementById('daHeroCheck').addEventListener('click', function () {
+      setTimeout(function () { var i = document.getElementById('daCoverInput'); if (i) i.focus({ preventScroll: true }); }, 0);
+    });
+    // The commerce buttons are inert until entitlement and checkout exist.
+    document.querySelectorAll('.da-off').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.preventDefault(); });
+    });
+  }
+  HS.onReady(init);
+})();
+</script>
+</body>
+</html>
