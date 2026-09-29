@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that builds the reportable-events view (decision 10 option (a)).
+Last updated: 2026-09-30, in the PR that records the reportable-events view applied to production (decision 10 option (a)).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -143,8 +143,9 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     `public.dev_change_event_reportable` (`docs/dev-change-reportable.sql`, design doc §11) is the one definition
     of which events may be shown as changes — only those written by an ordinary run; no ledger change, no
     writer change, reversible. A reader must select from it, never from `dev_change_event`; a structural test
-    fails if anything else names the raw table. **Not yet applied to production** (apply follows the merge; it has
-    no reader, so nothing visible changes). **Still open — option (b):** a reviewed change to
+    fails if anything else names the raw table. **Merged (#1470) and applied to production 2026-09-29 20:32Z**
+    (migration `dev_change_reportable_d2_20260930`; it reads 0 reportable events today, against 922,244 events
+    that are all baseline; it has no reader, so nothing visible changed; receipt in design doc §11). **Still open — option (b):** a reviewed change to
     `dev_change_observe_zip` so copies that disagree resolve to the newest materialisation without a change
     event, needed before the recurring job because an ordinary run re-observes ZIP copies and would meet the same
     disagreements, which the view would then show. It is a change to the Order C writer, so it waits for a go.
