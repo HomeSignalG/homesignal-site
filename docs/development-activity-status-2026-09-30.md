@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that adds Order C (the first version of this file merged as #1459).
+Last updated: 2026-09-30, in the PR that records Order C as applied (Order C merged as #1461).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -45,16 +45,17 @@ Last updated: 2026-09-30, in the PR that adds Order C (the first version of this
   byte-identical to the upload, added in the PR that merges this file.
 - B. ~~Audit national identity/lineage~~ —
   `docs/development-activity-audit-b-identity-lineage-2026-09-30.md`, merged with this file.
-- C. Durable observation/delta layer — **built and tested; NOT struck yet.** Founder go given
-  2026-09-30. `docs/dev-change-ledger.sql` + `docs/development-activity-change-layer-2026-09-30.md`;
-  33 SQL checks with 21 prohibited mutations all killed, 29 structural pins. It is struck when it is
-  merged **and** applied to production (then recorded here).
+- ~~C. Durable observation/delta layer~~ — **done.** Merged as #1461 (`764d6e3`) and applied to
+  production 2026-09-29 17:20Z (migration `dev_change_ledger_c1_20260930`, ledger version
+  `20260929172018`). `docs/dev-change-ledger.sql` + `docs/development-activity-change-layer-2026-09-30.md`;
+  33 SQL checks with 21 prohibited mutations all killed (Postgres 16 local, 17 in CI), 29 structural
+  pins. Production receipt: design doc §8.
 - D. National change baseline — **next.** Batch driver + per-ZIP cursor, source-health/freshness
   state, and the baseline run over the 12,722 ZIPs. Depends on C being applied.
-- E. Change-detection tests — **written with C** (all 11 cases, `test/dev_change_ledger_pg/`;
-  map in the design doc §4), so this is struck with C. The one case proven only in part: linked
-  source rows of one project are proven for ZIP copies of a record, not for cross-record lineage
-  (no source-proven identifiers exist yet).
+- ~~E. Change-detection tests~~ — **done with C** (all 11 cases, `test/dev_change_ledger_pg/`; map in
+  the design doc §4). One case is proven only in part, and stays so until sources supply proven
+  identifiers: linked source rows of one project are proven for ZIP copies of a record, not for
+  cross-record lineage.
 - F. Durable `report_id` + `content_hash` — open.
 - G. Deploy / smoke the canonical commercial API — open (national path required).
 - H. Remove the quota bypass — open.

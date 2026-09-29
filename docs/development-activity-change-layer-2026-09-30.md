@@ -112,8 +112,10 @@ e. **The `Decided` lifecycle mismatch** — flagged in the audit, not changed.
   read of that record by up to one sweep.
 - 46 of 5,782 multi-ZIP records disagreed between copies in the sample; rule 2 handles them,
   and the cause is *consistent with* read-time skew, not proven to be the only one.
-- Through PostgREST the authenticator's 8 s `statement_timeout` applies: the largest ZIP
-  (28451, 14,664 rows) must be driven from a direct database connection or pg_cron, not REST.
+- Through PostgREST the authenticator's 8 s `statement_timeout` applies. The production canary took
+  28–33 ms for ZIPs of 41–123 rows; the largest ZIP (28451, 14,664 rows) was **not** timed, so
+  whether it fits under 8 s is unmeasured. Order D's driver should call the function from a direct
+  database connection or pg_cron and measure the largest ZIPs before relying on REST.
 
 ## 7. Apply and rollback
 
@@ -122,3 +124,33 @@ Apply `docs/dev-change-ledger.sql` as one migration (`dev_change_ledger_c1_20260
 if `app_projects` lacks a column it reads. Rollback: the `ROLLBACK` block at the foot of the file
 (drops only its own objects). Verified in Postgres 16 and (CI) 17; idempotent (applied twice in
 the harness).
+
+## 8. Production receipt (2026-09-29)
+
+**Applied 17:20Z** as migration `dev_change_ledger_c1_20260930` (ledger version `20260929172018`),
+from the file on `main` (sha256 `be5f2ac49776e675…`, 23,671 bytes, byte-identical to what CI tested).
+Preflight beforehand: Postgres 17.6, roles present, no `dev_change_*` object existed, every column the
+SQL reads present, default ACLs equal to the ones the test fixture emulates.
+
+**Verified by fingerprint, not by eye.** `md5(prosrc)` and length of all 10 functions equal the values
+computed from the file before applying (for example `dev_change_observe_zip` `17b45b9c4b93` / 8,074
+chars; `dev_change_classify` `0f75659fcc47` / 422). Also read back: 3 tables, RLS on all three, both
+append-only triggers, no privilege of any kind for anon/authenticated/PUBLIC on the tables, sequence or
+any function, `service_role` limited to select+insert on events, all three tables empty before the
+canary, `app_projects` unchanged (3,136,783 rows, normal refresh churn).
+
+**Canary** (run `93776308-b470-4721-98a8-f4f68cc03bc7`, flagged `canary` in its detail; two ZIPs,
+baseline-flagged; it is **not** the national baseline). Expected values were computed independently from
+`app_projects` first; the ledger's answers equalled them exactly:
+
+| ZIP | rows | identities | with siblings | expected events | actual events | time |
+|---|---:|---:|---:|---:|---:|---:|
+| 84302 | 41 | 36 | 5 | 31 | 31 | 28 ms |
+| 19475 | 123 | 112 | 6 | 106 | 106 | 33 ms |
+
+A **second pass** over both ZIPs wrote 0 events, 0 new identities and 0 accepted observations
+(idempotent in production). Final state: 148 identities (137 comparable, 11 `sibling_records`), 137
+events, all `first_detected`, all baseline, none material, none on a non-comparable record, one per
+identity, `change_ready` = 0 everywhere (cold start, as the rule requires).
+
+These 148 identities and 137 events are real baseline rows and stay; Order D continues from them.
