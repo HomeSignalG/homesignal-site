@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that builds the durable report snapshot (Order F).
+Last updated: 2026-09-30, in the PR that records the durable report snapshot (Order F) as applied to production.
 
 ## Master steps (plan "Master Step Plan")
 
@@ -25,7 +25,8 @@ Last updated: 2026-09-30, in the PR that builds the durable report snapshot (Ord
 5. Standardize development/change content and lifecycle — **open.** Rulings R1–R3 apply.
    One mismatch to resolve first: stored status `Decided` (19,309 rows) resolves to
    "Lifecycle unknown" in `lib/project-type.js` while `decision.ts` buckets it as proposed.
-6. Durable report snapshot (`report_id` vs `content_hash`) — **open.**
+6. Durable report snapshot (`report_id` vs `content_hash`) — **storage layer done (Order F);** the
+   customer-facing use of it waits for Orders G, J and L.
 7. Secure share + print/PDF + disclosure + audit trail — **open.**
 8. Agent Workspace + Brokerage Admin — **open.**
 9. Canonical commercial property-intelligence API — **open.** One generation path, and it
@@ -65,11 +66,14 @@ Last updated: 2026-09-30, in the PR that builds the durable report snapshot (Ord
   the design doc §4). One case is proven only in part, and stays so until sources supply proven
   identifiers: linked source rows of one project are proven for ZIP copies of a record, not for
   cross-record lineage.
-- F. Durable `report_id` + `content_hash` — **built, in review** (`docs/report-snapshot.sql`, `docs/report-snapshot-contract-2026-09-30.md`).
-  Not struck until it is merged and applied. When done it will mean: a table that stores a report, a database-minted
-  `report_id` per stored snapshot, a `content_hash` that the database checks, and a shared module — **and nothing
-  calls the writer until Order G**; the legacy NYC page and API are untouched (R6). Two questions it leaves for
-  Orders J and L: whose report it is, and how long a stored customer address may be kept.
+- ~~F. Durable `report_id` + `content_hash`~~ — **done.** Merged as #1475 (`76dca60`) and applied to production
+  2026-09-29 21:16Z (migration `report_snapshot_f1_20260930`, ledger version `20260929211614`).
+  `docs/report-snapshot.sql` + `docs/report-snapshot-contract-2026-09-30.md`. It means: a table that stores a
+  report, a database-minted `report_id` per stored snapshot, a `content_hash` that the database checks, and a shared
+  module — **and nothing calls the writer until Order G**; the table holds 0 rows; the legacy NYC page and API are
+  untouched (R6). Production receipt: contract doc §7. Two questions it leaves for Orders J and L: whose report it
+  is, and how long a stored customer address may be kept (open founder decision, needed before the first real
+  report is stored).
 - G. Deploy / smoke the canonical commercial API — open (national path required).
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
