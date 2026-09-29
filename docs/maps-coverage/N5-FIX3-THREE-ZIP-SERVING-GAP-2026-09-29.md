@@ -111,6 +111,16 @@ in the database. Both READY and ACTIVATE already run this function, so both refu
   `B3` restored. `M21` (the comparison removed) is killed by B1; `M22` (only one direction checked)
   is killed by B2. The end-to-end lifecycle through the real orchestrator also passes.
 
+**Applied 2026-09-29 23:56Z** from `main` at `57aa5b6` (#1482), through `db-sql.yml` run
+`36647789091`. Read back afterwards through MCP:
+
+- Live `md5(prosrc)` is `66f5995db01c5bb8d6c9d88f9a217234`, which is Part G's post-condition
+  value. The grants are unchanged (`postgres` only).
+- The new check's predicate on the ACTIVE generation `n5-national-2026-09-27`: 12,722 status rows,
+  **0 disagreements**. It takes 88 ms (`explain analyze`).
+- `n5-national-2026-09-29` (BUILDING) had 0 status rows at that moment, so the check had nothing to
+  read there yet. It applies when that generation publishes and asks for READY.
+
 ### 5.2 The live verifier stops failing on a state that is now correctly empty
 
 `verify-map1-zip-states` had been red since the first national activation (runs 90 and 91) with a
