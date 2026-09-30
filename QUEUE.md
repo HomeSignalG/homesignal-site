@@ -66,6 +66,8 @@ boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVIN
   ZIP from the TIGER file the loader downloads, so a skipped shape would have published a
   boundary-bearing ZIP as `not_measured` and passed every existing check. Measured before
   applying: 0 disagreements in every generation.
+  **Applied 2026-09-29 23:56Z** (`db-sql.yml` run `36647789091`, from `main` `57aa5b6`): live
+  `md5(prosrc)` `66f5995d…` = Part G's post-condition; ACTIVE generation 12,722 rows, 0 disagree.
 - **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
   failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
   only live members of that state. It now asserts the three resolve to a measured state, and

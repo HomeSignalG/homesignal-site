@@ -111,6 +111,16 @@ in the database. Both READY and ACTIVATE already run this function, so both refu
   `B3` restored. `M21` (the comparison removed) is killed by B1; `M22` (only one direction checked)
   is killed by B2. The end-to-end lifecycle through the real orchestrator also passes.
 
+**Applied 2026-09-29 23:56Z** from `main` at `57aa5b6` (#1482), through `db-sql.yml` run
+`36647789091`. Read back afterwards through MCP:
+
+- Live `md5(prosrc)` is `66f5995db01c5bb8d6c9d88f9a217234`, which is Part G's post-condition
+  value. The grants are unchanged (`postgres` only).
+- The new check's predicate on the ACTIVE generation `n5-national-2026-09-27`: 12,722 status rows,
+  **0 disagreements**. It takes 88 ms (`explain analyze`).
+- `n5-national-2026-09-29` (BUILDING) had 0 status rows at that moment, so the check had nothing to
+  read there yet. It applies when that generation publishes and asks for READY.
+
 ### 5.2 The live verifier stops failing on a state that is now correctly empty
 
 `verify-map1-zip-states` had been red since the first national activation (runs 90 and 91) with a
@@ -128,6 +138,10 @@ were the only live members of that state.
 - Offline pins `10a`-`10g` in `test/map1-zip-state-kind-resolution.test.mjs`; three mutations of
   the verifier (gap may be pending, fake need not fire, any state may be synthetic) each fail it
   on exit code.
+- **First run from `main` after the merge and the Part G apply** (`verify-map1-zip-states` #94,
+  run `36647946914`, 2026-09-29 23:58Z): `LIVE ZIP-STATE GATE: PASS`. 94128 and 95219 read
+  measured_zero and 99128 authoritative. The synthetic pending case replaced 1 development-geography
+  request on 94128 and passed.
 
 ## 6. Not changed
 

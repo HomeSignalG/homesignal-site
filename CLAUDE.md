@@ -2299,7 +2299,8 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   LEGACY GENERATION AT ALL, AND HAVE SERVED `boundary_complete` SINCE 2026-09-27.** Each is the only
   canonical ZIP of its prefix, and the retired legacy writer built only shard prefixes. **A status
   row must also be the RIGHT one**: READY/ACTIVATE now refuse `canonical_zip_status_disagrees_with_boundary`
-  (status vs `geo.zcta_boundary`, both directions; Part D D11, applied by Part G). Receipt:
+  (status vs `geo.zcta_boundary`, both directions; Part D D11, applied by Part G on 2026-09-29
+  23:56Z, live `md5(prosrc)` `66f5995d…`). Receipt:
   `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`. `pending` now has no live member
   by design; `verify-map1-zip-states` exercises it synthetically and fails if any of the three reads it.
 - **Proof:** `test/n5_generation_pg/run_suite.py` (58 assertions + 10 mutations, all killed) via
