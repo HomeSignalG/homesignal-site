@@ -90,3 +90,5 @@ console.log(JSON.stringify(A, null, 2));
 console.log('ASSERTIONS_JSON_END');
 if (consoleErrors.length) { console.log('CONSOLE_ERRORS:', JSON.stringify(consoleErrors, null, 2)); }
 console.log('Screenshot:', OUT_PNG);
+
+// homepage-map-preview refresh 2026-09-30
