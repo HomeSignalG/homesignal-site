@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that builds the Order G national report engine (built and proven; not yet deployed).
+Last updated: 2026-09-30, in the PR that records the Order G production receipt (deployed; gates smoked; signed-in path not exercised).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -87,8 +87,13 @@ Last updated: 2026-09-30, in the PR that builds the Order G national report engi
   §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
   of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
   boundary-test checklist (§8.4).
-- G. Deploy / smoke the canonical commercial API — **in progress: the national engine is built and proven, deployment and
-  smoke are the next step.** **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
+- G. Deploy / smoke the canonical commercial API — **done for what it claims: the national engine is deployed (function
+  `get-development-activity-report`, version 1, JWT on, run `36648751939`) and its two access gates are smoked in production;
+  the signed-in path is NOT exercised, so no end-to-end report has been generated there.** Production receipt:
+  `docs/development-activity-report-engine-2026-09-30.md` §11. It stores nothing (both report tables read 0 rows), and the
+  ledger has no reportable events yet (0), so today a report can show Recent Official Activity but not What Changed Recently.
+  One logged-not-taken limit: a capped hydrate chunk fails the request rather than splitting (worst measured 572 of 1,000 rows).
+  **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
   (three are now proven, two are open: the Follow / Changes Since Report surface, and arming the purge).
