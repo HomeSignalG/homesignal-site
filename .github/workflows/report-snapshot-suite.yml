@@ -13,8 +13,13 @@ name: report-snapshot-suite
 #      private context leaves it byte-identical; the exact Order F table that is live in production
 #      upgrades to a fresh-install shape (and is refused if a report is stored); then every prohibited
 #      mutation, each of which MUST fail the suite.
+#   3. the NATIONAL REPORT ENGINE (Order G): its real output, assembled for six subject addresses, is stored by the
+#      real snapshot module through the real writer, and every assertion is about what the database holds — one
+#      permanent report for six customers, no private value or fragment in it, the private layer holding exactly what
+#      was entered, a purge leaving the report byte-identical, and each kind of leak caught where it can be.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
-# test/report-private-context-structure.test.mjs) run in unit-tests.yml with every other offline suite.
+# test/report-private-context-structure.test.mjs, test/national-report*.test.mjs) run in unit-tests.yml with every
+# other offline suite.
 #
 # This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
 # address the disposable container.
@@ -30,6 +35,10 @@ on:
       - 'test/report-private-context-structure.test.mjs'
       - 'test/report-snapshot.test.mjs'
       - 'supabase/functions/_shared/report-snapshot.ts'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -38,6 +47,10 @@ on:
       - 'docs/report-private-context.sql'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -74,6 +87,11 @@ jobs:
           fi
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      # 22, not the runner's default: the national report round trip imports the real TypeScript modules
+      # (report-snapshot.ts, national-report.ts), and Node strips types on import from 22.18 — the same pin unit-tests.yml uses.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: The private context passes; it applies twice; every prohibited mutation is killed
         env:
           PGHOST: localhost
@@ -94,3 +112,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_snapshot_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rs.log
+      - name: The national report engine's real output goes through the real writer
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/national_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/nr.log
