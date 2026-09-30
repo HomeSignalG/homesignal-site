@@ -200,7 +200,10 @@ the exact problem `QUEUE.md` exists to end.
 ## Permanent historical intelligence — preserve the longitudinal asset
 
 **HomeSignal's longitudinal development history is a core company data asset. Current product
-state may change; historical evidence must survive.** This rule governs every ingest,
+state may change; historical evidence must survive.**
+
+**Binding data contract:** `docs/historical-intelligence-data-contract.md` defines the minimum
+objects, evidence, lineage, provenance, retention and acceptance tests required to preserve that asset. This rule governs every ingest,
 deduplication, classification, refresh, archive, retirement, merge, cleanup, migration and
 storage-optimization decision involving development, regulatory or environmental records.
 
