@@ -199,9 +199,70 @@ change, and states `from` and `to` for each changed field.
 ## 9. Deployment and smoke
 
 Not deployed when this file was written. The production receipt is recorded as §11 after the deploy and the smoke test, in its own
-change, so this file never describes a state it did not measure.
+change, so this file never describes a state it did not measure. **§11 now exists; read it for what is live.**
 
 ## 10. Rollback
 
 No database object changed. To remove the endpoint: delete the function (Supabase dashboard or `supabase functions delete
 get-development-activity-report`). Nothing else depends on it.
+
+## 11. Production receipt (2026-09-30) — deployed, gates smoked, the signed-in path NOT exercised
+
+**Deployed.** `deploy-edge-functions.yml` run `36648751939` (dispatch from `main`, head `51e495b`, the #1483 merge) succeeded in
+under a minute (job 00:07:46–00:08:26Z), every step green, including the unconditional post-deploy `registry_incomplete_entries` recompute (checked beforehand to be a
+no-op: md5 `24d72bc484e5c34ab4691fef3d710949` on both sides, 10 rows, registry sha `d9dabc6b…`). Read back with
+`list_edge_functions`: slug `get-development-activity-report`, **ACTIVE, version 1, `verify_jwt: true`**, entrypoint the repo path
+`supabase/functions/get-development-activity-report/index.ts`. The 20 other functions in the listing all carry an update time
+earlier than this function's creation, so the run changed none of them.
+
+**What was exercised in production** (from Postgres through `pg_net`, since the sandbox has no egress; requests 6896–6899):
+
+| probe | answer | what it shows |
+|---|---|---|
+| POST, no `Authorization` | **401** `UNAUTHORIZED_NO_AUTH_HEADER` | the gateway refuses an unsigned call |
+| POST, `Bearer not-a-real-token` | **401** `UNAUTHORIZED_INVALID_JWT_FORMAT` | the gateway refuses a malformed token |
+| POST, the public **anon key** as apikey and Bearer | **401** `{"error":"unauthorized"}`, `Cache-Control: no-store` | **the second gate works**: the anon key is validly signed and passes the gateway, and the handler's own answer (it has no signed-in user) is what stops it. This is the case the design exists for. |
+| GET, anon key | **200**, `stores_reports: false`, `access: "signed-in internal user only …"`, `Cache-Control: no-store` | the capability answer, and the store switch reads OFF |
+
+**Nothing was stored.** Read straight after: `report_snapshot` **0** rows, `report_private_context` **0** rows (controls in the same
+query: `dashboard_admins` 1, `canonical_zip_registry` 12,722). The endpoint never calls the writer (pinned), and none of the four
+probes got past authentication, so none reached a data read.
+
+**What was NOT exercised, and must not be read as proven:** the signed-in, allow-listed path (geocode → registry → radius →
+hydrate → ledger → events → health → compose). The sandbox holds no admin session token and none was minted or forged, so **no
+end-to-end report has been generated in production.** What stands in for it is narrower, and each piece is a read of production:
+
+- **Every column the function selects exists**: 38 of 38 (`app_projects` 16, `dev_change_project` 7,
+  `dev_change_event_reportable` 9, `dev_change_source_health` 4, `dashboard_admins.email`, `canonical_zip_registry.zip`). A wrong
+  column name would have turned every admin call into a 502; none is wrong.
+- **The spatial read answers with the shape the function expects**: `n5_projects_within_radius(lat, lng, radius, limit)` returns
+  `source_key, feature_id, registry_id, provenance, distance_mi, geometry_type, marker_lat, marker_lng, has_more`. New Orleans,
+  1 mile: 100 rows, 100 distinct projects, nearest 0.111 mi, farthest 0.995 mi, `has_more` false (so the 100 is a real count and
+  not a cap). Same point, 5 miles: 1,000 rows, `has_more` **true** — the truncation the report discloses as `AREA_TRUNCATED`.
+  Brigham City, 1 mile: 10 rows.
+- **The ledger has no events to report yet**: `dev_change_event_reportable` holds **0** rows, against `dev_change_project` 932,969
+  and `dev_change_source_health` 237. So today no project can reach **What Changed Recently**; everything a report shows is
+  **Recent Official Activity** from the publisher's own dates, and the change section is empty by construction until a second
+  observation of the same records exists. That is Order D's recurring observation, which is a separate go.
+
+**Database cost, measured in Postgres only** (the Census geocode and the network are not in these numbers): the 5-mile radius read
+at New Orleans, 1,000 rows, **134 ms**; the 1-mile radius read joined to a 25-key hydrate from `app_projects` (an index-only scan,
+256 rows) in one plan, **109 ms** in total, so the hydrate alone is less than that. A full 5-mile report reads up to 40 hydrate
+chunks, four at a time; the total for a whole request was not measured.
+
+**A limit found while measuring, not fixed here.** A project has one `app_projects` copy per ZIP page it appears on, so a 25-key
+chunk returns more than 25 rows. Six dense centres at 5 miles (each 1,000 keys, sorted as the handler sorts them): worst chunk
+**572 rows** (Chicago Loop), most copies of one key **38** (Miami), **0 chunks at or over the 1,000-row cap**. `data.ts` refuses a
+response that reaches the cap, so a chunk that did reach it would fail the request as `data_unavailable` (502), never return a
+short list. That is the safe direction, but the margin at Chicago is under a factor of two. The fix is to split a capped chunk and
+retry rather than fail; it is a code change and is **logged, not taken**.
+
+**Still true after deploy:**
+- Nothing customer-facing exists: no page, no navigation, no caller. The only callers are a signed-in allow-listed user with a
+  hand-built request.
+- The rights registry is empty, so every customer-view report is LIMITED COVERAGE with no records; the internal view shows records
+  labelled HOLD and reports `storable: false` with its blockers.
+- Storing a real customer report stays off until the two open gates in the private-context contract §6 close: the Follow / Changes
+  Since Report surface, and arming the purge (a new scheduled job, its own go).
+
+**Rollback** is §10: delete the function. Nothing depends on it.
