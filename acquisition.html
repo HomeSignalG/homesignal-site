@@ -1612,7 +1612,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
           p_reviewed_image_path: gr?(gr.image_bucket_path||''):null,
           p_reviewed_embed_uri: gr?((gr.embed&&gr.embed.uri)||''):null
         });
-        if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
+        // A REFUSAL IS SHOWN ONCE, THEN THE QUEUE IS RE-READ — NEVER RETRIED. A stale review
+        // ("re-read it before approving") means the row moved; refreshBluesky() rebuilds
+        // _bskyRows, so the NEXT click reviews the current revision. It does not call
+        // hs_approve_social_post: the founder must look again and approve again.
+        if(r.error){ alert('Approve failed: '+(r.error.message||'')); refreshBluesky(); return; }
       } else if(act==='skip'){
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
         if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }
