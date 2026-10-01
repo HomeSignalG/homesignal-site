@@ -73,6 +73,16 @@
     var id = (location.hash || '').slice(1);
     var el = id && document.getElementById(id);
     if (el) el.scrollIntoView();
+    // On this page the Terms link is a jump within the page, not a page load, so nothing
+    // closes the phone drawer behind it (shell.js closes it only for the primary nav links).
+    // Close it here for any sidebar link that stays on this document.
+    document.querySelectorAll('#hs-side a[href*="#"]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        if (a.pathname !== location.pathname) return;
+        var side = document.getElementById('hs-side');
+        if (side && side.classList.contains('open')) HS.toggleMenu();
+      });
+    });
   });
 </script>
 </body>

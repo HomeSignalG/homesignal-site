@@ -14,7 +14,7 @@
 //   5. the five support links sit in the sidebar footer, in order, without overflow at
 //      1280px and at 390px;
 //   6. privacy.html#terms lands on the Terms heading even though the page body is injected
-//      after load;
+//      after load, and tapping Terms from the open phone drawer on privacy.html closes it;
 //   7. Enterprise is linked but still noindex.
 //
 // NO NETWORK. The supabase-js CDN request is fulfilled locally with a stub whose session is
@@ -207,6 +207,7 @@ const MATRIX = [
   ['/dashboard.html', ['props']],
   ['/alerts.html?zip=78617', ['props']],
   ['/reports.html', ['props']],
+  ['/property.html?id=' + SAVED.id, ['props']],
   ['/development-activity.html', ['enterprise']],
   ['/how-it-works.html', []],
   ['/about.html', []],
@@ -309,6 +310,40 @@ ok(t.exists && t.text === 'Terms of Use', '6 privacy.html has the Terms of Use h
 ok(t.scrollY > 0 && t.top >= 0 && t.top < t.vh, '6 1280px: #terms opens scrolled to the Terms heading', t);
 t = await terms(M.page);
 ok(t.top >= 0 && t.top < t.vh && t.scrollY > 0, '6 390px: ...and on a phone', t);
+
+// On privacy.html the Terms link stays on the same document, so no page load closes the
+// phone drawer. Tap it from the open drawer, both from the top of the page and when the URL
+// already ends in #terms (no hashchange fires then), and the drawer must close on Terms.
+// about:blank first: going to privacy.html#terms from privacy.html#terms is a jump within
+// the page, not a load, so the previous case's drawer state would carry over.
+const termsFromDrawer = async (page, start) => {
+  await page.goto('about:blank');
+  await page.goto(base + start, { waitUntil: 'domcontentloaded' });
+  await waitReady(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => window.HS.toggleMenu());
+  await page.waitForTimeout(350);
+  const before = await page.evaluate(() => document.getElementById('hs-side').classList.contains('open'));
+  let clickError = null;
+  try {
+    await page.click('#hs-side .sidefoot a[href="privacy.html#terms"]', { timeout: 5000 });
+  } catch (e) { clickError = String(e).split('\n')[0]; }
+  await page.waitForTimeout(400);
+  return page.evaluate(([b, ce]) => {
+    const h = document.getElementById('terms');
+    const r = h.getBoundingClientRect();
+    return { openBefore: b, clickError: ce, sideOpen: document.getElementById('hs-side').classList.contains('open'),
+             backdrop: document.getElementById('sidebackdrop').classList.contains('show'),
+             hash: location.hash, path: location.pathname, top: Math.round(r.top), vh: window.innerHeight };
+  }, [before, clickError]);
+};
+for (const start of ['/privacy.html', '/privacy.html#terms']) {
+  const d = await termsFromDrawer(M.page, start);
+  ok(d.openBefore && !d.clickError, '6 390px ' + start + ': the drawer was open and Terms was tapped (positive control)', d);
+  ok(!d.sideOpen && !d.backdrop, '6 390px ' + start + ': tapping Terms closes the drawer', d);
+  ok(d.path === '/privacy.html' && d.hash === '#terms' && d.top >= 0 && d.top < d.vh,
+    '6 390px ' + start + ': ...and shows the Terms heading', d);
+}
 
 // ═══ 7. Enterprise is linked, still noindex ═══
 console.log('--- 7. Enterprise stays noindex ---');
