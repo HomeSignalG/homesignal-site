@@ -838,24 +838,29 @@ async function finishCapture(d, label, r, proj, results) {
     ...(r.absence ? { absence: true } : { marker: r.marker, framed: r.framed }) });
 }
 
-// THE ZIP FALLBACK IS AT MODULE SCOPE SO ITS BODY CAN BE EXECUTED, not merely wired.
-// It was a closure inside `main()`, which made it unreachable from the offline suite: the
-// tests could assert that all five record-refusal exits CALL it and nothing about what it
-// then DOES. That is the shape this repo already names — a wiring pin reads as coverage
-// while the body it points at is never run — and it is why mutation F survived the whole
-// suite. Every value it needs is now an explicit parameter, which also removes the closure
-// class that produced `ReferenceError: scope is not defined` in #1287.
-async function zipMapFallback(page, d, label, results, why) {
-  const themeZ = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
-  let rz;
-  try { rz = await captureAbsence(page, d, themeZ); }
-  catch (e) { rz = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
-  if (rz.theme === undefined) rz.theme = themeZ || null;
-  // The reason the picture is of the ZIP rides on the row, so a reader can tell a
-  // deliberate fallback from an absence answer. `proj` stays null, which is what makes
-  // `finishCapture` key and name it at ZIP scope.
-  if (rz.ok) rz.zip_scope_reason = why;
-  await finishCapture(d, label, rz, null, results);
+// ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — FOUNDER RULING
+// 2026-10-01. When Map 1 cannot pin the project (the row is gone, is not a development
+// record, has no coordinates, has moved away from the draft, or is not drawn in this ZIP),
+// the draft gets NO picture and the reason is recorded. No ZIP map stands in for it: six
+// project posts went out on a ZIP map (five of them naming the wrong ZIP) and were deleted
+// from Bluesky the same day. A draft with no picture cannot be approved, so the founder
+// sees the reason on the dashboard instead of a picture that shows something else.
+//
+// 🛑 SUPERSEDES the 2026-09-21/22 "PROJECT MAP -> ZIP MAP" fallback that stood here, which
+// photographed the whole ZIP for these drafts. Posts with NO project are untouched: they
+// still get the map of their ZIP through `captureAbsence`, and are correct as they are.
+//
+// CAPTURE_INELIGIBLE is the state that means exactly this ("cannot be photographed on its
+// ZIP page yet"), and its long retry floor brings the row back in case the record becomes
+// drawable. It is kept at module scope so its body can be executed offline.
+async function projectPinRefusal(d, label, results, why) {
+  const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+  const reason = `The project's own pin could not be shown on Map 1: ${why}. A post about a `
+    + 'project must show its own pin with its popup open (founder ruling 2026-10-01), so no '
+    + 'ZIP map stands in for it.';
+  const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, reason, theme, 'project');
+  results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason, theme,
+    ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
 }
 
 /**
@@ -938,16 +943,10 @@ async function main() {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
 
-    // 🗑️ THE `ineligible(...)` HELPER IS GONE, AND ITS ABSENCE IS THE POINT. It recorded a
-    // refusal on the row for five record-shaped conditions; under the every-post-gets-a-map
-    // ruling every one of those is a DEMOTION to ZIP scope instead, so nothing here can
-    // produce CAPTURE_INELIGIBLE any more. Leaving an uncalled helper behind would read to
-    // the next session as a live path.
-    //
-    // ⚠️ INELIGIBLE IS NOT DELETED FROM THE VOCABULARY. 28 production rows still carry that
-    // stamp from runs before this, `lib/maps-capture-binding.js` still reports it, and its
-    // long retry floor is what brings those rows back for a capture. What changed is that
-    // no row SHAPE earns it: it is now only ever a historical value.
+    // ⚖️ CAPTURE_INELIGIBLE IS LIVE AGAIN (founder ruling 2026-10-01): it is what a post
+    // about a project records when Map 1 cannot pin that project. See projectPinRefusal().
+    // (From 2026-09-21 to 2026-10-01 those drafts were demoted to a ZIP map instead, and
+    // this state was only ever a historical stamp.)
 
     // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
     // This branch used to read `await ineligible('the draft carries no project_id, so there
@@ -969,32 +968,24 @@ async function main() {
       continue;
     }
 
-    // ⚖️ A PROJECT THAT CANNOT BE TRUTHFULLY PINNED IS A REASON TO PHOTOGRAPH THE ZIP, NOT
-    // A REASON TO SHIP A POST WITH NO MAP — founder ruling, 2026-09-21. The five branches
-    // below each ended the draft's run with `ineligible(...)` and no picture at all. The
-    // fallback the ruling states is:
+    // ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — founder ruling
+    // 2026-10-01, superseding the 2026-09-21 "PROJECT MAP -> ZIP MAP" fallback that stood
+    // here. The five branches below are statements about the RECORD: it is gone, it is not
+    // a development row, it has no coordinates, it has moved away from the draft, or the
+    // ZIP's authoritative set does not contain it. Each now leaves the draft with no picture
+    // and the reason recorded (CAPTURE_INELIGIBLE), which keeps Approve blocked.
     //
-    //     PROJECT MAP  ->  (if the project cannot be truthfully represented)  ->  ZIP MAP
-    //
-    // and never PROJECT MAP -> NO MAP. #1280 reached this conclusion for the ABSENCE post
-    // (no project at all) and left these four, which are the same fact arriving later: the
-    // row names a project, and Map 1 cannot place it.
-    //
-    // ⛔ THIS IS NOT "any failure becomes a ZIP map". These are all statements about the
-    // RECORD — it is gone, it is not a development row, it has no coordinates, it has moved
-    // away from the draft, or the ZIP's authoritative set does not contain it. A genuine
-    // INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter could not
-    // verify the controls) still returns `{ok:false}` from `capture*()` and is still
-    // recorded as CAPTURE_FAILED by `finishCapture`. Hiding a broken instrument behind a
-    // weaker screenshot is the one thing the ruling explicitly forbids.
-    const zipFallback = (why) => zipMapFallback(page, d, label, results, why);
+    // ⛔ A genuine INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter
+    // could not verify the controls) still returns `{ok:false}` from `capture*()` and is
+    // still recorded as CAPTURE_FAILED by `finishCapture`.
+    const pinRefusal = (why) => projectPinRefusal(d, label, results, why);
 
     const proj = await liveProject(pid);
-    if (!proj) { await zipFallback('the project row is no longer in app_projects'); continue; }
-    if (proj.record_kind !== 'development') { await zipFallback('the live row is not a development record'); continue; }
-    if (proj.lat == null || proj.lng == null) { await zipFallback('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
+    if (!proj) { await pinRefusal('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await pinRefusal('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await pinRefusal('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      await zipFallback('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
+      await pinRefusal('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
       continue;
     }
 
@@ -1003,7 +994,7 @@ async function main() {
       const why = auth.status !== 'boundary_complete'
         ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      await zipFallback(why);
+      await pinRefusal(why);
       continue;
     }
 
@@ -1327,9 +1318,10 @@ async function recordOutcome(draft, state, reason, theme, scope) {
             ? 'No Map 1 visual could be produced truthfully for this MAPS \u00b7 Data Center Theme '
               + 'candidate. There is NO generic fallback for this theme: approval is blocked in '
               + 'the Acquisition Dashboard until a real capture of the exact project exists.'
-            : 'No project-specific Map 1 visual could be produced truthfully. The draft keeps '
-              + 'its factual text and its Map 1 link; the generic OpenGraph link card remains the '
-              + 'publication fallback and is NOT a project-specific map preview.',
+            : 'No Map 1 visual could be produced truthfully for this MAPS post. Every MAPS post '
+              + 'publishes with its map or not at all (a post about a project with that project\'s '
+              + 'own pin, popup open): approval is blocked in the Acquisition Dashboard until a '
+              + 'real capture exists.',
         },
       },
   });

@@ -1772,6 +1772,22 @@ capture clipped to `#map`.
 
 ## 7.07 EVERY MAPS POST MUST HAVE A MAP — THE LADDER IS `PROJECT MAP → ZIP MAP`, NEVER `→ NO MAP` ⚖️ FOUNDER RULING (2026-09-22)
 
+🛑 **SUPERSEDED FOR PROJECT POSTS, 2026-10-01 (founder): "all mp posts need a pin pop up".** A
+MAPS post about a project (`evidence.project_id` set) must show that project's OWN pin with its
+popup open. The `→ ZIP MAP` step no longer applies to it: when the capture job cannot pin the
+project it calls `projectPinRefusal` (it replaced `zipMapFallback` in
+`scripts/maps-social-image.mjs`) and records `CAPTURE_INELIGIBLE` with no picture, which keeps the
+draft unapprovable. **Posts with no project keep the ZIP map and are correct as they are**
+(founder: *"there is no address to pin so they are correct and stay"*).
+- `lib/maps-capture-binding.js`: a project post on a ZIP-scope picture, or a project picture that
+  does not record `visual.popup_open`, is not bound and is refused by `bskyMapGateBlock`; the
+  dashboard says why.
+- The enforced boundary is still the database: `public.hs_maps_map_gate_violations`, migration
+  `20261001233000` in homesignal-ingest. `test/fixtures/maps-map-gate-cases.json` case 04 is now
+  refused and case 14 (project pin with no popup recorded) was added; the parity harness reads that
+  migration.
+- The rest of this section is the dated record of the 2026-09-22 ruling.
+
 **§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
 MAPS post that cannot truthfully pin its record does **not** fall through to no image — it
 falls back to the map of its own ZIP, which is a real screenshot of a real page and is what a

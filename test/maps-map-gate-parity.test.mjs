@@ -115,14 +115,18 @@ for (const a of (FX.known_asymmetries || [])) {
 
 // ── §2 THE REGRESSIONS ARE NAMED, so a revert is a red test and not a measurement ─────
 for (const needle of ['REGRESSION #560: projectless row carrying a project-framed key',
-                      'CONTROL a future non-record subject token must still pass']) {
+                      'CONTROL a future non-record subject token must still pass',
+                      'REFUSED (founder 2026-10-01): a project post on a ZIP map',
+                      'REFUSED (founder 2026-10-01): a project pin with no popup recorded']) {
   ok(FX.cases.some((c) => c.name.indexOf(needle) > -1),
     `2: the fixture still carries "${needle}"`);
 }
 
 // ── §3 THE SQL HALF — emitted, and honest about not having run ───────────────────────
+// The definition of record since the founder's 2026-10-01 ruling (a post about a project
+// shows its own pin, popup open). It supersedes 20260922000500.
 const MIG = new URL('../../homesignal-ingest/supabase/migrations/'
-  + '20260922000500_maps_map_gate_definition_of_record.sql', import.meta.url);
+  + '20261001233000_maps_project_post_requires_project_pin.sql', import.meta.url);
 const emitArg = process.argv.indexOf('--emit-sql');
 if (!existsSync(MIG)) {
   console.log('SKIP — §3 SQL parity: homesignal-ingest is not checked out beside this repo, so '
@@ -132,7 +136,9 @@ if (!existsSync(MIG)) {
   const src = readFileSync(MIG, 'utf8');
   const i = src.indexOf('CREATE OR REPLACE FUNCTION');
   ok(i > -1, '3a: the record file carries a literal function definition');
-  const fn = src.slice(i)
+  // Only the function itself: the record file also carries fingerprint guards (DO blocks)
+  // that read the live function by name, and they must not be emitted into this query.
+  const fn = src.slice(i, src.indexOf('$function$;', i) + '$function$;'.length)
     .replace(/public\.hs_maps_map_gate_violations/g, 'pg_temp.hs_maps_map_gate_violations')
     .replace(/CREATE OR REPLACE FUNCTION public\./, 'CREATE OR REPLACE FUNCTION pg_temp.')
     .replace(/CREATE OR REPLACE FUNCTION hs_maps/, 'CREATE OR REPLACE FUNCTION pg_temp.hs_maps');
@@ -142,7 +148,7 @@ if (!existsSync(MIG)) {
   // those and drops the rest. That keeps the query small enough to paste into a console, which
   // is the only channel this sandbox has, WITHOUT feeding the two halves different inputs:
   // anything dropped here is something the function cannot reach.
-  const READS = /capture_policy|project_id|image_bucket_path|content_family|\bzip\b|capture_key|'scope'/;
+  const READS = /capture_policy|project_id|image_bucket_path|content_family|\bzip\b|capture_key|'scope'|popup_open/;
   ok(READS.test(src), '3b: control — the projection below names fields the function text actually reads');
   const rows = FX.cases.map((c, k) => {
     const p = buildRow(c);
@@ -153,6 +159,7 @@ if (!existsSync(MIG)) {
       ev.visual = {};
       if ('scope' in v) ev.visual.scope = v.scope;
       if ('capture_key' in v) ev.visual.capture_key = v.capture_key;
+      if ('popup_open' in v) ev.visual.popup_open = v.popup_open;
       if (v.capture_policy && 'scope' in v.capture_policy) {
         ev.visual.capture_policy = { scope: v.capture_policy.scope };
       }

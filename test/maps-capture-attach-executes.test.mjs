@@ -68,7 +68,7 @@ const ABS = 'async function captureAbsence(page, draft, theme) {';
 ok(SRC.includes(ABS), '0b3: the absence-capture declaration is where the harness expects it');
 const patched = stripped.replace(PW, "const chromium = { launch: async () => { throw new Error('stubbed'); } };")
   .replace(ABS, ABS + ' if (globalThis.__TEST_ABSENCE) return globalThis.__TEST_ABSENCE(page, draft, theme);')
-  + '\nexport { attach, finishCapture, zipMapFallback };\n';
+  + '\nexport { attach, finishCapture, projectPinRefusal };\n';
 ok(!patched.includes(PW), '0b2: …and the stub replaced it');
 ok(patched.includes(ABS + ' if (globalThis.__TEST_ABSENCE)'),
   '0b4: …and the absence-capture injection point was spliced in');
@@ -211,81 +211,56 @@ ok(!/r\.scope\s*\|\|/.test(CODE),
   '4d: the second derivation is gone — nothing ever set that field, so it always fell '
   + 'through to re-deriving what finishCapture had already decided');
 
-// ── §5 THE ZIP FALLBACK'S BODY IS EXECUTED, NOT JUST WIRED ───────────────────────────
-// WHY THIS SECTION EXISTS: `zipFallback` was a closure inside `main()`, so nothing offline
-// could reach it. The suite could assert that all five record-refusal exits CALL it and
-// NOTHING about what it then did — which is why the mutation that guts its body survived
-// the entire set. Lifting it to module scope is what makes the assertions below possible;
-// they are the point of the lift, not a bonus.
-ok(mod && typeof mod.zipMapFallback === 'function',
-  '5a: `zipMapFallback` is reachable at module scope — the lift worked');
+// ── §5 A PROJECT THAT CANNOT BE PINNED GETS NO PICTURE — EXECUTED, NOT JUST WIRED ─────
+// ⚖️ FOUNDER RULING 2026-10-01: a post about a project must show that project's own pin
+// with its popup open. Until then the five record-refusal exits photographed the whole ZIP
+// instead (`zipMapFallback`, executed here from 2026-09-22). They now record a refusal and
+// write no picture (`projectPinRefusal`), which keeps Approve blocked. Its body is at module
+// scope so it runs here.
+ok(mod && typeof mod.projectPinRefusal === 'function',
+  '5a: `projectPinRefusal` is reachable at module scope');
 
-if (mod && typeof mod.zipMapFallback === 'function') {
-  const zipDraft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS', tile: 'development',
+if (mod && typeof mod.projectPinRefusal === 'function') {
+  const pinDraft = { id: 'd1', zip: '80210', revision: 3, content_family: 'MAPS', tile: 'development',
                      evidence: { project_id: 'p1', theme: 'datacenter', project_name: 'Acme Data Center' } };
-
-  // — the SUCCESS path: a real ZIP picture, bound at ZIP scope, reason recorded —
-  globalThis.__TEST_ABSENCE = async () => okResult({});
+  let absenceCalled = false;
+  globalThis.__TEST_ABSENCE = async () => { absenceCalled = true; return okResult({}); };
   patches.length = 0;
-  let results = [];
-  await mod.zipMapFallback({}, zipDraft, 'lbl', results, 'the project has no coordinates');
-  const row = results[0] || {};
-  ok(results.length === 1 && row.ok === true,
-    `5b: a successful ZIP capture produces one READY result (got ${JSON.stringify(row.state ?? row)})`);
-  const wrote = patches.filter((x) => x.method === 'PATCH');
-  const vis = wrote.length ? (wrote[wrote.length - 1].body?.evidence?.visual || {}) : {};
-  ok(vis.scope === 'zip',
-    `5c: …recorded at ZIP scope, because proj is passed as null (got ${JSON.stringify(vis.scope)})`);
-  ok(typeof vis.capture_key === 'string' && vis.capture_key.startsWith('v1|80210|'),
-    `5d: …and the key names THIS ZIP (got ${JSON.stringify(vis.capture_key)})`);
-  ok(!/^v1\|80210\|[0-9a-f-]{36}\|/.test(String(vis.capture_key || '')),
-    '5e: …and never names a record as the subject — the exact rule #560 dropped from SQL');
-  ok(vis.zip_scope_reason === 'the project has no coordinates',
-    `5f: the reason the picture is of the ZIP rides on the row (got ${JSON.stringify(vis.zip_scope_reason)})`);
-
-  // — the THROW path: caught, recorded as a failure, and the run is NOT aborted —
-  globalThis.__TEST_ABSENCE = async () => { throw new Error('browser exploded'); };
-  patches.length = 0;
-  results = [];
+  const results = [];
   let threw = false;
-  try { await mod.zipMapFallback({}, zipDraft, 'lbl', results, 'whatever'); }
+  try { await mod.projectPinRefusal(pinDraft, 'lbl', results, 'the project has no coordinates'); }
   catch { threw = true; }
-  ok(!threw,
-    '5g: a capture that throws does not propagate — one bad draft must not abort the run');
-  const bad = results[0] || {};
-  ok(results.length === 1 && bad.ok === false && /capture threw/.test(String(bad.reason || '')),
-    `5h: …it is recorded as a real failure naming the throw (got ${JSON.stringify(bad.reason)})`);
-  const badWrote = patches.filter((x) => x.method === 'PATCH');
-  const badVis = badWrote.length ? (badWrote[badWrote.length - 1].body?.evidence?.visual || {}) : {};
-  ok(badVis.state === 'CAPTURE_FAILED' && /capture threw/.test(String(badVis.failure_reason || '')),
-    `5i: …and the row records a capture FAILURE, not a ZIP finding (got ${JSON.stringify(badVis.state)})`);
-
-  // ⚠️ THE FIRST VERSION OF 5j ASSERTED `badVis.zip_scope_reason === undefined` AND WAS
-  // VACUOUS — it passed with the guard deleted, which a mutation caught. Measured: on the
-  // failure path `finishCapture` routes to `recordOutcome`, which COMPOSES ITS OWN visual
-  // block and never reads `rz.zip_scope_reason`, so the field cannot reach the row whatever
-  // the guard does. A behavioural pin for this does not exist to be written. The guard is
-  // still worth keeping — it stops a failed capture from carrying a "we deliberately chose
-  // the ZIP map" reason internally — so it is pinned STRUCTURALLY, and this comment records
-  // that the weaker pin is the honest ceiling rather than an oversight.
-  ok(/if \(rz\.ok\) rz\.zip_scope_reason = why;/.test(CODE_EARLY),
-    '5j: the reason is attached only on success (structural — see the note above for why no '
-    + 'behavioural assertion is possible)');
-
+  ok(!threw, '5b: the refusal runs without throwing');
+  const row = results[0] || {};
+  ok(results.length === 1 && row.ok === false && row.state === 'CAPTURE_INELIGIBLE',
+    `5c: it reports one INELIGIBLE result, not a picture (got ${JSON.stringify(row.state)})`);
+  ok(/own pin/.test(String(row.reason)) && /the project has no coordinates/.test(String(row.reason)),
+    '5d: …whose reason names why the pin could not be shown and that a project needs its own pin');
+  ok(!absenceCalled, '5e: no ZIP map was taken — the absence capture was never called');
+  ok(!patches.some((x) => x.method === 'POST' || /\/storage\//.test(x.url)),
+    '5f: …and nothing was uploaded');
+  const wrote = patches.filter((x) => x.method === 'PATCH');
+  const body = wrote.length ? wrote[wrote.length - 1].body : null;
+  const vis = (body && body.evidence && body.evidence.visual) || {};
+  ok(wrote.length === 1 && vis.state === 'CAPTURE_INELIGIBLE',
+    `5g: the row records CAPTURE_INELIGIBLE (got ${JSON.stringify(vis.state)})`);
+  ok(body && !('image_bucket_path' in body),
+    '5h: …and the write sets no picture');
+  ok(typeof vis.attempted_key === 'string' && vis.attempted_key.startsWith('v1|80210|p1|'),
+    `5i: …keyed at PROJECT scope, so the retry clock is about this project (got ${JSON.stringify(vis.attempted_key)})`);
   delete globalThis.__TEST_ABSENCE;
 }
 
-// ── §6 …AND THE LIFT DID NOT COST THE WIRING PIN ─────────────────────────────────────
-// Both halves, for the same reason §4 keeps both: execution proves the body, the greps
-// prove every refusal still reaches it.
-ok(/^async function zipMapFallback\(page, d, label, results, why\)/m.test(SRC),
-  '6a: the fallback is declared at MODULE scope with every value passed explicitly — a '
-  + 'closure is what made it untestable, and what produced the #1287 ReferenceError');
-const fallbackCalls = (SRC.match(/await zipFallback\(/g) || []).length;
-ok(fallbackCalls === 5,
-  `6b: all five record-refusal exits still reach the fallback (found ${fallbackCalls})`);
-ok(/zipMapFallback\(page, d, label, results, why\)/.test(SRC),
-  '6c: …through a thin adapter that forwards the loop locals, so the call sites are unchanged');
+// ── §6 …AND EVERY RECORD-REFUSAL EXIT REACHES IT ─────────────────────────────────────
+ok(/^async function projectPinRefusal\(d, label, results, why\)/m.test(SRC),
+  '6a: the refusal is declared at MODULE scope with every value passed explicitly');
+const refusalCalls = (SRC.match(/await pinRefusal\(/g) || []).length;
+ok(refusalCalls === 5,
+  `6b: all five record-refusal exits reach it (found ${refusalCalls})`);
+ok(/const pinRefusal = \(why\) => projectPinRefusal\(d, label, results, why\);/.test(SRC),
+  '6c: …through a thin adapter that forwards the loop locals');
+ok(!/zipMapFallback|zipFallback\(/.test(CODE),
+  '6d: the ZIP-map fallback is gone from the code (comment-stripped)');
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
