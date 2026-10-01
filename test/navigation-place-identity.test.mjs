@@ -2,14 +2,14 @@
 //
 //     Sidebar = which TOOL.     Viewing = which PLACE.
 //
-// The ZIP hub deliberately highlights NO sidebar tool (data-nav="comm"), which makes the
-// Viewing control the only thing on the page that says where the resident is looking —
-// and "ZIP 84301" is a code, not a place.
+// The ZIP hub lights Explore (data-nav="explore"), which names a SECTION and never a place,
+// so the Viewing control is the only thing on the page that says where the resident is
+// looking — and "ZIP 84301" is a code, not a place.
 //
-// DELIBERATELY NOT DUPLICATED HERE: that the sidebar is exactly four containers, that
-// community.html declares "comm" and highlights nothing, and that the generator stamps
-// the same token, are all already pinned by test/nav-identity.test.mjs (A-021). A second
-// copy of a pin drifts from the first; this file asserts only what Fix 6 adds — place
+// DELIBERATELY NOT DUPLICATED HERE: that the sidebar is exactly three primary items, that
+// community.html declares "explore", and that the generator stamps the same token, are all
+// already pinned by test/nav-identity.test.mjs (founder navigation plan v3). A second copy
+// of a pin drifts from the first; this file asserts only what Fix 6 adds — place
 // IDENTIFICATION — plus a guard that Fix 6 did not grow the sidebar.
 import fs from 'node:fs';
 let fails = 0;
@@ -78,15 +78,15 @@ ok(!/locLabel/.test(cpage),
 console.log('--- Fix 6 did not grow the sidebar or add a place label to it ---');
 const navBlock = (shellHtml.match(/<nav class="nav" id="hs-nav">[\s\S]*?<\/nav>/) || [''])[0];
 ok(navBlock.length > 0, 'the sidebar block was found');
-ok((navBlock.match(/<a /g) || []).length === 4,
-  'the sidebar is still EXACTLY FOUR tools', (navBlock.match(/data-nav="[a-z]+"/g) || []));
-ok(!/data-nav="comm"/.test(navBlock),
-  'the ZIP hub is still not a fifth sidebar container');
+ok((navBlock.match(/<a /g) || []).length === 3,
+  'the sidebar is EXACTLY THREE primary items (v3)', (navBlock.match(/data-nav="[a-z]+"/g) || []));
+ok(!/href="community\.html"/.test(navBlock),
+  'the ZIP hub is still not a primary sidebar item');
 // A persistent sidebar place label is explicitly deferred — the place lives in Viewing.
 ok(!/state\.zip|viewedLabel|locLabel|setViewLabel/.test(navBlock),
   'no place label was added to the sidebar in this unit', navBlock.slice(0, 120));
-ok(/data-nav="comm"/.test(strip(read('community.html'))),
-  'community.html still declares comm (A-021 owns the full pin)');
+ok(/data-nav="explore"/.test(strip(read('community.html'))),
+  'community.html declares explore (nav-identity owns the full pin)');
 ok(!/data-nav="dev"/.test(strip(read('community.html'))),
   'the ZIP hub does not pretend to be Development because it contains a map');
 

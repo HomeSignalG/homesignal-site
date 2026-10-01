@@ -1,5 +1,13 @@
-// Browser proof: on a project dossier, the Development sidebar keeps ?id=
-// so clicking it does not dump Viewing back to a ZIP list.
+// Browser proof: on a project dossier, nothing in the chrome can dump Viewing back to a ZIP
+// list, and the in-page paths between the dossier, the list and Map 1 keep the ZIP.
+//
+// RETARGETED (founder navigation plan v3, 2026-09-30). This file used to prove that the
+// Development SIDEBAR link kept ?id= on a dossier, because clicking the already-lit
+// Development item opened the ZIP list and Viewing fell off the project. Plan v3 removed
+// Development from the sidebar (Explore | My Places | Enterprise), so that defect has no
+// link left to happen through — and that absence is asserted here rather than dropped. The
+// journeys that remain are in-page: the dossier's "Back to development" button and the
+// list's "View Development Map" link, both stamped with the viewed ZIP.
 //
 // Run: node test/navigation-development-dossier-nav.browser.test.mjs
 import { createServer } from 'node:http';
@@ -76,13 +84,21 @@ async function waitReady() {
   await page.evaluate(() => window.HS.ready);
 }
 
-async function navHrefs() {
+async function chrome() {
   return page.evaluate(() => {
-    const href = (nav) => {
-      const a = document.querySelector('#hs-nav a[data-nav="' + nav + '"]');
-      return a ? a.getAttribute('href') : '';
+    const links = [...document.querySelectorAll('#hs-nav a')];
+    return {
+      tokens: links.map(a => a.getAttribute('data-nav')),
+      hrefs: links.map(a => a.getAttribute('href')),
+      lit: links.filter(a => a.classList.contains('on')).map(a => a.getAttribute('data-nav')),
+      back: (() => {
+        const b = [...document.querySelectorAll('#hs-slot button.backbtn')]
+          .find(x => /Back to development/.test(x.textContent));
+        return b ? b.getAttribute('onclick') : null;
+      })(),
+      mapLinks: [...document.querySelectorAll('#hs-slot a[data-znav="homesignalmap.html"]')]
+        .map(a => a.getAttribute('href'))
     };
-    return { dev: href('dev'), alerts: href('alerts'), dash: href('dash'), props: href('props') };
   });
 }
 
@@ -90,21 +106,28 @@ const PID = 'proj-datacenter';
 
 await page.goto(base + '/development.html?data=seed&zip=78617&id=' + PID, { waitUntil: 'domcontentloaded' });
 await waitReady();
-await page.waitForSelector('#hs-nav a[data-nav="dev"]');
-const onDossier = await navHrefs();
-ok(/development\.html\?/.test(onDossier.dev) && onDossier.dev.indexOf('id=' + PID) >= 0,
-  'dossier: Development sidebar keeps the project id', onDossier.dev);
-ok(/zip=78617/.test(onDossier.dev), 'dossier: Development sidebar keeps the project ZIP', onDossier.dev);
-ok(/alerts\.html\?zip=78617$/.test(onDossier.alerts),
-  'dossier: Alerts stays zip-only (no project id)', onDossier.alerts);
-ok(onDossier.props === 'properties.html' || onDossier.props.indexOf('properties.html') === 0,
-  'My Places stays account-wide', onDossier.props);
+await page.waitForSelector('#hs-nav a[data-nav="explore"]');
+await page.waitForFunction(() => !!document.querySelector('#hs-slot button.backbtn'), null, { timeout: 30000 });
+const onDossier = await chrome();
+ok(onDossier.tokens.join('|') === 'explore|props|enterprise',
+  'dossier: the sidebar is Explore, My Places, Enterprise (plan v3)', onDossier.tokens);
+ok(onDossier.hrefs.every(h => (h || '').split('?')[0] !== 'development.html'),
+  'dossier: no sidebar link targets development.html, so none can drop the dossier id', onDossier.hrefs);
+ok(JSON.stringify(onDossier.hrefs) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
+  'dossier: sidebar hrefs are unstamped section links (no ZIP, no project id)', onDossier.hrefs);
+ok(JSON.stringify(onDossier.lit) === JSON.stringify(['explore']),
+  'dossier: Explore is the one lit item (the development list is part of Explore)', onDossier.lit);
+ok(!!onDossier.back && /development\.html\?zip=78617/.test(onDossier.back) && onDossier.back.indexOf('id=') < 0,
+  'dossier: "Back to development" returns to the ZIP list, not to a leftover id', onDossier.back);
 
 await page.goto(base + '/development.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitReady();
-const onList = await navHrefs();
-ok(onList.dev === 'development.html?zip=78617',
-  'list: Development sidebar has ZIP only, no leftover dossier id', onList.dev);
+await page.waitForFunction(() => !!document.querySelector('#hs-slot a[data-znav="homesignalmap.html"]'), null, { timeout: 30000 });
+const onList = await chrome();
+ok(onList.tokens.join('|') === 'explore|props|enterprise' && JSON.stringify(onList.lit) === JSON.stringify(['explore']),
+  'list: same three items, Explore lit', onList);
+ok(onList.mapLinks.length > 0 && onList.mapLinks.every(h => h === 'homesignalmap.html?zip=78617'),
+  'list: "View Development Map" carries the viewed ZIP and nothing else', onList.mapLinks);
 
 await browser.close();
 server.close();

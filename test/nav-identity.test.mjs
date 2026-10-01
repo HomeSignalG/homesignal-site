@@ -31,16 +31,13 @@ const ok = (c, name, detail) => {
 // A section whose sidebar entry is deliberately not rendered today. A page may still
 // declare its token; anything NOT listed here must match a live nav entry, so a typo
 // ("mapz") can never pass as a valid identity.
-// PHASE 8 (A-019 / A-020 / A-021): the sidebar is now FOUR containers. Three tokens no
-// longer have a sidebar entry, and none of the three PAGES was deleted — that distinction
-// is what this map records.
-const HIDDEN_SECTIONS = {
-  reports: 'reports.html is the public-beta Property Reports Premium acquisition page, opened by '
-         + 'property.html\'s "Generate property report"; it has no sidebar entry. The report CAPABILITY '
-         + 'list is still A-009 on the Dashboard, which this page does not replace',
-  today:   'A-020: today.html is a redirect stub to dashboard.html; its four areas live on A-003/A-004/A-005 and A-022',
-  comm:    'A-021: community.html is the PUBLIC ZIP surface, not a fifth logged-in container — it highlights nothing'
-};
+// NAVIGATION PLAN v3 (founder, 2026-09-30): the sidebar is THREE items, Explore | My Places
+// | Enterprise, and every shell page declares one of those three or none at all. That
+// reverses A-021's four containers. The old hidden tokens are gone with it: reports.html
+// now sits under My Places ("props") and community.html under Explore ("explore"), so no
+// page declares a section that is deliberately missing from the menu. The map stays, empty,
+// so a future hidden section still has to be named here, with its reason, to pass.
+const HIDDEN_SECTIONS = {};
 
 // ── the sidebar, as shipped ──────────────────────────────────────────────────────────────
 const shellHtml = read('partials/shell.html');
@@ -51,11 +48,13 @@ const NAV = [];
 const linkRe = /<a\s+href="([^"]+)"[^>]*data-nav="([^"]*)"/g;
 let m;
 while ((m = linkRe.exec(navBlock))) NAV.push({ href: m[1], token: m[2] });
-ok(NAV.length === 4, 'A-021 the sidebar is EXACTLY FOUR containers', NAV);
-ok(NAV.map((n) => n.token).join('|') === 'dash|alerts|dev|props',
-  'A-021 ...in order: Dashboard, Alerts, Development, My Places', NAV.map((n) => n.token));
-ok(NAV.map((n) => n.href).join('|') === 'dashboard.html|alerts.html|development.html|properties.html',
-  'A-021 ...pointing at the four container pages', NAV.map((n) => n.href));
+ok(NAV.length === 3, 'v3 the sidebar is EXACTLY THREE primary items', NAV);
+ok(NAV.map((n) => n.token).join('|') === 'explore|props|enterprise',
+  'v3 ...in order: Explore, My Places, Enterprise', NAV.map((n) => n.token));
+ok(NAV.map((n) => n.href).join('|') === 'index.html|properties.html|development-activity.html',
+  'v3 ...pointing at index.html, properties.html and development-activity.html', NAV.map((n) => n.href));
+ok(/<a class="logo" href="index\.html">/.test(shellHtml),
+  'v3 the HomeSignal logo opens Explore (index.html)');
 
 const tokenForHref = Object.create(null);
 NAV.forEach((n) => { tokenForHref[n.href] = n.token; });
@@ -74,11 +73,13 @@ const PAGE_RE = /<body[^>]*\sdata-nav="([^"]*)"/;
 const pages = [];
 for (const n of NAV) pages.push(n.href.split('?')[0]);
 // plus every other root page that declares an identity (detail pages, hidden sections)
-// A-021 note: homesignalmap.html and community.html USED to be sidebar destinations and
-// are no longer, so they stopped arriving through NAV — they must be listed explicitly or
-// their identity goes unchecked, which is exactly the silence this file exists to end.
-for (const f of ['property.html', 'homesignalmap.html', 'community.html',
-                 'reports.html', 'today.html', 'about.html', 'contact.html',
+// Pages that USED to be sidebar destinations stop arriving through NAV when they leave the
+// menu (A-021 lost homesignalmap.html and community.html this way; v3 loses dashboard.html,
+// alerts.html and development.html), so every shell page is listed explicitly or its
+// identity goes unchecked, which is exactly the silence this file exists to end.
+for (const f of ['index.html', 'dashboard.html', 'alerts.html', 'development.html',
+                 'development-activity.html', 'property.html', 'homesignalmap.html',
+                 'community.html', 'reports.html', 'today.html', 'about.html', 'contact.html',
                  'how-it-works.html', 'privacy.html']) {
   if (existsSync(join(root, f))) pages.push(f);
 }
@@ -88,6 +89,12 @@ for (const f of [...new Set(pages)]) {
   if (mm && mm[1]) declared.push({ file: f, token: mm[1] });
 }
 ok(declared.length >= 5, 'the app pages declare a navigation identity', declared.length);
+// Every primary item's own page must declare that item's token. Without this, forgetting
+// index.html's token would pass silently: `declared` only records pages that HAVE one.
+const undeclaredTargets = NAV.filter((n) => !declared.some((d) => d.file === n.href.split('?')[0]))
+  .map((n) => n.href);
+ok(undeclaredTargets.length === 0,
+  'v3 every primary item\'s page declares an identity at all', undeclaredTargets);
 
 // THE ASSERTION THAT WOULD HAVE CAUGHT THE DEFECT: a page that IS a sidebar destination
 // must claim that entry's own token. homesignalmap.html claiming "dev" fails right here.
@@ -108,20 +115,22 @@ ok(orphanTokens.length === 0,
 
 // Named pins, so a rename is loud rather than quietly re-shuffling what lights up.
 const tokenOf = (f) => (declared.find((d) => d.file === f) || {}).token;
-// ⚠️ THE PIN BELOW IS THE EXACT INVERSE OF THE 2026-09-04 DEFECT, AND THAT IS DELIBERATE.
-// That defect was homesignalmap.html declaring "dev" WHILE a Maps sidebar entry existed:
-// the token pointed at a section the page was not, and Maps could never light up. A-021
-// removed the Maps entry, so Map 1 now genuinely LIVES UNDER Development — claiming "dev"
-// IS the fold, and visiting Map 1 correctly lights Development. The defect and the fix
-// look identical in one line of HTML and are opposites in context; the rest of this file
-// is what supplies the context. Do NOT re-add a Maps sidebar entry to make this green.
-ok(tokenOf('homesignalmap.html') === 'dev',
-  'A-021 MAP 1 (homesignalmap.html) now lives UNDER Development', tokenOf('homesignalmap.html'));
-ok(tokenOf('development.html') === 'dev',
-  'A-021 ...alongside development.html, which is the same section', tokenOf('development.html'));
-ok(tokenOf('alerts.html') === 'alerts', 'alerts.html IS the Alerts section', tokenOf('alerts.html'));
+// THE v3 ACTIVE-NAV MATRIX (founder navigation plan v3, §6). The token names the SECTION a
+// page belongs to, never the page that linked to it: Map 1 reached from My Places still
+// lights Explore. Do NOT re-add a Maps, Development, Dashboard or Alerts entry to make an
+// old pin green.
+for (const f of ['index.html', 'community.html', 'homesignalmap.html', 'development.html'])
+  ok(tokenOf(f) === 'explore', 'v3 ' + f + ' is an Explore page', tokenOf(f));
+for (const f of ['properties.html', 'property.html', 'dashboard.html', 'alerts.html', 'reports.html'])
+  ok(tokenOf(f) === 'props', 'v3 ' + f + ' sits under My Places', tokenOf(f));
+ok(tokenOf('development-activity.html') === 'enterprise',
+  'v3 development-activity.html lights Enterprise', tokenOf('development-activity.html'));
+for (const f of ['about.html', 'how-it-works.html', 'contact.html', 'privacy.html'])
+  ok(tokenOf(f) === undefined, 'v3 ' + f + ' is a support page and lights no primary item', tokenOf(f));
 ok(tokenForHref['homesignalmap.html'] === undefined,
-  'A-021 there is NO Maps sidebar entry any more', tokenForHref['homesignalmap.html']);
+  'there is NO Maps sidebar entry', tokenForHref['homesignalmap.html']);
+for (const gone of ['dashboard.html', 'alerts.html', 'development.html'])
+  ok(tokenForHref[gone] === undefined, 'v3 ' + gone + ' left the primary menu (the page stays)', tokenForHref[gone]);
 
 // The fold is about the SIDEBAR, never about the page. Map 1 must still exist and must
 // still be a ZIP-scoped nav target, or the wrong thing was folded.
@@ -141,6 +150,15 @@ ok(read('lib/view-zip.js').includes("var ZIP_NAV_PAGES = ['alerts.html', 'develo
 ok(!/HS\.ZIP_NAV_PAGES = \[[^\]]*'dashboard\.html'/.test(shellJsSrc)
    && !/var ZIP_NAV_PAGES = \[[^\]]*'dashboard\.html'/.test(read('lib/view-zip.js')),
   'Fix 8 D1 dashboard.html cannot creep back into either ZIP_NAV_PAGES literal');
+
+// v3: no primary item is a ZIP-scoped tool. That is intentional, and it is what makes
+// paintNavHrefs' sidebar loop stamp nothing now: ZIP context reaches the tools through the
+// bell and the in-page data-znav links instead. A ZIP_NAV_PAGES target re-entering the menu
+// would start carrying ?zip= again, so it has to arrive deliberately, through this pin.
+const zipNavPages = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
+ok(NAV.every((n) => !zipNavPages.includes(n.href.split('?')[0])),
+  'v3 no primary item is a ZIP_NAV_PAGES target, so none of the three carries ?zip=',
+  NAV.map((n) => n.href));
 
 // Zero map entries in the sidebar now, and the retired second map is still not there.
 const mapEntries = NAV.filter((n) => /map/i.test(n.href));
@@ -162,11 +180,14 @@ for (const [f, target] of [['today.html', '/dashboard.html']]) {
   ok(/var q = window\.location\.search \|\| '';/.test(src),
     'A-019/A-020 ...carrying the query string, same convention as maps.html', f);
 }
-// community.html keeps its own identity and is NOT a fifth container.
-ok(tokenOf('community.html') === 'comm',
-  'A-021 community.html still declares "comm" — the public ZIP highlights nothing', tokenOf('community.html'));
-ok(/data-nav="comm"/.test(read('scripts/gen_zip_pages.py')),
-  'A-021 ...and the generator SOURCE still stamps data-nav="comm" on every generated document');
+// community.html is an Explore page, and so is every generated /community/<zip>/ document,
+// which loads the same shell. The generator's other families carry no shell and keep
+// their own tokens.
+ok(tokenOf('community.html') === 'explore',
+  'v3 community.html declares "explore" — the public ZIP lights Explore', tokenOf('community.html'));
+const genSrc = read('scripts/gen_zip_pages.py');
+ok(/<body data-nav="explore" data-zip=/.test(genSrc) && !/data-nav="comm"/.test(genSrc),
+  'v3 ...and the generator SOURCE stamps data-nav="explore" on every generated ZIP document');
 // ── PUBLIC-BETA PROPERTY REPORTS ─────────────────────────────────────────────────────────
 // The Address dossier's "Generate property report" opens an honest in-progress page that
 // can return the resident to the EXACT Address they came from. Pinned here because this
@@ -195,8 +216,8 @@ const propSrc    = read('property.html');
 const reportsCode = strip(reportsSrc);   // the pins about what the page DOES read this one
 
 // It is a real page on the shared shell, not a stub and not a bespoke error screen.
-ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="reports">/.test(reportsSrc),
-  'reports.html is a real page on the shared shell (#hs-content + its nav identity)');
+ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="props">/.test(reportsSrc),
+  'reports.html is a real page on the shared shell (#hs-content), under My Places');
 ok(!/location\.replace/.test(reportsSrc),
   'reports.html no longer redirects — a resident who clicks the CTA lands here');
 

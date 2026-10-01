@@ -1,5 +1,7 @@
 // Landing decision unit test (no DB, no browser). Run: node test/landing.test.mjs
-// Pins: signed-in + home -> dashboard; signed-out -> hero; demo session -> hero (sample carve-out).
+// Pins: EVERY visitor stays on index.html, which IS Explore (founder navigation plan v3,
+// 2026-09-30). The signed-in + home -> dashboard bounce (#281) is gone; the demo carve-out
+// (#280) still holds, now because nobody is sent away.
 import { createRequire } from 'node:module';
 const { landingFor } = createRequire(import.meta.url)('../lib/landing.js');
 
@@ -14,7 +16,7 @@ const home = { id: 'p1', address: '3614 Bill Price Rd' };
 const realSession = { user: { id: 'u1' } };                 // no .demo
 const demoSession = { user: { id: 'demo' }, demo: true };
 
-eq(landingFor(realSession, home), 'dashboard.html', 'signed-in + home set -> dashboard');
+eq(landingFor(realSession, home), null,             'signed-in + home set -> stays on Explore (v3: no dashboard bounce)');
 eq(landingFor(null, home),        null,             'signed-out -> hero');
 eq(landingFor(null, null),        null,             'signed-out, no home -> hero');
 eq(landingFor(realSession, null), null,             'signed-in, no home yet -> hero');

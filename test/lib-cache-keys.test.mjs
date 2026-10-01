@@ -44,9 +44,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // fix in one of them that a warm browser never fetches would leave a paid report built on
 // a stale allowlist or a stale query window. That is the silent class this file exists to
 // stop, and it is the reason the report page keys them rather than joining KNOWN_KEYLESS.
+// lib/landing.js joined the set with the navigation plan v3 (2026-09-30). It decides whether
+// index.html bounces a signed-in resident to the Dashboard, and v3 removed that bounce. Loaded
+// keyless, a warm browser could keep the old copy and keep bouncing residents away from
+// Explore after the deploy, which is exactly the silent class this file exists to stop.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
-  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js'];
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/landing.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -84,7 +88,7 @@ CONTENT_KEYED.forEach((rel) => {
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
   'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
-  'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
+  'lib/coverage-copy.js', 'lib/why.js',
   'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
 // A leading "/" is the generator's absolute form, not a different file (same rule as

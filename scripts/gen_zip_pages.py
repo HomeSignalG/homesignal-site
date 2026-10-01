@@ -895,7 +895,10 @@ def render(p, built):
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
         + APP_CSS_LINK + '</head>\n'
-        f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
+        # data-nav="explore": this document loads the shared shell, and the public ZIP page
+        # is an Explore child (founder navigation plan v3), the same identity community.html
+        # declares. The city/project/project-list/guide families below carry no shell.
+        f'<body data-nav="explore" data-zip="{esc(z)}">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
@@ -925,7 +928,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=f7ec5a9a"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=082c2d92"></script>\n'
+        '<script src="/lib/community-page.js?v=7ab1d735"></script>\n'
         "</body>\n</html>\n")
 
 

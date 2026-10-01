@@ -16,6 +16,14 @@
       <h1>My Places</h1>
       <p>Everything HomeSignal watches for you. An <b>Address</b> is one location; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>Developments</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a Development does not turn on email alerts.</p>
     </div>
+    <!-- My Places' two secondary destinations (founder navigation plan v3). Both pages left the
+         primary menu and live under My Places now: the Dashboard is "What's Changed" and
+         alerts.html is "Alert Settings". Plain hrefs with no ?zip=, like the Dashboard's own
+         "Manage your alerts" link: this page covers every Place, so it names none. -->
+    <div class="pl-secondary" id="plSecondary" style="display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 20px">
+      <a class="inlinebtn" href="dashboard.html" id="plWhatsChanged" style="text-decoration:none">What's Changed &rarr;</a>
+      <a class="inlinebtn" href="alerts.html" id="plAlertSettings" style="text-decoration:none">Alert Settings &rarr;</a>
+    </div>
     <div class="strip" id="propStrip"></div>
     <div class="toolbar toolbar--lead">
       <div class="seg" id="plViews">

@@ -279,7 +279,10 @@ const nav = await page.evaluate(() => ({
   active: [].slice.call(document.querySelectorAll('.nav a.on')).map(a => a.getAttribute('data-nav'))
 }));
 ok(nav.sidebar > 0, '8 the page renders inside the shared shell, so nobody is stranded', nav);
-ok(nav.active.length === 0, '8 ...and lights no sidebar item, as a hidden section should', nav.active);
+// RETARGETED (founder navigation plan v3, 2026-09-30). Reports used to be a hidden section that
+// lit nothing. Plan v3 files Reports under My Places, so My Places is the one item it lights.
+ok(JSON.stringify(nav.active) === JSON.stringify(['props']),
+  '8 ...and lights exactly My Places, where Reports belongs (plan v3)', nav.active);
 
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base + '/reports.html?id=' + encodeURIComponent(target.id), { waitUntil: 'domcontentloaded' });
