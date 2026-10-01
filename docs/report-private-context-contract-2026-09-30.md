@@ -88,8 +88,9 @@ Order F's table also had two address-bearing columns of its own: `inputs` (the r
   and writes the audit event. **It never deletes a row**: the tombstone (`context_id`, timestamps, state, reason) stays,
   so the snapshot's foreign key stays valid and "was this purged, when, and why" stays answerable. A purged context is
   terminal.
-- **The batch.** `report_private_context_purge_due()` purges every context whose clock has run out. **It is written and
-  tested and is not scheduled** (a scheduled job waits for its own go).
+- **The batch.** `report_private_context_purge_due()` purges every context whose clock has run out. It was written and
+  tested first and scheduled later, on its own go (2026-09-30): `docs/report-private-context-purge-schedule.sql` runs it
+  every 15 minutes from pg_cron and watches it (§13).
 - **Audit.** Every change is an append-only event: `created`, `need_opened`, `need_closed`, `grace_started`,
   `grace_cleared`, `purged`, with the need kind or purge reason and the time — and **never a private value** (the three
   text columns are restricted by CHECK to fixed vocabularies, so the log cannot hold an address even by mistake).
@@ -121,7 +122,7 @@ prove:
 | 2 | the permanent snapshot does not contain the raw address elsewhere in its body / inputs | **Enforced as a backstop, with named limits; proven for whole values and fragments on the Order G engine's real output** (its own `boundaryFindings` runs before any store, §8.4) | The trigger scans body **and** engine inputs for the address, the normalized address, every property key, the label and full-precision coordinates (X02a–X02i), naming the field and never the value (X03), atomically (X04). **Limits, pinned not hidden:** §9. |
 | 3 | deleting private context does not damage canonical project / report history | **Proven** | `report_snapshot_pg` P01–P06: after a privacy-request purge and after a retention purge the snapshot row is byte-identical, `content_hash` still verifies, the reference still resolves to the tombstone, another customer is untouched, and history is still immutable. |
 | 4 | Follow / Changes Since Report continues to work while the private context is active | **Half proven; cannot be finished yet** | Proven: a Follow need keeps the address readable and stops the clock while the report itself is closed, and the snapshot never changes (P07). **Open:** the Follow surface and the Changes Since Report reader do not exist. By design that reader needs only the body (project identities) and `dev_change_event_reportable`, never the private context; that must be shown end to end when it is built. |
-| 5 | the retention clock and purge behaviour are testable and auditable | **Proven; not armed** | 52 checks and 51 mutations on the private layer (clock start, clear, restart, exact 90-day boundary, ceiling, every purge path, in-place blanking, terminal state, audit trail, retention check that can fail). **Open:** the purge batch is not scheduled, and the overdue-purge lag row is not yet an alertable check in the pipeline monitor. |
+| 5 | the retention clock and purge behaviour are testable and auditable | **Proven; the schedule and its alarm are built (§13) and take effect on apply** | 52 checks and 51 mutations on the private layer (clock start, clear, restart, exact 90-day boundary, ceiling, every purge path, in-place blanking, terminal state, audit trail, retention check that can fail). §13 adds the pg_cron job and an alertable monitor check (41 checks, 23 mutations, 33 structural pins). **Open until the production receipt is in §13:** the apply, the first scheduled run and the first monitor tick. |
 
 **Gate 4 and the open parts of gates 1, 2 and 5 keep "store a real customer report" switched off.** Nothing calls the
 writer, so that is the current state; this document is the checklist for turning it on.
@@ -273,6 +274,64 @@ on **0 of 1,500**. Fixed in both harnesses (`report_snapshot_pg/run.sh`, `report
 about what is checked changed (52 + 66 checks, 51 + 54 = 105 mutations, all killed, 0 survived). The same
 `| head -4` line exists in other suites' harnesses that belong to other work; they are not touched here.
 
-**Not done, on purpose** (each needs its own go): the purge batch is not scheduled; the overdue-purge lag is not a
-pipeline-monitor check; nothing calls the writer; the owner column, and what closes a `report` need, belong to Orders J
+**Not done, on purpose** (each needs its own go; the first two were given 2026-09-30 and are §13): the purge batch is not
+scheduled; the overdue-purge lag is not a pipeline-monitor check; nothing calls the writer; the owner column, and what closes a `report` need, belong to Orders J
 and L; backups are outside this unit (§9).
+
+## 13. Arming the purge, and watching it (2026-10-01 — built; the production receipt is added after the apply)
+
+Founder go 2026-09-30 for "arming the purge cron". SQL of record: `docs/report-private-context-purge-schedule.sql`. It adds
+**no purge logic**: the batch, the per-context purge, the in-place blanking and the audit log are the F2 functions above.
+
+**What it does.**
+1. pg_cron job **`report-private-context-purge`** calls `report_private_context_purge_due()` at minutes **5, 20, 35 and 50**
+   of every hour. **The one number it chooses is that cadence.** The founder's value is "no more than 90 days after the last
+   need ends"; the clock is set to exactly 90 days (a CHECK), so the job's period is the only slack between "due" and
+   "blanked": 15 minutes, not the 24 hours a daily job would add to a rule that says "no more than". Change it by editing
+   the one constant in the file; the structural pin (`report-private-context-purge-structure.test.mjs` 1b, 3e) fails
+   unless the longest gap stays 15 minutes and the monitor's grace stays at least four job periods.
+2. A new alertable check **`report_private_context_retention`** on the one existing monitor (`pipeline_health_tick`,
+   hourly at :10, then `notify-health`): it **fails** when the job is missing, inactive or no longer calls the batch; when
+   any context is **more than 1 hour past its purge date** and still holds its values; or when any invariant of
+   `report_private_context_retention_check()` is non-zero. The one-hour grace is four job periods; pg_cron is punctual (the
+   monitor's own job measured 0 s late on 8 of 8 fires), so a context stuck that long means the job is not purging, not that
+   it is late. It measures the **harm** (a private value held past its ceiling), so a job that runs and fails is caught
+   exactly as one that does not run.
+3. Both live in **one transaction** (a migration runs the file as one), and it refuses, changing nothing, when the private
+   layer, the monitor, or the monitor's single splice anchor is missing, so the purge is never armed without its alarm.
+
+**Decisions taken by default (the founder may change any):**
+- **D-7. Cadence every 15 minutes** (above). A daily job would be cheaper and would add up to 24 hours to a founder rule.
+- **D-8. The check is alertable from the first tick**, even with 0 contexts held: a missing or inactive job is a defect
+  whether or not anything is waiting.
+- **D-9. "Overdue" is the F2 audit's own predicate plus a grace**, in a new function `report_private_context_purge_health()`
+  that returns **counts, one date and fixed words only** and names no private column. At grace 0 it equals the audit's lag
+  row exactly (pinned: suite H05, structural 2c).
+- **D-10. A check that cannot run is a failing check, not a dead monitor.** The spliced block catches its own failure and
+  reports it as a failing row carrying the SQLSTATE only, so breaking or rolling back this one function can never stop the
+  other checks from running.
+
+**What it cannot prove, stated:**
+- The suite runs against a stand-in for pg_cron (the CI and local images do not carry it). It reproduces the three calls
+  the file makes and the unique `(jobname, username)` rule. Real pg_cron 1.6.4 behaviour is shown by the production
+  read-back after the apply, not by the suite.
+- A job that is scheduled and active but whose runs fail is caught **when a context becomes due**, not before; with nothing
+  held, a failing job harms nothing.
+- The batch scans the table each run. At 0 rows it costs nothing; if the table ever holds many thousands of rows, a partial
+  index on `purge_due_at` is a one-line additive change to the F2 table and was deliberately not added now.
+- The alarm lives in pg_cron and the monitor, never in GitHub Actions: one of the failures it watches for is "Actions will
+  not run jobs". `report-private-context-purge-structure.test.mjs` 7 fails if any workflow, script or edge function calls
+  the purge.
+
+**Proof.** `test/report_private_context_purge_pg` (41 checks; the file applies twice with an identical result; the rollback
+restores the monitor **byte for byte**, unschedules the job and drops the health function without touching a private
+context; it is refused, arming nothing, without the private layer or without a splice anchor; **23 prohibited mutations, all
+killed by a named check**), and `test/report-private-context-purge-structure.test.mjs` (33 pins; 13 of 13 distinct mutations of the SQL
+turn the right pin red — a first run found that a comment stripper had swapped strings and code after a `--` inside a string
+literal, so one pin passed vacuously; fixed with a scanner and a quote-parity control). One mutation was deliberately NOT
+registered: removing the explicit `grant execute … to service_role` is an equivalent mutant while the platform's default
+privileges grant it anyway (the fixture reproduces them), and a suite that "killed" it would be asserting the fixture.
+
+**Applying it.** `apply_migration` from the committed file, **after** reading the live monitor's definition md5 and
+confirming the anchor still appears once (other sessions splice the same function: Rule #0a). Rollback: the commented
+footer of the file, which the harness extracts and runs.
