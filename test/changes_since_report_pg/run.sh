@@ -13,11 +13,16 @@ case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a di
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
-P -c "drop schema public cascade; create schema public;" >/dev/null 2>&1
-P -f "$root/test/dev_change_ledger_pg/fixture.sql" >/dev/null
-P -f "$root/docs/dev-change-ledger.sql" >/dev/null 2>&1
-P -f "$root/docs/dev-change-reportable.sql" >/dev/null 2>&1
-P -f "$root/docs/report-private-context.sql" >/dev/null 2>&1
-P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1
-P -f "$here/standins.sql" >/dev/null
+# Apply one file. A failure PRINTS why (psql's own error, which a CI log needs) and stops the run; notices stay quiet.
+apply() {
+  local out
+  out="$(P -f "$1" 2>&1 >/dev/null)" || { echo "FAIL — $1 did not apply:"; echo "$out"; exit 3; }
+}
+out="$(P -c "drop schema public cascade; create schema public;" 2>&1 >/dev/null)" || { echo "FAIL — the disposable database could not be reset:"; echo "$out"; exit 3; }
+apply "$root/test/dev_change_ledger_pg/fixture.sql"
+apply "$root/docs/dev-change-ledger.sql"
+apply "$root/docs/dev-change-reportable.sql"
+apply "$root/docs/report-private-context.sql"
+apply "$root/docs/report-snapshot.sql"
+apply "$here/standins.sql"
 exec node "$here/roundtrip.mjs"

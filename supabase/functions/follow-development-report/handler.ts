@@ -3,23 +3,27 @@
 //
 // THREE ACTIONS on a STORED report, addressed by its report_id (never by an address, and never by the private context's id):
 //   changes   what the change ledger has learned about the projects in that report since it was issued. Reads the report's
-//             PERMANENT body, the ledger and the rights registry. It has no handle on the private context, so it gives the
-//             same answer while a Follow keeps the context alive and after the context has been purged.
+//             PERMANENT body, the ledger, source health and the rights registry. It never reads the report's private-context id
+//             (its report read does not select it), so it gives the same answer while a Follow keeps the context alive and
+//             after the context has been purged.
 //   follow    registers a `follow` need on the report's private context, so the context is kept (the 90-day clock stops) while
 //             the property is being watched. Idempotent for the same follow_id.
 //   unfollow  closes that need. When it was the last open need, the 90-day clock starts. Idempotent.
+// follow and unfollow read only the context handle (a body-less read); changes reads only the body. Neither action sees the other's column.
 //
 // WHO MAY CALL IT is _shared/admin-gate.ts, the same gate as the national report: a signed-in user in public.dashboard_admins.
 // Orders J and K (secure delivery, accounts) replace the allow-list with the account's entitlement, in that one place.
 //
 // WHAT A FOLLOW IS, TODAY: an open `follow` need row, opaque and owner-less, because the account system that would own it
 // (who follows, notification preferences, billing) is Order K. It is exactly what the contract defines (§4: "a property Follow
-// … registers its own"). The id this function mints is a random UUID: it is not derived from the address, the report, the user
-// or anything private, and the audit log records the need's KIND, never its reference.
+// … registers its own"). The `follow_id` is REQUIRED and chosen by the CALLER (a random UUID it keeps): this function never mints
+// one. A server-minted id returned only in a response is lost with a lost response, leaving an open need nobody can close, which
+// holds the private context open past the contract's 90 days; a caller-held id makes a retry the same request. The id is not
+// derived from the address, the report, the user or anything private, and the audit log records the need's KIND, never its reference.
 //
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { authorizeAdmin, corsFor, readBounded, reply, TOO_LARGE } from '../_shared/admin-gate.ts';
-import { changesSinceReport, parseStoredReport, ReportUnreadable, writtenSinceInstant } from '../_shared/changes-since-report.ts';
+import { changesSinceReport, EventRowUnreadable, parseStoredReport, ReportUnreadable, writtenSinceInstant } from '../_shared/changes-since-report.ts';
 import type { StoredReport, WrittenEvent } from '../_shared/changes-since-report.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 import { validateRights } from '../_shared/national-report.ts';
@@ -27,16 +31,18 @@ import type { LedgerProject, SourceHealth, View } from '../_shared/national-repo
 
 export { DataUnavailable };
 
-/** A stored report's row (the snapshot table). `private_context_id` is an internal handle: it is never put in a response. */
-export type StoredReportRow = StoredReport & { private_context_id: string | null };
+/** What follow / unfollow read of a stored report: only the opaque handle to its private context. It is never put in a response. */
+export type ReportContextRow = { private_context_id: string | null };
 
 export type Deps = {
   now: () => Date;
   rights: unknown;
-  newId: () => string;
   authenticate: (token: string) => Promise<{ email: string } | null>;
   isAdmin: (email: string) => Promise<boolean>;
-  report: (reportId: string) => Promise<StoredReportRow | null>;
+  /** The permanent body and identity of a stored report. Selects no private-context column. For `changes`. */
+  report: (reportId: string) => Promise<StoredReport | null>;
+  /** The private-context handle of a stored report, and nothing else (no body). For `follow` and `unfollow`. */
+  reportContext: (reportId: string) => Promise<ReportContextRow | null>;
   ledger: (keys: string[]) => Promise<LedgerProject[]>;
   eventsWrittenSince: (keys: string[], sinceIso: string) => Promise<WrittenEvent[]>;
   health: (families: string[]) => Promise<SourceHealth[]>;
@@ -56,7 +62,7 @@ const FIELDS: Record<string, string[]> = {
 export function capability() {
   return {
     product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-    method: 'POST { action: "changes" | "follow" | "unfollow", report_id, view?, follow_id? }',
+    method: 'POST { action: "changes", report_id, view? } | { action: "follow" | "unfollow", report_id, follow_id }',
     access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
     stores_reports: false,
     reads_private_context: false,
@@ -90,29 +96,33 @@ export function makeHandler(deps: Deps) {
       if (typeof b.follow_id !== 'string' || !UUID.test(b.follow_id)) return reply(req, { error: 'invalid_request', detail: 'follow_id' }, 400);
       followId = b.follow_id.toLowerCase();
     }
-    if (action === 'unfollow' && !followId) return reply(req, { error: 'invalid_request', detail: 'follow_id' }, 400);
+    // the caller holds the id: follow and unfollow both require it, and the function never mints one
+    if ((action === 'follow' || action === 'unfollow') && !followId) return reply(req, { error: 'invalid_request', detail: 'follow_id' }, 400);
     const view = (b.view === undefined ? 'customer' : b.view) as View;
     if (view !== 'customer' && view !== 'internal') return reply(req, { error: 'invalid_request', detail: 'view' }, 400);
 
     try {
-      const stored = await deps.report(reportId);
-      if (!stored) return reply(req, { error: 'report_not_found' }, 404);
-
-      // ── follow / unfollow: a need on the private context. The id of the context never leaves this function.
+      // ── follow / unfollow: a need on the private context. The id of the context never leaves this function, and the body is never read.
       if (action === 'follow' || action === 'unfollow') {
-        if (!stored.private_context_id) return reply(req, { status: 'NO_PRIVATE_CONTEXT', report_id: reportId });
+        const ctx = await deps.reportContext(reportId);
+        if (!ctx) return reply(req, { error: 'report_not_found' }, 404);
+        if (!ctx.private_context_id) return reply(req, { status: 'NO_PRIVATE_CONTEXT', report_id: reportId });
         if (action === 'follow') {
-          const id = followId ?? deps.newId();
-          const opened = await deps.openFollow(stored.private_context_id, id);
+          const opened = await deps.openFollow(ctx.private_context_id, followId!);
           if (opened === 'CONTEXT_PURGED') return reply(req, { status: 'CONTEXT_PURGED', report_id: reportId });
-          return reply(req, { status: 'FOLLOWING', report_id: reportId, follow_id: id });
+          return reply(req, { status: 'FOLLOWING', report_id: reportId, follow_id: followId });
         }
-        await deps.closeFollow(stored.private_context_id, followId!);
+        await deps.closeFollow(ctx.private_context_id, followId!);
         return reply(req, { status: 'UNFOLLOWED', report_id: reportId, follow_id: followId });
       }
 
-      // ── changes: the permanent body, the ledger, the rights. Never the private context.
+      // ── changes: the permanent body, the ledger, source health, the rights. Never the private context.
+      // `now` is taken BEFORE the reads, so the answer's `through` and its upper bound are the instant the question was asked, not an
+      // instant after reads that may have taken seconds. It is this function's clock, not the database's snapshot.
+      const asked = deps.now();
       const rights = validateRights(deps.rights); // a malformed registry fails the request: never "everything is cleared"
+      const stored = await deps.report(reportId);
+      if (!stored) return reply(req, { error: 'report_not_found' }, 404);
       const parsed = parseStoredReport(stored);
       const keys = parsed.projects.map((p) => p.project_id);
       const families = [...new Set(parsed.projects.map((p) => p.source_family).filter((f): f is string => !!f))].sort();
@@ -121,14 +131,11 @@ export function makeHandler(deps: Deps) {
         keys.length ? deps.eventsWrittenSince(keys, writtenSinceInstant(stored.generated_at)) : Promise.resolve([] as WrittenEvent[]),
         families.length ? deps.health(families) : Promise.resolve([] as SourceHealth[]),
       ]);
-      const result = changesSinceReport({
-        now: deps.now(), view, rights, ledger, events, health,
-        report: { report_id: stored.report_id, content_hash: stored.content_hash, report_version: stored.report_version, generated_at: stored.generated_at, body: stored.body },
-      });
+      const result = changesSinceReport({ now: asked, view, rights, ledger, events, health, report: stored });
       return reply(req, { status: 'OK', result });
     } catch (e) {
       if (e instanceof ReportUnreadable) return reply(req, { error: 'report_unreadable' }, 422);
-      if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
+      if (e instanceof DataUnavailable || e instanceof EventRowUnreadable) return reply(req, { error: 'data_unavailable' }, 502);
       return reply(req, { error: 'internal' }, 500); // never the message
     }
   };

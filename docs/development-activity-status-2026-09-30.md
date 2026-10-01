@@ -96,26 +96,27 @@ Last updated: 2026-10-01, in the PR that builds the Follow / Changes Since Repor
   **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
-  (gate 5, arming the purge, is applied and reading ok — contract §13; gate 4, the Follow / Changes Since Report function, is built and proven end to end on a real Postgres in the PR that adds `follow-development-report`, **not yet deployed** — `docs/development-activity-follow-changes-2026-10-01.md`; the open parts of gates 1 and 2 are stated limits, not unbuilt features).
+  (gate 5, arming the purge, is applied and reading ok — contract §13; gate 4, the Follow / Changes Since Report function, is built and proven end to end on a disposable Postgres (stand-ins stated in its doc §6), **not yet deployed** — `docs/development-activity-follow-changes-2026-10-01.md`; the open parts of gates 1 and 2 are stated limits, not unbuilt features; gate 5's open part is only that no real due context has yet been purged in production).
   `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
   commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
   JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
   source's records to a customer only if that source is on a written clearance list, which is empty** — so today every
   customer report is LIMITED COVERAGE with no records, and the internal view is the only one that shows records (labelled
-  HOLD, never storable). Proof: 117 + 85 + 59 offline checks, 28 checks storing the engine's real output through the real
-  Postgres writer, 107 mutations all killed. **Not built, by design:** entitlement, quota, idempotency and rate limiting
+  HOLD, never storable). Proof: 117 + 85 + 64 offline checks, 28 checks storing the engine's real output through the real
+  Postgres writer, 109 mutations all killed *(59 structural checks and 107 mutations when it deployed; the Follow change moved the gate, the reads and the change rule into shared modules, so the structural suite and the harness were re-pointed and extended; the two behavioural suites are unchanged)*. **Not built, by design:** entitlement, quota, idempotency and rate limiting
   (Orders H, L, M), the "Things to Review" section, per-ZIP source-applicability measurement.
-- G2. Follow / Changes Since Report — **built and proven end to end on a real Postgres; not deployed, and not struck until it is merged and
-  deployed.** `follow-development-report` (internal, JWT on, plus the admin allow-list) answers what the change ledger has learned about the
+- G2. Follow / Changes Since Report — **built and proven end to end on a disposable Postgres (the transport, the sign-in and allow-list, the rights registry and `dev_change_source_health` are stand-ins; its doc §6 lists them); not deployed.** This file's rule is that struck means merged; G2 is held back until it is also deployed and smoked, because the plan item is the surface, not the code. `follow-development-report` (internal, JWT on, plus the admin allow-list) answers what the change ledger has learned about the
   projects **in a stored report** since it was issued, and registers or closes a `follow` need on the report's private context.
-  `docs/development-activity-follow-changes-2026-10-01.md`: the boundary in time is the ledger's **write** time (`created_at`) with a
+  `docs/development-activity-follow-changes-2026-10-01.md`: the boundary in time is the ledger's **recording** time (`created_at`, the instant the recording transaction began) with a
   ten-minute overlap and a removal of what the report already showed, because `observed_at` is the source's retrieval instant and
-  would lose events written after a report but retrieved before it; the reader has no handle on the private context, so its answer is
-  byte-identical while a Follow holds the context and after a purge. Proof: 52 + 76 + 72 offline checks, 38 checks on a disposable
-  Postgres through the real handler and data layer, 90 mutations all killed. The gate, the ledger reads and the change rule are shared
-  with the national report (one definition each), and the national function was refactored onto them with its suites unchanged.
-  **Defaults the founder may change:** D-F1 internal-only until accounts exist; D-F2 a Follow is an opaque need with a random id;
-  D-F3 the overlap is ten minutes; D-F4 a purged report cannot be followed again. **Not covered, and the answer says so:** projects that
+  would lose events recorded after a report but retrieved before it, and each such answer says so (`recorded_at`, `RECORDED_AFTER_REPORT`);
+  the reader has no handle on the private context (the `changes` read selects no private column), so its answer is byte-identical for the
+  same clock and ledger state while a Follow holds the context and after a purge. Proof: 69 + 92 + 84 offline checks, 43 checks on a
+  disposable Postgres through the real handler and data layer, 120 mutations all killed. The gate, the ledger reads and the change rule are
+  shared with the national report (one definition each), and the national function was refactored onto them with its two behavioural suites
+  unchanged (its structural suite and harness were re-pointed at the shared files).
+  **Defaults the founder may change:** D-F1 internal-only until accounts exist; D-F2 a Follow is an opaque need whose id the caller chooses
+  and keeps (required; the function mints none); D-F3 the overlap is ten minutes, pinned to at least twice the observation job's longest transaction; D-F4 a purged report cannot be followed again. **Not covered, and the answer says so:** projects that
   appeared near the property after the report. **Not built:** notifications, ownership of a Follow (Order K).
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.

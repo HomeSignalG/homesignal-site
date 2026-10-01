@@ -156,10 +156,10 @@ change, and states `from` and `to` for each changed field.
 | 1 | the exact address resides only in the deletable layer | enforced; not proven for a real engine | **proven for this engine**, on the real writer: `national_report_pg` stores its output and asks the database what it holds |
 | 2 | the permanent snapshot holds no raw address elsewhere | backstop with named limits | **proven for whole values and fragments** on the real path; the fragment case shows the database accepting it and the engine's check catching it (`national_report_pg` 4c) |
 | 3 | deleting private context does not damage history | proven | proven again on this engine's reports (`national_report_pg` 3a–3f) |
-| 4 | Follow / Changes Since Report works while private context is active | half proven | *(at that time) still open — no Follow surface or reader existed.* **Since built and proven end to end on a real database** (2026-10-01): `docs/development-activity-follow-changes-2026-10-01.md`; not yet deployed |
+| 4 | Follow / Changes Since Report works while private context is active | half proven | *(at that time) still open — no Follow surface or reader existed.* **Since built and proven end to end on a disposable Postgres, with stand-ins stated in its doc** (2026-10-01): `docs/development-activity-follow-changes-2026-10-01.md`; not yet deployed |
 | 5 | retention clock and purge testable and auditable | proven; not armed | **still open** — the purge is not scheduled |
 
-**Storing a real customer report stays switched off.** Two gates are open, and this endpoint does not call the writer.
+**Storing a real customer report stays switched off.** *(When this table was written, two gates were open: 4 and 5. Gate 5 has since been armed and gate 4 built; the open parts of gates 1, 2 and 5 are listed in the contract §6.)* This endpoint does not call the writer.
 
 ## 7. What this does NOT do (stated, not hidden)
 

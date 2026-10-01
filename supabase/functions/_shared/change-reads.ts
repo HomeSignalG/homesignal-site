@@ -34,13 +34,18 @@ export function makeChangeReads(rest: Rest) {
     },
 
     /**
-     * Events the LEDGER WROTE after an instant: what Changes Since Report asks. `observed_at` is the retrieval instant of the
-     * source record, which can be hours older than the moment the ledger wrote the event, so "what the ledger learned since the
-     * report" is `created_at`, not `observed_at`. (docs/dev-change-ledger.sql defines both columns; docs/development-activity-follow-changes-2026-10-01.md §3 records what sets each.)
+     * MATERIAL events the ledger recorded after an instant: what Changes Since Report asks. `observed_at` is the retrieval instant of
+     * the source record, which can be hours older than the moment the ledger recorded the event, so "what the ledger learned since
+     * the report" is `created_at` (the instant the recording transaction began), not `observed_at`. (docs/dev-change-ledger.sql
+     * defines both columns; docs/development-activity-follow-changes-2026-10-01.md §3 records what sets each.)
+     * Only material events are asked for: every consumer discards the rest (national-report.ts `materialEvents`), and the non-material
+     * ones are the high-volume refreshes, so asking for them would push a long-held Follow toward the 1,000-row cap sooner.
+     * The cap is still fatal by design (service-rest.ts fails closed, a cut-short page is never an answer), so a Follow held long
+     * enough on a very busy set of projects can still answer 502; paging is the follow-up if that ever happens (§7 of the follow doc).
      */
     async eventsWrittenSince(keys: string[], sinceIso: string): Promise<WrittenEvent[]> {
       return await inBatches<WrittenEvent>(keys, (b) =>
-        rest('dev_change_event_reportable?select=' + EVENT_COLUMNS + ',created_at&created_at=gt.' + encodeURIComponent(sinceIso)
+        rest('dev_change_event_reportable?select=' + EVENT_COLUMNS + ',created_at&material=eq.true&created_at=gt.' + encodeURIComponent(sinceIso)
           + '&identity_key=in.' + encodeURIComponent(quoteIn(b))));
     },
 

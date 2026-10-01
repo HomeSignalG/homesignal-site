@@ -26,8 +26,10 @@ name: report-snapshot-suite
 #   5. CHANGES SINCE REPORT and FOLLOW (Order G follow-up; contract §6 gate 4): the real edge function handler and data layer,
 #      driven against the shipped ledger, reportable-events view, private layer and snapshot SQL. A report is assembled by the
 #      real engine and stored by the real writer; events are written; the reader answers "what changed since" while a Follow
-#      keeps the private context alive AND after the context is purged, byte-identically; a purged context is named, not
-#      reopened; nothing private appears in any response; and the data layer touches only the four relations it is allowed.
+#      keeps the private context alive AND after the context is purged, byte-identically (for the same clock and ledger state); a
+#      purged context is named, not reopened; nothing private appears in any response; and the data layer touches only the four data
+#      relations it is allowed plus the gate's allow-list and user lookup and the two need functions. Not shipped, and stated: the
+#      transport is a PostgREST translator, the sign-in and allow-list are canned, and one view and the roles are stand-ins.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
@@ -53,6 +55,7 @@ on:
       - 'supabase/functions/_shared/national-report.ts'
       - 'supabase/functions/_shared/project-type.generated.js'
       - 'supabase/functions/_shared/report-rights.json'
+      - 'test/dev_change_ledger_pg/fixture.sql'
       - 'test/changes_since_report_pg/**'
       - 'supabase/functions/_shared/changes-since-report.ts'
       - 'supabase/functions/_shared/change-reads.ts'
@@ -75,6 +78,7 @@ on:
       - 'supabase/functions/_shared/national-report.ts'
       - 'supabase/functions/_shared/project-type.generated.js'
       - 'supabase/functions/_shared/report-rights.json'
+      - 'test/dev_change_ledger_pg/fixture.sql'
       - 'test/changes_since_report_pg/**'
       - 'supabase/functions/_shared/changes-since-report.ts'
       - 'supabase/functions/_shared/change-reads.ts'

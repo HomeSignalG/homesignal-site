@@ -153,11 +153,12 @@ insertEvent({ key: 'k1', observed: TS + " - interval '1 hour'", created: TS + " 
 insertEvent({ key: 'k9', observed: TS + " + interval '14 minutes'", created: TS + " + interval '24 minutes'" });                                                                                  // P6: a project that was never in the report
 insertEvent({ key: 'k1', observed: TS + " + interval '15 minutes'", created: TS + " + interval '3 hours'", prev: { status: 'Reopened' }, next: { status: 'Sold' } });                              // P7: written after "now"
 insertEvent({ key: 'k1', observed: TS + " - interval '2 minutes'", created: TS + " - interval '3 minutes'", prev: { status: 'Sold' }, next: { status: 'Stalled' } });                              // E_s: straddles the issue; the report could not see it
+insertEvent({ key: 'k1', observed: TS + " - interval '30 minutes'", created: TS + " + interval '40 minutes'", prev: { status: 'Proposed' }, next: { status: 'Approved' } });                          // P8: the new fact is what the report's own card already says (k1 is Approved in the body)
 
 const NOW = new Date(T.getTime() + 2 * 3600 * 1000);
+// the follow ids belong to the CALLER: the function mints none. They carry a hex letter so a lower-casing test can fail.
 const ids = ['a1111111-1111-4111-8111-111111111111', 'a2222222-2222-4222-8222-222222222222', 'a3333333-3333-4333-8333-333333333333', 'a4444444-4444-4444-8444-444444444444'];
-let idn = 0;
-const handler = H.makeHandler(D.makeDeps({ url: 'http://pg.test', serviceKey: 'service-key', rights: RIGHTS, now: () => NOW, newId: () => ids[idn++] }, pgrest));
+const handler = H.makeHandler(D.makeDeps({ url: 'http://pg.test', serviceKey: 'service-key', rights: RIGHTS, now: () => NOW }, pgrest));
 const responses = [];
 const ask = async (body) => {
   const res = await handler(new Request('https://x.supabase.co/functions/v1/follow-development-report', { method: 'POST', headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
@@ -171,8 +172,14 @@ ok(A1.status === 200 && A1.json.status === 'OK', '3a the handler answers a store
 const changed = A1.json.result.changed;
 ok(same(changed.map((c) => c.project_id), ['k1']), '3b only k1 changed since the report (k2 is not change-ready; k9 was never in the report)', changed.map((c) => c.project_id));
 const rel = changed[0].changes_since_report.map((c) => minutes(Date.parse(c.detected_at) - T.getTime()));
-ok(same(rel, [10, -2, -60]), '3c k1\'s three changes, newest first: +10 min (P1), -2 min (E_s, straddled the issue), -60 min (P5, retrieved before the report but written after it)', rel);
-ok(same(changed[0].changes_since_report.map((c) => c.changes[0].to), ['Operating', 'Stalled', 'Reopened']), '3d and they say what changed to what: Operating, Stalled, Reopened');
+ok(same(rel, [10, -2, -30, -60]), '3c k1\'s four changes, newest source retrieval first: +10 min (P1), -2 min (E_s, straddled the issue), -30 min (P8) and -60 min (P5, retrieved before the report but written after it)', rel);
+ok(same(changed[0].changes_since_report.map((c) => c.changes[0].to), ['Operating', 'Stalled', 'Approved', 'Reopened']), '3d and they say what changed to what: Operating, Stalled, Approved, Reopened');
+const recorded = changed[0].changes_since_report.map((c) => minutes(Date.parse(c.recorded_at) - T.getTime()));
+ok(same(recorded, [20, -3, 40, 30]) && same(changed[0].changes_since_report.map((c) => c.source_retrieved_before_report), [false, true, true, true]),
+  '3d2 every entry says when the DATABASE recorded it (+20, -3, +40, +30 min) and whether its source predates the report: only P1 (retrieved after the issue) does not', [recorded, changed[0].changes_since_report.map((c) => c.source_retrieved_before_report)]);
+ok(changed[0].lifecycle_at_report.key === 'approved' && changed[0].changes_since_report[2].changes[0].to === 'Approved' && changed[0].changes_since_report[2].source_retrieved_before_report === true
+  && A1.json.result.limitations.some((l) => l.code === 'RECORDED_AFTER_REPORT'),
+  '3d3 THE REVIEW\'S CASE: the report\'s own card says Approved and the ledger recorded Proposed to Approved after it, from a source retrieved before it: the answer labels it (recorded after, source retrieved before) and carries the limitation instead of presenting it as plainly new', changed[0].lifecycle_at_report);
 ok(A1.json.result.excluded.not_change_ready === 1, '3e the k2 event (a project the ledger has seen once) is COUNTED as withheld, not silently dropped', A1.json.result.excluded);
 ok(!changed[0].changes_since_report.some((c) => c.changes[0].to === 'Closed'), '3f P4, written by a BASELINE run, is not a change: the reader goes through the reportable view, not the raw table');
 ok(!changed[0].changes_since_report.some((c) => c.changes[0].to === 'Sold'), '3g P7, written after "now", is not shown yet');
@@ -182,9 +189,11 @@ ok(A1.json.result.limitations.some((l) => l.code === 'NEW_PROJECTS_NOT_COVERED')
 const ANSWER = JSON.stringify(A1.json.result);
 
 // ---- 4. FOLLOW keeps the context, and Changes Since Report works throughout --------------------------------------------------------------------------
-const F1 = await ask({ action: 'follow', report_id: RID });
-ok(F1.json.status === 'FOLLOWING' && F1.json.follow_id === ids[0], '4a follow registers a follow through the real database function');
-ok(one("select count(*) from public.report_private_context_need where context_id = :'c'::uuid and kind = 'follow' and ref = :'r' and closed_at is null", { c: CTX, r: ids[0] }) === '1', '4b the database holds exactly one open follow need, with the random id as its reference');
+const F1 = await ask({ action: 'follow', report_id: RID, follow_id: ids[0].toUpperCase() });
+ok(F1.json.status === 'FOLLOWING' && F1.json.follow_id === ids[0] && ids[0] !== ids[0].toUpperCase(), '4a follow registers the follow the caller named (sent in upper case) through the real database function, and the answer carries it in lower case');
+ok(one("select count(*) from public.report_private_context_need where context_id = :'c'::uuid and kind = 'follow' and ref = :'r' and closed_at is null", { c: CTX, r: ids[0] }) === '1', '4b the database holds exactly one open follow need, with the LOWER-case id as its reference (the same id in either case is the same follow)');
+const NOID = await ask({ action: 'follow', report_id: RID });
+ok(NOID.status === 400 && NOID.json.detail === 'follow_id' && one("select count(*) from public.report_private_context_need where context_id = :'c'::uuid and kind = 'follow'", { c: CTX }) === '1', '4b2 a follow with no follow_id is refused: the function mints none, so no need can be opened that the caller does not hold the id of');
 const F1b = await ask({ action: 'follow', report_id: RID, follow_id: ids[0] });
 ok(F1b.json.status === 'FOLLOWING' && one("select count(*) from public.report_private_context_need where context_id = :'c'::uuid and kind = 'follow'", { c: CTX }) === '1', '4c following again with the same id is idempotent: still one need');
 one("select public.report_private_context_need_close(:'c'::uuid, 'report', :'r')", { c: CTX, r: RID }, 'service_role');
@@ -196,7 +205,7 @@ const U1 = await ask({ action: 'unfollow', report_id: RID, follow_id: ids[0] });
 ok(U1.json.status === 'UNFOLLOWED', '4f unfollow closes it');
 const clock = one("select (purge_due_at - last_needed_at) || '|' || state from public.report_private_context where context_id = :'c'::uuid", { c: CTX });
 ok(clock === '90 days|active', '4g the last need closing starts the 90-day clock: exactly 90 days, context still active', clock);
-const F2 = await ask({ action: 'follow', report_id: RID });
+const F2 = await ask({ action: 'follow', report_id: RID, follow_id: ids[1] });
 const reopened = one("select coalesce(purge_due_at::text, 'no-clock') from public.report_private_context where context_id = :'c'::uuid", { c: CTX });
 ok(F2.json.status === 'FOLLOWING' && reopened === 'no-clock', '4h following again inside the window stops the clock (the context is kept)', [F2.json, reopened]);
 const audit = one("select string_agg(kind || coalesce(':' || need_kind, ''), ',' order by event_id) from public.report_private_context_event where context_id = :'c'::uuid", { c: CTX });
@@ -208,7 +217,7 @@ const purged = one("select state || '|' || coalesce(address, 'NULL') || '|' || c
 ok(purged === 'purged|NULL|NULL', '5a a verified privacy request purges the context in place (address and coordinates are gone)', purged);
 const A3 = await ask({ action: 'changes', report_id: RID });
 ok(JSON.stringify(A3.json.result) === ANSWER, '5b Changes Since Report after the purge gives the SAME answer, byte for byte: it never depended on the private context');
-const F3 = await ask({ action: 'follow', report_id: RID });
+const F3 = await ask({ action: 'follow', report_id: RID, follow_id: ids[2] });
 ok(F3.status === 200 && F3.json.status === 'CONTEXT_PURGED' && F3.json.follow_id === undefined, '5c following a purged report says CONTEXT_PURGED (the database\'s own 55000, translated): a purge is terminal');
 const U2 = await ask({ action: 'unfollow', report_id: RID, follow_id: ids[0] });
 ok(U2.status === 200 && U2.json.status === 'UNFOLLOWED', '5d unfollowing a purged report is a harmless no-op');
@@ -230,6 +239,11 @@ ok(A4.json.status === 'OK' && A4.json.result.changed.length === 1 && A4.json.res
   ok(!/44\.04612|122\.98123|41\.83452|71\.41255/.test(responses.join('')), '6d no coordinate either');
   const tables = [...new Set(requests.map((r) => r.path.replace('/rest/v1/', '').replace('rpc/', 'rpc:')))].sort();
   ok(same(tables, ['/auth/v1/user', 'dashboard_admins', 'dev_change_event_reportable', 'dev_change_project', 'dev_change_source_health', 'report_snapshot', 'rpc:report_private_context_need_close', 'rpc:report_private_context_need_open']), '6e the data layer\'s whole footprint: the ledger, the view, the snapshot, the allow-list and the two need functions. Never the private context', tables);
+  const selects = (pred) => [...new Set(requests.filter(pred).map((r) => new URL('http://x' + r.path + r.search).searchParams.get('select')))].sort();
+  ok(same(selects((r) => r.path.endsWith('/report_snapshot')), ['private_context_id', 'report_id,content_hash,report_version,generated_at,body']),
+    '6e2 the snapshot was read in exactly two ways: the body and identity (no private-context column), and the handle alone (no body)', selects((r) => r.path.endsWith('/report_snapshot')));
+  const sinceReads = requests.filter((r) => r.path.endsWith('/dev_change_event_reportable') && r.search.includes('created_at=gt.'));
+  ok(sinceReads.length >= 4 && sinceReads.every((r) => r.search.includes('material=eq.true')), '6e3 every Changes Since Report read of the ledger asked for material events only (' + sinceReads.length + ' reads)', sinceReads.length);
   const denied = psql('select address from public.report_private_context limit 1;', {}, 'service_role');
   ok(!denied.ok && /permission denied/.test(denied.err), '6f (control) as service_role the private table CANNOT be read directly: the data layer could not have read it by accident');
   const read = psql("select * from public.report_private_context_read(:'c'::uuid)", { c: CTX2 }, 'service_role');

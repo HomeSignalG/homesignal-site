@@ -91,13 +91,17 @@ ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA
 {
   const t = readFileSync(join(ROOT, FOLLOW_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
-  ok(namesTable.includes(FOLLOW_DATA) && uses.length === 1 && /^report_snapshot\?select=report_id,content_hash,report_version,generated_at,private_context_id,body&report_id=eq\.$/.test(uses[0])
+  // two SELECTs, one per kind of request: `changes` reads the body and identity and never the private-context handle;
+  // follow / unfollow read only the handle and never the body. Neither selects an engine input or any private column.
+  ok(namesTable.includes(FOLLOW_DATA) && uses.length === 2
+    && uses.includes('report_snapshot?select=report_id,content_hash,report_version,generated_at,body&report_id=eq.')
+    && uses.includes('report_snapshot?select=private_context_id&report_id=eq.')
     && !/method: '(PUT|PATCH|DELETE)'/.test(t),
-    '3b: the one reader names the table once, in a SELECT of exactly the six columns it needs for one report, and has no write verb (control: it does name it)', uses);
+    '3b: the one reader names the table twice, in two SELECTs for one report each (the body and identity; the context handle alone), and has no write verb (control: it does name it)', uses);
 }
 const callsWriter = scanned.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
 ok(callsWriter.every((f) => ['docs/report-snapshot.sql', 'supabase/functions/_shared/report-snapshot.ts'].includes(f)),
-  '3b: the writer is called from one place only, the shared module', callsWriter.join(','));
+  '3c: the writer is called from one place only, the shared module', callsWriter.join(','));
 
 // ── 4. one place mints a report identity; the two legacy fingerprint sites are named, not extended ─────
 const assigners = scanned.filter((f) => !f.startsWith('test/') && /\b(draft|report|out|result)\.report_id\s*=[^=]/.test(readFileSync(join(ROOT, f), 'utf8')));

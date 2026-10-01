@@ -212,6 +212,11 @@ export function boundaryFindings(intelligence: Record<string, unknown>, ctx: Pri
 
 // ── what counts as a detected change: ONE rule, two readers ──────────────────────────────────────────────────
 
+/** Whether the ledger says a project's change history may be called changes: comparable, and observed at least twice. The ONE place this is asked. */
+export function isChangeReady(led: LedgerProject | undefined): boolean {
+  return !!led && led.change_ready === true;
+}
+
 /**
  * THE rule for which ledger events a report may call a HomeSignal-detected change. The report (`assemble`, below) and
  * Changes Since Report (`changes-since-report.ts`) both ask THIS function and neither restates it, so the two cannot
@@ -221,11 +226,6 @@ export function boundaryFindings(intelligence: Record<string, unknown>, ctx: Pri
  *   * an event counts only when it is material (not a non-material refresh of a field such as `submitted_at`);
  *   * newest first.
  */
-/** Whether the ledger says a project's change history may be called changes: comparable, and observed at least twice. The ONE place this is asked. */
-export function isChangeReady(led: LedgerProject | undefined): boolean {
-  return !!led && led.change_ready === true;
-}
-
 export function selectDetectedChanges(
   led: LedgerProject | undefined, events: ReportableEvent[], keep: (e: ReportableEvent) => boolean,
 ): ReportableEvent[] {

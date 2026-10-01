@@ -59,15 +59,41 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
   const r = run({ events: [e] });
   ok(r.changed.length === 1 && r.changed[0].project_id === 'k1', '2a one project changed since the report: k1');
   const c = r.changed[0].changes_since_report;
-  ok(same(c, [{ event_type: 'status_changed', detected_at: '2026-09-30T06:30:00Z', publisher_event: { kind: 'issued', date: '2026-09-24' }, changes: [{ field: 'status', from: 'Approved', to: 'Operating' }] }]),
-    '2b its change is exactly: status Approved to Operating, detected 2026-09-30T06:30:00Z, with the publisher event', c);
-  // the SAME event, shown by the report itself, has the same shape: one rule, one entry shape
+  ok(same(c, [{ event_type: 'status_changed', detected_at: '2026-09-30T06:30:00Z', publisher_event: { kind: 'issued', date: '2026-09-24' }, changes: [{ field: 'status', from: 'Approved', to: 'Operating' }], recorded_at: '2026-09-30T06:35:00Z', source_retrieved_before_report: false }]),
+    '2b its change is exactly: status Approved to Operating, detected 2026-09-30T06:30:00Z, recorded 06:35:00Z, source retrieved AFTER the report, with the publisher event', c);
+  // the SAME event, shown by the report itself, has the same shared shape: one rule, one entry shape. The since-reader adds exactly two fields to it.
   const reportShows = assembleFor('customer', RIGHTS, { ...FIELD, events: [{ ...e, observed_at: '2026-09-29T09:00:00Z' }] });
   const inReport = reportShows.intelligence.projects.find((p) => p.project_id === 'k1').homesignal_detected_changes[0];
-  ok(same(inReport, { ...c[0], detected_at: '2026-09-29T09:00:00Z' }), '2c and the report, given the same event, builds the identical entry (only the date differs): the two cannot disagree about what a change looks like');
+  const { recorded_at: _r, source_retrieved_before_report: _s, ...shared } = c[0];
+  ok(same(inReport, { ...shared, detected_at: '2026-09-29T09:00:00Z' }), '2c and the report, given the same event, builds the identical entry (only the date differs, and the since-reader\'s two extra fields): the two cannot disagree about what a change looks like');
+  ok(same(Object.keys(c[0]).filter((k) => !(k in inReport)).sort(), ['recorded_at', 'source_retrieved_before_report']), '2c2 and the since-reader adds EXACTLY recorded_at and source_retrieved_before_report to the shared entry', Object.keys(c[0]));
   ok(r.changed[0].name === 'Ravenna Bridge Retrofit' && r.changed[0].lifecycle_at_report.key === 'approved' && r.changed[0].type.key === 'infrastructure' && r.changed[0].type.label === 'Roads & infrastructure', '2d the project is named and typed as the REPORT said (lifecycle at the report: approved)', [r.changed[0].lifecycle_at_report, r.changed[0].type]);
   ok(r.changed[0].source.url === 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0' && r.changed[0].source.attribution === 'Data: WSDOT', '2e with its official source link, and the attribution from the rights registry as it stands now');
   ok(r.report.report_id === REPORT_ID && r.report.issued_at === ISSUED && r.as_of === '2026-09-30' && r.through === '2026-09-30T08:00:00.000Z' && r.projects_in_report === 2, '2f the answer names the report, when it was issued, and the instant it is current to');
+  ok(same(r.limitations.map((l) => l.code), ['NEW_PROJECTS_NOT_COVERED']), '2f2 an event retrieved AFTER the report adds no RECORDED_AFTER_REPORT limitation: there is nothing to explain', r.limitations);
+}
+
+// ---- 2g. an event recorded after the report from a source record retrieved BEFORE it is labelled, never presented as plainly new -----------------
+{
+  // retrieved the evening before the report was issued, recorded by the ledger at 02:30 the next day
+  const e = wev('k1', '2026-09-30T02:30:00Z', { observed_at: '2026-09-28T23:00:00Z' });
+  const r = run({ events: [e] });
+  const c = r.changed[0].changes_since_report[0];
+  ok(c.detected_at === '2026-09-28T23:00:00Z' && c.recorded_at === '2026-09-30T02:30:00Z' && c.source_retrieved_before_report === true,
+    '2g1 detected_at (the source retrieval) PREDATES the report, so the entry carries when the ledger recorded it and says the source was retrieved before the report', c);
+  ok(same(r.limitations.map((l) => l.code), ['NEW_PROJECTS_NOT_COVERED', 'RECORDED_AFTER_REPORT']), '2g2 and the answer carries the RECORDED_AFTER_REPORT limitation, once', r.limitations.map((l) => l.code));
+  ok(/already show the new state/.test(r.limitations[1].text), '2g3 which tells the reader the report may already show the new state', r.limitations[1].text);
+  // the case an independent review proved: the report's own card already states the event's NEW fact
+  // (k1 is Approved in the report; the ledger recorded Proposed -> Approved, retrieved before the report, after it)
+  const rp = run({ events: [wev('k1', '2026-09-30T03:00:00Z', { observed_at: '2026-09-29T09:00:00Z', prev_facts: { status: 'Proposed' }, new_facts: { status: 'Approved' } })] });
+  const only = rp.changed[0];
+  ok(only.lifecycle_at_report.key === 'approved' && only.changes_since_report[0].changes[0].to === 'Approved' && only.changes_since_report[0].source_retrieved_before_report === true
+    && rp.limitations.some((l) => l.code === 'RECORDED_AFTER_REPORT'),
+    '2g4 the report says Approved and the event says Proposed to Approved: the answer is not silent about the apparent contradiction, it labels it (source retrieved before the report; recorded after)', [only.lifecycle_at_report, only.changes_since_report]);
+  // an event retrieved exactly at the issue instant counts as retrieved before (not after) the report
+  const edge = run({ events: [wev('k1', '2026-09-30T03:00:00Z', { observed_at: ISSUED })] }).changed[0].changes_since_report[0];
+  ok(edge.source_retrieved_before_report === true && run({ events: [wev('k1', '2026-09-30T03:00:00Z', { observed_at: '2026-09-29T12:00:05.001Z' })] }).changed[0].changes_since_report[0].source_retrieved_before_report === false,
+    '2g5 the flag is exact: retrieved at the issue instant is "before", one millisecond later is not');
 }
 
 // ---- 3. what is NOT a change since the report ---------------------------------------------------------------------------------------------
@@ -153,10 +179,24 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
   refuse('a project listed twice', { ...base, body: JSON.stringify({ ...goodBody, projects: [goodBody.projects[0], goodBody.projects[0]] }) });
   refuse('an issue time that is not a time', { ...base, generated_at: 'yesterday' });
   refuse('a body that is an array', { ...base, body: '[]' });
+  const withDetected = (v) => ({ ...base, body: JSON.stringify({ ...goodBody, projects: goodBody.projects.map((p, i) => (i === 0 ? { ...p, homesignal_detected_changes: v } : p)) }) });
+  refuse('a project whose detected changes are not a list', withDetected('status_changed'));
+  refuse('a detected change that is null', withDetected([null]));
+  refuse('a detected change with no event type', withDetected([{ detected_at: '2026-09-25T10:00:00Z' }]));
+  refuse('a detected change whose event type is not text', withDetected([{ event_type: 5, detected_at: '2026-09-25T10:00:00Z' }]));
+  refuse('a detected change with no readable instant', withDetected([{ event_type: 'status_changed', detected_at: 'sometime' }]));
+  refuse('a detected change with a missing instant', withDetected([{ event_type: 'status_changed' }]));
+  ok(run({ report: withDetected([]) }).projects_in_report === 2 && run({ report: { ...base, body: JSON.stringify({ ...goodBody, projects: goodBody.projects.map((p) => { const { homesignal_detected_changes, ...rest } = p; return rest; }) }) } }).projects_in_report === 2,
+    '7 (control) a project with no detected changes, an empty list or the field absent, is valid');
   const empty = run({ report: { ...base, body: JSON.stringify({ ...goodBody, projects: [] }) }, events: [wev('k1', '2026-09-30T06:35:00Z')] });
   ok(empty.projects_in_report === 0 && empty.changed.length === 0, '7 (control) a report that genuinely lists no projects is a valid, empty answer: refusal is for what cannot be read, not for emptiness');
   let v = null; try { run({ view: 'public' }); } catch (x) { v = String(x.message); }
   ok(v !== null, '7 an unknown view is refused');
+  // a ledger event whose time cannot be read is refused, never dropped (a dropped event would read as "no change")
+  for (const [label, x] of [['created_at', { created_at: 'garbage' }], ['observed_at', { observed_at: 'garbage' }], ['a missing created_at', { created_at: undefined }]]) {
+    let e = null; try { run({ events: [wev('k1', '2026-09-30T06:35:00Z', x)] }); } catch (err) { e = err; }
+    ok(e instanceof C.EventRowUnreadable, '7 a ledger event with an unreadable ' + label + ': refused, not silently dropped', e && e.message);
+  }
 }
 
 // ---- 8. nothing private can be in the answer: the engine's own boundary scan is run over it ---------------------------------------------

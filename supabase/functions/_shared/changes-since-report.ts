@@ -3,9 +3,10 @@
 //
 // PURE. This file reads no environment, calls no network and holds no client; the edge function hands it what the database
 // returned. And it has no handle on the PRIVATE CONTEXT at all: it is given the report's permanent body (which holds project
-// identities and no address), the ledger rows and events for those projects, and the rights registry. That is the whole contract
-// (§8.5), and it is why this works while a Follow keeps the context alive, and equally after the context is purged: the answer
-// is the same either way, byte for byte (test/changes_since_report_pg).
+// identities and no address), the ledger rows and events for those projects, the source health of the families in the report,
+// and the rights registry. That is the whole contract (§8.5), and it is why this works while a Follow keeps the context alive,
+// and equally after the context is purged: with the same clock and the same ledger state the answer is the same either way, byte
+// for byte (test/changes_since_report_pg).
 //
 // IT DECIDES NOTHING THAT ALREADY HAS AN OWNER.
 //   what a detected change is ...... national-report.ts `selectDetectedChanges` / `detectedChangeEntries`, the SAME functions the
@@ -18,13 +19,26 @@
 //
 // WHAT "SINCE" MEANS, and why it is not `observed_at > issued_at`.
 //   An event's `observed_at` is the retrieval instant of the SOURCE RECORD (the materialiser's refresh time). The observation job
-//   reaches a ZIP up to a day later, so an event can carry an `observed_at` hours BEFORE the report and be WRITTEN to the ledger
+//   reaches a ZIP up to a day later, so an event can carry an `observed_at` hours BEFORE the report and be RECORDED in the ledger
 //   AFTER it: the report could not have shown it, and `observed_at > issued_at` would lose it for good. What the report could not
-//   have known is what the LEDGER WROTE after the report read it, so the boundary is the event's `created_at`.
-//   The report reads the ledger a moment before it is issued, and an observation tick is one transaction of up to a minute, so an
-//   event can have a `created_at` slightly before `issued_at` and still not have been visible to the report. The boundary therefore
-//   reaches back SINCE_REPORT_OVERLAP_MS, and any event the report ALREADY SHOWED (the same project, instant and type are in its
-//   body) is removed. The overlap cannot double-report, because of that removal; without the removal it would.
+//   have known is what the ledger recorded after the report read it, so the boundary is the event's `created_at`. That column is
+//   `default now()`, which Postgres evaluates at TRANSACTION START, not at the write or the commit: an event is stamped with the
+//   instant its transaction began.
+//   The report reads the ledger a moment before it is issued, and an observation tick is one transaction (a soft 60 s budget checked
+//   between ZIPs, a hard 120 s statement timeout), so an event can have a `created_at` slightly before `issued_at` and still not have
+//   been visible to the report. The boundary therefore reaches back SINCE_REPORT_OVERLAP_MS, and any event the report ALREADY SHOWED
+//   (the same project, instant and type are in its body) is removed. The overlap cannot double-report, because of that removal;
+//   without the removal it would.
+//   ONE ASSUMPTION IS NOT ENFORCED HERE: that the report's ledger read and its store were less than (overlap − longest tick) apart.
+//   The body records `as_of` (a day), not the instant of the ledger read, so the reader cannot check it. Stamping the read instant
+//   into the body is a report-engine change (Order I); until then this is the documented limit.
+//
+// SOME ANSWERS CAN LOOK AS IF THEY CONTRADICT THE REPORT, and every such answer says why. The report reads the project's CURRENT
+// state at issue time; an event can be recorded after issue from a source record that was retrieved BEFORE issue, so its new facts
+// may be exactly what the report already stated. Each entry therefore carries `recorded_at` (the ledger's `created_at`) beside
+// `detected_at` (the source retrieval instant) and `source_retrieved_before_report`, and the answer carries a RECORDED_AFTER_REPORT
+// limitation whenever one is present. The event is not dropped (dropping it would lose a change the report's own body may not
+// carry in full) and not hidden: it is labelled.
 //
 // WHAT IT DOES NOT COVER, and says so on every answer: a project that appeared near the property after the report. Finding one
 // needs the subject's point, which is the private context, and this reader never touches it. It is a different feature (a watch,
@@ -44,6 +58,9 @@ export type StoredReport = { report_id: string; content_hash: string; report_ver
 /** The stored report is not a report this reader understands. Fail closed: never "no changes". */
 export class ReportUnreadable extends Error {}
 
+/** A ledger event row whose timestamps cannot be read. Fail closed: an event dropped for its date would read as "no change". */
+export class EventRowUnreadable extends Error {}
+
 /**
  * How far before the issue instant the ledger read reaches. Defined once. It must exceed the longest span between the report's ledger
  * read and its write plus the longest observation transaction (the observation tick is capped at 60 s); ten minutes is that with
@@ -55,6 +72,10 @@ export const NEW_PROJECTS_NOT_COVERED = {
   code: 'NEW_PROJECTS_NOT_COVERED',
   text: 'This answer covers the projects that were in the report. A project that appeared near the property after the report is not part of it.',
 };
+export const RECORDED_AFTER_REPORT = {
+  code: 'RECORDED_AFTER_REPORT',
+  text: 'Some changes below were recorded by HomeSignal after the report was issued, from a source record that was retrieved before it. The report may already show the new state; compare with the report.',
+};
 export const SOURCES_NOT_INCLUDED_SINCE = {
   code: 'SOURCES_NOT_INCLUDED',
   text: 'Some projects in the report come from official sources that are not included in this answer.',
@@ -62,10 +83,27 @@ export const SOURCES_NOT_INCLUDED_SINCE = {
 
 type ReportedProject = {
   project_id: string; source_family: string | null; name: unknown; type: unknown; lifecycle: unknown;
-  source: { url?: unknown } | null; homesignal_detected_changes: Array<{ event_type?: unknown; detected_at?: unknown }>;
+  source: { url?: unknown } | null; homesignal_detected_changes: Array<{ event_type: string; detected_at: string }>;
 };
 
 export type ParsedReport = { generated_at: string; projects: ReportedProject[] };
+
+/**
+ * The changes a stored project card already showed. Each must be an object with an event type and a readable instant: they are what
+ * de-duplicates the answer against the report, so an element that cannot be read would silently stop de-duplicating. Refused instead.
+ */
+function detectedChangesOf(p: { homesignal_detected_changes?: unknown }): Array<{ event_type: string; detected_at: string }> {
+  const raw = p.homesignal_detected_changes;
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new ReportUnreadable('a project\'s detected changes are not a list');
+  return raw.map((c) => {
+    if (!c || typeof c !== 'object' || Array.isArray(c) || typeof c.event_type !== 'string'
+      || typeof c.detected_at !== 'string' || !Number.isFinite(Date.parse(c.detected_at))) {
+      throw new ReportUnreadable('a detected change in the report cannot be read');
+    }
+    return { event_type: c.event_type, detected_at: c.detected_at };
+  });
+}
 
 /** Read the permanent body. Anything that is not the national report's own shape is refused. */
 export function parseStoredReport(stored: StoredReport): ParsedReport {
@@ -86,7 +124,7 @@ export function parseStoredReport(stored: StoredReport): ParsedReport {
       source_family: typeof p.source_family === 'string' ? p.source_family : null,
       name: p.name ?? null, type: p.type ?? null, lifecycle: p.lifecycle ?? null,
       source: p.source && typeof p.source === 'object' ? p.source : null,
-      homesignal_detected_changes: Array.isArray(p.homesignal_detected_changes) ? p.homesignal_detected_changes : [],
+      homesignal_detected_changes: detectedChangesOf(p),
     });
   }
   projects.sort((a, b) => (a.project_id < b.project_id ? -1 : 1));
@@ -125,17 +163,21 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
   const ledger = new Map(input.ledger.map((l) => [l.identity_key, l]));
   const eventsByKey = new Map<string, WrittenEvent[]>();
   for (const e of input.events) {
+    // an event whose instants cannot be read is refused, never dropped: a dropped event would read as "no change"
+    if (!Number.isFinite(instant(e.created_at)) || !Number.isFinite(instant(e.observed_at))) throw new EventRowUnreadable('a ledger event has an unreadable time');
     if (!eventsByKey.has(e.identity_key)) eventsByKey.set(e.identity_key, []);
     eventsByKey.get(e.identity_key)!.push(e);
   }
 
-  const lower = instant(parsed.generated_at) - SINCE_REPORT_OVERLAP_MS;
+  const issued = instant(parsed.generated_at);
+  const lower = issued - SINCE_REPORT_OVERLAP_MS;
   const upper = now.getTime();
 
   const excluded = { no_rights: {} as Record<string, number>, not_change_ready: 0 };
   const changed: ChangesSinceReport['changed'] = [];
   const latest = new Map<string, string>();
   const familiesInAnswer = new Set<string>();
+  let recordedAfterReport = false;
 
   for (const p of parsed.projects) {
     const family = p.source_family ?? '';
@@ -148,9 +190,7 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
     const keep = (e: WrittenEvent) => {
       const written = instant(e.created_at);
       const observed = instant(e.observed_at);
-      return Number.isFinite(written) && written > lower && written <= upper
-        && Number.isFinite(observed) && observed <= upper
-        && !shown.has(observed + '|' + e.event_type);
+      return written > lower && written <= upper && observed <= upper && !shown.has(observed + '|' + e.event_type);
     };
     const events = eventsByKey.get(p.project_id) ?? [];
     const led = ledger.get(p.project_id);
@@ -160,6 +200,12 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
       continue;
     }
     latest.set(p.project_id, String(found[0].observed_at));
+    // the shared entry shape, plus when the ledger recorded the event and whether its source record predates the report
+    const entries = (found as WrittenEvent[]).map((e) => {
+      const retrievedBefore = instant(e.observed_at) <= issued;
+      if (retrievedBefore) recordedAfterReport = true;
+      return { ...detectedChangeEntries([e])[0], recorded_at: e.created_at, source_retrieved_before_report: retrievedBefore };
+    });
     changed.push({
       project_id: p.project_id,
       name: p.name,
@@ -167,7 +213,7 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
       type: p.type,
       lifecycle_at_report: p.lifecycle,
       source: { url: p.source && typeof p.source.url === 'string' ? p.source.url : null, attribution: grant ? (grant.attribution || null) : null },
-      changes_since_report: detectedChangeEntries(found),
+      changes_since_report: entries,
       ...(view === 'internal' ? { rights: grant ? 'CLEARED' : 'HOLD' } : {}),
     });
   }
@@ -177,6 +223,7 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
   });
 
   const limitations = [{ ...NEW_PROJECTS_NOT_COVERED }];
+  if (recordedAfterReport) limitations.push({ ...RECORDED_AFTER_REPORT });
   if (Object.keys(excluded.no_rights).length > 0) limitations.push({ ...SOURCES_NOT_INCLUDED_SINCE });
   if (sourcesNotFullyRead(input.health, familiesInAnswer)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
 
