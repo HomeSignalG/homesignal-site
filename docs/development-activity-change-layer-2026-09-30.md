@@ -227,3 +227,32 @@ writer is refused and nothing is created; a missing ledger is refused; a failed 
 **Apply.** `apply_migration` from the generated file, after re-reading the live writer's `md5(prosrc)` (the guard refuses unless it is the
 old or the new one) and confirming no run is mid-flight. It touches no existing row. Rollback: the ledger file's `ROLLBACK` block drops the
 new objects; the old writer is restored by `create or replace` of `test/dev_change_ledger_pg/as_applied.sql`'s function.
+
+**Production receipt (2026-10-01).** Merged as #1506 (`a43ec82`).
+
+- **How it was applied, and why not the usual way.** `apply_migration` on the 33,810-byte generated file timed out at the tool's 60-second
+  limit twice, and each time the live state was read back and **nothing had been applied** (the writer md5 was still the old one). It was
+  then applied by `db-sql.yml` dispatched from `main` (run `36896464758`, `sql_file=docs/dev-change-copy-conflicts-apply.sql`, ref `a43ec82`),
+  which finished `success` in 11 seconds: the whole file is one query and the runner has no 60-second tool limit. **That path writes no
+  `supabase_migrations` row**, so the file, that run id and this section are the record.
+- **Measured after (17:11Z, each beside its control).** The live writer's `md5(prosrc)` is `042ce94641c713c6c0b6e7d18c4addb6`, the value the
+  guard accepts as "new" (the old one was `17b45b9c4b93855b0ed3ee7d2ada09e1`); `dev_change_record_facts(jsonb)` is 1 function;
+  `dev_change_copy_conflict` exists with row-level security on and **0** grants to `anon`, `authenticated` or PUBLIC; and the ledger was
+  untouched by the upgrade: **932,969 projects, 922,244 events, 4 runs, 12,722 cursor rows**, exactly the figures read before. (The projects
+  row fingerprint was not recomputed before the pilots below rewrote project rows, so it is not claimed.)
+- **The hold has been seen to fire on production data, which is the only evidence that it runs there.** A first pilot of 175 ZIPs (the lowest ZIP
+  numbers, which are mostly single-ZIP records) wrote 45 events and **left `dev_change_copy_conflict` empty**, so it proved nothing about
+  the hold. Five ZIPs that carry known cross-copy conflicts (Boone County KY: 41005, 41042, 41048, 41080, 41091, picked from identities that
+  carry baseline cross-copy events) were then observed once in their own ordinary run: **99 identities were held (`change_held`) and 1 event
+  was written.** Both halves were checked against `app_projects` rather than taken from the counters:
+  - the one event is a real publisher change (a state highway plan's stage `ESTIMATED A` to `ESTIMATED TentativeLetting`);
+  - the held ones are different records sharing one source key. `arcgis:boone-county-ky-planning-board-actions:00-004` is a conditional use
+    permit for a car rental business at 7101-7107 Dixie Hwy (ZIP 41042, filed 2000-08-10) on one page and a fellowship hall at 11036 Bog Bone
+    Church Rd (ZIP 41091, filed 2000-01-12) on another; `…:01-007` is a sign variance at 8001 Burlington Pike against a rear-yard setback
+    variance at 2752 Fister Place Blvd. Announcing either as a change would have been wrong.
+- **Newly recorded, not fixed here.** That registry keys a record by a board case number that is **not unique per case**, so two different cases
+  share one identity and the ledger marks it comparable. The hold now contains the effect; the key itself is a registry question.
+- **Runs.** `063858f0-5ce6-451b-8e61-adac6148d519` (purpose `pilot_ordinary`) and `ed116015-e3f3-444b-ac88-b0dda2e1cc40`
+  (`pilot_ordinary_conflicts`); both finished, both ordinary, so their **46 events (25 `first_detected`, 21 `status_changed`) are the first
+  reportable events in production** (the view read 0 before). The first run is also the measurement behind the schedule in
+  baseline doc §12.

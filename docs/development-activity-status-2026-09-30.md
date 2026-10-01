@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conflict hold (built and proven; applied to production after merge). The purge schedule from the previous PR (#1502) is merged and applied.
+Last updated: 2026-10-01, in the PR that records the production receipts of the purge schedule (#1502, applied 16:34Z, first monitor tick ok at 17:10Z) and of ledger option (b) (#1506, applied 17:02Z).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -83,7 +83,7 @@ Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conf
   append-only audit; the snapshot keeps its `report_id`, hash, body and time when the address is purged. Measured
   first: the legacy report shape would have stored the typed address, the exact property point and per-record offsets
   that recover the point to within a metre (contract §2). All four tables hold 0 rows and **nothing calls the writer**;
-  the purge is written and tested; **its schedule and alarm are built in `docs/report-private-context-purge-schedule.sql` (contract §13) and take effect on apply**. Production receipt and a rolled-back behaviour probe: contract
+  the purge is written and tested; **its schedule and alarm are applied (contract §13): pg_cron job 70 every 15 minutes, and the alertable check `report_private_context_retention`, which read ok on its first monitor tick (2026-10-01 17:10Z)**. Production receipt and a rolled-back behaviour probe: contract
   §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
   of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
   boundary-test checklist (§8.4).
@@ -96,7 +96,7 @@ Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conf
   **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
-  (three are proven; gate 5, arming the purge, is built and takes effect on apply — contract §13; one is open: the Follow / Changes Since Report surface).
+  (three are proven; gate 5, arming the purge, is applied and reading ok — contract §13; one is open: the Follow / Changes Since Report surface).
   `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
   commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
   JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
@@ -183,13 +183,15 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     writer change, reversible. A reader must select from it, never from `dev_change_event`; a structural test
     fails if anything else names the raw table. **Merged (#1470) and applied to production 2026-09-29 20:32Z**
     (migration `dev_change_reportable_d2_20260930`; it reads 0 reportable events today, against 922,244 events
-    that are all baseline; it has no reader, so nothing visible changed; receipt in design doc §11). **Option (b) — go given 2026-09-30, built 2026-10-01
-    (takes effect on merge + apply; change-layer doc §9):** the writer now HOLDS copies that contradict on name, address or
+    that are all baseline; it has no reader, so nothing visible changed; receipt in design doc §11). **Option (b) — go given 2026-09-30, built 2026-10-01, merged (#1506) and
+    applied to production 2026-10-01 17:02Z (change-layer doc §9, with the receipt):** the writer now HOLDS copies that contradict on name, address or
     filing date instead of announcing them (a hold, not a newest-copy resolution, because the measured conflicts persist:
     528 of the 862 identities that carried a cross-copy event still disagree today). A real rename is reported once the copies
     converge; a new record whose copies already contradict is recorded non-comparable (`copies_disagree`); a held
     observation writes only an audit row (`dev_change_copy_conflict`). The production upgrade is the generated
-    `docs/dev-change-copy-conflicts-apply.sql`, guarded on the live writer's md5. **Still undecided:** an ordinary-run event on
+    `docs/dev-change-copy-conflicts-apply.sql`, guarded on the live writer's md5, applied through `db-sql.yml` (the 33.8 KB file
+    timed out twice at `apply_migration`'s 60 s limit and applied nothing). **The hold was then seen to fire on production data:** five ZIPs
+    with known conflicts held 99 identities and wrote 1 real change. **Still undecided:** an ordinary-run event on
     an identity that later becomes non-comparable stays reportable.
 11. ~~Retention and privacy of a brokerage-entered address~~ — **decided by the founder 2026-09-29.** Not permanent
     intelligence; kept only while a report, Follow or account relationship needs it; purged no more than 90 days
