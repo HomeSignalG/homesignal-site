@@ -111,8 +111,8 @@ Last updated: 2026-10-01, in the PR that builds the Follow / Changes Since Repor
   `docs/development-activity-follow-changes-2026-10-01.md`: the boundary in time is the ledger's **write** time (`created_at`) with a
   ten-minute overlap and a removal of what the report already showed, because `observed_at` is the source's retrieval instant and
   would lose events written after a report but retrieved before it; the reader has no handle on the private context, so its answer is
-  byte-identical while a Follow holds the context and after a purge. Proof: 52 + 76 + 71 offline checks, 38 checks on a disposable
-  Postgres through the real handler and data layer, 89 mutations all killed. The gate, the ledger reads and the change rule are shared
+  byte-identical while a Follow holds the context and after a purge. Proof: 52 + 76 + 72 offline checks, 38 checks on a disposable
+  Postgres through the real handler and data layer, 90 mutations all killed. The gate, the ledger reads and the change rule are shared
   with the national report (one definition each), and the national function was refactored onto them with its suites unchanged.
   **Defaults the founder may change:** D-F1 internal-only until accounts exist; D-F2 a Follow is an opaque need with a random id;
   D-F3 the overlap is ten minutes; D-F4 a purged report cannot be followed again. **Not covered, and the answer says so:** projects that

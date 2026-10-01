@@ -165,6 +165,8 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   ok(/follow-development-report\/handler\.ts/.test(rt) && /follow-development-report\/data\.ts/.test(rt) && /change-reads\.ts/.test(rt) && /report-snapshot\.ts/.test(rt) && /national-report\.ts/.test(rt),
     '7h it drives the real handler, the real data layer, the real shared reads, the real writer and the real engine');
   const standins = read('test/changes_since_report_pg/standins.sql');
+  ok(/^alter role service_role bypassrls;$/m.test(standins) && !/^\s*--.*alter role service_role bypassrls/m.test(standins.split('\n').filter((l) => /^alter role/.test(l)).join('\n')),
+    '7i2 the stand-in gives service_role the BYPASSRLS attribute Supabase\'s role has: without it the ledger (RLS on, no policy) reads as empty on a fresh database, which a developer machine where the role already carries the attribute hides');
   const created = [...standins.matchAll(/create (?:table|view|function) (?:if not exists )?(?:public\.)?(\w+)/gi)].map((m) => m[1]);
   ok(created.join() === 'dev_change_source_health', '7i the only stand-in is dev_change_source_health (a view over ingest-side tables this repo does not own); every other relation is the shipped SQL', created);
 }

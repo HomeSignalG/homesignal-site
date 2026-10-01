@@ -153,6 +153,7 @@ m('follow_workflow_ignores_the_reader_on_prs', RSW, "      - 'supabase/functions
   "      - 'docs/dev-change-ledger.sql'\n      - '.github/workflows/report-snapshot-suite.yml'\n  push:")
 m('follow_roundtrip_runs_on_any_database', RUN, "case \"$PGDATABASE\" in *disposable*) ;; *) echo \"ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')\"; exit 1;; esac", "true")
 m('follow_roundtrip_uses_a_copy_of_the_sql', RUN, 'P -f "$root/docs/dev-change-reportable.sql" >/dev/null 2>&1', 'P -f "$here/reportable-copy.sql" >/dev/null 2>&1')
+m('follow_roundtrip_standin_forgets_bypassrls', 'test/changes_since_report_pg/standins.sql', "alter role service_role bypassrls;\n", "")
 m('follow_roundtrip_accepts_a_credential', RUN, 'if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi', 'true')
 
 

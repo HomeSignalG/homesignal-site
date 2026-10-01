@@ -5,6 +5,11 @@
 -- Supabase grants USAGE on schema public to its three API roles; run.sh rebuilds the schema from nothing, so the stand-in restores
 -- it. (Production has it by platform default; every other disposable harness runs as the database owner and never needs it.)
 grant usage on schema public to anon, authenticated, service_role;
+-- Supabase's service_role BYPASSES row level security (that is how PostgREST reads the ledger and the snapshot with the service key).
+-- The shared fixtures create it as a plain nologin role, so on a FRESH cluster (CI) the ledger's tables, which have RLS and no policy,
+-- read as empty to it: the first run of this proof on a fresh cluster found zero ledger rows and zero events. A role created by an
+-- earlier session on a developer machine may already carry the attribute, which hid it locally. Set it here, from production's fact.
+alter role service_role bypassrls;
 
 create table public.dev_change_source_health (
   registry_id text primary key,
