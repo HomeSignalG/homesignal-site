@@ -183,13 +183,15 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     writer change, reversible. A reader must select from it, never from `dev_change_event`; a structural test
     fails if anything else names the raw table. **Merged (#1470) and applied to production 2026-09-29 20:32Z**
     (migration `dev_change_reportable_d2_20260930`; it reads 0 reportable events today, against 922,244 events
-    that are all baseline; it has no reader, so nothing visible changed; receipt in design doc §11). **Option (b) — go given 2026-09-30, built 2026-10-01
-    (takes effect on merge + apply; change-layer doc §9):** the writer now HOLDS copies that contradict on name, address or
+    that are all baseline; it has no reader, so nothing visible changed; receipt in design doc §11). **Option (b) — go given 2026-09-30, built 2026-10-01, merged (#1506) and
+    applied to production 2026-10-01 17:02Z (change-layer doc §9, with the receipt):** the writer now HOLDS copies that contradict on name, address or
     filing date instead of announcing them (a hold, not a newest-copy resolution, because the measured conflicts persist:
     528 of the 862 identities that carried a cross-copy event still disagree today). A real rename is reported once the copies
     converge; a new record whose copies already contradict is recorded non-comparable (`copies_disagree`); a held
     observation writes only an audit row (`dev_change_copy_conflict`). The production upgrade is the generated
-    `docs/dev-change-copy-conflicts-apply.sql`, guarded on the live writer's md5. **Still undecided:** an ordinary-run event on
+    `docs/dev-change-copy-conflicts-apply.sql`, guarded on the live writer's md5, applied through `db-sql.yml` (the 33.8 KB file
+    timed out twice at `apply_migration`'s 60 s limit and applied nothing). **The hold was then seen to fire on production data:** five ZIPs
+    with known conflicts held 99 identities and wrote 1 real change. **Still undecided:** an ordinary-run event on
     an identity that later becomes non-comparable stays reportable.
 11. ~~Retention and privacy of a brokerage-entered address~~ — **decided by the founder 2026-09-29.** Not permanent
     intelligence; kept only while a report, Follow or account relationship needs it; purged no more than 90 days
