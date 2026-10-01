@@ -68,6 +68,12 @@ boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVIN
   applying: 0 disagreements in every generation.
   **Applied 2026-09-29 23:56Z** (`db-sql.yml` run `36647789091`, from `main` `57aa5b6`): live
   `md5(prosrc)` `66f5995d…` = Part G's post-condition; ACTIVE generation 12,722 rows, 0 disagree.
+  **First real READY + ACTIVATE under it:** `n5-national-2026-09-29`, activated 2026-09-30 12:22Z,
+  12,722 rows, 0 disagree. **Rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is
+  generated, fingerprint-proven to restore the pre-Part-G body exactly, and executed in CI by
+  `run_part_g_rollback.py`. A refusal holds the build BUILDING, and `n5_map1_build` reports it
+  after 6 h with no progress. **Not applied: it exists for use only if the check refuses a
+  correct build.**
 - **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
   failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
   only live members of that state. It now asserts the three resolve to a measured state, and
