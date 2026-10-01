@@ -129,7 +129,15 @@ Last updated: 2026-10-02, in the Order M step M0 PR (a payment-event ledger, bui
   **Defaults the founder may change:** D-F1 internal-only until accounts exist; D-F2 a Follow is an opaque need whose id the caller chooses
   and keeps (required, a random version-4 UUID; the function mints none); D-F3 the overlap is ten minutes, pinned to at least twice the observation job's longest transaction; D-F4 a purged report cannot be followed again; D-F5 unfollow answers `UNFOLLOW_REQUESTED`, not "done". **Not covered, and the answer says so:** projects that
   appeared near the property after the report. **Not built:** notifications, ownership of a Follow (Order K).
-- H. Remove the quota bypass — open.
+- H. Remove the quota bypass — **open. First step is in the PR that merges this file: the customer surface is retired; the onto-the-canonical-path half waits on K and L.**
+  The legacy browser-direct NYC page `future-surroundings-report.html` leaves the production artifact (`scripts/stage_site.py`; the page and
+  its three libraries stay in the repository, R6), so the only shipped browser-side report generator is gone and anyone holding its old URL gets a
+  404 (reversible by one line). `test/single-customer-generation-path.test.mjs` pins, by content on the real staged artifact, that no shipped
+  page loads the browser-direct engine or names a report-generating server function (16 prohibited mutations, each killed by the pin it targets).
+  **Not done, and why H is not struck:** no customer identity, entitlement, quota, idempotency or rate limit exists, so nothing authorizes a customer
+  on the national path (Orders K, J, L, M); the rights registry is empty, so a customer report there is LIMITED COVERAGE with no records; and
+  retiring the page rather than keeping it as an internal surface is the audit's founder decision 1 taken at its default and awaiting confirmation.
+  Design, decisions and receipt: `docs/order-h-retire-legacy-generator-2026-10-01.md`.
 - I. Redesign the report, only after the data contract is proven — open. **Step 1 built 2026-10-02, no caller, nothing struck:** `lib/da-report-view.js`, a pure presentation module that renders the national engine's own response in the approved section order (only sections with data), proven offline against the real handler's output (`docs/development-activity-report-view-2026-10-02.md`); no page loads it, so nothing a customer sees has changed. Not built: Things to Review, the map, Permitted / Under Construction, the action bar.
 - J. Secure stored-report delivery — **open.** Split (audit 2026-10-01): **J1** the share-link primitive now; **J2** the read-only client view,
   disclosure and print, after Order I; **J3** the audit trail with actor and brokerage, after Orders K and L. **J1 is built and proven on a
