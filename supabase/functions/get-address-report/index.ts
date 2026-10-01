@@ -339,7 +339,7 @@ type FacilityPlane = { sites: Record<string, unknown>[]; epa: Record<string, unk
 // never an answer of zero — the empty array plus `ok:false` is exactly the shape a 429 already
 // produces, which is why no downstream consumer needs to learn a new state.
 function facilitiesUnavailable(reason: "deadline" | "error"): FacilityPlane {
-  return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, kept: 0 } };
+  return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, pre_cap: 0, kept: 0 } };
 }
 async function facilitySites(
   homeLat: number,
@@ -372,6 +372,9 @@ async function facilitySites(
     kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
   }
   kept.sort((a, b) => (a._d as number) - (b._d as number));
+  // `pre_cap` is the product-filtered count BEFORE MAX_FACILITIES. `kept` is after the cap.
+  // A ZIP sitting at exactly 40 cannot be told apart from a cap-hit without this number.
+  const preCap = kept.length;
   const sites = kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
   return {
     sites,
@@ -384,6 +387,7 @@ async function facilitySites(
       reason: outcome.reason,
       attempts: outcome.attempts,
       raw_rows: rows.length,
+      pre_cap: preCap,
       kept: sites.length,
     },
   };

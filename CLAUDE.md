@@ -3383,6 +3383,61 @@ supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the R
 - Pinned by `test/dev-refresh-collect-once-per-response.test.mjs`. Its §1 proves that the new body,
   minus the named additions, **equals** the superseded body.
 
+### ✅ THE EPA WRITE-GUARD JUDGES FRESHNESS BY THE FACILITY CLOCK (2026-09-27) — PARKED
+SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from the once-per-response
+body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**
+Do not re-apply `docs/dev-refresh-collect-once-per-response.sql` after this file: that body still
+passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would restore the defect.
+- 🔑 **REVERSE COUPLING IS CUT.** Step (e) now writes the EPA plane when core is withheld
+  (same write-guard as step (d)). A shape-withheld row cannot iterate sites; it flags a
+  stale nonzero count as unavailable. The 74 ZIPs that presented old facilities as current
+  can recover, and they can no longer masquerade.
+- 🔑 **MISSING `epa.ok` FAIL-CLOSES TO FALSE.** The audit's latent case G coalesced a missing
+  key to `true`, so a payload with no `epa` object was treated as a healthy retrieval. Both
+  `dev_epa_write_refused` and the `facilities_unavailable` third branch now use
+  `coalesce(..., false)`. A genuine zero must carry `epa.ok=true`.
+- 🔑 **THE 7-DAY FRESHNESS LIMB WAS READING THE WRONG CLOCK.** Development refreshes on a ~53 h
+  sweep, so `d.refreshed_at` stayed inside 7 days forever and a genuine EPA zero could never
+  replace a cached nonzero count. Measured 2026-09-27 (read-only): healthy EPA + zero + cached 12
+  + core 1 h → refused; 6.9 d → refused; 7.1 d → accepted. `facilities_refreshed_at` was never an
+  input. Live: **1,004** ZIPs had a fresh core, a facility layer older than 7 days and a nonzero
+  count; **418** were older than 30 days.
+- **The refusal predicate is unchanged** — only the clock that "fresh" consults moves. CORE GUARD 2
+  still reads `d.refreshed_at`. An EPA failure still cannot block a core write.
+- 🆕 **`development_reports.epa_last_outcome`** stores the per-ZIP `epa` object (`ok`, `radius_used`,
+  `raw_rows`, `pre_cap`, `kept`, `reason`, `attempts`) plus `collected_at` / `response_id` /
+  `write_refused` on every evaluated response — accepted in step (d), withheld/core-refused in
+  step (e). `net._http_response` is temporary (1,590 rows at 00:36Z, **0** at 00:37Z). Without this
+  column, source-zero / partial-scope / product-filtered / cap-hit are not instrumented.
+- The engine now emits `pre_cap` (product-filtered count before `MAX_FACILITIES=40`) so a ZIP at
+  exactly 40 can be told apart from a cap-hit after the next deploy.
+
+### ✅ EPA PROBE HARVEST MATCHES THE INGEST ENVELOPE (2026-09-27) — PARKED
+SQL of record: **`docs/epa-frs-probe-schema-align.sql`**, a CREATE OR REPLACE of
+`epa_frs_probe_tick` only. Pinned by `test/epa-probe-schema-align.test.mjs`. **Not applied.**
+`docs/epa-frs-probe-migration.sql` remains the table + original function + cron; do not
+re-apply it after this file or the loose `"Results" and not "Error"` harvest returns.
+- 🔑 **`{"Results":{}}` IS NOT HEALTHY.** The live probe called a body ok on HTTP 200 + the
+  text `"Results"` + no `"Error"`. Ingest used to accept any 2xx and any parseable JSON.
+  Both treated an empty Results object as a successful answer. The engine now schema-fails
+  that shape; this file makes the probe fail it too. `ok` requires HTTP 200 AND `"Results"`
+  AND (`"FRSFacility"` OR `"Facilities"`) AND no `"Error"`. Still text-matched, never
+  jsonb-cast (FRS unescaped backslashes).
+- Official FRS wraps in Results. A bare `{FRSFacility:[…]}` still counts as retrieval on
+  ingest and still fails the probe. That split is deliberate: the probe asks the official
+  envelope; ingest accepts the list it can use.
+- Ingest `frsAt` now treats any status other than 200 as transient (was any non-2xx). A 204
+  used to fall through to parse and become a schema miss or, before that, a silent zero.
+
+### ✅ COMMUNITY ZIP TILE MATCHES MAP 1 ON AN UNKNOWN EPA COUNT (2026-09-27)
+`lib/community-page.js` used the materializer's `regulated facilities` component score
+alone. A refused EPA read with no stored markers (`overlay_unknown` /
+`facilities_unavailable`) rendered as **"0 Regulated facilities"** — the same false
+zero Map 1 already refuses. The strip now shows an em-dash on that flag, never
+inferred from a zero, so a genuine rural empty still reads 0. Pinned by
+`test/facilities-unavailable-copy.test.mjs`. Cache keys on `community.html` and
+`scripts/gen_zip_pages.py` moved with the file.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
