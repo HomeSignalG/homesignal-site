@@ -695,6 +695,9 @@ def main():
     if MODE not in MODES:
         raise SystemExit(f"STOP: unknown MODE {MODE!r}. Known: {sorted(MODES)}")
     rc = MODES[MODE]()
+    if MODE == "status":
+        free, floor = free_disk_mb()
+        say("free MB (floor)", f"{free:,.0f} ({floor:,.0f})")
     gen = GENERATION or (discover_building() if MODE in ("work", "publish", "reconcile", "status") else None)
     if gen:
         status(gen)

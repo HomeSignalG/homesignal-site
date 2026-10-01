@@ -92,7 +92,9 @@ jobs:
           # 36 GB = 36,864 MiB), minus a 512 MiB margin for the System share the formula does
           # not subtract. It was 24,370 (the 2026-09-25 24 GB reading); left stale, the next
           # build would have seen ~4 GB free and halted at the floor. The 2,048 MB floor
-          # (DISK_FLOOR_MB) is unchanged. The disk autoscales: update this on any resize.
+          # (DISK_FLOOR_MB) is unchanged. FALLBACK ONLY since 2026-10-01: n5_shard reads the
+          # provisioned size from the Supabase disk config on every run, so a resize needs no
+          # edit here. This value is used only when that read fails (the run log says which).
           DISK_TOTAL_MB: '36352'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py
