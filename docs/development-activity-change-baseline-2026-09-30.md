@@ -501,7 +501,8 @@ about 933,000 records rewritten -> roughly **25 to 35 minutes of work and 1 to 3
 
 **The schedule that follows.** A pass is 12,722 ZIPs = 64 calls of 200. `*/5 2-6` (60 calls) could never reach "nothing due" in a day
 and would have tripped its own alarm; **`*/5 2-7` gives 72 calls (14,400 ZIPs, 13% headroom)**. At the worst measured rate a
-200-ZIP call is about 25-30 s, so the 60-second cap is not the limit. The window ends before 13:00 UTC, the earliest the daily
+200-ZIP call is about 25-30 s, so the 60-second cap is not the limit. **(Contradicted by the first real tick, 2026-10-01: 32.3 s
+for 200 ZIPs; see the production receipt below. The cap is close, not far.)** The window ends before 13:00 UTC, the earliest the daily
 `verify-communities` walk can start (13:17). **No UTC hour is quiet**: over three days, cron runs of more than 20 s occurred in every hour
 (16 to 38 per hour, the content refresh and the development refresh), so the window avoids the one known heavy reader and does not
 claim silence. It overlaps the 05:30 development-SEO refresh, which reads `app_projects` through the API; both are reads and every
@@ -545,3 +546,46 @@ ends `none_due`, so scenario W15 now forces a capped tick.
 **Apply and rollback.** `apply_migration` from the committed file after re-reading the live monitor's md5 and confirming its anchor appears
 once; if the tool's 60-second limit is hit (it was, at 33.8 KB, for option (b)), `db-sql.yml` from `main`. Rollback: the commented footer
 of the file (unsplice the check, unschedule the job, drop the two functions); runs already written and every ledger row stay.
+
+**Production receipt (2026-10-01), observation job.**
+
+- **Merged and applied.** Merged as #1512 (`f9a72d6`). Applied by `db-sql.yml` dispatched from `main` (run `36902655576`, 17:52:48Z to
+  17:53:00Z, `success` in 12 s), so the bytes applied are the committed bytes (the file is about 21 KB; this path avoids retyping it into a
+  tool argument). That path writes **no** `supabase_migrations` row, so the file, the run id and this receipt are the record.
+- **The monitor splice is one contiguous insertion.** Before: `pipeline_health_tick` md5 `93dd92e436eee51b07f476efdead54fa`, 36,273
+  characters, the anchor once, 20 check rows. After: md5 `11d4722b2e637da4f115535777dca0f5`, 38,726 characters, the check block once.
+  **Cutting the 2,453 inserted characters back out reproduces `93dd92e4...` and 36,273 characters exactly** (computed in the database
+  from the live body), so nothing else in the monitor moved.
+- **Read back.** pg_cron job **74**, `dev-change-observe`, `*/5 2-7 * * *`, command `select public.dev_change_observe_scheduled()`, active,
+  user `postgres`. `dev_change_observe_scheduled()` and `dev_change_observation_health()` are `SECURITY DEFINER`, owner `postgres`,
+  EXECUTE for `service_role` only (`anon` and `authenticated`: no).
+- **The first scheduled fire is 02:00Z on 2026-10-02.** The window is 02:00 to 07:59 UTC, so no cron run can have happened yet
+  (`dev_change_observation_health()` reads `cron_runs 0`). To prove the wrapper on production before then, **one call was made by hand
+  through the wrapper, outside its window**, 17:54:33Z to 17:55:05Z. It is a single bounded tick of the kind the pilot already ran, and it
+  is real data: the events it wrote are real.
+  - **Receipt of that call:** run `6209c4f1-166e-47b7-b011-5c09219d51a0`, status ok, **200 ZIPs observed, 30,129 rows read, 32.3 s, 60 events
+    written, 0 ZIPs in error**, stopped on `max_zips`, ledger 1,932,607,488 bytes (budget 3,500 MB), `baseline` false.
+  - **Before and after, each count read from the table:** events 922,290 -> 922,350 (**+60, exactly the run's own events; 0 of them
+    baseline**); reportable events 46 -> 106; identities 932,994 -> 933,013 (**+19, equal to the run's 19 `first_detected`**); cursor rows
+    older than 24 h 12,547 -> 12,347 (**-200**); cursor rows not `ok` 0 -> 0; the option (b) audit table 99 rows and 104 holds before and
+    after (**these 200 ZIPs held nothing**).
+  - **The 60 events by type:** 36 `source_record_updated` (not material; the only changed field is `submitted_at`), 19 `first_detected`
+    (material), 5 `status_changed` (material; `stage` and `status`). The reportable view is every event of a non-baseline run, material or
+    not, so the report's reader is what keeps the 36 out of the news; that is its design, not a defect here. Their `observed_at` values run
+    from 2026-09-30 03:38Z to 04:30Z, the day before the call, so they are not stamped with the tick's own clock; **I did not check what
+    sets them.**
+  - **The run row:** `purpose` scheduled, `day` 2026-10-01, ordinary (not baseline), 1 tick, not finished and not marked completed. It stays
+    open until the first call of the next day closes it, as designed.
+- **The first monitor tick after the apply (18:10:00Z) read the new check ok:** `dev_change_observation`, `ok = true`, `alertable = true`,
+  detail *"job active; last tick 2026-10-01 17:55 UTC (max_zips); no error ZIPs"*, `last_notified_at` null. The monitor holds 21 rows (20
+  before). The one failing row at that tick, `dc_resolvers`, belongs to another session's check.
+
+**What the first real tick changes in the sizing, and what it does not.** Its rate is **1.07 ms a row** (32.3 s for 30,129 rows), against
+the pilot's 0.5 to 0.7. One call is one sample: its ZIPs are the next-oldest observed, and 60 events in it is 0.2% of the rows read.
+At 1.07 ms a row the national read of 2,925,376 rows is **about 52 minutes of work** (the pilot projected 25 to 35), and an average
+200-ZIP call is **about 49 s**, inside the 60 s cap with a thin margin. A call that holds large ZIPs will stop on `time` with fewer than 200
+observed. The window has 72 calls against the 64 a pass needs, so 8 calls (12.5%) of slack, and each `time` stop spends some of it. **The
+schedule is not changed on one sample.** The first full pass, from 02:00Z on 2026-10-02, is the measurement: read that day's run row
+(`zips_observed` against `ticks`, and `finished_at` and `detail->'completed'`). If the calls routinely stop on time, the options are a
+later end to the window or a higher time cap, decided on that reading. The 48-hour alarm is what reports a pass that did not finish. WAL
+for this call was **not** measured.

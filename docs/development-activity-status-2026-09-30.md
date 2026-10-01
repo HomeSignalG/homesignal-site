@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-01, in the PR that builds the recurring observation job (built and proven; it takes effect on merge and apply). The production receipts of the purge schedule (#1502, applied 16:34Z, first monitor tick ok at 17:10Z) and of ledger option (b) (#1506, applied 17:02Z) are merged (#1509).
+Last updated: 2026-10-01, in the PR that records the production receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z). The receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -169,7 +169,7 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    engineering change in the refresh's lane. The view exposes the evidence; details in the Order D design doc §8.
 9. **A recurring observation job.** Without one the ledger never detects a change after the baseline.
    Go given 2026-09-30; decision 10 (option (b)) is applied, so an ordinary run no longer announces disagreements
-   between ZIP copies. **Built 2026-10-01 (takes effect on merge + apply; baseline doc §12):**
+   between ZIP copies. **Built and APPLIED 2026-10-01 (#1512, applied 17:53Z by `db-sql` run `36902655576`; baseline doc §12 and its production receipt):**
    `docs/dev-change-observation-schedule.sql` adds one wrapper (one ordinary run per UTC day, one tick per call),
    the pg_cron job `dev-change-observe` at `*/5 2-7 * * *` UTC, and an alertable monitor check. The schedule comes from
    **a production pilot of the update path** (175 ZIPs through the real tick plus six named ZIPs): every one of the
@@ -178,7 +178,7 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    at a different time each day (17:10, 17:44, 20:07 and 18:38Z on 09-26 to 09-29), lasts 22–47 minutes, and on 09-29 drove
    the API to 190 statement timeouts on its own: the window ends at 07:59 UTC, before the earliest start (13:17). No hour is
    quiet; it does overlap the 05:30 SEO refresh (both are reads). **The first pilot runs already produced the first 46
-   reportable events** (a real highway-plan stage change and 45 in one ZIP). **Not yet measured:** the first full pass.
+   reportable events** (a real highway-plan stage change and 45 in one ZIP). **Live state:** pg_cron job 74 is active, the first monitor tick read `dev_change_observation` ok (18:10Z), and one call made by hand through the wrapper observed 200 ZIPs in 32.3 s and wrote 60 events (reportable events 46 -> 106). **No scheduled run has fired yet; the first is 02:00Z on 2026-10-02.** **Not yet measured:** the first full pass, and its time per call is the open sizing question (this call ran at 1.07 ms a row against the pilot's 0.5 to 0.7).
 10. **Cross-copy disagreements are typed as changes (found by the national baseline).** 959 events (563
     `status_changed`, 396 `source_record_updated`) on 863 multi-ZIP identities were written as changes although
     they are differences between ZIP copies materialised at different times, none of them seen during the run;
