@@ -25,6 +25,11 @@ Last updated: 2026-10-01, in the receipt PR for the Follow / Changes Since Repor
 5. Standardize development/change content and lifecycle — **open.** Rulings R1–R3 apply.
    One mismatch to resolve first: stored status `Decided` (19,309 rows) resolves to
    "Lifecycle unknown" in `lib/project-type.js` while `decision.ts` buckets it as proposed.
+   **Fixed 2026-10-01 (go given):** `lifecycleKey` and the card-bar `statusKey` now read `Decided` as proposed, like `n5BucketFromStatus`
+   already did; `test/decided-lifecycle-parity.test.mjs` holds the three rules together (19,364 rows measured that day).
+   What changes for a resident is narrow: the left bar of a decided application's card takes the Proposed colour instead of an
+   impact-score colour, and the national report groups it with Proposed instead of Lifecycle unknown. Map 1's ZIP-mode pin was already
+   proposed. The wording "Decided" printed bare on `development.html` is **not** changed here (named, not fixed).
 6. Durable report snapshot (`report_id` vs `content_hash`) — **storage layer done (Order F);** the
    customer-facing use of it waits for Orders G, J and L.
 7. Secure share + print/PDF + disclosure + audit trail — **open.**
@@ -165,8 +170,8 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    (follows from R3). Confirm at Step 4.
 3. **Civic & Public subtypes** (plan lines 830–843): default applied — display labels from
    publisher evidence only, no new classifier key. Confirm at Step 5.
-4. **`Decided` lifecycle mismatch** (above): the fix changes what residents see on
-   existing surfaces, so it is not made without a go.
+4. ~~**`Decided` lifecycle mismatch** (above): the fix changes what residents see on
+   existing surfaces, so it is not made without a go.~~ Go given; fixed 2026-10-01 (see item 5 above).
 5. ~~Order C schema~~ — go given 2026-09-30 (new tables, additive only).
 6. **Rights per source family** (R4) before any paid pilot exposes a source's content.
 7. ~~Free disk for the national baseline — and the go to run it.~~ Go given 2026-09-29 and the run is done. The
