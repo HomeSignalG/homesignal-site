@@ -424,7 +424,8 @@ now grants USAGE to all three roles and checks it as a control before the refusa
 - An **ordinary** run re-observes ZIP copies too, so the same cross-copy differences can appear there as change
   events, and this view would show them. Whether the writer should resolve copies that disagree to the newest
   materialisation without an event is option (b), a change to the Order C writer. **It must be settled before
-  the recurring job is armed** (status file, decisions 9 and 10).
+  the recurring job is armed** (status file, decisions 9 and 10). *(2026-10-01: built as a HOLD rather than a
+  newest-copy resolution, because the measured conflicts persist — change-layer doc §9.)*
 - 114 of the 959 sit on identities the ledger marks non-comparable. Those are excluded here only because they
   were written by the baseline run. An ordinary-run event on an identity that *later* becomes non-comparable
   would still be reportable. Not decided here.

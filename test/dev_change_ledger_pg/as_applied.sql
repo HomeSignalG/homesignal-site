@@ -51,20 +51,8 @@
 --   6. Change readiness is per record: comparable AND at least two comparable observations
 --      (Step 3A cold-start rule). Never a city flag.
 --   7. Events are append-only (trigger). Nothing is ever updated or deleted.
---   8. COPY CONFLICTS ARE HELD, NEVER ANNOUNCED (option (b), 2026-10-01). Two copies of one record that
---      disagree on WHO it is (name, address, filing date: dev_change_record_facts) are either two
---      different records sharing a key or one record mid-change; one snapshot cannot tell which. A
---      change is therefore written only when every other copy agrees with the new facts on those three
---      fields (so a rename is reported once the copies converge, at the retrieval time of the copy
---      that completed the agreement), and a NEW record whose copies already contradict is recorded
---      non-comparable (`copies_disagree`) instead of being announced. A held observation changes
---      nothing but the ZIP attribute and the audit row in dev_change_copy_conflict. A disagreement in
---      status or stage alone is read-time skew and is NOT a conflict. Measured 2026-10-01: of the 862
---      identities that produced a cross-copy event in the national baseline, 528 still disagree on
---      those three fields; by the writer's own ordering rule (a newer, different copy is a change) each
---      refresh of either ZIP would write the same false event again, so the answer is to hold, not to pick a copy.
 --
--- ADDITIVE ONLY. Creates four tables and their functions. Alters no existing object and
+-- ADDITIVE ONLY. Creates three tables and their functions. Alters no existing object and
 -- writes no existing table. ROLLBACK: drop the objects listed at the foot of this file.
 -- Idempotent: safe to run twice.
 -- ============================================================================
@@ -151,19 +139,6 @@ create table if not exists public.dev_change_event (
   constraint dev_change_event_once_per_observation unique (identity_key, observed_at)
 );
 
--- One row per identity whose copies contradict (rule 8): what the ledger held back, so the silence is
--- auditable. State, not history: the row is updated in place and never read by a report.
-create table if not exists public.dev_change_copy_conflict (
-  identity_key          text primary key references public.dev_change_project (identity_key),
-  kind                  text not null check (kind in ('change_held', 'new_identity')),
-  first_held_at         timestamptz not null default now(),
-  last_held_at          timestamptz not null default now(),
-  last_held_observed_at timestamptz not null,       -- retrieval instant of the newest held observation
-  times_held            integer not null default 1 check (times_held >= 1),
-  last_zip              text not null,
-  last_run_id           uuid references public.dev_change_run (id)
-);
-
 -- ---- 2. APPEND-ONLY -------------------------------------------------------------
 create or replace function public.dev_change_event_immutable() returns trigger
 language plpgsql as $$
@@ -228,14 +203,6 @@ language sql immutable as $$
     from ch where cardinality(ch.f) > 0
 $$;
 
--- The fields that say WHICH record this is. A real record can change its status, its stage and its type
--- between two reads; it does not move its address, change its name AND its filing date at once without the
--- publisher having changed the record. Copies that disagree on these are in conflict (rule 8).
-create or replace function public.dev_change_record_facts(facts jsonb) returns jsonb
-language sql immutable as $$
-  select jsonb_build_object('name', facts->'name', 'address', facts->'address', 'submitted_at', facts->'submitted_at')
-$$;
-
 -- ---- 4. RUNS ------------------------------------------------------------------------
 create or replace function public.dev_change_start_run(p_baseline boolean default false, p_detail jsonb default '{}'::jsonb)
 returns uuid language sql security definer set search_path = public, pg_temp as $$
@@ -268,8 +235,6 @@ declare
   _acc integer := 0;    -- identities whose observation was NEWER than the ledger's
   _ev  integer := 0;    -- events written
   _chg integer := 0;
-  _held integer := 0;     -- observations held back by a copy conflict (an existing identity)
-  _newconf integer := 0;  -- new identities recorded non-comparable because their copies already contradict
 begin
   if p_zip is null or p_zip !~ '^[0-9]{5}$' then
     raise exception 'dev_change_observe_zip: % is not a 5-digit ZIP', p_zip;
@@ -335,37 +300,13 @@ begin
   get diagnostics _seen = row_count;
   select coalesce(sum(o.n_rows), 0) into _rowsok from _dc_obs o;
 
-  -- COPY CONFLICTS (rule 8). Only the observations that WOULD write an event are checked (a change from the
-  -- ledger's state, or a first sighting outside a baseline run), so the cost is a few indexed lookups per ZIP,
-  -- never one per row. The other copies are read as they stand in app_projects now: a stale copy that still
-  -- disagrees holds the identity until its ZIP is refreshed, which is the safe side of the error.
-  create temp table if not exists _dc_conflict (identity_key text primary key) on commit delete rows;
-  truncate _dc_conflict;
-  insert into _dc_conflict (identity_key)
-  select o.identity_key
-    from _dc_obs o
-   where o.here_comparable
-     and ((o.is_new and not _baseline)
-          or (not o.is_new and o.old_comparable and o.old_facts_version = _fv
-              and o.observed_at > o.old_last_observed_at and o.old_fp <> o.fp))
-     and exists (select 1 from public.app_projects c
-                  where c.source_key = o.identity_key and c.record_kind = 'development' and c.zip <> p_zip
-                    and public.dev_change_record_facts(public.dev_change_facts(c))
-                        is distinct from public.dev_change_record_facts(o.facts));
-  select count(*) filter (where o.is_new), count(*) filter (where not o.is_new)
-    into _newconf, _held
-    from _dc_obs o join _dc_conflict k on k.identity_key = o.identity_key;
-
-  -- New identities (state first, so events can reference them). One whose copies already contradict is
-  -- recorded NON-comparable (sticky, like every other reason) and is never announced.
+  -- New identities (state first, so events can reference them).
   insert into public.dev_change_project
     (identity_key, registry_id, key_basis, comparable, non_comparable_reason, facts_version, facts,
      facts_fp, first_observed_at, last_observed_at, observation_count, zips, first_run_id, last_run_id)
-  select o.identity_key, o.registry_id, o.key_basis, (o.here_comparable and k.identity_key is null),
-         case when k.identity_key is not null and o.here_reason is null then 'copies_disagree' else o.here_reason end,
-         _fv, o.facts, o.fp, o.observed_at, o.observed_at, 1, array[p_zip], p_run, p_run
-    from _dc_obs o left join _dc_conflict k on k.identity_key = o.identity_key
-   where o.is_new;
+  select o.identity_key, o.registry_id, o.key_basis, o.here_comparable, o.here_reason, _fv, o.facts,
+         o.fp, o.observed_at, o.observed_at, 1, array[p_zip], p_run, p_run
+    from _dc_obs o where o.is_new;
   get diagnostics _new = row_count;
 
   -- First sighting of a comparable record: `first_detected`, never "approved" or "filed".
@@ -375,9 +316,7 @@ begin
      facts_version, run_id)
   select o.identity_key, 'first_detected', not _baseline, _baseline, o.observed_at, null, o.facts, null,
          o.fp, '{}'::text[], o.date_kind, o.submitted_at, o.registry_id, _dv, _fv, p_run
-    from _dc_obs o
-   where o.is_new and o.here_comparable
-     and not exists (select 1 from _dc_conflict k where k.identity_key = o.identity_key)
+    from _dc_obs o where o.is_new and o.here_comparable
   on conflict (identity_key, observed_at) do nothing;
   get diagnostics _ev = row_count;
 
@@ -395,44 +334,26 @@ begin
      and o.old_facts_version = _fv
      and o.old_comparable and o.here_comparable
      and o.old_fp <> o.fp
-     and not exists (select 1 from _dc_conflict k where k.identity_key = o.identity_key)
   on conflict (identity_key, observed_at) do nothing;
   get diagnostics _chg = row_count;
   _ev := _ev + _chg;
 
   -- Existing identities: a NEWER observation replaces the current facts; an older or equal
-  -- one changes nothing but the ZIP attribute and the (sticky) comparability. A HELD observation (rule 8)
-  -- is treated like an older one: the ledger keeps what it knew, and the next observation that agrees
-  -- with every other copy is compared against that.
+  -- one changes nothing but the ZIP attribute and the (sticky) comparability.
   update public.dev_change_project p
-     set facts = case when o.observed_at > p.last_observed_at and k.identity_key is null then o.facts else p.facts end,
-         facts_fp = case when o.observed_at > p.last_observed_at and k.identity_key is null then o.fp else p.facts_fp end,
-         facts_version = case when o.observed_at > p.last_observed_at and k.identity_key is null then _fv else p.facts_version end,
-         last_observed_at = case when k.identity_key is null then greatest(p.last_observed_at, o.observed_at) else p.last_observed_at end,
-         observation_count = p.observation_count
-                             + case when o.observed_at > p.last_observed_at and k.identity_key is null then 1 else 0 end,
+     set facts = case when o.observed_at > p.last_observed_at then o.facts else p.facts end,
+         facts_fp = case when o.observed_at > p.last_observed_at then o.fp else p.facts_fp end,
+         facts_version = case when o.observed_at > p.last_observed_at then _fv else p.facts_version end,
+         last_observed_at = greatest(p.last_observed_at, o.observed_at),
+         observation_count = p.observation_count + case when o.observed_at > p.last_observed_at then 1 else 0 end,
          zips = case when p_zip = any(p.zips) then p.zips else p.zips || p_zip end,
          comparable = p.comparable and o.here_comparable,
          non_comparable_reason = coalesce(p.non_comparable_reason, o.here_reason),
          last_run_id = p_run,
          updated_at = now()
-    from _dc_obs o left join _dc_conflict k on k.identity_key = o.identity_key
+    from _dc_obs o
    where not o.is_new and o.identity_key = p.identity_key;
-  select count(*) into _acc
-    from _dc_obs o left join _dc_conflict k on k.identity_key = o.identity_key
-   where not o.is_new and o.observed_at > o.old_last_observed_at and k.identity_key is null;
-
-  -- What was held back, so the silence is auditable. Idempotent: the same observation twice counts once.
-  insert into public.dev_change_copy_conflict as c
-    (identity_key, kind, last_held_observed_at, last_zip, last_run_id)
-  select o.identity_key, case when o.is_new then 'new_identity' else 'change_held' end, o.observed_at, p_zip, p_run
-    from _dc_obs o join _dc_conflict k on k.identity_key = o.identity_key
-  on conflict (identity_key) do update
-     set last_held_at = now(),
-         times_held = c.times_held + case when excluded.last_held_observed_at > c.last_held_observed_at then 1 else 0 end,
-         last_held_observed_at = greatest(c.last_held_observed_at, excluded.last_held_observed_at),
-         last_zip = excluded.last_zip,
-         last_run_id = excluded.last_run_id;
+  select count(*) into _acc from _dc_obs o where not o.is_new and o.observed_at > o.old_last_observed_at;
 
   update public.dev_change_run r
      set zips_observed = r.zips_observed + 1,
@@ -445,8 +366,7 @@ begin
 
   return jsonb_build_object('status', 'ok', 'zip', p_zip, 'rows_read', _read, 'rows_skipped', greatest(_read - _rowsok, 0),
                             'identities_seen', _seen,
-                            'identities_new', _new, 'observations_accepted', _acc + _new, 'events_written', _ev,
-                            'copy_conflicts_held', _held, 'identities_new_conflicted', _newconf);
+                            'identities_new', _new, 'observations_accepted', _acc + _new, 'events_written', _ev);
 end
 $fn$;
 
@@ -456,17 +376,15 @@ $fn$;
 alter table public.dev_change_run     enable row level security;
 alter table public.dev_change_project enable row level security;
 alter table public.dev_change_event   enable row level security;
-alter table public.dev_change_copy_conflict enable row level security;
 
 -- service_role is revoked too: the default grant gives it ALL (including DELETE and TRUNCATE),
 -- which the ledger must never need. It is then granted back exactly what it uses.
-revoke all on public.dev_change_run, public.dev_change_project, public.dev_change_event, public.dev_change_copy_conflict
+revoke all on public.dev_change_run, public.dev_change_project, public.dev_change_event
   from public, anon, authenticated, service_role;
 revoke all on sequence public.dev_change_event_id_seq from public, anon, authenticated;
 grant select, insert, update on public.dev_change_run     to service_role;
 grant select, insert, update on public.dev_change_project to service_role;
 grant select, insert         on public.dev_change_event   to service_role;
-grant select, insert, update on public.dev_change_copy_conflict to service_role;
 grant usage on sequence public.dev_change_event_id_seq to service_role;
 
 -- Every dev_change_ function, computed rather than typed (a list typed here would silently
@@ -487,5 +405,5 @@ end $lock$;
 --     public.dev_change_start_run(boolean, jsonb), public.dev_change_classify(jsonb, jsonb),
 --     public.dev_change_key_is_durable(text), public.dev_change_fp(jsonb), public.dev_change_facts(public.app_projects),
 --     public.dev_change_derivation_version(), public.dev_change_facts_version(),
---     public.dev_change_event_immutable(), public.dev_change_record_facts(jsonb) cascade;
---   drop table if exists public.dev_change_copy_conflict, public.dev_change_event, public.dev_change_project, public.dev_change_run;
+--     public.dev_change_event_immutable() cascade;
+--   drop table if exists public.dev_change_event, public.dev_change_project, public.dev_change_run;

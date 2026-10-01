@@ -91,9 +91,9 @@ ok(/create or replace trigger dev_change_event_no_update_delete/.test(SQL) && /c
   '9c: the event log is guarded by append-only triggers');
 
 // ── 8. lock-down ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-ok((SQL.match(/enable row level security/g) || []).length === 3, '10: row level security is enabled on all three tables');
-ok(/revoke all on public\.dev_change_run, public\.dev_change_project, public\.dev_change_event\s+from public, anon, authenticated, service_role;/.test(SQL),
-  '10b: the three tables are revoked from PUBLIC, anon, authenticated AND service_role before service_role is granted back exactly what it uses');
+ok((SQL.match(/enable row level security/g) || []).length === 4, '10: row level security is enabled on all four tables (run, project, event, copy_conflict)');
+ok(/revoke all on public\.dev_change_run, public\.dev_change_project, public\.dev_change_event, public\.dev_change_copy_conflict\s+from public, anon, authenticated, service_role;/.test(SQL),
+  '10b: the four tables are revoked from PUBLIC, anon, authenticated AND service_role before service_role is granted back exactly what it uses');
 ok(!/grant[^;]*\bto\b[^;]*\b(anon|authenticated|public)\b/i.test(SQL), '10c: nothing is ever granted to anon, authenticated or PUBLIC');
 ok(/like 'dev\\_change\\_%'/.test(SQL) && /revoke all on function %s from public, anon, authenticated/.test(SQL),
   '10d: every dev_change_ function is locked down by a COMPUTED loop, not a typed list');
@@ -104,9 +104,40 @@ ok(!/grant[^;]*(delete|truncate|all)[^;]*public\.dev_change_event/i.test(SQL) &&
 const rollback = RAW.slice(RAW.lastIndexOf('-- ROLLBACK'));
 const createdFns = [...SQL.matchAll(/create or replace function public\.([a-z_]+)\(/g)].map((m) => m[1]);
 const createdTables = [...SQL.matchAll(/create table if not exists public\.([a-z_]+)/g)].map((m) => m[1]);
-ok(createdFns.length >= 10 && createdTables.length === 3
+ok(createdFns.length >= 10 && createdTables.length === 4
    && createdFns.every((f) => rollback.includes('public.' + f)) && createdTables.every((t) => rollback.includes('public.' + t)),
   '11: the ROLLBACK block names every created function and table', createdFns.length + ' fns, ' + createdTables.length + ' tables');
+
+// ── 9b. option (b): copy conflicts are held, in the writer, once ──────────────────────────────────────────────────────────────────────
+const OBSERVE = (SQL.match(/create or replace function public\.dev_change_observe_zip[\s\S]*?\n\$fn\$;/) || [''])[0];
+ok(OBSERVE.length > 9000 && /_dc_conflict/.test(OBSERVE) && (OBSERVE.match(/dev_change_record_facts\(/g) || []).length === 2,
+  '9d: the conflict rule lives in the ONE writer and compares through the one definition of "which record this is" (dev_change_record_facts), used on both sides of the comparison');
+ok(/create or replace function public\.dev_change_record_facts\(facts jsonb\) returns jsonb\s+language sql immutable as \$\$\s+select jsonb_build_object\('name', facts->'name', 'address', facts->'address', 'submitted_at', facts->'submitted_at'\)/.test(SQL),
+  '9e: the record-identity fields are exactly name, address and submitted_at — never a status, stage or type');
+ok(/select 1 from public\.app_projects c\s+where c\.source_key = o\.identity_key and c\.record_kind = 'development' and c\.zip <> p_zip/.test(OBSERVE)
+   && /o\.here_comparable\s+and \(\(o\.is_new and not _baseline\)\s+or \(not o\.is_new and o\.old_comparable and o\.old_facts_version = _fv\s+and o\.observed_at > o\.old_last_observed_at and o\.old_fp <> o\.fp\)\)/.test(OBSERVE),
+  '9f: only an observation that WOULD write an event is checked (a change from the ledger\'s state, or a first sighting outside a baseline), against the OTHER development copies by indexed key — never one lookup per row');
+ok((OBSERVE.match(/not exists \(select 1 from _dc_conflict k where k\.identity_key = o\.identity_key\)/g) || []).length === 2
+   && /k\.identity_key is null then o\.facts else p\.facts end/.test(OBSERVE),
+  '9g: a conflicted identity is kept out of BOTH event inserts and does not advance the ledger\'s state');
+ok(!/\bdelete\s+from\b|\btruncate\b(?!\s+_dc_)/i.test(SQL.replace(/before truncate/gi, '').replace(/truncate _dc_obs;|truncate _dc_conflict;/g, '')) && !/dev_change_event_reportable|dev_change_zip_cursor/.test(OBSERVE),
+  '9h: the rule deletes nothing and does not touch the reader\'s view or the driver\'s cursor');
+
+// ── 9c. the production upgrade is GENERATED from the SQL of record, guarded, and checked after ───────────────────────────────────────
+import { createHash } from 'node:crypto';
+const APPLY = existsSync(join(ROOT, 'docs/dev-change-copy-conflicts-apply.sql')) ? read('docs/dev-change-copy-conflicts-apply.sql') : '';
+const AS_APPLIED = read('test/dev_change_ledger_pg/as_applied.sql');
+const bodyMd5 = (t) => { const a = t.indexOf('create or replace function public.dev_change_observe_zip'); const st = t.indexOf('as $fn$', a) + 7; const e = t.indexOf('\n$fn$;', st); return createHash('md5').update(t.slice(st, e + 1)).digest('hex'); };
+const OLD_MD5 = bodyMd5(AS_APPLIED), NEW_MD5 = bodyMd5(RAW);
+ok(OLD_MD5 === '17b45b9c4b93855b0ed3ee7d2ada09e1' && NEW_MD5 !== OLD_MD5,
+  '9i: the fixture of the ledger as applied hashes to the writer that was read from production on 2026-10-01 (17b45b9c…), and the SQL of record has a different one', OLD_MD5 + ' -> ' + NEW_MD5);
+ok(APPLY.length > 30000 && APPLY.includes(RAW.trimEnd() + '\n') && /GENERATED by test\/dev_change_ledger_pg\/build_apply\.py/.test(APPLY),
+  '9j: the apply file is generated and contains the whole SQL of record verbatim — a hand copy of the ledger is an unreviewed edit to production');
+ok(APPLY.includes("not in ('" + OLD_MD5 + "', '" + NEW_MD5 + "')") && APPLY.includes("is distinct from '" + NEW_MD5 + "'")
+   && (APPLY.match(new RegExp(NEW_MD5, 'g')) || []).length >= 4 && !/\b(delete|truncate|drop)\b[^;]{0,60}\b(dev_change_event|dev_change_project|dev_change_run)\b/i.test(APPLY.slice(0, APPLY.indexOf('create table')) + APPLY.slice(APPLY.indexOf('$post$'))),
+  '9k: the guard refuses a writer that is neither the old nor the new version, the post-condition refuses unless the new one is installed, and neither deletes a ledger row');
+ok(APPLY.indexOf('do $guard$') >= 0 && APPLY.indexOf('do $guard$') < APPLY.indexOf('create table if not exists public.dev_change_run') && APPLY.lastIndexOf('do $post$') > APPLY.lastIndexOf('do $lock$'),
+  '9l: the guard comes before anything is created and the post-condition after the last lock-down statement');
 
 // ── 10. the suite, its mutations and its workflow are real and wired ───────────────────────────────────────────────────────────
 const checks = (SUITE.match(/pg_temp\._ck\(\s*'C\d+/g) || []).length;

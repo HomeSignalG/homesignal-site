@@ -25,6 +25,7 @@ if [ "$n_all" -lt 25 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped l
 # applying the file a second time must be a no-op (idempotent), and still pass
 P -f "$root/docs/dev-change-ledger.sql" >/dev/null 2>&1 || { echo "FAIL — the SQL of record is not idempotent"; exit 1; }
 
+[ -z "${ONLY_SHIPPED:-}" ] || exit 0
 status=0
 while IFS= read -r name; do
   apply_base

@@ -105,11 +105,13 @@ const rootFiles = readdirSync(ROOT).filter((f) => /\.(html|js|mjs|ts)$/.test(f))
 const sqlDocs = readdirSync(join(ROOT, 'docs')).filter((f) => f.endsWith('.sql')).map((f) => 'docs/' + f);
 const scanned = [...CODE_DIRS.flatMap((d) => walk(d)), ...rootFiles, ...sqlDocs];
 const mentions = scanned.filter((f) => /\.(sql|js|mjs|ts|html|py|sh|yml|json)$/.test(f) && /\bdev_change_event\b/.test(readFileSync(join(ROOT, f), 'utf8')));
-const ALLOWED = ['docs/dev-change-baseline.sql', 'docs/dev-change-ledger.sql', 'docs/dev-change-reportable.sql'];
+// docs/dev-change-copy-conflicts-apply.sql is the GENERATED production upgrade: the whole ledger file verbatim plus a guard and a
+// post-condition (test/dev-change-ledger-structure.test.mjs 9j pins that it is exactly that, so it can name the table only as the ledger does).
+const ALLOWED = ['docs/dev-change-baseline.sql', 'docs/dev-change-copy-conflicts-apply.sql', 'docs/dev-change-ledger.sql', 'docs/dev-change-reportable.sql'];
 ok(scanned.length > 50 && mentions.includes('docs/dev-change-ledger.sql'),
   '7-control: the scan covers the code directories, the root files and every docs SQL, and it finds the ledger itself', scanned.length + ' files, ' + mentions.length + ' mention(s)');
 ok(mentions.every((f) => ALLOWED.includes(f)),
-  '7: no reader, script, page or function selects from dev_change_event — the only files that name it are the ledger, this view and the baseline driver', mentions.filter((f) => !ALLOWED.includes(f)).join(','));
+  '7: no reader, script, page or function selects from dev_change_event — the only files that name it are the ledger (and its generated upgrade), this view and the baseline driver', mentions.filter((f) => !ALLOWED.includes(f)).join(','));
 const baselineMentions = (stripSql(read('docs/dev-change-baseline.sql')).match(/.*\bdev_change_event\b.*/g) || []);
 ok(baselineMentions.length === 1 && /pg_total_relation_size\('public\.dev_change_event'\)/.test(baselineMentions[0]) && !/\bfrom\s+public\.dev_change_event\b/.test(stripSql(read('docs/dev-change-baseline.sql'))),
   '7b: the baseline driver names the event table once, only to measure its SIZE (the capacity gate), and never reads a row from it');
