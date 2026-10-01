@@ -55,6 +55,9 @@ eq("city.bare_place", cityFromJurisdiction("Fort Worth"), "Fort Worth");
 eq("city.county_null", cityFromJurisdiction("Pierce County (PALS)"), null);
 eq("city.county_plain_null", cityFromJurisdiction("Clark County"), null);
 eq("city.empty_null", cityFromJurisdiction(""), null);
+eq("city.strip_trailing_state", cityFromJurisdiction("City of Worcester, Massachusetts"), "Worcester");
+eq("city.strip_kansas_city_state", cityFromJurisdiction("City of Kansas City, Missouri"), "Kansas City");
+eq("city.metro", cityFromJurisdiction("Louisville Metro, Kentucky"), "Louisville");
 
 // Graceful degradation: missing state + missing zip → just street (+ city).
 eq("missing.state_and_zip",
@@ -70,6 +73,20 @@ eq("no_duplicate_city",
 eq("no_duplicate_zip",
   buildGeocodeInput({ rawAddress: "1128 104TH ST E 98444", jurisdiction: "Pierce County", state: "WA", zipColValue: null, reportZip: "98444" }),
   { input: "1128 104TH ST E 98444, WA", filedZip: "98444" });
+
+// Audit high-impact city ledgers: bare street + zip becomes a complete one-liner.
+eq("hartford.assemble",
+  buildGeocodeInput({ rawAddress: "123 MAIN ST", jurisdiction: "City of Hartford", state: "CT", zipColValue: "06103", reportZip: "06103" }),
+  { input: "123 MAIN ST, Hartford, CT 06103", filedZip: "06103" });
+eq("anaheim.assemble",
+  buildGeocodeInput({ rawAddress: "100 S HARBOR BLVD", jurisdiction: "City of Anaheim", state: "CA", zipColValue: null, reportZip: "92805" }),
+  { input: "100 S HARBOR BLVD, Anaheim, CA 92805", filedZip: "92805" });
+eq("austin.assemble",
+  buildGeocodeInput({ rawAddress: "1000 E 11TH ST", jurisdiction: "City of Austin", state: "TX", zipColValue: "78702", reportZip: "78702" }),
+  { input: "1000 E 11TH ST, Austin, TX 78702", filedZip: "78702" });
+eq("worcester.city_stripped",
+  buildGeocodeInput({ rawAddress: "202 MAY ST", jurisdiction: "City of Worcester, Massachusetts", state: "MA", zipColValue: null, reportZip: "01602" }),
+  { input: "202 MAY ST, Worcester, MA 01602", filedZip: "01602" });
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) (globalThis as { process?: { exit(n: number): void } }).process?.exit(1);

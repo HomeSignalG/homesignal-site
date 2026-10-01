@@ -68,7 +68,7 @@ import { resolvePlanes } from "./sources/planes.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
-import { productionLadder, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { GeocodeTransportError, isGeocodeTransportError, pickCensusMatch, productionLadder, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 import { canonicalAddr } from "./canonical-addr.ts";
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
 import { readAllRows } from "./sources/pg-pages.ts";
@@ -207,12 +207,24 @@ function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [numb
 }
 async function geocode(address: string): Promise<[number, number, string]> {
   const q = new URLSearchParams({ address, benchmark: "Public_AR_Current", format: "json" });
-  const r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
-  const data = await r.json();
+  let r: Response;
+  try {
+    r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
+  } catch (e) {
+    throw new GeocodeTransportError(e instanceof Error ? e.message : "census fetch failed");
+  }
+  if (!r.ok) throw new GeocodeTransportError(`census HTTP ${r.status}`, r.status);
+  let data: { result?: { addressMatches?: { coordinates?: { x?: unknown; y?: unknown }; matchedAddress?: string; addressComponents?: { zip?: string } }[] } };
+  try {
+    data = await r.json();
+  } catch {
+    throw new GeocodeTransportError("census response was not JSON");
+  }
   const matches = data?.result?.addressMatches ?? [];
   if (!matches.length) throw new Error(`No geocoder match for: ${address}`);
-  const c = matches[0].coordinates;
-  return [Number(c.y), Number(c.x), matches[0].matchedAddress ?? address];
+  const m = pickCensusMatch(matches, address) ?? matches[0];
+  const c = m.coordinates;
+  return [Number(c?.y), Number(c?.x), m.matchedAddress ?? address];
 }
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
@@ -725,6 +737,10 @@ async function handleRequest(req: Request): Promise<Response> {
     // the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
     const geoStore = supabaseStore(supabase);
     const geoLadder = GEO_LADDER(supabase);
+    const noteFence = async (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => {
+      await supabase.from("geocodes").update({ geofence_status: status })
+        .eq("canonical_addr", canonicalAddr(input)).then(() => {}, () => {});
+    };
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
       geocode: async (a: string) => {
@@ -732,6 +748,9 @@ async function handleRequest(req: Request): Promise<Response> {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (tdlr-tabs.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      zipCentroid: { lat: clat, lng: clng },
+      reportZip: zip,
+      noteFence,
     });
     // TASK 1 — structured open-data permit/case records (Socrata), coverage-gated per registry entry.
     // Generic connector; adding a city is a jurisdiction-registry.json edit, never code here. Records
@@ -745,6 +764,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
     // permit/case layers (e.g. Salt Lake City building permits). Adding a jurisdiction is a
@@ -759,6 +779,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
       // the engine's standard centroid+radius ZIP approximation; records keep their own points.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
     // (e.g. Boston's data.boston.gov Approved Building Permits). Adding a jurisdiction is a
@@ -773,6 +794,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
     // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
@@ -786,6 +808,7 @@ async function handleRequest(req: Request): Promise<Response> {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals
     // (e.g. Philadelphia's phl.carto.com permits table). Adding a jurisdiction is a
@@ -801,6 +824,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
@@ -948,7 +972,12 @@ async function handleRequest(req: Request): Promise<Response> {
   const radiusMi = Math.min(Math.max(Number(body.radius_mi) || 1, 0.25), MAX_RADIUS_MI);
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   let lat: number, lng: number, matched: string;
-  try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
+  try {
+    [lat, lng, matched] = await geocode(address);
+  } catch (e) {
+    if (isGeocodeTransportError(e)) return json({ error: "geocoder_unavailable" }, 502, cors);
+    return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors);
+  }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
   // UNIT 4 — same bounded-deadline join as ZIP mode above, same module, one implementation.
