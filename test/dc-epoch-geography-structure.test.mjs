@@ -73,9 +73,17 @@ const fnOf = (name, src) => (src.match(new RegExp('create or replace function pu
 const classify = fnOf('dc_classify_observation', A3);
 const siteAddr = fnOf('dc_site_address', A3);
 const citation = fnOf('dc_record_citation', A3);
-const rest = Object.values(SQL).join('\n').replace(extract, '').replace(classify, '').replace(siteAddr, '').replace(citation, '').replace(admit, '');
+// 2026-10-01: the ONE place a source is named as DATA rather than as a rule -- the record-key discriminator seed
+// (epoch_ai/timelines pairs the name with 'Date'). The key view reads the registry and names no source.
+const seed = (A3.match(/insert into public\.dc_record_key_discriminator[\s\S]*?on conflict[^;]*;/) || [''])[0];
+const rest = Object.values(SQL).join('\n').replace(extract, '').replace(classify, '').replace(siteAddr, '').replace(citation, '').replace(admit, '').replace(seed, '');
 ok([classify, extract, siteAddr, citation].every((f) => f.length > 200 && /'epoch_ai'/.test(f)) && /'epoch_ai'/.test(admit) && !/'epoch_ai'/.test(rest),
   'S1b: production SQL names epoch_ai only in the source-keyed rules (classifier, address extraction, site address, citation) and the admission gate');
+ok(seed.length > 100 && (seed.match(/\('epoch_ai'/g) || []).length === 1 && /\('epoch_ai', 'timelines', 'Date', 'date'\)/.test(seed),
+  'S1b2: the record-key discriminator seed is the only data naming a source, and it is exactly epoch_ai/timelines/Date');
+ok(/create or replace view public\.dc_observation_record_key[\s\S]*?left join public\.dc_record_key_discriminator/.test(A3)
+   && !/'epoch_ai'/.test((A3.match(/create or replace view public\.dc_observation_record_key[\s\S]*?;\n/) || [''])[0]),
+  'S1b3: the record-key view reads the registry and names no source');
 ok(/'NO_SITE_ADDRESS_RULE'/.test(siteAddr), 'S1c: a source with no site-address rule gets no automatic cross-source identity');
 
 // ── the verdict: output quality, fail closed ────────────────────────────────────────────────
