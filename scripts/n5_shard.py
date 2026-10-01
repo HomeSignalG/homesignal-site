@@ -154,12 +154,42 @@ def load_registry():
     return out
 
 
+# THE PROVISIONED DISK SIZE IS READ FROM SUPABASE, NOT TYPED IN (founder, 2026-10-01: "i can
+# not be doing this for years"). The disk autoscales, so a hand-set DISK_TOTAL_MB goes stale on
+# the first resize and then understates free space until builds stop starting. The Management
+# API's disk config (attributes.size_gb, GiB - the dashboard's "36 GB" is 36,864 MiB) is read
+# once per process; a 512 MiB margin covers the system share the formula does not subtract.
+# If the read fails for any reason, DISK_TOTAL_MB is the fallback and the log says so.
+DISK_SYSTEM_MARGIN_MB = 512
+_DISK_TOTAL = {}
+
+
+def provisioned_disk_mb():
+    if "mb" in _DISK_TOTAL:
+        return _DISK_TOTAL["mb"]
+    mb, source = DISK_TOTAL_MB, "DISK_TOTAL_MB setting"
+    try:
+        req = urllib.request.Request(
+            f"https://api.supabase.com/v1/projects/{PROJECT_REF}/config/disk",
+            headers={"Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                     "Accept": "application/json", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            gb = float((json.loads(r.read().decode()).get("attributes") or {})["size_gb"])
+        if gb > 0:
+            mb, source = gb * 1024 - DISK_SYSTEM_MARGIN_MB, f"Supabase disk config ({gb:g} GB)"
+    except Exception as e:  # noqa: BLE001 - any failure falls back to the setting, loudly
+        source = f"DISK_TOTAL_MB setting - Supabase disk config unreadable ({type(e).__name__})"
+    _DISK_TOTAL["mb"] = mb
+    print(f"{'provisioned disk MB':38} {mb:,.0f}  [{source}]", flush=True)
+    return mb
+
+
 def disk_free_mb():
     r = sql("select (pg_database_size(current_database())/1048576.0) db, "
             "(select coalesce(sum(size),0)/1048576.0 from pg_ls_waldir()) wal;", "disk")
     db = float(r[0]["db"])
     wal = float(r[0]["wal"])
-    return DISK_TOTAL_MB - (db + wal), db, wal
+    return provisioned_disk_mb() - (db + wal), db, wal
 
 
 # ---------------------------------------------------------------- boundaries
