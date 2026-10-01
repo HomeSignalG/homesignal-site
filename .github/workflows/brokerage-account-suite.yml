@@ -1,0 +1,78 @@
+name: brokerage-account-suite
+
+# THE BROKERAGE ACCOUNT SPINE (docs/brokerage-account-spine.sql; Development Activity plan Order K0): the two tables and the one
+# resolver that say who a signed-in person is in the commercial sense (a brokerage account, an explicit membership of one Supabase Auth
+# user in one brokerage as owner or agent, and brokerage_membership_of(user_id)). Parked, NOT applied to production; this workflow only
+# ever addresses a disposable container.
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres:
+#   1. the suite — the file seeds nothing; the tables are unreadable by anon, authenticated and service_role (RLS on, no policy, every
+#      privilege revoked) and reached only through the resolver; one ACTIVE membership per user; closed vocabularies; the last active
+#      owner of an active brokerage cannot be deactivated or demoted; identity and history cannot be rewritten; deleting an auth user is
+#      never blocked; the resolver answers for an active member of an active brokerage, by user id only, never by email or domain;
+#   2. two sessions removing the two owners of one brokerage at the same moment leave exactly one;
+#   3. the file applies twice with an identical definition; a poisoned state (a policy that would make a table readable) stops the
+#      apply, and a stray grant is revoked by it;
+#   4. every prohibited mutation of that SQL, each of which MUST fail the executable checks (test/brokerage_account_mutants.py).
+# The offline half (test/brokerage-account-structure.test.mjs) runs in unit-tests.yml with every other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/brokerage-account-spine.sql'
+      - 'test/brokerage_account_pg/**'
+      - 'test/brokerage_account_mutants.py'
+      - '.github/workflows/brokerage-account-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/brokerage-account-spine.sql'
+      - 'test/brokerage_account_pg/**'
+      - 'test/brokerage_account_mutants.py'
+      - '.github/workflows/brokerage-account-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: brokerage_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The spine passes; two owners removed at once leave one; it applies twice; a poisoned state is refused; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: brokerage_disposable
+        run: |
+          set -o pipefail
+          bash test/brokerage_account_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/ba.log
