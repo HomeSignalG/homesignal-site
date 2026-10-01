@@ -1683,13 +1683,20 @@ HS.onReady(function(){
       sigs.sort(function(a,b){ return ENV_TONE_RANK[a.tone]-ENV_TONE_RANK[b.tone]; });
       out = out.concat(sigs);
     }
-    // Baseline for any EPA facility (keyed on the FRS id) that produced no stronger signal — so the
-    // ECHO affordance never disappears, including on cache rows written before the env layer (they
-    // have no s.env; fall back to the legacy s.viol count).
+    // Baseline: a clean EPA record is a positive fact ONLY while compliance tracking is
+    // on — the same rule as HS.fac.signals. An FRS id alone is not a clean record: ECHO
+    // failed, ECHO matched nothing, CWA-only, and tracking-off used to print this line
+    // and made Map 1 disagree with the ZIP page (audit 2026-09-27: 199,409 stored sites).
     if(frsRid(s) && !out.length){
       var lv = s.viol||0;
-      out.push(lv>0 ? { text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" }
-                    : { text:"no recorded EPA violations", tone:"ok" });
+      if(lv>0){
+        out.push({ text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" });
+      } else {
+        var interp = (typeof HS!=="undefined" && HS.fac) ? HS.fac.interpret({epa:epa}) : null;
+        if(interp && interp.tracking===true){
+          out.push({ text:"no recorded EPA violations (compliance tracking on)", tone:"ok" });
+        }
+      }
     }
     return out;
   }
