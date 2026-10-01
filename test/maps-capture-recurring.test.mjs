@@ -78,9 +78,12 @@ const COMPLIANT_POLICY = {
 function bound(over) {
   const d = draft(over);
   d.image_bucket_path = 'maps/' + d.zip + '/proj.png';
+  // popup_open: a real project capture refuses the shot unless the popup is open, and records
+  // it (scripts/maps-social-image.mjs). Since 2026-10-01 the binding requires it (founder:
+  // a post about a project shows its own pin, popup open).
   d.evidence.visual = Object.assign({
     status: 'REAL_MAP_VISUAL', state: S.READY, capture_key: HS.mapsCaptureKey(d), attempts: 0,
-    capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
+    popup_open: true, capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
   }, (over && over.visual) || {});
   return d;
 }
@@ -312,13 +315,14 @@ ok((GEN.match(/recordOutcome\(/g) || []).length >= 2,
 // record what was removed, so a pin that searches the whole file finds the very string it
 // forbids — the trap this repo has already paid for twice.
 const GEN_EXEC = GEN.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
-// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
-// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
-// which syntax declares it — freezing the shape is what made three suites go red on a
-// correct change, for the third time in this workstream.
-ok(/async function zipMapFallback\(/.test(GEN_EXEC),
+// ⚠️ UPDATED 2026-10-01: the ZIP-map fallback for a project that cannot be pinned is GONE
+// (founder: a post about a project shows its own pin, popup open). Those five record-shaped
+// conditions now record a refusal through `projectPinRefusal`, at module scope so its body
+// runs offline. This pin guards that it EXISTS, not which syntax declares it.
+ok(/async function projectPinRefusal\(/.test(GEN_EXEC),
   '10f₀₀: the comment-stripped source still holds the real code (control for §10f₀)');
+ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project'\)/.test(GEN_EXEC),
+  '10f₀₀b: a project that cannot be pinned is recorded INELIGIBLE at project scope, with no picture');
 ok(!/await ineligible\(/.test(GEN_EXEC),
   '10f₀: …and no record-shaped condition ends a draft with no picture any more');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
@@ -403,7 +407,7 @@ const compliantPolicy = COMPLIANT_POLICY;
 function dcBound(over) {
   const d = draft();
   d.image_bucket_path = 'maps/19475/x.png';
-  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null,
+  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null, popup_open: true,
     capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
   if (d.evidence.visual.capture_key === null) d.evidence.visual.capture_key = HS.mapsCaptureKey(d);
   return d;

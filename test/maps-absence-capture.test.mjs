@@ -112,22 +112,21 @@ ok(!/siteMarkers\s*\|\|\s*\[\]\)\.length\s*>\s*0/.test(ABS),
 // fifth copy in the same session that removed four.
 ok(/async function finishCapture\(d, label, r, proj, results\)/.test(GEN_CODE),
   '5a: there is ONE shared finish path');
-// ⚖️ THREE CALL SITES NOW. The third is `zipFallback`, which turns the four
-// record-shaped refusals (the project row is gone / is not a development row / has no
-// coordinates / is outside the ZIP's authoritative set) into ZIP-scope captures instead of
-// leaving those drafts with no map. Corrected with its reason recorded rather than by
-// relaxing the count: what must hold is that every path finishes through the SAME function,
-// so the FAILED record, the key-fingerprinted object name and the attach stay one
-// implementation.
-ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 3,
-  '5b: …and every path finishes through it — project, absence, and the ZIP fallback');
-// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
-// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
-// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
-// which syntax declares it — freezing the shape is what made three suites go red on a
-// correct change, for the third time in this workstream.
-ok(/async function zipMapFallback\(/.test(GEN_CODE),
-  '5b₁: …including the ZIP fallback for a project that cannot truthfully be pinned');
+// ⚖️ TWO CALL SITES AGAIN, SINCE 2026-10-01: project and absence. From 2026-09-21 a third,
+// the ZIP fallback, turned the five record-shaped refusals (the project row is gone / is not
+// a development row / has no coordinates / has moved / is outside the ZIP's authoritative
+// set) into ZIP-scope captures. The founder then ruled that a post about a project must show
+// its own pin with its popup open, so those drafts now get NO picture and a recorded reason
+// (`projectPinRefusal`). What must still hold is that every picture finishes through the
+// SAME function.
+ok((GEN_CODE.match(/await finishCapture\(/g) || []).length === 2,
+  '5b: …and every picture finishes through it — project and absence');
+const REFUSAL = GEN_CODE.slice(GEN_CODE.indexOf('async function projectPinRefusal('),
+  GEN_CODE.indexOf('\n}\n', GEN_CODE.indexOf('async function projectPinRefusal(')));
+ok(REFUSAL.length > 100 && /recordOutcome\(d, INELIGIBLE/.test(REFUSAL),
+  '5b₁: a project that cannot be pinned is recorded INELIGIBLE (control: the body was located)');
+ok(!/captureAbsence|finishCapture|upload\(/.test(REFUSAL),
+  '5b₂: …and gets no picture: no ZIP map stands in for a project\'s own pin');
 ok((GEN_CODE.match(/await upload\(objectPath, r\.file\)/g) || []).length === 1,
   '5c: the upload happens in exactly one place');
 // ⚠️ 5d USED TO PIN THE WHOLE ARGUMENT LIST, `await attach(d, objectPath, r, proj)`, and

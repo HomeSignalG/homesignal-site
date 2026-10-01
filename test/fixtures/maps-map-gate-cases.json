@@ -32,7 +32,12 @@
     "",
     "A DATA-CENTRE-THEMED CASE ALSO CARRIES A COMPLIANT capture_policy, because mapsCaptureBound",
     "requires the MEASURED map state for that theme on top of a matching key. Without it the row",
-    "is unbound for a DC-policy reason and the case would prove nothing about the universal rule."
+    "is unbound for a DC-policy reason and the case would prove nothing about the universal rule.",
+    "",
+    "FOUNDER RULING 2026-10-01: a MAPS post about a project must show that project's own pin",
+    "with its popup open. Case 04 (a ZIP map on a project-backed row) was the 2026-09-22 fallback",
+    "and is now REFUSED by both halves; a project capture must record popup_open (case 14).",
+    "A post with no project keeps the map of its ZIP (cases 03, 11)."
   ],
   "cases": [
     {
@@ -120,12 +125,12 @@
       }
     },
     {
-      "name": "04 ZIP fallback of a project-backed row",
+      "name": "04 REFUSED (founder 2026-10-01): a project post on a ZIP map",
       "zip": "12345",
       "image": true,
       "derive_scope": "zip",
-      "js": true,
-      "sql": true,
+      "js": false,
+      "sql": false,
       "evidence": {
         "project_id": "11111111-2222-3333-4444-555555555555",
         "theme": "datacenter",
@@ -262,7 +267,8 @@
               "regulatory_badges_drawn": 0,
               "dual_identity_target": false
             }
-          }
+          },
+          "popup_open": true
         }
       }
     },
@@ -350,7 +356,8 @@
               "regulatory_badges_drawn": 0,
               "dual_identity_target": false
             }
-          }
+          },
+          "popup_open": true
         }
       }
     },
@@ -546,6 +553,79 @@
         "visual": {
           "capture_key": "v1|12345|zip-scope|",
           "status": "REAL_MAP_VISUAL"
+        }
+      }
+    },
+    {
+      "name": "14 REFUSED (founder 2026-10-01): a project pin with no popup recorded",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "project",
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "project",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "project",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": true,
+              "target_sought": true,
+              "on_map_total": 3,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          }
         }
       }
     }
