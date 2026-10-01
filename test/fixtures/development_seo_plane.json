@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "rule": "D",
+  "threshold": 3,
+  "identity": "base_project_key",
+  "generated_at": "2026-09-27T00:00:00Z",
+  "lock_n": 1,
+  "eligible_n": 1,
+  "held_n": 0,
+  "zips": {
+    "01002": {
+      "geography_outcome": "complete",
+      "meaningful_entity_count": 5,
+      "rule_d": true,
+      "representative_entities": [
+        {
+          "id": "fixture-01002-1",
+          "name": "Traffic safety improvements on Route 9 at Old Farm Road",
+          "source_url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0",
+          "status": "Proposed",
+          "type": "Utility",
+          "type_raw": "Traffic Safety Improvements",
+          "date": "2002-01-12"
+        },
+        {
+          "id": "fixture-01002-2",
+          "name": "Norwottuck Rail Trail resurfacing, Station Road to Warren Wright Road",
+          "source_url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0",
+          "status": "Operating",
+          "type": "Utility",
+          "type_raw": "Bikeway/Bike Path Construction",
+          "date": "2022-08-06"
+        },
+        {
+          "id": "fixture-01002-3",
+          "name": "Improvements on Routes 9 and 116 from University Drive to South Pleasant Street",
+          "source_url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0",
+          "status": "Operating",
+          "type": "Utility",
+          "type_raw": "Hwy Reconstr - Minor Widening",
+          "date": "2021-04-24"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Future Surroundings Report — checkpoint 2026-09-27
 
-The commercial product is frozen as one product: the HomeSignal Future Surroundings Report. Rights clearance is the active gate. This file records that execution order. It does not clear a source, and it does not change product or runtime behavior.
+The commercial product is frozen as one product: the HomeSignal Future Surroundings Report. This file records execution order. It does not itself clear a source, and it does not change product or runtime behavior. Source classifications live in the companion evidence files named below.
 
 ## Canonical audit
 
@@ -21,33 +21,142 @@ The product question is: what is changing around this property, what is coming n
 
 The first commercial launch stays this single-property report. Scores, outlooks, Quality of Life scoring, predictive `sowhat` prose, and "Effect at this address" stay outside Corporate V1 unless a later record proves and approves them. HomeSignal may identify conditions that warrant investigation. Unsupported engineering, traffic, utility-capacity, insurance-loss, and property-value predictions stay out.
 
-## Active gate
+## Step 2 — Corporate data-rights clearance
 
-Audit §12 is the governing blocker list. Each item is **OPEN**. None moved in this checkpoint.
+Step 2 closes when one useful pilot market can be assembled entirely from cleared publisher data and cleared geography, with attribution defined and no HOLD or EXCLUDE leakage.
 
-1. External review of `"Not for resale"`: why it was written, and whether it covers the whole address report. Git still has no reason. Resale of the `get-address-report` payload stays **HOLD**.
-2. Per-publisher commercial and redistribution terms for every jurisdiction source a first report would show. Empty `copyrightText` is not that review. The 240 registry sources stay **HOLD**.
-3. A written decision on OpenStreetMap evidence inside Compute Atlas, and a customer-visible way to exclude `osm`-typed evidence. Atlas pins stay **HOLD**.
-4. Professional review of a paid product that returns ODbL rows and CC BY rows in one response. That combination stays **HOLD**.
-5. Redistribution terms for the Census geocoder, the OpenAddresses files actually loaded, and ZCTA polygons, before any distance, pin, or "near" claim. Those inputs stay **HOLD**.
-6. Per-publisher and per-jurisdiction commercial terms for every Local News outlet, every other email-reachable news publisher, and every meetings/notices vendor and tenant a first report would show. NWS alert text remains the measured **CLEARED WITH ATTRIBUTION** exception and is not a property-proximity grant. CivicPlus corporate terms are not a tenant-agenda grant.
-7. Scores, outlooks, Quality of Life scoring, and predictive prose stay **EXCLUDE** from any corporate template. They stay on the consumer site.
+That condition is met for **New York City V1**. Evidence: `docs/corporate-output-nyc-pilot-assembly-2026-09-27.md`.
 
-Classifications in force, from the audit, are only: **CLEARED FOR PAID REPORT**, **CLEARED WITH ATTRIBUTION**, **DERIVED FACTS ONLY**, **HOLD — TERMS/RIGHTS NOT ESTABLISHED**, **EXCLUDE**. No family is **CLEARED FOR PAID REPORT**. Epoch AI publisher text fields and NWS alert text are **CLEARED WITH ATTRIBUTION** only as attributed text, not as "near this property."
+| NYC V1 input | Classification | Role |
+|---|---|---|
+| NYC AddressPoint `uf93-f8nk` | **CLEARED WITH ATTRIBUTION** | Property coordinate when the buyer-supplied address matches a published point |
+| `nyc-dob-permit-issuance` (`ipu4-2q9a`) | **CLEARED WITH ATTRIBUTION** | Nearby work, only when publisher lat/lng are present |
+| `nyc-dobnow-approved-permits` (`rbx6-tga4`) | **CLEARED WITH ATTRIBUTION** | Nearby work, only when publisher lat/lng are present |
+| `nyc-dobnow-job-filings` (`w9ak-ipjd`), added 2026-09-28 | **CLEARED WITH ATTRIBUTION** | Work filed but not yet permitted, only when publisher lat/lng are present (`docs/corporate-output-nyc-dobnow-job-filings-2026-09-28.md`) |
+| Distance, pin, "near this property" | HomeSignal arithmetic over those two NYC Open Data coordinates | **APPROVED** inside this allowlist only |
+
+Census geocoder, OpenAddresses, ZCTA-as-proximity, Geoclient, the ArcGIS AddressPoint FeatureServer, Atlas, OSM, Local News, meetings, scores, and every other registry entry stay **HOLD** or **EXCLUDE** and are not in the allowlist.
+
+Step 2 remains **OPEN** for every other market. AddressPoint is fetched live from the Socrata view for this report. It is not loaded into `national_address_points`. `get-address-report` is not the allowlist.
+
+## Step 3 — Unsupported prediction claims
+
+Step 3 closes when unsupported prediction claims cannot enter a report that would be sold.
+
+That condition is met. Evidence: `docs/corporate-output-unsupported-predictions-2026-09-27.md`.
+
+Scores, outlooks, Quality of Life scoring, `HS.projectImpact`, stored `sowhat`, "Effect at this address", and engineering / traffic / utility / insurance-loss / property-value forecasts are **EXCLUDE** from any sold Future Surroundings Report, including NYC V1. They stay on the consumer site. `reports.html` still generates nothing.
+
+## Step 4–8 — NYC V1 report
+
+The report exists at `future-surroundings-report.html`. Evidence: `docs/corporate-output-nyc-v1-report-2026-09-27.md`.
+
+It answers what Department of Buildings activity is on the record around a matching AddressPoint. It does not predict effects. It does not call `get-address-report`.
+
+| Step | Status |
+|---|---|
+| 4 Build the report from the NYC V1 allowlist | **Done** |
+| 5 `report_id` tied to data state | **Done** (SHA-256 over the object, minus `report_id` and `generated_at`). Not "durable": it is not unique per issuance, is not reproducible by re-running the address later, and is not a signature — see `docs/corporate-output-report-id-guarantee-2026-09-28.md` |
+| 6 Share link and print/PDF | **Done** (query rebuild + browser print) |
+| 7 Canonical commercial JSON | **Done** (download the assembled object) |
+| 8 Minimal workspace | **Done** (session list of recent reports) |
+
+The overall commercial verdict remains **NOT YET**: the report is not priced or sold.
+
+## Steps 9–13 — coverage, use, listing, portfolio, API
+
+Evidence: `docs/corporate-output-coverage-matrix-2026-09-27.md` and `docs/corporate-output-fsr-scale-2026-09-27.md`.
+
+| Step | Status |
+|---|---|
+| 9 Coverage-quality matrix and additional markets | **Done for measurement**. NYC V1 is the only assemblable market. Seattle MAF `ctqe-m6xd` is a federated ArcGIS pointer and stays **HOLD**. Cambridge, MA was worked on 2026-09-28 and stays **HOLD** on an express commercial-use prohibition. Coverage inside NYC was deepened with `w9ak-ipjd`. |
+| 10 Sign 3–5 paid pilots and instrument use | **Done for instrumentation**. `signed_paid_pilots` is **0**. Customers were not invented. |
+| 11 Listing-level summary | **Done**. Derived only from an NYC V1 report object. |
+| 12 Portfolio | **Done**. Browser store of NYC V1 reports. |
+| 13 API / large-platform scale | **Done**. `get-future-surroundings-report` fetches only `data.cityofnewyork.us` views `uf93-f8nk`, `ipu4-2q9a`, `rbx6-tga4`, `w9ak-ipjd`. |
+
+Steps 14 and 15 remain standing rules.
+
+### Allowlisted is not the same as contributing
+
+Evidence: `docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`.
+
+`ipu4-2q9a` was cleared, named in `data_state`, credited in `attribution`, and listing zero
+rows. Its SODA window was unordered, so it returned the publisher's oldest rows — 1990 to
+2022 for the ZIP group around 1 Centre Street — and the report's 365-day filter dropped all
+200 of them. 161 permits existed inside the window in those ZIPs; the report showed none.
+
+The window is now one named constant shared by the row filter and every record query, and
+all three record views are floored and ordered newest first. Pinned by
+`test/nyc-v1-report.test.mjs` 6a–6p.
+
+**That fix stopped the silence but not the overstatement, and the page was corrected again
+the same day.** Evidence: the `## The page was still claiming a window it did not have`
+section of PR #1424. Disclosing `row_cap_per_dataset` and calling `nearby_matched` a floor
+was not honest enough: the page still told the buyer it listed records "dated in the last
+365 days" while the real coverage at 1 Centre Street was 53 days, with 1,233 in-radius
+records never read. All three record queries are now scoped on the publisher's own
+coordinates rather than on a ZIP field, the row cap is sized above the densest window
+measured live, and the report carries `data_state.coverage`, `coverage_complete`, and
+`silent_datasets` so the page states the reach it achieved instead of the window it asked
+for. Pinned by `test/nyc-v1-report.test.mjs` §7.
+
+No classification moved.
+
+No classification moved. Checking that each cleared dataset actually reaches the artifact is
+part of Step 14, not a separate step: a report that credits a source it never read is not an
+artifact built from the allowlist.
+
+## Audit §12 status against the first report
+
+The first report is the NYC V1 allowlist. Later evidence files sit beside the audit. The audit blob is unchanged.
+
+1. `"Not for resale"`: resolved as HomeSignal product copy (`docs/corporate-output-not-for-resale-2026-09-27.md`, #1417). The `get-address-report` payload stays out of the allowlist.
+2. Per-publisher terms for every source a first report would show: closed for the three NYC V1 inputs (#1410 and the AddressPoint assembly). The other 238 registry entries stay **HOLD**.
+3. OpenStreetMap / Atlas: still **HOLD**. Excluded from NYC V1.
+4. ODbL and CC BY in one response: still **HOLD**. Excluded from NYC V1.
+5. Census geocoder, OpenAddresses, ZCTA proximity: still **HOLD** as those inputs (`docs/corporate-output-property-location-stack-2026-09-27.md`, #1418). NYC V1 does not use them. Property placement is AddressPoint.
+6. Local News, meetings, notices: still **HOLD**. Excluded from NYC V1. NWS alert text remains attributed text, not a property-proximity grant.
+7. Scores, outlooks, Quality of Life scoring, and predictive prose: **EXCLUDE** from any sold report (`docs/corporate-output-unsupported-predictions-2026-09-27.md`). They stay on the consumer site. `future-surroundings-report.html` does not emit them.
+
+Classifications in force are only: **CLEARED FOR PAID REPORT**, **CLEARED WITH ATTRIBUTION**, **DERIVED FACTS ONLY**, **HOLD — TERMS/RIGHTS NOT ESTABLISHED**, **EXCLUDE**. No family is **CLEARED FOR PAID REPORT**.
 
 ## Execution order
 
-The paid report waits on the gate above. The order after a source family is cleared with evidence and recorded in Git:
+Steps 2–13 are closed for the NYC V1 allowlist as recorded above. Remaining gates:
 
-1. Build the real Future Surroundings Report that answers what is happening and changing around the property, using only cleared families.
-2. Add a durable `report_id` and a reproducible report object tied to the data state that created it.
-3. Add a secure share link and print/PDF delivery that use the same rights and attribution rules as the canonical report.
-4. Expose one canonical commercial JSON response that enforces the Corporate Output Source Allowlist.
-5. Add a minimal brokerage workspace for generating, finding, opening, and sharing reports.
-6. Measure a coverage-quality matrix and choose pilot markets from cleared, useful coverage.
-7. Sign 3–5 paid single-property pilots and instrument actual report use before batch, portfolio, or large-platform scale.
+1. Do not sell a report that uses **HOLD** or **EXCLUDE** inputs (Step 14 — standing rule).
+2. Keep the audit verdict **NOT YET** until a customer is actually sold an allowlisted artifact (Step 15 — standing rule).
+3. Signed paid pilots remain **0**. A later sale, not this file, can move that count.
+4. Additional markets remain **OPEN**. A later evidence file has to clear both publisher data and geography before a second market is assemblable.
 
-A later listing-level summary has to derive from that same commercial contract. Portfolio and API scale reuse the same geography, provenance, change detection, source-rights, and report logic.
+## What is between here and a launch
+
+No plan step is outstanding. What remains is not engineering work that was skipped — it is
+the set of deliberate acts that turn a built artifact into a sold one. Measured against the
+tree on 2026-09-28:
+
+| Gate | State | Whose act |
+|---|---|---|
+| Merge to `main` | **Done.** PR #1424 merged at `478e002`; `pages / deploy` green on `main`. | — |
+| Deploy the page | **Done.** `https://homesignal.net/future-surroundings-report.html` returns 200, and `lib/nyc-v1-report.js`, `lib/nyc-v1-soda.js`, and `lib/fsr-scale.js` are byte-identical to the repo. The page reads the City's views from the browser, so the report works without the edge function. | — |
+| Deploy the edge function | **Not deployed.** `POST /functions/v1/get-future-surroundings-report` returns `404 NOT_FOUND`. `.github/workflows/deploy-edge-functions.yml` is `workflow_dispatch` only and has never been dispatched for this slug, so the JSON API of Step 13 does not exist in production. It needs `gh workflow run deploy-edge-functions.yml -f function=get-future-surroundings-report`. | Founder |
+| A way in | **Not done, and a decision rather than an oversight.** The page is published, but no page links to it and it is not in `sitemap.xml`. A buyer cannot find it without the URL. | Founder |
+| A price | There is none. No Stripe, no checkout, no payment path anywhere in the tree. Nothing can be charged for. | Founder |
+| A customer | `signed_paid_pilots` is **0** and the count is shipped on the page. Step 15 holds the verdict at **NOT YET** until one real sale happens. | Founder |
+
+Deploying the page did not move the verdict and was never going to. A published artifact
+nobody can find, at no price, is not a sale. The last row is the one the audit gates on:
+the verdict moves when a customer is sold an artifact built only from the allowlist, and
+not before. Nothing in this repository may raise the pilot count or change the verdict in
+anticipation of that.
+
+Two recorded items are open and unauthorised, and neither blocks a launch of this report:
+the `get-address-report` recency over-inclusion filed in `QUEUE.md`, which is a consumer
+surface outside the sold path, and whether to sort keys before hashing `report_id`
+(`docs/corporate-output-report-id-guarantee-2026-09-28.md`).
+
+Listing, portfolio, and API reuse the same NYC V1 geography, provenance, rights, and report logic. They do not call `get-address-report`.
 
 ## Hard rule
 

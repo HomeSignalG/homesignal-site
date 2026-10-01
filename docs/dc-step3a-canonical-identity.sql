@@ -346,13 +346,42 @@ merge is reversible: the decision, not the evidence, is what gets corrected.';
 --     marker id) being minted for the same Epoch record every day -- measured: 270 entities for
 --     92 current records after 3 runs.
 --     A rename mints a new key (fails safe: a decision is lost, nothing is merged). A name that
---     repeats inside a run is NOT a key, so epoch_ai/timelines (538 rows, 92 names) stays
---     singleton -- the rule is the uniqueness measurement, not a list of distributions;
+--     repeats inside a run is NOT a key on its own, so epoch_ai/timelines (538 rows, 92 names) was
+--     singleton -- the rule is the uniqueness measurement, not a list of distributions. SUPERSEDED
+--     2026-10-01 for that distribution only: dc_record_key_discriminator pairs the name with one more
+--     payload field ('Date'), and (name, Date) is the key;
 --   * otherwise a singleton key that no other observation can ever share.
+-- A source whose records repeat a NAME inside one run (epoch_ai/timelines: several milestones per data centre) can
+-- still have a stable key: the name PLUS one payload field that tells its rows apart. That pairing is DATA, not
+-- code — this registry names it, so no source appears in the key rule below. 2026-10-01: epoch_ai/timelines,
+-- 'Date' — (name, Date) is unique in every run (7 of 7) and 534 of 546 pairs persist across all seven.
+create table if not exists public.dc_record_key_discriminator (
+  source_key       text not null,
+  distribution_key text not null,
+  payload_field    text not null check (btrim(payload_field) <> ''),
+  key_label        text not null check (key_label ~ '^[a-z]+$'),
+  primary key (source_key, distribution_key)
+);
+alter table public.dc_record_key_discriminator enable row level security;
+revoke all on public.dc_record_key_discriminator from anon, authenticated;
+insert into public.dc_record_key_discriminator (source_key, distribution_key, payload_field, key_label)
+values ('epoch_ai', 'timelines', 'Date', 'date')
+on conflict (source_key, distribution_key) do nothing;
+comment on table public.dc_record_key_discriminator is
+'STEP 3A. For a source with no record id whose names repeat inside a run: the one payload field that, together with the
+name, is a stable record key (rank 1, only when the pair is unique in its own run). Evidence identity only.';
+
 create or replace view public.dc_observation_record_key with (security_invoker = true) as
 select o.home_signal_observation_id,
        case when o.publisher_record_id is not null
               then o.source_key || '|' || o.distribution_key || '|' || o.publisher_record_id
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
+             and nullif(btrim(o.raw_payload ->> d.payload_field), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name), btrim(o.raw_payload ->> d.payload_field)) = 1
+              then o.source_key || '|' || o.distribution_key || '|name+' || d.key_label || ':'
+                   || btrim(o.source_native_name) || '|' || btrim(o.raw_payload ->> d.payload_field)
             when s.supplies_publisher_record_id is false
              and nullif(btrim(o.source_native_name), '') is not null
              and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
@@ -362,11 +391,18 @@ select o.home_signal_observation_id,
        case when o.publisher_record_id is not null then 0
             when s.supplies_publisher_record_id is false
              and nullif(btrim(o.source_native_name), '') is not null
+             and nullif(btrim(o.raw_payload ->> d.payload_field), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name), btrim(o.raw_payload ->> d.payload_field)) = 1 then 1
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
              and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
                                              btrim(o.source_native_name)) = 1 then 1
             else 2 end as record_key_rank   -- 0 publisher id, 1 unique name, 2 singleton
   from public.dc_source_observation o
-  join public.dc_source s on s.source_key = o.source_key;
+  join public.dc_source s on s.source_key = o.source_key
+  left join public.dc_record_key_discriminator d
+    on d.source_key = o.source_key and d.distribution_key = o.distribution_key;
 
 revoke all on public.dc_observation_record_key from anon, authenticated;
 

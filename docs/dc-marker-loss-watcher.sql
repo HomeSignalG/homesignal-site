@@ -106,14 +106,19 @@ begin
     raise exception 'DRIFT: dc-resolve-canonical runs %, not the expected command — refusing', coalesce(v_canon, '(no job)');
   end if;
   if v_geo is distinct from 'select count(*) from public.dc_resolve_geography(true)'
-     and v_geo is distinct from $c$select public.dc_resolve_serialized('geography')$c$ then
+     and v_geo is distinct from $c$select public.dc_resolve_serialized('geography')$c$
+     and v_geo is distinct from $c$set statement_timeout = '300s'; select public.dc_resolve_serialized('geography')$c$ then
     raise exception 'DRIFT: dc-resolve-geography runs %, not the expected command — refusing', coalesce(v_geo, '(no job)');
   end if;
 
   perform cron.unschedule(j.jobid) from cron.job j
    where j.jobname in ('dc-resolve-canonical', 'dc-resolve-geography', 'dc-resolve-on-acquisition');
   perform cron.schedule('dc-resolve-canonical', '25 * * * *', $c$select public.dc_resolve_serialized('canonical')$c$);
-  perform cron.schedule('dc-resolve-geography', '35 * * * *', $c$select public.dc_resolve_serialized('geography')$c$);
+  -- geography ran 101-108 s against the 120 s database limit and was cancelled once (2026-09-28 20:35), so it
+  -- gets a 300 s ceiling. It has to be a SEPARATE STATEMENT ahead of the call: a SET inside the function does
+  -- not re-arm the timer of the statement already running (measured: test/dc_resolver_hardening_pg).
+  perform cron.schedule('dc-resolve-geography', '35 * * * *',
+                        $c$set statement_timeout = '300s'; select public.dc_resolve_serialized('geography')$c$);
   perform cron.schedule('dc-resolve-on-acquisition', '*/2 * * * *', 'select public.dc_resolve_on_acquisition()');
 end
 $cron$;

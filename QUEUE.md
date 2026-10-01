@@ -40,6 +40,107 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
+
+**Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
+boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`.
+
+- **Why they were omitted:** each is the ONLY canonical ZIP in its ZIP3 prefix (941, 952, 991).
+  The legacy generation's writer (`scripts/n5_unit_a_shadow.py`, retired) built only prefixes
+  that had a phase-1 shard (`select_prefixes()` reads `n5_shard where state='done'`), and wrote
+  `boundary_complete` only for the boundaries it loaded. None of the three prefixes had a phase-1
+  shard, and the separate `not_measured` backfill covered only ZIPs with no boundary. So nothing
+  wrote them: legacy = 12,013 + 706 = **12,719** of 12,722.
+- **The presence half was already repaired** by the generation path (#1336 / #1350): scope =
+  shard prefixes ∪ every canonical prefix, and READY / ACTIVATE refuse on
+  `canonical_zip_without_status`. Both national generations carry 12,722 rows.
+- **Serving since 2026-09-27 15:00Z**, re-measured 2026-09-29 on `n5-national-2026-09-27`:
+  94128 `boundary_complete` 0 · 95219 `boundary_complete` 0 · 99128 `boundary_complete` 1.
+  `app_zip_geography_state`: 12,016 authoritative + 706 not_measured + **0 pending**.
+- **Correct, not just present:** membership was recomputed from the generation's candidate
+  geometry and matches on all three. 94128's 32 source-stated projects all lie 1.0-13.6 km outside
+  its polygon; 95219's one point inside is an unresolved `GEOMETRY_INVALID` record, correctly
+  withheld; 99128's member is a WSDOT line that crosses the polygon.
+- **What this change adds (Part G):** READY / ACTIVATE now also refuse a status that disagrees
+  with `geo.zcta_boundary` (`canonical_zip_status_disagrees_with_boundary`). The publisher labels a
+  ZIP from the TIGER file the loader downloads, so a skipped shape would have published a
+  boundary-bearing ZIP as `not_measured` and passed every existing check. Measured before
+  applying: 0 disagreements in every generation.
+  **Applied 2026-09-29 23:56Z** (`db-sql.yml` run `36647789091`, from `main` `57aa5b6`): live
+  `md5(prosrc)` `66f5995d…` = Part G's post-condition; ACTIVE generation 12,722 rows, 0 disagree.
+  **First real READY + ACTIVATE under it:** `n5-national-2026-09-29`, activated 2026-09-30 12:22Z,
+  12,722 rows, 0 disagree. **Rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is
+  generated, fingerprint-proven to restore the pre-Part-G body exactly, and executed in CI by
+  `run_part_g_rollback.py`. A refusal holds the build BUILDING, and `n5_map1_build` reports it
+  after 6 h with no progress. **Not applied: it exists for use only if the check refuses a
+  correct build.**
+- **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
+  failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
+  only live members of that state. It now asserts the three resolve to a measured state, and
+  exercises the pending contract by handing the live page the producer's exact `unknown` answer.
+
+### 2026-09-28 — 🔴 FINDING (RECORDED, NOT FIXED): the BIS `recency_expr` admits permits back to 1989 — 89.6% of what it returns is not recent
+
+**This is a finding, not authorised work.** Per Rule 16 it is filed as its own item rather
+than folded into the Future Surroundings Report checkpoint, whose scope is fixed and whose
+sold artifact does not touch this code path. **Nothing here has been changed.** Fixing it
+needs founder authorisation because it is a live consumer surface.
+
+**Where:** `supabase/functions/get-address-report/jurisdiction-registry.json`, the
+`socrata` entry for dataset `ipu4-2q9a` (NYC DOB Permit Issuance, BIS legacy):
+
+```
+"recency_expr": "(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'"
+```
+
+**What it assumed.** `issuance_date` is a *text* column. The convention dated 2026-08-02
+reformats it into a sortable `YYYYMMDD` key by slicing the parts out of `MM/DD/YYYY`. That
+was correct when every value in the column had that shape.
+
+**What the column is now.** The publisher has been writing ISO values into it. Measured
+against the live view 2026-09-28: **3,990,689 rows total — 3,881,514 `MM/DD/YYYY` and
+88,238 `YYYY-MM-DD…`.** The slice positions mean nothing on the second shape. For
+`2026-03-01T00:00:00.000` the expression builds the key `3-01206-`, and because the
+comparison is lexical and `3` sorts above `2`, that key clears **any** `{cutoff_compact}`
+beginning with a 2 — i.e. every cutoff this century.
+
+**What that costs, measured 2026-09-28 at a 365-day cutoff (`20250928`):**
+
+| | rows |
+|---|---|
+| admitted by `recency_expr` | 71,681 |
+| genuinely inside the 365-day window | 7,442 |
+| **over-included** | **64,239 (89.6% of what it returns)** |
+| oldest permit the expression admits | **1989-05-11** |
+
+Every one of the 64,239 is an ISO-formatted row. This is not a rounding error at the
+boundary: nine of every ten permits the consumer path calls recent are not.
+
+**There is a green test over this and it cannot see the defect.**
+`test/socrata-text-date-recency.test.ts` passes, and it is a real test — it pins that the
+substring comparison is emitted, that `{cutoff}` is substituted at request time rather than
+frozen, that the older broken ISO comparison is gone rather than merely accompanied, and
+that a blank `recency_expr` falls back to a filter rather than to none. Every one of those
+is about **substitution**. None is about whether the expression the substitution produces
+selects the right rows. It would pass unchanged if the key were pure noise, which for
+88,238 rows it is. Do not read its green as coverage of this finding.
+
+**Why it was not fixed here.** `ipu4-2q9a` is on the NYC V1 allowlist, but
+`get-address-report` is on the EXCLUDE list and contributes nothing to the sold report —
+see `docs/corporate-output-source-rights-audit-2026-09-27.md`. The paid path reads the same
+column with a cast (`issuance_date::floating_timestamp`) and is unaffected; the reasoning,
+and the rejected option of reusing this convention, is written up in
+`docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`. Routing around a defect in a
+second implementation is not resolving it, so it is recorded here against the surface that
+still has it.
+
+**Proposed remedy (NOT AUTHORISED, NOT STARTED).** Replace the substring key with
+`issuance_date::floating_timestamp >= '{cutoff_iso}'`, which is verified working on this
+view in both `$where` and `$order`. Note `date_extract_y` is **not** available on a text
+column here — it returns HTTP 400 on type mismatch. Any other registry entry whose
+`recency_expr` slices a text date has the same exposure the moment its publisher changes
+format; that sweep is also unstarted and unauthorised.
+
 ### 2026-09-20 — DECISION HISTORY: code landed on the branch; deploy + backfill separately gated
 
 **State:** implementation complete and COMMITTED on
@@ -325,7 +426,8 @@ does not substitute centroid proximity for membership.
   · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
   change · no Fix 30/31 work.
 - 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
-  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
+  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128 — ✅ closed by FIX 3, 2026-09-29,
+  entry at the top of the resume point); page-eligibility for the 21
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.

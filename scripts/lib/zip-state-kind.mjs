@@ -10,6 +10,11 @@
 //   'not_measured'      -> not_measured  706 ZIPs   measured deliberately as not-measured
 //   'boundary_complete' -> authoritative           project_count > 0
 //   'boundary_complete' -> measured_zero           project_count = 0   (12,013 complete in total)
+//
+// FIX 3, 2026-09-29: the 3 'unknown' ZIPs were 94128 / 95219 / 99128, which the legacy build
+// never wrote. Every generation since serves all 12,722 (12,016 boundary_complete + 706
+// not_measured), so no live ZIP is `pending` now. The state stays in the mapping: the page must
+// still handle a producer that answers 'unknown'.
 
 /**
  * @returns one of 'pending' | 'authoritative' | 'not_measured' | 'measured_zero', or

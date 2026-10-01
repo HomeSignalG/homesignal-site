@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "authority": "docs/corporate-output-source-rights-audit-2026-09-27.md",
+  "rule": "A source family (registry_id) may appear in a customer report only if it is listed under `cleared` with an audit reference. Unlisted means excluded. A HOLD is never cleared (founder ruling R4). Adding an entry is a recorded decision, never a default.",
+  "entry_shape": {
+    "registry_id": "the source family exactly as app_projects.registry_id spells it; no wildcard",
+    "cleared_on": "YYYY-MM-DD of the recorded clearance",
+    "audit_ref": "where the clearance is recorded (file and section)",
+    "attribution": "the credit line the report must carry, or an empty string if none is required"
+  },
+  "cleared": []
+}

@@ -1,0 +1,74 @@
+name: dev-change-baseline-suite
+
+# THE DEVELOPMENT CHANGE BASELINE DRIVER (docs/dev-change-baseline.sql; Development Activity plan Order D).
+# Runs the SHIPPED SQL — on top of the Order C ledger it builds on — against a DISPOSABLE Postgres:
+# the executable checks (which ZIP is due, the baseline-only first sighting, failure isolation, the ZIP
+# and time bounds, the capacity gate, the ledger byte budget, the busy-ledger stop, the per-source
+# evidence view, the lock-down), then every prohibited mutation of the SQL — each MUST fail the suite.
+# The offline half (test/dev-change-baseline-structure.test.mjs) runs in unit-tests.yml with every
+# other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
+# address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-baseline.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'test/dev_change_baseline_pg/**'
+      - 'test/dev_change_ledger_pg/fixture.sql'
+      - 'test/dev-change-baseline-structure.test.mjs'
+      - '.github/workflows/dev-change-baseline-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-change-baseline.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'test/dev_change_baseline_pg/**'
+      - '.github/workflows/dev-change-baseline-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The shipped driver passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_change_baseline_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dcb.log

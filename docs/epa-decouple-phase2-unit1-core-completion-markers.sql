@@ -27,6 +27,20 @@
 -- closed on the three ANCHORS instead, each of which must appear exactly once.
 -- =====================================================================================
 
+-- ⛔ REJECTED — FOUNDER RULING 2026-09-27. DO NOT APPLY.
+--   "Do not unlist ~1,005 map pages just because they have plants and no new
+--    construction. 'Nothing is being built' is a valid answer. Those pages stay listed.
+--    This was the old Unit 1 idea; it is rejected."
+-- The `_nfc >= 3` limb of `indexable` STAYS. This file is kept as the dated record of
+-- what was proposed, and the block below makes running it end to end a hard error
+-- before any statement can take effect. Checked in production the same day: the live
+-- `app_refresh_zip` still carries the facility limb and none of this unit's markers,
+-- and 11,696 of 12,722 ZIPs are indexable. Nothing was applied, nothing needed undoing.
+do $$
+begin
+  raise exception 'PHASE 2 UNIT 1 IS REJECTED (founder, 2026-09-27): EPA-only ZIPs stay indexable. Do not apply this file.';
+end $$;
+
 -- --------------------------------------------------------------------- 1. the columns
 -- Two markers, because the current single flag answers two different questions at once
 -- and the answers disagree:
