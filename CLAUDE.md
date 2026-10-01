@@ -2215,6 +2215,15 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     `DISK_TOTAL_MB` (`36352`, the 2026-09-29 36 GB reading) is the FALLBACK when that read fails;
     the run log prints `provisioned disk MB … [source]`. The 2,048 MB floor is unchanged. One
     build ≈ 2.9 GiB. Pinned by `scripts/test_disk_size.py`.
+    ✅ Verified live 2026-10-01 18:27Z (run `36901928216`): `provisioned disk MB 36,352
+    [Supabase disk config (36 GB)]`.
+  - **A halted shard is retried, up to 3 tries.** `n5_claim_shard` never reclaims a `halted`
+    shard, so one timeout used to leave a build unable to finish. Unattended ticks now put a
+    halted shard tried fewer than `MAX_SHARD_ATTEMPTS` (3) times back to `pending` before
+    claiming; a rerun deletes its own partial slice and every gate runs again. A shard that
+    halts 3 times stays halted and `n5_map1_build` alarms. Seen first 2026-10-01: shard 010
+    of `n5-national-2026-10-01` timed out freezing ZIP 01001 minutes after the 2.9M-row open,
+    while the next 145 shards ran clean (requeued by hand once, attempts 1).
 
 - ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
   (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores

@@ -30,7 +30,7 @@ def check(name, cond):
 
 
 def world(ready=(), building=(), newest=None, exists=False, free=10000.0, complete=False,
-          ready_raises=False, auto=True, generation=""):
+          ready_raises=False, auto=True, generation="", requeue=False):
     """Stub every database read the auto path makes; record every lifecycle call."""
     log = []
 
@@ -47,6 +47,11 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
             return [{"snapshot_id": "snap"}]
         if tag == "unresolved fresh":
             return [{"ok": complete}]
+        if tag == "requeue halted":
+            if requeue:  # only the requeue scenarios record it; the rest keep exact logs
+                log.append(("requeue", query))
+                return [{"z3": "010", "attempts": 1}]
+            return []
         raise AssertionError(f"unexpected query tag {tag!r}")
 
     def fake_ready(gen):
@@ -149,6 +154,24 @@ check("auto off: complete build is NOT finished", log == [("publish", "g1")])
 log = world(generation="g-explicit", ready=["g-ready"], complete=True)
 o.mode_work()
 check("explicit GENERATION: auto path ignored (no retirement either)", log == [("publish", "g-explicit")])
+
+# 6b. halted shards: requeued only on unattended ticks, bounded, scoped to the generation
+log = world(building=["g1"], requeue=True)
+o.mode_work()
+rq = [e for e in log if e[0] == "requeue"]
+check("auto tick requeues halted shards before claiming", len(rq) == 1
+      and log.index(rq[0]) < log.index(("publish", "g1")))
+q = rq[0][1]
+check("requeue is bounded by attempts < MAX_SHARD_ATTEMPTS (3)",
+      o.MAX_SHARD_ATTEMPTS == 3 and "attempts < 3" in q)
+check("requeue touches only halted shards of THIS generation",
+      "state='halted'" in q and "generation_id='g1'" in q)
+log = world(auto=False, building=["g1"], requeue=True)
+o.mode_work()
+check("auto off: halted shards are not requeued", not any(e[0] == "requeue" for e in log))
+log = world(generation="g-explicit", requeue=True)
+o.mode_work()
+check("explicit GENERATION: halted shards are not requeued", not any(e[0] == "requeue" for e in log))
 
 # 7. structure: one disk definition, and the gates stay behind heavy(..., verify=)
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
