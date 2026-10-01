@@ -158,7 +158,7 @@ change, and states `from` and `to` for each changed field.
 | 1 | the exact address resides only in the deletable layer | enforced; not proven for a real engine | **proven for this engine**, on the real writer: `national_report_pg` stores its output and asks the database what it holds |
 | 2 | the permanent snapshot holds no raw address elsewhere | backstop with named limits | **proven for whole values and fragments** on the real path; the fragment case shows the database accepting it and the engine's check catching it (`national_report_pg` 4c) |
 | 3 | deleting private context does not damage history | proven | proven again on this engine's reports (`national_report_pg` 3a–3f) |
-| 4 | Follow / Changes Since Report works while private context is active | half proven | *(at that time) still open — no Follow surface or reader existed.* **Since built and proven end to end on a disposable Postgres, with stand-ins stated in its doc** (2026-10-01): `docs/development-activity-follow-changes-2026-10-01.md`; not yet deployed |
+| 4 | Follow / Changes Since Report works while private context is active | half proven | *(at that time) still open — no Follow surface or reader existed.* **Since built and proven end to end on a disposable Postgres, with stand-ins stated in its doc** (2026-10-01): `docs/development-activity-follow-changes-2026-10-01.md`; deployed 2026-10-01 (refusals and capability verified live; no signed-in call yet) |
 | 5 | retention clock and purge testable and auditable | proven; not armed | **still open** — the purge is not scheduled |
 
 **Storing a real customer report stays switched off.** *(When this table was written, two gates were open: 4 and 5. Gate 5 has since been armed and gate 4 built; the open parts of gates 1, 2 and 5 are listed in the contract §6.)* This endpoint does not call the writer.
@@ -267,12 +267,13 @@ retry rather than fail; it is a code change and is **logged, not taken**.
 - Storing a real customer report stays off until the two open gates in the private-context contract §6 close: the Follow / Changes
   Since Report surface, and arming the purge (a new scheduled job, its own go).
   *(Dated annotation, 2026-10-01: the purge is armed and reading ok — contract §13 — and the Follow / Changes Since Report function is
-  built and proven end to end, not yet deployed: `docs/development-activity-follow-changes-2026-10-01.md`. The text above is the state at deploy.)*
+  built, proven end to end and deployed (2026-10-01, no signed-in production call yet): `docs/development-activity-follow-changes-2026-10-01.md`. The text above is the state at deploy.)*
 
 **Annotation, 2026-10-01 (the Follow change).** This function was refactored onto the shared modules named in §4, and its source-health read
 now queries the new narrow view `dev_change_source_fetch_health` (applied to production, migration `20261001220554`; the follow doc §6b has
 the measurement: 6.1–6.2 s on the wide view against PostgREST's 8 s timeout, about 0.1–0.2 s on the narrow one). **What is deployed is the
-2026-09-30 version recorded above, which reads the wide view**; the refactored function is not deployed until the follow doc §9 says so. Nothing in
-this section's receipt changes: it describes the deployed code.
+2026-09-30 version recorded above, which reads the wide view** *(superseded 2026-10-01 22:32Z: the refactored function is deployed as v2, reading the
+narrow view; follow doc §9 has the run, the smoke and the one thing not exercised, a signed-in call)*. This section's receipt describes the
+2026-09-30 code and is left as written.
 
 **Rollback** is §10: delete the function. Nothing depends on it.
