@@ -36,6 +36,9 @@ on:
       - 'test/dc_marker_loss_pg/**'
       - 'docs/dc-resolver-hardening.sql'
       - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-epoch-timeline-key-apply.sql'
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'test/dc_epoch_timeline_key_pg/**'
       - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
@@ -66,6 +69,9 @@ on:
       - 'test/dc_marker_loss_pg/**'
       - 'docs/dc-resolver-hardening.sql'
       - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-epoch-timeline-key-apply.sql'
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'test/dc_epoch_timeline_key_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -270,3 +276,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_resolver_hardening_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/resolverhardening.log
+      - name: Epoch timeline record key (one entity per milestone, leftovers superseded not deleted, steady state) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_epoch_timeline_key_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/timelinekey.log
