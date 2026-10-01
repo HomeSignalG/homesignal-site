@@ -263,6 +263,14 @@ ZCTA = {"11101": "MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))",
         "11201": "MULTIPOLYGON(((2 0,3 0,3 1,2 1,2 0)))",
         "11301": "MULTIPOLYGON(((3 0,4 0,4 1,3 1,3 0)))"}
 
+# geo.zcta_boundary holds the SAME polygons the loaders make resident, as production's table
+# and the TIGER file the loaders read are the same pinned file. 11199 has none, so its correct
+# status is not_measured. Part G's check compares every status row against this table.
+SEED += "".join(
+    f"insert into geo.zcta_boundary (zcta5, geom, source_vintage, source_url, source_checksum) "
+    f"values ('{z}', ST_GeomFromText('{w}',4269), 'fixture', 'https://example.test/zcta', 'sha');\n"
+    for z, w in ZCTA.items())
+
 
 def load_zcta(conn, gen, prefix):
     n = 0
@@ -543,6 +551,31 @@ def run(conn, label, mutate=None, suite=None):
         w.rollback()
         w.close()
 
+    # Part G (fix 3): a status row can EXIST and still be the wrong one. 94128 / 95219 / 99128
+    # had a boundary and no row at all in the legacy generation; the presence check above
+    # (canonical_zip_without_status) catches that shape. These catch the silent sibling: a
+    # boundary-bearing ZIP published as not_measured (a loader that skipped its polygon), and
+    # the reverse. Everything else about B is clean here, so each refusal can only be this check.
+    problems = lambda: {r["check_name"]: r["n"] for r in q(
+        c, "select * from geo.n5_generation_publish_problems(%s, array['111','112'])", (GEN_B,))}
+    s.ok("B0 control: every B status agrees with geo.zcta_boundary (4 boundary_complete, 11199 not_measured)",
+         "canonical_zip_status_disagrees_with_boundary" not in problems()
+         and q1(c, "select count(*) from geo.zcta_boundary") == 4, problems())
+    q(c, "update geo.maps_zip_geography_status set status='not_measured' where generation_id=%s and zip='11301'", (GEN_B,))
+    s.ok("B1 a ZIP that HAS a boundary, published as not_measured, blocks READY",
+         problems().get("canonical_zip_status_disagrees_with_boundary") == 1
+         and raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,),
+                    r"canonical_zip_status_disagrees_with_boundary = 1"), problems())
+    q(c, "update geo.maps_zip_geography_status set status='boundary_complete' where generation_id=%s and zip='11301'", (GEN_B,))
+    q(c, "update geo.maps_zip_geography_status set status='boundary_complete' where generation_id=%s and zip='11199'", (GEN_B,))
+    s.ok("B2 a ZIP with NO boundary, published as boundary_complete, blocks READY",
+         problems().get("canonical_zip_status_disagrees_with_boundary") == 1
+         and raises(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,),
+                    r"canonical_zip_status_disagrees_with_boundary = 1"), problems())
+    q(c, "update geo.maps_zip_geography_status set status='not_measured' where generation_id=%s and zip='11199'", (GEN_B,))
+    s.ok("B3 restored: the check is clear again, so READY below is not passing over a tamper",
+         "canonical_zip_status_disagrees_with_boundary" not in problems(), problems())
+
     q(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,))
     s.ok("G6 recorded unresolved outcomes are frozen once B leaves BUILDING",
          raises(c, "delete from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,), r"N5 GUARD"))
@@ -705,6 +738,12 @@ MUTATIONS = {
     "M20 the unreachable class is removed": ("7e", """
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_gen_record_unresolved(text)'::regprocedure),
           'then ''RECOVERY_PUBLISHER_UNREACHABLE''', 'then null'); end $m$;"""),
+    "M21 completeness stops comparing status with the boundary (Part G removed)": ("B1", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_publish_problems(text,text[])'::regprocedure),
+          'where st.status is distinct from', 'where false and st.status is distinct from'); end $m$;"""),
+    "M22 completeness checks only one direction (boundary ZIPs)": ("B2", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_publish_problems(text,text[])'::regprocedure),
+          'then ''boundary_complete'' else ''not_measured'' end)', 'then ''boundary_complete'' else st.status end)'); end $m$;"""),
     "M7 activation stops recording the predecessor": ("16", """
         do $$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
           'predecessor_generation_id = coalesce(predecessor_generation_id, prev.generation_id)', 'predecessor_generation_id = predecessor_generation_id'); end $$;"""),

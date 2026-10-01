@@ -1,0 +1,75 @@
+name: dev-change-reportable-suite
+
+# THE DEVELOPMENT CHANGE LEDGER'S REPORTABLE EVENTS (docs/dev-change-reportable.sql; Development Activity
+# plan, decision 10 option (a)). Runs the SHIPPED SQL — on top of the Order C ledger it reads — against a
+# DISPOSABLE Postgres: a baseline run's events (including the cross-copy differences the writer types as
+# changes) are never reportable, an ordinary run's are, an event that names no run is not, the run is the
+# event's own and never the record's, the view adds no column of its own, and it is readable by
+# service_role only. Then every prohibited mutation of the SQL — each MUST fail the suite.
+# The offline half (test/dev-change-reportable-structure.test.mjs) runs in unit-tests.yml with every
+# other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
+# address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'test/dev_change_reportable_pg/**'
+      - 'test/dev_change_ledger_pg/fixture.sql'
+      - 'test/dev-change-reportable-structure.test.mjs'
+      - '.github/workflows/dev-change-reportable-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'test/dev_change_reportable_pg/**'
+      - '.github/workflows/dev-change-reportable-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reportable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The shipped view passes; it applies twice; it refuses without the ledger; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_change_reportable_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dcr.log

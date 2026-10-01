@@ -8,3 +8,14 @@ project_id = "qwnnmljucajnexpxdgxr"
 
 [functions.edge-probe]
 verify_jwt = true
+
+# Allowlist JSON API. Not get-address-report. JWT stays on; this is not in the
+# workflow's --no-verify-jwt exception.
+[functions.get-future-surroundings-report]
+verify_jwt = true
+
+# The national Development Activity report (Order G). JWT stays ON, and the handler additionally requires a
+# signed-in, allow-listed user: the public anon key is a validly signed JWT and would otherwise pass the gateway.
+# Not in the deploy workflow's --no-verify-jwt exception.
+[functions.get-development-activity-report]
+verify_jwt = true

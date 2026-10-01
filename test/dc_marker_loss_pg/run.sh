@@ -75,9 +75,14 @@ else chk 'W7 an unknown resolver is refused' 'refused' 'refused'; fi
 
 chk 'W8 the jobs: both hourly resolvers go through the lock; the watcher every 2 minutes' "$(Q "
   select string_agg(jobname || '|' || schedule || '|' || command, ' ; ' order by jobname)
-    from cron.job where jobname like 'dc-resolve%'")" "dc-resolve-canonical|25 * * * *|select public.dc_resolve_serialized('canonical') ; dc-resolve-geography|35 * * * *|select public.dc_resolve_serialized('geography') ; dc-resolve-on-acquisition|*/2 * * * *|select public.dc_resolve_on_acquisition()"
+    from cron.job where jobname like 'dc-resolve%'")" "dc-resolve-canonical|25 * * * *|select public.dc_resolve_serialized('canonical') ; dc-resolve-geography|35 * * * *|set statement_timeout = '300s'; select public.dc_resolve_serialized('geography') ; dc-resolve-on-acquisition|*/2 * * * *|select public.dc_resolve_on_acquisition()"
 P -f docs/dc-marker-loss-watcher.sql >/dev/null
 chk 'W9 re-applying is a no-op: still exactly three resolver jobs' "$(Q "select count(*) from cron.job where jobname like 'dc-resolve%'")" '3'
+# W9b: production's geography job today runs the UNPREFIXED serialized command. The first apply of the 300 s
+# version has to accept it (not call it drift) and move it to the prefixed one.
+Q "update cron.job set command = 'select public.dc_resolve_serialized(''geography'')' where jobname = 'dc-resolve-geography'" >/dev/null
+P -f docs/dc-marker-loss-watcher.sql >/dev/null
+chk 'W9b the guard accepts the pre-300s geography command and moves it to the 300 s one' "$(Q "select command from cron.job where jobname = 'dc-resolve-geography'")" "set statement_timeout = '300s'; select public.dc_resolve_serialized('geography')"
 Q "update cron.job set command = 'select 1' where jobname = 'dc-resolve-canonical'" >/dev/null
 if P -f docs/dc-marker-loss-watcher.sql >/dev/null 2>&1; then chk 'W10 a drifted resolver job is refused' 'applied' 'refused'
 else chk 'W10 a drifted resolver job is refused' 'refused' 'refused'; fi

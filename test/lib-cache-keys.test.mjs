@@ -39,8 +39,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // capture job and the Approve gate. A fix in it that a warm browser never fetches would
 // leave the dashboard unlocking Approve on a binding rule the capture no longer uses,
 // which is precisely the disagreement it exists to prevent.
+// The three NYC V1 libs joined the set with the Future Surroundings Report. They are the
+// whole sold artifact — the allowlist, the SODA client, and the derived surfaces — so a
+// fix in one of them that a warm browser never fetches would leave a paid report built on
+// a stale allowlist or a stale query window. That is the silent class this file exists to
+// stop, and it is the reason the report page keys them rather than joining KNOWN_KEYLESS.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
-  'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js'];
+  'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 

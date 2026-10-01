@@ -94,6 +94,13 @@ production run, and written up. Everything before that fetch was sunk cost.
 **Do not ask permission for work you have already verified.** Verifying first and asking after
 spends the full cost and ships nothing; that ordering is the thing this grant exists to fix.
 
+⚖️ **MERGE IS NOT A GATE (founder, 2026-09-29: "you can merge on your own and you do not need
+to ask me").** Squash-merge your own PRs without asking once CI is green on the current head
+and there is no conflict. Never merge with red, held (`action_required`) or unrun checks. The
+stop lists elsewhere in this file still stand: secrets/PII/subscriber data, destructive or
+non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
+approval step only, not the verification before it.
+
 **Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
 
 1. **`jurisdiction-registry.json` only.** No other file.
@@ -186,6 +193,70 @@ settled decisions, and the workbook editing conventions.
 
 **Do not mirror queue items into the workbook or into this file** — two queues drift, which is
 the exact problem `QUEUE.md` exists to end.
+
+---
+
+
+## Permanent historical intelligence — preserve the longitudinal asset
+
+**HomeSignal's longitudinal development history is a core company data asset. Current product
+state may change; historical evidence must survive.** This rule governs every ingest,
+deduplication, classification, refresh, archive, retirement, merge, cleanup, migration and
+storage-optimization decision involving development, regulatory or environmental records.
+
+1. **Never destroy historical observations or change events.** Customer-facing removal,
+   archival, source retirement, disappearance from current source data, or cleanup must not
+   delete the historical record.
+2. **Preserve before-and-after evidence.** A meaningful change must retain the prior facts,
+   new facts, changed fields, observation time, publisher/source evidence and the applicable
+   derivation/facts version.
+3. **Retrieval is not real-world change.** Refresh timestamps, collection times, parser changes,
+   classifier changes, ZIP rematerialization and other technical metadata must never be reported
+   as project change.
+4. **Maintain durable source-record identity.** A source record must remain linkable across
+   observations. ZIP-page copies are memberships/attributes, not separate real-world projects.
+5. **Build toward permanent canonical real-world project lineage.** Filing, zoning, approval,
+   permit, construction, completion, environmental, enforcement and related records that are
+   proven to concern the same real-world development must be linkable under a HomeSignal-minted,
+   immutable canonical project ID. **Do not infer or merge lineage without sufficient evidence.**
+6. **Identity decisions must be auditable and reversible.** Preserve the evidence and
+   rule/version used to link, separate, merge or supersede entities. Correct an identity
+   decision without deleting the underlying observations or prior decision history.
+7. **Archive does not mean delete.** A project may leave the active/customer-facing dataset or
+   move to an inactive/archive state, but its observations, events, source lineage and canonical
+   identity remain available for historical analysis.
+8. **Classification is versioned history.** Preserve source-native values plus the HomeSignal
+   classification and rule/version used at the time. A future classifier change must not rewrite
+   what the source said or fabricate a historical real-world event.
+9. **Environmental and regulatory lineage must be preservable.** EPA, state environmental,
+   enforcement, contamination, fine/penalty, permit, remediation and similar events must be
+   capable of linking to the relevant canonical project/facility when the evidence supports
+   that relationship.
+10. **No cleanup may sacrifice the longitudinal asset.** If a proposed migration,
+    deduplication, retention policy, archive process or storage optimization would overwrite,
+    collapse or delete historical evidence, **STOP and surface the conflict before
+    implementation.**
+
+**Governing principle: CURRENT PRODUCT STATE MAY CHANGE. HISTORICAL EVIDENCE MUST SURVIVE.**
+
+### What this rule does NOT cover — customer-entered private context (founder decision, 2026-09-29)
+
+**Permanent intelligence survives. Customer-entered private context does not become permanent merely because it
+generated that intelligence.** A street address a brokerage typed, its normalized form, the exact property
+coordinates, any identifier that resolves to one address, and any client-identifying detail are **customer context,
+not historical intelligence**. They must never be written into an immutable or append-only table — not a report
+snapshot's body, not its inputs, not a property-key column, and not a value derived from them (a distance or an
+east / north offset measured from the property recovers it to within a metre).
+
+- They live only in the deletable `public.report_private_context` layer, kept while a report, a property Follow or an
+  account relationship needs them, purged **no more than 90 days after the last need ends** (immediately on a verified
+  privacy request or a legal requirement), and purged **in place** so the permanent snapshot that references them by
+  an opaque id stays whole.
+- Rule 10 above is not weakened by this: the report snapshot stays immutable, and what survives a purge is exactly
+  the project intelligence, evidence, identities, observations, change history and issuance record.
+- Read `docs/report-private-context-contract-2026-09-30.md` before touching a stored report, the report engine
+  (Order G) or anything that reads a customer-entered address. Its §6 lists the gates that must be closed before a
+  real customer report is stored.
 
 ---
 
@@ -2109,6 +2180,58 @@ fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
 `app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
 still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
 
+- ⚖️ **2026-09-29 — MAP 1 REBUILDS ITSELF, ONCE A DAY, AND SWITCHES ONLY WHEN EVERY CHECK
+  PASSES** (founder: "swap automatically once check pasees"; "keep 2"). Nobody dispatches runs.
+  - **Trigger:** pg_cron job 69 `n5-generation-dispatch` (`47 * * * *`) POSTs a
+    `workflow_dispatch` of `n5-generation.yml` with `mode=work, max_shards=200, auto=1`, using
+    `vault.github_actions_pat` (the digest's credential; its fine-grained token
+    `homesignal-dashboard-dispatch` was given `homesignal-site` Actions read/write on
+    2026-09-29 — test dispatch HTTP 204, run `36636442855`). GitHub's own `17 * * * *`
+    schedule stays as a second trigger; it drops ticks on this repo, pg_cron does not.
+  - **The unattended tick** (`AUTO_LIFECYCLE=1`, no `GENERATION`; #1476): activates a READY
+    generation left by an earlier tick; else opens `n5-national-<UTC date>` when nothing is
+    BUILDING — at most one per 20 h, never after a FAILED newest build, and only with free disk
+    ≥ the 2,048 MB floor + 3,500 MB (the shard's own `disk_free_mb`); works shards and publishes;
+    once the build is complete, calls `geo.n5_generation_mark_ready` then
+    `geo.n5_generation_activate` through `heavy(..., verify=)`. **The database gates still
+    decide**: a refusal turns the tick red and the generation stays where it is.
+  - **Keep two** (founder, 2026-09-29): after every activation, and at the start of each tick,
+    `retire_superseded()` discards every SUPERSEDED generation except the serving one's
+    predecessor (`geo.n5_generation_discard`) and deletes its capture from
+    `preservation.app_project_identity` (~1.1 GiB each; discard does not touch it). Never a
+    FAILED generation, never a generation on a PROTECTED snapshot: `phase1-2026-09-01` is
+    protected (founder ruling 2026-09-01) and `guard_frozen` refuses the delete anyway, so
+    `legacy-phase1-2026-09-01` and its capture stay. A DELETE does not shrink the database;
+    autovacuum makes the space reusable and the next build's inserts reuse it.
+    Proven on a disposable Postgres through the real orchestrator (`run_lifecycle.py` E17-E24:
+    two unattended ticks build and switch two generations; the one two back loses its rows and
+    capture; the predecessor and the protected legacy capture are untouched); 4 of 4 breaks fail it.
+  - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
+    build with no progress for 6 h, on no build running while the serving map was captured
+    > 72 h ago, and on two builds in flight at once.
+  - **Disk:** the provisioned size is READ from the Supabase Management API
+    (`/v1/projects/<ref>/config/disk`, `attributes.size_gb` GiB, minus 512 MiB) once per run, so
+    an autoscale resize needs no edit (founder, 2026-10-01: "i can not be doing this for years").
+    `DISK_TOTAL_MB` (`36352`, the 2026-09-29 36 GB reading) is the FALLBACK when that read fails;
+    the run log prints `provisioned disk MB … [source]`. The 2,048 MB floor is unchanged. One
+    build ≈ 2.9 GiB. Pinned by `scripts/test_disk_size.py`.
+
+- ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
+  (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores
+  it exactly).** READY passed on the first attempt — no INV-1 gap, confirming the Part F fix.
+  - **Serving == candidate:** membership **911,527**, fp `1958341294288126` · markers
+    **1,018,870** · status **12,722**. The pre-switch serving fp re-measured equal to the value
+    recorded at the first activation (`1945248397386972`), so nothing moved underneath.
+  - **Newly visible: 9,966 projects · 633 ZIPs** (`geo.n5_generation_entries`), led by
+    miami-building-permits 4,157 and tempe-building-permits 3,100 — the sources whose rows were
+    re-created after the 09-25 cutoff. 85282 / 33133 / 33127 render 1,184 / 2,494 / 1,558 markers,
+    all `boundary_complete`.
+  - **Left: 3,831 projects** = 3,751 no longer in `public.app_projects` + 60 re-created after this
+    build's cutoff (2026-09-27 16:59:37Z; the next generation recovers them) + 20 `POINT_REJECTED`.
+  - Operationally: GitHub's hourly schedule dropped several ticks; the build was driven by
+    dispatches plus the ticks that did fire. `open` got a 524 and committed — fixed for the next
+    open by #1398 (open now proves a lost response from state).
+
 - ✅ **SUPERSEDED 2026-09-27 — THE GENERATION PATH RAN END TO END AND MAP 1 NOW SERVES
   `n5-national-2026-09-25` (ACTIVE since 15:00:49Z; `legacy-phase1-2026-09-01` is SUPERSEDED and
   recorded as its predecessor, so `rollback` restores it exactly).** The heading and the ⛔ bullet
@@ -2176,8 +2299,24 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
 - **Publication scope = shard prefixes ∪ every canonical prefix** (`geo.n5_generation_publish_scope`).
   Shards alone would leave **40 prefixes / 445 ZIPs** with no status; **442** of those serve a
   measured zero today and would regress to 'unknown' on activation.
-- **Proof:** `test/n5_generation_pg/run_suite.py` (58 assertions + 10 mutations, all killed) via
-  `n5-generation-publish-suite.yml`; `test/n5-generation-publish.test.mjs` (53 static pins).
+- ✅ **FIX 3 (2026-09-29): THE OTHER 3 OF THOSE 445 — 94128, 95219, 99128 — HAD NO ROW IN THE
+  LEGACY GENERATION AT ALL, AND HAVE SERVED `boundary_complete` SINCE 2026-09-27.** Each is the only
+  canonical ZIP of its prefix, and the retired legacy writer built only shard prefixes. **A status
+  row must also be the RIGHT one**: READY/ACTIVATE now refuse `canonical_zip_status_disagrees_with_boundary`
+  (status vs `geo.zcta_boundary`, both directions; Part D D11, applied by Part G on 2026-09-29
+  23:56Z, live `md5(prosrc)` `66f5995d…`). Receipt:
+  `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`. `pending` now has no live member
+  by design; `verify-map1-zip-states` exercises it synthetically and fails if any of the three reads it.
+- **Proof:** `test/n5_generation_pg/run_suite.py` (78 assertions + 22 mutations, all killed; run
+  2026-10-01 on PostgreSQL 16) via `n5-generation-publish-suite.yml`;
+  `test/n5-generation-publish.test.mjs` (84 static checks); `run_part_g_rollback.py` (15 checks).
+  *(This line read "58 assertions + 10 mutations … 53 static pins" until 2026-10-01; it went stale
+  as Parts D-G added tests.)*
+- **Part G rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is generated by
+  `build_part_g.py`, fingerprint-proven to restore the pre-Part-G body (`611926…`), and NOT
+  applied. Use it only if the boundary-agreement check refuses a correct build. Then revert
+  D11 in Part D too. The first real build under the check, `n5-national-2026-09-29`, was activated
+  2026-09-30 12:22Z with 0 disagreements.
 - ⛔ **CAPACITY GATE: PRODUCTION MIGRATION/CUTOVER IS BLOCKED UNTIL VERIFIED DATABASE CAPACITY IS
   SUFFICIENT.** PART A and PART B each raise unless the operator sets `n5.verified_free_disk_mb`
   to an INDEPENDENTLY verified physical free-disk figure ≥ 2,048 MB floor + 950 MB PART B peak.
@@ -3313,9 +3452,21 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 
 **Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+
+⛔ **DECIDED 2026-09-27 — THE FOUNDER REJECTED IT. EPA-only ZIPs STAY INDEXABLE.** Verbatim:
+*"Do not unlist ~1,005 map pages just because they have plants and no new construction.
+'Nothing is being built' is a valid answer. Those pages stay listed. This was the old Unit 1
+idea; it is rejected."* The `_nfc >= 3` limb of `indexable` stays. Checked live the same day:
+`app_refresh_zip` still carries it and none of Unit 1's markers; 11,696 of 12,722 ZIPs are
+indexable. **Do not re-propose "EPA presence manufactures completeness" as a reason to
+unlist a page** — a ZIP with regulated facilities and no new construction is an honest,
+useful page, and its answer is "nothing is being built".
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
-### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+### ⛔ PHASE 2 · UNIT 1 IS REJECTED (founder, 2026-09-27) — built and parked 2026-09-07, never applied
+The parked SQL now raises `PHASE 2 UNIT 1 IS REJECTED` as its first executable statement, so
+running it changes nothing (pinned by checks 0/0b in its test; weakening the raise fails
+them). The record below is kept as the dated receipt of what was proposed.
 SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
 **not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
 load-bearing by six mutations). Production still stamps the old expressions; the sitemap,

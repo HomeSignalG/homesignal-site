@@ -43,8 +43,9 @@ ok(/^RULE_F_MIN = 3\b/m.test(gen), 'A-017 RULE_F_MIN is still 3');
 ok(/p\["rule_f_count"\] = p\["n_ln_journalism"\] \+ p\["n_gn"\] \+ p\["n_um"\]/.test(gen),
   'A-017 the Rule F count is journalism + government notices + capped meetings');
 ok(/p\["rule_f"\] = p\["rule_f_count"\] >= RULE_F_MIN/.test(gen), 'A-017 ...and the threshold is that constant');
-ok(/robots = "index, follow" if p\["rule_f"\] else "noindex, follow"/.test(gen),
-  'A-017 the generator writes index,follow on a pass and noindex,FOLLOW on a fail');
+ok(/robots = "index, follow" if \(p\["rule_f"\] or p\.get\("rule_d"\)\) else "noindex, follow"/.test(gen),
+  'A-017 the generator writes index,follow on Rule F OR Rule D and noindex,FOLLOW otherwise');
+ok(/^RULE_D_MIN = 3\b/m.test(gen), 'A-017 RULE_D_MIN is still 3');
 // Read the generator's actual line first: it is an f-string,
 // f'<meta name="robots" content="{robots}" id="robots-meta">\n'
 ok(/<meta name="robots" content="\{robots\}" id="robots-meta">/.test(gen),
@@ -69,9 +70,25 @@ ok(/<meta name="robots" content="noindex, nofollow" id="robots-meta">/.test(lega
   'PS-001 the LEGACY community.html?zip= surface is noindex, nofollow — it is not the SEO contract');
 
 // ---- PS-001 STRUCTURED DATA: absence is preserved, never "improved" ----
-for (const [f, body] of [['lib/community-page.js', cp], ['scripts/gen_zip_pages.py', gen], ['community.html', legacy]])
+for (const [f, body] of [['lib/community-page.js', cp], ['community.html', legacy]])
   ok(!/application\/ld\+json/.test(body), 'PS-001 no application/ld+json invented in ' + f,
     (body.match(/.{0,40}ld\+json.{0,40}/) || [])[0]);
+// scripts/gen_zip_pages.py also renders PROJECT pages, which carry breadcrumb markup (founder,
+// 2026-09-28). The rule is about the public ZIP document, so it is asserted on the ZIP
+// renderer itself: no JSON-LD, and no call into the shared head/structured-data helpers the
+// project page uses. test/project-pages.test.mjs checks the generated ZIP document too.
+{
+  const i = gen.indexOf('\ndef render(p, built):');
+  const j = gen.indexOf('\ndef ', i + 1);
+  const zipRender = i >= 0 && j > i ? gen.slice(i, j) : '';
+  ok(zipRender.includes('canon = f"{BASE}/community/{z}/"') && zipRender.includes('<!DOCTYPE html>'),
+    'PS-001 control: the ZIP document renderer was located (it builds its own head)');
+  ok(!/ld\+json|_ld_json|\b_head\(|\bld=/.test(zipRender),
+    'PS-001 no application/ld+json invented in the ZIP document renderer',
+    (zipRender.match(/.{0,40}(ld\+json|_ld_json|_head\(|ld=).{0,40}/) || [])[0]);
+  ok((gen.match(/application\/ld\+json/g) || []).length === 1 && /def _ld_json\(obj\):[\s\S]{0,600}application\/ld\+json/.test(gen),
+    'PS-001 the generator has exactly one structured-data writer, _ld_json (project pages)');
+}
 
 // ---- PS-001 CHROME: FOUR containers (A-021, Phase 8) ----
 // ⚠️ THIS IS THE ONLY SECTION OF THIS FILE PHASE 8 WAS AUTHORIZED TO RETARGET. The chrome

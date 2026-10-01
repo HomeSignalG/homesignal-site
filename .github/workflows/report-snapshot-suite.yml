@@ -1,0 +1,145 @@
+name: report-snapshot-suite
+
+# DURABLE REPORT SNAPSHOTS (docs/report-snapshot.sql; Development Activity plan Order F) and their
+# PRIVACY BOUNDARY (docs/report-private-context.sql; F2, founder decision 2026-09-29): the immutable
+# snapshot holds permanent intelligence only, and the customer-entered street address lives in a separate,
+# deletable private context that is purged 90 days after the last thing needing it (at once on a verified
+# privacy request).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres, twice over:
+#   1. the private layer — retention clock, purge in place, audit log, lock-down — then every prohibited
+#      mutation of that SQL, each of which MUST fail the suite;
+#   2. the snapshot — the database mints report_id, content_hash must be the SHA-256 of the stored body,
+#      the body is kept byte for byte, a snapshot is immutable, nothing private can enter it, purging the
+#      private context leaves it byte-identical; the exact Order F table that is live in production
+#      upgrades to a fresh-install shape (and is refused if a report is stored); then every prohibited
+#      mutation, each of which MUST fail the suite.
+#   3. the NATIONAL REPORT ENGINE (Order G): its real output, assembled for six subject addresses, is stored by the
+#      real snapshot module through the real writer, and every assertion is about what the database holds — one
+#      permanent report for six customers, no private value or fragment in it, the private layer holding exactly what
+#      was entered, a purge leaving the report byte-identical, and each kind of leak caught where it can be.
+#   4. the PURGE SCHEDULE (docs/report-private-context-purge-schedule.sql; Order F2 gate 5): the pg_cron job that runs
+#      the F2 purge batch every 15 minutes, and the alertable monitor check that pages when a private context is more
+#      than an hour past its purge date. Against a stand-in pg_cron and a stand-in monitor: the job and its schedule, the
+#      health read, every monitor outcome, the scheduled command purging exactly what is due, a check that cannot run
+#      failing instead of killing the monitor, an exact rollback, two refusals that arm nothing, and every prohibited
+#      mutation, each of which MUST fail the suite.
+# The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
+# test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
+# test/national-report*.test.mjs) run in unit-tests.yml with every
+# other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
+# address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'test/report_private_context_purge_pg/**'
+      - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
+      - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-private-context-structure.test.mjs'
+      - 'test/report-snapshot.test.mjs'
+      - 'supabase/functions/_shared/report-snapshot.ts'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
+      - '.github/workflows/report-snapshot-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'test/report_private_context_purge_pg/**'
+      - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
+      - '.github/workflows/report-snapshot-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      # 22, not the runner's default: the national report round trip imports the real TypeScript modules
+      # (report-snapshot.ts, national-report.ts), and Node strips types on import from 22.18 — the same pin unit-tests.yml uses.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The private context passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpc.log
+      - name: The shipped snapshot passes; it applies twice; the Order F table upgrades; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_snapshot_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rs.log
+      - name: The national report engine's real output goes through the real writer
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/national_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/nr.log
+      - name: The purge schedule and its monitor check pass; the file applies twice and rolls back exactly; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log

@@ -5,6 +5,22 @@
 output-identical (see CLAUDE.md §7.13). What is not runnable is the *lifecycle* that builds a
 new generation on top of them.
 
+## Outcome (2026-09-29) — the second national generation is serving
+
+**`n5-national-2026-09-27` has been ACTIVE since 2026-09-29 20:30:14Z**, with `n5-national-2026-09-25` as its
+predecessor. READY passed first time (548/548 shards, 584/584 prefixes, unresolved recorded).
+
+| | before (N5 09-25) | after (N5 09-27) |
+|---|---:|---|
+| membership rows | 905,390 · fp `1945248397386972` | **911,527 · fp `1958341294288126`** (= candidate) |
+| markers | 1,012,663 | **1,018,870** |
+| ZIP status rows | 12,722 | **12,722** |
+
+- **Newly visible:** 9,979 (ZIP, project) pairs · **9,966 projects · 633 ZIPs**; miami-building-permits
+  4,157 and tempe-building-permits 3,100 lead, i.e. the rows re-created after the previous cutoff returned.
+- **Left:** 3,831 projects = 3,751 pruned from `public.app_projects` + 60 re-created after this cutoff
+  + 20 `POINT_REJECTED`.
+
 ## Outcome (2026-09-27) — the generation ran end to end and is serving
 
 The status line above is the dated receipt of 2026-09-25. **`n5-national-2026-09-25` is ACTIVE

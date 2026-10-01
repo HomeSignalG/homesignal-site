@@ -53,6 +53,7 @@ ROOT_FILES = (
     'community.html',
     'contact.html',
     'dashboard.html',
+    'development-activity.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
@@ -65,6 +66,7 @@ ROOT_FILES = (
     'properties.html',
     'property.html',
     'reports.html',
+    'future-surroundings-report.html',
     'share-text.html',
     'terms.html',
     'today.html',
@@ -90,6 +92,9 @@ ROOT_FILES = (
     # test/bsky-did-document.test.mjs and generated in homesignal-ingest by
     # bluesky/lib/feed-contract.mjs::didDocument().
     '.well-known/did.json',
+    # Google Search Console ownership verification (HTML-file method, founder 2026-09-28).
+    # Google re-checks it; removing it un-verifies homesignal.net.
+    'google59e1ae3ef6b75e3a.html',
 )
 
 #: Directory trees that ship, each with the file extensions allowed inside it. A tree is

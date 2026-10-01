@@ -36,15 +36,31 @@ const ok = (c, name, detail) => {
 const PRODUCER_RPC = 'app_zip_projects_markers';
 
 // CANDIDATES, not fixtures. Deliberately MORE than four and redundant per state, so one ZIP
-// graduating (exactly what happened to 08005) costs coverage nothing. Measured 2026-09-15:
-// 12,013 of 12,722 canonical ZIPs are boundary_complete, 706 not_measured and just 3 unknown —
-// so `pending` is the scarce state and carries all three of its live members.
+// graduating (exactly what happened to 08005) costs coverage nothing.
 const CANDIDATES = [
-  '94128', '95219', '99128',   // unknown  -> pending        (all 3 that exist)
+  '94128', '95219', '99128',   // the fix-3 ZIPs: once 'unknown', now measured (see FORMER_GAP)
   '01004',                     // not_measured
   '01001',                     // boundary_complete, projects > 0 -> authoritative
   '01009', '08005',            // boundary_complete, projects = 0 -> measured_zero
 ];
+
+// ── `pending` HAS NO LIVE MEMBER, ON PURPOSE (fix 3, 2026-09-29) ─────────────────────────────
+// Measured 2026-09-15: 12,013 boundary_complete + 706 not_measured + 3 unknown. The 3 were
+// 94128 / 95219 / 99128: each has a Census ZCTA boundary and had NO row in the generation that
+// served until 2026-09-27, because each is the only canonical ZIP of its ZIP3 prefix and the
+// legacy build wrote only prefixes that had a shard. Every national generation since carries
+// all 12,722 rows (12,016 + 706), and READY / ACTIVATE refuse a generation that misses one or
+// labels one against its boundary. So a live `pending` ZIP is now a REGRESSION, not coverage:
+//   * FORMER_GAP must each resolve to a MEASURED state; one reading `pending` fails loudly;
+//   * the page's pending contract is still exercised, on the LIVE page, by handing it the
+//     producer's exact 'unknown' answer (SYNTHETIC_PENDING below). Every other state still
+//     needs a real live member, or COVERAGE fails as before.
+const FORMER_GAP = ['94128', '95219', '99128'];
+const SYNTHETIC_PENDING_KIND = 'pending';
+// public.app_zip_projects_markers' reply when a ZIP has no serving status row, read from the
+// live function body 2026-09-29: jsonb_build_object('mode','authoritative','zip',p_zip,
+// 'status',coalesce(v_status,'unknown'),'projects',null,'markers',null).
+const unknownPayload = (zip) => ({ mode: 'authoritative', zip, status: 'unknown', projects: null, markers: null });
 
 const KINDS = ZIP_STATE_KINDS;
 
@@ -86,12 +102,24 @@ ok(unresolved.length === 0,
    'every candidate ZIP resolved to a known producer state',
    unresolved.length ? unresolved.map((r) => `${r.zip}: ${r.why}`).join('; ') : 'all resolved');
 
+const gapNow = resolved.filter((r) => FORMER_GAP.includes(r.zip));
+ok(gapNow.length === FORMER_GAP.length && gapNow.every((r) => r.kind && r.kind !== 'pending'),
+   'the three ZIPs that once had NO serving row (fix 3) now resolve to a MEASURED state',
+   gapNow.map((r) => `${r.zip}=${r.kind || 'UNRESOLVED'}`).join(' '));
+
 // One representative per state. Browsing one ZIP per kind keeps this gate the same size it has
 // always been; the extra candidates exist for redundancy, not to lengthen the run.
 const CASES = KINDS
   .map((kind) => {
     const hit = resolved.find((r) => r.kind === kind);
-    return hit ? { zip: hit.zip, kind } : { zip: null, kind };
+    if (hit) return { zip: hit.zip, kind };
+    // No live member. Only `pending` may be exercised synthetically (see FORMER_GAP above), on a
+    // real ZIP whose page otherwise loads normally: a MEASURED candidate, never a guess.
+    if (kind === SYNTHETIC_PENDING_KIND) {
+      const host = resolved.find((r) => r.kind === 'measured_zero') || resolved.find((r) => r.kind === 'authoritative');
+      if (host) return { zip: host.zip, kind, synthetic: true };
+    }
+    return { zip: null, kind };
   });
 
 // ⚠️ COVERAGE IS ASSERTED, because a state with no representative would otherwise make this
@@ -142,11 +170,36 @@ async function waitForRenderSettled(page, { quietMs = 1500, timeoutMs = 45000 } 
 }
 
 for (const c of CASES.filter((c) => c.zip)) {
+  // SYNTHETIC pending: only the development geography answer is replaced, and only for this
+  // page load. Facilities, notices and the page's own code are all live.
+  let faked = 0;
+  if (c.synthetic) {
+    console.log(`── ${c.zip}: no live ZIP is pending (expected since fix 3) - exercising the pending ` +
+                `contract by handing the LIVE page the producer's 'unknown' answer`);
+    await page.route('**/rest/v1/rpc/app_zip_projects_markers', async (route) => {
+      let body = null;
+      try { body = JSON.parse(route.request().postData() || 'null'); } catch (e) { body = null; }
+      if (body && body.p_kind === 'development' && body.p_zip === c.zip) {
+        faked++;
+        return route.fulfill({ status: 200, contentType: 'application/json',
+                               body: JSON.stringify(unknownPayload(c.zip)) });
+      }
+      return route.continue();
+    });
+  }
   await page.goto(`${BASE}/homesignalmap.html?zip=${c.zip}`, { waitUntil: 'domcontentloaded' });
   const settle = await waitForRenderSettled(page);
   ok(settle.settled, `${c.zip}: the page finished rendering`,
      settle.settled ? `settled at ${settle.ms}ms with ${settle.n} site(s)`
                     : `NEVER SETTLED after ${settle.ms}ms — nothing below was measured on a finished page`);
+  if (c.synthetic) {
+    await page.unroute('**/rest/v1/rpc/app_zip_projects_markers');
+    // An instrument must prove it ran: a fake the page never asked for would leave the REAL
+    // measured answer on screen and score the pending contract against it.
+    ok(faked > 0, `${c.zip}: SYNTHETIC pending - the page received the producer's 'unknown' answer`,
+       `development geography requests replaced: ${faked}`);
+    if (!faked) { console.log(''); continue; }
+  }
   if (!settle.settled) { console.log(''); continue; }
 
   const m = await page.evaluate(() => {

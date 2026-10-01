@@ -5,10 +5,13 @@ WHY THIS EXISTS. The 544-shard build completed on 2026-09-05 and stopped, becaus
 of work was "build every ZIP3 prefix once" and every prefix reached state='done'. Nothing
 was wrong; there was simply no lifecycle. This script is that lifecycle.
 
-⛔ IT NEVER ACTIVATES ANYTHING BY ITSELF. Worker completion is not reconciliation success,
-and reconciliation success is not activation. `activate` is a separate, explicit mode, and
-even then the decision belongs to geo.n5_generation_activate(), which re-derives every
-condition against the DECLARED chunk set and raises rather than returning false.
+ACTIVATION IS DECIDED BY THE DATABASE, NEVER BY THIS SCRIPT. Worker completion is not
+reconciliation success, and reconciliation success is not activation. The decision belongs
+to geo.n5_generation_mark_ready() and geo.n5_generation_activate(), which re-derive every
+condition against the DECLARED chunk set and raise rather than returning false.
+With AUTO_LIFECYCLE=1 (the unattended tick, founder instruction 2026-09-29) the `work` tick
+also opens the next generation when none is building and, once a build is complete, CALLS
+those two gates in order. A gate that raises stops the tick red; nothing is retried around it.
 
 MODES
   status     one-read generation state (geo.n5_generation_status)
@@ -66,6 +69,25 @@ WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')
 CHUNKS = [c for c in os.environ.get("CHUNKS", "").split(",") if c.strip()]
 REASON = os.environ.get("REASON", "").strip()
 HERE = os.path.dirname(os.path.abspath(__file__))
+# AUTO LIFECYCLE (founder instruction, 2026-09-29: "swap automatically once checks pass").
+# Only the unattended `work` tick with no GENERATION given acts on it. It adds no rule of its
+# own: it OPENS when nothing is building, and it calls the SAME ready/activate gates a human
+# would, which re-derive every condition and raise on any gap.
+AUTO_LIFECYCLE = os.environ.get("AUTO_LIFECYCLE", "").strip() == "1"
+AUTO_PREFIX = "n5-national-"
+# One build per day at most. A generation takes ~20-28 h end to end, so a newer one opening
+# while the last is still young would only compete with it for the same disk.
+AUTO_OPEN_MIN_HOURS = float(os.environ.get("AUTO_OPEN_MIN_HOURS", "20"))
+# MEASURED 2026-09-29: one generation adds ~2.9 GiB (identity snapshot ~1.1, association
+# ~0.66, membership ~0.38, markers ~0.31, boundary ~0.22, proven points ~0.21). Opening
+# requires that much above the 2,048 MB floor, so a build is never started that the floor
+# would halt half way.
+BUILD_RESERVE_MB = float(os.environ.get("BUILD_RESERVE_MB", "3500"))
+# READY + ACTIVATE are two heavy calls (up to HEAVY_CLIENT_TIMEOUT each). They start only
+# while the tick still has room for both inside the 150-minute job; otherwise the next tick
+# does them first thing.
+FINISH_START_LIMIT_S = int(os.environ.get("FINISH_START_LIMIT_S", "3000"))
+T_START = time.time()
 
 
 def say(k, v=""):
@@ -172,13 +194,16 @@ def _verify_state(gen, want):
 
 
 def mode_open():
+    return open_generation(require_generation())
+
+
+def open_generation(gen):
     """Capture an immutable snapshot and open a generation bound to it.
 
     THE SNAPSHOT IS ONE TRANSACTION, deliberately. Its whole value is that the expected set
     cannot move afterwards; a chunked capture would be a set assembled from several different
     instants of a table that is rewritten every two minutes, which is not a watermark.
     """
-    gen = require_generation()
     if sql(f"select 1 from geo.n5_generation where generation_id={lit(gen)};", "exists",
            read_only=True):
         raise SystemExit(f"STOP: generation {gen} already exists. `open` is not a resume - "
@@ -310,7 +335,22 @@ def mode_open():
 
 
 def mode_work():
+    auto = AUTO_LIFECYCLE and not GENERATION
+    if auto:
+        pending = generations_in("READY")
+        if len(pending) > 1:
+            raise SystemExit(f"STOP: {len(pending)} generations are READY ({','.join(pending)}). "
+                             f"Refusing to guess which one to activate.")
+        if pending:
+            # A READY generation left by an earlier tick (its activate was deferred or lost).
+            activate(pending[0])
+            retire_superseded()
+            return 0
+        # Catch-up, and before any open: an old build's space is reusable by the next one.
+        retire_superseded()
     gen = GENERATION or discover_building()
+    if not gen and auto:
+        gen = auto_open()
     if not gen:
         say("work", "no BUILDING generation - nothing to do (clean no-op)")
         return 0
@@ -344,7 +384,140 @@ def mode_work():
     budget = MAX_SECONDS - (time.time() - t0)
     if budget > 0:
         publish_pending(gen, budget)
+    if auto:
+        auto_finish(gen)
     return 0
+
+
+def generations_in(state):
+    return [r["generation_id"] for r in sql(
+        f"select generation_id from geo.n5_generation where state={lit(state)} order by opened_at;",
+        f"generations {state}", read_only=True)]
+
+
+def free_disk_mb():
+    """Free disk by the SAME formula and floor the shards halt on (n5_shard.disk_free_mb):
+    one definition, so the open decision and the shard floor can never disagree."""
+    from n5_shard import disk_free_mb, DISK_FLOOR_MB  # noqa: E402 - one implementation
+    return disk_free_mb()[0], DISK_FLOOR_MB
+
+
+def auto_open():
+    """Open today's national generation, or say exactly why not. Every refusal is a clean
+    no-op, never a guess: a newer build than 20 h, a FAILED newest build (a failure needs a
+    human to discard it first), today's name already taken, or too little disk."""
+    newest = sql("select generation_id, state, extract(epoch from now() - opened_at)/3600.0 h "
+                 "from geo.n5_generation order by opened_at desc limit 1;", "newest",
+                 read_only=True)
+    if newest:
+        n = newest[0]
+        if n["state"] == "FAILED":
+            say("auto open", f"skipped - newest generation {n['generation_id']} is FAILED; "
+                             f"discard it before another build opens")
+            return None
+        if float(n["h"]) < AUTO_OPEN_MIN_HOURS:
+            say("auto open", f"skipped - newest generation {n['generation_id']} opened "
+                             f"{float(n['h']):.1f} h ago (< {AUTO_OPEN_MIN_HOURS:g} h)")
+            return None
+    gen = AUTO_PREFIX + time.strftime("%Y-%m-%d", time.gmtime())
+    if sql(f"select 1 from geo.n5_generation where generation_id={lit(gen)};", "exists",
+           read_only=True):
+        say("auto open", f"skipped - {gen} already exists")
+        return None
+    free, floor = free_disk_mb()
+    say("free MB (floor + reserve)", f"{free:,.0f} ({floor:,.0f} + {BUILD_RESERVE_MB:,.0f})")
+    if free < floor + BUILD_RESERVE_MB:
+        say("auto open", "skipped - not enough disk for a whole build above the floor")
+        return None
+    say("auto open", gen)
+    open_generation(gen)
+    return gen
+
+
+def build_complete(gen):
+    """Every shard done, every prefix published, unresolved recorded after the last publish.
+    Only decides WHETHER to call the gates; the gates re-derive all of it themselves."""
+    if shards_unfinished(gen) or unpublished_prefixes(gen):
+        return False
+    return bool(sql(_verify_unresolved(gen), "unresolved fresh", read_only=True)[0]["ok"])
+
+
+def auto_finish(gen):
+    if not build_complete(gen):
+        say("auto finish", "build not complete yet")
+        return 0
+    if time.time() - T_START > FINISH_START_LIMIT_S:
+        say("auto finish", "build complete - READY/activate deferred to the next tick (time)")
+        return 0
+    ready(gen)
+    activate(gen)
+    retire_superseded()
+    return 0
+
+
+# RETENTION (founder, 2026-09-29: "keep 2"). Keep the serving generation and its predecessor,
+# which is the rollback target and the baseline "newly visible" is measured against; the
+# database's own discard refuses both anyway. Every OTHER superseded generation is retired:
+# its build rows (geo.n5_generation_discard, the one existing rule) and then its capture in
+# preservation.app_project_identity, which discard does not touch (~1.1 GiB each).
+# NEVER a protected snapshot: phase1-2026-09-01 is protected by founder ruling (2026-09-01)
+# and the table's guard_frozen trigger refuses the delete regardless; a generation built on
+# it is excluded here entirely, geo rows included. Never a FAILED generation either - a
+# failure is left for a human to read before it is discarded.
+# A DELETE does not shrink the database; autovacuum makes the space reusable, and the next
+# build's inserts into the same tables reuse it, so measured size stops growing by a build a
+# day. The auto-open disk check stays on the measured figure, which errs on the safe side.
+RETIRE_CANDIDATES_SQL = """
+select g.generation_id, g.snapshot_id,
+       exists (select 1 from geo.zip_authoritative_membership m
+                where m.generation_id = g.generation_id) as has_rows,
+       exists (select 1 from preservation.app_project_identity i
+                where i.snapshot_id = g.snapshot_id) as has_snapshot
+  from geo.n5_generation g
+ where g.state = 'SUPERSEDED'
+   and exists (select 1 from geo.n5_generation s where s.state = 'ACTIVE')
+   and g.generation_id is distinct from
+       (select s.predecessor_generation_id from geo.n5_generation s
+         where s.state in ('ACTIVE', 'ACTIVE_LEGACY'))
+   and not exists (select 1 from preservation.protected_snapshot p
+                    where p.snapshot_id = g.snapshot_id)
+   and not exists (select 1 from geo.n5_generation o
+                    where o.snapshot_id = g.snapshot_id and o.generation_id <> g.generation_id)
+ order by g.opened_at;"""
+
+
+def _verify_discarded(gen):
+    return (f"select not exists (select 1 from geo.zip_authoritative_membership "
+            f"where generation_id={lit(gen)}) and not exists (select 1 from geo.n5_association "
+            f"where generation_id={lit(gen)}) ok;")
+
+
+def _verify_snapshot_gone(snap):
+    return (f"select not exists (select 1 from preservation.app_project_identity "
+            f"where snapshot_id={lit(snap)}) ok;")
+
+
+def retire_superseded():
+    """Retire every superseded generation outside the kept two. Idempotent: a generation
+    whose rows and snapshot are already gone is skipped, so a lost response or a killed run
+    is finished by the next tick."""
+    done = 0
+    for r in sql(RETIRE_CANDIDATES_SQL, "retire candidates", read_only=True):
+        gen, snap = r["generation_id"], r["snapshot_id"]
+        if not (r["has_rows"] or r["has_snapshot"]):
+            continue  # already retired on an earlier tick
+        if r["has_rows"]:
+            heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",
+                  verify=_verify_discarded(gen))
+            say("retired build rows", gen)
+        if r["has_snapshot"]:
+            heavy(f"delete from preservation.app_project_identity where snapshot_id={lit(snap)};",
+                  "retire snapshot", verify=_verify_snapshot_gone(snap))
+            say("retired snapshot", snap)
+        done += 1
+    if not done:
+        say("retention", "nothing to retire (keeping the serving build and its predecessor)")
+    return done
 
 
 def shards_unfinished(gen):
@@ -385,10 +558,12 @@ def publish_pending(gen, budget_seconds):
     run_id = f"pub-{WORKER}"
     todo = unpublished_prefixes(gen)
     say("prefixes to publish", len(todo))
-    for z3 in todo:
+    for i, z3 in enumerate(todo):
         if time.time() - t0 >= budget_seconds:
             say("publish", "budget spent - resuming next tick")
             return 0
+        if i % ANALYZE_EVERY_PREFIXES == 0:
+            analyze_publish_tables()
         publish_prefix(gen, z3, run_id)
     if not unpublished_prefixes(gen):
         stale = sql(f"select (g.unresolved_recorded_at is null or g.unresolved_recorded_at < "
@@ -400,6 +575,25 @@ def publish_pending(gen, budget_seconds):
                       verify=_verify_unresolved(gen))
             say("unresolved outcomes recorded", r[-1]["r"] if r else "verified from state")
     return 0
+
+
+# FRESH STATISTICS BEFORE PUBLISHING (measured 2026-10-01). geo.n5_gen_publish_prefix joins the
+# boundary rows it has just written for the generation being built. Autoanalyze waits for ~10%
+# of a table to change, and these tables hold several generations (~2.5M rows), so for most of a
+# build their statistics say the new generation has NO rows. The planner then drives step (2)
+# from every boundary row of the generation instead of from the prefix's ~24 ZIP boundaries:
+# prefix 284 (120,049 rows) went from under a minute in the 09-29 build to past its 5,400 s
+# budget on every retry, and the build stalled 7 h (caught by the n5_map1_build alarm). One
+# ANALYZE of the three tables restored the plan (EXPLAIN: n5_gen_zcta outer, 24 rows).
+# Re-analyzed every ANALYZE_EVERY_PREFIXES prefixes, because the rows keep arriving.
+ANALYZE_EVERY_PREFIXES = int(os.environ.get("ANALYZE_EVERY_PREFIXES", "25"))
+PUBLISH_ANALYZE_TABLES = ("geo.n5_boundary_membership", "geo.zip_authoritative_membership",
+                          "geo.zip_authoritative_marker")
+
+
+def analyze_publish_tables():
+    sql("".join(f"analyze {t};" for t in PUBLISH_ANALYZE_TABLES), "analyze")
+    say("statistics refreshed", ", ".join(PUBLISH_ANALYZE_TABLES))
 
 
 def mode_publish():
@@ -439,7 +633,10 @@ def mode_ready():
     markers paired, every canonical ZIP carrying a status, the declared chunks covering the
     whole expected set, and reconciliation recomputed to zero unaccounted. It raises on any
     gap; this script adds no second copy of those rules."""
-    gen = require_generation()
+    return ready(require_generation())
+
+
+def ready(gen):
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
     heavy(f"select geo.n5_generation_mark_ready({lit(gen)}, {arr});", "ready",
           verify=_verify_state(gen, "READY"))
@@ -448,7 +645,10 @@ def mode_ready():
 
 
 def mode_activate():
-    gen = require_generation()
+    return activate(require_generation())
+
+
+def activate(gen):
     arr = "array[" + ",".join(lit(c) for c in chunks_for(gen)) + "]::text[]"
     heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate",
           verify=_verify_state(gen, "ACTIVE"))
@@ -495,6 +695,9 @@ def main():
     if MODE not in MODES:
         raise SystemExit(f"STOP: unknown MODE {MODE!r}. Known: {sorted(MODES)}")
     rc = MODES[MODE]()
+    if MODE == "status":
+        free, floor = free_disk_mb()
+        say("free MB (floor)", f"{free:,.0f} ({floor:,.0f})")
     gen = GENERATION or (discover_building() if MODE in ("work", "publish", "reconcile", "status") else None)
     if gen:
         status(gen)

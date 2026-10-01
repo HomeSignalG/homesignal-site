@@ -118,9 +118,27 @@ ok(/from n5_publish import publish_prefix/.test(orch) && /geo\.n5_gen_publish_pr
 const ready = (orch.split('def mode_ready(')[1] || '').split('\ndef ')[0];
 ok(/n5_generation_mark_ready/.test(ready) && !/update geo\.n5_generation/.test(ready),
   'READY is decided by geo.n5_generation_mark_ready, never a raw UPDATE');
-for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready']) {
+for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready', 'ready', 'auto_finish']) {
   const body = (orch.split(`def ${fn}(`)[1] || '').split('\ndef ')[0];
-  ok(body && !/n5_generation_activate/.test(body), `${fn} can never activate`);
+  ok(body && !/n5_generation_activate/.test(body), `${fn} never calls the activation gate directly`);
+}
+for (const fn of ['mode_publish', 'publish_pending', 'mode_ready', 'ready']) {
+  const body = (orch.split(`def ${fn}(`)[1] || '').split('\ndef ')[0];
+  ok(body && !/\bactivate\(/.test(body), `${fn} can never activate`);
+}
+// AUTO LIFECYCLE (founder instruction 2026-09-29): the unattended `work` tick may reach
+// activation, but ONLY through activate() -> geo.n5_generation_activate, and ONLY when
+// AUTO_LIFECYCLE is on and no explicit GENERATION was given.
+{
+  const work = (orch.split('def mode_work(')[1] || '').split('\ndef ')[0];
+  ok(/auto = AUTO_LIFECYCLE and not GENERATION/.test(work), 'auto is off unless AUTO_LIFECYCLE=1 and no GENERATION');
+  ok(/if auto:\n\s+auto_finish\(gen\)/.test(work), 'mode_work finishes a build only under auto');
+  const acts = work.match(/\bactivate\(/g) || [];
+  ok(acts.length === 1 && /if auto:[\s\S]*?activate\(pending\[0\]\)/.test(work),
+    'mode_work activates only a READY generation, only under auto');
+  const fin = (orch.split('def auto_finish(')[1] || '').split('\ndef ')[0];
+  ok(fin.indexOf('ready(gen)') > -1 && fin.indexOf('ready(gen)') < fin.indexOf('activate(gen)'),
+    'auto_finish goes through READY before activate');
 }
 
 // ── `open` writes the snapshot's NOT NULL fingerprints with the CANONICAL expressions ──
@@ -132,7 +150,7 @@ for (const fn of ['mode_work', 'mode_publish', 'publish_pending', 'mode_ready'])
   const hashes = (t) => (t.match(/decode\(md5\([\s\S]*?\),'hex'\)/g) || [])
     .map((h) => h.replace(/\s+/g, ' '));
   const canonHashes = hashes(canon.slice(canon.indexOf('ins_identity as ('), canon.indexOf('ins_report as (')));
-  const openBody = (orch.split('def mode_open(')[1] || '').split('\ndef ')[0];
+  const openBody = (orch.split('def open_generation(')[1] || '').split('\ndef ')[0];
   const capture = openBody.slice(openBody.indexOf('insert into preservation.app_project_identity'));
   ok(canonHashes.length === 2, 'the canonical capture defines exactly identity_hash and content_hash');
   ok(/identity_hash, content_hash\)/.test(capture), '`open` names both NOT NULL fingerprint columns');
@@ -171,6 +189,47 @@ ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied befor
   ok(/^begin;$/m.test(partF) && /^commit;$/m.test(partF) && (partF.match(/raise exception 'part F/g) || []).length === 2,
     'Part F is one transaction, fail-closed before and after');
   ok(/n5-generation-publish-part-f\.sql/.test(wf), 'the executable suite runs when Part F changes');
+}
+
+// ── Part G is Part D's D11 function, verbatim — the status/boundary agreement check ──────
+// Fix 3 (2026-09-29): a canonical ZIP's status must be the one its boundary implies, not
+// merely present. canonical_zip_without_status caught the legacy shape (94128 / 95219 / 99128
+// had no row); this catches a boundary-bearing ZIP published as not_measured, and the reverse.
+{
+  const partD = readFileSync('docs/n5-generation-publish-part-d.sql', 'utf8');
+  const partG = readFileSync('docs/n5-generation-publish-part-g.sql', 'utf8');
+  const slice = (t) => {
+    const i = t.indexOf('create or replace function geo.n5_generation_publish_problems(');
+    const end = 'revoke all on function geo.n5_generation_publish_problems(text, text[]) from public;';
+    const j = t.indexOf(end, i);
+    return i < 0 || j < 0 ? '' : t.slice(i, j + end.length);
+  };
+  const d11 = slice(partD);
+  ok(d11.length > 3000, 'Part D carries the completeness function (control)');
+  ok(slice(partG) === d11, 'Part G applies exactly Part D\'s completeness function');
+  ok(/'canonical_zip_without_status'/.test(d11), 'the presence check is still there');
+  ok(/'canonical_zip_status_disagrees_with_boundary'/.test(d11)
+     && /from geo\.zcta_boundary b where b\.zcta5 = r\.zip/.test(d11)
+     && /then 'boundary_complete' else 'not_measured' end\)/.test(d11),
+    'the status must equal what geo.zcta_boundary implies, in BOTH directions');
+  ok(/^begin;$/m.test(partG) && /^commit;$/m.test(partG) && (partG.match(/raise exception 'part G/g) || []).length === 2,
+    'Part G is one transaction, fail-closed before and after');
+  ok(/n5-generation-publish-part-g\.sql/.test(wf), 'the executable suite runs when Part G changes');
+  const prestate = readFileSync('test/n5_generation_pg/fixture_prestate.sql', 'utf8');
+  ok(/create table geo\.zcta_boundary \(/.test(prestate),
+    'the fixture carries geo.zcta_boundary, so the suite runs the check against real rows');
+
+  // The rollback puts the pre-Part-G body back. It is generated (build_part_g.py proves the cut
+  // equals production's pre-Part-G fingerprint) and executed (run_part_g_rollback.py).
+  const rb = readFileSync('docs/n5-generation-publish-part-g.rollback.sql', 'utf8');
+  const old = slice(rb);
+  ok(old.length > 3000 && !/canonical_zip_status_disagrees_with_boundary/.test(old)
+     && /'canonical_zip_without_status'/.test(old),
+    'the rollback restores the completeness function without the Part G check, and keeps the rest');
+  ok(/^begin;$/m.test(rb) && /^commit;$/m.test(rb) && (rb.match(/raise exception 'part G rollback/g) || []).length === 2,
+    'the rollback is one transaction, fail-closed before and after');
+  ok(/n5-generation-publish-part-g\.rollback\.sql/.test(wf) && /run_part_g_rollback\.py/.test(wf),
+    'the suite runs the rollback proof, and runs when the rollback changes');
 }
 
 console.log(`n5-generation-publish: ${n} structural checks passed`);

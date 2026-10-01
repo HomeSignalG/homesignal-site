@@ -21,6 +21,8 @@ on:
       - 'docs/n5-generation-publish.sql'
       - 'docs/n5-generation-publish-part-d.sql'
       - 'docs/n5-generation-publish-part-f.sql'
+      - 'docs/n5-generation-publish-part-g.sql'
+      - 'docs/n5-generation-publish-part-g.rollback.sql'
       - 'docs/map1-zip-read-char5.sql'
       - 'docs/map1-zip-read-char5.rollback.sql'
       - 'test/n5_generation_pg/**'
@@ -30,6 +32,8 @@ on:
       - 'scripts/n5_shard.py'
       - 'scripts/n3_pilot.py'
       - 'scripts/test_heavy_gateway.py'
+      - 'scripts/test_n5_auto_lifecycle.py'
+      - 'scripts/test_disk_size.py'
       - 'scripts/n5_candidate_bounding.py'
       - '.github/workflows/n5-generation-publish-suite.yml'
       - '.github/workflows/n5-generation.yml'
@@ -108,13 +112,33 @@ jobs:
           set -o pipefail
           python3 test/n5_generation_pg/run_map1_char5.py 2>&1 | tee /tmp/map1-char5.log
 
+      - name: Run Part G's rollback proof (undo, refuse twice, re-apply)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_part_g_rollback.py 2>&1 | tee /tmp/part-g-rollback.log
+
       - name: Run the gateway-timeout guard (a lost 524 response is proven, never re-sent)
         if: always()
         run: python3 scripts/test_heavy_gateway.py
 
+      - name: Run the auto-lifecycle guard (open daily, READY then ACTIVATE only when complete)
+        if: always()
+        run: python3 scripts/test_n5_auto_lifecycle.py
+
+      - name: Run the disk-size guard (read from Supabase, the setting only as a fallback)
+        if: always()
+        run: python3 scripts/test_disk_size.py
+
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
         run: node test/n5-generation-publish.test.mjs
+
+      - name: Part G and its rollback are exactly what the generator writes from Part D (no hand edits)
+        if: always()
+        run: python3 test/n5_generation_pg/build_part_g.py --check
 
       - name: Publish the receipt
         if: always()
@@ -125,5 +149,6 @@ jobs:
             grep -E '^(BASE|KILLED|SURVIVED|FAIL)' /tmp/n5-publish-suite.log || echo '(no log)'
             grep -E '^(END-TO-END|FAIL)' /tmp/n5-lifecycle.log || echo '(no lifecycle log)'
             grep -E '^(MAP1-CHAR5|KILLED|SURVIVED|FAIL)' /tmp/map1-char5.log || echo '(no map1-char5 log)'
+            grep -E '^(PART-G-ROLLBACK|FAIL)' /tmp/part-g-rollback.log || echo '(no part-g-rollback log)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
