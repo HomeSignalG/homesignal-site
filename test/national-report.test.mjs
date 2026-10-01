@@ -142,7 +142,12 @@ const ids = (list) => list.join(',');
   }
   ok(same && count === 90, '3a Type and lifecycle equal the source authority (lib/project-type.js) on 9 types x 10 statuses = 90 records; the publisher status is carried verbatim', count);
   const dec = run({ rows: [row('kd', 0.2)], projects: [proj('kd', { status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' })] }).intelligence.projects[0];
-  ok(dec.lifecycle.key === 'unknown' && dec.publisher_status === 'Decided', '3b "Decided" stays lifecycle unknown with the publisher status kept (the known mismatch is not patched here)');
+  ok(dec.lifecycle.key === 'proposed' && dec.lifecycle.label === 'Proposed' && dec.publisher_status === 'Decided',
+    '3b "Decided" is lifecycle proposed (a decided application is a historical proposal, CLAUDE.md §7.05) with the publisher status "Decided" kept verbatim beside it');
+  const decGroups = run({ rows: [row('kd', 0.2), row('kp', 0.3)], projects: [
+    proj('kd', { status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' }), proj('kp', { status: 'Proposed' })] }).intelligence.sections.by_lifecycle;
+  ok(ids(decGroups.proposed) === 'kd,kp' && decGroups.unknown.length === 0,
+    '3b2 a Decided project is listed with the Proposed group, and nothing lands in unknown because of it', ids(decGroups.proposed) + ' / unknown ' + decGroups.unknown.length);
   const lc = run({ rows: [row('ka', 0.2), row('kb', 0.3), row('kc', 0.4)], projects: [
     proj('ka', { status: 'Approved' }), proj('kb', { status: 'Proposed' }), proj('kc', { status: 'On file' })] }).intelligence.sections.by_lifecycle;
   ok(ids(lc.approved) === 'ka' && ids(lc.proposed) === 'kb' && ids(lc.unknown) === 'kc' && lc.operating.length === 0, '3c lifecycle groups are exactly the four canonical keys');

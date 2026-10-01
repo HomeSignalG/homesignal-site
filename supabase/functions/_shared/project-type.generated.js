@@ -530,6 +530,16 @@
   // `On file` — the one the materializer (public.app_refresh_zip) already writes for a
   // development record with no lifecycle bucket. It is not a key of its own: it resolves to
   // `unknown` here like any other unrecognised status, so there is ONE unknown state.
+  //
+  // `Decided` (2026-10-01). public.app_refresh_zip writes status 'Decided' for a record whose
+  // source stated a decision (19,364 of 2,930,690 development rows, measured 2026-10-01 22:38Z;
+  // it was 0 on 2026-09-20, before any connector stamped a decision). It is NOT a fifth lifecycle: a
+  // decided application is a HISTORICAL PROPOSAL and stays in the Proposed browsing category
+  // (decision-history contract, CLAUDE.md §7.05; supabase/functions/get-address-report/sources/
+  // decision.ts browsingBucketFor() always answers `proposed`). Falling through to `unknown`
+  // asserted that we do not know its stage, when we know it exactly. The decision itself is
+  // never carried by the lifecycle: it is the sourced text on the record, and
+  // HS.isActiveUndecided() still refuses a `Decided` row from every active count.
   const LIFECYCLE_KEYS = ['proposed', 'approved', 'operating', 'unknown'];
   const LIFECYCLE_LABELS = {
     proposed:  'Proposed',
@@ -539,7 +549,7 @@
   };
   function lifecycleKey(status) {
     const s = String(status || '').toLowerCase();
-    return (s === 'proposed') ? 'proposed'
+    return (s === 'proposed' || s === 'decided') ? 'proposed'
          : (s === 'approved') ? 'approved'
          : (s === 'operating' || s === 'active' || s === 'built') ? 'operating'
          : 'unknown';

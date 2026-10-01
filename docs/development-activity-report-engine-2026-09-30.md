@@ -144,6 +144,10 @@ change, and states `from` and `to` for each changed field.
 - **D-G6. Type and lifecycle come from the authority through a generated copy.** No function imports from outside its own tree
   and the bundle needs the file, so the copy is produced mechanically and proven identical (structural 1a). `Decided` stays
   lifecycle `unknown` with the publisher status kept: that is the known mismatch (open decision 4), and it is not patched here.
+  *(Superseded 2026-10-01 by the `Decided` fix: the authority now maps `Decided` to lifecycle `proposed`, the generated copy was
+  regenerated, and the publisher status `Decided` is still kept verbatim beside it. National-report test 3b says so. **A deployed
+  `get-development-activity-report` carries the copy it was deployed with**, so it reads `Decided` as `unknown` until that function is
+  redeployed from `main`.)*
 - **D-G7. Coverage is assessed on the records returned for the radius, and the report says so.** Step 10's per-ZIP
   source-applicability measurement is not built; this engine cannot see what a cleared source *should* have covered.
 - **D-G8. A record with no source URL, or that is not a development record, is not in the report** (Regulatory is an overlay, R1).
