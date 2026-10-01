@@ -121,6 +121,21 @@ in the database. Both READY and ACTIVATE already run this function, so both refu
 - `n5-national-2026-09-29` (BUILDING) had 0 status rows at that moment, so the check had nothing to
   read there yet. It applies when that generation publishes and asks for READY.
 
+**First real build under the check (read 2026-10-01).** `n5-national-2026-09-29` passed READY and
+was activated 2026-09-30 12:22:28Z, both through `geo.n5_generation_publish_problems` at Part G's
+body (`66f5995d…`). It carries 12,722 status rows with 0 disagreements. The next build,
+`n5-national-2026-09-30`, is BUILDING with 4,318 status rows published so far, also 0 disagreements.
+
+**If the check ever refuses a correct generation**, `docs/n5-generation-publish-part-g.rollback.sql`
+puts the previous body back. Both files come from `test/n5_generation_pg/build_part_g.py`. That
+script derives the rollback by cutting the Part G block out of Part D's D11, and refuses to write
+it unless the result's md5 equals the pre-Part-G production fingerprint (`611926736840a6b43847978d2ec9e9d6`).
+`test/n5_generation_pg/run_part_g_rollback.py` executes both files (CI step in
+`n5-generation-publish-suite.yml`): 15 checks covering undo, refuse twice and re-apply. Three
+deliberate breaks each fail it: the guard removed, the wrong body restored, and a hand edit.
+A refusal leaves the build BUILDING, so `pipeline_health_tick`'s `n5_map1_build` check reports it
+after 6 hours with no progress, while Map 1 keeps serving the previous build.
+
 ### 5.2 The live verifier stops failing on a state that is now correctly empty
 
 `verify-map1-zip-states` had been red since the first national activation (runs 90 and 91) with a

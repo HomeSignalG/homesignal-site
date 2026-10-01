@@ -218,6 +218,18 @@ ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied befor
   const prestate = readFileSync('test/n5_generation_pg/fixture_prestate.sql', 'utf8');
   ok(/create table geo\.zcta_boundary \(/.test(prestate),
     'the fixture carries geo.zcta_boundary, so the suite runs the check against real rows');
+
+  // The rollback puts the pre-Part-G body back. It is generated (build_part_g.py proves the cut
+  // equals production's pre-Part-G fingerprint) and executed (run_part_g_rollback.py).
+  const rb = readFileSync('docs/n5-generation-publish-part-g.rollback.sql', 'utf8');
+  const old = slice(rb);
+  ok(old.length > 3000 && !/canonical_zip_status_disagrees_with_boundary/.test(old)
+     && /'canonical_zip_without_status'/.test(old),
+    'the rollback restores the completeness function without the Part G check, and keeps the rest');
+  ok(/^begin;$/m.test(rb) && /^commit;$/m.test(rb) && (rb.match(/raise exception 'part G rollback/g) || []).length === 2,
+    'the rollback is one transaction, fail-closed before and after');
+  ok(/n5-generation-publish-part-g\.rollback\.sql/.test(wf) && /run_part_g_rollback\.py/.test(wf),
+    'the suite runs the rollback proof, and runs when the rollback changes');
 }
 
 console.log(`n5-generation-publish: ${n} structural checks passed`);
