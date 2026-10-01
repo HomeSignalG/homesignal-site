@@ -84,6 +84,12 @@ ok(seed.length > 100 && (seed.match(/\('epoch_ai'/g) || []).length === 1 && /\('
 ok(/create or replace view public\.dc_observation_record_key[\s\S]*?left join public\.dc_record_key_discriminator/.test(A3)
    && !/'epoch_ai'/.test((A3.match(/create or replace view public\.dc_observation_record_key[\s\S]*?;\n/) || [''])[0]),
   'S1b3: the record-key view reads the registry and names no source');
+// 2026-10-01: the identity-open view is read by every geography run; it reads the window-function record-key view ONCE
+// (a materialized CTE) and never from inside a per-row subquery -- the shape that cost ~175 s of a ~192 s read.
+const openView = (A3.match(/create or replace view public\.dc_entity_identity_open[\s\S]*?;\n/) || [''])[0];
+ok(openView.length > 800 && /rk as materialized \(/.test(openView) && /from cand c\b[\s\S]*join rk r1[\s\S]*join rk r2/.test(openView)
+   && !/not exists \([^;]*dc_observation_record_key/.test(openView) && /dc_adjudicate_pair\(p\.observation_a/.test(openView),
+  'S1b4: identity-open reads the record keys once (materialized) and adjudicates only the cross-source pairs of different entities');
 ok(/'NO_SITE_ADDRESS_RULE'/.test(siteAddr), 'S1c: a source with no site-address rule gets no automatic cross-source identity');
 
 // ── the verdict: output quality, fail closed ────────────────────────────────────────────────
