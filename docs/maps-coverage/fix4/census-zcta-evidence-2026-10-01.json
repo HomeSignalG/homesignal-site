@@ -1,111 +1,214 @@
 {
-  "_doc": "Fix 4 evidence: is any of the canonical ZIPs with no geo.zcta_boundary row a Census ZCTA that HomeSignal failed to load or publish? Every value here was read from production on 2026-10-01 by the queries in no-boundary-zips.sql. Census was read from Postgres through pg_net (the build sandbox has no egress to census.gov). scripts/fix4_classify_no_boundary_zips.py reads this file and refuses to run if the input export does not match the fingerprints below.",
-  "read_at": "2026-10-01T17:18:42Z",
-  "no_boundary_input": {
-    "file": "docs/maps-coverage/fix4/no-boundary-zips-2026-10-01.psv",
-    "definition": "public.canonical_zip_registry ZIPs with no geo.zcta_boundary row, joined to their level='zip' page in public.communities",
-    "row_format": "zip|state|county|page_name",
-    "rows": 706,
-    "zip_md5": "7d1bf19a913e437a28f68c7442842890",
-    "rows_md5": "18edb6de1c6f3d8623e35c1eaa67cf23",
-    "fingerprint_rule": "zip_md5 = md5 of the ZIPs joined by ',' in byte order; rows_md5 = md5 of the rows joined by '\\n' in byte order with no trailing newline; both computed in the database with collate \"C\"",
-    "read_at": "2026-10-01T17:23:33Z",
-    "controls": {
-      "canonical_registry_zips": 12722,
-      "registry_zips_with_boundary": 12016,
-      "zip_pages_for_these_zips": 706,
-      "pages_carrying_more_than_one_zip": 0
-    }
-  },
-  "boundary_table": {
-    "table": "geo.zcta_boundary",
-    "rows": 33791,
-    "distinct_codes": 33791,
-    "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
-    "source_vintage": "TIGER/Line 2025 (2020 Census ZCTA delineation)",
-    "source_url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/tl_2025_us_zcta520.zip",
-    "registry_boundaries_null_or_empty": 0,
-    "registry_boundaries_invalid": 0,
-    "geometry_types": "MULTIPOLYGON/4269"
-  },
-  "serving": {
-    "active_generation": "n5-national-2026-09-29",
-    "not_measured": 706,
-    "not_measured_zip_md5": "7d1bf19a913e437a28f68c7442842890",
-    "boundary_complete": 12016,
-    "status_rows": 12722,
-    "note": "The serving generation marks exactly the no-boundary ZIPs not_measured (same md5 as no_boundary_input.zip_md5). Part D D11 (applied by Part G 2026-09-29) refuses READY/ACTIVATE on any status that disagrees with geo.zcta_boundary."
-  },
-  "census_zcta_2020_layers": {
-    "_doc": "Current Census ZCTA delineation as served by TIGERweb, a different carrier from the TIGER/Line archive the boundary table was loaded from. TIGERweb returned byte-identical bodies for all four layers (response_md5), so they are ONE independent check served four ways, not four checks.",
-    "query": "where=1=1&outFields=ZCTA5&returnGeometry=false&orderByFields=ZCTA5&f=json (maxRecordCount 100000; exceededTransferLimit absent)",
-    "codes_md5_rule": "md5 of the ZCTA5 codes joined by ',' with order by collate \"C\"",
-    "layers": [
-      {
-        "id": "current",
-        "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2",
-        "name": "2020 Census ZIP Code Tabulation Areas",
-        "pg_net_request_id": 16689,
-        "http_status": 200,
-        "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
-        "features": 33791,
-        "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
-        "in_census_not_in_boundary_table": 0,
-        "in_boundary_table_not_in_census": 0,
-        "positive_control_registry_zips_with_boundary_found": 12016
-      },
-      {
-        "id": "bas2026",
-        "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1",
-        "name": "2020 Census ZIP Code Tabulation Areas (BAS 2026 group)",
-        "pg_net_request_id": 16690,
-        "http_status": 200,
-        "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
-        "features": 33791,
-        "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
-        "in_census_not_in_boundary_table": 0,
-        "in_boundary_table_not_in_census": 0,
-        "positive_control_registry_zips_with_boundary_found": 12016
-      },
-      {
-        "id": "acs2025",
-        "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4",
-        "name": "2020 Census ZIP Code Tabulation Areas (ACS 2025 group)",
-        "pg_net_request_id": 16691,
-        "http_status": 200,
-        "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
-        "features": 33791,
-        "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
-        "in_census_not_in_boundary_table": 0,
-        "in_boundary_table_not_in_census": 0,
-        "positive_control_registry_zips_with_boundary_found": 12016
-      },
-      {
-        "id": "census2020",
-        "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/7",
-        "name": "2020 Census ZIP Code Tabulation Areas (Census 2020 group)",
-        "pg_net_request_id": 16692,
-        "http_status": 200,
-        "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
-        "features": 33791,
-        "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
-        "in_census_not_in_boundary_table": 0,
-        "in_boundary_table_not_in_census": 0,
-        "positive_control_registry_zips_with_boundary_found": 12016
-      }
+    "_doc": "Fix 4 evidence. Generated whole by docs/maps-coverage/fix4/no-boundary-zips.sql step 4 and saved verbatim (the database also returns this file's md5, recorded in the receipt). Census was read from Postgres through pg_net because the build sandbox cannot reach census.gov; pg_net writes only its own request/response queue. scripts/fix4_classify_no_boundary_zips.py reads this file.",
+    "read_at": "2026-10-01T19:03:03Z",
+    "serving": {
+        "status_rows": 12722,
+        "activated_at": "2026-10-01T18:13:50Z",
+        "not_measured": 706,
+        "active_generation": "n5-national-2026-09-30",
+        "boundary_complete": 12016,
+        "not_measured_notes": [
+            "NO_ZCTA_BOUNDARY: canonical ZIP has no Census ZCTA polygon"
+        ],
+        "building_generation": "n5-national-2026-10-01",
+        "building_status_rows": 0,
+        "not_measured_zip_md5": "7d1bf19a913e437a28f68c7442842890",
+        "building_not_measured_outside_input": 0,
+        "status_disagreeing_with_boundary_table": 0,
+        "building_status_disagreeing_with_boundary_table": 0
+    },
+    "input_export": {
+        "file": "docs/maps-coverage/fix4/no-boundary-zips-2026-10-01.psv",
+        "rows": 706,
+        "zip_md5": "7d1bf19a913e437a28f68c7442842890",
+        "controls": {
+            "pages_found_for_them": 706,
+            "canonical_registry_zips": 12722,
+            "registry_zips_with_boundary": 12016,
+            "registry_zips_without_boundary": 706,
+            "pages_carrying_more_than_one_zip": 0
+        },
+        "file_md5": "6d97dc36c72350b62f7ef4bddac663e5",
+        "rows_md5": "18edb6de1c6f3d8623e35c1eaa67cf23",
+        "definition": "public.canonical_zip_registry ZIPs with no geo.zcta_boundary row, each with its level='zip' page in public.communities, one row per line: zip|state|county|page_name"
+    },
+    "census_layers": [
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1",
+            "layer": "PUMA_TAD_TAZ_UGA_ZCTA/1",
+            "features": 33791,
+            "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+            "layer_name": "2020 Census ZIP Code Tabulation Areas",
+            "delineation": "2020",
+            "description": null,
+            "http_status": 200,
+            "parent_group": null,
+            "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
+            "distinct_codes": 33791,
+            "no_boundary_hits": [
+            ],
+            "response_created": "2026-10-01T17:18:42Z",
+            "pg_net_request_id": 16690,
+            "metadata_request_id": 17177,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 0,
+            "in_census_not_in_boundary_table": 0,
+            "positive_control_registry_zips_with_boundary_found": 12016
+        },
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/11",
+            "layer": "PUMA_TAD_TAZ_UGA_ZCTA/11",
+            "features": 33791,
+            "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+            "layer_name": "ZIP Code Tabulation Areas",
+            "delineation": "2020",
+            "description": null,
+            "http_status": 200,
+            "parent_group": "Census 2020",
+            "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
+            "distinct_codes": 33791,
+            "no_boundary_hits": [
+            ],
+            "response_created": "2026-10-01T19:00:59Z",
+            "pg_net_request_id": 17178,
+            "metadata_request_id": 17177,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 0,
+            "in_census_not_in_boundary_table": 0,
+            "positive_control_registry_zips_with_boundary_found": 12016
+        },
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4",
+            "layer": "PUMA_TAD_TAZ_UGA_ZCTA/4",
+            "features": 33791,
+            "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+            "layer_name": "2020 Census ZIP Code Tabulation Areas",
+            "delineation": "2020",
+            "description": null,
+            "http_status": 200,
+            "parent_group": "BAS 2026",
+            "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
+            "distinct_codes": 33791,
+            "no_boundary_hits": [
+            ],
+            "response_created": "2026-10-01T17:18:42Z",
+            "pg_net_request_id": 16691,
+            "metadata_request_id": 17177,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 0,
+            "in_census_not_in_boundary_table": 0,
+            "positive_control_registry_zips_with_boundary_found": 12016
+        },
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/7",
+            "layer": "PUMA_TAD_TAZ_UGA_ZCTA/7",
+            "features": 33791,
+            "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+            "layer_name": "2020 Census ZIP Code Tabulation Areas",
+            "delineation": "2020",
+            "description": null,
+            "http_status": 200,
+            "parent_group": "ACS 2025",
+            "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
+            "distinct_codes": 33791,
+            "no_boundary_hits": [
+            ],
+            "response_created": "2026-10-01T17:18:42Z",
+            "pg_net_request_id": 16692,
+            "metadata_request_id": 17177,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 0,
+            "in_census_not_in_boundary_table": 0,
+            "positive_control_registry_zips_with_boundary_found": 12016
+        },
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2",
+            "layer": "tigerWMS_Current/2",
+            "features": 33791,
+            "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+            "layer_name": "2020 Census ZIP Code Tabulation Areas",
+            "delineation": "2020",
+            "description": "ZIP Code Tabulation Areas; 2020 Census - January 1, 2020 vintage",
+            "http_status": 200,
+            "parent_group": null,
+            "response_md5": "f5c1c0acf3ea1b3b24cb4843f5c1f8e1",
+            "distinct_codes": 33791,
+            "no_boundary_hits": [
+            ],
+            "response_created": "2026-10-01T17:18:42Z",
+            "pg_net_request_id": 16689,
+            "metadata_request_id": 16686,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 0,
+            "in_census_not_in_boundary_table": 0,
+            "positive_control_registry_zips_with_boundary_found": 12016
+        },
+        {
+            "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/8",
+            "layer": "tigerWMS_Census2010/8",
+            "features": 33144,
+            "codes_md5": "b95f023e2604c73bfd2e9f20a09eba09",
+            "layer_name": "ZIP Code Tabulation Areas",
+            "delineation": "2010",
+            "description": "ZIP Code Tabulation Areas; 2010 Census - January 1, 2010 vintage",
+            "http_status": 200,
+            "parent_group": null,
+            "response_md5": "21162496bb91a3f09c82ce359e45c8ad",
+            "distinct_codes": 33144,
+            "no_boundary_hits": [
+                "01086",
+                "01199",
+                "01467",
+                "02651",
+                "02669",
+                "11351",
+                "80511",
+                "98205",
+                "98929"
+            ],
+            "response_created": "2026-10-01T17:18:42Z",
+            "pg_net_request_id": 16693,
+            "metadata_request_id": 17179,
+            "exceeded_transfer_limit_present": false,
+            "in_boundary_table_not_in_census": 851,
+            "in_census_not_in_boundary_table": 204,
+            "positive_control_registry_zips_with_boundary_found": 11757
+        }
     ],
-    "no_boundary_hits": []
-  },
-  "census_zcta_2010": {
-    "_doc": "The previous (2010) delineation. Context only: a 2010 polygon is a superseded delineation and is never a boundary for a current ZIP page.",
-    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/8",
-    "name": "ZIP Code Tabulation Areas",
-    "pg_net_request_id": 16693,
-    "http_status": 200,
-    "response_md5": "21162496bb91a3f09c82ce359e45c8ad",
-    "features": 33144,
-    "codes_md5": "b95f023e2604c73bfd2e9f20a09eba09",
-    "positive_control_registry_zips_with_boundary_found": 11757,
-    "no_boundary_hits": ["01086", "01199", "01467", "02651", "02669", "11351", "80511", "98205", "98929"]
-  }
+    "boundary_table": {
+        "rows": 33791,
+        "table": "geo.zcta_boundary",
+        "codes_md5": "7e927a8ed57b1d787973c5510ee325b1",
+        "source_urls": [
+            "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/tl_2025_us_zcta520.zip"
+        ],
+        "distinct_codes": 33791,
+        "source_vintages": [
+            "TIGER/Line 2025 (2020 Census ZCTA delineation)"
+        ],
+        "source_checksums": [
+            "e87129634eefe8719ef06ce4cfdf6588520be2e359360e590aaae90e4afb1911"
+        ],
+        "registry_rows_geometry_types": [
+            "MULTIPOLYGON/4269"
+        ],
+        "registry_rows_invalid_geometry": 0,
+        "registry_rows_null_or_empty_geometry": 0
+    },
+    "pg_net_requests": {
+        "note": "GET requests to tigerweb.geo.census.gov only. No HomeSignal table was written.",
+        "census_bodies": [
+            16689,
+            16690,
+            16691,
+            16692,
+            16693,
+            17178
+        ],
+        "census_metadata": [
+            16686,
+            17177,
+            17179
+        ]
+    }
 }

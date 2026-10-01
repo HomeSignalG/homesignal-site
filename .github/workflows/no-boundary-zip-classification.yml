@@ -1,10 +1,12 @@
 name: no-boundary-zip-classification
 
 # Fix 4 (2026-10-01). Regenerates the classification of every canonical ZIP with no Census ZCTA
-# boundary from its committed inputs and the pinned USPS dataset (zipcodes 3.0.0), and fails if
-# the committed CSV or summary differ. The offline unit test
-# (test/no-boundary-zip-classification.test.mjs) checks the committed files against the Census
-# evidence; this job is the half that needs PyPI. Holds no secret and reads no database.
+# boundary from its committed inputs and the pinned ZIP dataset (zipcodes 3.0.0 on PyPI; its type
+# and active flags come from unitedstateszipcodes.org, not from USPS), and fails if the committed
+# CSV or summary differ. --self-test runs every class branch and every input refusal on tampered
+# copies. The offline unit test (test/no-boundary-zip-classification.test.mjs) checks the
+# committed files against the Census evidence; this job is the half that needs PyPI. Holds no
+# secret and reads no database.
 
 on:
   pull_request:
@@ -26,7 +28,7 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  no-boundary-classification:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,8 +36,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install the pinned USPS dataset
+      - name: Install the pinned ZIP dataset (zipcodes 3.0.0)
         run: pip install zipcodes==3.0.0
+      - name: Self-test (every class branch and every input refusal)
+        run: python3 scripts/fix4_classify_no_boundary_zips.py --self-test
       - name: Regenerate and compare
         run: python3 scripts/fix4_classify_no_boundary_zips.py --check
       - uses: actions/setup-node@v4
