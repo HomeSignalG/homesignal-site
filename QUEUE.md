@@ -40,6 +40,45 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — all legitimate, 0 HomeSignal omissions
+
+**Classified before changing anything; nothing in production changed.** All 706 stay
+`not_measured`. Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.
+Per-ZIP record: `docs/maps-coverage/fix4/no-boundary-zip-classification.csv`.
+
+- **Split (USPS dataset zipcodes 3.0.0):**
+
+  | class | ZIPs |
+  |---|---:|
+  | PO Box | 498 |
+  | unique | 107 |
+  | standard ZIP with no Census ZCTA | 52 |
+  | retired (19 standard, 20 unique, 8 PO Box) | 47 |
+  | not in the USPS dataset (84684, 84685) | 2 |
+  | **HomeSignal omission** | **0** |
+
+  The total is 706.
+- **0 acquisition defects.** `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to
+  Census TIGERweb's current ZCTA set. All four layers returned one identical body, so this is one
+  independent check, not four. 0 of the 706 are in it; positive control 12,016.
+- **0 generation defects.** The ACTIVE generation's `not_measured` set is exactly these 706 (md5
+  `7d1bf19a…`), and all 12,016 registry boundaries are valid.
+- **Kept honest:**
+  - `scripts/fix4_classify_no_boundary_zips.py` is the only place a class is decided. It is
+    fail-closed on input fingerprints, the Census evidence and the zipcodes version.
+  - `test/no-boundary-zip-classification.test.mjs` runs in the offline unit suite.
+  - `no-boundary-zip-classification.yml` regenerates the classification and fails on any
+    difference.
+  - 13 mutations, all caught.
+- 📌 **NEW ITEM, not built (Rule 16): Fix 3's READY/ACTIVATE check trusts `geo.zcta_boundary` to
+  be complete.**
+  - A deleted boundary row would publish that ZIP as `not_measured` and pass every check.
+  - Guard options: the table must still fingerprint to the Census set, or every `not_measured` ZIP
+    must be in the Fix 4 classification.
+  - Either is a Part D/H change to the daily build. Today the table is complete.
+- 📌 **Still open (unchanged): page eligibility for 84684 and 84685.** Neither appears in two ZIP
+  datasets or in either Census delineation. The registry is founder-owned and was not touched.
+
 ### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
 
 **Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
@@ -431,6 +470,9 @@ does not substitute centroid proximity for membership.
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+  *(2026-10-01, FIX 4: the 706 are now classified per ZIP with evidence. Retired is 47, not 19: the
+  19 was the retired standard ZIPs only. And all 706, not 685, lack a current Census ZCTA. The
+  founder ruled that they stay `not_measured`.)*
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 

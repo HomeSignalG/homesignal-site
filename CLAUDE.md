@@ -2303,6 +2303,17 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   23:56Z, live `md5(prosrc)` `66f5995d…`). Receipt:
   `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`. `pending` now has no live member
   by design; `verify-map1-zip-states` exercises it synthetically and fails if any of the three reads it.
+- ✅ **FIX 4 (2026-10-01): THE 706 `not_measured` ZIPs ARE ALL LEGITIMATE NON-ZCTA ZIPs. 0 ARE
+  HOMESIGNAL OMISSIONS, AND THEY STAY `not_measured`.**
+  - Split: PO Box 498 · unique 107 · standard ZIP with no Census ZCTA 52 · retired 47 · not in the
+    USPS dataset 2 (84684, 84685).
+  - `geo.zcta_boundary`'s 33,791 codes are md5-identical to Census TIGERweb's current ZCTA set
+    (`7e927a8e…`). 0 of the 706 are in it.
+  - ⛔ **Do not give any of them a polygon** (neighbor, centroid, radius or the 2010 delineation).
+  - The class is decided only by `scripts/fix4_classify_no_boundary_zips.py`. Per-ZIP CSV and
+    receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.
+  - 📌 **Open:** the check above trusts `geo.zcta_boundary` to be complete. A deleted boundary row
+    would publish its ZIP as `not_measured` and pass. That is its own unit (QUEUE, Fix 4).
 - **Proof:** `test/n5_generation_pg/run_suite.py` (78 assertions + 22 mutations, all killed; run
   2026-10-01 on PostgreSQL 16) via `n5-generation-publish-suite.yml`;
   `test/n5-generation-publish.test.mjs` (84 static checks); `run_part_g_rollback.py` (15 checks).

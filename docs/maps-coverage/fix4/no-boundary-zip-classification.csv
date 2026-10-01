@@ -1,0 +1,707 @@
+zip,state,county,page_name,usps_type,usps_active,usps_city,census_zcta_2020,census_zcta_2010,class,disposition
+01004,MA,Hampshire,Amherst (01004),PO BOX,true,Amherst,false,false,USPS_PO_BOX,not_measured
+01014,MA,Hampden,Chicopee (01014),PO BOX,true,Chicopee,false,false,USPS_PO_BOX,not_measured
+01021,MA,Hampden,Chicopee (01021),PO BOX,true,Chicopee,false,false,USPS_PO_BOX,not_measured
+01041,MA,Hampden,Holyoke (01041),PO BOX,true,Holyoke,false,false,USPS_PO_BOX,not_measured
+01059,MA,Hampshire,North Amherst (01059),PO BOX,true,North Amherst,false,false,USPS_PO_BOX,not_measured
+01061,MA,Hampshire,Northampton (01061),PO BOX,true,Northampton,false,false,USPS_PO_BOX,not_measured
+01086,MA,Hampden,Westfield (01086),PO BOX,true,Westfield,false,true,USPS_PO_BOX,not_measured
+01090,MA,Hampden,West Springfield (01090),PO BOX,true,West Springfield,false,false,USPS_PO_BOX,not_measured
+01101,MA,Hampden,Springfield (01101),PO BOX,true,Springfield,false,false,USPS_PO_BOX,not_measured
+01102,MA,Hampden,Springfield (01102),PO BOX,true,Springfield,false,false,USPS_PO_BOX,not_measured
+01111,MA,Hampden,Springfield (01111),UNIQUE,true,Springfield,false,false,USPS_UNIQUE,not_measured
+01115,MA,Hampden,Springfield (01115),PO BOX,true,Springfield,false,false,USPS_PO_BOX,not_measured
+01116,MA,Hampden,Longmeadow (01116),PO BOX,true,Longmeadow,false,false,USPS_PO_BOX,not_measured
+01138,MA,Hampden,Springfield (01138),PO BOX,true,Springfield,false,false,USPS_PO_BOX,not_measured
+01139,MA,Hampden,Springfield (01139),PO BOX,true,Springfield,false,false,USPS_PO_BOX,not_measured
+01152,MA,Hampden,Springfield (01152),STANDARD,true,Springfield,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+01199,MA,Hampden,Springfield (01199),UNIQUE,true,Springfield,false,true,USPS_UNIQUE,not_measured
+01202,MA,Berkshire,Pittsfield (01202),PO BOX,true,Pittsfield,false,false,USPS_PO_BOX,not_measured
+01203,MA,Berkshire,Pittsfield (01203),PO BOX,true,Pittsfield,false,false,USPS_PO_BOX,not_measured
+01227,MA,Berkshire,Dalton (01227),PO BOX,true,Dalton,false,false,USPS_PO_BOX,not_measured
+01252,MA,Berkshire,North Egremont (01252),STANDARD,true,North Egremont,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+01263,MA,Berkshire,Stockbridge (01263),UNIQUE,true,Stockbridge,false,false,USPS_UNIQUE,not_measured
+01441,MA,Worcester,Westminster (01441),UNIQUE,true,Westminster,false,false,USPS_UNIQUE,not_measured
+01467,MA,Worcester,Still River (01467),PO BOX,true,Still River,false,true,USPS_PO_BOX,not_measured
+01470,MA,Middlesex,Groton (01470),UNIQUE,true,Groton,false,false,USPS_UNIQUE,not_measured
+01471,MA,Middlesex,Groton (01471),UNIQUE,true,Groton,false,false,USPS_UNIQUE,not_measured
+01472,MA,Middlesex,West Groton (01472),PO BOX,true,West Groton,false,false,USPS_PO_BOX,not_measured
+01508,MA,Worcester,Charlton City (01508),PO BOX,true,Charlton City,false,false,USPS_PO_BOX,not_measured
+01509,MA,Worcester,Charlton Depot (01509),PO BOX,true,Charlton Depot,false,false,USPS_PO_BOX,not_measured
+01526,MA,Worcester,Manchaug (01526),PO BOX,true,Manchaug,false,false,USPS_PO_BOX,not_measured
+01538,MA,Worcester,North Uxbridge (01538),PO BOX,true,North Uxbridge,false,false,USPS_PO_BOX,not_measured
+01546,MA,Worcester,Shrewsbury (01546),UNIQUE,true,Shrewsbury,false,false,USPS_UNIQUE,not_measured
+01586,MA,Worcester,West Millbury (01586),PO BOX,true,West Millbury,false,false,USPS_PO_BOX,not_measured
+01601,MA,Worcester,Worcester (01601),PO BOX,true,Worcester,false,false,USPS_PO_BOX,not_measured
+01613,MA,Worcester,Worcester (01613),PO BOX,true,Worcester,false,false,USPS_PO_BOX,not_measured
+01614,MA,Worcester,Worcester (01614),PO BOX,true,Worcester,false,false,USPS_PO_BOX,not_measured
+01615,MA,Worcester,Worcester (01615),PO BOX,true,Worcester,false,false,USPS_PO_BOX,not_measured
+01653,MA,Worcester,Worcester (01653),UNIQUE,true,Worcester,false,false,USPS_UNIQUE,not_measured
+01655,MA,Worcester,Worcester (01655),STANDARD,true,Worcester,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+01703,MA,Middlesex,Framingham (01703),PO BOX,true,Framingham,false,false,USPS_PO_BOX,not_measured
+01704,MA,Middlesex,Framingham (01704),PO BOX,true,Framingham,false,false,USPS_PO_BOX,not_measured
+01705,MA,Middlesex,Framingham (01705),PO BOX,true,Framingham,false,false,USPS_PO_BOX,not_measured
+01784,MA,Middlesex,Woodville (01784),PO BOX,true,Woodville,false,false,USPS_PO_BOX,not_measured
+01805,MA,Middlesex,Burlington (01805),UNIQUE,true,Burlington,false,false,USPS_UNIQUE,not_measured
+01812,MA,Essex,Andover (01812),UNIQUE,true,Andover,false,false,USPS_UNIQUE,not_measured
+01813,MA,Middlesex,Woburn (01813),UNIQUE,true,Woburn,false,false,USPS_UNIQUE,not_measured
+01815,MA,Middlesex,Woburn (01815),UNIQUE,true,Woburn,false,false,USPS_UNIQUE,not_measured
+01822,MA,Middlesex,Billerica (01822),PO BOX,true,Billerica,false,false,USPS_PO_BOX,not_measured
+01825,MA,Middlesex,North Reading (01825),PO BOX,true,North Reading,false,false,USPS_PO_BOX,not_measured
+01831,MA,Essex,Haverhill (01831),PO BOX,true,Haverhill,false,false,USPS_PO_BOX,not_measured
+01842,MA,Essex,Lawrence (01842),PO BOX,true,Lawrence,false,false,USPS_PO_BOX,not_measured
+01853,MA,Middlesex,Lowell (01853),PO BOX,true,Lowell,false,false,USPS_PO_BOX,not_measured
+01865,MA,Middlesex,Nutting Lake (01865),PO BOX,true,Nutting Lake,false,false,USPS_PO_BOX,not_measured
+01866,MA,Middlesex,Pinehurst (01866),PO BOX,true,Pinehurst,false,false,USPS_PO_BOX,not_measured
+01885,MA,Essex,West Boxford (01885),PO BOX,true,West Boxford,false,false,USPS_PO_BOX,not_measured
+01888,MA,Middlesex,Woburn (01888),PO BOX,true,Woburn,false,false,USPS_PO_BOX,not_measured
+01889,MA,Middlesex,North Reading (01889),UNIQUE,true,North Reading,false,false,USPS_UNIQUE,not_measured
+01899,MA,Essex,Andover (01899),UNIQUE,true,Andover,false,false,USPS_UNIQUE,not_measured
+01903,MA,Essex,Lynn (01903),PO BOX,true,Lynn,false,false,USPS_PO_BOX,not_measured
+01910,MA,Essex,Lynn (01910),UNIQUE,true,Lynn,false,false,USPS_UNIQUE,not_measured
+01931,MA,Essex,Gloucester (01931),PO BOX,true,Gloucester,false,false,USPS_PO_BOX,not_measured
+01936,MA,Essex,Hamilton (01936),PO BOX,true,Hamilton,false,false,USPS_PO_BOX,not_measured
+01961,MA,Essex,Peabody (01961),PO BOX,true,Peabody,false,false,USPS_PO_BOX,not_measured
+01971,MA,Essex,Salem (01971),PO BOX,true,Salem,false,false,USPS_PO_BOX,not_measured
+02018,MA,Plymouth,Accord (02018),PO BOX,true,Accord,false,false,USPS_PO_BOX,not_measured
+02020,MA,Plymouth,Brant Rock (02020),PO BOX,true,Brant Rock,false,false,USPS_PO_BOX,not_measured
+02027,MA,Norfolk,Dedham (02027),PO BOX,true,Dedham,false,false,USPS_PO_BOX,not_measured
+02040,MA,Plymouth,Greenbush (02040),PO BOX,true,Greenbush,false,false,USPS_PO_BOX,not_measured
+02041,MA,Plymouth,Green Harbor (02041),PO BOX,true,Green Harbor,false,false,USPS_PO_BOX,not_measured
+02044,MA,Plymouth,Hingham (02044),UNIQUE,true,Hingham,false,false,USPS_UNIQUE,not_measured
+02051,MA,Plymouth,Marshfield Hills (02051),PO BOX,true,Marshfield Hills,false,false,USPS_PO_BOX,not_measured
+02055,MA,Plymouth,Minot (02055),PO BOX,true,Minot,false,false,USPS_PO_BOX,not_measured
+02059,MA,Plymouth,North Marshfield (02059),PO BOX,true,North Marshfield,false,false,USPS_PO_BOX,not_measured
+02060,MA,Plymouth,North Scituate (02060),PO BOX,true,North Scituate,false,false,USPS_PO_BOX,not_measured
+02065,MA,Plymouth,Ocean Bluff (02065),PO BOX,true,Ocean Bluff,false,false,USPS_PO_BOX,not_measured
+02070,MA,Norfolk,Sheldonville (02070),PO BOX,true,Sheldonville,false,false,USPS_PO_BOX,not_measured
+02153,MA,Middlesex,Medford (02153),PO BOX,true,Medford,false,false,USPS_PO_BOX,not_measured
+02156,MA,Middlesex,West Medford (02156),PO BOX,true,West Medford,false,false,USPS_PO_BOX,not_measured
+02185,MA,Norfolk,Braintree (02185),PO BOX,true,Braintree,false,false,USPS_PO_BOX,not_measured
+02187,MA,Norfolk,Milton Village (02187),PO BOX,true,Milton Village,false,false,USPS_PO_BOX,not_measured
+02212,MA,Suffolk,Boston (02212),UNIQUE,true,Boston,false,false,USPS_UNIQUE,not_measured
+02222,MA,Suffolk,Boston (02222),STANDARD,true,Boston,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+02238,MA,Middlesex,Cambridge (02238),PO BOX,true,Cambridge,false,false,USPS_PO_BOX,not_measured
+02269,MA,Norfolk,Quincy (02269),PO BOX,true,Quincy,false,false,USPS_PO_BOX,not_measured
+02303,MA,Plymouth,Brockton (02303),PO BOX,true,Brockton,false,false,USPS_PO_BOX,not_measured
+02304,MA,Plymouth,Brockton (02304),PO BOX,true,Brockton,false,false,USPS_PO_BOX,not_measured
+02305,MA,Plymouth,Brockton (02305),PO BOX,true,Brockton,false,false,USPS_PO_BOX,not_measured
+02327,MA,Plymouth,Bryantville (02327),PO BOX,true,Bryantville,false,false,USPS_PO_BOX,not_measured
+02331,MA,Plymouth,Duxbury (02331),PO BOX,true,Duxbury,false,false,USPS_PO_BOX,not_measured
+02334,MA,Bristol,Easton (02334),PO BOX,true,Easton,false,false,USPS_PO_BOX,not_measured
+02337,MA,Plymouth,Elmwood (02337),PO BOX,true,Elmwood,false,false,USPS_PO_BOX,not_measured
+02340,MA,Plymouth,Hanover (02340),UNIQUE,false,Hanover,false,false,USPS_RETIRED,not_measured
+02344,MA,Plymouth,Middleboro (02344),UNIQUE,true,Middleboro,false,false,USPS_UNIQUE,not_measured
+02345,MA,Plymouth,Manomet (02345),PO BOX,true,Manomet,false,false,USPS_PO_BOX,not_measured
+02348,MA,Plymouth,Lakeville (02348),UNIQUE,true,Lakeville,false,false,USPS_UNIQUE,not_measured
+02349,MA,Plymouth,Middleboro (02349),UNIQUE,true,Middleboro,false,false,USPS_UNIQUE,not_measured
+02355,MA,Plymouth,North Carver (02355),PO BOX,true,North Carver,false,false,USPS_PO_BOX,not_measured
+02358,MA,Plymouth,North Pembroke (02358),PO BOX,true,North Pembroke,false,false,USPS_PO_BOX,not_measured
+02361,MA,Plymouth,Plymouth (02361),PO BOX,true,Plymouth,false,false,USPS_PO_BOX,not_measured
+02362,MA,Plymouth,Plymouth (02362),PO BOX,true,Plymouth,false,false,USPS_PO_BOX,not_measured
+02381,MA,Plymouth,White Horse Beach (02381),PO BOX,true,White Horse Beach,false,false,USPS_PO_BOX,not_measured
+02447,MA,Norfolk,Brookline Village (02447),PO BOX,true,Brookline Village,false,false,USPS_PO_BOX,not_measured
+02454,MA,Middlesex,Waltham (02454),PO BOX,true,Waltham,false,false,USPS_PO_BOX,not_measured
+02455,MA,Middlesex,North Waltham (02455),PO BOX,true,North Waltham,false,false,USPS_PO_BOX,not_measured
+02456,MA,Middlesex,New Town (02456),PO BOX,true,New Town,false,false,USPS_PO_BOX,not_measured
+02471,MA,Middlesex,Watertown (02471),PO BOX,true,Watertown,false,false,USPS_PO_BOX,not_measured
+02475,MA,Middlesex,Arlington Heights (02475),PO BOX,true,Arlington Heights,false,false,USPS_PO_BOX,not_measured
+02477,MA,Middlesex,Watertown (02477),UNIQUE,true,Watertown,false,false,USPS_UNIQUE,not_measured
+02479,MA,Middlesex,Waverley (02479),PO BOX,true,Waverley,false,false,USPS_PO_BOX,not_measured
+02495,MA,Middlesex,Nonantum (02495),PO BOX,true,Nonantum,false,false,USPS_PO_BOX,not_measured
+02541,MA,Barnstable,Falmouth (02541),PO BOX,true,Falmouth,false,false,USPS_PO_BOX,not_measured
+02574,MA,Barnstable,West Falmouth (02574),PO BOX,true,West Falmouth,false,false,USPS_PO_BOX,not_measured
+02634,MA,Barnstable,Centerville (02634),PO BOX,true,Centerville,false,false,USPS_PO_BOX,not_measured
+02651,MA,Barnstable,North Eastham (02651),PO BOX,true,North Eastham,false,true,USPS_PO_BOX,not_measured
+02661,MA,Barnstable,South Harwich (02661),PO BOX,true,South Harwich,false,false,USPS_PO_BOX,not_measured
+02662,MA,Barnstable,South Orleans (02662),PO BOX,true,South Orleans,false,false,USPS_PO_BOX,not_measured
+02669,MA,Barnstable,West Chatham (02669),PO BOX,true,West Chatham,false,true,USPS_PO_BOX,not_measured
+02712,MA,Bristol,Chartley (02712),PO BOX,true,Chartley,false,false,USPS_PO_BOX,not_measured
+02714,MA,Bristol,Dartmouth (02714),PO BOX,true,Dartmouth,false,false,USPS_PO_BOX,not_measured
+02722,MA,Bristol,Fall River (02722),PO BOX,true,Fall River,false,false,USPS_PO_BOX,not_measured
+02741,MA,Bristol,New Bedford (02741),PO BOX,true,New Bedford,false,false,USPS_PO_BOX,not_measured
+02742,MA,Bristol,New Bedford (02742),PO BOX,true,New Bedford,false,false,USPS_PO_BOX,not_measured
+02761,MA,Bristol,North Attleboro (02761),PO BOX,true,North Attleboro,false,false,USPS_PO_BOX,not_measured
+02768,MA,Bristol,Raynham Center (02768),PO BOX,true,Raynham Center,false,false,USPS_PO_BOX,not_measured
+02783,MA,Bristol,Taunton (02783),UNIQUE,false,Taunton,false,false,USPS_RETIRED,not_measured
+05501,MA,Essex,Andover (05501),UNIQUE,true,Andover,false,false,USPS_UNIQUE,not_measured
+05544,MA,Essex,Andover (05544),UNIQUE,false,Andover,false,false,USPS_RETIRED,not_measured
+10015,NY,New York,New York (10015),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10041,NY,New York,New York (10041),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10045,NY,New York,New York (10045),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10048,NY,New York,New York (10048),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10055,NY,New York,New York (10055),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10060,NY,New York,New York (10060),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10090,NY,New York,New York (10090),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10095,NY,New York,New York (10095),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10098,NY,New York,New York (10098),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10099,NY,New York,New York (10099),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10104,NY,New York,New York (10104),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10105,NY,New York,New York (10105),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10106,NY,New York,New York (10106),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10107,NY,New York,New York (10107),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10118,NY,New York,New York (10118),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10120,NY,New York,New York (10120),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10121,NY,New York,New York (10121),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10122,NY,New York,New York (10122),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10123,NY,New York,New York (10123),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10151,NY,New York,New York (10151),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10155,NY,New York,New York (10155),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10158,NY,New York,New York (10158),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10161,NY,New York,New York (10161),STANDARD,false,New York,false,false,USPS_RETIRED,not_measured
+10166,NY,New York,New York (10166),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10175,NY,New York,New York (10175),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10176,NY,New York,New York (10176),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10178,NY,New York,New York (10178),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10260,NY,New York,New York (10260),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10265,NY,New York,New York (10265),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10270,NY,New York,New York (10270),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+10281,NY,New York,New York (10281),STANDARD,true,New York,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11240,NY,Kings,Brooklyn (11240),STANDARD,false,Brooklyn,false,false,USPS_RETIRED,not_measured
+11241,NY,Kings,Brooklyn (11241),STANDARD,true,Brooklyn,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11242,NY,Kings,Brooklyn (11242),STANDARD,true,Brooklyn,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11243,NY,Kings,Brooklyn (11243),STANDARD,true,Brooklyn,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11252,NY,Kings,Brooklyn (11252),STANDARD,true,Brooklyn,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11256,NY,Kings,Brooklyn (11256),STANDARD,true,Brooklyn,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+11351,NY,Queens,Flushing (11351),STANDARD,true,Flushing,false,true,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+19110,PA,Philadelphia,Philadelphia (19110),STANDARD,true,Philadelphia,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+48007,MI,Oakland,Troy (48007),PO BOX,true,Troy,false,false,USPS_PO_BOX,not_measured
+48012,MI,Oakland,Birmingham (48012),PO BOX,true,Birmingham,false,false,USPS_PO_BOX,not_measured
+48037,MI,Oakland,Southfield (48037),PO BOX,true,Southfield,false,false,USPS_PO_BOX,not_measured
+48046,MI,Macomb,Mount Clemens (48046),PO BOX,true,Mount Clemens,false,false,USPS_PO_BOX,not_measured
+48068,MI,Oakland,Royal Oak (48068),PO BOX,true,Royal Oak,false,false,USPS_PO_BOX,not_measured
+48086,MI,Oakland,Southfield (48086),PO BOX,true,Southfield,false,false,USPS_PO_BOX,not_measured
+48090,MI,Macomb,Warren (48090),PO BOX,true,Warren,false,false,USPS_PO_BOX,not_measured
+48099,MI,Oakland,Troy (48099),PO BOX,true,Troy,false,false,USPS_PO_BOX,not_measured
+48106,MI,Washtenaw,Ann Arbor (48106),PO BOX,true,Ann Arbor,false,false,USPS_PO_BOX,not_measured
+48107,MI,Washtenaw,Ann Arbor (48107),PO BOX,true,Ann Arbor,false,false,USPS_PO_BOX,not_measured
+48110,MI,Monroe,Azalia (48110),PO BOX,true,Azalia,false,false,USPS_PO_BOX,not_measured
+48112,MI,Wayne,Belleville (48112),PO BOX,true,Belleville,false,false,USPS_PO_BOX,not_measured
+48113,MI,Washtenaw,Ann Arbor (48113),PO BOX,true,Ann Arbor,false,false,USPS_PO_BOX,not_measured
+48115,MI,Washtenaw,Bridgewater (48115),PO BOX,true,Bridgewater,false,false,USPS_PO_BOX,not_measured
+48121,MI,Wayne,Dearborn (48121),PO BOX,true,Dearborn,false,false,USPS_PO_BOX,not_measured
+48123,MI,Wayne,Dearborn (48123),PO BOX,true,Dearborn,false,false,USPS_PO_BOX,not_measured
+48136,MI,Wayne,Garden City (48136),PO BOX,true,Garden City,false,false,USPS_PO_BOX,not_measured
+48151,MI,Wayne,Livonia (48151),PO BOX,true,Livonia,false,false,USPS_PO_BOX,not_measured
+48153,MI,Wayne,Livonia (48153),PO BOX,true,Livonia,false,false,USPS_PO_BOX,not_measured
+48175,MI,Washtenaw,Salem (48175),PO BOX,true,Salem,false,false,USPS_PO_BOX,not_measured
+48231,MI,Wayne,Detroit (48231),PO BOX,true,Detroit,false,false,USPS_PO_BOX,not_measured
+48232,MI,Wayne,Detroit (48232),PO BOX,true,Detroit,false,false,USPS_PO_BOX,not_measured
+48244,MI,Wayne,Detroit (48244),PO BOX,true,Detroit,false,false,USPS_PO_BOX,not_measured
+48303,MI,Oakland,Bloomfield Hills (48303),PO BOX,true,Bloomfield Hills,false,false,USPS_PO_BOX,not_measured
+48308,MI,Oakland,Rochester (48308),PO BOX,true,Rochester,false,false,USPS_PO_BOX,not_measured
+48311,MI,Macomb,Sterling Heights (48311),PO BOX,true,Sterling Heights,false,false,USPS_PO_BOX,not_measured
+48318,MI,Macomb,Utica (48318),PO BOX,true,Utica,false,false,USPS_PO_BOX,not_measured
+48321,MI,Oakland,Auburn Hills (48321),PO BOX,true,Auburn Hills,false,false,USPS_PO_BOX,not_measured
+48325,MI,Oakland,West Bloomfield (48325),PO BOX,true,West Bloomfield,false,false,USPS_PO_BOX,not_measured
+48330,MI,Oakland,Drayton Plains (48330),PO BOX,true,Drayton Plains,false,false,USPS_PO_BOX,not_measured
+48332,MI,Oakland,Farmington (48332),PO BOX,true,Farmington,false,false,USPS_PO_BOX,not_measured
+48333,MI,Oakland,Farmington (48333),PO BOX,true,Farmington,false,false,USPS_PO_BOX,not_measured
+48343,MI,Oakland,Pontiac (48343),PO BOX,true,Pontiac,false,false,USPS_PO_BOX,not_measured
+48347,MI,Oakland,Clarkston (48347),PO BOX,true,Clarkston,false,false,USPS_PO_BOX,not_measured
+48361,MI,Oakland,Lake Orion (48361),PO BOX,true,Lake Orion,false,false,USPS_PO_BOX,not_measured
+48366,MI,Oakland,Lakeville (48366),PO BOX,true,Lakeville,false,false,USPS_PO_BOX,not_measured
+48376,MI,Oakland,Novi (48376),PO BOX,true,Novi,false,false,USPS_PO_BOX,not_measured
+48387,MI,Oakland,Union Lake (48387),PO BOX,true,Union Lake,false,false,USPS_PO_BOX,not_measured
+48391,MI,Oakland,Walled Lake (48391),PO BOX,false,Walled Lake,false,false,USPS_RETIRED,not_measured
+48501,MI,Genesee,Flint (48501),PO BOX,true,Flint,false,false,USPS_PO_BOX,not_measured
+48531,MI,Genesee,Flint (48531),PO BOX,true,Flint,false,false,USPS_PO_BOX,not_measured
+48805,MI,Ingham,Okemos (48805),PO BOX,true,Okemos,false,false,USPS_PO_BOX,not_measured
+48826,MI,Ingham,East Lansing (48826),PO BOX,true,East Lansing,false,false,USPS_PO_BOX,not_measured
+48844,MI,Livingston,Howell (48844),PO BOX,true,Howell,false,false,USPS_PO_BOX,not_measured
+48863,MI,Livingston,Howell (48863),STANDARD,false,Howell,false,false,USPS_RETIRED,not_measured
+48901,MI,Ingham,Lansing (48901),PO BOX,true,Lansing,false,false,USPS_PO_BOX,not_measured
+48909,MI,Ingham,Lansing (48909),PO BOX,true,Lansing,false,false,USPS_PO_BOX,not_measured
+48924,MI,Ingham,Lansing (48924),STANDARD,true,Lansing,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+49317,MI,Kent,Cannonsburg (49317),PO BOX,true,Cannonsburg,false,false,USPS_PO_BOX,not_measured
+49422,MI,Ottawa,Holland (49422),PO BOX,true,Holland,false,false,USPS_PO_BOX,not_measured
+49427,MI,Ottawa,Jamestown (49427),PO BOX,true,Jamestown,false,false,USPS_PO_BOX,not_measured
+49429,MI,Ottawa,Jenison (49429),PO BOX,true,Jenison,false,false,USPS_PO_BOX,not_measured
+49468,MI,Kent,Grandville (49468),PO BOX,true,Grandville,false,false,USPS_PO_BOX,not_measured
+49501,MI,Kent,Grand Rapids (49501),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49510,MI,Kent,Grand Rapids (49510),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49514,MI,Kent,Grand Rapids (49514),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49515,MI,Kent,Grand Rapids (49515),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49516,MI,Kent,Grand Rapids (49516),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49518,MI,Kent,Grand Rapids (49518),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49523,MI,Kent,Grand Rapids (49523),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49588,MI,Kent,Grand Rapids (49588),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+49599,MI,Kent,Grand Rapids (49599),PO BOX,true,Grand Rapids,false,false,USPS_PO_BOX,not_measured
+55083,MN,Washington,Stillwater (55083),PO BOX,true,Stillwater,false,false,USPS_PO_BOX,not_measured
+55377,MN,Sherburne,Santiago (55377),PO BOX,true,Santiago,false,false,USPS_PO_BOX,not_measured
+60006,IL,Cook,Arlington Heights (60006),PO BOX,true,Arlington Heights,false,false,USPS_PO_BOX,not_measured
+60009,IL,Cook,Elk Grove Village (60009),PO BOX,true,Elk Grove Village,false,false,USPS_PO_BOX,not_measured
+60011,IL,Cook,Barrington (60011),PO BOX,true,Barrington,false,false,USPS_PO_BOX,not_measured
+60017,IL,Cook,Des Plaines (60017),PO BOX,true,Des Plaines,false,false,USPS_PO_BOX,not_measured
+60019,IL,Cook,Des Plaines (60019),UNIQUE,true,Des Plaines,false,false,USPS_UNIQUE,not_measured
+60037,IL,Lake,Fort Sheridan (60037),STANDARD,true,Fort Sheridan,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+60038,IL,Cook,Palatine (60038),UNIQUE,true,Palatine,false,false,USPS_UNIQUE,not_measured
+60039,IL,McHenry,Crystal Lake (60039),PO BOX,true,Crystal Lake,false,false,USPS_PO_BOX,not_measured
+60055,IL,Cook,Palatine (60055),UNIQUE,true,Palatine,false,false,USPS_UNIQUE,not_measured
+60065,IL,Cook,Northbrook (60065),PO BOX,true,Northbrook,false,false,USPS_PO_BOX,not_measured
+60078,IL,Cook,Palatine (60078),PO BOX,true,Palatine,false,false,USPS_PO_BOX,not_measured
+60079,IL,Lake,Waukegan (60079),PO BOX,true,Waukegan,false,false,USPS_PO_BOX,not_measured
+60082,IL,Cook,Techny (60082),PO BOX,true,Techny,false,false,USPS_PO_BOX,not_measured
+60086,IL,Lake,North Chicago (60086),UNIQUE,true,North Chicago,false,false,USPS_UNIQUE,not_measured
+60094,IL,Cook,Palatine (60094),PO BOX,true,Palatine,false,false,USPS_PO_BOX,not_measured
+60095,IL,Cook,Palatine (60095),PO BOX,true,Palatine,false,false,USPS_PO_BOX,not_measured
+60105,IL,DuPage,Bensenville (60105),UNIQUE,true,Bensenville,false,false,USPS_UNIQUE,not_measured
+60116,IL,DuPage,Carol Stream (60116),UNIQUE,true,Carol Stream,false,false,USPS_UNIQUE,not_measured
+60117,IL,DuPage,Bloomingdale (60117),UNIQUE,true,Bloomingdale,false,false,USPS_UNIQUE,not_measured
+60121,IL,Kane,Elgin (60121),PO BOX,true,Elgin,false,false,USPS_PO_BOX,not_measured
+60122,IL,DuPage,Carol Stream (60122),UNIQUE,true,Carol Stream,false,false,USPS_UNIQUE,not_measured
+60128,IL,DuPage,Carol Stream (60128),UNIQUE,true,Carol Stream,false,false,USPS_UNIQUE,not_measured
+60132,IL,DuPage,Carol Stream (60132),UNIQUE,true,Carol Stream,false,false,USPS_UNIQUE,not_measured
+60138,IL,DuPage,Glen Ellyn (60138),PO BOX,true,Glen Ellyn,false,false,USPS_PO_BOX,not_measured
+60147,IL,Kane,Lafox (60147),PO BOX,true,Lafox,false,false,USPS_PO_BOX,not_measured
+60159,IL,Cook,Schaumburg (60159),PO BOX,true,Schaumburg,false,false,USPS_PO_BOX,not_measured
+60161,IL,Cook,Melrose Park (60161),PO BOX,true,Melrose Park,false,false,USPS_PO_BOX,not_measured
+60168,IL,Cook,Schaumburg (60168),PO BOX,true,Schaumburg,false,false,USPS_PO_BOX,not_measured
+60179,IL,Cook,Hoffman Estates (60179),UNIQUE,true,Hoffman Estates,false,false,USPS_UNIQUE,not_measured
+60186,IL,DuPage,West Chicago (60186),PO BOX,true,West Chicago,false,false,USPS_PO_BOX,not_measured
+60196,IL,Cook,Schaumburg (60196),UNIQUE,true,Schaumburg,false,false,USPS_UNIQUE,not_measured
+60197,IL,DuPage,Carol Stream (60197),PO BOX,true,Carol Stream,false,false,USPS_PO_BOX,not_measured
+60199,IL,DuPage,Carol Stream (60199),STANDARD,true,Carol Stream,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+60204,IL,Cook,Evanston (60204),PO BOX,true,Evanston,false,false,USPS_PO_BOX,not_measured
+60303,IL,Cook,Oak Park (60303),PO BOX,true,Oak Park,false,false,USPS_PO_BOX,not_measured
+60399,IL,DuPage,Wood Dale (60399),UNIQUE,true,Wood Dale,false,false,USPS_UNIQUE,not_measured
+60412,IL,Cook,Chicago Heights (60412),PO BOX,true,Chicago Heights,false,false,USPS_PO_BOX,not_measured
+60434,IL,Will,Joliet (60434),PO BOX,true,Joliet,false,false,USPS_PO_BOX,not_measured
+60454,IL,Cook,Oak Lawn (60454),PO BOX,true,Oak Lawn,false,false,USPS_PO_BOX,not_measured
+60499,IL,Cook,Bedford Park (60499),PO BOX,true,Bedford Park,false,false,USPS_PO_BOX,not_measured
+60507,IL,Kane,Aurora (60507),PO BOX,true,Aurora,false,false,USPS_PO_BOX,not_measured
+60522,IL,DuPage,Hinsdale (60522),PO BOX,true,Hinsdale,false,false,USPS_PO_BOX,not_measured
+60566,IL,DuPage,Naperville (60566),PO BOX,true,Naperville,false,false,USPS_PO_BOX,not_measured
+60567,IL,DuPage,Naperville (60567),PO BOX,true,Naperville,false,false,USPS_PO_BOX,not_measured
+60568,IL,Kane,Aurora (60568),UNIQUE,true,Aurora,false,false,USPS_UNIQUE,not_measured
+60572,IL,Kane,Aurora (60572),UNIQUE,true,Aurora,false,false,USPS_UNIQUE,not_measured
+60598,IL,Kane,Aurora (60598),PO BOX,true,Aurora,false,false,USPS_PO_BOX,not_measured
+60599,IL,DuPage,Fox Valley (60599),STANDARD,true,Fox Valley,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+60664,IL,Cook,Chicago (60664),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60666,IL,Cook,Chicago (60666),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60668,IL,Cook,Chicago (60668),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60669,IL,Cook,Chicago (60669),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60670,IL,Cook,Chicago (60670),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60673,IL,Cook,Chicago (60673),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60674,IL,Cook,Chicago (60674),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60675,IL,Cook,Chicago (60675),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60677,IL,Cook,Chicago (60677),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60678,IL,Cook,Chicago (60678),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60680,IL,Cook,Chicago (60680),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60681,IL,Cook,Chicago (60681),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60682,IL,Cook,Chicago (60682),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60684,IL,Cook,Chicago (60684),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60685,IL,Cook,Chicago (60685),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60686,IL,Cook,Chicago (60686),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60687,IL,Cook,Chicago (60687),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60688,IL,Cook,Chicago (60688),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60689,IL,Cook,Chicago (60689),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60690,IL,Cook,Chicago (60690),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60691,IL,Cook,Chicago (60691),PO BOX,true,Chicago,false,false,USPS_PO_BOX,not_measured
+60693,IL,Cook,Chicago (60693),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60694,IL,Cook,Chicago (60694),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60695,IL,Cook,Chicago (60695),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60696,IL,Cook,Chicago (60696),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60697,IL,Cook,Chicago (60697),UNIQUE,true,Chicago,false,false,USPS_UNIQUE,not_measured
+60699,IL,Cook,Chicago (60699),STANDARD,true,Chicago,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+60701,IL,Cook,Chicago (60701),STANDARD,true,Chicago,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+61105,IL,Winnebago,Rockford (61105),PO BOX,true,Rockford,false,false,USPS_PO_BOX,not_measured
+61106,IL,Winnebago,Rockford (61106),PO BOX,true,Rockford,false,false,USPS_PO_BOX,not_measured
+61110,IL,Winnebago,Rockford (61110),PO BOX,true,Rockford,false,false,USPS_PO_BOX,not_measured
+61125,IL,Winnebago,Rockford (61125),PO BOX,true,Rockford,false,false,USPS_PO_BOX,not_measured
+61126,IL,Winnebago,Rockford (61126),PO BOX,true,Rockford,false,false,USPS_PO_BOX,not_measured
+61130,IL,Winnebago,Loves Park (61130),PO BOX,true,Loves Park,false,false,USPS_PO_BOX,not_measured
+61131,IL,Winnebago,Loves Park (61131),PO BOX,true,Loves Park,false,false,USPS_PO_BOX,not_measured
+61132,IL,Winnebago,Loves Park (61132),PO BOX,true,Loves Park,false,false,USPS_PO_BOX,not_measured
+61803,IL,Champaign,Urbana (61803),PO BOX,true,Urbana,false,false,USPS_PO_BOX,not_measured
+61824,IL,Champaign,Champaign (61824),PO BOX,true,Champaign,false,false,USPS_PO_BOX,not_measured
+61825,IL,Champaign,Champaign (61825),PO BOX,true,Champaign,false,false,USPS_PO_BOX,not_measured
+61826,IL,Champaign,Champaign (61826),PO BOX,true,Champaign,false,false,USPS_PO_BOX,not_measured
+73301,TX,Travis,Austin (73301),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+73344,TX,Travis,Austin (73344),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+75011,TX,Dallas,Carrollton (75011),PO BOX,true,Carrollton,false,false,USPS_PO_BOX,not_measured
+75014,TX,Dallas,Irving (75014),PO BOX,true,Irving,false,false,USPS_PO_BOX,not_measured
+75015,TX,Dallas,Irving (75015),PO BOX,true,Irving,false,false,USPS_PO_BOX,not_measured
+75016,TX,Dallas,Irving (75016),PO BOX,true,Irving,false,false,USPS_PO_BOX,not_measured
+75017,TX,Dallas,Irving (75017),PO BOX,true,Irving,false,false,USPS_PO_BOX,not_measured
+75026,TX,Collin,Plano (75026),PO BOX,true,Plano,false,false,USPS_PO_BOX,not_measured
+75027,TX,Denton,Flower Mound (75027),PO BOX,true,Flower Mound,false,false,USPS_PO_BOX,not_measured
+75029,TX,Denton,Lewisville (75029),PO BOX,true,Lewisville,false,false,USPS_PO_BOX,not_measured
+75030,TX,Dallas,Rowlett (75030),PO BOX,true,Rowlett,false,false,USPS_PO_BOX,not_measured
+75037,TX,Dallas,Irving (75037),UNIQUE,false,Irving,false,false,USPS_RETIRED,not_measured
+75045,TX,Dallas,Garland (75045),PO BOX,true,Garland,false,false,USPS_PO_BOX,not_measured
+75046,TX,Dallas,Garland (75046),PO BOX,true,Garland,false,false,USPS_PO_BOX,not_measured
+75047,TX,Dallas,Garland (75047),PO BOX,true,Garland,false,false,USPS_PO_BOX,not_measured
+75049,TX,Dallas,Garland (75049),PO BOX,true,Garland,false,false,USPS_PO_BOX,not_measured
+75053,TX,Dallas,Grand Prairie (75053),PO BOX,true,Grand Prairie,false,false,USPS_PO_BOX,not_measured
+75083,TX,Dallas,Richardson (75083),PO BOX,true,Richardson,false,false,USPS_PO_BOX,not_measured
+75085,TX,Dallas,Richardson (75085),PO BOX,true,Richardson,false,false,USPS_PO_BOX,not_measured
+75086,TX,Collin,Plano (75086),PO BOX,true,Plano,false,false,USPS_PO_BOX,not_measured
+75097,TX,Collin,Weston (75097),PO BOX,true,Weston,false,false,USPS_PO_BOX,not_measured
+75099,TX,Dallas,Coppell (75099),UNIQUE,true,Coppell,false,false,USPS_UNIQUE,not_measured
+75106,TX,Dallas,Cedar Hill (75106),PO BOX,true,Cedar Hill,false,false,USPS_PO_BOX,not_measured
+75123,TX,Dallas,Desoto (75123),PO BOX,true,Desoto,false,false,USPS_PO_BOX,not_measured
+75138,TX,Dallas,Duncanville (75138),PO BOX,true,Duncanville,false,false,USPS_PO_BOX,not_measured
+75185,TX,Dallas,Mesquite (75185),PO BOX,true,Mesquite,false,false,USPS_PO_BOX,not_measured
+75187,TX,Dallas,Mesquite (75187),PO BOX,true,Mesquite,false,false,USPS_PO_BOX,not_measured
+75221,TX,Dallas,Dallas (75221),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75222,TX,Dallas,Dallas (75222),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75242,TX,Dallas,Dallas (75242),STANDARD,true,Dallas,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+75245,TX,Dallas,Dallas (75245),STANDARD,false,Dallas,false,false,USPS_RETIRED,not_measured
+75250,TX,Dallas,Dallas (75250),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75258,TX,Dallas,Dallas (75258),STANDARD,false,Dallas,false,false,USPS_RETIRED,not_measured
+75260,TX,Dallas,Dallas (75260),STANDARD,true,Dallas,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+75262,TX,Dallas,Dallas (75262),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75263,TX,Dallas,Dallas (75263),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75264,TX,Dallas,Dallas (75264),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75265,TX,Dallas,Dallas (75265),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75266,TX,Dallas,Dallas (75266),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75267,TX,Dallas,Dallas (75267),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75275,TX,Dallas,Dallas (75275),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75277,TX,Dallas,Dallas (75277),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75283,TX,Dallas,Dallas (75283),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75284,TX,Dallas,Dallas (75284),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75285,TX,Dallas,Dallas (75285),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75286,TX,Dallas,Dallas (75286),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75301,TX,Dallas,Dallas (75301),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75303,TX,Dallas,Dallas (75303),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75310,TX,Dallas,Dallas (75310),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75312,TX,Dallas,Dallas (75312),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75313,TX,Dallas,Dallas (75313),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75315,TX,Dallas,Dallas (75315),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75320,TX,Dallas,Dallas (75320),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75323,TX,Dallas,Dallas (75323),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75326,TX,Dallas,Dallas (75326),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75334,TX,Dallas,Dallas (75334),PO BOX,false,Dallas,false,false,USPS_RETIRED,not_measured
+75336,TX,Dallas,Dallas (75336),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75339,TX,Dallas,Dallas (75339),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75340,TX,Dallas,Dallas (75340),PO BOX,false,Dallas,false,false,USPS_RETIRED,not_measured
+75342,TX,Dallas,Dallas (75342),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75343,TX,Dallas,Dallas (75343),PO BOX,false,Dallas,false,false,USPS_RETIRED,not_measured
+75344,TX,Dallas,Dallas (75344),PO BOX,false,Dallas,false,false,USPS_RETIRED,not_measured
+75353,TX,Dallas,Dallas (75353),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75354,TX,Dallas,Dallas (75354),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75355,TX,Dallas,Dallas (75355),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75356,TX,Dallas,Dallas (75356),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75357,TX,Dallas,Dallas (75357),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75358,TX,Dallas,Dallas (75358),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75359,TX,Dallas,Dallas (75359),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75360,TX,Dallas,Dallas (75360),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75363,TX,Dallas,Dallas (75363),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75364,TX,Dallas,Dallas (75364),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75367,TX,Dallas,Dallas (75367),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75368,TX,Dallas,Dallas (75368),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75370,TX,Dallas,Dallas (75370),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75371,TX,Dallas,Dallas (75371),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75372,TX,Dallas,Dallas (75372),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75373,TX,Dallas,Dallas (75373),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75374,TX,Dallas,Dallas (75374),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75376,TX,Dallas,Dallas (75376),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75378,TX,Dallas,Dallas (75378),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75379,TX,Dallas,Dallas (75379),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75380,TX,Dallas,Dallas (75380),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75381,TX,Dallas,Dallas (75381),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75382,TX,Dallas,Dallas (75382),PO BOX,true,Dallas,false,false,USPS_PO_BOX,not_measured
+75386,TX,Dallas,Dallas (75386),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75387,TX,Dallas,Dallas (75387),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75388,TX,Dallas,Dallas (75388),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75389,TX,Dallas,Dallas (75389),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75391,TX,Dallas,Dallas (75391),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75392,TX,Dallas,Dallas (75392),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75393,TX,Dallas,Dallas (75393),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75394,TX,Dallas,Dallas (75394),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75395,TX,Dallas,Dallas (75395),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75396,TX,Dallas,Dallas (75396),UNIQUE,false,Dallas,false,false,USPS_RETIRED,not_measured
+75397,TX,Dallas,Dallas (75397),UNIQUE,true,Dallas,false,false,USPS_UNIQUE,not_measured
+75398,TX,Dallas,Dallas (75398),STANDARD,true,Dallas,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+75485,TX,Collin,Westminster (75485),PO BOX,true,Westminster,false,false,USPS_PO_BOX,not_measured
+76003,TX,Tarrant,Arlington (76003),PO BOX,true,Arlington,false,false,USPS_PO_BOX,not_measured
+76004,TX,Tarrant,Arlington (76004),PO BOX,true,Arlington,false,false,USPS_PO_BOX,not_measured
+76007,TX,Tarrant,Arlington (76007),PO BOX,true,Arlington,false,false,USPS_PO_BOX,not_measured
+76019,TX,Tarrant,Arlington (76019),UNIQUE,true,Arlington,false,false,USPS_UNIQUE,not_measured
+76094,TX,Tarrant,Arlington (76094),PO BOX,true,Arlington,false,false,USPS_PO_BOX,not_measured
+76095,TX,Tarrant,Bedford (76095),PO BOX,true,Bedford,false,false,USPS_PO_BOX,not_measured
+76096,TX,Tarrant,Arlington (76096),PO BOX,true,Arlington,false,false,USPS_PO_BOX,not_measured
+76098,TX,Tarrant,Azle (76098),PO BOX,true,Azle,false,false,USPS_PO_BOX,not_measured
+76099,TX,Tarrant,Grapevine (76099),PO BOX,true,Grapevine,false,false,USPS_PO_BOX,not_measured
+76101,TX,Tarrant,Fort Worth (76101),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76113,TX,Tarrant,Fort Worth (76113),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76121,TX,Tarrant,Fort Worth (76121),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76122,TX,Tarrant,Fort Worth (76122),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76124,TX,Tarrant,Fort Worth (76124),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76130,TX,Tarrant,Fort Worth (76130),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76136,TX,Tarrant,Fort Worth (76136),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76147,TX,Tarrant,Fort Worth (76147),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76150,TX,Tarrant,Fort Worth (76150),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76161,TX,Tarrant,Fort Worth (76161),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76162,TX,Tarrant,Fort Worth (76162),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76163,TX,Tarrant,Fort Worth (76163),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76166,TX,Tarrant,Fort Worth (76166),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76181,TX,Tarrant,Fort Worth (76181),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76185,TX,Tarrant,Fort Worth (76185),PO BOX,true,Fort Worth,false,false,USPS_PO_BOX,not_measured
+76191,TX,Tarrant,Fort Worth (76191),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76192,TX,Tarrant,Fort Worth (76192),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76193,TX,Tarrant,Fort Worth (76193),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76195,TX,Tarrant,Fort Worth (76195),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76196,TX,Tarrant,Fort Worth (76196),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76197,TX,Tarrant,Fort Worth (76197),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76198,TX,Tarrant,Fort Worth (76198),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76199,TX,Tarrant,Fort Worth (76199),UNIQUE,true,Fort Worth,false,false,USPS_UNIQUE,not_measured
+76202,TX,Denton,Denton (76202),PO BOX,true,Denton,false,false,USPS_PO_BOX,not_measured
+76204,TX,Denton,Denton (76204),PO BOX,true,Denton,false,false,USPS_PO_BOX,not_measured
+76206,TX,Denton,Denton (76206),PO BOX,true,Denton,false,false,USPS_PO_BOX,not_measured
+77305,TX,Montgomery,Conroe (77305),PO BOX,true,Conroe,false,false,USPS_PO_BOX,not_measured
+77393,TX,Harris,Spring (77393),PO BOX,true,Spring,false,false,USPS_PO_BOX,not_measured
+77487,TX,Fort Bend,Sugar Land (77487),PO BOX,true,Sugar Land,false,false,USPS_PO_BOX,not_measured
+77496,TX,Fort Bend,Sugar Land (77496),PO BOX,true,Sugar Land,false,false,USPS_PO_BOX,not_measured
+77497,TX,Fort Bend,Stafford (77497),PO BOX,true,Stafford,false,false,USPS_PO_BOX,not_measured
+78131,TX,Comal,New Braunfels (78131),PO BOX,true,New Braunfels,false,false,USPS_PO_BOX,not_measured
+78135,TX,Comal,New Braunfels (78135),STANDARD,true,New Braunfels,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+78627,TX,Williamson,Georgetown (78627),PO BOX,true,Georgetown,false,false,USPS_PO_BOX,not_measured
+78630,TX,Williamson,Cedar Park (78630),PO BOX,true,Cedar Park,false,false,USPS_PO_BOX,not_measured
+78646,TX,Williamson,Leander (78646),PO BOX,true,Leander,false,false,USPS_PO_BOX,not_measured
+78667,TX,Hays,San Marcos (78667),PO BOX,true,San Marcos,false,false,USPS_PO_BOX,not_measured
+78673,TX,Williamson,Walburg (78673),PO BOX,true,Walburg,false,false,USPS_PO_BOX,not_measured
+78682,TX,Williamson,Round Rock (78682),UNIQUE,true,Round Rock,false,false,USPS_UNIQUE,not_measured
+78691,TX,Travis,Pflugerville (78691),PO BOX,true,Pflugerville,false,false,USPS_PO_BOX,not_measured
+78708,TX,Travis,Austin (78708),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78709,TX,Travis,Austin (78709),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78710,TX,Travis,Austin (78710),STANDARD,true,Austin,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+78711,TX,Travis,Austin (78711),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78713,TX,Travis,Austin (78713),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78714,TX,Travis,Austin (78714),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78715,TX,Travis,Austin (78715),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78716,TX,Travis,Austin (78716),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78718,TX,Travis,Austin (78718),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78720,TX,Travis,Austin (78720),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78755,TX,Travis,Austin (78755),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78760,TX,Travis,Austin (78760),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78761,TX,Travis,Austin (78761),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78762,TX,Travis,Austin (78762),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78763,TX,Travis,Austin (78763),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78764,TX,Travis,Austin (78764),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78765,TX,Travis,Austin (78765),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78766,TX,Travis,Austin (78766),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78767,TX,Travis,Austin (78767),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78768,TX,Travis,Austin (78768),PO BOX,true,Austin,false,false,USPS_PO_BOX,not_measured
+78769,TX,Travis,Austin (78769),PO BOX,false,Austin,false,false,USPS_RETIRED,not_measured
+78772,TX,Travis,Austin (78772),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78773,TX,Travis,Austin (78773),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78774,TX,Travis,Austin (78774),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78778,TX,Travis,Austin (78778),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78779,TX,Travis,Austin (78779),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78780,TX,Travis,Austin (78780),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78781,TX,Travis,Austin (78781),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78783,TX,Travis,Austin (78783),UNIQUE,true,Austin,false,false,USPS_UNIQUE,not_measured
+78785,TX,Travis,Austin (78785),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78786,TX,Travis,Austin (78786),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78788,TX,Travis,Austin (78788),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78789,TX,Travis,Austin (78789),UNIQUE,false,Austin,false,false,USPS_RETIRED,not_measured
+78798,TX,Travis,Austin (78798),STANDARD,false,Austin,false,false,USPS_RETIRED,not_measured
+78799,TX,Travis,Austin (78799),STANDARD,true,Austin,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+79910,TX,El Paso,El Paso (79910),STANDARD,true,El Paso,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+79913,TX,El Paso,El Paso (79913),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79914,TX,El Paso,El Paso (79914),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79917,TX,El Paso,El Paso (79917),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79923,TX,El Paso,El Paso (79923),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79926,TX,El Paso,El Paso (79926),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79929,TX,El Paso,El Paso (79929),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79931,TX,El Paso,El Paso (79931),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79937,TX,El Paso,El Paso (79937),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79940,TX,El Paso,El Paso (79940),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79941,TX,El Paso,El Paso (79941),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79943,TX,El Paso,El Paso (79943),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79944,TX,El Paso,El Paso (79944),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79945,TX,El Paso,El Paso (79945),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79946,TX,El Paso,El Paso (79946),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79947,TX,El Paso,El Paso (79947),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79948,TX,El Paso,El Paso (79948),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79949,TX,El Paso,El Paso (79949),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79950,TX,El Paso,El Paso (79950),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79951,TX,El Paso,El Paso (79951),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79952,TX,El Paso,El Paso (79952),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79953,TX,El Paso,El Paso (79953),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79954,TX,El Paso,El Paso (79954),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79955,TX,El Paso,El Paso (79955),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79958,TX,El Paso,El Paso (79958),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79960,TX,El Paso,El Paso (79960),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79961,TX,El Paso,El Paso (79961),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79968,TX,El Paso,El Paso (79968),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79976,TX,El Paso,El Paso (79976),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79978,TX,El Paso,El Paso (79978),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79980,TX,El Paso,El Paso (79980),UNIQUE,true,El Paso,false,false,USPS_UNIQUE,not_measured
+79990,TX,El Paso,El Paso (79990),PO BOX,false,El Paso,false,false,USPS_RETIRED,not_measured
+79995,TX,El Paso,El Paso (79995),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79996,TX,El Paso,El Paso (79996),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79997,TX,El Paso,El Paso (79997),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79998,TX,El Paso,El Paso (79998),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+79999,TX,El Paso,El Paso (79999),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+80001,CO,Jefferson,Arvada (80001),PO BOX,true,Arvada,false,false,USPS_PO_BOX,not_measured
+80150,CO,Arapahoe,Littleton (80150),PO BOX,true,Englewood,false,false,USPS_PO_BOX,not_measured
+80163,CO,Douglas,Highlands Ranch (80163),PO BOX,true,Littleton,false,false,USPS_PO_BOX,not_measured
+80511,CO,Larimer,Estes Park (80511),PO BOX,true,Estes Park,false,true,USPS_PO_BOX,not_measured
+84011,UT,Davis,Bountiful (84011),PO BOX,true,Bountiful,false,false,USPS_PO_BOX,not_measured
+84016,UT,Davis,Clearfield (84016),PO BOX,true,Clearfield,false,false,USPS_PO_BOX,not_measured
+84068,UT,Summit,Park City (84068),PO BOX,true,Park City,false,false,USPS_PO_BOX,not_measured
+84079,UT,Uintah,Vernal (84079),PO BOX,true,Vernal,false,false,USPS_PO_BOX,not_measured
+84089,UT,Davis,Clearfield (84089),PO BOX,true,Clearfield,false,false,USPS_PO_BOX,not_measured
+84323,UT,Cache,Logan (84323),PO BOX,true,Logan,false,false,USPS_PO_BOX,not_measured
+84402,UT,Weber,Ogden (84402),PO BOX,true,Ogden,false,false,USPS_PO_BOX,not_measured
+84409,UT,Weber,Ogden (84409),PO BOX,true,Ogden,false,false,USPS_PO_BOX,not_measured
+84412,UT,Weber,Ogden (84412),PO BOX,true,Ogden,false,false,USPS_PO_BOX,not_measured
+84415,UT,Weber,Ogden (84415),PO BOX,true,Ogden,false,false,USPS_PO_BOX,not_measured
+84510,UT,San Juan,Aneth (84510),PO BOX,true,Aneth,false,false,USPS_PO_BOX,not_measured
+84603,UT,Utah,Provo (84603),PO BOX,true,Provo,false,false,USPS_PO_BOX,not_measured
+84605,UT,Utah,Provo (84605),PO BOX,true,Provo,false,false,USPS_PO_BOX,not_measured
+84684,UT,Utah,West Mountain,,,,false,false,NOT_IN_USPS_DATASET,not_measured
+84685,UT,Utah,Woodland Hills (84685),,,,false,false,NOT_IN_USPS_DATASET,not_measured
+84717,UT,Garfield,Bryce Canyon (84717),STANDARD,false,Bryce Canyon,false,false,USPS_RETIRED,not_measured
+84771,UT,Washington,Saint George (84771),PO BOX,true,Saint George,false,false,USPS_PO_BOX,not_measured
+84791,UT,Washington,Saint George (84791),PO BOX,true,Saint George,false,false,USPS_PO_BOX,not_measured
+88510,TX,El Paso,El Paso (88510),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88511,TX,El Paso,El Paso (88511),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88512,TX,El Paso,El Paso (88512),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88513,TX,El Paso,El Paso (88513),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88514,TX,El Paso,El Paso (88514),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88515,TX,El Paso,El Paso (88515),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88516,TX,El Paso,El Paso (88516),PO BOX,false,El Paso,false,false,USPS_RETIRED,not_measured
+88517,TX,El Paso,El Paso (88517),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88518,TX,El Paso,El Paso (88518),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88519,TX,El Paso,El Paso (88519),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88520,TX,El Paso,El Paso (88520),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88521,TX,El Paso,El Paso (88521),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88523,TX,El Paso,El Paso (88523),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88524,TX,El Paso,El Paso (88524),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88525,TX,El Paso,El Paso (88525),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88526,TX,El Paso,El Paso (88526),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88527,TX,El Paso,El Paso (88527),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88528,TX,El Paso,El Paso (88528),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88529,TX,El Paso,El Paso (88529),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88530,TX,El Paso,El Paso (88530),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88531,TX,El Paso,El Paso (88531),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88532,TX,El Paso,El Paso (88532),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88533,TX,El Paso,El Paso (88533),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88534,TX,El Paso,El Paso (88534),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88535,TX,El Paso,El Paso (88535),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88536,TX,El Paso,El Paso (88536),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88538,TX,El Paso,El Paso (88538),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88539,TX,El Paso,El Paso (88539),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88540,TX,El Paso,El Paso (88540),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88541,TX,El Paso,El Paso (88541),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88542,TX,El Paso,El Paso (88542),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88543,TX,El Paso,El Paso (88543),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88544,TX,El Paso,El Paso (88544),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88545,TX,El Paso,El Paso (88545),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88546,TX,El Paso,El Paso (88546),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88547,TX,El Paso,El Paso (88547),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88548,TX,El Paso,El Paso (88548),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88549,TX,El Paso,El Paso (88549),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88550,TX,El Paso,El Paso (88550),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88553,TX,El Paso,El Paso (88553),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88554,TX,El Paso,El Paso (88554),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88555,TX,El Paso,El Paso (88555),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88556,TX,El Paso,El Paso (88556),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88557,TX,El Paso,El Paso (88557),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88558,TX,El Paso,El Paso (88558),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88559,TX,El Paso,El Paso (88559),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88560,TX,El Paso,El Paso (88560),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88561,TX,El Paso,El Paso (88561),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88562,TX,El Paso,El Paso (88562),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88563,TX,El Paso,El Paso (88563),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88565,TX,El Paso,El Paso (88565),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88566,TX,El Paso,El Paso (88566),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88567,TX,El Paso,El Paso (88567),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88568,TX,El Paso,El Paso (88568),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88569,TX,El Paso,El Paso (88569),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88570,TX,El Paso,El Paso (88570),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88571,TX,El Paso,El Paso (88571),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88572,TX,El Paso,El Paso (88572),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88573,TX,El Paso,El Paso (88573),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88574,TX,El Paso,El Paso (88574),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88575,TX,El Paso,El Paso (88575),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88576,TX,El Paso,El Paso (88576),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88577,TX,El Paso,El Paso (88577),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88578,TX,El Paso,El Paso (88578),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88579,TX,El Paso,El Paso (88579),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88580,TX,El Paso,El Paso (88580),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88581,TX,El Paso,El Paso (88581),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88582,TX,El Paso,El Paso (88582),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88583,TX,El Paso,El Paso (88583),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88584,TX,El Paso,El Paso (88584),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88585,TX,El Paso,El Paso (88585),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88586,TX,El Paso,El Paso (88586),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88587,TX,El Paso,El Paso (88587),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88588,TX,El Paso,El Paso (88588),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88589,TX,El Paso,El Paso (88589),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88590,TX,El Paso,El Paso (88590),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+88595,TX,El Paso,El Paso (88595),PO BOX,true,El Paso,false,false,USPS_PO_BOX,not_measured
+98009,WA,King,Bellevue (98009),PO BOX,true,Bellevue,false,false,USPS_PO_BOX,not_measured
+98013,WA,King,Burton (98013),PO BOX,true,Burton,false,false,USPS_PO_BOX,not_measured
+98015,WA,King,Bellevue (98015),PO BOX,true,Bellevue,false,false,USPS_PO_BOX,not_measured
+98035,WA,King,Kent (98035),PO BOX,true,Kent,false,false,USPS_PO_BOX,not_measured
+98041,WA,King,Bothell (98041),PO BOX,true,Bothell,false,false,USPS_PO_BOX,not_measured
+98046,WA,Snohomish,Lynnwood (98046),PO BOX,true,Lynnwood,false,false,USPS_PO_BOX,not_measured
+98054,WA,King,Redondo (98054),STANDARD,false,Redondo,false,false,USPS_RETIRED,not_measured
+98062,WA,King,Seahurst (98062),PO BOX,true,Seahurst,false,false,USPS_PO_BOX,not_measured
+98063,WA,King,Federal Way (98063),PO BOX,true,Federal Way,false,false,USPS_PO_BOX,not_measured
+98064,WA,King,Kent (98064),PO BOX,true,Kent,false,false,USPS_PO_BOX,not_measured
+98071,WA,King,Auburn (98071),PO BOX,true,Auburn,false,false,USPS_PO_BOX,not_measured
+98073,WA,King,Redmond (98073),PO BOX,true,Redmond,false,false,USPS_PO_BOX,not_measured
+98082,WA,Snohomish,Mill Creek (98082),PO BOX,true,Mill Creek,false,false,USPS_PO_BOX,not_measured
+98083,WA,King,Kirkland (98083),PO BOX,true,Kirkland,false,false,USPS_PO_BOX,not_measured
+98093,WA,King,Federal Way (98093),PO BOX,true,Federal Way,false,false,USPS_PO_BOX,not_measured
+98111,WA,King,Seattle (98111),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98114,WA,King,Seattle (98114),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98124,WA,King,Seattle (98124),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98131,WA,King,Seattle (98131),STANDARD,true,Seattle,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+98132,WA,King,Seattle (98132),STANDARD,false,Seattle,false,false,USPS_RETIRED,not_measured
+98138,WA,King,Seattle (98138),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98145,WA,King,Seattle (98145),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98160,WA,King,Seattle (98160),PO BOX,true,Seattle,false,false,USPS_PO_BOX,not_measured
+98161,WA,King,Seattle (98161),STANDARD,true,Seattle,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+98171,WA,King,Seattle (98171),STANDARD,false,Seattle,false,false,USPS_RETIRED,not_measured
+98205,WA,Snohomish,Everett (98205),STANDARD,false,Everett,false,true,USPS_RETIRED,not_measured
+98206,WA,Snohomish,Everett (98206),PO BOX,true,Everett,false,false,USPS_PO_BOX,not_measured
+98227,WA,Whatcom,Bellingham (98227),PO BOX,true,Bellingham,false,false,USPS_PO_BOX,not_measured
+98228,WA,Whatcom,Bellingham (98228),PO BOX,true,Bellingham,false,false,USPS_PO_BOX,not_measured
+98231,WA,Whatcom,Blaine (98231),PO BOX,true,Blaine,false,false,USPS_PO_BOX,not_measured
+98259,WA,Snohomish,North Lakewood (98259),PO BOX,true,North Lakewood,false,false,USPS_PO_BOX,not_measured
+98287,WA,Snohomish,Silvana (98287),PO BOX,true,Silvana,false,false,USPS_PO_BOX,not_measured
+98291,WA,Snohomish,Snohomish (98291),PO BOX,true,Snohomish,false,false,USPS_PO_BOX,not_measured
+98293,WA,Snohomish,Startup (98293),PO BOX,true,Startup,false,false,USPS_PO_BOX,not_measured
+98344,WA,Pierce,Kapowsin (98344),PO BOX,true,Kapowsin,false,false,USPS_PO_BOX,not_measured
+98348,WA,Thurston,La Grande (98348),PO BOX,true,La Grande,false,false,USPS_PO_BOX,not_measured
+98395,WA,Pierce,Wauna (98395),PO BOX,true,Wauna,false,false,USPS_PO_BOX,not_measured
+98397,WA,Pierce,Longmire (98397),PO BOX,true,Longmire,false,false,USPS_PO_BOX,not_measured
+98398,WA,Lewis,Paradise Inn (98398),PO BOX,true,Paradise Inn,false,false,USPS_PO_BOX,not_measured
+98401,WA,Pierce,Tacoma (98401),PO BOX,true,Tacoma,false,false,USPS_PO_BOX,not_measured
+98411,WA,Pierce,Tacoma (98411),PO BOX,true,Tacoma,false,false,USPS_PO_BOX,not_measured
+98412,WA,Pierce,Tacoma (98412),PO BOX,true,Tacoma,false,false,USPS_PO_BOX,not_measured
+98413,WA,Pierce,Tacoma (98413),STANDARD,true,Tacoma,false,false,USPS_STANDARD_NO_CENSUS_ZCTA,not_measured
+98415,WA,Pierce,Tacoma (98415),PO BOX,true,Tacoma,false,false,USPS_PO_BOX,not_measured
+98442,WA,Pierce,Tacoma (98442),STANDARD,false,Tacoma,false,false,USPS_RETIRED,not_measured
+98464,WA,Pierce,Tacoma (98464),PO BOX,true,Tacoma,false,false,USPS_PO_BOX,not_measured
+98492,WA,Pierce,Tacoma (98492),STANDARD,false,Tacoma,false,false,USPS_RETIRED,not_measured
+98497,WA,Pierce,Lakewood (98497),PO BOX,true,Lakewood,false,false,USPS_PO_BOX,not_measured
+98507,WA,Thurston,Olympia (98507),PO BOX,true,Olympia,false,false,USPS_PO_BOX,not_measured
+98508,WA,Thurston,Olympia (98508),PO BOX,true,Olympia,false,false,USPS_PO_BOX,not_measured
+98509,WA,Thurston,Lacey (98509),PO BOX,true,Lacey,false,false,USPS_PO_BOX,not_measured
+98511,WA,Thurston,Tumwater (98511),PO BOX,true,Tumwater,false,false,USPS_PO_BOX,not_measured
+98540,WA,Thurston,East Olympia (98540),PO BOX,true,East Olympia,false,false,USPS_PO_BOX,not_measured
+98622,WA,Clark,Heisson (98622),PO BOX,true,Heisson,false,false,USPS_PO_BOX,not_measured
+98666,WA,Clark,Vancouver (98666),PO BOX,true,Vancouver,false,false,USPS_PO_BOX,not_measured
+98668,WA,Clark,Vancouver (98668),PO BOX,true,Vancouver,false,false,USPS_PO_BOX,not_measured
+98904,WA,Yakima,Yakima (98904),PO BOX,true,Yakima,false,false,USPS_PO_BOX,not_measured
+98907,WA,Yakima,Yakima (98907),PO BOX,true,Yakima,false,false,USPS_PO_BOX,not_measured
+98909,WA,Yakima,Yakima (98909),PO BOX,true,Yakima,false,false,USPS_PO_BOX,not_measured
+98920,WA,Yakima,Brownstown (98920),PO BOX,true,Brownstown,false,false,USPS_PO_BOX,not_measured
+98929,WA,Yakima,Naches (98929),STANDARD,false,Naches,false,true,USPS_RETIRED,not_measured
+99209,WA,Spokane,Spokane (99209),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99210,WA,Spokane,Spokane (99210),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99211,WA,Spokane,Spokane (99211),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99213,WA,Spokane,Spokane (99213),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99214,WA,Spokane,Spokane (99214),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99215,WA,Spokane,Spokane (99215),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99219,WA,Spokane,Spokane (99219),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99220,WA,Spokane,Spokane (99220),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
+99228,WA,Spokane,Spokane (99228),PO BOX,true,Spokane,false,false,USPS_PO_BOX,not_measured
