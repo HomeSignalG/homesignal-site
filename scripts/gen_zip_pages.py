@@ -911,11 +911,11 @@ def render(p, built):
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20260922a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
-        '<script src="/lib/templates.js?v=ec3b1cb1"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=74ada1e6"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
-        '<script src="/lib/project-type.js?v=6ad8270c"></script>\n'
+        '<script src="/lib/project-type.js?v=108e00a6"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
