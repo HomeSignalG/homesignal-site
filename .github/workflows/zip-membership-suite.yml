@@ -89,7 +89,7 @@ concurrency:
 jobs:
   membership:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30   # was 15: the job runs every PostGIS suite in sequence and the Epoch key + identity-open suites pushed it past the old ceiling (cancelled at 15:17, 2026-10-01)
     services:
       postgres:
         image: postgis/postgis:16-3.4
