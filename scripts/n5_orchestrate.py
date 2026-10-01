@@ -59,6 +59,13 @@ MODE = os.environ.get("MODE", "status").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
 MAX_SECONDS = int(os.environ.get("MAX_SECONDS", "3000"))
 LEASE_SECONDS = int(os.environ.get("LEASE_SECONDS", "3600"))
+# Unattended ticks put a halted shard back in the queue until it has been tried this many
+# times. A shard rerun is safe by design: it deletes its own partial slice before freezing
+# again, and every gate runs again. 2026-10-01: shard 010 of n5-national-2026-10-01 timed out
+# freezing ZIP 01001 minutes after the 2.9M-row open (cold statistics), while the next 145
+# shards ran clean; a halt is final to n5_claim_shard, so without this the build could never
+# finish. A shard that halts this many times stays halted and n5_map1_build alarms.
+MAX_SHARD_ATTEMPTS = 3
 WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')}-"
                                   f"{os.environ.get('GITHUB_JOB', os.getpid())}")
 # CHUNKS defaults to EMPTY, meaning "the generation's own shard prefixes". Reconciliation
@@ -363,6 +370,8 @@ def mode_work():
     if not snap:
         raise SystemExit(f"STOP: generation {gen} does not exist.")
     snapshot_id = snap[0]["snapshot_id"]
+    if auto:
+        requeue_halted(gen)
     t0 = time.time()
     done = 0
     while done < MAX_SHARDS and (time.time() - t0) < MAX_SECONDS:
@@ -387,6 +396,17 @@ def mode_work():
     if auto:
         auto_finish(gen)
     return 0
+
+
+def requeue_halted(gen):
+    """Put halted shards tried fewer than MAX_SHARD_ATTEMPTS times back in the queue."""
+    rows = sql(f"""update geo.n5_shard set state='pending', claimed_by=null, claim_expires_at=null
+                    where generation_id={lit(gen)} and state='halted'
+                      and attempts < {MAX_SHARD_ATTEMPTS}
+                   returning z3, attempts;""", "requeue halted")
+    for r in rows or []:
+        say("requeued halted shard", f"{r['z3']} (tried {r['attempts']} of {MAX_SHARD_ATTEMPTS})")
+    return len(rows or [])
 
 
 def generations_in(state):
