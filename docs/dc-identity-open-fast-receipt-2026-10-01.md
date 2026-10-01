@@ -28,3 +28,19 @@ The cause was the per-row `NOT EXISTS` reaching `dc_observation_record_key` (a w
 
 ## Not claimed
 Run-time of the geography job after the apply is measured at the first :35 run after it and reported, not assumed (expected: ~199 s → ~35 s).
+
+## Applied (2026-10-01 22:46 UTC — outside :18–:45, not at :10) and read back
+
+- Migration `identity_open_record_keys_once` (ledger `20261001224631`). Stored text md5 `b9dde85f0f5e35805bdcc754bc1d9fd1` = the committed file with its trailing newline stripped. The live view's `pg_get_viewdef` md5 `3e0c7823…` = the md5 a fresh build of `docs/dc-step3a-canonical-identity.sql` produces. `security_invoker` kept, ACL `{postgres, service_role}`, comment kept.
+- **Parity on production after the apply (22:49):** 272 rows, md5 `35cadd92…` = the old view's — in **18.1 s**.
+- **Geography job, the first :35 run after the apply (23:35): 26.9 s, succeeded** (22:35: 210.6 s; 21:35: 216.2 s; 20:35: 193.9 s; 19:35: 196.7 s). Run-time ceiling headroom: 300 s → ~11x.
+- `dc_resolvers` still reads the *slow* class for up to 24 h: its window looks at the slowest successful run in the last 24 h, so it clears once the 200 s+ runs age out (tomorrow ~19:35). That is the check working, not a regression.
+
+## ⚠️ UNEXPLAINED, recorded and not hand-waved: the resolved set grew by 22 between my 17:06 baseline and the 23:35 run
+
+Before (17:06, after nothing of mine): 1,836 resolved live canonical geography rows, fingerprint `a1dfcdd7…`. After (23:38): **1,858 = 1,836 PUBLISHER_POINT + 22 DERIVED_ADDRESS_POINT**.
+- All 1,858 rows were rewritten by the **17:35 run** (the first run after the Epoch consolidation at 17:12), **not** by the 22:46 view change (whose rows are proven identical).
+- **0** acquisitions or geocodes since 17:06; 0 new entities. The 22 are existing `compute_atlas` entities whose derived points were ACCEPTED on 2026-09-25.
+- None of the 22 has a candidate pair with a timeline observation (0 of 22), and only 1 has any candidate at all, so the obvious mechanism (an identity question closed by the Epoch consolidation) is **not** supported by the data.
+- The publisher-only fingerprint is `cff81f7f…` (1,836 rows) and the before-fingerprint covered 1,836 rows of a different composition, so I cannot say whether the 22 are new *derived* points or 22 publisher points swapped for them. **Not proven either way.**
+- Map 1 impact is unmeasured: the daily snapshot (11:50) read 1,825 markers / 980 canonical on 10-01 before any of this; tomorrow's snapshot is the first reading after. Its coverage check will page on a >5% move.
