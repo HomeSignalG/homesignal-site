@@ -40,6 +40,53 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — 0 HomeSignal omissions; 704 legitimate, 2 not established
+
+**Classified before changing anything. No HomeSignal data changed.** All 706 stay `not_measured`.
+Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. Per-ZIP record:
+`docs/maps-coverage/fix4/no-boundary-zip-classification.csv`.
+
+- **Split.** Types and the decommissioned flag come from zipcodes 3.0.0, whose base data is
+  unitedstateszipcodes.org's, not USPS's.
+
+  | class | ZIPs |
+  |---|---:|
+  | PO Box | 498 |
+  | unique | 107 |
+  | standard ZIP with no Census ZCTA (31 in New York City) | 52 |
+  | decommissioned in the dataset (19 standard, 20 unique, 8 PO Box) | 47 |
+  | not in the ZIP dataset (84684, 84685): existence not established | 2 |
+  | **HomeSignal omission** | **0** |
+
+  The total is 706: 704 legitimate non-ZCTA ZIPs plus 2 not established.
+- **0 acquisition defects.** `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to
+  Census TIGERweb's 2020 ZCTA set.
+  - It is one check: five layers returned one identical body. It compares codes only, through a route
+    independent of our load path.
+  - 0 of the 706 are in it; positive control 12,016.
+  - The code sets are committed, so it can be re-checked offline.
+- **0 generation defects.** The ACTIVE generation (`n5-national-2026-09-30` at 19:03Z, and 09-29
+  before it) marks exactly these 706 `not_measured` (md5 `7d1bf19a…`), with 0 disagreements.
+- **Kept honest:**
+  - `scripts/fix4_classify_no_boundary_zips.py` is the only place a class is decided.
+  - `test/no-boundary-zip-classification.test.mjs` is in the required `unit` check and runs the
+    classifier's offline self-test.
+  - `no-boundary-zip-classification.yml` regenerates from zipcodes 3.0.0. It is not a required
+    check.
+  - 16 mutations: 15 fail `unit`; the 16th fails only the advisory job.
+- ⛔ **RETRACTED: the "new item" this entry first carried was false.** It said Fix 3's READY/ACTIVATE
+  check trusts `geo.zcta_boundary` to be complete. It does not: the publisher reads the pinned TIGER
+  archive itself, so a deleted or short table disagrees with it and is refused. No guard is needed.
+  See receipt §5.
+- 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
+  - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
+    established);
+  - the 47 ZIPs the dataset flags as decommissioned;
+  - the 52 active standard ZIPs with no Census ZCTA;
+  - the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.
+
+  The registry and the page copy were not touched.
+
 ### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
 
 **Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
@@ -431,6 +478,11 @@ does not substitute centroid proximity for membership.
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+  *(2026-10-01, FIX 4: the 706 are now classified per ZIP with evidence. Reconciled, not
+  corrected: "685" was 706 minus the 21 obsolete pages set aside, and "19 retired" was the
+  decommissioned STANDARD ZIPs; the dataset flags 47 in all (19 standard, 20 unique, 8 PO Box). The
+  founder ruled that all 706 stay `not_measured`. This item stays OPEN: the pages still say "not
+  measured yet".)*
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 
