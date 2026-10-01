@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conflict hold (built and proven; applied to production after merge). The purge schedule from the previous PR (#1502) is merged and applied.
+Last updated: 2026-10-01, in the PR that records the production receipts of the purge schedule (#1502, applied 16:34Z, first monitor tick ok at 17:10Z) and of ledger option (b) (#1506, applied 17:02Z).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -83,7 +83,7 @@ Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conf
   append-only audit; the snapshot keeps its `report_id`, hash, body and time when the address is purged. Measured
   first: the legacy report shape would have stored the typed address, the exact property point and per-record offsets
   that recover the point to within a metre (contract §2). All four tables hold 0 rows and **nothing calls the writer**;
-  the purge is written and tested; **its schedule and alarm are built in `docs/report-private-context-purge-schedule.sql` (contract §13) and take effect on apply**. Production receipt and a rolled-back behaviour probe: contract
+  the purge is written and tested; **its schedule and alarm are applied (contract §13): pg_cron job 70 every 15 minutes, and the alertable check `report_private_context_retention`, which read ok on its first monitor tick (2026-10-01 17:10Z)**. Production receipt and a rolled-back behaviour probe: contract
   §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
   of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
   boundary-test checklist (§8.4).
@@ -96,7 +96,7 @@ Last updated: 2026-10-01, in the PR that builds ledger option (b), the copy-conf
   **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
-  (three are proven; gate 5, arming the purge, is built and takes effect on apply — contract §13; one is open: the Follow / Changes Since Report surface).
+  (three are proven; gate 5, arming the purge, is applied and reading ok — contract §13; one is open: the Follow / Changes Since Report surface).
   `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
   commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
   JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
