@@ -120,8 +120,18 @@ ok(allFiles.length > 50 && namesPrivate.includes('docs/report-private-context.sq
 // The ONE addition (2026-10-01, founder go for gate 5): the file that schedules the purge and watches it. It names the layer
 // because it must; test/report-private-context-purge-structure.test.mjs pins that it never names a private COLUMN, never
 // writes the layer, and never calls the per-context purge. Anything else naming the layer is still a consumer nobody designed.
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql'].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the one addition is the file that schedules and watches the purge', namesPrivate.join(','));
+// The SECOND addition (2026-10-01, the Follow / Changes Since Report function; contract §4: "a property Follow ... registers its own"
+// need, and §6 gate 4): the one file that calls the two need functions. It is the data layer of an internal admin function, and
+// 5c2 below pins that it names ONLY those two functions: never the table, never a column, never the read function (5d), never
+// the writer or the purge. Anything else naming the layer is still a consumer nobody designed.
+const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the two additions are the file that schedules and watches the purge and the Follow function\'s data layer', namesPrivate.join(','));
+{
+  const names = [...code(FOLLOW_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1').matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  ok(namesPrivate.includes(FOLLOW_DATA) && names.length === 2 && names.every((x) => x === 'report_private_context_need_open' || x === 'report_private_context_need_close'),
+    '5c2: the Follow function\'s data layer names the private layer only as report_private_context_need_open and report_private_context_need_close (control: it does name them; and nothing else, in code)', names);
+}
 ok(!allFiles.some((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))),
   '5d: nothing calls the function that returns the private values');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),

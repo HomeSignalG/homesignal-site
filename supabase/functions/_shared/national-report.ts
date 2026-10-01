@@ -72,6 +72,8 @@ export type ReportableEvent = {
   prev_facts: Record<string, unknown> | null; new_facts: Record<string, unknown> | null;
   changed_fields: string[] | null; publisher_event_type: string | null; publisher_event_date: string | null;
 };
+/** A reportable event together with the instant the ledger WROTE it (`created_at`): what Changes Since Report reads. */
+export type WrittenEvent = ReportableEvent & { created_at: string };
 export type SourceHealth = {
   registry_id: string; fetch_failures_24h: number; blocked_24h: number; truncated_24h: number;
 };
@@ -210,6 +212,58 @@ export function boundaryFindings(intelligence: Record<string, unknown>, ctx: Pri
   return [...new Set(findings)];
 }
 
+// ── what counts as a detected change: ONE rule, two readers ──────────────────────────────────────────────────
+
+/** Whether the ledger says a project's change history may be called changes: comparable, and observed at least twice. The ONE place this is asked. */
+export function isChangeReady(led: LedgerProject | undefined): boolean {
+  return !!led && led.change_ready === true;
+}
+
+/**
+ * THE rule for which ledger events a report may call a HomeSignal-detected change. The report (`assemble`, below) and
+ * Changes Since Report (`changes-since-report.ts`) both ask THIS function and neither restates it, so the two cannot
+ * disagree about what a change is. It decides nothing about WHICH events exist (public.dev_change_event_reportable owns
+ * that) and nothing about the time window (each caller passes its own `keep`).
+ *   * a project counts only when the ledger marks it change-ready (comparable, and observed at least twice);
+ *   * an event counts only when it is material (not a non-material refresh of a field such as `submitted_at`);
+ *   * newest first.
+ */
+export function selectDetectedChanges(
+  led: LedgerProject | undefined, events: ReportableEvent[], keep: (e: ReportableEvent) => boolean,
+): ReportableEvent[] {
+  if (!isChangeReady(led)) return [];
+  return materialEvents(events, keep);
+}
+
+/** The material events that pass `keep`, newest first. A caller that must count what a not-yet-change-ready project WOULD show asks this. */
+export function materialEvents<T extends ReportableEvent>(events: T[], keep: (e: T) => boolean): T[] {
+  return events
+    .filter((e) => e.material === true && keep(e))
+    .sort((a, b) => (a.observed_at < b.observed_at ? 1 : -1));
+}
+
+/**
+ * Whether any source family in `families` could not be fully read in the last day. ONE definition, used by the report and by
+ * Changes Since Report: "no change was detected" is a weaker statement when the source was blocked, failed or came back cut short,
+ * and both answers must say so by the same rule. Health of a family that is not in the answer is not the answer's business.
+ */
+export function sourcesNotFullyRead(health: SourceHealth[], families: Set<string>): boolean {
+  return health
+    .filter((h) => families.has(h.registry_id))
+    .some((h) => h.fetch_failures_24h > 0 || h.blocked_24h > 0 || h.truncated_24h > 0);
+}
+export const SOURCE_NOT_FULLY_READ = { code: 'SOURCE_NOT_FULLY_READ', text: 'One or more official sources for this area could not be fully read recently.' };
+
+/** The one shape a detected change takes in any customer-facing answer: the event, and what changed from what to what. */
+export function detectedChangeEntries(events: ReportableEvent[]) {
+  return events.map((e) => ({
+    event_type: e.event_type,
+    detected_at: e.observed_at,
+    publisher_event: e.publisher_event_type ? { kind: e.publisher_event_type, date: e.publisher_event_date } : null,
+    changes: (e.changed_fields ?? []).map((f) => ({ field: f, from: (e.prev_facts ?? {})[f] ?? null, to: (e.new_facts ?? {})[f] ?? null })),
+  }));
+}
+
 // ── the assembly ─────────────────────────────────────────────────────────────────────────────────────────
 
 export function assemble(input: AssembleInput): Assembled {
@@ -272,10 +326,9 @@ export function assemble(input: AssembleInput): Assembled {
     const lc = HS().canonicalLifecycle({ status: p.status });
     const ev = recentPublisherEvent(p, today);
     const led = ledger.get(p.source_key);
-    const material = (eventsByKey.get(p.source_key) ?? [])
-      .filter((e) => e.material === true && String(e.observed_at).slice(0, 10) >= windowStart && String(e.observed_at).slice(0, 10) <= today)
-      .sort((a, b) => (a.observed_at < b.observed_at ? 1 : -1));
-    const changeCounts = !!led && led.change_ready === true && material.length > 0;
+    const material = selectDetectedChanges(led, eventsByKey.get(p.source_key) ?? [],
+      (e) => String(e.observed_at).slice(0, 10) >= windowStart && String(e.observed_at).slice(0, 10) <= today);
+    const changeCounts = material.length > 0;
 
     // R3 / default D-4: an operating record is not a standing inventory. It appears only when it carries an event in the window.
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
@@ -305,12 +358,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (changeCounts) whatChanged.push({ project_id: p.source_key, at: String(material[0].observed_at) });
     else if (ev) recentOfficial.push({ project_id: p.source_key, at: ev.date });
     if (changeCounts) {
-      entry.homesignal_detected_changes = material.map((e) => ({
-        event_type: e.event_type,
-        detected_at: e.observed_at,
-        publisher_event: e.publisher_event_type ? { kind: e.publisher_event_type, date: e.publisher_event_date } : null,
-        changes: (e.changed_fields ?? []).map((f) => ({ field: f, from: (e.prev_facts ?? {})[f] ?? null, to: (e.new_facts ?? {})[f] ?? null })),
-      }));
+      entry.homesignal_detected_changes = detectedChangeEntries(material);
     }
   }
   const order = (list: Array<{ project_id: string; at: string }>) =>
@@ -328,10 +376,7 @@ export function assemble(input: AssembleInput): Assembled {
   if (truncated) {
     limitations.push({ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' });
   }
-  const includedHealth = input.health.filter((h) => familiesIncluded.has(h.registry_id));
-  if (includedHealth.some((h) => h.fetch_failures_24h > 0 || h.blocked_24h > 0 || h.truncated_24h > 0)) {
-    limitations.push({ code: 'SOURCE_NOT_FULLY_READ', text: 'One or more official sources for this area could not be fully read recently.' });
-  }
+  if (sourcesNotFullyRead(input.health, familiesIncluded)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
   const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
 
   const intelligence: Record<string, unknown> = {

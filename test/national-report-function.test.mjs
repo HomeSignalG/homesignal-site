@@ -267,10 +267,10 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(hyd.length === 1 && hyd[0].name === 'new copy' && !('last_seen_at' in hyd[0]), '7f a project with several ZIP copies resolves to the newest materialisation, and the bookkeeping column is dropped');
 
   reqs.length = 0;
-  d = mk([[/dev_change_event_reportable/, () => json([])], [/dev_change_project/, () => json([])], [/dev_change_source_health/, () => json([])]]);
+  d = mk([[/dev_change_event_reportable/, () => json([])], [/dev_change_project/, () => json([])], [/dev_change_source_fetch_health/, () => json([])]]);
   await d.events(['a', 'b'], '2026-07-01'); await d.ledger(['a']); await d.health(['fam-a']);
   ok(reqs[0].url.includes('dev_change_event_reportable') && reqs[0].url.includes('observed_at=gte.2026-07-01'), '7g changes are read only from the ledger\'s REPORTABLE view, since the window start');
-  ok(reqs[1].url.includes('dev_change_project?') && reqs[2].url.includes('dev_change_source_health?'), '7g change-readiness and source health come from the ledger\'s own relations');
+  ok(reqs[1].url.includes('dev_change_project?') && reqs[2].url.includes('dev_change_source_fetch_health?'), '7g change-readiness and source health come from the ledger\'s own relations (health from the failure-only view, never the whole-ledger one)');
   ok(!reqs.some((r) => /dev_change_event\?/.test(r.url)), '7g the raw event table is never read (the reportable view is the one rule)');
 
   d = mk([[/app_projects/, () => json(Array.from({ length: 1000 }, (_, i) => ({ source_key: 'k' + i })))]]);

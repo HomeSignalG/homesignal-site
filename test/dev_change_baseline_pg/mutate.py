@@ -101,6 +101,24 @@ MUTATIONS = {
     'view_not_invoker': [(
         "create or replace view public.dev_change_source_health with (security_invoker = true) as",
         "create or replace view public.dev_change_source_health as", 1)],
+    # ---- the failure evidence on its own (the reader's cheap path) ---------------------------------------------
+    # the narrow view starts reading the ledger again: the reader would pay for it
+    'narrow_view_reads_ledger': [(
+        "    from public.dev_refresh_source_failures f\n   where f.kind in ('fetch_failed', 'truncated', 'retired')\n   group by f.registry_id;",
+        "    from public.dev_refresh_source_failures f\n    left join (select registry_id from public.dev_change_project limit 1) _lp on _lp.registry_id = f.registry_id\n   where f.kind in ('fetch_failed', 'truncated', 'retired')\n   group by f.registry_id;", 1)],
+    # the answers stay right but a registry_id filter is applied after the aggregate again
+    'narrow_view_blocks_pushdown': [(
+        "   group by f.registry_id;\n", "   group by f.registry_id offset 0;\n", 1)],
+    'narrow_view_open_to_anon': [(
+        "grant select on public.dev_change_source_fetch_health to service_role;",
+        "grant select on public.dev_change_source_fetch_health to service_role, anon;", 1)],
+    'narrow_view_not_invoker': [(
+        "create or replace view public.dev_change_source_fetch_health with (security_invoker = true) as",
+        "create or replace view public.dev_change_source_fetch_health as", 1)],
+    # the wide view stops using the narrow view's counts (a second, different definition would drift the same way)
+    'wide_view_ignores_narrow_counts': [(
+        "  full join public.dev_change_source_fetch_health f on f.registry_id = l.registry_id;",
+        "  full join (select registry_id, 0::bigint as fetch_failures_24h, 0::bigint as blocked_24h, 0::bigint as truncated_24h, 0::bigint as fetch_failures_14d, 0::bigint as blocked_14d, 0::bigint as truncated_14d, 0::bigint as zips_failed_14d, null::timestamptz as last_fetch_failure_at, false as retired_ever from public.dev_change_source_fetch_health) f on f.registry_id = l.registry_id;", 1)],
     'functions_unlocked': [(
         "execute format('revoke all on function %s from public, anon, authenticated', f.sig);",
         "execute format('select 1 /* %s */', f.sig);", 1)],

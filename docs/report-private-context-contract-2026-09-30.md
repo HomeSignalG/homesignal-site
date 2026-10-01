@@ -121,11 +121,11 @@ prove:
 | 1 | the exact address resides only in the deletable layer | **Proven for the Order G engine on the real writer** (2026-09-30, `docs/development-activity-report-engine-2026-09-30.md` §6; `test/national_report_pg`); enforced at the schema, the writer, the trigger and the module | Enforced at the schema (no column), the writer (one hand-off), the trigger and the module. Proven with the legacy engine's real data split at the boundary (module tests 3a–3g). **Closed by Order G:** the engine emits the split (§8.1); its output is stored through the real writer and the database is asked what it holds. |
 | 2 | the permanent snapshot does not contain the raw address elsewhere in its body / inputs | **Enforced as a backstop, with named limits; proven for whole values and fragments on the Order G engine's real output** (its own `boundaryFindings` runs before any store, §8.4) | The trigger scans body **and** engine inputs for the address, the normalized address, every property key, the label and full-precision coordinates (X02a–X02i), naming the field and never the value (X03), atomically (X04). **Limits, pinned not hidden:** §9. |
 | 3 | deleting private context does not damage canonical project / report history | **Proven** | `report_snapshot_pg` P01–P06: after a privacy-request purge and after a retention purge the snapshot row is byte-identical, `content_hash` still verifies, the reference still resolves to the tombstone, another customer is untouched, and history is still immutable. |
-| 4 | Follow / Changes Since Report continues to work while the private context is active | **Half proven; cannot be finished yet** | Proven: a Follow need keeps the address readable and stops the clock while the report itself is closed, and the snapshot never changes (P07). **Open:** the Follow surface and the Changes Since Report reader do not exist. By design that reader needs only the body (project identities) and `dev_change_event_reportable`, never the private context; that must be shown end to end when it is built. |
+| 4 | Follow / Changes Since Report continues to work while the private context is active | **Proven end to end on a disposable Postgres, by the function `follow-development-report` (built; not yet deployed; not run against production)** (2026-10-01, `docs/development-activity-follow-changes-2026-10-01.md`; `test/changes_since_report_pg`, run in CI by `report-snapshot-suite.yml`) | Proven earlier: a Follow need keeps the address readable and stops the clock while the report itself is closed, and the snapshot never changes (P07). **Now also proven through the real handler and data layer, with stand-ins stated:** the transport is a PostgREST-to-SQL translator (not PostgREST), the sign-in and the admin allow-list are canned answers, the rights registry is a fixture, the ingest-side failure table `dev_refresh_source_failures` is a stand-in table (the health view the reader queries, `dev_change_source_fetch_health`, is the shipped SQL, sliced out of `docs/dev-change-baseline.sql`), and the roles and `app_projects` come from a fixture file; everything else is the shipped SQL and code. `follow` (with a caller-held `follow_id`) opens one `follow` need; with only that need holding the context, `changes` gives the identical answer byte for byte **for the same clock and ledger state** (the answer is a function of the report body, the ledger, the rights and `now`, none of which is the private context); after a purge it still gives the **same bytes** (the reader never touched the private context); a purged context reports `CONTEXT_PURGED` and cannot be followed again; no private value, fragment, coordinate or context id appears in any response; the data layer's whole footprint is four data relations (the snapshot, the ledger's projects, its reportable view, its source-failure health view), the gate's allow-list and user lookup, and the two need functions. **Open, stated:** a Follow can keep a context (and the address in it) alive **indefinitely** while its need stays open, so "purged no more than 90 days after the last need ends" holds only once every need is closed; there is no cap on needs per context, no way to list or close a Follow whose id was lost, and `report_private_context_need_open` does not check `purge_due_at` (limits in the follow doc §7);  the function is internal (admin allow-list) until accounts exist (Order K); it covers the projects in the report, not new ones near the property (the answer says so); a Follow is an opaque need row with no owner and no notification. |
 | 5 | the retention clock and purge behaviour are testable and auditable | **Proven, and live: the schedule and its alarm are applied (§13) and the first monitor tick read ok** | 52 checks and 51 mutations on the private layer (clock start, clear, restart, exact 90-day boundary, ceiling, every purge path, in-place blanking, terminal state, audit trail, retention check that can fail). §13 adds the pg_cron job and an alertable monitor check (41 checks, 23 mutations, 33 structural pins). **Receipt in §13** (the apply, the first scheduled runs, the first monitor tick). **Not yet seen in production:** the purge of a real due context (none exists; §12's rolled-back probe shows what it does). |
 
-**Gate 4 and the open parts of gates 1, 2 and 5 keep "store a real customer report" switched off.** Nothing calls the
-writer, so that is the current state; this document is the checklist for turning it on.
+**The open parts of gates 1, 2 and 5 keep "store a real customer report" switched off, and gate 4 is not closed for production until its function is deployed and smoked** (it is proven end to end on a disposable Postgres; the function is not deployed, and the Follow's limits above are decisions for Orders J and K). Nothing calls the writer, so that is the current state; this document is the checklist for
+turning it on.
 
 ## 7. Decisions taken by default in this unit (the founder may change any of them)
 
@@ -159,7 +159,11 @@ writer, so that is the current state; this document is the checklist for turning
    and assert the body contains none of the private values, **no fragment of the address** (house number with street
    name, the street line alone), and none of the subject-relative keys. The database backstop matches whole values only
    (§9).
-5. Make Changes Since Report read the body and `dev_change_event_reportable` only.
+5. Make Changes Since Report read **no private context**: the report's permanent body, the ledger's reportable view
+   (`dev_change_event_reportable`), the ledger's per-project readiness (`dev_change_project`), source health and the rights
+   registry — nothing else. *(This item first said "the body and `dev_change_event_reportable` only"; the reader also needs
+   the readiness flag and source health, so the list is corrected here. The rule that matters, and that is pinned, is that it
+   has no handle on the private context.)* Built: `docs/development-activity-follow-changes-2026-10-01.md`.
 6. Not store a real customer report until §6 is closed.
 
 ## 9. Limits (stated, not hidden)
@@ -178,6 +182,11 @@ writer, so that is the current state; this document is the checklist for turning
   unit governs the database tables only. **Backups** are outside it and are a question for the privacy decision's
   operational follow-up.
 - `service_role` reaches private values only through `report_private_context_read`; nothing calls it yet.
+- **A Follow can extend retention without bound** (2026-10-01, the Follow function): the "no more than 90 days after the last need ends" rule is
+  about the last need *ending*; an open `follow` need is a need. Who may open one is the admin allow-list today, and an entitlement later
+  (Orders J and K). A follow id is the caller's and there is no cap per context; a lost id cannot be listed or closed from this function.
+  `report_private_context_need_open` also does not check `purge_due_at`, so a follow on a context whose clock has run out but that the
+  cron has not yet purged keeps it. All three are changes to this locked layer, left to their own SQL change (`docs/development-activity-follow-changes-2026-10-01.md` §7).
 
 ## 10. Proof inventory
 
@@ -188,7 +197,7 @@ writer, so that is the current state; this document is the checklist for turning
   report is stored**; **54 prohibited mutations, all killed by a named check**.
 - `test/report-snapshot.test.mjs` — 38 checks on the module against a stand-in database; `test/report_snapshot_module_mutants.py`
   — 23 mutations of the module, all killed.
-- `test/report-snapshot-structure.test.mjs` (45 pins) and `test/report-private-context-structure.test.mjs` (42 pins);
+- `test/report-snapshot-structure.test.mjs` (46 pins) and `test/report-private-context-structure.test.mjs` (43 pins) *(45 and 42 before the Follow change added one each)*;
   eleven mutations of the pins themselves each turned the right pin red.
 - `.github/workflows/report-snapshot-suite.yml` runs both database harnesses on Postgres 17 and holds no Supabase credential.
 
