@@ -1299,40 +1299,56 @@ best-anchored entity and follow the evidence on every run.';
 -- Everything else stays OPEN -- the automatic IDENTITY_UNRESOLVED -- and is recomputed from the
 -- current evidence every time this view is read. There is no queue and nothing waits for a person.
 create or replace view public.dc_entity_identity_open with (security_invoker = true) as
-with d as (
-    select k.observation_a, k.observation_b, k.candidate_rule_key, a.decision_state, a.decision_rule_key
+with pre as (
+    -- 2026-10-01: ONLY a pair of two DIFFERENT entities from two DIFFERENT sources can ever be open, so that test
+    -- runs BEFORE the adjudicator, not after it. The adjudicator is the expensive part (it builds geocode inputs
+    -- per pair) and this view used to run it on every candidate and then discard the same-source ones: measured
+    -- on production 2026-10-01, ~195 s of the ~199 s geography run, almost all of it on epoch_ai/timelines pairs
+    -- that share a name and a source. The decision is only ever read for the pairs that survive this test.
+    select k.observation_a, k.observation_b, k.candidate_rule_key,
+           xa.canonical_entity_id ea, xb.canonical_entity_id eb
       from public.dc_identity_candidate k
-     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b, k.candidate_rule_key) a
-     where a.decision_state <> 'CONFIRMED_DISTINCT'
-), e as (
-    select xa.canonical_entity_id ea, xb.canonical_entity_id eb,
-           d.candidate_rule_key, d.decision_state, d.decision_rule_key
-      from d
-      join public.dc_entity_observation xa on xa.home_signal_observation_id = d.observation_a
-      join public.dc_entity_observation xb on xb.home_signal_observation_id = d.observation_b
+      join public.dc_entity_observation xa on xa.home_signal_observation_id = k.observation_a
+      join public.dc_entity_observation xb on xb.home_signal_observation_id = k.observation_b
      where xa.source_key <> xb.source_key
        and xa.canonical_entity_id <> xb.canonical_entity_id
+), e as (
+    select p.ea, p.eb, p.candidate_rule_key, a.decision_state, a.decision_rule_key
+      from pre p
+     cross join lateral public.dc_adjudicate_pair(p.observation_a, p.observation_b, p.candidate_rule_key) a
+     where a.decision_state <> 'CONFIRMED_DISTINCT'
 ), both_dirs as (
     select ea canonical_entity_id, eb other_entity_id, candidate_rule_key, decision_state, decision_rule_key from e
     union
     select eb, ea, candidate_rule_key, decision_state, decision_rule_key from e
+), cand as (
+    select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
+      from both_dirs b
+      join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
+      join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
+     where me.superseded_by is null
+       and oe.superseded_by is null
+       and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+), rk as materialized (
+    -- 2026-10-01: the record keys are a window-function view over EVERY observation. The exclusivity test used to
+    -- reach it from inside a per-row NOT EXISTS and re-derived it for each pair: measured on production, ~175 s of
+    -- a ~192 s read (272 rows). Computed once here (rank < 2 only) it is 0.4 s and the whole test 2.2 s.
+    -- The test stays a CORRELATED probe on purpose: written as a join over rk the planner pairs the two record-key
+    -- sets before it applies the entity filter and the read exceeds 900 s (measured, probe cancelled).
+    select home_signal_observation_id, record_key, record_key_rank
+      from public.dc_observation_record_key
+     where record_key_rank < 2
 )
-select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
-  from both_dirs b
-  join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
-  join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
- where me.superseded_by is null
-   and oe.superseded_by is null
-   and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
-   and not exists (
+select c.canonical_entity_id, c.other_entity_id, c.candidate_rule_key, c.decision_state, c.decision_rule_key
+  from cand c
+ where not exists (
         select 1
           from public.dc_entity_observation l1
-          join public.dc_observation_record_key r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
+          join rk r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
           join public.dc_entity_observation l2
-            on l2.canonical_entity_id = b.other_entity_id
-          join public.dc_observation_record_key r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
-         where l1.canonical_entity_id = b.canonical_entity_id
-           and r1.record_key_rank < 2 and r2.record_key_rank < 2
+            on l2.canonical_entity_id = c.other_entity_id
+          join rk r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
+         where l1.canonical_entity_id = c.canonical_entity_id
            and split_part(r1.record_key, '|', 1) = split_part(r2.record_key, '|', 1)
            and split_part(r1.record_key, '|', 2) = split_part(r2.record_key, '|', 2)
            and r1.record_key <> r2.record_key);
