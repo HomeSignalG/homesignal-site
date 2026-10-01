@@ -2209,8 +2209,12 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
     build with no progress for 6 h, on no build running while the serving map was captured
     > 72 h ago, and on two builds in flight at once.
-  - **Disk:** `DISK_TOTAL_MB` is `36352` (dashboard 2026-09-29: 36 GB; one build ≈ 2.9 GiB).
-    The disk autoscales; **update the constant on any resize**, or the open check reads stale.
+  - **Disk:** the provisioned size is READ from the Supabase Management API
+    (`/v1/projects/<ref>/config/disk`, `attributes.size_gb` GiB, minus 512 MiB) once per run, so
+    an autoscale resize needs no edit (founder, 2026-10-01: "i can not be doing this for years").
+    `DISK_TOTAL_MB` (`36352`, the 2026-09-29 36 GB reading) is the FALLBACK when that read fails;
+    the run log prints `provisioned disk MB … [source]`. The 2,048 MB floor is unchanged. One
+    build ≈ 2.9 GiB. Pinned by `scripts/test_disk_size.py`.
 
 - ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
   (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores

@@ -33,6 +33,7 @@ on:
       - 'scripts/n3_pilot.py'
       - 'scripts/test_heavy_gateway.py'
       - 'scripts/test_n5_auto_lifecycle.py'
+      - 'scripts/test_disk_size.py'
       - 'scripts/n5_candidate_bounding.py'
       - '.github/workflows/n5-generation-publish-suite.yml'
       - '.github/workflows/n5-generation.yml'
@@ -126,6 +127,10 @@ jobs:
       - name: Run the auto-lifecycle guard (open daily, READY then ACTIVATE only when complete)
         if: always()
         run: python3 scripts/test_n5_auto_lifecycle.py
+
+      - name: Run the disk-size guard (read from Supabase, the setting only as a fallback)
+        if: always()
+        run: python3 scripts/test_disk_size.py
 
       - name: Run the STATIC wiring guards (same commit, no database)
         if: always()
