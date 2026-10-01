@@ -16,7 +16,9 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\
 
 const FN = 'supabase/functions/get-development-activity-report';
 const MOD = 'supabase/functions/_shared/national-report.ts';
-const files = { module: MOD, handler: FN + '/handler.ts', data: FN + '/data.ts', index: FN + '/index.ts' };
+const GATE = 'supabase/functions/_shared/admin-gate.ts';
+const REST = 'supabase/functions/_shared/service-rest.ts';
+const files = { module: MOD, handler: FN + '/handler.ts', data: FN + '/data.ts', index: FN + '/index.ts', gate: GATE, rest: REST, reads: 'supabase/functions/_shared/change-reads.ts' };
 const src = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, read(f)]));
 const all = Object.values(src).map(code).join('\n');
 
@@ -49,7 +51,7 @@ const all = Object.values(src).map(code).join('\n');
   ok(/rpc\/n5_projects_within_radius/.test(src.data) && /p_radius_mi/.test(src.data), '2c nearby projects come from the canonical spatial read');
   ok(!/ST_DWithin|st_distance|haversine|earth_distance/i.test(all) && !/Math\.(sin|cos|atan2|asin)\(/.test(all), '2d and no distance is computed here');
   ok(/canonical_zip_registry/.test(src.data), '2e ZIP support is asked of canonical_zip_registry');
-  ok(/dev_change_event_reportable/.test(src.data) && !/dev_change_event\?/.test(code(src.data)), '2f changes are read from the ledger\'s reportable view, never the raw event table');
+  ok(/dev_change_event_reportable/.test(src.reads) && !/dev_change_event\?/.test(code(src.reads)) && !/dev_change_event\?/.test(code(src.data)), '2f changes are read from the ledger\'s reportable view, never the raw event table');
   ok(!/get-future-surroundings-report|nyc-v1|allowlist\.ts|soda|socrata/i.test(all), '2g the legacy NYC engine is not a dependency: there is one commercial engine');
   ok(!/\b(nyc|new york|manhattan|brooklyn|queens|bronx|wsdot|austin|seattle|denver|phoenix|boston|chicago)\b/i.test(all), '2h the engine names no city and no source');
   const fnDirs = readdirSync(join(root, 'supabase/functions')).filter((d) => statSync(join(root, 'supabase/functions', d)).isDirectory());
@@ -80,23 +82,27 @@ const all = Object.values(src).map(code).join('\n');
   const noJwt = [...wf.matchAll(/--no-verify-jwt/g)].length;
   ok(noJwt === 1 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && !/get-development-activity-report/.test(wf), '4b the deploy workflow\'s one --no-verify-jwt exception is get-address-report, and this function is not in it', noJwt);
   const h = code(src.handler);
+  const g = code(src.gate);
   const at = (s) => h.indexOf(s);
-  ok(at('deps.authenticate(') > 0 && at('deps.authenticate(') < at('deps.isAdmin(') && at('deps.isAdmin(') < at('readBounded(req)') && at('readBounded(req)') < at('deps.geocode('),
-    '4c the order is: authenticate, then allow-list, then read the body, then any geocode or data read', [at('deps.authenticate('), at('deps.isAdmin('), at('readBounded(req)'), at('deps.geocode(')]);
-  ok(!/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(h), '4d there is no wildcard CORS origin');
-  ok(/MAX_BODY_BYTES = 4096/.test(h) && /Cache-Control': 'no-store'/.test(h), '4e the body is bounded and responses are no-store');
-  ok(/dashboard_admins/.test(src.data) && !/dashboard_admins.*(insert|update|delete)/i.test(src.data), '4f the allow-list is read from dashboard_admins, never written');
-  ok(/error: 'internal'/.test(h) && !/e\.message|err\.message|String\(e\)/.test(h), '4g an unexpected error is answered without its message');
+  const gat = (s) => g.indexOf(s);
+  ok(at('authorizeAdmin(req, deps)') > 0 && at('authorizeAdmin(req, deps)') < at('readBounded(req)') && at('readBounded(req)') < at('deps.geocode('),
+    '4c the order is: the shared gate (authenticate, then allow-list), then read the body, then any geocode or data read', [at('authorizeAdmin(req, deps)'), at('readBounded(req)'), at('deps.geocode(')]);
+  ok(gat('deps.authenticate(') > 0 && gat('deps.authenticate(') < gat('deps.isAdmin('), '4c the gate itself authenticates before it asks the allow-list', [gat('deps.authenticate('), gat('deps.isAdmin(')]);
+  ok(!/auth\/v1\/user|dashboard_admins\?|rows\[0\]\.email|deps\.authenticate\(|deps\.isAdmin\(/.test(h + code(src.data)), '4c and the handler and the report reads carry NO copy of the gate: it lives once, in the shared modules');
+  ok(!/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(h + g), '4d there is no wildcard CORS origin');
+  ok(/MAX_BODY_BYTES = 4096/.test(g) && /Cache-Control': 'no-store'/.test(g), '4e the body is bounded and responses are no-store');
+  ok(/dashboard_admins/.test(src.rest) && !/dashboard_admins.*(insert|update|delete)/i.test(src.rest), '4f the allow-list is read from dashboard_admins, never written');
+  ok(/error: 'internal'/.test(h) && !/e\.message|err\.message|String\(e\)/.test(h + g), '4g an unexpected error is answered without its message');
   ok(!/console\./.test(all), '4h and nothing logs (the address may be in scope everywhere here)');
-  ok(/SUPABASE_SERVICE_ROLE_KEY/.test(src.index) && !/SUPABASE_SERVICE_ROLE_KEY/.test(code(src.handler) + code(src.data) + code(src.module)), '4i only index.ts reads the service key; every other file receives it');
+  ok(/SUPABASE_SERVICE_ROLE_KEY/.test(src.index) && !/SUPABASE_SERVICE_ROLE_KEY/.test(code(src.handler) + code(src.data) + code(src.module) + g + code(src.rest)), '4i only index.ts reads the service key; every other file receives it');
 }
 
 // ---- 5. purity: the module and the handler can reach nothing by themselves ---------------------------------------------------------
 {
-  for (const k of ['module', 'handler', 'data']) {
-    ok(!/\bDeno\b|process\.env|\brequire\(/.test(code(src[k])), '5' + 'abc'[['module', 'handler', 'data'].indexOf(k)] + ' ' + files[k].split('/').pop() + ' reads no environment and no runtime global');
+  for (const k of ['module', 'handler', 'data', 'gate', 'rest', 'reads']) {
+    ok(!/\bDeno\b|process\.env|\brequire\(/.test(code(src[k])), '5' + 'abcdef'[['module', 'handler', 'data', 'gate', 'rest', 'reads'].indexOf(k)] + ' ' + files[k].split('/').pop() + ' reads no environment and no runtime global');
   }
-  ok(!/\bfetch\(/.test(code(src.module)) && !/\bfetch\(/.test(code(src.handler)) && !/\bfetch\(/.test(code(src.data)), '5d none of them calls a bare fetch: the network arrives injected');
+  ok(!/\bfetch\(/.test(code(src.module)) && !/\bfetch\(/.test(code(src.handler)) && !/\bfetch\(/.test(code(src.data)) && !/\bfetch\(/.test(code(src.gate)), '5d none of them calls a bare fetch: the network arrives injected');
   ok(/\(input, init\) => fetch\(input, init\)/.test(code(src.index)), '5e index.ts is the one place the real fetch is handed in');
 }
 

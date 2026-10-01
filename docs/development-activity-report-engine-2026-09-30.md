@@ -156,7 +156,7 @@ change, and states `from` and `to` for each changed field.
 | 1 | the exact address resides only in the deletable layer | enforced; not proven for a real engine | **proven for this engine**, on the real writer: `national_report_pg` stores its output and asks the database what it holds |
 | 2 | the permanent snapshot holds no raw address elsewhere | backstop with named limits | **proven for whole values and fragments** on the real path; the fragment case shows the database accepting it and the engine's check catching it (`national_report_pg` 4c) |
 | 3 | deleting private context does not damage history | proven | proven again on this engine's reports (`national_report_pg` 3a–3f) |
-| 4 | Follow / Changes Since Report works while private context is active | half proven | **still open** — no Follow surface or reader exists |
+| 4 | Follow / Changes Since Report works while private context is active | half proven | *(at that time) still open — no Follow surface or reader existed.* **Since built and proven end to end on a real database** (2026-10-01): `docs/development-activity-follow-changes-2026-10-01.md`; not yet deployed |
 | 5 | retention clock and purge testable and auditable | proven; not armed | **still open** — the purge is not scheduled |
 
 **Storing a real customer report stays switched off.** Two gates are open, and this endpoint does not call the writer.
@@ -264,5 +264,7 @@ retry rather than fail; it is a code change and is **logged, not taken**.
   labelled HOLD and reports `storable: false` with its blockers.
 - Storing a real customer report stays off until the two open gates in the private-context contract §6 close: the Follow / Changes
   Since Report surface, and arming the purge (a new scheduled job, its own go).
+  *(Dated annotation, 2026-10-01: the purge is armed and reading ok — contract §13 — and the Follow / Changes Since Report function is
+  built and proven end to end, not yet deployed: `docs/development-activity-follow-changes-2026-10-01.md`. The text above is the state at deploy.)*
 
 **Rollback** is §10: delete the function. Nothing depends on it.

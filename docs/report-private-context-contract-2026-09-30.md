@@ -121,11 +121,12 @@ prove:
 | 1 | the exact address resides only in the deletable layer | **Proven for the Order G engine on the real writer** (2026-09-30, `docs/development-activity-report-engine-2026-09-30.md` §6; `test/national_report_pg`); enforced at the schema, the writer, the trigger and the module | Enforced at the schema (no column), the writer (one hand-off), the trigger and the module. Proven with the legacy engine's real data split at the boundary (module tests 3a–3g). **Closed by Order G:** the engine emits the split (§8.1); its output is stored through the real writer and the database is asked what it holds. |
 | 2 | the permanent snapshot does not contain the raw address elsewhere in its body / inputs | **Enforced as a backstop, with named limits; proven for whole values and fragments on the Order G engine's real output** (its own `boundaryFindings` runs before any store, §8.4) | The trigger scans body **and** engine inputs for the address, the normalized address, every property key, the label and full-precision coordinates (X02a–X02i), naming the field and never the value (X03), atomically (X04). **Limits, pinned not hidden:** §9. |
 | 3 | deleting private context does not damage canonical project / report history | **Proven** | `report_snapshot_pg` P01–P06: after a privacy-request purge and after a retention purge the snapshot row is byte-identical, `content_hash` still verifies, the reference still resolves to the tombstone, another customer is untouched, and history is still immutable. |
-| 4 | Follow / Changes Since Report continues to work while the private context is active | **Half proven; cannot be finished yet** | Proven: a Follow need keeps the address readable and stops the clock while the report itself is closed, and the snapshot never changes (P07). **Open:** the Follow surface and the Changes Since Report reader do not exist. By design that reader needs only the body (project identities) and `dev_change_event_reportable`, never the private context; that must be shown end to end when it is built. |
+| 4 | Follow / Changes Since Report continues to work while the private context is active | **Proven end to end on a real database, by the function `follow-development-report` (built; not yet deployed)** (2026-10-01, `docs/development-activity-follow-changes-2026-10-01.md`; `test/changes_since_report_pg`, run in CI by `report-snapshot-suite.yml`) | Proven earlier: a Follow need keeps the address readable and stops the clock while the report itself is closed, and the snapshot never changes (P07). **Now also proven through the real handler and data layer:** `follow` opens one `follow` need; with only that need holding the context, `changes` gives the identical answer byte for byte; after a purge it still gives the **same bytes** (the reader never touched the private context); a purged context reports `CONTEXT_PURGED` and cannot be followed again; no private value, fragment, coordinate or context id appears in any response; the data layer's whole footprint is four relations and the two need functions. **Open, stated:** the function is internal (admin allow-list) until accounts exist (Order K); it covers the projects in the report, not new ones near the property (the answer says so); a Follow is an opaque need row with no owner and no notification. |
 | 5 | the retention clock and purge behaviour are testable and auditable | **Proven, and live: the schedule and its alarm are applied (§13) and the first monitor tick read ok** | 52 checks and 51 mutations on the private layer (clock start, clear, restart, exact 90-day boundary, ceiling, every purge path, in-place blanking, terminal state, audit trail, retention check that can fail). §13 adds the pg_cron job and an alertable monitor check (41 checks, 23 mutations, 33 structural pins). **Receipt in §13** (the apply, the first scheduled runs, the first monitor tick). **Not yet seen in production:** the purge of a real due context (none exists; §12's rolled-back probe shows what it does). |
 
-**Gate 4 and the open parts of gates 1, 2 and 5 keep "store a real customer report" switched off.** Nothing calls the
-writer, so that is the current state; this document is the checklist for turning it on.
+**The open parts of gates 1, 2 and 5 keep "store a real customer report" switched off** (gate 4 is now proven end to end; its
+function is not yet deployed). Nothing calls the writer, so that is the current state; this document is the checklist for
+turning it on.
 
 ## 7. Decisions taken by default in this unit (the founder may change any of them)
 
@@ -159,7 +160,11 @@ writer, so that is the current state; this document is the checklist for turning
    and assert the body contains none of the private values, **no fragment of the address** (house number with street
    name, the street line alone), and none of the subject-relative keys. The database backstop matches whole values only
    (§9).
-5. Make Changes Since Report read the body and `dev_change_event_reportable` only.
+5. Make Changes Since Report read **no private context**: the report's permanent body, the ledger's reportable view
+   (`dev_change_event_reportable`), the ledger's per-project readiness (`dev_change_project`), source health and the rights
+   registry — nothing else. *(This item first said "the body and `dev_change_event_reportable` only"; the reader also needs
+   the readiness flag and source health, so the list is corrected here. The rule that matters, and that is pinned, is that it
+   has no handle on the private context.)* Built: `docs/development-activity-follow-changes-2026-10-01.md`.
 6. Not store a real customer report until §6 is closed.
 
 ## 9. Limits (stated, not hidden)

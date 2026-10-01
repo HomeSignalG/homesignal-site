@@ -23,6 +23,11 @@ name: report-snapshot-suite
 #      health read, every monitor outcome, the scheduled command purging exactly what is due, a check that cannot run
 #      failing instead of killing the monitor, an exact rollback, two refusals that arm nothing, and every prohibited
 #      mutation, each of which MUST fail the suite.
+#   5. CHANGES SINCE REPORT and FOLLOW (Order G follow-up; contract §6 gate 4): the real edge function handler and data layer,
+#      driven against the shipped ledger, reportable-events view, private layer and snapshot SQL. A report is assembled by the
+#      real engine and stored by the real writer; events are written; the reader answers "what changed since" while a Follow
+#      keeps the private context alive AND after the context is purged, byte-identically; a purged context is named, not
+#      reopened; nothing private appears in any response; and the data layer touches only the four relations it is allowed.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
@@ -48,6 +53,14 @@ on:
       - 'supabase/functions/_shared/national-report.ts'
       - 'supabase/functions/_shared/project-type.generated.js'
       - 'supabase/functions/_shared/report-rights.json'
+      - 'test/changes_since_report_pg/**'
+      - 'supabase/functions/_shared/changes-since-report.ts'
+      - 'supabase/functions/_shared/change-reads.ts'
+      - 'supabase/functions/_shared/service-rest.ts'
+      - 'supabase/functions/_shared/admin-gate.ts'
+      - 'supabase/functions/follow-development-report/**'
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -62,6 +75,14 @@ on:
       - 'supabase/functions/_shared/national-report.ts'
       - 'supabase/functions/_shared/project-type.generated.js'
       - 'supabase/functions/_shared/report-rights.json'
+      - 'test/changes_since_report_pg/**'
+      - 'supabase/functions/_shared/changes-since-report.ts'
+      - 'supabase/functions/_shared/change-reads.ts'
+      - 'supabase/functions/_shared/service-rest.ts'
+      - 'supabase/functions/_shared/admin-gate.ts'
+      - 'supabase/functions/follow-development-report/**'
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -143,3 +164,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log
+      - name: Changes Since Report and Follow run end to end; the answer is the same while the context is kept and after it is purged
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/changes_since_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/csr.log

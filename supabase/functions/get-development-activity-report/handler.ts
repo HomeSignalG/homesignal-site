@@ -4,12 +4,11 @@
 // environment and calls no network: everything external arrives through `Deps`, so the whole request path is
 // testable without Deno or a database (test/national-report-function.test.mjs).
 //
-// WHO MAY CALL IT — and why the gateway's JWT check is not enough. `verify_jwt = true` proves a token is validly
-// SIGNED. The public anon key is a validly signed token, and it is in every page of the site. So the gateway alone
-// leaves an anonymous generator. This handler therefore also requires a real SIGNED-IN USER whose email is in
-// public.dashboard_admins. That is an internal diagnostic surface, which is what the plan permits before the
-// account, entitlement and quota units (Orders H and L) exist; it is NOT a customer surface and cannot function as
-// an unlimited customer generator. When those units land, the entitlement check replaces `isAdmin` here.
+// WHO MAY CALL IT is _shared/admin-gate.ts (`authorizeAdmin`), the ONE gate every internal function uses: a signed-in user whose
+// email is in public.dashboard_admins. The gateway's JWT check alone is not enough, because the public anon key is a validly
+// signed token. That is an internal diagnostic surface, which is what the plan permits before the account, entitlement and
+// quota units (Orders H and L) exist; it is NOT a customer surface and cannot function as an unlimited customer generator.
+// When those units land, the entitlement check replaces `isAdmin` in the shared gate.
 //
 // NOTHING IS STORED. This function never calls the snapshot writer and does not import issueSnapshot (a structural
 // test fails if it does). `assemble` says whether a report COULD be stored (`storage_blockers`); the response reports
@@ -17,12 +16,13 @@
 import {
   addDays, ALLOWED_RADII, assemble, dayOf, parseRadius, RECENT_DAYS, validateRights,
 } from '../_shared/national-report.ts';
+import { authorizeAdmin, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
+import { DataUnavailable } from '../_shared/service-rest.ts';
 import type {
   LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth, View,
 } from '../_shared/national-report.ts';
 
-export const MAX_BODY_BYTES = 4096;
-export const ALLOWED_ORIGINS = ['https://homesignal.net', 'https://www.homesignal.net'];
+export { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };
 /** Rows requested from the canonical spatial read. It reports `has_more`, and a truncated area is disclosed, never hidden. */
 export const RADIUS_ROW_LIMIT = 1000;
 
@@ -42,29 +42,8 @@ export type Deps = {
   health: (families: string[]) => Promise<SourceHealth[]>;
 };
 
-/** A read failed. The caller answers 502 and says nothing about which read. */
-export class DataUnavailable extends Error {}
 /** The geocoder itself could not be reached (distinct from "no match"). */
 export class GeocoderUnavailable extends Error {}
-
-function corsFor(req: Request): Record<string, string> {
-  const origin = req.headers.get('origin');
-  const h: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Vary': 'Origin',
-  };
-  if (origin && ALLOWED_ORIGINS.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
-  return h;
-}
-
-function reply(req: Request, body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    // the response can carry the customer's own address back to them: it is never cacheable
-    headers: { ...corsFor(req), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-  });
-}
 
 export function capability() {
   return {
@@ -75,17 +54,6 @@ export function capability() {
     access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
     stores_reports: false,
   };
-}
-
-/** A unique object, so no JSON body can ever be mistaken for "too large". */
-const TOO_LARGE = Symbol('too-large');
-
-async function readBounded(req: Request): Promise<unknown | typeof TOO_LARGE> {
-  const declared = Number(req.headers.get('content-length') ?? '0');
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return TOO_LARGE;
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return TOO_LARGE;
-  try { return JSON.parse(text); } catch { return null; }
 }
 
 export function chunk<T>(xs: T[], n: number): T[][] {
@@ -100,16 +68,9 @@ export function makeHandler(deps: Deps) {
     if (req.method === 'GET') return reply(req, capability());
     if (req.method !== 'POST') return reply(req, { error: 'GET for the capability, POST to generate' }, 405);
 
-    // 1. who is asking — a signed-in user, then an allow-listed one
-    const auth = req.headers.get('authorization') ?? '';
-    const token = /^Bearer\s+(\S+)$/i.exec(auth)?.[1];
-    if (!token) return reply(req, { error: 'unauthorized' }, 401);
-    let user: { email: string } | null;
-    try { user = await deps.authenticate(token); } catch { return reply(req, { error: 'unavailable' }, 502); }
-    if (!user || !user.email) return reply(req, { error: 'unauthorized' }, 401); // includes the public anon key: it has no user
-    let admin: boolean;
-    try { admin = await deps.isAdmin(user.email); } catch { return reply(req, { error: 'unavailable' }, 502); }
-    if (!admin) return reply(req, { error: 'forbidden' }, 403);
+    // 1. who is asking — the one shared gate: a signed-in user, then an allow-listed one
+    const denied = await authorizeAdmin(req, deps);
+    if (denied) return denied;
 
     // 2. what they asked — bounded, validated, and nothing unknown accepted
     const raw = await readBounded(req);

@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-01, in the PR that records the production receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z). The receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
+Last updated: 2026-10-01, in the PR that builds the Follow / Changes Since Report function (contract §6 gate 4: proven end to end on a disposable Postgres; **not deployed**). The receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z) is merged (#1514); the receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -96,7 +96,7 @@ Last updated: 2026-10-01, in the PR that records the production receipt of the r
   **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
-  (three are proven; gate 5, arming the purge, is applied and reading ok — contract §13; one is open: the Follow / Changes Since Report surface).
+  (gate 5, arming the purge, is applied and reading ok — contract §13; gate 4, the Follow / Changes Since Report function, is built and proven end to end on a real Postgres in the PR that adds `follow-development-report`, **not yet deployed** — `docs/development-activity-follow-changes-2026-10-01.md`; the open parts of gates 1 and 2 are stated limits, not unbuilt features).
   `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
   commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
   JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
@@ -105,6 +105,18 @@ Last updated: 2026-10-01, in the PR that records the production receipt of the r
   HOLD, never storable). Proof: 117 + 85 + 59 offline checks, 28 checks storing the engine's real output through the real
   Postgres writer, 107 mutations all killed. **Not built, by design:** entitlement, quota, idempotency and rate limiting
   (Orders H, L, M), the "Things to Review" section, per-ZIP source-applicability measurement.
+- G2. Follow / Changes Since Report — **built and proven end to end on a real Postgres; not deployed, and not struck until it is merged and
+  deployed.** `follow-development-report` (internal, JWT on, plus the admin allow-list) answers what the change ledger has learned about the
+  projects **in a stored report** since it was issued, and registers or closes a `follow` need on the report's private context.
+  `docs/development-activity-follow-changes-2026-10-01.md`: the boundary in time is the ledger's **write** time (`created_at`) with a
+  ten-minute overlap and a removal of what the report already showed, because `observed_at` is the source's retrieval instant and
+  would lose events written after a report but retrieved before it; the reader has no handle on the private context, so its answer is
+  byte-identical while a Follow holds the context and after a purge. Proof: 52 + 76 + 71 offline checks, 38 checks on a disposable
+  Postgres through the real handler and data layer, 89 mutations all killed. The gate, the ledger reads and the change rule are shared
+  with the national report (one definition each), and the national function was refactored onto them with its suites unchanged.
+  **Defaults the founder may change:** D-F1 internal-only until accounts exist; D-F2 a Follow is an opaque need with a random id;
+  D-F3 the overlap is ten minutes; D-F4 a purged report cannot be followed again. **Not covered, and the answer says so:** projects that
+  appeared near the property after the report. **Not built:** notifications, ownership of a Follow (Order K).
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
 - J. Secure stored-report delivery — open.
@@ -208,5 +220,5 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     `label` is the one optional free-text field (D-5); unknown private fields are refused (D-6). **Arming the purge
     (go 2026-09-30) is built:** a pg_cron job every 15 minutes and an alertable monitor check
     (`docs/report-private-context-purge-schedule.sql`, contract §13; defaults D-7..D-10). **Still to do before the first
-    real report is stored:** the apply and its production receipt, the Follow / Changes Since Report surface, and backups
+    real report is stored:** the deploy and smoke of the Follow / Changes Since Report function (built 2026-10-01), and backups
     are outside this unit.

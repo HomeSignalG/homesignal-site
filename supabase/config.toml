@@ -19,3 +19,8 @@ verify_jwt = true
 # Not in the deploy workflow's --no-verify-jwt exception.
 [functions.get-development-activity-report]
 verify_jwt = true
+
+# Changes Since Report and Follow for a stored Development Activity report. JWT stays ON, and the handler additionally requires a
+# signed-in, allow-listed user (the same shared gate as the national report). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.follow-development-report]
+verify_jwt = true
