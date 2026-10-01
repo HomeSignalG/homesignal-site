@@ -96,6 +96,26 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
     '2g5 the flag is exact: retrieved at the issue instant is "before", one millisecond later is not');
 }
 
+// ---- 2h. the review's second case: recorded BEFORE the issue, omitted by the report only because the project was not yet change-ready ---------
+{
+  // k2 is not change-ready in the report (observed once). The ledger recorded its first sighting at 11:55, five minutes BEFORE the report was issued
+  // (inside the overlap), then observed it again, so the project is change-ready NOW. The report could not show the event; the answer can.
+  const early = wev('k2', '2026-09-29T11:55:00Z', { type: 'first_detected', observed_at: '2026-09-29T11:50:00Z', event_type: 'first_detected', prev_facts: null, new_facts: { status: 'Proposed' }, changed_fields: [] });
+  const ready = FIELD.ledger.map((l) => (l.identity_key === 'k2' ? { ...l, change_ready: true, observation_count: 2 } : l));
+  const r = run({ ledger: ready, events: [early] });
+  const k2 = r.changed.find((c) => c.project_id === 'k2');
+  ok(!!k2 && k2.changes_since_report.length === 1 && k2.changes_since_report[0].recorded_at === '2026-09-29T11:55:00Z' && k2.changes_since_report[0].source_retrieved_before_report === true,
+    '2h1 an event recorded five minutes BEFORE the report was issued, which the report omitted because its project was not yet change-ready, is listed with its true recorded_at', k2 && k2.changes_since_report);
+  ok(!r.limitations.some((l) => l.code === 'RECORDED_AFTER_REPORT'),
+    '2h2 and the answer does NOT say it was recorded after the report was issued: it was not (the limitation is raised only when the ledger wrote the event after the issue instant)', r.limitations.map((l) => l.code));
+  // the same event written 5 minutes AFTER the issue does raise it
+  const late = run({ ledger: ready, events: [{ ...early, created_at: '2026-09-29T12:05:05Z' }] });
+  ok(late.limitations.some((l) => l.code === 'RECORDED_AFTER_REPORT'), '2h3 CONTROL: the same event recorded five minutes after the issue instant does raise RECORDED_AFTER_REPORT', late.limitations.map((l) => l.code));
+  // written exactly at the issue instant is not "after"
+  const atIssue = run({ ledger: ready, events: [{ ...early, created_at: ISSUED }] });
+  ok(!atIssue.limitations.some((l) => l.code === 'RECORDED_AFTER_REPORT'), '2h4 recorded at exactly the issue instant is not after it: the boundary is strict');
+}
+
 // ---- 3. what is NOT a change since the report ---------------------------------------------------------------------------------------------
 {
   const nonMaterial = wev('k1', '2026-09-30T06:35:00Z', { material: false, event_type: 'source_record_updated', changed_fields: ['submitted_at'] });

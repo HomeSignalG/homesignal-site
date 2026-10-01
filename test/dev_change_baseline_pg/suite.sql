@@ -383,6 +383,52 @@ select pg_temp._ck('D13g the view exposes exactly the evidence columns and no he
       'truncated_24h', 'fetch_failures_14d', 'blocked_14d', 'truncated_14d', 'zips_failed_14d', 'last_fetch_failure_at', 'retired_ever']
      from pg_attribute where attrelid = 'public.dev_change_source_health'::regclass and attnum > 0 and not attisdropped));
 
+-- ---- D15  the failure evidence on its own: the reader's cheap path ------------------------------------------------------
+-- The reader (supabase/functions/_shared/change-reads.ts) asks for ONE family's failure counts. Through the wide view that
+-- means aggregating the whole ledger first (measured 6.1-6.2 s on 933,013 projects, against PostgREST's 8 s). These checks
+-- read the query PLAN, because the defect was a plan shape: the answers were always right, only the work was wrong.
+create function pg_temp._plan(q text) returns jsonb language plpgsql as $f$
+declare r jsonb;
+begin execute 'explain (format json) ' || q into r; return r; end $f$;
+create function pg_temp._rels(p jsonb) returns text language sql as $f$
+  select coalesce(string_agg(distinct x #>> '{}', ',' order by x #>> '{}'), '') from jsonb_path_query(p, '$.**."Relation Name"') x $f$;
+select pg_temp._ck('D15a the narrow view returns the same failure counts the wide view does, for a family with failures and for one with none (row sets equal, in both directions)',
+  not exists (select 1 from (
+      select registry_id, fetch_failures_24h, blocked_24h, truncated_24h, fetch_failures_14d, blocked_14d, truncated_14d, zips_failed_14d, last_fetch_failure_at, retired_ever
+        from public.dev_change_source_fetch_health
+      except
+      select registry_id, fetch_failures_24h, blocked_24h, truncated_24h, fetch_failures_14d, blocked_14d, truncated_14d, zips_failed_14d, last_fetch_failure_at, retired_ever
+        from public.dev_change_source_health where last_fetch_failure_at is not null or fetch_failures_14d > 0 or fetch_failures_24h > 0 or truncated_24h > 0 or retired_ever or blocked_24h > 0) a)
+  and not exists (select 1 from (
+      select registry_id, fetch_failures_24h, blocked_24h, truncated_24h, fetch_failures_14d, blocked_14d, truncated_14d, zips_failed_14d, last_fetch_failure_at, retired_ever
+        from public.dev_change_source_health where last_fetch_failure_at is not null or fetch_failures_14d > 0 or fetch_failures_24h > 0 or truncated_24h > 0 or retired_ever or blocked_24h > 0
+      except
+      select registry_id, fetch_failures_24h, blocked_24h, truncated_24h, fetch_failures_14d, blocked_14d, truncated_14d, zips_failed_14d, last_fetch_failure_at, retired_ever
+        from public.dev_change_source_fetch_health) b)
+  and (select count(*) from public.dev_change_source_fetch_health) >= 2);
+select pg_temp._ck('D15b a family with ledger rows and no failure record has NO row in the narrow view (and a zero row in the wide one): absent and all-zero mean the same to every consumer',
+  not exists (select 1 from public.dev_change_source_fetch_health where registry_id = 'src-y')
+  and exists (select 1 from public.dev_change_source_health where registry_id = 'src-y' and fetch_failures_24h = 0 and blocked_24h = 0 and truncated_24h = 0));
+select pg_temp._ck('D15c CONTROL: the plan reader can see a ledger scan — the wide view''s plan for the same question reaches dev_change_project',
+  pg_temp._rels(pg_temp._plan($q$select registry_id, fetch_failures_24h, blocked_24h, truncated_24h from public.dev_change_source_health where registry_id = any (array['src-h'])$q$)) like '%dev_change_project%');
+select pg_temp._ck('D15d the narrow view''s plan for the reader''s query touches ONLY dev_refresh_source_failures — it never reads the ledger',
+  pg_temp._rels(pg_temp._plan($q$select registry_id, fetch_failures_24h, blocked_24h, truncated_24h from public.dev_change_source_fetch_health where registry_id = any (array['src-h'])$q$)) = 'dev_refresh_source_failures');
+select pg_temp._ck('D15e the registry_id filter is PUSHED DOWN to the scan of the failure record (not applied after the aggregate, which would read every family)',
+  exists (select 1 from jsonb_path_query(
+      pg_temp._plan($q$select registry_id, fetch_failures_24h, blocked_24h, truncated_24h from public.dev_change_source_fetch_health where registry_id = any (array['src-h'])$q$),
+      '$.** ? (@."Relation Name" == "dev_refresh_source_failures")') n
+    where coalesce(n->>'Filter', '') || coalesce(n->>'Index Cond', '') || coalesce(n->>'Recheck Cond', '') like '%registry_id%'));
+select pg_temp._ck('D15f the narrow view is system-only like the wide one: service_role can select, anon and authenticated cannot, and it is a security-invoker view',
+  has_table_privilege('service_role', 'public.dev_change_source_fetch_health', 'select')
+  and not has_table_privilege('service_role', 'public.dev_change_source_fetch_health', 'insert')
+  and not has_table_privilege('anon', 'public.dev_change_source_fetch_health', 'select')
+  and not has_table_privilege('authenticated', 'public.dev_change_source_fetch_health', 'select')
+  and (select 'security_invoker=true' = any (reloptions) from pg_class where oid = 'public.dev_change_source_fetch_health'::regclass));
+select pg_temp._ck('D15g the narrow view exposes exactly the failure columns, in the order the wide view carries them',
+  (select array_agg(attname::text order by attnum) = array['registry_id', 'fetch_failures_24h', 'blocked_24h', 'truncated_24h',
+      'fetch_failures_14d', 'blocked_14d', 'truncated_14d', 'zips_failed_14d', 'last_fetch_failure_at', 'retired_ever']
+     from pg_attribute where attrelid = 'public.dev_change_source_fetch_health'::regclass and attnum > 0 and not attisdropped));
+
 -- ---- D14  the ledger vocabulary is unchanged by the driver -------------------------------------------------------
 select pg_temp._ck('D14 across every scenario the driver produced only the three ledger event words, and no first sighting made in a baseline run is material',
   (select coalesce(bool_and(event_type in ('first_detected', 'status_changed', 'source_record_updated')), false) from public.dev_change_event)

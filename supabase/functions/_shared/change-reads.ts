@@ -1,7 +1,8 @@
-// THE CHANGE LEDGER READS an internal edge function makes — moved here VERBATIM from
-// get-development-activity-report/data.ts so the column lists and the one-reader rule have ONE definition
-// (CLAUDE.md "one canonical truth path"). The national report and Changes Since Report ask the ledger the same questions in
-// the same words; neither carries its own copy of the SELECT.
+// THE CHANGE LEDGER READS an internal edge function makes — moved here from get-development-activity-report/data.ts so the
+// column lists and the one-reader rule have ONE definition (CLAUDE.md "one canonical truth path"). The national report and
+// Changes Since Report ask the ledger the same questions in the same words; neither carries its own copy of the SELECT.
+// What is NOT verbatim, so nobody has to diff it to find out: `eventsWrittenSince` is new (Changes Since Report asks it), and
+// `health` now names public.dev_change_source_fetch_health instead of dev_change_source_health (see the comment on `health`).
 //
 // WHAT IT READS, AND WHAT IT NEVER READS.
 //   * events come ONLY from public.dev_change_event_reportable, the view that owns "may this event be shown as a change"
@@ -11,8 +12,7 @@
 //   * nothing here reads the private context. It has no handle to it.
 // It makes no decision and holds no rule; it fetches through the `rest` it is handed, which fails closed.
 import { inBatches, quoteIn } from './service-rest.ts';
-import type { LedgerProject, ReportableEvent, SourceHealth } from './national-report.ts';
-import type { WrittenEvent } from './changes-since-report.ts';
+import type { LedgerProject, ReportableEvent, SourceHealth, WrittenEvent } from './national-report.ts';
 
 type Rest = <T>(path: string) => Promise<T[]>;
 
@@ -49,9 +49,16 @@ export function makeChangeReads(rest: Rest) {
           + '&identity_key=in.' + encodeURIComponent(quoteIn(b))));
     },
 
+    /**
+     * The failure evidence for the families a report names. It reads public.dev_change_source_fetch_health, NOT dev_change_source_health:
+     * the wide view aggregates the whole ledger (933,013 projects on 2026-10-01) before a registry_id filter can apply, which measured
+     * 6.1-6.2 s here and 7.4-10.6 s by an independent reviewer, against the 8 s statement timeout PostgREST runs under. The narrow view
+     * is the same definition of the 24-hour counts (the wide view is built FROM it) and touches only the failure record. A family
+     * with no failure record has no row, and `sourcesNotFullyRead` treats an absent row and an all-zero row alike.
+     */
     async health(families: string[]): Promise<SourceHealth[]> {
       return await inBatches<SourceHealth>(families, (b) =>
-        rest('dev_change_source_health?select=registry_id,fetch_failures_24h,blocked_24h,truncated_24h&registry_id=in.'
+        rest('dev_change_source_fetch_health?select=registry_id,fetch_failures_24h,blocked_24h,truncated_24h&registry_id=in.'
           + encodeURIComponent(quoteIn(b))));
     },
   };

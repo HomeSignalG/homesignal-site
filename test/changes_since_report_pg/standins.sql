@@ -1,6 +1,10 @@
--- Disposable stand-in for the ONE production object this proof does not apply: public.dev_change_source_health.
--- The real view (docs/dev-change-baseline.sql) reads the Order D failure log and is proven by its own suite
--- (test/dev_change_baseline_pg); here only its three columns and its grant matter, so a table with exactly those stands in.
+-- Disposable stand-in for the ONE production object this proof does not apply: the failure record public.dev_refresh_source_failures
+-- (the refresh's own table, whose DDL is split across docs/dev-refresh-source-failure-guard.sql and a later `kind` migration). run.sh
+-- applies the REAL view the reader queries, public.dev_change_source_fetch_health, sliced out of docs/dev-change-baseline.sql by
+-- pattern (never retyped), on top of this table. So the thing proven here is the production view's own definition and grants, read
+-- through the same translator and the same role as the data layer; only the table under it is a stand-in, with the columns the
+-- view reads. The whole-ledger view dev_change_source_health is NOT used by the reader and is proven by its own suite
+-- (test/dev_change_baseline_pg), which also pins that the reader's view never touches the ledger.
 -- NEVER applied to production: run.sh refuses unless PGDATABASE names a disposable database.
 -- Supabase grants USAGE on schema public to its three API roles; run.sh rebuilds the schema from nothing, so the stand-in restores
 -- it. (Production has it by platform default; every other disposable harness runs as the database owner and never needs it.)
@@ -11,11 +15,15 @@ grant usage on schema public to anon, authenticated, service_role;
 -- earlier session on a developer machine may already carry the attribute, which hid it locally. Set it here, from production's fact.
 alter role service_role bypassrls;
 
-create table public.dev_change_source_health (
-  registry_id text primary key,
-  fetch_failures_24h integer not null default 0,
-  blocked_24h integer not null default 0,
-  truncated_24h integer not null default 0
+create table public.dev_refresh_source_failures (
+  id             bigint generated always as identity primary key,
+  zip            text        not null,
+  registry_id    text        not null,
+  reason         text        not null,
+  cached_records integer     not null,
+  blocked_update boolean     not null,
+  seen_at        timestamptz not null default now(),
+  kind           text        not null
 );
-revoke all on public.dev_change_source_health from public, anon, authenticated, service_role;
-grant select on public.dev_change_source_health to service_role;
+-- production: RLS on, no policy; the service role reads it by BYPASSRLS (set above), anon and authenticated read nothing
+alter table public.dev_refresh_source_failures enable row level security;

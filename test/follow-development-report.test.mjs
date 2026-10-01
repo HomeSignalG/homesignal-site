@@ -91,7 +91,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   f = fakes();
   const bad1 = await call(f.deps, '{not json');
   ok(bad1.status === 401, '1e validation comes AFTER identity: an unauthenticated bad request is 401, not 400');
-  // PARITY with the national report: the same six requests get the same status and body from both functions
+  // PARITY with the national report: the same seven sign-in scenarios get the same status and body from both functions
   const rf = (over = {}) => ({
     now: () => NOW, rights: RIGHTS,
     authenticate: async (t) => (t === 'user-token' ? { email: 'founder@example.com' } : null), isAdmin: async (e) => e === 'founder@example.com',
@@ -137,7 +137,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   const big = await call(fakes().deps, JSON.stringify({ action: 'changes', report_id: REPORT_ID, view: 'x'.repeat(5000) }), AUTH);
   ok(big.status === 413, '2 a body over 4,096 bytes: 413');
   const get = await call(fakes().deps, null, {}, 'GET');
-  ok(get.status === 200 && get.json.stores_reports === false && get.json.reads_private_context === false, '2 GET answers the capability, which says it stores no reports and reads no private context');
+  ok(get.status === 200 && get.json.stores_reports === false && get.json.reads_private_values === false && get.json.uses_private_context_handle === true && get.json.reads_private_context === undefined, '2 GET answers the capability, which says it stores no reports, reads no private VALUE and uses the private context\'s opaque handle (follow/unfollow pass it to two database functions): the old "reads_private_context: false" was imprecise');
   ok(same(get.json.writes, ['a follow need on a report\'s private context (follow, unfollow)']) && /dashboard_admins/.test(get.json.access)
     && /action: "changes", report_id, view\?/.test(get.json.method) && /action: "follow" \| "unfollow", report_id, follow_id \}/.test(get.json.method) && !/follow_id\?/.test(get.json.method),
     '2 and says what it writes (a follow need, nothing else), who may call it, and how: follow_id is required for follow and unfollow', get.json);
@@ -190,6 +190,23 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   const un = fakes({ report: async () => ({ ...ROW, body: 'not json' }) });
   const bad2 = await call(un.deps, CHANGES, AUTH);
   ok(bad2.status === 422 && bad2.json.error === 'report_unreadable' && !bad2.text.includes('not json') && !un.calls.includes('ledger'), '3k a report this reader cannot read is 422, never an empty answer, and nothing from its body is echoed');
+  // the operator gets the REASON of a failure on the server log; the caller never does, and the log carries no value from the request or the ledger
+  {
+    const lines = []; const orig = console.error; console.error = (...a) => lines.push(a.join(' '));
+    let r502, r500, r422;
+    try {
+      r502 = await call(fakes({ health: async () => { throw new H.DataUnavailable('http 500'); } }).deps, CHANGES, AUTH);
+      r500 = await call(fakes({ ledger: async () => { throw new Error('SECRET 742 Evergreen Terrace ' + REPORT_ID + ' ' + FOLLOW_ID); } }).deps, CHANGES, AUTH);
+      r422 = await call(fakes({ report: async () => ({ ...ROW, body: 'not json' }) }).deps, CHANGES, AUTH);
+    } finally { console.error = orig; }
+    const parsed = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } });
+    ok(r502.status === 502 && r500.status === 500 && r422.status === 422 && lines.length === 3 && parsed.every(Boolean), '3m1 each failed request writes exactly one structured log line', lines);
+    ok(same(parsed[0], { fn: 'follow-development-report', action: 'changes', status: 502, reason: 'http 500' }), '3m2 a 502 logs its reason (http 500), so a data outage, a row cap and a bad event can be told apart', parsed[0]);
+    ok(parsed[1].status === 500 && parsed[1].reason === 'Error' && !lines[1].includes('SECRET') && !lines[1].includes('Evergreen'), '3m3 an unexpected error logs its CLASS NAME only: its message (which could hold anything) is never logged', parsed[1]);
+    ok(parsed[2].status === 422 && !lines.join('\n').includes(REPORT_ID) && !lines.join('\n').includes(FOLLOW_ID) && !lines.join('\n').includes(CONTEXT_ID) && !lines.join('\n').includes('Evergreen'),
+      '3m4 no log line carries a report id, a follow id, the context id or an address');
+    ok(![r502, r500, r422].some((r) => /http 500|SECRET|Error/.test(r.text)), '3m5 and none of it reaches the caller: the response is still a bare status');
+  }
   for (const which of ['ledger', 'eventsWrittenSince', 'health', 'report']) {
     const g = fakes({ [which]: async () => { throw new H.DataUnavailable('x'); } });
     const rr = await call(g.deps, CHANGES, AUTH);
@@ -265,8 +282,28 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   ok(nc.json.status === 'NO_PRIVATE_CONTEXT' && !f.calls.includes('openFollow'), '4f a report stored with no private context has nothing to follow');
   f = fakes();
   const un = await call(f.deps, { action: 'unfollow', report_id: REPORT_ID, follow_id: FOLLOW_ID }, AUTH);
-  ok(un.json.status === 'UNFOLLOWED' && un.json.follow_id === FOLLOW_ID && same(f.asked.closeFollow, [CONTEXT_ID, FOLLOW_ID]) && !f.calls.includes('openFollow') && !f.calls.includes('report'),
+  ok(un.json.status === 'UNFOLLOW_REQUESTED' && un.json.follow_id === FOLLOW_ID && same(f.asked.closeFollow, [CONTEXT_ID, FOLLOW_ID]) && !f.calls.includes('openFollow') && !f.calls.includes('report'),
     '4g unfollow closes exactly the follow the caller named on the report\'s context, and reads no body', f.calls);
+  // a follow_id is stored for good, so only a RANDOM (version 4) id is accepted: name-based and time-based ids are refused before anything is read
+  for (const [label, id] of [['name-based v5', 'abcdef02-3456-5789-8abc-def012345678'], ['name-based v3', 'abcdef02-3456-3789-8abc-def012345678'], ['time-based v1', 'abcdef02-3456-1789-8abc-def012345678'], ['time-based v7', 'abcdef02-3456-7789-8abc-def012345678']]) {
+    for (const action of ['follow', 'unfollow']) {
+      const g = fakes();
+      const r = await call(g.deps, { action, report_id: REPORT_ID, follow_id: id }, AUTH);
+      ok(r.status === 400 && r.json.detail === 'follow_id' && !g.calls.includes('reportContext') && !g.calls.includes('openFollow') && !g.calls.includes('closeFollow'),
+        '4g2 a ' + label + ' follow_id is refused for ' + action + ' (400 follow_id) before any database call', [r.status, r.json, g.calls]);
+    }
+  }
+  {
+    const g = fakes();
+    const r = await call(g.deps, { action: 'follow', report_id: REPORT_ID, follow_id: 'abcdef02-3456-4789-8abc-def012345678' }, AUTH);
+    ok(r.status === 200 && r.json.status === 'FOLLOWING', '4g3 (control) a random version-4 id is accepted', r.json);
+  }
+  // unfollow answers what it KNOWS: the close function returns nothing, so an unknown id gets the same answer as an open one
+  {
+    const g = fakes();
+    const never = await call(g.deps, { action: 'unfollow', report_id: REPORT_ID, follow_id: 'abcdef09-3456-4789-8abc-def012345678' }, AUTH);
+    ok(never.json.status === 'UNFOLLOW_REQUESTED' && never.json.status !== 'UNFOLLOWED', '4g4 an unfollow of an id that was never opened answers UNFOLLOW_REQUESTED: the function cannot claim it closed anything');
+  }
   const miss = await call(fakes().deps, { action: 'unfollow', report_id: '99999999-9999-4999-8999-999999999999', follow_id: FOLLOW_ID }, AUTH);
   ok(miss.status === 404, '4h unfollowing an unknown report is 404');
   f = fakes({ openFollow: async () => { throw new H.DataUnavailable('x'); } });
@@ -352,7 +389,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   const sel = (u) => ((u.match(/select=([^&]+)/) || [])[1] || '').split(',');
   const lcols = sel(reqs[0].url), hcols = sel(reqs[1].url);
   ok(reqs[0].url.includes('/rest/v1/dev_change_project?select=') && ['identity_key', 'registry_id', 'comparable', 'change_ready', 'observation_count'].every((c) => lcols.includes(c)), '5l the ledger read selects identity_key, registry_id, comparable, change_ready and observation_count', lcols);
-  ok(reqs[1].url.includes('/rest/v1/dev_change_source_health?select=') && ['registry_id', 'fetch_failures_24h', 'blocked_24h', 'truncated_24h'].every((c) => hcols.includes(c)), '5m the source-health read selects registry_id and the three 24 h counters', hcols);
+  ok(reqs[1].url.includes('/rest/v1/dev_change_source_fetch_health?select=') && ['registry_id', 'fetch_failures_24h', 'blocked_24h', 'truncated_24h'].every((c) => hcols.includes(c)), '5m the source-health read selects registry_id and the three 24 h counters', hcols);
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

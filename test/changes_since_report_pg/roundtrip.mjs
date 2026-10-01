@@ -29,7 +29,7 @@ const one = (q, v, role = null) => { const r = psql(q, v, role); if (!r.ok) thro
 const lit = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
 // ---- a PostgREST translator: only the request shapes the data layer is known to send --------------------------------------------------------
-const TABLES = ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_health'];
+const TABLES = ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_fetch_health'];
 const requests = [];
 function parseIn(v) {
   const m = /^in\.\((.*)\)$/s.exec(v); if (!m) throw new Error('unsupported in-list ' + v);
@@ -188,6 +188,17 @@ ok(!changed[0].changes_since_report.some((c) => c.changes[0].field === 'submitte
 ok(A1.json.result.limitations.some((l) => l.code === 'NEW_PROJECTS_NOT_COVERED') && A1.json.result.projects_in_report === 2, '3j and the answer says it covers the report\'s projects only');
 const ANSWER = JSON.stringify(A1.json.result);
 
+// a REAL failure record for the report's family reaches the answer through the REAL narrow view, and removing it clears it again
+ok(!A1.json.result.limitations.some((l) => l.code === 'SOURCE_NOT_FULLY_READ'), '3k (control) with no failure record for the family the answer carries no SOURCE_NOT_FULLY_READ');
+one("insert into public.dev_refresh_source_failures (zip, registry_id, reason, cached_records, blocked_update, kind) values ('97477', " + lit(FAM) + ", 'timeout', 3, false, 'fetch_failed')");
+const AF = await ask({ action: 'changes', report_id: RID });
+ok(AF.status === 200 && AF.json.result.limitations.some((l) => l.code === 'SOURCE_NOT_FULLY_READ'),
+  '3l a fetch failure recorded in the last 24 hours for the report\'s family makes the answer say the source was not fully read (read through the real dev_change_source_fetch_health, as role service_role)', AF.json.result && AF.json.result.limitations);
+one("update public.dev_refresh_source_failures set seen_at = now() - interval '3 days'");
+const AO = await ask({ action: 'changes', report_id: RID });
+ok(!AO.json.result.limitations.some((l) => l.code === 'SOURCE_NOT_FULLY_READ'), '3m the same failure three days old is outside the 24-hour window: the limitation is gone');
+one("delete from public.dev_refresh_source_failures");
+
 // ---- 4. FOLLOW keeps the context, and Changes Since Report works throughout --------------------------------------------------------------------------
 const F1 = await ask({ action: 'follow', report_id: RID, follow_id: ids[0].toUpperCase() });
 ok(F1.json.status === 'FOLLOWING' && F1.json.follow_id === ids[0] && ids[0] !== ids[0].toUpperCase(), '4a follow registers the follow the caller named (sent in upper case) through the real database function, and the answer carries it in lower case');
@@ -202,7 +213,7 @@ ok(st === 'active|no-clock', '4d the REPORT need closes (the brokerage archives 
 const A2 = await ask({ action: 'changes', report_id: RID });
 ok(JSON.stringify(A2.json.result) === ANSWER, '4e Changes Since Report, asked while only a Follow holds the context, gives the identical answer, byte for byte');
 const U1 = await ask({ action: 'unfollow', report_id: RID, follow_id: ids[0] });
-ok(U1.json.status === 'UNFOLLOWED', '4f unfollow closes it');
+ok(U1.json.status === 'UNFOLLOW_REQUESTED', '4f unfollow answers UNFOLLOW_REQUESTED (the database function returns nothing, so the answer cannot claim more); 4g shows it did close the need');
 const clock = one("select (purge_due_at - last_needed_at) || '|' || state from public.report_private_context where context_id = :'c'::uuid", { c: CTX });
 ok(clock === '90 days|active', '4g the last need closing starts the 90-day clock: exactly 90 days, context still active', clock);
 const F2 = await ask({ action: 'follow', report_id: RID, follow_id: ids[1] });
@@ -210,6 +221,28 @@ const reopened = one("select coalesce(purge_due_at::text, 'no-clock') from publi
 ok(F2.json.status === 'FOLLOWING' && reopened === 'no-clock', '4h following again inside the window stops the clock (the context is kept)', [F2.json, reopened]);
 const audit = one("select string_agg(kind || coalesce(':' || need_kind, ''), ',' order by event_id) from public.report_private_context_event where context_id = :'c'::uuid", { c: CTX });
 ok(audit === 'created,need_opened:report,need_opened:follow,need_closed:report,need_closed:follow,grace_started,need_opened:follow,grace_cleared', '4i the audit log tells the story in order, with need KINDS and no reference or value', audit);
+
+// ---- 4j. several follows, replays and ids that were never opened: what the database does with them, observed ---------------------------------------------------
+// ids[1] is open here (4h). These pin the behaviour the follow doc §7 lists as limits, so a change to it has to be made on purpose.
+{
+  const needs = (ref) => one("select count(*) filter (where closed_at is null) || '/' || count(*) from public.report_private_context_need where context_id = :'c'::uuid and kind = 'follow' and ref = :'r'", { c: CTX, r: ref });
+  const state = () => one("select state || '|' || coalesce((purge_due_at - last_needed_at)::text, 'no-clock') from public.report_private_context where context_id = :'c'::uuid", { c: CTX });
+  const NEVER = 'a5555555-5555-4555-8555-555555555555';
+  await ask({ action: 'follow', report_id: RID, follow_id: ids[3] });
+  ok(needs(ids[1]) === '1/1' && needs(ids[3]) === '1/1' && state() === 'active|no-clock', '4j1 two follows are open at once, each with its own need, and the clock is stopped', [needs(ids[1]), needs(ids[3]), state()]);
+  await ask({ action: 'unfollow', report_id: RID, follow_id: ids[1] });
+  ok(needs(ids[1]) === '0/1' && state() === 'active|no-clock', '4j2 closing ONE of two follows leaves the context held and the clock stopped: the other follow still needs it', [needs(ids[1]), state()]);
+  const UN = await ask({ action: 'unfollow', report_id: RID, follow_id: NEVER });
+  ok(UN.json.status === 'UNFOLLOW_REQUESTED' && needs(NEVER) === '0/0' && needs(ids[3]) === '1/1' && state() === 'active|no-clock',
+    '4j3 an unfollow of an id that was NEVER opened changes nothing (no need created, the real follow still open) and is answered UNFOLLOW_REQUESTED, not "done"', [UN.json.status, needs(NEVER), state()]);
+  await ask({ action: 'unfollow', report_id: RID, follow_id: ids[3] });
+  ok(state() === 'active|90 days', '4j4 closing the LAST follow starts the 90-day clock', state());
+  await ask({ action: 'follow', report_id: RID, follow_id: ids[1] });
+  ok(needs(ids[1]) === '1/2' && state() === 'active|no-clock', '4j5 DOCUMENTED LIMIT: a follow replayed AFTER its unfollow opens a second need on the same id and stops the clock again; the last request to arrive wins, not the caller\'s last intent', [needs(ids[1]), state()]);
+  await ask({ action: 'unfollow', report_id: RID, follow_id: ids[1] });
+  ok(needs(ids[1]) === '0/2' && state() === 'active|90 days', '4j6 and one more unfollow of that id closes it again and restarts the clock', [needs(ids[1]), state()]);
+  await ask({ action: 'follow', report_id: RID, follow_id: ids[1] });   // leave a follow open, as sections 5+ expect
+}
 
 // ---- 5. THE PURGE: the answer does not change, because the reader never touched the private context --------------------------------------------------
 one("select public.report_private_context_purge(:'c'::uuid, 'verified_privacy_request')", { c: CTX }, 'service_role');
@@ -220,7 +253,7 @@ ok(JSON.stringify(A3.json.result) === ANSWER, '5b Changes Since Report after the
 const F3 = await ask({ action: 'follow', report_id: RID, follow_id: ids[2] });
 ok(F3.status === 200 && F3.json.status === 'CONTEXT_PURGED' && F3.json.follow_id === undefined, '5c following a purged report says CONTEXT_PURGED (the database\'s own 55000, translated): a purge is terminal');
 const U2 = await ask({ action: 'unfollow', report_id: RID, follow_id: ids[0] });
-ok(U2.status === 200 && U2.json.status === 'UNFOLLOWED', '5d unfollowing a purged report is a harmless no-op');
+ok(U2.status === 200 && U2.json.status === 'UNFOLLOW_REQUESTED', '5d unfollowing a purged report is a harmless no-op');
 ok(one("select count(*) from public.report_snapshot where report_id = :'r'::uuid and private_context_id = :'c'::uuid", { r: RID, c: CTX }) === '1', '5e the snapshot still points at the tombstone: nothing permanent was damaged');
 ok(one("select state from public.report_private_context where context_id = :'c'::uuid", { c: CTX2 }) === 'active' && one("select address from public.report_private_context where context_id = :'c'::uuid", { c: CTX2 }) === SUBJECT2.address, '5f the OTHER customer\'s context is untouched by all of it');
 const A4 = await ask({ action: 'changes', report_id: RID2 });
@@ -238,7 +271,7 @@ ok(A4.json.status === 'OK' && A4.json.result.changed.length === 1 && A4.json.res
   ok(![CTX, CTX2].some((c) => responses.join('').includes(c)), '6c and neither context id is in any response');
   ok(!/44\.04612|122\.98123|41\.83452|71\.41255/.test(responses.join('')), '6d no coordinate either');
   const tables = [...new Set(requests.map((r) => r.path.replace('/rest/v1/', '').replace('rpc/', 'rpc:')))].sort();
-  ok(same(tables, ['/auth/v1/user', 'dashboard_admins', 'dev_change_event_reportable', 'dev_change_project', 'dev_change_source_health', 'report_snapshot', 'rpc:report_private_context_need_close', 'rpc:report_private_context_need_open']), '6e the data layer\'s whole footprint: the ledger, the view, the snapshot, the allow-list and the two need functions. Never the private context', tables);
+  ok(same(tables, ['/auth/v1/user', 'dashboard_admins', 'dev_change_event_reportable', 'dev_change_project', 'dev_change_source_fetch_health', 'report_snapshot', 'rpc:report_private_context_need_close', 'rpc:report_private_context_need_open']), '6e the data layer\'s whole footprint: the ledger, the view, the snapshot, the allow-list and the two need functions. Never the private context', tables);
   const selects = (pred) => [...new Set(requests.filter(pred).map((r) => new URL('http://x' + r.path + r.search).searchParams.get('select')))].sort();
   ok(same(selects((r) => r.path.endsWith('/report_snapshot')), ['private_context_id', 'report_id,content_hash,report_version,generated_at,body']),
     '6e2 the snapshot was read in exactly two ways: the body and identity (no private-context column), and the handle alone (no body)', selects((r) => r.path.endsWith('/report_snapshot')));

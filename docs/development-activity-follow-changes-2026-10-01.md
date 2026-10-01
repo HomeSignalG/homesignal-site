@@ -1,7 +1,8 @@
 # Development Activity — Follow and Changes Since Report (2026-10-01)
 
-Plan item: "Watch This Property" (the Follow / Changes Since Report surface), and gate 4 of
-`docs/report-private-context-contract-2026-09-30.md` §6. This document is the design record, the proof, and the list of
+Plan item: "Watch This Property". **What this delivers is the internal reader and the need registration behind it** (the Follow /
+Changes Since Report function), not the customer-facing feature: no notification is sent, no new project near the property is
+found, and no customer can reach it. It is also gate 4 of `docs/report-private-context-contract-2026-09-30.md` §6. This document is the design record, the proof, and the list of
 what it does not do. It is a record of work in a pull request, not of a deployment: **nothing here is deployed or
 applied until the receipt section (§9) says so.**
 
@@ -13,8 +14,8 @@ One internal edge function, `follow-development-report`, with three actions on a
 | action | what it does | what it reads or writes |
 |---|---|---|
 | `changes` | What the change ledger has learned about the projects **in that report** since it was issued. | Reads the report's permanent body, the ledger, source health and the rights registry. Writes nothing. |
-| `follow` | Registers a `follow` need on the report's private context, so the context is kept (the 90-day clock stops) while the property is being watched. The **caller names the `follow_id`** (a UUID it keeps); the function mints none. | Reads only the context handle (never the body). One write: the existing `report_private_context_need_open`, kind fixed to `follow`. |
-| `unfollow` | Closes that need, by the same `follow_id`. When it was the last open need, the 90-day clock starts. | Reads only the context handle. One write: the existing `report_private_context_need_close`. |
+| `follow` | Registers a `follow` need on the report's private context, so the context is kept (the 90-day clock stops) while the property is being watched. The **caller names the `follow_id`**: a random (version 4) UUID it keeps; a name-based id (a hash of an address or a user) is refused. The function mints none. | Reads only the context handle (never the body). One write: the existing `report_private_context_need_open`, kind fixed to `follow`. |
+| `unfollow` | Asks for that need to be closed, by the same `follow_id`. When it was the last open need, the 90-day clock starts. The answer is `UNFOLLOW_REQUESTED`, not "done": the database function returns nothing, so this function cannot tell whether a need was open (§7). | Reads only the context handle. One write: the existing `report_private_context_need_close`. |
 
 It is **not a customer surface**. It is gated by the same gate as the national report (a signed-in user in
 `public.dashboard_admins`; the gateway's JWT check stays on, and the anon key is a valid JWT, so the handler adds the
@@ -32,13 +33,16 @@ allow-list). Orders J and K replace the allow-list with an account entitlement, 
   - which sources may be shown: `_shared/report-rights.json`, read **now**;
   - whether a source was readable: `national-report.ts` `sourcesNotFullyRead`;
   - who may ask: `_shared/admin-gate.ts` and `_shared/service-rest.ts`;
-  - the ledger SELECTs: `_shared/change-reads.ts`.
+  - the ledger SELECTs: `_shared/change-reads.ts`;
+  - the source-health read: the view `dev_change_source_fetch_health` (failure counts, the one definition of the 24 h / 14 d
+    windows and of which failure kinds count); the wide `dev_change_source_health` is built from it (§6b).
   The one thing this function owns is the boundary in time: which events count as "since" (§3).
 - **Shortcut check.** The first draft of this work copied the gate, the PostgREST reads and the change rule into the new
   function. That was a second way to decide each of those facts, so it was undone: the gate, the reads and the rule are now
   shared by both functions, and the national report's own function was refactored onto them. Its two behavioural suites
-  (117 + 85 checks) are **unchanged** and pass; its structural suite (64) and its mutation harness (109) were **re-pointed** at
-  the shared files, because they pinned text that moved, and all 109 mutants are still killed.
+  (117 + 85 checks) pass — the 85-check one with a single changed line, the name of the health view it expects (§6b); its
+  structural suite (64) and its mutation harness (109) were **re-pointed** at the shared files, because they pinned text that
+  moved, and all 109 mutants are still killed.
   `test/follow-development-report-structure.test.mjs` 1d, 3a–3d and 4j–4k fail if any of them is copied back.
 
 ## 3. The boundary in time: `created_at`, not `observed_at`
@@ -67,8 +71,10 @@ Three consequences, all handled and all tested:
    is issued; an event can be recorded after that from a source record retrieved *before* it, so the event's new facts may be
    exactly what the report already states (the report says Approved; the ledger says Proposed → Approved). Each entry therefore
    carries `recorded_at` (the ledger's `created_at`) beside `detected_at` (the source retrieval instant) and
-   `source_retrieved_before_report`, and the answer carries a `RECORDED_AFTER_REPORT` limitation whenever one is present. The
-   event is labelled, not dropped: dropping it would lose a change the report's own body may not carry in full.
+   `source_retrieved_before_report`, and the answer carries a `RECORDED_AFTER_REPORT` limitation **only when an entry's source was
+   retrieved before the report AND the ledger recorded it after the report was issued** (`created_at > issued`). An event recorded
+   inside the overlap, before the report, is not the case the limitation describes and does not raise it. The event is labelled,
+   not dropped: dropping it would lose a change the report's own body may not carry in full.
 
 Events are also bounded above: nothing with a `created_at` or an `observed_at` after the instant the question was asked is
 shown. That instant is taken **once, before the reads**, and is both the bound and the answer's `through`. It is this
@@ -103,7 +109,9 @@ The separation is **structural, not only behavioural.** The data layer reads `re
 handle and **no body**. The handler's `changes` branch therefore never holds the handle, and follow never downloads a report to
 learn one id. The handler passes the handle only to the two need functions and never puts it in a response.
 `report_private_context_read` — the one database function that returns the customer's address — is called nowhere in this
-feature.
+feature. The capability read says it in two fields rather than one: `reads_private_values: false` (nothing in this function ever
+holds an address, a point or a name) and `uses_private_context_handle: true` (follow and unfollow do pass the context's opaque id
+to the two need functions). A single "no private context" flag would have been false.
 
 Contract §8.5 said the reader reads "the body and `dev_change_event_reportable` only". That was an approximation; the full list is
 the body, the reportable view, `dev_change_project` (for `change_ready`), `dev_change_source_health`, and the rights registry.
@@ -113,11 +121,12 @@ The contract is corrected in this change.
 
 | layer | where | result |
 |---|---|---|
-| the reader, pure | `test/changes-since-report.test.mjs` | 69 checks. Reports come from the **real engine**, so the reader is proven against the body the engine really writes. |
-| the function (handler + data layer) | `test/follow-development-report.test.mjs` | 92 checks: the gate is byte-identical to the national report's across 7 sign-in scenarios; every field list; every refusal; ids with hex letters sent in upper case and checked in lower case at every lookup and write; the clock read once before the reads; the exact request each read and the one write would send. |
-| structure | `test/follow-development-report-structure.test.mjs` | 84 pins. Most absences carry a positive control (the same search finds the thing it forbids elsewhere): no handle on the private context, one gate, one rule, one set of reads, a fixed kind on the only two writes, no raw event table anywhere in the edge functions, and the overlap tied to the observation job's own timing. |
-| **end to end on a real Postgres** | `test/changes_since_report_pg` (run in CI by `report-snapshot-suite.yml`) | 43 checks, below. Its first run on a fresh database (CI) found a fault the developer machine hid: the stand-in `service_role` lacked Supabase's BYPASSRLS, so the RLS-protected ledger read as empty; the stand-in now sets it and a pin keeps it. `run.sh` now prints which setup file failed to apply and why. |
-| prohibited mutations | `test/follow_report_mutants.py` | 120 of 120 killed by the offline suites (8 aim at the older guards: two this work had to narrow, the private layer's and the snapshot table's, and a third, the raw event table's, that it must not trip; each is shown to refuse a second consumer on its own). The national report's own harness: 109 of 109. |
+| the reader, pure | `test/changes-since-report.test.mjs` | 73 checks. Reports come from the **real engine**, so the reader is proven against the body the engine really writes. |
+| the function (handler + data layer) | `test/follow-development-report.test.mjs` | 107 checks: the gate is byte-identical to the national report's across 7 sign-in scenarios; every field list; every refusal; ids with hex letters sent in upper case and checked in lower case at every lookup and write; name-based ids refused; the clock read once before the reads; the exact request each read and the one write would send; the failure log carries a reason and nothing from the request. |
+| structure | `test/follow-development-report-structure.test.mjs` | 92 pins. Most absences carry a positive control (the same search finds the thing it forbids elsewhere): no handle on the private context, one gate, one rule, one set of reads, a fixed kind on the only two writes, no raw event table anywhere in the edge functions, the overlap tied to the observation job's own timing, the one failure log line, and the workflow's pull-request and push path lists being the same set. |
+| the health views, on a real Postgres | `test/dev_change_baseline_pg` (Order D's suite) | 47 checks, 34 of 34 prohibited mutations killed. D15a–g are new: the narrow view returns the same failure counts as the wide one in both directions, the wide view is built from it, the reader's query plan touches no ledger table, and the grants are system-only. |
+| **end to end on a real Postgres** | `test/changes_since_report_pg` (run in CI by `report-snapshot-suite.yml`) | 52 checks, below. Its first run on a fresh database (CI) found a fault the developer machine hid: the stand-in `service_role` lacked Supabase's BYPASSRLS, so the RLS-protected ledger read as empty; the stand-in now sets it and a pin keeps it. `run.sh` now prints which setup file failed to apply and why. |
+| prohibited mutations | `test/follow_report_mutants.py` | 136 of 136 killed by the offline suites (8 aim at the older guards: two this work had to narrow, the private layer's and the snapshot table's, and a third, the raw event table's, that it must not trip; each is shown to refuse a second consumer on its own). The national report's own harness: 109 of 109. Both harnesses are run by hand, not in CI, so these counts are point-in-time. |
 
 ### The end-to-end run (gate 4)
 
@@ -127,8 +136,10 @@ handler and data layer then run against the database as role `service_role`. **W
 (1) the transport: a small PostgREST translator turns each request into SQL run as `service_role` (a request shape it does not
 know fails the run, and a grant production would refuse is refused here); (2) `test/dev_change_ledger_pg/fixture.sql`, which
 creates the roles, the default privileges and the `app_projects` table the ledger SQL expects; (3) `standins.sql`, which gives the
-stand-in `service_role` Supabase's BYPASSRLS attribute and defines **one** relation, `dev_change_source_health` (it reads
-ingest-side failure tables this repo does not own; the real view is proven by the Order D suite). Events are written with
+stand-in `service_role` Supabase's BYPASSRLS attribute and defines **one** relation, the ingest-side failure TABLE
+`dev_refresh_source_failures` (this repo does not own it). **No view is typed here:** `run.sh` slices the real
+`dev_change_source_fetch_health`, its revoke and its grant out of `docs/dev-change-baseline.sql` by pattern (and stops if a
+pattern stops matching) and applies them, so the view the reader queries is production's own. Events are written with
 SQL-relative times and the answer is read:
 
 - **Changes since:** k1's four later changes, newest source retrieval first — one retrieved 10 minutes after the report (recorded
@@ -143,8 +154,16 @@ SQL-relative times and the answer is read:
   reference is the lower-case id, idempotently; a `follow` with no id is refused. The report's own need is closed (the
   brokerage archives it); the context stays `active` and the 90-day clock has **not** started, because the follow holds it. The
   answer, asked in that state, is **identical byte for byte** to the earlier one.
+- **A source that failed to read says so, through the real view.** A real failure row in `dev_refresh_source_failures` for a
+  family in the report makes the answer carry `SOURCE_NOT_FULLY_READ`; the same row aged three days (outside the 24-hour window)
+  clears it. (3k–3m. This is the path that was timing out in production before §6b.)
 - **Unfollow starts the clock.** Closing the last need puts `purge_due_at` exactly 90 days out; following again stops it. The
-  audit log tells the story with need kinds and no references.
+  audit log tells the story with need kinds and no references. It answers `UNFOLLOW_REQUESTED`.
+- **Several follows, replays and a never-opened id (4j1–4j6), pinned as they behave:** two follow ids on one context keep it alive
+  until **both** are closed; closing one starts no clock; a replayed `follow` is idempotent; an `unfollow` of an id that was
+  never opened changes nothing and gets the same answer as a real one (it cannot tell); and a `follow` replayed **after** its
+  `unfollow` opens the need again (the database treats each open as a fresh need; a retried request that arrives late can undo
+  an unfollow).
 - **Purge changes nothing the reader says.** After a verified-privacy-request purge (address and coordinates gone, in place),
   `changes` returns the **same bytes**; `follow` says `CONTEXT_PURGED` (the database's own refusal, translated), `unfollow` is a
   harmless no-op, the snapshot still resolves, and the other customer's context and report are untouched.
@@ -154,6 +173,46 @@ SQL-relative times and the answer is read:
   (always with `material=eq.true`), its source health, the allow-list, the user lookup and the two need functions; the private
   table cannot be read by `service_role` directly, and the one function that returns the address does work for it, so the absence
   is a choice the code makes.
+
+## 6b. The source-health read, and the one production change it needed (2026-10-01)
+
+An adversarial review of this pull request claimed the source-health read takes 7–11 seconds. It was checked against production
+rather than argued: reading `dev_change_source_health` for a handful of families took **6.1–6.2 s** (a different number from the
+reviewer's, and no better in kind). PostgREST runs under the `authenticator` role's 8 s `statement_timeout`, so the read had under
+two seconds of headroom, and the cause is structural: the wide view joined its failure counts to an aggregate over the **whole
+ledger** (`dev_change_project`, 933,013 rows), and a filter on a column of a full join's `coalesce(...)` cannot be pushed below
+that aggregate. The reader needs only the failure counts. So:
+
+- **`public.dev_change_source_fetch_health`** (new) holds the failure evidence on its own: counts of `fetch_failed`, blocked
+  and `truncated` rows in the last 24 hours and 14 days, the distinct ZIPs affected, the newest fetch failure and whether the
+  source was ever retired. It is a `GROUP BY registry_id` over `dev_refresh_source_failures`, so a filter on `registry_id` reaches
+  the table's index. `security_invoker = true`; `service_role` only (revoke all, grant select).
+- **`public.dev_change_source_health`** (the wide view, columns and order unchanged) is now built **from** the narrow one:
+  ledger coverage full-joined to it. The windows and the failure kinds are therefore defined **once**, not in two views that
+  could drift.
+- **The reader reads the narrow view** (`_shared/change-reads.ts::health`) and asks it for four columns. A family with no
+  failure row is simply absent, which is the same answer as an all-zero row: `sourcesNotFullyRead` fires only on a positive
+  count of failures, blocked or truncated fetches in the last 24 hours.
+
+**Applied to production 2026-10-01**, additive (one new view, one `create or replace` of the wide view, both with their grants
+restated). Migration `dev_change_source_fetch_health_narrow_view`, ledger version `20261001220554`; the stored statements are the
+generated file byte for byte (md5 `54792bddc6af041cb2148abb832699b0`, 7,519 characters, re-read from
+`supabase_migrations.schema_migrations` and compared). It was generated **from `docs/dev-change-baseline.sql` by pattern, never
+retyped**, and it refuses to commit unless, inside the same transaction: the wide view's output is **row-for-row identical**
+before and after (a copy of the old output is taken first, compared in both directions with `EXCEPT`), the wide view's column list
+is unchanged, the grants are system-only on both views, both views are still `security_invoker`, and the reader's query plan reaches
+the failure table and **not** the ledger. Read back afterwards: both views `security_invoker=true`, `service_role` can select and
+`anon` / `authenticated` cannot.
+Measured after: the narrow read for three families took **101 ms** when applied and **166 ms** cold on a re-read, its plan touching
+only `dev_refresh_source_failures` (a bitmap scan on the registry index); against 6.1–6.2 s for the wide view. The 8 s budget now has
+a factor of about fifty of headroom.
+
+**Rollback:** `create or replace` the wide view from the previous text of `docs/dev-change-baseline.sql` (it is the git
+history of that file), then drop the narrow view. The wide view must be restored first: it depends on the narrow one.
+
+**What is and is not live.** The view is applied. The deployed `get-development-activity-report` still reads the **wide** view until
+it is redeployed with this change; that works, with the headroom described above, and nothing changes for it by the view's arrival.
+`follow-development-report` is not deployed yet (§9).
 
 ## 7. Limits, stated
 
@@ -172,7 +231,28 @@ SQL-relative times and the answer is read:
 - **A follow id is the caller's, and there is no cap on how many one context may hold.** An allow-listed admin (or a stolen admin
   token) could open many needs on one context, hold it open past its 90 days until each is closed, and grow the append-only need
   and audit tables. The function mints no id, so a lost response cannot orphan a need, but a cap per context belongs in
-  `report_private_context_need_open` — a change to the locked private layer, left to its own SQL change.
+  `report_private_context_need_open` — a change to the locked private layer, left to its own SQL change. **It also means the
+  contract's "no more than 90 days after the last need ends" is bypassable through a Follow**: a caller that keeps a follow open keeps
+  the address indefinitely. That is the intended meaning of "while the property is being watched", but it is only as safe as who
+  may follow, which is the admin allow-list today and an account entitlement (Orders J and K) later. A lost `follow_id` cannot be
+  listed or closed by this function: there is no "list the follows on this report" and no "close everything for this report".
+  Both are for the Order K surface that knows who owns a follow.
+- **Replays and ordering.** A `follow` that arrives **after** its own `unfollow` (a retry that was delayed) opens the need again;
+  there is no sequence number. An `unfollow` cannot tell whether anything was open, so it answers `UNFOLLOW_REQUESTED`, never
+  "unfollowed". Both are pinned in the round trip (4j) so a later change is a deliberate one.
+- **The reads are not one snapshot.** The report, the ledger, the events and source health are separate requests; a change recorded
+  between two of them can appear in one and not another. The answer's `through` is this function's clock, not a database snapshot.
+  It says so (§3).
+- **No timeout on the shared REST layer's fetches** other than the platform's own, so a hanging database read holds the request until
+  the platform ends it. It is the national report's behaviour, moved unchanged.
+- **The rights registry is read at answer time from the deployed JSON bundle.** A withdrawal of a source's clearance therefore takes
+  effect when the function is next redeployed, not instantly.
+- **"Byte for byte" is conditional.** The answer is the same while a Follow keeps the context and after a purge **for the same body,
+  the same ledger state, the same rights, the same clock, the same source health and the same view**. The round trip holds each of
+  those fixed.
+- **No type-check in CI for these functions.** Deno is not installed in this sandbox and `verify-edge-function` is known not to
+  catch type errors (CLAUDE.md §7.1, Phase 2 Unit 4); the functions are covered by Node's type-stripping in the suites, not by `deno
+  check`. Extending the verifier is a separate change.
 - **`report_private_context_need_open` does not check `purge_due_at`.** A follow on a context whose 90-day clock has run out but
   which the purge cron has not yet purged (normally under 15 minutes; unbounded if the cron fails) clears the clock and keeps
   the customer's address. This predates the Follow function and is reachable by it. The fix (treat a due context as expired:
@@ -189,16 +269,20 @@ SQL-relative times and the answer is read:
 ## 8. Defaults taken here that the founder may change
 
 - **D-F1.** The function is internal-only (admin allow-list) until accounts exist.
-- **D-F2.** A Follow is a bare need whose id the **caller** chooses and keeps (required on follow and unfollow); the function
-  mints none and never learns who is following. A server-minted id returned only in a response is lost with the response and
+- **D-F2.** A Follow is a bare need whose id the **caller** chooses and keeps (required on follow and unfollow, and a random
+  version-4 UUID: a name-based id is refused); the function mints none and never learns who is following. A server-minted id returned only in a response is lost with the response and
   leaves an open need nobody can close.
 - **D-F3.** The overlap is ten minutes, pinned to at least twice the observation job's longest transaction.
 - **D-F4.** A purged report cannot be followed again (a purge is terminal in the database); the function reports it rather than
   hiding it.
+- **D-F5.** `unfollow` answers `UNFOLLOW_REQUESTED`, not "unfollowed", because the database's close function returns nothing and
+  the function cannot tell whether a need was open.
 
 ## 9. Receipt
 
-Not yet deployed. When it is: the dispatch of `deploy-edge-functions.yml` for `follow-development-report` and for the refactored
-`get-development-activity-report`, the version numbers, and the production smoke are recorded here. The smoke covers **both**
+Not yet deployed. **Applied already:** the narrow health view (§6b), migration `20261001220554`. When the functions are deployed: the
+dispatch of `deploy-edge-functions.yml` for `follow-development-report` and for the refactored
+`get-development-activity-report` (one function per dispatch), the version numbers, and the production smoke are recorded here.
+The smoke also exercises the narrow view in production for the first time from a function. The smoke covers **both**
 functions: the anon key refused with 401 and the capability read on each, and one signed-in call to the refactored national
 report (it was refactored onto the shared modules, so its own behaviour in production is part of this change).

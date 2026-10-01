@@ -72,6 +72,8 @@ export type ReportableEvent = {
   prev_facts: Record<string, unknown> | null; new_facts: Record<string, unknown> | null;
   changed_fields: string[] | null; publisher_event_type: string | null; publisher_event_date: string | null;
 };
+/** A reportable event together with the instant the ledger WROTE it (`created_at`): what Changes Since Report reads. */
+export type WrittenEvent = ReportableEvent & { created_at: string };
 export type SourceHealth = {
   registry_id: string; fetch_failures_24h: number; blocked_24h: number; truncated_24h: number;
 };

@@ -52,6 +52,14 @@ export type Deps = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * A follow_id is stored for good (it becomes the need's `ref`, which a purge does not blank), so it must carry no information about the
+ * customer or the property. Only a version-4 (random) UUID is accepted: a name-based id (version 3 or 5, a hash of a string) or a
+ * time-based one (1, 2, 6, 7, 8) is refused. The shape cannot PROVE randomness (a caller can still choose to build a v4-looking id from
+ * an address hash), so the caller's contract in docs/development-activity-follow-changes-2026-10-01.md §5 is that it generates the id
+ * randomly and keeps it; what this refuses is the ordinary way of deriving one by accident.
+ */
+const FOLLOW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIONS = ['changes', 'follow', 'unfollow'];
 const FIELDS: Record<string, string[]> = {
   changes: ['action', 'report_id', 'view'],
@@ -65,7 +73,8 @@ export function capability() {
     method: 'POST { action: "changes", report_id, view? } | { action: "follow" | "unfollow", report_id, follow_id }',
     access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
     stores_reports: false,
-    reads_private_context: false,
+    reads_private_values: false,
+    uses_private_context_handle: true, // follow / unfollow pass the context's opaque id to two database functions; the id is never returned
     writes: ['a follow need on a report\'s private context (follow, unfollow)'],
   };
 }
@@ -93,7 +102,7 @@ export function makeHandler(deps: Deps) {
     if (!reportId) return reply(req, { error: 'invalid_request', detail: 'report_id' }, 400);
     let followId: string | null = null;
     if (b.follow_id !== undefined) {
-      if (typeof b.follow_id !== 'string' || !UUID.test(b.follow_id)) return reply(req, { error: 'invalid_request', detail: 'follow_id' }, 400);
+      if (typeof b.follow_id !== 'string' || !FOLLOW_ID.test(b.follow_id)) return reply(req, { error: 'invalid_request', detail: 'follow_id' }, 400);
       followId = b.follow_id.toLowerCase();
     }
     // the caller holds the id: follow and unfollow both require it, and the function never mints one
@@ -113,7 +122,9 @@ export function makeHandler(deps: Deps) {
           return reply(req, { status: 'FOLLOWING', report_id: reportId, follow_id: followId });
         }
         await deps.closeFollow(ctx.private_context_id, followId!);
-        return reply(req, { status: 'UNFOLLOWED', report_id: reportId, follow_id: followId });
+        // The database's close function returns nothing, so this function cannot know whether a need was open: a follow_id that was never
+        // opened, or belongs to another report, changes nothing and gets this same answer. It says "requested", not "done".
+        return reply(req, { status: 'UNFOLLOW_REQUESTED', report_id: reportId, follow_id: followId });
       }
 
       // ── changes: the permanent body, the ledger, source health, the rights. Never the private context.
@@ -134,8 +145,14 @@ export function makeHandler(deps: Deps) {
       const result = changesSinceReport({ now: asked, view, rights, ledger, events, health, report: stored });
       return reply(req, { status: 'OK', result });
     } catch (e) {
+      // The caller gets a bare status; the operator gets the REASON, so a 502 can be told apart (row cap, http 500, network, unreadable
+      // event). Only the three classes below carry a fixed-string message (none holds a value from the report, the ledger or the caller);
+      // any other error logs its class name and nothing else. The action is one of three validated words.
+      const known = e instanceof ReportUnreadable || e instanceof DataUnavailable || e instanceof EventRowUnreadable;
+      const status = e instanceof ReportUnreadable ? 422 : known ? 502 : 500;
+      console.error(JSON.stringify({ fn: 'follow-development-report', action, status, reason: known ? (e as Error).message : (e instanceof Error ? e.name : 'unknown') }));
       if (e instanceof ReportUnreadable) return reply(req, { error: 'report_unreadable' }, 422);
-      if (e instanceof DataUnavailable || e instanceof EventRowUnreadable) return reply(req, { error: 'data_unavailable' }, 502);
+      if (known) return reply(req, { error: 'data_unavailable' }, 502);
       return reply(req, { error: 'internal' }, 500); // never the message
     }
   };

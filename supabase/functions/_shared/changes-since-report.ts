@@ -37,7 +37,9 @@
 // state at issue time; an event can be recorded after issue from a source record that was retrieved BEFORE issue, so its new facts
 // may be exactly what the report already stated. Each entry therefore carries `recorded_at` (the ledger's `created_at`) beside
 // `detected_at` (the source retrieval instant) and `source_retrieved_before_report`, and the answer carries a RECORDED_AFTER_REPORT
-// limitation whenever one is present. The event is not dropped (dropping it would lose a change the report's own body may not
+// limitation whenever one was recorded after the issue instant from a source retrieved before it (an event recorded inside the
+// overlap, before issue, and omitted by the report only because its project was not yet change-ready, is listed with its earlier
+// `recorded_at` and does not raise it). The event is not dropped (dropping it would lose a change the report's own body may not
 // carry in full) and not hidden: it is labelled.
 //
 // WHAT IT DOES NOT COVER, and says so on every answer: a project that appeared near the property after the report. Finding one
@@ -47,10 +49,10 @@ import {
   dayOf, detectedChangeEntries, isChangeReady, materialEvents, PRODUCT_NAME, selectDetectedChanges, SOURCE_NOT_FULLY_READ, sourcesNotFullyRead,
   validateRights,
 } from './national-report.ts';
-import type { LedgerProject, ReportableEvent, SourceHealth, View } from './national-report.ts';
+import type { LedgerProject, ReportableEvent, SourceHealth, View, WrittenEvent } from './national-report.ts';
 
-/** A ledger event with the instant the ledger WROTE it. */
-export type WrittenEvent = ReportableEvent & { created_at: string };
+/** A ledger event with the instant the ledger WROTE it. Defined in national-report.ts beside ReportableEvent, so the shared read layer does not import its own consumer. */
+export type { WrittenEvent };
 
 /** A stored report's row (the snapshot table), as the reader needs it. `body` is the permanent text; nothing private is on the row. */
 export type StoredReport = { report_id: string; content_hash: string; report_version: string; generated_at: string; body: string };
@@ -203,7 +205,10 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
     // the shared entry shape, plus when the ledger recorded the event and whether its source record predates the report
     const entries = (found as WrittenEvent[]).map((e) => {
       const retrievedBefore = instant(e.observed_at) <= issued;
-      if (retrievedBefore) recordedAfterReport = true;
+      // the limitation says "recorded AFTER the report was issued", so it is raised only when the ledger's own write instant is after
+      // the issue instant. An event recorded inside the overlap BEFORE issue that the report omitted (its project was not yet
+      // change-ready) is listed with its earlier recorded_at and does not raise it: the claim would be false.
+      if (retrievedBefore && instant(e.created_at) > issued) recordedAfterReport = true;
       return { ...detectedChangeEntries([e])[0], recorded_at: e.created_at, source_retrieved_before_report: retrievedBefore };
     });
     changed.push({

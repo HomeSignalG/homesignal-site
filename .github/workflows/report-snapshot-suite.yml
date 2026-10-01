@@ -29,7 +29,8 @@ name: report-snapshot-suite
 #      keeps the private context alive AND after the context is purged, byte-identically (for the same clock and ledger state); a
 #      purged context is named, not reopened; nothing private appears in any response; and the data layer touches only the four data
 #      relations it is allowed plus the gate's allow-list and user lookup and the two need functions. Not shipped, and stated: the
-#      transport is a PostgREST translator, the sign-in and allow-list are canned, and one view and the roles are stand-ins.
+#      transport is a PostgREST translator, the sign-in and allow-list are canned, and the failure TABLE under the source-health view
+#      and the roles are stand-ins (the view the reader queries is production's own, sliced from docs/dev-change-baseline.sql).
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
@@ -64,6 +65,7 @@ on:
       - 'supabase/functions/follow-development-report/**'
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -74,6 +76,10 @@ on:
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
+      - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-private-context-structure.test.mjs'
+      - 'test/report-snapshot.test.mjs'
+      - 'supabase/functions/_shared/report-snapshot.ts'
       - 'test/national_report_pg/**'
       - 'supabase/functions/_shared/national-report.ts'
       - 'supabase/functions/_shared/project-type.generated.js'
@@ -87,6 +93,7 @@ on:
       - 'supabase/functions/follow-development-report/**'
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 

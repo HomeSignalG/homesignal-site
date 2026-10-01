@@ -51,7 +51,20 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   ok(/authorizeAdmin/.test(c.gate) && /dashboard_admins/.test(c.rest), '1e (control) the shared modules do hold the gate and the allow-list read');
   ok(!/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(h + c.gate), '1f there is no wildcard CORS origin');
   ok(/error: 'internal'/.test(h) && !/e\.message|err\.message|String\(e\)/.test(h), '1g an unexpected error is answered without its message');
-  ok(!/console\./.test(mine + c.reads + c.gate + c.rest), '1h and nothing logs');
+  // 1h: exactly ONE log call exists anywhere in the feature, in the handler's catch block, and it carries only fixed words: the function name,
+  // the action (one of three validated words), the HTTP status, and a reason that is either the fixed-string message of one of the three
+  // known error classes or an unknown error's CLASS NAME. Nothing from the request, the report, the ledger or the customer can reach it.
+  const all = [c.handler, c.data, c.index, c.reader, c.reads, c.gate, c.rest, c.module].join('\n');
+  const logs = [...all.matchAll(/console\.\w+\(/g)].map((m) => m[0]);
+  ok(logs.length === 1 && logs[0] === 'console.error(', '1h the whole feature logs exactly once, with console.error', logs);
+  const logLine = c.handler.split('\n').filter((l) => /console\.error\(/.test(l));
+  ok(logLine.length === 1
+      && /^\s*console\.error\(JSON\.stringify\(\{ fn: 'follow-development-report', action, status, reason: known \? \(e as Error\)\.message : \(e instanceof Error \? e\.name : 'unknown'\) \}\)\);\s*$/.test(logLine[0]),
+    '1h2 that one line names only the function, the action, the status and a reason (a fixed-string message, or an unknown error\'s class name), and nothing else', logLine);
+  ok(/const known = e instanceof ReportUnreadable \|\| e instanceof DataUnavailable \|\| e instanceof EventRowUnreadable;/.test(c.handler),
+    '1h3 a message is logged only for the three error classes whose messages are fixed strings');
+  ok(!/new (ReportUnreadable|DataUnavailable|EventRowUnreadable)\([^)]*[a-z_]+\.(zip|address|lat|lng|point|body|project_id|report_id|follow_id|email)/i.test(all),
+    '1h4 and none of those messages is built from a field of the request, the report or the customer');
 }
 
 // ---- 2. the reader has no handle on the private context --------------------------------------------------------------------------------
@@ -113,7 +126,7 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   const stmtTimeout = Number((base.match(/below the (\d+) s statement timeout/) || [])[1]);
   ok(Number.isFinite(maxSecs) && maxSecs > 0 && Number.isFinite(stmtTimeout) && stmtTimeout > maxSecs, '3j2 (control) the observation tick\'s soft budget and the hard statement timeout are both read from the SQL of record', [maxSecs, stmtTimeout]);
   ok(overlapMs >= 2 * stmtTimeout * 1000 && overlapMs >= 2 * maxSecs * 1000,
-    '3j3 the overlap is at least twice the longest observation transaction (the hard statement timeout), so a cadence or timeout change in the SQL breaks this pin before it breaks an answer', [overlapMs, maxSecs, stmtTimeout]);
+    '3j3 the overlap is at least twice the observation tick\'s soft time cap AND twice the hard statement timeout (the longest a transaction can run), so a change to either in the SQL breaks this pin before it breaks an answer', [overlapMs, maxSecs, stmtTimeout]);
   ok(/NEW_PROJECTS_NOT_COVERED/.test(c.reader) && /limitations = \[\{ \.\.\.NEW_PROJECTS_NOT_COVERED \}\]/.test(c.reader), '3k every answer carries the statement that projects new since the report are not covered');
   ok(/recorded_at: e\.created_at/.test(c.reader) && /source_retrieved_before_report/.test(c.reader) && /\.\.\.RECORDED_AFTER_REPORT/.test(c.reader) && /RECORDED_AFTER_REPORT = \{\s*code: 'RECORDED_AFTER_REPORT'/.test(c.reader),
     '3k2 every entry carries when the ledger recorded it and whether its source predates the report, and the answer says so when one does');
@@ -138,8 +151,8 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   const sels = [...c.data.matchAll(/report_snapshot\?select=([^&']+)/g)].map((m) => m[1]);
   ok(same2(sels, ['report_id,content_hash,report_version,generated_at,body', 'private_context_id']), '4h and its two SELECTs are exactly these: the changes read has NO private column, the follow read has NO body', sels);
   const ledgerTables = [...(c.data + c.reads).matchAll(/'([a-z_]+)\?select=/g)].map((m) => m[1]);
-  ok(ledgerTables.every((t) => ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_health'].includes(t)) && ledgerTables.length >= 4,
-    '4i every table it reads is one of four: the snapshot, the ledger\'s projects, its reportable view, its source health', ledgerTables);
+  ok(ledgerTables.every((t) => ['report_snapshot', 'dev_change_project', 'dev_change_event_reportable', 'dev_change_source_fetch_health'].includes(t)) && ledgerTables.length >= 4,
+    '4i every table it reads is one of four: the snapshot, the ledger\'s projects, its reportable view, and the failure-only source-health view (never the whole-ledger dev_change_source_health, which cannot be filtered cheaply)', ledgerTables);
   const allRaw = [];
   const walk = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walk(p); else if (/\.(ts|js|mjs)$/.test(e) && /dev_change_event(?!_reportable)/.test(code(read(p)))) allRaw.push(p); } };
   walk('supabase/functions');
@@ -169,7 +182,9 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   ok(/changes: \['action', 'report_id', 'view'\]/.test(h) && /follow: \['action', 'report_id', 'follow_id'\]/.test(h) && /unfollow: \['action', 'report_id', 'follow_id'\]/.test(h), '6b each action has a fixed field list');
   ok(/unknown field/.test(h), '6c any other field is refused');
   ok(!/\baddress\b|\bzip\b|\blat\b|\blng\b/i.test(c.handler), '6d no action accepts an address, a ZIP or a point: a report is addressed by its id');
-  ok(/UUID\.test\(b\.report_id\)/.test(h) && /UUID\.test\(b\.follow_id\)/.test(h), '6e both ids must be UUIDs before they are used');
+  ok(/UUID\.test\(b\.report_id\)/.test(h) && /FOLLOW_ID\.test\(b\.follow_id\)/.test(h), '6e the report id must be a UUID and the follow id a version-4 (random) UUID before they are used');
+  ok(/const FOLLOW_ID = \/\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-4\[0-9a-f\]\{3\}-\[89ab\]\[0-9a-f\]\{3\}-\[0-9a-f\]\{12\}\$\/i;/.test(h) && !/UUID\.test\(b\.follow_id\)/.test(h),
+    '6e1 the follow id pattern admits version 4 only, so a name-based id (a hash of an address or a user) is refused, and the looser pattern is not used for it');
   ok(/\(action === 'follow' \|\| action === 'unfollow'\) && !followId\) return reply\(req, \{ error: 'invalid_request', detail: 'follow_id' \}, 400\)/.test(h) && !/followId \?\?/.test(h),
     '6e2 follow and unfollow both REQUIRE a follow_id, and nothing falls back to another value when it is absent');
   ok(/b\.report_id\.toLowerCase\(\)/.test(h) && /b\.follow_id\.toLowerCase\(\)/.test(h), '6e3 both ids are lower-cased before they are used, so a retry in another case is the same follow');
@@ -202,11 +217,27 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   const rt = read('test/changes_since_report_pg/roundtrip.mjs');
   ok(/follow-development-report\/handler\.ts/.test(rt) && /follow-development-report\/data\.ts/.test(rt) && /change-reads\.ts/.test(rt) && /report-snapshot\.ts/.test(rt) && /national-report\.ts/.test(rt),
     '7h it drives the real handler, the real data layer, the real shared reads, the real writer and the real engine');
+  // the workflow's two path lists must be the SAME list: the round trip imports files that only one list named (a push to main that changed
+  // only report-snapshot.ts or the SQL the round trip slices its real view from ran nothing), and reads docs/dev-change-baseline.sql
+  const lists = (txt) => {
+    const grab = (re) => { const m = re.exec(txt); return m ? [...m[1].matchAll(/^ {6}- '([^']*)'$/gm)].map((x) => x[1]) : null; };
+    return { pr: grab(/ {2}pull_request:\n {4}paths:\n((?: {6}- '[^\n]*'\n)+)/), push: grab(/ {2}push:\n {4}branches: \[main\]\n {4}paths:\n((?: {6}- '[^\n]*'\n)+)/) };
+  };
+  ok(lists("  pull_request:\n    paths:\n      - 'a'\n      - 'b'\n  push:\n    branches: [main]\n    paths:\n      - 'a'\n").pr.length === 2 && lists("  pull_request:\n    paths:\n      - 'a'\n  push:\n    branches: [main]\n    paths:\n      - 'a'\n      - 'c'\n").push.length === 2,
+    '7j-control the path-list reader finds both lists in a workflow');
+  const wfl = lists(wf);
+  ok(wfl.pr && wfl.push && wfl.pr.length >= 20 && same2([...wfl.pr].sort(), [...wfl.push].sort()),
+    '7j the workflow\'s push-to-main and pull-request path lists are the SAME set: a push that changes any file the round trip uses runs it, as a pull request does', [wfl.pr && wfl.pr.length, wfl.push && wfl.push.length]);
+  ok(['supabase/functions/_shared/report-snapshot.ts', 'docs/dev-change-baseline.sql', 'docs/dev-change-ledger.sql', 'docs/report-snapshot.sql', 'test/dev_change_ledger_pg/fixture.sql'].every((f) => wfl.push && wfl.push.includes(f)),
+    '7j2 both lists name the real writer, the SQL of record the round trip applies and the SQL it slices its real view from');
   const standins = read('test/changes_since_report_pg/standins.sql');
   ok(/^alter role service_role bypassrls;$/m.test(standins),
     '7i2 the stand-in gives service_role the BYPASSRLS attribute Supabase\'s role has: without it the ledger (RLS on, no policy) reads as empty on a fresh database, which a developer machine where the role already carries the attribute hides');
   const created = [...standins.matchAll(/create (?:table|view|function) (?:if not exists )?(?:public\.)?(\w+)/gi)].map((m) => m[1]);
-  ok(created.join() === 'dev_change_source_health', '7i the only stand-in is dev_change_source_health (a view over ingest-side tables this repo does not own); every other relation is the shipped SQL', created);
+  ok(created.join() === 'dev_refresh_source_failures' && !/create (?:or replace )?view/i.test(standins),
+    '7i the only stand-in is the failure TABLE dev_refresh_source_failures (an ingest-side table this repo does not own) and NO view is typed here; every other relation, including the source-health view the reader queries, is the shipped SQL', created);
+  ok(/docs\/dev-change-baseline\.sql/.test(run) && /dev_change_source_fetch_health/.test(run) && /re\.search\(pat, s\)/.test(run) && /apply "\$slice"/.test(run),
+    '7i3 run.sh applies the REAL dev_change_source_fetch_health, its revoke and its grant, sliced out of the SQL of record by pattern (and fails if the pattern stops matching), so the view the reader queries is production\'s own');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
