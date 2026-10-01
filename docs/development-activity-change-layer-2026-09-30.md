@@ -160,3 +160,70 @@ events, all `first_detected`, all baseline, none material, none on a non-compara
 identity, `change_ready` = 0 everywhere (cold start, as the rule requires).
 
 These 148 identities and 137 events are real baseline rows and stay; Order D continues from them.
+
+## 9. Option (b): copies that contradict are HELD, never announced (2026-10-01)
+
+Founder go 2026-09-30 ("ledger option (b)"). Order D left this open and said it **must be settled before the recurring job is armed**
+(baseline doc §11). Settled here, in the one writer. SQL of record: `docs/dev-change-ledger.sql` (rule 8); the production upgrade is
+the **generated** `docs/dev-change-copy-conflicts-apply.sql`.
+
+**Pre-implementation statement.** *Canonical truth path:* `public.app_projects` (one copy per ZIP page) → `dev_change_observe_zip` (the
+ledger's only writer) → ledger → `dev_change_event_reportable`. *Decision owner for "is this a change of the record":* the writer,
+through one new pure function, `dev_change_record_facts`, which reads the existing `dev_change_facts` list. *Shortcut check:* the
+rule is not a reader-side filter and not a second classifier; the reportable view and the Order D driver are untouched (pinned: 9h).
+
+**What was measured first (production, 2026-10-01, every figure beside its control).**
+
+- Control: the ledger holds 922,244 events and 932,969 identities; **959** events are not first detections.
+- Those 959 changed these fields (counts of events naming the field): `stage` 563 · `address` 535 · `name` 502 · `submitted_at` 444 ·
+  `status` 392 · `source_ref` 116 · `type_raw` 110 · `type` 100. **A record does not move its address and rename itself and change its
+  filing date between two reads of one publisher feed**; those are different records sharing a key, or one record caught mid-change.
+- Of the identities carrying those events, **862 still have development copies today (all on 2+ ZIP pages)**, and **528 of the 862 still
+  disagree on name / address / filing date now**: 312 disagree on those fields only, 216 on those and on status or stage as well.
+  **44** disagree only on status or stage (read-time skew), and **290** now agree on everything (a transient disagreement that has
+  resolved). So a persistent conflict is the common case, not the exception.
+- A sample of **1,995** identities of one registry (`arlington-issued-permits`, the first 2,000 by key; 10,392 copies): **91 (4.6%)**
+  disagree on those three fields and 4 on status/stage alone. That registry is one of the largest multi-ZIP sources, so the share of
+  all identities is not yet known (the all-registry query timed out at the tool's 60 s limit and was not retried).
+
+**Why this has to be fixed in the writer.** The writer advances an identity on any copy newer than its last observation, whichever ZIP
+that copy came from. With two copies that persistently contradict, each refresh of either ZIP is "newer and different", so by the
+writer's own ordering rule the same pair of events would be written again on every refresh cycle (this is a deduction from the code, not
+an observation: no recurring job has run yet). Option (a) hid the 959 baseline artifacts from the reader; it cannot hide an ordinary
+run's events, which are reportable by definition.
+
+**The rule (8).** `dev_change_record_facts(facts)` = `{name, address, submitted_at}`. For an observation that would write an event
+(a change from the ledger's state, or a first sighting **outside a baseline run**), the writer reads the identity's **other**
+development copies from `app_projects` by the indexed key. If any other copy's record facts differ from the candidate's:
+
+- an existing identity is **held**: no event, the ledger's facts, `last_observed_at` and `observation_count` do not move, the ZIP
+  attribute and an audit row (`dev_change_copy_conflict`: kind `change_held`, first/last held, times held — idempotent per
+  observation) are the only writes. When every copy later agrees, the next observation is compared against the facts the ledger kept,
+  so **a real rename is reported once, at the retrieval time of the copy that completed the agreement** (C32/C33);
+- a **new** identity is recorded **non-comparable** (`copies_disagree`, sticky like every other reason) and is not announced
+  (kind `new_identity`). Inside a baseline run a new identity is left as today (first detected, baseline), because a baseline
+  neither announces anything nor should pay a lookup per identity; its later contradicting copy is held.
+
+A difference in `stage`, `status`, `type`, `type_raw` or `source_ref` alone is **not** a conflict: that is read-time skew and an
+ordinary change (C34). A facility row under the same key is not a copy (C39). A copy with no name against one with a name is a
+conflict (C40).
+
+**What it costs, stated.** (1) Only observations that would write an event are checked: a few indexed lookups per ZIP, not one per
+row (pinned 9f). (2) A copy that is **stale and still disagrees** holds the identity until its ZIP is refreshed (about one refresh
+cycle); the error is on the safe side and shows in `dev_change_copy_conflict`. (3) A **new** identity that is held as
+`copies_disagree` can never produce an event later, even if the copies converge (comparability is sticky by Order C rule 5): a
+deliberate choice, because a key whose copies contradict at first sight is not a record that can be named. (4) The audit table is
+state, not history; it is never read by a report.
+
+**Proof.** `test/dev_change_ledger_pg`: 50 checks (33 existing, 17 new C26–C42), **44 prohibited mutations, all killed by a named
+check** (21 existing, 23 new; one candidate was deliberately not registered — `<>` for `IS DISTINCT FROM` is an equivalent mutant on a
+jsonb object, which is never SQL NULL — and C40 pins the behaviour instead); three existing mutation anchors were re-pointed to the lines
+this change reworded. `test/dev_change_ledger_pg/upgrade.sh`: the exact file applied to production on 2026-09-29 (writer md5
+`17b45b9c4b93855b0ed3ee7d2ada09e1`, equal to the production value read 2026-10-01) is upgraded by the generated migration; real
+history written by the **old** writer is byte-identical afterwards; the new rule then works on it; re-applying is a no-op; an edited
+writer is refused and nothing is created; a missing ledger is refused; a failed post-condition rolls everything back.
+`test/dev-change-ledger-structure.test.mjs`: 38 pins (9 new; 10 of 10 mutations of the new pins turn the right pin red).
+
+**Apply.** `apply_migration` from the generated file, after re-reading the live writer's `md5(prosrc)` (the guard refuses unless it is the
+old or the new one) and confirming no run is mid-flight. It touches no existing row. Rollback: the ledger file's `ROLLBACK` block drops the
+new objects; the old writer is restored by `create or replace` of `test/dev_change_ledger_pg/as_applied.sql`'s function.
