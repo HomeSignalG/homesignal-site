@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- DEPLOYED DARK (founder, 2026-09-29: "deploy"). The page is served at this URL but is noindex,
-     linked from nowhere in the site, and absent from the sitemap, because the plan's launch blockers
-     are still open (100126 plan, section 25): the free-evaluation entitlement and the $79/month
-     checkout do not exist yet, so the commerce buttons are inert. To LAUNCH: make those buttons
-     live, remove this noindex tag, add the page to sitemap STATIC (scripts/gen_sitemap.py) and link
-     it. test/development-activity-landing.test.mjs fails if any of that is done out of order. -->
+<!-- LINKED, NOT LAUNCHED. Deployed 2026-09-29 (founder: "deploy") as noindex, unlinked and absent
+     from the sitemap, because the plan's launch blockers are still open (100126 plan, section 25):
+     the free-evaluation entitlement and the $79/month checkout do not exist yet, so the commerce
+     buttons are inert. The founder's navigation plan v3 (2026-09-30) then made the page VISIBLE as
+     the shell's "Enterprise" item and nothing more: it is linked exactly once, from
+     partials/shell.html, and lights Enterprise (data-nav="enterprise"). Visibility is not launch.
+     To LAUNCH: make those buttons live, remove this noindex tag and add the page to sitemap STATIC
+     (scripts/gen_sitemap.py). test/development-activity-landing.test.mjs fails if either is done
+     while the buttons are inert, or if anything other than the shell's Enterprise item links here. -->
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://homesignal.net/development-activity.html">
 <title>HomeSignal — Development Activity</title>
@@ -139,7 +142,7 @@
   }
 </style>
 </head>
-<body data-nav="">
+<body data-nav="enterprise">
 <template id="hs-content">
   <div class="page da">
 

@@ -34,10 +34,14 @@ const n5    = strip(read('lib/n5-radius.js'));
 const shellHtml = strip(read('partials/shell.html'));
 const shellJs   = strip(read('shell.js'));
 
-// ---- A-008: TWO surviving surfaces, both reachable, Maps still in nav ----
+// ---- A-008: TWO surviving surfaces, both reachable (as Explore children since v3) ----
 for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
   ok(fs.existsSync(new URL('../' + f, import.meta.url)), 'A-008 ' + f + ' still exists');
-ok(/href="development\.html"\s+data-nav="dev"/.test(shellHtml), 'A-008 Development is in the nav');
+// v3 (founder navigation plan, 2026-09-30): Development LEFT the primary nav. Like Map 1 in
+// A-021, the PAGE stays and stays reachable (ZIP_NAV_PAGES below, the map's list link, the
+// Address dossier's "All projects"); only its sidebar entry went, and it now lights Explore.
+ok(!/href="development\.html"/.test(shellHtml), 'v3 Development is NO LONGER a sidebar item — it is an Explore child');
+ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "explore"');
 // ⚠️ RETARGETED IN PHASE 8, ONE LINE, AND THE DEVELOPMENT CONTRACT IS UNCHANGED IN
 // SUBSTANCE. This line used to read `A-008 Maps is STILL in the nav — not folded`, which
 // was a true statement about the Phase 6 CHROME, not about Development's capability.
@@ -46,10 +50,10 @@ ok(/href="development\.html"\s+data-nav="dev"/.test(shellHtml), 'A-008 Developme
 // reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
 // Everything else in this file is byte-identical to Phase 6.
 ok(!/href="homesignalmap\.html"/.test(shellHtml),
-  'A-021 Maps is NO LONGER a sidebar item — folded under Development',
+  'A-021 Maps is NO LONGER a sidebar item (an Explore child since v3)',
   (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
-ok(/<body data-nav="dev"/.test(map),
-  'A-021 ...and Map 1 declares "dev", so visiting it lights Development');
+ok(/<body data-nav="explore"/.test(map),
+  'v3 ...and Map 1 declares "explore", so visiting it lights Explore');
 ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs),
   'A-008 Map 1 is still in MAP_PAGES — the PAGE was not retired, only its sidebar entry');
 for (const p of ['development.html', 'homesignalmap.html'])

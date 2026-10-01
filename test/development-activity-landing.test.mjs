@@ -13,9 +13,13 @@
 //      every var(--token) it names is defined there.
 //   4. NOTHING PROMISES WHAT DOES NOT EXIST. The free-evaluation and $79 checkout buttons are
 //      inert until entitlement and checkout ship (plan sections 18 and 25). The page IS deployed
-//      (founder, 2026-09-29) but DARK: noindex, linked from nowhere, not in the sitemap. Those
-//      facts are tied together: the page may be discoverable (indexed, linked or in the sitemap)
-//      only once the buttons are live, so launching out of order fails this file.
+//      (founder, 2026-09-29) and noindex, and is not in the sitemap. The founder's navigation
+//      plan v3 (2026-09-30) made it VISIBLE as the shell's "Enterprise" item and nothing more:
+//      it is linked exactly once, from partials/shell.html, and nothing else links it. That
+//      supersedes the 2026-09-29 "linked from nowhere" state, which was a session's addition
+//      to the founder's "deploy", never a founder ruling. Visibility is not launch: the page
+//      may be INDEXED or enter the SITEMAP only once its buttons are live, so launching out of
+//      order still fails this file.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -38,7 +42,7 @@ const text = markup.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+
 
 console.log('--- 1. the shared shell, unchanged ---');
 ok(/<template id="hs-content">/.test(src) && /<\/template>/.test(src), 'content lives in <template id="hs-content"> like every shell page');
-ok(/<body data-nav="">/.test(src), 'declares no navigation identity (no sidebar entry exists for it, none is invented)');
+ok(/<body data-nav="enterprise">/.test(src), 'v3 declares the Enterprise identity, so its sidebar item lights here');
 const scripts = (h) => (h.match(/<script[^>]*\ssrc="[^"]+"/g) || []).map((s) => s.match(/src="([^"]+)"/)[1]);
 ok(JSON.stringify(scripts(src)) === JSON.stringify(scripts(contact)),
   'loads exactly the same script set, in the same order, with the same cache keys as contact.html', { page: scripts(src), contact: scripts(contact) });
@@ -152,8 +156,17 @@ ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_si
 ok(noindex, 'the page is noindex (dark: reachable by URL, not discoverable by search)');
 ok(!(inert && !noindex), 'TRIPWIRE: a page with inert commerce buttons must stay noindex');
 ok(!(inSitemap && (noindex || inert)), 'TRIPWIRE: the page enters the sitemap only when it is indexable and its commerce buttons are live', { inSitemap, noindex, inert });
-ok(!(inert && linkedFrom.length), 'TRIPWIRE: nothing in the site links to the page while its commerce buttons are inert', linkedFrom);
-ok(!inSitemap && linkedFrom.length === 0, 'DEPLOYED DARK: not in the sitemap and linked from no shipped page or script', { inSitemap, linkedFrom });
+// v3 (founder navigation plan, 2026-09-30): the shell's Enterprise item is the ONE link to this
+// page. Any other link while the buttons are inert is a second, unreviewed entry point, and an
+// Enterprise item that drifted to another href would silently stop pointing here.
+const shellSrc = read('partials/shell.html');
+const shellLinks = shellSrc.match(/<a\s+href="development-activity\.html"[^>]*>/g) || [];
+ok(JSON.stringify(linkedFrom) === JSON.stringify(['partials/shell.html']),
+  'TRIPWIRE: while its commerce buttons are inert, the ONLY thing that links the page is the shell\'s Enterprise item', linkedFrom);
+ok(shellLinks.length === 1 && /data-nav="enterprise"/.test(shellLinks[0])
+   && /<a\s+href="development-activity\.html"[^>]*>[\s\S]{0,80}?Enterprise<\/a>/.test(shellSrc),
+  'v3 the shell links it exactly once, as the "Enterprise" primary item', shellLinks);
+ok(!inSitemap, 'LINKED, NOT LAUNCHED: still not in the sitemap', { inSitemap });
 ok(!/HS\.data\.(projects|facilities)|from\('app_projects'\)|rpc\(/.test(noComments), 'the sample reads no production project data: it is labelled illustrative and shows no real record');
 ok(/Sample Development Activity report\. The property, projects, distances and dates below are illustrative entries, not records for a real address\./.test(text), 'the sample is labelled illustrative in plain words');
 

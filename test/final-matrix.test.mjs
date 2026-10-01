@@ -115,8 +115,12 @@ ok(/HS\.navHref\('homesignalmap\.html', S\.zip\)/.test(dev), 'LEFTOVER 7 ...and 
 ok(!/sampleBtn/.test(map), 'LEFTOVER 7 #sampleBtn is still absent');
 ok(!/repPreview|impact model|updated today/.test(strip(read('reports.html'))),
   'LEFTOVER 8 the reports preview document was not ported into the stub');
-ok(/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="dev">/.test(read('homesignalmap.html')),
-  'LEFTOVER 10 the stale "This page is MAPS" narration sits above the correct data-nav="dev" — recorded, not edited');
+// LEFTOVER 10 CLOSED 2026-10-01 (founder navigation plan v3). It recorded a stale "This page
+// is MAPS." narration sitting above data-nav="dev". v3 re-tokened Map 1 to Explore, so the
+// comment had to be rewritten anyway; it now names the section the token actually lights.
+ok(!/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="explore">/.test(read('homesignalmap.html'))
+   && /Map 1 belongs to EXPLORE/.test(read('homesignalmap.html')),
+  'LEFTOVER 10 CLOSED: the narration above Map 1\'s data-nav="explore" now matches what it lights');
 
 console.log(fails ? '\nFAILED ' + fails : '\nAll final-matrix checks passed');
 process.exit(fails ? 1 : 0);

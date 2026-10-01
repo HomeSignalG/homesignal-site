@@ -213,7 +213,9 @@ await waitShell();
 let c = await chrome();
 info('development.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '1 development.html highlights exactly one sidebar item', c.activeLabels);
-ok(c.activeTokens[0] === 'dev', '1 ...and it is Development & Impact', c.activeTokens);
+// RETARGETED (founder navigation plan v3, 2026-09-30). Development left the sidebar; the
+// development list is part of Explore, so Explore is the item it lights.
+ok(c.activeTokens[0] === 'explore', '1 ...and it is Explore (plan v3)', c.activeTokens);
 ok(c.activeTokens.indexOf('maps') < 0, '1 Maps is NOT active on Development & Impact', c.activeTokens);
 
 // ═══ 2. Map 1 identifies itself ═══
@@ -223,13 +225,12 @@ await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeo
 c = await chrome();
 info('homesignalmap.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '2 Map 1 highlights exactly one sidebar item', c.activeLabels);
-// ⚠️ RETARGETED (A-021). This used to assert `activeTokens[0] === 'maps'`, and that was the
-// right assertion while a Maps sidebar entry existed — the 2026-09-04 defect this file was
-// written for was Map 1 claiming "dev" WHILE Maps was a container. A-021 folded Maps UNDER
-// Development, so there is no Maps entry to light and claiming "dev" IS the fold. The thing
-// this section protects is unchanged: Map 1 must light exactly one item, and it must be the
-// section it actually lives in.
-ok(c.activeTokens[0] === 'dev', '2 ...and it is Development — Map 1 lives under it (A-021)', c.activeTokens);
+// ⚠️ RETARGETED TWICE. This first asserted `activeTokens[0] === 'maps'` while a Maps sidebar
+// entry existed; A-021 then folded Maps under Development and it asserted 'dev'. The founder
+// navigation plan v3 (2026-09-30) makes the sidebar Explore | My Places | Enterprise, and
+// Map 1 is part of Explore. The thing this section protects is unchanged: Map 1 must light
+// exactly one item, and it must be the section it actually lives in.
+ok(c.activeTokens[0] === 'explore', '2 ...and it is Explore — Map 1 lives under it (plan v3)', c.activeTokens);
 ok(c.activeTokens.indexOf('maps') < 0, '2 there is no Maps item to light any more', c.activeTokens);
 
 // ═══ 6. ...while the proven ZIP contract is untouched ═══
@@ -270,9 +271,16 @@ ok(z.distances === 0, '6 no radius distance is attached in ZIP mode', z.distance
 await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
-  '3 there is no Maps sidebar entry — Maps was folded under Development (A-021)');
-ok(await page.locator('.nav a').count() === 4,
-  '3 ...and the sidebar is the four containers', await page.locator('.nav a').count());
+  '3 there is no Maps sidebar entry (A-021, kept by plan v3)');
+ok(await page.locator('.nav a').count() === 3,
+  '3 ...and the sidebar is the three primary items (plan v3)', await page.locator('.nav a').count());
+ok((await page.locator('.nav a').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+     === 'explore|props|enterprise',
+  '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
+// The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
+c = await chrome();
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',
+  '3 the Dashboard lights My Places (plan v3)', c.activeTokens);
 
 // ═══ 4. The Dashboard is the ALL MY PLACES briefing — it has no map to open ═══
 // RETARGETED (Fix 8). This section used to click a Dashboard "Open full map" control
@@ -346,8 +354,8 @@ for (const [origin, selector, label] of [
   c = await chrome();
   info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
   ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
-  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev',
-    label + ' -> Development is the active item after the page settles', c.activeTokens);
+  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+    label + ' -> Explore is the active item after the page settles', c.activeTokens);
 }
 
 // ═══ 7. A saved home in Del Valle, a map of Denver ═══
@@ -368,7 +376,7 @@ ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '7 the saved home is still saved (unchanged, still the active property)', c.savedHome);
 ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', '7 Explore is still the active item (plan v3)');
 
 // ═══ 7b. Map 1 AT AN EXPLICIT ?zip= IS A ZIP PLACE, even on the saved address's own ZIP ═══
 // SUPERSEDES the earlier 7b, which required "Viewing · 13313 COOMES DR" here. That was the

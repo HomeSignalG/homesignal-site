@@ -90,22 +90,22 @@ for (const [f, body] of [['lib/community-page.js', cp], ['community.html', legac
     'PS-001 the generator has exactly one structured-data writer, _ld_json (project pages)');
 }
 
-// ---- PS-001 CHROME: FOUR containers (A-021, Phase 8) ----
-// ⚠️ THIS IS THE ONLY SECTION OF THIS FILE PHASE 8 WAS AUTHORIZED TO RETARGET. The chrome
-// on the public ZIP changed because there is ONE shell and the retirement was authorized;
+// ---- PS-001 CHROME: THREE primary items (founder navigation plan v3; was A-021's four) ----
+// ⚠️ THIS IS THE ONLY SECTION OF THIS FILE PHASE 8 (and later v3) WAS AUTHORIZED TO RETARGET.
+// The chrome on the public ZIP changed because there is ONE shell and the change was authorized;
 // every other assertion here — robots, canonical, Rule F, ld+json, Follow copy, View
 // Development Map, Invite, FM-078, the Local News cap, the A-022 gate — is unchanged and
 // must stay that way. A public ZIP that kept Today/Maps/Comm while the logged-in pages
-// lost them would be a stealth shell split, so the four-item assertion below is measured
+// lost them would be a stealth shell split, so the item-count assertion below is measured
 // on the ONE partials/shell.html both surfaces load.
 {
   const nav = [...shellHtml.matchAll(/href="([^"]+)"\s+data-nav="([a-z]+)"/g)].map(m => m[2] + '->' + m[1]);
-  ok(nav.length === 4, 'PS-001 the shared chrome is FOUR containers', nav);
-  ok(nav.join('|') === 'dash->dashboard.html|alerts->alerts.html|dev->development.html|props->properties.html',
-    'PS-001 ...Dashboard, Alerts, Development, My Places — in that order', nav);
+  ok(nav.length === 3, 'v3 the shared chrome is THREE primary items', nav);
+  ok(nav.join('|') === 'explore->index.html|props->properties.html|enterprise->development-activity.html',
+    'v3 ...Explore, My Places, Enterprise — in that order', nav);
   ok(!nav.some(n => /today/.test(n)), 'PS-001 Today is NOT in the chrome (A-020 retired it)', nav);
-  ok(!nav.some(n => /homesignalmap/.test(n)), 'PS-001 Maps is NOT in the chrome (A-021 folded it under Development)', nav);
-  ok(!nav.some(n => /community\.html/.test(n)), 'PS-001 Zip Code Activity is NOT in the chrome — the public ZIP is not a fifth container', nav);
+  ok(!nav.some(n => /homesignalmap/.test(n)), 'PS-001 Maps is NOT in the chrome (Map 1 is an Explore child)', nav);
+  ok(!nav.some(n => /community\.html/.test(n)), 'PS-001 Zip Code Activity is NOT in the chrome — the public ZIP is an Explore child, not a primary item', nav);
 }
 
 // ---- PS-001 PRODUCT ENTRY: the public page's own copy and targets ----

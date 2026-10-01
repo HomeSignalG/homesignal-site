@@ -613,12 +613,13 @@
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
-     whose data-nav matches it. This page is MAPS. It read "dev" from the days when the
-     sidebar's Maps entry pointed at the now-retired maps.html (which owned "maps"), so
-     after that retirement the primary map told every visitor they were in Development &
-     Impact and the Maps item could never light up anywhere. Founder-observed live.
-     Contract asserted by test/nav-identity.test.mjs. -->
-<body data-nav="dev">
+     whose data-nav matches it. Map 1 belongs to EXPLORE (founder navigation plan v3,
+     2026-09-30): it is a contextual Explore tool with no primary item of its own, reached
+     from the "View Development Map" links on the public ZIP page and development.html, and
+     from how-it-works.html. It is still in ZIP_NAV_PAGES and MAP_PAGES. Before v3 it
+     declared "dev" (A-021), and before that a retired "maps" entry. Contract asserted by
+     test/nav-identity.test.mjs. -->
+<body data-nav="explore">
 <!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
      share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
      the shell owns them now. Page content lives in the <template> below; shell.js moves it into

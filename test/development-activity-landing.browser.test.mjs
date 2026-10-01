@@ -1,7 +1,8 @@
 // DEVELOPMENT ACTIVITY LANDING PAGE — driven in a real browser.
 //
 // Proves the behaviour the brief asks the page to demonstrate, on the shipped file:
-//   * the shared shell is the only chrome (four sidebar containers, nothing added, nothing lit);
+//   * the shared shell is the only chrome (the three primary items of the founder navigation plan
+//     v3, and Enterprise is the one lit — this page IS Enterprise);
 //   * the sample report keeps the real hierarchy, and Type and Stage are two separate fields;
 //   * selecting a Type filters that Type across ALL THREE Stage sections at once, dims the same
 //     projects on the evidence plot, and shows an honest empty line where a Stage has none;
@@ -95,17 +96,18 @@ const shell = await page.evaluate(() => ({
   navLinks: [...document.querySelectorAll('#hs-nav a')].map((a) => a.getAttribute('href').split('?')[0]),
   sidebars: document.querySelectorAll('.side').length,
   navs: document.querySelectorAll('nav').length,
-  lit: document.querySelectorAll('#hs-nav a.on').length,
+  lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),
   logo: document.querySelectorAll('.logo').length,
   upsell: document.querySelectorAll('.upsell').length,
   top: document.querySelectorAll('#hs-top').length,
   inSlot: !!document.querySelector('#hs-slot .page.da'),
   outsideSlot: document.querySelectorAll('.da').length - document.querySelectorAll('#hs-slot .da, #hs-slot .da *').length
 }));
-ok(JSON.stringify(shell.navLinks) === JSON.stringify(['dashboard.html', 'alerts.html', 'development.html', 'properties.html']),
-  'the sidebar is the four shared containers, unchanged', shell.navLinks);
+ok(JSON.stringify(shell.navLinks) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
+  'the sidebar is the three primary items: Explore, My Places, Enterprise (plan v3)', shell.navLinks);
 ok(shell.sidebars === 1 && shell.logo === 1 && shell.top === 1 && shell.navs === 1, 'one sidebar, one logo, one top bar, one <nav>: the page adds none', shell);
-ok(shell.lit === 0, 'no sidebar entry is lit: no Development Activity menu item was invented');
+ok(JSON.stringify(shell.lit) === JSON.stringify(['enterprise']),
+  'exactly one sidebar entry is lit, and it is Enterprise: this page is the Enterprise item (plan v3)', shell.lit);
 ok(shell.inSlot, 'the page content is mounted in the shell slot');
 
 console.log('--- 2. the sample keeps the real report hierarchy ---');

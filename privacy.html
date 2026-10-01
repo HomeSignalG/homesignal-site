@@ -65,5 +65,15 @@
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=f7ec5a9a"></script>
+<script>
+  // privacy.html#terms is the shell's "Terms" link. The Terms heading lives in the page
+  // template that shell.js injects after load, so the browser's own jump to #terms finds
+  // nothing and the page opens at the top. Jump once the shell has put the page in place.
+  HS.onReady(function () {
+    var id = (location.hash || '').slice(1);
+    var el = id && document.getElementById(id);
+    if (el) el.scrollIntoView();
+  });
+</script>
 </body>
 </html>
