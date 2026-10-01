@@ -210,9 +210,9 @@ a factor of about fifty of headroom.
 **Rollback:** `create or replace` the wide view from the previous text of `docs/dev-change-baseline.sql` (it is the git
 history of that file), then drop the narrow view. The wide view must be restored first: it depends on the narrow one.
 
-**What is and is not live.** The view is applied. The deployed `get-development-activity-report` still reads the **wide** view until
-it is redeployed with this change; that works, with the headroom described above, and nothing changes for it by the view's arrival.
-`follow-development-report` is not deployed yet (§9).
+**What is and is not live.** The view is applied, and both functions that read it are deployed (§9): the refactored
+`get-development-activity-report` (v2) and `follow-development-report` (v1) read the **narrow** view. Until 2026-10-01 22:32Z the deployed
+national function (v1) read the wide view; that worked, with the headroom described above.
 
 ## 7. Limits, stated
 
@@ -263,7 +263,9 @@ it is redeployed with this change; that works, with the headroom described above
   caps request sizes. Streaming the bound belongs in `_shared/admin-gate.ts`, for both functions at once.
 - The stored report's `report_version` is not checked by the reader; a body of another shape is refused by its `product` and
   project-list checks, and a version that kept those shapes but changed what a detected change means would not be noticed.
-- It is not deployed and not smoked in production (§9).
+- It is deployed (2026-10-01), but **no signed-in call has been made to either function in production** (§9). The anon-key refusal and the
+  capability reads are proven live; a call that passes the admin gate, reads a stored report and the ledger through PostgREST, and
+  answers, has only been run on the disposable Postgres. That needs an admin session token, which this work did not and must not mint.
 - Real customer reports stay unstored: the other gates of the contract §6 are unchanged by this work.
 
 ## 8. Defaults taken here that the founder may change
@@ -280,9 +282,50 @@ it is redeployed with this change; that works, with the headroom described above
 
 ## 9. Receipt
 
-Not yet deployed. **Applied already:** the narrow health view (§6b), migration `20261001220554`. When the functions are deployed: the
-dispatch of `deploy-edge-functions.yml` for `follow-development-report` and for the refactored
-`get-development-activity-report` (one function per dispatch), the version numbers, and the production smoke are recorded here.
-The smoke also exercises the narrow view in production for the first time from a function. The smoke covers **both**
-functions: the anon key refused with 401 and the capability read on each, and one signed-in call to the refactored national
-report (it was refactored onto the shared modules, so its own behaviour in production is part of this change).
+**Applied before the merge:** the narrow health view (§6b), migration `20261001220554` (additive; applied 2026-10-01 so the reader's
+source-health read would not time out, and disclosed in the PR).
+
+**Merged:** #1516, squash `5937254`, CI green on the head.
+
+**Deployed 2026-10-01, from `main` at `5937254`, one dispatch per function** (`deploy-edge-functions.yml` checks out the dispatch ref, so
+both ran the merged code; `jurisdiction-registry.json` is unchanged, so its post-deploy recompute is a no-op):
+
+| function | run | result | version after | `verify_jwt` | source hash (`ezbr_sha256`) |
+|---|---|---|---|---|---|
+| `follow-development-report` | `36935574349` | success | **1** (new; created 22:31:46Z) | true | `30f1accc…` |
+| `get-development-activity-report` | `36935640335` | success | **2** (was 1, 2026-09-30; updated 22:32:28Z) | true | `2cb02c9d…` |
+
+Versions were read back with `list_edge_functions` after each run.
+
+**Production smoke, through `pg_net` from SQL with the public anon key** (the sandbox has no egress to Supabase; request ids 18113–18118
+in `net._http_response`, read back after about eight seconds; bodies quoted):
+
+| request | status | body |
+|---|---|---|
+| follow, `GET`, no `Authorization` | **401** | `{"code":"UNAUTHORIZED_NO_AUTH_HEADER","message":"Missing authorization header"}` (the gateway) |
+| follow, `GET`, anon key | **200** | the capability: `"access":"signed-in internal user only (JWT + dashboard_admins). Not a customer surface."`, `"stores_reports":false`, `"reads_private_values":false`, `"uses_private_context_handle":true`, `"writes":["a follow need on a report's private context (follow, unfollow)"]` |
+| follow, `POST` `{"action":"changes",…}`, anon key | **401** | `{"error":"unauthorized"}` (the handler's own refusal: the anon key passes the gateway, and the admin gate refuses it before any read) |
+| national report, `GET`, no `Authorization` | **401** | the same gateway body |
+| national report, `GET`, anon key | **200** | the capability (`"stores_reports":false`, the radius list and `recent_days: 90`, the same access sentence) |
+| national report, `POST` `{"zip":"01002"}`, anon key | **401** | `{"error":"unauthorized"}` |
+
+Controls: the two `GET` capability reads are answered by the deployed code (the follow function's body carries
+`uses_private_context_handle:true`, a field that exists only in the merged source), and the two handler 401s differ in kind from the two
+gateway 401s (a different body), so the gateway and the handler are each shown to refuse.
+
+**The narrow view, read in production** (`EXPLAIN (ANALYZE)` as the owner role through the database tool; not through PostgREST):
+**186 rows, execution 259 ms**, one parallel scan of `dev_refresh_source_failures` (159,418 rows) filtered to the three kinds, aggregated
+by registry id. The same read through the wide view was 6.1–6.2 s (§6b). That is the view's cost in production as a database read; the
+function's read of it through PostgREST under the `authenticator` 8 s budget has not been exercised (next paragraph).
+
+**Not exercised, stated plainly: a signed-in call to either function.** The smoke above proves what the gateway and the handler refuse and
+what the capability says. It does **not** prove, in production, that an allow-listed admin gets an answer from `get-development-activity-report`
+after its refactor onto the shared modules (the one smoke this document earlier said would be run), nor that `follow-development-report`
+answers `changes` / `follow` / `unfollow` for a real stored report. Both are proven on the disposable Postgres (§6) and by the national
+function's two behavioural suites, which did not change. Doing it needs an admin session token; none was available and none was minted. Until
+an admin makes that call, gate 4 of the contract is **closed on the disposable-Postgres proof plus a deployed function whose refusals and capability
+are verified live**, not on a production answer, and the status file says the same.
+
+**Rollback:** delete `follow-development-report` (nothing depends on it). For the national function, dispatch `deploy-edge-functions.yml` on a ref
+that carries the earlier source (the commit before #1516 is `24112a4`; the workflow checks out the dispatch ref and has no ref guard).
+That version read the wide view, which still works with the wide view's headroom.
