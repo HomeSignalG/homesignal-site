@@ -17,8 +17,15 @@ name: report-snapshot-suite
 #      real snapshot module through the real writer, and every assertion is about what the database holds — one
 #      permanent report for six customers, no private value or fragment in it, the private layer holding exactly what
 #      was entered, a purge leaving the report byte-identical, and each kind of leak caught where it can be.
+#   4. the PURGE SCHEDULE (docs/report-private-context-purge-schedule.sql; Order F2 gate 5): the pg_cron job that runs
+#      the F2 purge batch every 15 minutes, and the alertable monitor check that pages when a private context is more
+#      than an hour past its purge date. Against a stand-in pg_cron and a stand-in monitor: the job and its schedule, the
+#      health read, every monitor outcome, the scheduled command purging exactly what is due, a check that cannot run
+#      failing instead of killing the monitor, an exact rollback, two refusals that arm nothing, and every prohibited
+#      mutation, each of which MUST fail the suite.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
-# test/report-private-context-structure.test.mjs, test/national-report*.test.mjs) run in unit-tests.yml with every
+# test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
+# test/national-report*.test.mjs) run in unit-tests.yml with every
 # other offline suite.
 #
 # This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
@@ -29,6 +36,8 @@ on:
     paths:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
       - 'test/report-snapshot-structure.test.mjs'
@@ -45,6 +54,8 @@ on:
     paths:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
       - 'test/national_report_pg/**'
@@ -122,3 +133,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/national_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/nr.log
+      - name: The purge schedule and its monitor check pass; the file applies twice and rolls back exactly; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log

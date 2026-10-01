@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-09-30, in the PR that records the Order G production receipt (deployed; gates smoked; signed-in path not exercised).
+Last updated: 2026-10-01, in the PR that builds the purge schedule and its monitor check (built and proven; applied to production after merge).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -83,7 +83,7 @@ Last updated: 2026-09-30, in the PR that records the Order G production receipt 
   append-only audit; the snapshot keeps its `report_id`, hash, body and time when the address is purged. Measured
   first: the legacy report shape would have stored the typed address, the exact property point and per-record offsets
   that recover the point to within a metre (contract §2). All four tables hold 0 rows and **nothing calls the writer**;
-  the purge is written and tested but **not scheduled**. Production receipt and a rolled-back behaviour probe: contract
+  the purge is written and tested; **its schedule and alarm are built in `docs/report-private-context-purge-schedule.sql` (contract §13) and take effect on apply**. Production receipt and a rolled-back behaviour probe: contract
   §12. **The probe found one limit the docs had not named:** the database backstop matches whole values, so a fragment
   of the address (the street line alone) is not caught — now stated in §9 and pinned by X07b, and it goes on Order G's
   boundary-test checklist (§8.4).
@@ -96,7 +96,7 @@ Last updated: 2026-09-30, in the PR that records the Order G production receipt 
   **Go given 2026-09-29 under one rule: Order G may build the national report engine, but no
   production path may permanently write a brokerage-entered exact address into the immutable snapshot, and no real
   customer report is stored until the five gates in `docs/report-private-context-contract-2026-09-30.md` §6 are closed**
-  (three are now proven, two are open: the Follow / Changes Since Report surface, and arming the purge).
+  (three are proven; gate 5, arming the purge, is built and takes effect on apply — contract §13; one is open: the Follow / Changes Since Report surface).
   `docs/development-activity-report-engine-2026-09-30.md` records what was found and built: the plan's "canonical
   commercial API" (NYC-only) was **never deployed**, so this builds the national path (`get-development-activity-report`,
   JWT on, plus a signed-in allow-listed user because the anon key passes the gateway). **It stores nothing, and it shows a
@@ -194,6 +194,8 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
     survives the purge. Built as F2. **Defaults taken in F2 that the founder may change** (contract §7): distances
     from the subject are private-derived and not stored (D-1); a ZIP stays permanent (D-2); the purge keeps a
     tombstone row with no personal data (D-3); the `report` need stays open until Orders J and L close it (D-4);
-    `label` is the one optional free-text field (D-5); unknown private fields are refused (D-6). **Still to do
-    before the first real report is stored:** the purge batch is not scheduled (a new scheduled job waits for its
-    own go), the overdue-purge lag is not yet a monitor check, and backups are outside this unit.
+    `label` is the one optional free-text field (D-5); unknown private fields are refused (D-6). **Arming the purge
+    (go 2026-09-30) is built:** a pg_cron job every 15 minutes and an alertable monitor check
+    (`docs/report-private-context-purge-schedule.sql`, contract §13; defaults D-7..D-10). **Still to do before the first
+    real report is stored:** the apply and its production receipt, the Follow / Changes Since Report surface, and backups
+    are outside this unit.

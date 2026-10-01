@@ -117,12 +117,15 @@ const code = (f) => { const t = readFileSync(join(ROOT, f), 'utf8'); return f.en
 const namesPrivate = allFiles.filter((f) => /report_private_context/.test(code(f)));
 ok(allFiles.length > 50 && namesPrivate.includes('docs/report-private-context.sql'),
   '5c-control: the scan covers the code directories, the root files and every docs SQL, and finds the SQL of record', allFiles.length + ' files');
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql'].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may)', namesPrivate.join(','));
+// The ONE addition (2026-10-01, founder go for gate 5): the file that schedules the purge and watches it. It names the layer
+// because it must; test/report-private-context-purge-structure.test.mjs pins that it never names a private COLUMN, never
+// writes the layer, and never calls the per-context purge. Anything else naming the layer is still a consumer nobody designed.
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql'].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the one addition is the file that schedules and watches the purge', namesPrivate.join(','));
 ok(!allFiles.some((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))),
   '5d: nothing calls the function that returns the private values');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),
-  '5e: no schedule is armed and no network call is made — the purge batch is written and tested, and waits for its own go');
+  '5e: THIS file arms no schedule and makes no network call — the purge batch is scheduled only by docs/report-private-context-purge-schedule.sql, a separate file with its own go and its own proof');
 
 // ── 6. lock-down: system-only ─────────────────────────────────────────────────────────────────────────────────────────────
 ok(['report_private_context', 'report_private_context_need', 'report_private_context_event'].every((t) =>
