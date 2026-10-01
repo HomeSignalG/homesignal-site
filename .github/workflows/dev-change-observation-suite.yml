@@ -1,0 +1,82 @@
+name: dev-change-observation-suite
+
+# THE RECURRING OBSERVATION JOB AND ITS ALARM (docs/dev-change-observation-schedule.sql; Development
+# Activity plan, change ledger; status file decision 9).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres: the wrapper pg_cron calls over real ledger scenarios
+# (one ordinary run per UTC day, the 200-ZIP cap, the 24-hour interval, option (b) in force, a call that raises
+# writes nothing, the lock-down), the alarm on both sides of every threshold, the job, applying twice, the
+# rollback, and every refusal. Then every prohibited mutation of the SQL — each MUST fail a NAMED check (a
+# mutation that only crashes the suite does not count as killed). The offline half
+# (test/dev-change-observation-structure.test.mjs) runs in unit-tests.yml with every other offline suite.
+#
+# pg_cron is a STAND-IN here (test/report_private_context_purge_pg/fixture_cron.sql plus a job-run-details
+# stand-in): the real extension's behaviour is measured in production, not here.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever address
+# the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-observation-schedule.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
+      - 'docs/dev-change-reportable.sql'
+      - 'test/dev_change_observation_pg/**'
+      - 'test/dev_change_ledger_pg/fixture.sql'
+      - 'test/dev_change_baseline_pg/fixture.sql'
+      - 'test/report_private_context_purge_pg/fixture_cron.sql'
+      - 'test/report_private_context_purge_pg/fixture_monitor.sql'
+      - 'test/dev-change-observation-structure.test.mjs'
+      - '.github/workflows/dev-change-observation-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-change-observation-schedule.sql'
+      - 'test/dev_change_observation_pg/**'
+      - '.github/workflows/dev-change-observation-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_observation_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The shipped schedule passes; it applies twice; its rollback restores the monitor; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_observation_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_change_observation_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dco.log

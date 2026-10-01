@@ -446,3 +446,102 @@ now grants USAGE to all three roles and checks it as a control before the refusa
   (the cross-copy differences of §10), and **0** events name no run. The run counters agree: 922,244 events written
   by baseline runs, 0 by ordinary ones.
 - Nothing reads the view yet, so no page, email or report changed.
+
+## 12. The recurring observation job, and the pilot that sets its schedule (2026-10-01)
+
+Founder go 2026-09-30 ("the recurring observation job"). Until now nothing has observed a ZIP since the baseline, so the
+ledger detects nothing: it held 922,244 events, all baseline, and read 0 reportable ones. SQL of record:
+`docs/dev-change-observation-schedule.sql`. It adds **no observation logic**.
+
+**Pre-implementation statement (CLAUDE.md "one canonical truth path").**
+
+- *Canonical truth path:* `public.app_projects` -> `dev_change_observe_zip` (the ledger's only writer, called by
+  `dev_change_tick`) -> `dev_change_event` -> `dev_change_event_reportable` (the one reader) -> the report (Order G).
+- *Decision owner for "when is a ZIP observed":* `dev_change_tick`'s due rule, unchanged. The new wrapper chooses four numbers
+  and one run per UTC day; it does not decide what is due, what a change is, or what may be shown.
+- *Shortcut check:* the wrapper and the health read never name the event or project table (structural pins 5, 5b), the check
+  reads only the health function (8, 8b), and the reportable-view test (7) still fails if any other file reads the raw event
+  table. No second writer, no second reader, no second monitor.
+- *Concurrency check:* no open or recent PR for this outcome. Verdict: GENUINE GAP.
+
+**What the file creates.** (1) `dev_change_observe_scheduled()`: one **ordinary** run per UTC day (an ordinary run can only
+re-observe a ZIP the baseline already covered, so it can never write a first sighting as news), one `dev_change_tick` per call,
+the receipt of each tick kept on the run's own `detail`; it **refuses, writing nothing, unless ledger option (b) is applied**.
+(2) `dev_change_observation_health()`: counts, times, up to five ZIP codes and fixed words, never a project or an error text.
+(3) the pg_cron job `dev-change-observe`. (4) the check `dev_change_observation`, spliced into the one existing monitor
+(`pipeline_health_tick` -> `notify-health`) with the same fail-closed splice as the purge and the address-check monitor.
+Service-role only; idempotent (re-applying re-arms a deactivated job and never makes a second); a rollback footer restores the
+monitor byte for byte.
+
+**Why a pilot.** The baseline measured INSERTS (about 340 ZIPs a minute). This job REWRITES: every record of a re-observed ZIP is
+rewritten. And **every one of the 12,722 canonical ZIPs is due every day**: measured 2026-10-01 17:11Z, all 12,722 had a
+`materialized_at` newer than their cursor (the materialiser stamps each ZIP on every sweep), so the 24-hour interval is the only
+limiter. Cursor: 12,722 rows, 0 in error, oldest observation 2026-09-29 18:57Z.
+
+**The pilot (production, 2026-10-01 17:12-17:14Z; two ordinary runs, never scheduled, both finished).** Controls first: the project
+table was 1,110 MB, events 731 MB, 932,969 identities, 14,544 dead tuples, database 22 GB; `max_wal_size` 4 GB, checkpoint 300 s,
+`full_page_writes` on, autovacuum scale factor 0.2.
+
+| what | ZIPs | rows read | time | records rewritten | WAL | events |
+|---|---:|---:|---:|---:|---:|---:|
+| real tick, lowest ZIP numbers | 25 | 3,073 | 2.06 s | 673 | 5.3 MB (9 s window, background included) | 0 |
+| real tick, next 150 | 150 | 15,126 | 10.6 s (70 ms a ZIP) | 3,546 (1,383 HOT, 39%) | 11.6 MB (bracketed, background included) | 0 |
+| the writer on 28451 | 1 | 13,921 | 5.0 s | 13,921 | 20.8 MB (1.5 KB a row) | 45 |
+| 10025 / 11236 / 60629 | 3 | 807 / 329 / 430 | 0.45 / 0.23 / 0.29 s | 768 / 325 / 430 | 841 / 746 / 582 KB | 0 |
+| 77449, 90011 | 2 | 0 | 6-10 ms | 0 | 0 | 0 |
+
+Rates: about **14 ZIPs a second** on ZIPs of about 100 rows; **0.5 to 0.7 ms a row** on larger ones (the baseline's upper bound was 0.77);
+**1.1 to 1.5 KB of WAL per rewritten record** when tightly bracketed, 3.3 KB at the loosest (background WAL is inside every bracket,
+so these are ceilings). 61% of updates were not HOT, so dead tuples accumulate: 14,544 -> 18,487 over the pilot.
+
+**Projection for a full daily pass** (a projection, not a measurement): 2,925,376 development rows read (the baseline's count),
+about 933,000 records rewritten -> roughly **25 to 35 minutes of work and 1 to 3 GB of WAL a day**, about 570,000 dead tuples
+(autovacuum fires roughly three times a day at a 0.2 scale factor on this table). The ledger grows only with real changes:
+46 events from 181 ZIP observations, 45 of them in one ZIP.
+
+**The schedule that follows.** A pass is 12,722 ZIPs = 64 calls of 200. `*/5 2-6` (60 calls) could never reach "nothing due" in a day
+and would have tripped its own alarm; **`*/5 2-7` gives 72 calls (14,400 ZIPs, 13% headroom)**. At the worst measured rate a
+200-ZIP call is about 25-30 s, so the 60-second cap is not the limit. The window ends before 13:00 UTC, the earliest the daily
+`verify-communities` walk can start (13:17). **No UTC hour is quiet**: over three days, cron runs of more than 20 s occurred in every hour
+(16 to 38 per hour, the content refresh and the development refresh), so the window avoids the one known heavy reader and does not
+claim silence. It overlaps the 05:30 development-SEO refresh, which reads `app_projects` through the API; both are reads and every
+call here is bounded, so the overlap is a shared-cache cost, not a lock. The structural test pins the **capacity** (calls a day x 200 >=
+12,722 x 1.1), not just the string.
+
+**The tick numbers** (constants in the function; the structural test pins each): 200 ZIPs, 60 seconds, a 3,500 MB ledger budget (the
+Order D value: the ledger was 1.93 GB), 24 hours. The 200 is pinned by behaviour too (suite W15: 201 due ZIPs, exactly 200 observed,
+the stop named `max_zips`).
+
+**What the alarm measures, and where each limit comes from.** The check fails when: the job is missing, inactive or no longer calls
+the wrapper; no tick has completed in **36 hours** (a daily window plus 12; pg_cron fired the monitor's own job 0 s late on 8 of 8
+runs); no daily pass has reached "nothing due" in **48 hours** once the first tick is 48 hours old; the newest tick stopped on the
+ledger budget; the last **3** cron runs all failed; or **any** ZIP is in error (the baseline had 0 of 12,722). It is alertable from the
+first tick **except** when no tick has ever run and the job has no cron run: that is "armed, has not run yet", ok and not alertable.
+A check that cannot run is a failing row naming the SQLSTATE only.
+
+**Proof.** `test/dev_change_observation_pg`: **68 checks** against a disposable Postgres (the wrapper over real ledger scenarios, option
+(b) in force, a call that raises writes nothing, the lock-down, the cap, the interval, the alarm on **both sides of every threshold**, the
+job, applying twice, the rollback, every refusal) and **53 prohibited mutations, each killed by a named check**.
+`test/dev-change-observation-structure.test.mjs`: **52 pins**, and **17 deliberate breaks of the SQL each turn the right pin red**.
+**Two defects in my own harness were found and fixed by this work:** (1) the suite prints its results only at the end, so a crash printed
+nothing and the harness read "no failures" -- two mutations were reported as surviving when one of them had in fact crashed the
+suite; the harness now counts a crash as a failure of its own and a mutation that only crashes the suite as **not killed**; (2) a second
+mutation (a completed day losing its "completed" mark when a later tick is capped) was genuinely invisible because a draining tick always
+ends `none_due`, so scenario W15 now forces a capped tick.
+
+**What this does not show (stated, not hidden).**
+
+- pg_cron is a stand-in in the suite; the real extension's behaviour is shown by the production read-back after the apply.
+- The **first full pass** is unmeasured: it will observe 12,722 ZIPs after two days of source changes, so it writes the first large batch
+  of real events and (option (b)) audit rows for the 528 identities that still disagree. The ledger budget stop and the alarm are the
+  bounds; the first pass should be read, not assumed.
+- The wrapper passes **no disk figure**, as an ordinary run does not (Order D's gate applies to the baseline). Dead tuples are bounded by
+  autovacuum; disk headroom is watched elsewhere (the monitor's N5 build check and the provisioned-size read).
+- A 'busy' ZIP stops a tick (the existing Order D behaviour); the next call retries it. A ZIP that stayed busy for a long time would hold a
+  pass back until it freed, and the 48-hour alarm would say so.
+- The pilot's 181 observations covered the lowest ZIP numbers plus a few named ones, so the per-row rates are measured on small ZIPs and
+  one 13,921-row ZIP, not on a random national sample.
+
+**Apply and rollback.** `apply_migration` from the committed file after re-reading the live monitor's md5 and confirming its anchor appears
+once; if the tool's 60-second limit is hit (it was, at 33.8 KB, for option (b)), `db-sql.yml` from `main`. Rollback: the commented footer
+of the file (unsplice the check, unschedule the job, drop the two functions); runs already written and every ledger row stay.
