@@ -329,3 +329,32 @@ are verified live**, not on a production answer, and the status file says the sa
 **Rollback:** delete `follow-development-report` (nothing depends on it). For the national function, dispatch `deploy-edge-functions.yml` on a ref
 that carries the earlier source (the commit before #1516 is `24112a4`; the workflow checks out the dispatch ref and has no ref guard).
 That version read the wide view, which still works with the wide view's headroom.
+
+### 9b. Redeploy of `get-development-activity-report` for the `Decided` lifecycle fix (2026-10-01)
+
+#1526 (squash `ea0d1db`) changed `lib/project-type.js`, which the national function bundles as `_shared/project-type.generated.js`
+(regenerated in that PR), so the deployed function kept reading a stored `Decided` as lifecycle `unknown` until it was redeployed.
+
+**Deployed from `main` at `ea0d1db`**, one dispatch (`deploy-edge-functions.yml`, run `36937982242`): the deploy step and the registry recompute
+(a no-op, `jurisdiction-registry.json` unchanged) succeeded. Read back with `list_edge_functions`:
+
+| function | version after | updated | `verify_jwt` | source hash (`ezbr_sha256`) |
+|---|---|---|---|---|
+| `get-development-activity-report` | **3** (was 2) | 22:56:41Z | true | `77f3d344…` |
+| `follow-development-report` | **1** (unchanged; `30f1accc…`, same as §9) | 22:31:46Z | true | not redeployed |
+
+**Smoke, through `pg_net` from SQL with the public anon key** (request ids 18218–18220 in `net._http_response`, bodies quoted):
+
+| request | status | body |
+|---|---|---|
+| national report, `GET`, no `Authorization` | **401** | `{"code":"UNAUTHORIZED_NO_AUTH_HEADER","message":"Missing authorization header"}` (the gateway) |
+| national report, `GET`, anon key | **200** | the capability: `"access":"signed-in internal user only (JWT + dashboard_admins). Not a customer surface."`, `"stores_reports":false`, `"radius_mi":[0.5,1,2,5]`, `"recent_days":90` |
+| national report, `POST` `{"zip":"01002"}`, anon key | **401** | `{"error":"unauthorized"}` (the handler's own refusal) |
+
+These are the same three answers as §9 before the redeploy, which is what a lifecycle-only change should leave unchanged at the edge.
+
+**Not exercised: a signed-in call, so the new grouping (`Decided` under Proposed) has not been seen in a production answer.** It is proven by
+`test/national-report.test.mjs` 3b/3b2 on the shipped module and by `test/decided-lifecycle-parity.test.mjs`; no admin token was available and none
+was minted. Same position as §9.
+
+**Rollback:** dispatch `deploy-edge-functions.yml` on a ref carrying the earlier source (the commit before #1526 is `609eb02`).

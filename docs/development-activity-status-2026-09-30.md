@@ -30,6 +30,8 @@ Last updated: 2026-10-01, in the receipt PR for the Follow / Changes Since Repor
    What changes for a resident is narrow: the left bar of a decided application's card takes the Proposed colour instead of an
    impact-score colour, and the national report groups it with Proposed instead of Lifecycle unknown. Map 1's ZIP-mode pin was already
    proposed. The wording "Decided" printed bare on `development.html` is **not** changed here (named, not fixed).
+   **Redeployed 2026-10-01 22:56Z:** `get-development-activity-report` v2 → v3 carries the regenerated lifecycle copy (follow doc §9b).
+   `follow-development-report` bundles the same generated file but stores a report's lifecycle as stored, so it was not redeployed.
 6. Durable report snapshot (`report_id` vs `content_hash`) — **storage layer done (Order F);** the
    customer-facing use of it waits for Orders G, J and L.
 7. Secure share + print/PDF + disclosure + audit trail — **open.**
