@@ -172,5 +172,43 @@ check("the discard and the snapshot delete both go through heavy(..., verify=)",
       'heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",\n                  verify=' in src
       and '"retire snapshot", verify=' in src)
 
+# 9. publishing refreshes table statistics first and then every ANALYZE_EVERY_PREFIXES prefixes
+import importlib, types  # noqa: E402
+o = importlib.reload(o)
+calls = []
+fake_pub = types.ModuleType("n5_publish")
+fake_pub.publish_prefix = lambda gen, z3, run_id: calls.append(("publish", z3))
+sys.modules["n5_publish"] = fake_pub
+
+
+def pub_sql(query, tag="", **kw):
+    if tag == "analyze":
+        calls.append(("analyze",))
+        return []
+    if tag == "prepared?":
+        return [{"publish_prepared_at": "2026-10-01"}]
+    if tag == "unresolved stale":
+        return [{"s": False}]
+    raise AssertionError(f"unexpected query tag {tag!r}")
+
+
+o.sql = pub_sql
+o.say = lambda *a, **k: None
+o.shards_unfinished = lambda gen: 0
+todo = [f"{i:03d}" for i in range(100, 160)]
+state = {"n": 0}
+o.unpublished_prefixes = lambda gen: todo if state.__setitem__("n", state["n"] + 1) or state["n"] == 1 else []
+o.publish_pending("g1", 10_000)
+analyze_at = [i for i, c in enumerate([c for c in calls]) if c == ("analyze",)]
+pubs = [c for c in calls if c[0] == "publish"]
+check("statistics are refreshed before the FIRST prefix", calls[0] == ("analyze",))
+check("statistics are refreshed every 25 prefixes (60 prefixes -> 3 refreshes)",
+      len(analyze_at) == 3 and len(pubs) == 60)
+check("each refresh lands right before prefixes 1, 26 and 51",
+      [calls[i + 1][1] for i in analyze_at] == ["100", "125", "150"])
+check("the refresh covers the three tables publish joins",
+      all(t in o.PUBLISH_ANALYZE_TABLES for t in ("geo.n5_boundary_membership",
+          "geo.zip_authoritative_membership", "geo.zip_authoritative_marker")))
+
 print(f"\n{len(FAILS)} failure(s)")
 sys.exit(1 if FAILS else 0)

@@ -558,10 +558,12 @@ def publish_pending(gen, budget_seconds):
     run_id = f"pub-{WORKER}"
     todo = unpublished_prefixes(gen)
     say("prefixes to publish", len(todo))
-    for z3 in todo:
+    for i, z3 in enumerate(todo):
         if time.time() - t0 >= budget_seconds:
             say("publish", "budget spent - resuming next tick")
             return 0
+        if i % ANALYZE_EVERY_PREFIXES == 0:
+            analyze_publish_tables()
         publish_prefix(gen, z3, run_id)
     if not unpublished_prefixes(gen):
         stale = sql(f"select (g.unresolved_recorded_at is null or g.unresolved_recorded_at < "
@@ -573,6 +575,25 @@ def publish_pending(gen, budget_seconds):
                       verify=_verify_unresolved(gen))
             say("unresolved outcomes recorded", r[-1]["r"] if r else "verified from state")
     return 0
+
+
+# FRESH STATISTICS BEFORE PUBLISHING (measured 2026-10-01). geo.n5_gen_publish_prefix joins the
+# boundary rows it has just written for the generation being built. Autoanalyze waits for ~10%
+# of a table to change, and these tables hold several generations (~2.5M rows), so for most of a
+# build their statistics say the new generation has NO rows. The planner then drives step (2)
+# from every boundary row of the generation instead of from the prefix's ~24 ZIP boundaries:
+# prefix 284 (120,049 rows) went from under a minute in the 09-29 build to past its 5,400 s
+# budget on every retry, and the build stalled 7 h (caught by the n5_map1_build alarm). One
+# ANALYZE of the three tables restored the plan (EXPLAIN: n5_gen_zcta outer, 24 rows).
+# Re-analyzed every ANALYZE_EVERY_PREFIXES prefixes, because the rows keep arriving.
+ANALYZE_EVERY_PREFIXES = int(os.environ.get("ANALYZE_EVERY_PREFIXES", "25"))
+PUBLISH_ANALYZE_TABLES = ("geo.n5_boundary_membership", "geo.zip_authoritative_membership",
+                          "geo.zip_authoritative_marker")
+
+
+def analyze_publish_tables():
+    sql("".join(f"analyze {t};" for t in PUBLISH_ANALYZE_TABLES), "analyze")
+    say("statistics refreshed", ", ".join(PUBLISH_ANALYZE_TABLES))
 
 
 def mode_publish():
