@@ -2335,6 +2335,13 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to Census TIGERweb's 2020
     ZCTA set. 0 of the 706 are in it. The Census code sets are committed, so this re-checks offline.
   - ⛔ **Do not give any of them a polygon** (neighbour, centroid, radius or the 2010 delineation).
+  - ⏸️ **THE 47 DECOMMISSIONED-IN-DATASET ZIP PAGES ARE WITHHELD (founder, 2026-10-01: "take them off
+    live site until i can investigate further").** One list, `lib/withheld-zip-pages.json`,
+    computed from the Fix 4 record. `shell.js` shows a noindex "not available" notice on every page
+    that draws one of them and never resolves `HS.ready`; `gen_zip_pages.py` writes no document,
+    sitemap entry or link for them (manifest: documents + withheld = registry). Nothing is deleted
+    and `canonical_zip_registry` still holds 12,722. **To restore one, move it from `zips` to
+    `restored`**; `test/withheld-zip-pages.test.mjs` requires zips + restored = the Fix 4 class.
   - The class is decided only by `scripts/fix4_classify_no_boundary_zips.py`. Per-ZIP record:
     `docs/maps-coverage/fix4/no-boundary-zip-classification.csv`. Receipt:
     `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.

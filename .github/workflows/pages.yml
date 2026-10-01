@@ -82,6 +82,8 @@ on:
       # ship an artifact whose controls file the live monitor cannot use.
       - 'scripts/lib/zip-page-controls.mjs'
       - 'lib/community-page.js'
+      - 'lib/withheld-zip-pages.json'
+      - 'shell.js'
       - 'community.html'
       - '404.html'
       - 'test/zip-pages-seo.test.mjs'
@@ -191,6 +193,23 @@ jobs:
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
+          # WITHHELD ZIP PAGES (founder, 2026-10-01): no document for any of them, the list
+          # itself ships (shell.js reads it), and the documents plus the withheld ZIPs are
+          # exactly the canonical registry.
+          python3 - <<'PY'
+          import json, os
+          man = json.load(open('_site/zip-pages-manifest.json'))
+          wh = json.load(open('_site/lib/withheld-zip-pages.json'))['zips']
+          assert sorted(wh) == man['withheld_zips'], 'the shipped list != the list the build used'
+          present = [z for z in wh if os.path.exists(f'_site/community/{z}')]
+          assert not present, f'withheld ZIP documents were written: {present}'
+          sm = open('_site/sitemap.xml', encoding='utf-8').read()
+          listed = [z for z in wh if f'/community/{z}/' in sm or f'zip={z}' in sm]
+          assert not listed, f'withheld ZIPs are in the sitemap: {listed}'
+          assert man['documents'] + len(wh) == man['canonical_registry'], \
+              f"documents {man['documents']} + withheld {len(wh)} != registry {man['canonical_registry']}"
+          print(f"withheld ZIP pages: {len(wh)} absent; {man['documents']} documents + {len(wh)} = {man['canonical_registry']}")
+          PY
           echo "artifact size: $(du -sh _site | cut -f1)"
           # SITEMAP RECONCILIATION — the advertised set must BE the index-eligible set.
           python3 - <<'PY'

@@ -128,6 +128,22 @@ def meeting_cutoff(now_iso):
     return (now_iso or "")[:10]
 
 
+WITHHELD_PATH = os.path.join(os.path.dirname(__file__), "..", "lib", "withheld-zip-pages.json")
+
+
+def load_withheld(path=WITHHELD_PATH):
+    """The ZIPs whose pages are taken off the live site. A missing or malformed list is an
+    error, never an empty set: an empty set would silently put every withheld page back."""
+    try:
+        doc = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        sys.exit(f"ERROR: cannot read the withheld ZIP list {path}: {e}")
+    zips = doc.get("zips") if isinstance(doc, dict) else None
+    if not isinstance(zips, list) or not all(isinstance(z, str) and ZIP_RE.match(z) for z in zips):
+        sys.exit(f"ERROR: {path} must carry a list of 5-digit ZIP strings under 'zips'")
+    return set(zips)
+
+
 def fetch_data(key, now_iso):
     d = {}
     d["zips"] = [r["zip"] for r in fetch_all("canonical_zip_registry", key, "zip", keyset="zip")]
@@ -926,7 +942,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=f7ec5a9a"></script>\n'
+        '<script src="/shell.js?v=c50ecfcd"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=7ab1d735"></script>\n'
         "</body>\n</html>\n")
@@ -1727,6 +1743,20 @@ def main():
     if "80249" in set(zips):
         sys.exit("ERROR: ZIP 80249 present in the canonical registry - removed drift page")
     print(f"canonical registry: {len(zips)} rows, {len(set(zips))} distinct, 0 duplicates")
+    # WITHHELD ZIP PAGES (founder, 2026-10-01: "take them off live site until i can investigate
+    # further"). lib/withheld-zip-pages.json is the one list; shell.js reads it too. A withheld
+    # ZIP stays in the registry and in the database, and gets no document, no sitemap entry and
+    # no sibling, city or project link from this build. Against production every listed ZIP
+    # must be canonical, or a typo would withhold nothing while the build reported success
+    # (a fixture is a small slice of the registry, so it is only intersected).
+    withheld = load_withheld()
+    stray = sorted(withheld - set(zips))
+    if stray and not a.fixture:
+        sys.exit(f"ERROR: withheld ZIP(s) not in the canonical registry: {stray}")
+    registry_n = len(zips)
+    zips = [z for z in zips if z not in withheld]
+    d["zips"] = zips
+    print(f"withheld pages : {len(withheld)} (lib/withheld-zip-pages.json); building {len(zips)} of {registry_n}")
 
     pages = assemble(d, now_iso)
     if len(pages) != len(zips):
@@ -1782,6 +1812,7 @@ def main():
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
+               "canonical_registry": registry_n, "withheld_zips": sorted(withheld),
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,

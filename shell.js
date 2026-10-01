@@ -341,6 +341,70 @@
   HS.ready = new Promise(r => (_resolveReady = r));
   HS.onReady = (fn) => HS.ready.then(fn);
 
+  // ------------------------------------------------------ withheld ZIP pages --
+  // Founder, 2026-10-01: "retire the 47 zip code pages, take them off live site until i can
+  // investigate further". The list is lib/withheld-zip-pages.json, the ONE record of which ZIP
+  // pages are withheld; the Pages build reads the same file and writes no document or sitemap
+  // entry for them. Every page that draws a ZIP waits on HS.ready, so the shell checks here
+  // ONCE, shows a noindex "not available" notice, and never resolves HS.ready for that page.
+  // Nothing is deleted: putting a ZIP back is moving it out of the list's "zips".
+  HS.WITHHELD_ZIPS_URL = 'lib/withheld-zip-pages.json';
+  // Pure. Which withheld ZIP (if any) this page would show. The URL's ?zip= and a page's own
+  // declared ZIP count on every page; the viewed ZIP (saved or carried in the session) counts
+  // only on a page that draws the viewed ZIP.
+  HS.withheldZipFor = function (opts) {
+    opts = opts || {};
+    const list = opts.withheld;
+    if (!list || typeof list.has !== 'function') return null;
+    const cands = [opts.urlZip, opts.pageZip];
+    if (opts.onZipPage) cands.push(opts.viewedZip);
+    for (let i = 0; i < cands.length; i++) {
+      const z = cands[i] == null ? '' : String(cands[i]);
+      if (/^\d{5}$/.test(z) && list.has(z)) return z;
+    }
+    return null;
+  };
+  HS.isZipPagePath = function (path) {
+    path = String(path || '');
+    if (/\/community\/\d{5}\/?$/.test(path)) return true;
+    const base = path.split('/').pop() || 'index.html';
+    return (HS.ZIP_NAV_PAGES || []).indexOf(base) >= 0;
+  };
+  // A list that cannot be read fails OPEN (the page draws as before) and says so: a failed
+  // fetch of one small same-origin file must not take every ZIP page down with it. The build
+  // still writes no document or sitemap entry for a withheld ZIP either way.
+  async function loadWithheldZips() {
+    try {
+      const r = await fetch(HS.WITHHELD_ZIPS_URL, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const doc = await r.json();
+      return new Set((doc && Array.isArray(doc.zips) ? doc.zips : []).map(String));
+    } catch (e) {
+      console.warn('withheld ZIP list could not be read; pages draw as before', e);
+      return null;
+    }
+  }
+  // Started as the script loads, so the read runs alongside the shell's own fetches rather
+  // than after them.
+  const _withheldZipsP = loadWithheldZips();
+  function renderWithheldZip(zip) {
+    SS.set('viewZip', null);   // never carry a withheld ZIP onto the next page
+    let robots = document.querySelector('meta[name="robots"]');
+    if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
+    robots.content = 'noindex, nofollow';
+    document.querySelectorAll('link[rel="canonical"]').forEach(function (l) { l.remove(); });
+    document.title = 'ZIP ' + zip + ' is not available — HomeSignal';
+    const html = '<div class="page" id="hs-withheld" data-zip-withheld="' + zip + '"><div class="ph">'
+      + '<div class="eyebrow">ZIP Codes</div><h1>ZIP ' + zip + ' is not available</h1>'
+      + '<p>We have taken this ZIP code\'s page down while we review it. Our ZIP code data lists '
+      + zip + ' as retired, so it may no longer be in use.</p>'
+      + '<p style="margin-top:12px"><a class="inlinebtn" href="/">Look up another ZIP code or address →</a></p>'
+      + '</div></div>';
+    const slot = $('hs-slot');
+    if (slot) slot.innerHTML = html;
+    else document.body.innerHTML = html;
+  }
+
   // -------------------------------------------------------------- modals -----
   let _lastFocus = null;
   HS.openModal = function (id) {
@@ -2404,6 +2468,17 @@
     captureReferral();          // first-touch attribution, before anything can fail
     captureEntry();             // which page type this visit entered through
     await injectShell();
+    // A withheld ZIP page shows its notice and stops here: HS.ready is never resolved, so no
+    // page code draws the ZIP, and no onboarding or sign-in flow opens over the notice.
+    const withheld = await _withheldZipsP;
+    const withheldZip = HS.withheldZipFor({
+      withheld: withheld,
+      urlZip: HS.parseZipParam(location.search),
+      pageZip: document.body && document.body.dataset ? document.body.dataset.zip : null,
+      viewedZip: state.zip,
+      onZipPage: HS.isZipPagePath(location.pathname)
+    });
+    if (withheldZip) { renderWithheldZip(withheldZip); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
