@@ -125,8 +125,19 @@ ok(allFiles.length > 50 && namesPrivate.includes('docs/report-private-context.sq
 // 5c2 below pins that it names ONLY those two functions: never the table, never a column, never the read function (5d), never
 // the writer or the purge. Anything else naming the layer is still a consumer nobody designed.
 const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the two additions are the file that schedules and watches the purge and the Follow function\'s data layer', namesPrivate.join(','));
+// The THIRD addition (2026-10-02): the follow-up that closes the audit log's identity counter, which production left usable by
+// anon and authenticated. It names the layer because it must (it finds the counter through the layer's tables); 5c3 below pins that
+// it names ONLY the event table and its own name, never a column, a function or the read path, and
+// test/report-private-context-sequence-lockdown-structure.test.mjs pins that it only ever REVOKES, from a computed lookup.
+const SEQ_LOCKDOWN = 'docs/report-private-context-sequence-lockdown.sql';
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer and the file that closes the audit log\'s counter', namesPrivate.join(','));
+{
+  const names = [...new Set([...code(SEQ_LOCKDOWN).matchAll(/report_private_context\w*/g)].map((m) => m[0]))].sort();
+  ok(namesPrivate.includes(SEQ_LOCKDOWN) && names.length > 0
+     && names.every((x) => ['report_private_context', 'report_private_context_event', 'report_private_context_sequence_lockdown'].includes(x)),
+    '5c3: the counter lock-down names the private layer only as its event table, the layer\'s own name and its own prefix (control: it does name them; never a column, a function or the read path)', names.join(','));
+}
 {
   const names = [...code(FOLLOW_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1').matchAll(/report_private_context\w*/g)].map((m) => m[0]);
   ok(namesPrivate.includes(FOLLOW_DATA) && names.length === 2 && names.every((x) => x === 'report_private_context_need_open' || x === 'report_private_context_need_close'),
