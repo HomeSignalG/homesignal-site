@@ -169,10 +169,12 @@ ok(linking.length === 0, 'P5d no other staged file names the review page: no lin
 ok(robots.includes(REVIEW_PAGE) && readRepo('scripts/stage_site.py').includes("'" + REVIEW_PAGE + "'"), 'P5e control: the same detector finds the page name where it really is (robots.txt and the stager\'s list), so the empty result above is a real absence');
 const handler = readRepo('supabase/functions/get-development-activity-report/handler.ts');
 const gate = readRepo('supabase/functions/_shared/admin-gate.ts');
-const iGate = handler.indexOf('await authorizeAdmin(req, deps)'), iBody = handler.indexOf('await readBounded(req)');
-ok(iGate > 0 && iBody > iGate, 'P5f the function still runs the admin gate before it reads anything the caller sent', { iGate, iBody });
-ok(/if \(!admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(!token\) return reply\(req, \{ error: 'unauthorized' \}, 401\)/.test(gate),
-  'P5g the gate still refuses a caller with no token (401) and a signed-in caller who is not an admin (403)');
+// build step 5b: the report gate admits an admin or an ACTIVE trial member (public.evaluation_usage); everyone else is refused first
+const iGate = handler.indexOf('await authorizeReportCaller(req, deps)'), iBody = handler.indexOf('await readBounded(req)');
+ok(iGate > 0 && iBody > iGate, 'P5f the function still runs its gate before it reads anything the caller sent', { iGate, iBody });
+ok(/if \(!who\.admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(!token\) return reply\(req, \{ error: 'unauthorized' \}, 401\)/.test(gate)
+   && /if \(!trial\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(trial\.status !== 'active' \|\| trial\.expired\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate),
+  'P5g the gate still refuses a caller with no token (401), and a signed-in caller who is neither an admin nor a member of an active, unexpired trial (403)');
 ok(!/service_role|SERVICE_ROLE/.test(review), 'P5h the review page carries no service-role key; it uses the public browser key and the signed-in user\'s own token');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');

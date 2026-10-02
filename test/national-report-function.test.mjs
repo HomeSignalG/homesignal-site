@@ -112,7 +112,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const declared = await call(f(), REQ, { ...AUTH, 'content-length': '999999' });
   ok(declared.status === 413, '2g a declared length over the bound is refused before the body is read');
   const get = await call(f(), null, {}, 'GET');
-  ok(get.status === 200 && get.json.stores_reports === false && get.json.radius_mi.join() === '0.5', '2h GET returns the capability (no data), and says it stores nothing');
+  ok(get.status === 200 && /never an admin report/.test(get.json.stores_reports) && get.json.radius_mi.join() === '0.5', '2h GET returns the capability (no data), and says an admin report is never stored');
   ok((await call(f(), null, AUTH, 'DELETE')).status === 405, '2h other methods: 405');
 }
 
@@ -199,7 +199,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     '4l the shipped state (nothing cleared): the customer report says "No data ingested" and would use no free report', cust.json.credit);
   ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-1', '4m the operator\'s internal view is never charged', internal.json.credit);
   ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1', '4n an empty radius under a cleared source is still "No data ingested", not "No development activity"', dflt.json.credit);
-  ok(r.json.stored === false && r.json.report_id === null && !('charged' in r.json) && !('credits_used' in r.json), '4o and nothing is charged or stored by this endpoint');
+  ok(r.json.stored === false && r.json.report_id === null && r.json.charged === false && !('trial' in r.json), '4o an admin report is never charged or stored, even when the rule would charge a customer');
   ok(H.capability().credit_rule === 'credit-rule-1', '4p the capability names the credit rule');
 }
 
@@ -310,6 +310,205 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   d = mk([]);
   await d.authenticate('t'); await d.isAdmin('a@b.com'); await d.zipSupported('97477'); await d.radius(1, 1, 1); await d.hydrate(['k']); await d.ledger(['k']); await d.events(['k'], '2026-07-01'); await d.health(['f']); await d.geocode(ADDRESS).catch(() => null);
   ok(reqs.length >= 9 && reqs.every((r) => r.url.startsWith(BASE + '/')), '7j the service key is sent only to the project\'s own URL: every request went there', reqs.map((r) => r.url));
+}
+
+// ---- 8. the trial (build step 5b): a member of an active evaluation gets the customer view, charged only by the one rule -------------
+{
+  const S = await import('../supabase/functions/_shared/report-snapshot.ts');
+  const M = await import('../supabase/functions/_shared/national-report.ts');
+  const USER = '0f0e4d2c-1b3a-4c5d-8e9f-a1b2c3d4e5f6';
+  const KEY = '3b2c1d4e-5f60-4718-8a9b-0c1d2e3f4a5b';
+  const KEY2 = '7d6c5b4a-3928-4170-9e8d-7c6b5a493827';
+  const TRIAL = { status: 'active', credits_used: 3, credits_remaining: 17, expired: false };
+  const TAUTH = { authorization: 'Bearer trial-token' };
+  const trialFakes = (over = {}) => {
+    const f = fakes({
+      authenticate: async (t) => (t === 'trial-token' ? { email: 'agent@brokerage.example', id: USER } : t === 'user-token' ? { email: 'founder@example.com' } : null),
+      isAdmin: async (e) => e === 'founder@example.com',
+      ...over,
+    });
+    const rec = (name, fn) => async (...a) => { f.calls.push(name); f.args[name] = a; return fn(...a); };
+    f.args = {};
+    for (const [name, fn] of Object.entries({
+      trialOf: async () => TRIAL,
+      issue: async () => ({ replayed: false, report_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', content_hash: 'h', report_version: M.REPORT_VERSION, generated_at: '2026-10-02T19:00:00Z',
+        private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', report: { stored: 'body' }, credit: { ordinal: 4, credits_used: 4, credits_remaining: 16, evaluation_status: 'active' } }),
+      storedReport: async () => JSON.stringify({ stored: 'first', coverage: { state: 'REPORT_READY' } }),
+      contextMatches: async () => 'match',
+      ...Object.fromEntries(Object.entries(over).filter(([k]) => ['trialOf', 'issue', 'storedReport', 'contextMatches'].includes(k))),
+    })) f.deps[name] = rec(name, fn);
+    for (const name of ['authenticate', 'isAdmin']) { const fn = f.deps[name]; f.deps[name] = rec(name, fn); }
+    return f;
+  };
+  const NONE = { version: 1, cleared: [] };
+  const cr = (x) => x && [x.uses_report, x.reason].join('|');
+
+  // the shipped state: nothing is cleared, so a trial report is "No data ingested", free, and stored nowhere
+  let f = trialFakes({ rights: NONE });
+  let r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && cr(r.json.credit) === 'false|NO_DATA_INGESTED' && r.json.charged === false
+    && r.json.stored === false && r.json.report_id === null && !f.calls.includes('issue'),
+    '8a a trial member today: "No data ingested", not charged, nothing stored, the ledger never called', [r.status, r.json.credit, f.calls]);
+  ok(JSON.stringify(r.json.trial) === '{"status":"active","credits_used":3,"credits_remaining":17}' && f.args.trialOf[0] === USER,
+    '8a and the answer says how many free reports are left (asked of the database by the auth user\'s id, never the email)', r.json.trial);
+  ok(JSON.stringify(f.calls.slice(0, 4)) === '["authenticate","isAdmin","trialOf","geocode"]', '8a the order: who you are, the allow-list, the trial, and only then the address', f.calls);
+
+  // once a source is cleared and a record is shown, the report uses one free report: stored and charged in one call
+  f = trialFakes();
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  const a = f.args.issue || [];
+  ok(r.status === 200 && f.calls.filter((c) => c === 'issue').length === 1 && a[0] === USER && a[1] === KEY && a[2] && a[2].activity.outcome === 'DEVELOPMENT_SHOWN'
+    && a[3] && a[3].address === ADDRESS && a[4].reportVersion === M.REPORT_VERSION && a[4].engineInputs.engine === M.REPORT_VERSION,
+    '8b a report that shows development is issued ONCE through the evaluation, with the user, the page\'s key, the permanent body, the private address and the engine version', [a[0], a[1], a[4]]);
+  ok(r.json.stored === true && r.json.report_id === 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' && r.json.charged === true && r.json.replayed === false && JSON.stringify(r.json.report) === '{"stored":"body"}'
+    && JSON.stringify(r.json.trial) === '{"status":"active","credits_used":4,"credits_remaining":16}' && cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN',
+    '8b and the answer is the STORED report, its id, "charged", and the trial counted after the charge', r.json.trial);
+  ok(!JSON.stringify(a[2]).includes('Evergreen') && !('distances_mi' in a[2]) && !JSON.stringify(r.json.report).includes('Evergreen'), '8b the permanent body handed to the ledger carries no address and no distance');
+
+  // what a trial request may carry
+  for (const [what, body, detail] of [['no key', REQ, 'idempotency_key'], ['a key that is not a UUID', { ...REQ, idempotency_key: 'abc' }, 'idempotency_key'],
+    ['a non-random (v1) UUID', { ...REQ, idempotency_key: 'c232ab00-9414-11ec-b3c8-9e6bdeced846' }, 'idempotency_key'], ['a number', { ...REQ, idempotency_key: 5 }, 'idempotency_key']]) {
+    f = trialFakes();
+    r = await call(f.deps, body, TAUTH);
+    ok(r.status === 400 && r.json.detail === detail && !f.calls.includes('geocode'), '8c a trial request with ' + what + ' is refused before any address is looked up', r.json);
+  }
+  f = trialFakes();
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY, view: 'internal' }, TAUTH);
+  ok(r.status === 403 && r.json.error === 'forbidden' && !f.calls.includes('geocode'), '8d a trial member may not ask for the internal view');
+  f = trialFakes();
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, AUTH);
+  ok(r.status === 400 && r.json.detail === 'idempotency_key is for trial reports' && !f.calls.includes('trialOf'), '8e an admin sending a key is refused (an admin report stores nothing and takes none), and an admin\'s trial is never read');
+  f = trialFakes();
+  r = await call(f.deps, REQ, AUTH);
+  ok(r.status === 200 && !f.calls.includes('trialOf') && !f.calls.includes('issue') && r.json.charged === false && !('trial' in r.json), '8e2 the admin path is unchanged: no trial read, no charge');
+
+  // who is refused
+  for (const [what, over, status, err] of [
+    ['no trial at all', { trialOf: async () => null }, 403, 'forbidden'],
+    ['a trial whose 20 reports are used', { trialOf: async () => ({ ...TRIAL, status: 'complete', credits_used: 20, credits_remaining: 0 }) }, 403, 'evaluation_complete'],
+    ['a revoked trial', { trialOf: async () => ({ ...TRIAL, status: 'revoked' }) }, 403, 'forbidden'],
+    ['an expired trial', { trialOf: async () => ({ ...TRIAL, expired: true }) }, 403, 'forbidden'],
+    ['a trial read that fails', { trialOf: async () => { throw new H.DataUnavailable('x'); } }, 502, 'unavailable'],
+    ['a signed-in user with no id', { authenticate: async () => ({ email: 'agent@brokerage.example' }) }, 403, 'forbidden'],
+  ]) {
+    f = trialFakes(over);
+    r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+    ok(r.status === status && r.json.error === err && !f.calls.includes('geocode') && !f.calls.includes('issue'), '8f ' + what + ': ' + status + ' ' + err + ', and no address is looked up', [r.status, r.json]);
+  }
+  f = trialFakes({ trialOf: async () => ({ ...TRIAL, status: 'complete', credits_used: 20, credits_remaining: 0 }) });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(JSON.stringify(r.json.trial) === '{"status":"complete","credits_used":20,"credits_remaining":0}', '8f2 a used-up trial is told it is complete, with its counts (and never an id)', r.json);
+
+  // the ledger refuses: nothing stored, nothing charged, and no report given
+  for (const [what, err, status, code] of [['the 20th report used by another request first', new S.EvaluationComplete('x'), 403, 'evaluation_complete'],
+    ['membership ended while the report was made', new S.NotEntitled('x'), 403, 'forbidden'], ['the ledger unreachable', new H.DataUnavailable('x'), 502, 'data_unavailable'], ['anything else', new Error('boom'), 500, 'internal']]) {
+    f = trialFakes({ issue: async () => { throw err; } });
+    r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+    ok(r.status === status && r.json.error === code && r.json.report === undefined, '8g ' + what + ': ' + status + ' ' + code + ' and NO report (a report given anyway would be a free one)', [r.status, r.json]);
+  }
+
+  // a retried key: the database returns the FIRST report and charges nothing; shown only if it is about the same property
+  const replay = { replayed: true, report_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', generated_at: '2026-10-02T18:00:00Z', private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000',
+    credit: { ordinal: 4, credits_used: 4, credits_remaining: 16, evaluation_status: 'active' } };
+  f = trialFakes({ issue: async () => replay });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 200 && r.json.replayed === true && r.json.charged === false && r.json.stored === true && JSON.stringify(r.json.report) === '{"stored":"first","coverage":{"state":"REPORT_READY"}}'
+    && f.args.contextMatches[0] === replay.private_context_id && f.args.contextMatches[1] === ADDRESS && f.args.storedReport[0] === replay.report_id,
+    '8h a retried key for the same property returns the FIRST stored report, says it was not charged again, and the trial counts are the ledger\'s', r.json);
+  for (const [what, ans] of [['a different property', 'mismatch'], ['a context that can no longer be read', 'unknown']]) {
+    f = trialFakes({ issue: async () => replay, contextMatches: async () => ans });
+    r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+    ok(r.status === 409 && r.json.error === 'idempotency_key_reused' && r.json.report === undefined && !f.calls.includes('storedReport'), '8i a retried key for ' + what + ' is refused (409) and shows no report', r.json);
+  }
+  f = trialFakes({ issue: async () => ({ ...replay, private_context_id: null }) });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 409 && !f.calls.includes('contextMatches'), '8i a replay with no private context cannot be checked, so it is refused');
+  f = trialFakes({ issue: async () => replay, storedReport: async () => null });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 502 && r.json.error === 'data_unavailable', '8i a stored report that cannot be read back is 502, never the freshly made one in its place');
+
+  // a trial request that is not a report is never charged
+  f = trialFakes({ geocode: async () => null });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY2 }, TAUTH);
+  ok(r.json.status === 'ADDRESS_NOT_RESOLVED' && cr(r.json.credit) === 'false|NOT_A_REPORT' && !f.calls.includes('issue') && r.json.trial.credits_remaining === 17, '8j an address that cannot be found: not a report, not charged, counts shown');
+  f = trialFakes({ zipSupported: async () => false });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY2 }, TAUTH);
+  ok(r.json.status === 'OUTSIDE_COVERAGE' && cr(r.json.credit) === 'false|NOT_A_REPORT' && !f.calls.includes('issue'), '8j a ZIP HomeSignal does not cover: not charged');
+}
+
+// ---- 9. the data layer's trial reads: each goes through the database function that owns the decision --------------------------------
+{
+  const BASE = 'https://proj.supabase.co';
+  const reqs = [];
+  const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
+  const mk = (handlers) => D.makeDeps({ url: BASE, serviceKey: 'svc', rights: RIGHTS }, async (url, init) => {
+    reqs.push({ url, init: init || {} });
+    for (const [re, fn] of handlers) if (re.test(url)) return fn(url, init || {});
+    return json([]);
+  });
+  const S = await import('../supabase/functions/_shared/report-snapshot.ts');
+  const USER = '0f0e4d2c-1b3a-4c5d-8e9f-a1b2c3d4e5f6';
+  let d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: USER })]]);
+  const who = await d.authenticate('t');
+  ok(who.email === 'a@b.com' && who.id === USER, '9a authenticate also returns the auth user\'s id');
+  d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: 'not-a-uuid' })]]);
+  ok(JSON.stringify(await d.authenticate('t')) === '{"email":"a@b.com"}', '9a a malformed id is not passed on');
+
+  reqs.length = 0;
+  d = mk([[/rpc\/evaluation_usage/, () => json([{ evaluation_id: 'e', status: 'active', credit_limit: 20, credits_used: 2, credits_remaining: 18, expires_at: null, expired: false }])]]);
+  const t = await d.trialOf(USER);
+  ok(JSON.stringify(t) === '{"status":"active","credits_used":2,"credits_remaining":18,"expired":false}' && reqs[0].init.method === 'POST'
+    && JSON.parse(reqs[0].init.body).p_user_id === USER && reqs[0].url === BASE + '/rest/v1/rpc/evaluation_usage', '9b the trial is asked of public.evaluation_usage by user id, and only its status and counts are kept (never the evaluation id)', t);
+  d = mk([[/rpc\/evaluation_usage/, () => json([])]]);
+  ok(await d.trialOf(USER) === null, '9b no membership: no trial');
+  for (const [what, resp] of [['two rows', json([{ status: 'active', credits_used: 1, credits_remaining: 19, expired: false }, { status: 'active', credits_used: 1, credits_remaining: 19, expired: false }])],
+    ['a malformed row', json([{ status: 'active', credits_used: '1', credits_remaining: 19, expired: false }])], ['a 500', json({}, 500)], ['a refusal', json({ message: 'x' }, 400)]]) {
+    d = mk([[/rpc\/evaluation_usage/, () => resp.clone()]]);
+    ok(await d.trialOf(USER).then(() => false, (e) => e instanceof H.DataUnavailable), '9c ' + what + ' from the trial read is DataUnavailable, never "no trial" and never "a trial"');
+  }
+
+  const BODY = { product: 'P', projects: [] };
+  const CTX = { address: '742 Evergreen Terrace, Springfield, OR 97477', latitude: 44.04, longitude: -122.98 };
+  const OPTS = { reportVersion: 'v', engineInputs: { engine: 'v' } };
+  const KEY = '3b2c1d4e-5f60-4718-8a9b-0c1d2e3f4a5b';
+  const ROW = { report_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', generated_at: '2026-10-02T19:00:00Z', private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', replayed: false, credit_ordinal: 1, credits_used: 1, credits_remaining: 19, evaluation_status: 'active' };
+  reqs.length = 0;
+  d = mk([[/rpc\/evaluation_report_issue/, () => json([ROW])]]);
+  const out = await d.issue(USER, KEY, BODY, CTX, OPTS);
+  const sent = JSON.parse(reqs[0].init.body);
+  ok(reqs[0].url === BASE + '/rest/v1/rpc/evaluation_report_issue' && sent.p_user_id === USER && sent.p_idempotency_key === KEY && sent.p_body === JSON.stringify(BODY)
+    && sent.p_content_hash === await S.sha256Hex(JSON.stringify(BODY)) && JSON.stringify(sent.p_private) === JSON.stringify(CTX) && !sent.p_body.includes('Evergreen'),
+    '9d the charge is ONE call to public.evaluation_report_issue: user, key, the body and its hash, and the address only as p_private', Object.keys(sent));
+  ok(out.replayed === false && out.report_id === ROW.report_id && out.credit.credits_remaining === 19 && JSON.stringify(out.report) === JSON.stringify(BODY), '9d and its answer is read back');
+  for (const [what, resp, cls] of [['EVALUATION_COMPLETE', json({ code: 'EV002', message: 'EVALUATION_COMPLETE' }, 400), S.EvaluationComplete], ['NOT_ENTITLED', json({ code: 'EV003', message: 'NOT_ENTITLED' }, 400), S.NotEntitled]]) {
+    d = mk([[/rpc\/evaluation_report_issue/, () => resp.clone()]]);
+    ok(await d.issue(USER, KEY, BODY, CTX, OPTS).then(() => false, (e) => e instanceof cls), '9e the database\'s ' + what + ' becomes its own named refusal');
+  }
+  d = mk([[/rpc\/evaluation_report_issue/, () => json({ message: 'x' }, 503)]]);
+  ok(await d.issue(USER, KEY, BODY, CTX, OPTS).then(() => false, (e) => e instanceof H.DataUnavailable), '9e a 5xx is DataUnavailable, never a refusal');
+  d = mk([[/rpc\/evaluation_report_issue/, () => json([{ ...ROW, credits_used: null }])]]);
+  ok(await d.issue(USER, KEY, BODY, CTX, OPTS).then(() => false, (e) => /did not confirm the credit/.test(e.message)), '9e an answer that does not confirm the credit is a failure, not a stored report');
+  ok(await d.issue(USER, 'c232ab00-9414-11ec-b3c8-9e6bdeced846', BODY, CTX, OPTS).then(() => false, (e) => /idempotency key/.test(e.message)), '9e a non-random key never reaches the database');
+  d = mk([[/rpc\/evaluation_report_issue/, () => json([{ ...ROW, replayed: true }])]]);
+  const rep = await d.issue(USER, KEY, BODY, CTX, OPTS);
+  ok(rep.replayed === true && !('report' in rep) && rep.report_id === ROW.report_id, '9f a replay carries the FIRST report\'s id and no body (the body this call made is not the stored one)');
+
+  reqs.length = 0;
+  d = mk([[/rpc\/report_private_context_read/, () => json([{ state: 'active', address: '742  EVERGREEN Terrace, Springfield, OR 97477', normalized_address: 'x', latitude: 1, longitude: 2 }])]]);
+  ok(await d.contextMatches('cccccccc-dddd-4eee-8fff-000000000000', '742 Evergreen Terrace, Springfield, OR 97477') === 'match'
+    && JSON.parse(reqs[0].init.body).p_context === 'cccccccc-dddd-4eee-8fff-000000000000', '9g the same property (case and spacing aside) matches; the read is the private layer\'s own function');
+  ok(await d.contextMatches('cccccccc-dddd-4eee-8fff-000000000000', '1 Other St, Springfield, OR 97477') === 'mismatch', '9g a different property does not');
+  d = mk([[/rpc\/report_private_context_read/, () => json([{ state: 'purged', address: null }])]]);
+  ok(await d.contextMatches('c', 'x y') === 'unknown', '9g a purged context cannot be checked');
+  d = mk([[/rpc\/report_private_context_read/, () => json([])]]);
+  ok(await d.contextMatches('c', 'x y') === 'unknown', '9g a missing context cannot be checked');
+  d = mk([[/rpc\/report_private_context_read/, () => json({}, 500)]]);
+  ok(await d.contextMatches('c', 'x y').then(() => false, (e) => e instanceof H.DataUnavailable), '9g a failed read is DataUnavailable');
+
+  reqs.length = 0;
+  d = mk([[/report_snapshot/, () => json([{ body: '{"a":1}' }])]]);
+  ok(await d.storedReport('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee') === '{"a":1}' && /report_snapshot\?select=body&report_id=eq\.aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee$/.test(reqs[0].url) && !reqs[0].init.method,
+    '9h the stored report is read back by id, its body only, with a GET');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

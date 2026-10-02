@@ -130,8 +130,14 @@ const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
 // it names ONLY the event table and its own name, never a column, a function or the read path, and
 // test/report-private-context-sequence-lockdown-structure.test.mjs pins that it only ever REVOKES, from a computed lookup.
 const SEQ_LOCKDOWN = 'docs/report-private-context-sequence-lockdown.sql';
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer and the file that closes the audit log\'s counter', namesPrivate.join(','));
+// The FOURTH addition (2026-10-02, build step 5b): the report function's data layer. When a retried trial key returns the FIRST stored
+// report (docs/evaluation-entitlement.sql D-L6: the key is bound to the evaluation, never to the address), it must know whether that
+// report is about the same property before showing it. It calls the read function ONCE and compares the address inside one function;
+// only 'match' / 'mismatch' / 'unknown' leaves it (5c4, 5d). It never names the table, a column outside that comparison, the writer
+// or the purge.
+const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN, REPORT_DATA].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer, the file that closes the audit log\'s counter, and the report function\'s replay check', namesPrivate.join(','));
 {
   const names = [...new Set([...code(SEQ_LOCKDOWN).matchAll(/report_private_context\w*/g)].map((m) => m[0]))].sort();
   ok(namesPrivate.includes(SEQ_LOCKDOWN) && names.length > 0
@@ -143,8 +149,17 @@ ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-sn
   ok(namesPrivate.includes(FOLLOW_DATA) && names.length === 2 && names.every((x) => x === 'report_private_context_need_open' || x === 'report_private_context_need_close'),
     '5c2: the Follow function\'s data layer names the private layer only as report_private_context_need_open and report_private_context_need_close (control: it does name them; and nothing else, in code)', names);
 }
-ok(!allFiles.some((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))),
-  '5d: nothing calls the function that returns the private values');
+{
+  const t = code(REPORT_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  const fn = (t.match(/async contextMatches\(contextId, address\) \{[\s\S]*?\n    \},/) || [''])[0];
+  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read"]' && fn.includes('report_private_context_read')
+     && [...fn.matchAll(/return ([^;]+);/g)].map((m) => m[1]).every((r) => /^'unknown'$|^norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch'$/.test(r))
+     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t),
+    '5c4: the report function\'s data layer names the private layer once, the read function inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares (control: it does name it)', names);
+}
+ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).join() === REPORT_DATA,
+  '5d: one caller of the function that returns the private values: the report function\'s replay check, which compares and returns no value');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),
   '5e: THIS file arms no schedule and makes no network call — the purge batch is scheduled only by docs/report-private-context-purge-schedule.sql, a separate file with its own go and its own proof');
 

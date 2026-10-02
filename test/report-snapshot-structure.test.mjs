@@ -94,8 +94,16 @@ const SHARE_SQL = 'docs/report-share.sql';
 // stored report) and the replay branch of its issue function reads one stored report back by id. It never writes the table: the only writer it calls is
 // report_snapshot_issue. test/evaluation-entitlement-structure.test.mjs pins that.
 const EVALUATION_SQL = 'docs/evaluation-entitlement.sql';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the one reader is the Follow / Changes Since Report data layer; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
+// Build step 5b: the report function reads back ONE stored body by id, when a retried trial key returns the first report (3e).
+const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer and the report function\'s replay read; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
+{
+  const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
+  ok(namesTable.includes(REPORT_DATA) && JSON.stringify(uses) === JSON.stringify(['report_snapshot?select=body&report_id=eq.']) && !/method: '(PUT|PATCH|DELETE)'/.test(t),
+    '3e: the report function names the table once, to read ONE stored body by id (a retried trial key), and has no write verb (control: it does name it)', uses);
+}
 {
   const t = codeOf(SHARE_SQL).replace(/'(?:[^']|'')*'/g, "''");
   const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());

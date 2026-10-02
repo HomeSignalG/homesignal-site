@@ -132,7 +132,46 @@ check itself had at first — a value filling a whole JSON string has no space o
 - `credit: { uses_report, reason, rule_version }` on every report and on `ADDRESS_NOT_RESOLVED` / `OUTSIDE_COVERAGE`. It
   says whether a trial customer's report would use one of the 20 free reports.
   - The one owner is `_shared/credit-rule.ts` `creditDecision()`.
-  - This endpoint charges nothing.
+  - *(5a)* This endpoint charges nothing. *Superseded by 5b, next.*
+
+**Step 5b (2026-10-02): invited trial members.** Who may call is `_shared/admin-gate.ts` `authorizeReportCaller`:
+- **An admin** (`dashboard_admins`), exactly as before: either view, never charged, nothing stored, no idempotency key accepted.
+- **A trial member**: `public.evaluation_usage` (by the auth user's id, never the email) answers an `active`, unexpired trial.
+  - The customer view only.
+  - Every request carries `idempotency_key`, a random (v4) UUID the page mints once per report and repeats only to retry it.
+  - The answer carries `trial: { status, credits_used, credits_remaining }`, never an id.
+- **Anyone else**: 401 or 403 before the body is read. A used-up trial gets 403 `evaluation_complete` with its counts.
+
+**What is charged.** Only a trial report that `creditDecision()` charges:
+- It is stored and charged in ONE database transaction by `public.evaluation_report_issue`, reached only through
+  `_shared/report-snapshot.ts` `issueEvaluationReport`. That function shares its body preparation and boundary checks with
+  `issueSnapshot`, which this function never calls.
+- The answer then says `stored: true`, `charged: true` and the stored `report_id`.
+- Today `report-rights.json` clears nothing, so every trial report is "No data ingested": free and stored nowhere. The charged
+  path is reachable only once a source is cleared.
+
+**A retried key** returns the FIRST report and charges nothing (`replayed: true`, `charged: false`). The key is bound to the
+evaluation, never to the address (L1 D-L6), so the first report is shown only after its private context says it is the same
+property:
+- `report_private_context_read` is called inside the data layer, and only match, mismatch or unknown leaves it.
+- A mismatch, a purged context or no context is 409 `idempotency_key_reused`, with no report.
+
+**A refusal from the ledger** stores nothing, charges nothing and returns no report:
+- `EVALUATION_COMPLETE` (another request used the 20th report first) is 403;
+- `NOT_ENTITLED` is 403;
+- a 5xx is 502.
+
+**Defaults taken in 5b** (the founder may change any of them):
+- **D-5b-1.** A trial whose 20 reports are used makes no more reports, even free ones. More is the paid product's (Order M).
+- **D-5b-2.** A person on the admin list is always served as an admin, and is never charged, even if also a trial member.
+- **D-5b-3.** A trial member never sees the internal view.
+
+**Still open, stated:**
+- No rate limit on free trial reports. "No data ingested" is free by ruling, so one member could make unlimited reports, each
+  costing a geocode and a spatial read. L1 §8 named this; it must be closed before the trial is opened to brokerages (build
+  step 13).
+- Nothing yet creates a trial (build step 5d) or lets a member use one from a page (5c). Production holds 0 evaluations,
+  so no one can reach the trial path today.
 
 `publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a

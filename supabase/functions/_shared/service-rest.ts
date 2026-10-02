@@ -55,14 +55,16 @@ export function makeServiceReads(cfg: { url: string; serviceKey: string }, fetch
     return rows as T[];
   }
 
-  async function authenticate(token: string): Promise<{ email: string } | null> {
+  async function authenticate(token: string): Promise<{ email: string; id?: string } | null> {
     let r: Response;
     try { r = await fetchFn(base + '/auth/v1/user', { headers: { apikey: cfg.serviceKey, Authorization: 'Bearer ' + token } }); }
     catch { throw new DataUnavailable('network'); }
     if (r.status === 401 || r.status === 403 || r.status === 404) return null; // includes the public anon key: no user
     if (!r.ok) throw new DataUnavailable('http ' + r.status);
     const u = await r.json().catch(() => null);
-    return u && typeof u.email === 'string' && u.email ? { email: u.email } : null;
+    if (!(u && typeof u.email === 'string' && u.email)) return null;
+    // the user's id travels with the email so an entitlement can be asked by id (the evaluation is keyed on the auth user, never an email)
+    return typeof u.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(u.id) ? { email: u.email, id: u.id } : { email: u.email };
   }
 
   async function isAdmin(email: string): Promise<boolean> {

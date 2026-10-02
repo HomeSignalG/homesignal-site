@@ -14,7 +14,7 @@ export const MAX_BODY_BYTES = 4096;
 export const ALLOWED_ORIGINS = ['https://homesignal.net', 'https://www.homesignal.net'];
 
 export type AdminGateDeps = {
-  authenticate: (token: string) => Promise<{ email: string } | null>;
+  authenticate: (token: string) => Promise<{ email: string; id?: string } | null>;
   isAdmin: (email: string) => Promise<boolean>;
 };
 
@@ -53,14 +53,52 @@ export async function readBounded(req: Request): Promise<unknown | typeof TOO_LA
  * send. It reads nothing from the request body: identity is settled BEFORE anything the caller typed is looked at.
  */
 export async function authorizeAdmin(req: Request, deps: AdminGateDeps): Promise<Response | null> {
+  const who = await identify(req, deps);
+  if (who instanceof Response) return who;
+  if (!who.admin) return reply(req, { error: 'forbidden' }, 403);
+  return null;
+}
+
+/** A signed-in user, and whether the allow-list names them. Shared by both gates, so neither can authenticate differently. */
+async function identify(req: Request, deps: AdminGateDeps): Promise<Response | { user: { email: string; id?: string }; admin: boolean }> {
   const auth = req.headers.get('authorization') ?? '';
   const token = /^Bearer\s+(\S+)$/i.exec(auth)?.[1];
   if (!token) return reply(req, { error: 'unauthorized' }, 401);
-  let user: { email: string } | null;
+  let user: { email: string; id?: string } | null;
   try { user = await deps.authenticate(token); } catch { return reply(req, { error: 'unavailable' }, 502); }
   if (!user || !user.email) return reply(req, { error: 'unauthorized' }, 401); // includes the public anon key: it has no user
   let admin: boolean;
   try { admin = await deps.isAdmin(user.email); } catch { return reply(req, { error: 'unavailable' }, 502); }
-  if (!admin) return reply(req, { error: 'forbidden' }, 403);
-  return null;
+  return { user, admin };
+}
+
+// ── WHO MAY MAKE A DEVELOPMENT ACTIVITY REPORT (build step 5b) ───────────────────────────────────────────────────────────────
+//
+// An admin, exactly as before, or a member of an ACTIVE, unexpired brokerage evaluation (the 20-report trial). The gate decides
+// nothing about the trial itself: whether this person is a member, and of which evaluation, is public.evaluation_usage (built on the
+// ONE resolver public.brokerage_membership_of, docs/evaluation-entitlement.sql). This only asks it, by the auth user's id, and reads
+// its status. Only the report function uses this gate; Follow / Changes Since Report stay admin-only (authorizeAdmin).
+
+/** A trial as public.evaluation_usage reports it. */
+export type TrialState = { status: string; credits_used: number; credits_remaining: number; expired: boolean };
+export type ReportCaller = { kind: 'admin' } | { kind: 'trial'; userId: string; trial: TrialState };
+export type ReportGateDeps = AdminGateDeps & { trialOf: (userId: string) => Promise<TrialState | null> };
+
+/** What a trial member is told about their own trial: never an id. */
+export function trialSummary(t: TrialState) {
+  return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining };
+}
+
+export async function authorizeReportCaller(req: Request, deps: ReportGateDeps): Promise<Response | ReportCaller> {
+  const who = await identify(req, deps);
+  if (who instanceof Response) return who;
+  if (who.admin) return { kind: 'admin' };
+  if (!who.user.id) return reply(req, { error: 'forbidden' }, 403);
+  let trial: TrialState | null;
+  try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }
+  if (!trial) return reply(req, { error: 'forbidden' }, 403);
+  // a trial whose 20 reports are used is over; making more reports (even free ones) is the paid product's (Order M)
+  if (trial.status === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);
+  if (trial.status !== 'active' || trial.expired) return reply(req, { error: 'forbidden' }, 403);
+  return { kind: 'trial', userId: who.user.id, trial };
 }
