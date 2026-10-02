@@ -77,5 +77,50 @@ try {
   ok(c.zips.size === zips.length && c.zips.has('10048'), '4h a served list is read whole');
 } finally { globalThis.fetch = realFetch; }
 
+// §5 city and project pages: a withheld ZIP leaves their lists, and a city that COUNTS one stops
+// the build. Pages run 36942358791 (2026-10-02) stopped on exactly this: the Brooklyn city page
+// listed 11240 (withheld, held in the plane), and the build refuses a city naming a ZIP it did
+// not write.
+{
+  const { mkdtempSync, writeFileSync, readFileSync: rf, existsSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { spawnSync } = await import('node:child_process');
+  const W = '10048';
+  const FIX = join(root, 'test', 'fixtures', 'city-pages');
+  const runWith = (mutate) => {
+    const dir = mkdtempSync(join(tmpdir(), 'whz-city-'));
+    const fx = JSON.parse(rf(join(FIX, 'zip-pages.json'), 'utf8'));
+    const plane = JSON.parse(rf(join(FIX, 'development_seo_plane.json'), 'utf8'));
+    fx.zips = [...fx.zips, W].sort();
+    fx.meta = (fx.meta || []).concat([{ zip: W, name: 'New York (10048)', county: 'New York', state: 'NY',
+      data_quality: 'pass', indexable: true }]);
+    mutate(plane);
+    writeFileSync(join(dir, 'zip-pages.json'), JSON.stringify(fx));
+    writeFileSync(join(dir, 'development_seo_plane.json'), JSON.stringify(plane));
+    const out = join(dir, 'site');
+    const r = spawnSync('python3', [join(root, 'scripts', 'gen_zip_pages.py'), '--fixture', join(dir, 'zip-pages.json'),
+      '--out', out, '--now', '2026-09-28T00:00:00'], { encoding: 'utf8' });
+    return { r, out, dir, rmSync };
+  };
+  // 5a: the city lists the withheld ZIP as a held ZIP (the Brooklyn shape) → the build succeeds
+  const a = runWith((pl) => { const c = pl.cities['ma/amherst']; c.zips = [...c.zips, W]; c.held_zips = [...c.held_zips, W]; });
+  ok(a.r.status === 0, '5a a city listing a withheld ZIP as held still builds', (a.r.stderr || a.r.stdout).slice(-300));
+  if (a.r.status === 0) {
+    const city = rf(join(a.out, 'city', 'ma', 'amherst', 'index.html'), 'utf8');
+    ok(!city.includes(`/community/${W}/`) && !city.includes(W), '5b the city page does not link or name the withheld ZIP');
+    ok(city.includes('/community/01004/'), '5c control: the city page still links its other held ZIP');
+    ok(!existsSync(join(a.out, 'community', W)), '5d and no document was written for it');
+  }
+  a.rmSync(a.dir, { recursive: true, force: true });
+  // 5e: a city that COUNTS a withheld ZIP as Rule D stops the build, naming it
+  const b = runWith((pl) => {
+    const c = pl.cities['ma/amherst']; c.zips = [...c.zips, W]; c.rule_d_zips = [...c.rule_d_zips, W];
+    pl.zips[W] = JSON.parse(JSON.stringify(pl.zips['01002']));
+  });
+  ok(b.r.status !== 0 && /counts withheld ZIP\(s\) \['10048'\] as Rule D/.test(b.r.stdout + b.r.stderr),
+    '5e a city counting a withheld ZIP as Rule D stops the build and names it', (b.r.stdout + b.r.stderr).slice(-300));
+  b.rmSync(b.dir, { recursive: true, force: true });
+}
+
 console.log('FAILS: ' + fails);
 process.exit(fails ? 1 : 0);

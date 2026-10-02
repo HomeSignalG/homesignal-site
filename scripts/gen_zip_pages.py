@@ -1757,6 +1757,21 @@ def main():
     zips = [z for z in zips if z not in withheld]
     d["zips"] = zips
     print(f"withheld pages : {len(withheld)} (lib/withheld-zip-pages.json); building {len(zips)} of {registry_n}")
+    # City and project pages list the ZIPs they cover. A withheld ZIP has no page, so it leaves
+    # those lists too. It may only appear there as a listed or held ZIP: a withheld ZIP that a
+    # city COUNTS as Rule D, or the only ZIP a project page has, would make that page describe
+    # records from a withheld page, so the build stops and names it rather than guessing.
+    for key, c in cities.items():
+        counted = [z for z in c["rule_d_zips"] if z in withheld]
+        if counted:
+            sys.exit(f"ERROR: city {key} counts withheld ZIP(s) {counted} as Rule D")
+        c["zips"] = [z for z in c["zips"] if z not in withheld]
+        c["held_zips"] = [z for z in c["held_zips"] if z not in withheld]
+    for key, pr in projects.items():
+        kept = [z for z in pr["zips"] if z not in withheld]
+        if not kept:
+            sys.exit(f"ERROR: project {key!r} is only on withheld ZIP(s) {pr['zips'][:5]}")
+        pr["zips"] = kept
 
     pages = assemble(d, now_iso)
     if len(pages) != len(zips):
