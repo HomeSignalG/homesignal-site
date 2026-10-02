@@ -39,7 +39,7 @@ through once each step is complete").
 4. ~~**Private review page for the founder.**~~ Signed in, type any address, see the full report. First check:
    20 N Main St, Brigham City, UT 84302.
    *(Done: #1576 merged as `5ba0643`; Pages run `37045997546` deployed it at 2026-10-02 18:18Z. Read back from
-   homesignal.net at 18:2xZ, each byte-identical to `main` by md5: the page `095ce855…`, noindex; `robots.txt`
+   homesignal.net at 18:19Z, each byte-identical to `main` by md5: the page `095ce855…`, noindex; `robots.txt`
    `b84f0e80…`, with its Disallow line; and `lib/da-report-view.js?v=dbfe52f9` `41b1eeb8…`. The browser's
    preflight is not a risk: production logs show the gateway passing browser `OPTIONS` to another
    JWT-checked function (`geocode-address`, 9 of 9 answered 200 in 24 hours), and the report function allows
