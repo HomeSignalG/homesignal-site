@@ -63,7 +63,14 @@ through once each step is complete").
    because of **"No data ingested"** does not. Until HomeSignal can prove "No development activity" for an
    address, an empty report is "No data ingested" and is free.
    Four pull requests:
-   - **5a. The outcome and the one credit rule.**
+   - ~~**5a. The outcome and the one credit rule.**~~ *(Done: #1579 merged as `ba59f16`.*
+     - *`get-development-activity-report` was deployed from `main` by run `37051044339`: version 4 → 5 at
+       2026-10-02 18:58Z. All 11 deployed files read back byte-identical to `main`, and the JWT check is still on.*
+     - *Live probe 19:00Z: the capability answer names `credit-rule-1`. A call with no token, and a call with only
+       the public key, are both refused with 401.*
+     - *Pages run `37051040628` deployed the page and view at 19:02Z. Read back from homesignal.net, each is
+       byte-identical to `main` by md5: the review page `34259cff…` (noindex), and `lib/da-report-view.js?v=2cb756ec`
+       `7c04d9a7…`.)*
      - The report engine names every report's outcome: "No development activity" vs "No data ingested" (`report.activity`).
      - One versioned function (`_shared/credit-rule.ts`) says whether a report uses a free report.
      - An empty report says "No data ingested" in plain words.
