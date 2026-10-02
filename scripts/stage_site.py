@@ -54,6 +54,9 @@ ROOT_FILES = (
     'contact.html',
     'dashboard.html',
     'development-activity.html',
+    # Internal, admin-only (build step 4 of docs/development-activity-build-steps-100526.md): noindex, robots-disallowed,
+    # linked from nowhere. The function it calls refuses anyone not signed in and on dashboard_admins.
+    'development-activity-review.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',

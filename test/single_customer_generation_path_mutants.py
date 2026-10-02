@@ -78,6 +78,17 @@ m('M14_city_host_detector_neutered', ['P3d', 'P3e'],
   [(NEW, "['the City of New York open-data host', /data\\.cityofnewyork\\.us/i]", "['the City of New York open-data host', /data\\.cityofnewyork\\.zz/i]")])
 m('M15_slug_detector_neutered', ['P4d'], [(NEW, "const slugRe = (s) => new RegExp(s);", "const slugRe = (s) => new RegExp(s + 'zz');")])
 m('M16_artifact_floor_removed', ['P1b'], [(NEW, "ok(pages.length >= 20,", "ok(pages.length >= 0 && false,")])
+# ---- build step 4: the one admitted page (the private review page) must stay an operator tool -------------------------------------------
+REVIEW = 'development-activity-review.html'
+HANDLER = 'supabase/functions/get-development-activity-report/handler.ts'
+GATE = 'supabase/functions/_shared/admin-gate.ts'
+m('M17_review_page_made_indexable', ['P5b'], [(REVIEW, '<meta name="robots" content="noindex, nofollow">', '<meta name="robots" content="index, follow">')])
+m('M18_review_page_robots_line_dropped', ['P5c'], [('robots.txt', 'Disallow: /development-activity-review.html\n', '')])
+m('M19_a_shipped_page_links_to_the_review_page', ['P5d'], [('about.html', '</body>', '<a href="development-activity-review.html">review</a></body>')])
+m('M20_admin_gate_removed_from_the_engine', ['P5f'], [(HANDLER, "    const denied = await authorizeAdmin(req, deps);\n    if (denied) return denied;\n", '')])
+m('M21_gate_lets_a_non_admin_through', ['P5g'], [(GATE, "  if (!admin) return reply(req, { error: 'forbidden' }, 403);\n", '')])
+m('M22_service_role_key_in_the_review_page', ['P5h'], [(REVIEW, "var SB_ANON = '", "var SB_SERVICE_ROLE = 'x'; var SB_ANON = '")])
+m('M23_review_page_unstaged', ['P4', 'P5a'], [(STAGE, "    'development-activity-review.html',\n", '')])
 
 
 def run_tests():

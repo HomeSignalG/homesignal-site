@@ -167,6 +167,10 @@ export const UNVERIFIED_SURFACES = [
   // tests/gov_archive_scenarios.sql).
   'gov-archive.html — source_registry, acquisition_runs, acquisition_errors, '
     + 'source_documents, gov_actions (all via gated gov_archive_* RPCs)',
+  // Internal, admin-only (Development Activity build step 4). A live verifier would need an allowlisted test account,
+  // the same residual as gov-archive.html. Offline coverage: test/development-activity-review.test.mjs (contract) and
+  // test/development-activity-review.browser.test.mjs (the page against the real handler's responses).
+  'development-activity-review.html — get-development-activity-report (admin-gated edge function; nothing stored)',
 ];
 
 /** PARTIALLY covered surfaces — a verifier exists but does NOT cover the whole page.
