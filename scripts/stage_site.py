@@ -114,7 +114,9 @@ ROOT_FILES = (
 TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
-    'assets': ('.js', '.css', '.png', '.svg', '.woff2'),
+    # .webp: the homepage's approved Development Activity report preview
+    # (assets/home-development-activity-report-preview.webp, founder-approved in #1494).
+    'assets': ('.js', '.css', '.png', '.svg', '.webp', '.woff2'),
     'seed': ('.js',),
 }
 

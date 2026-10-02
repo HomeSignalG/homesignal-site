@@ -138,6 +138,7 @@ const REQUIRED = [
   '.well-known/did.json',     // Bluesky feed generator DID document
   'google59e1ae3ef6b75e3a.html', // Google Search Console verification (removing it un-verifies the site)
   'partials/shell.html', 'seed/delvalle.js', 'assets/acquisition-video-producer.js',
+  'assets/home-development-activity-report-preview.webp', // the homepage's approved report preview (#1494)
   // production page families
   'community.html',        // ZIP / community
   'property.html',         // address / property dossier

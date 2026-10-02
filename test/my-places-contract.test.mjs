@@ -42,14 +42,19 @@ ok(!/Change your zip code/.test(shellHtml) && !/Change your zip code/.test(shell
   'Fix 11 the loc-modal title is Add, not Change — Change is the Switch-place verb');
 ok(/: 'Add a zip code'/.test(shell),
   'Fix 11 openLoc (non-onboarding) sets Add a zip code, matching the chip that opens it');
-ok(/id="hsAddAddress"[\s\S]{0,160}HS\.addHome\(\)/.test(shellHtml),
-  'A-010 + Add an address sits in the shared top bar next to Viewing, on every page');
-ok(/id="hsAddZip"[\s\S]{0,120}HS\.openLoc\(\)/.test(shellHtml),
-  'Fix 11 + Add a zip code sits in the shared top bar next to Viewing, on every page');
-ok(/id="hsAddAddress"[\s\S]{0,400}id="hsAddZip"/.test(shellHtml),
-  'A-010 top-bar Place adds are Address then ZIP — the same order as My Places');
-ok(/topadd-short\{display:inline\}/.test(strip(read('app.css'))),
-  'phone top bar shortens Address/ZIP chips so 390px does not scroll sideways');
+// The horizontal header (founder, Revised Index Design, 2026-09-30) took the Place adds out
+// of the global chrome: "My Places already contains + Add Address and remains the supported
+// management entry point", and the same for + Add ZIP Code. Their functions are kept.
+ok(!/id="hsAddAddress"/.test(shellHtml) && !/id="hsAddZip"/.test(shellHtml),
+  'the Place adds are no longer in the shared header');
+ok(/id="plAddAddress">\+ Add Address</.test(props) && /getElementById\('plAddAddress'\)\.addEventListener\('click', function \(\) \{ HS\.addHome\(\); \}\)/.test(props),
+  'A-010 My Places carries + Add Address, wired to HS.addHome()');
+ok(/id="plAddZip">\+ Add ZIP Code</.test(props) && /getElementById\('plAddZip'\)\.addEventListener\('click', function \(\) \{ HS\.openLoc\(\); \}\)/.test(props),
+  'Fix 11 My Places carries + Add ZIP Code, wired to HS.openLoc()');
+ok(/id="plAddAddress"[\s\S]{0,200}id="plAddZip"/.test(props),
+  'A-010 the Place adds are Address then ZIP');
+ok(/HS\.addHome = function/.test(shell) && /HS\.openLoc = function/.test(shell),
+  'HS.addHome() and HS.openLoc() still exist');
 ok(/Add this zip code/.test(shellHtml) && !/Find my zip code/.test(shellHtml),
   'Fix 11 the loc-modal CTA is Add this zip code, not Find');
 ok(/function afterAddZipHref/.test(shell) && /focusHref\(zip\)/.test(shell),

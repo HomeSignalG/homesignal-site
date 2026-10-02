@@ -20,60 +20,95 @@
 <meta name="twitter:title" content="HomeSignal — Community change">
 <meta name="twitter:description" content="See what's being built and proposed around your home — mapped from public records — and follow the notices, meetings, and topics that matter. Free, one email a day, every item links to its official record.">
 <meta name="twitter:image" content="https://homesignal.net/og-default.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<link rel="stylesheet" href="app.css?v=20814d85">
-<style>
-  /* On a phone the button left the box about 104px, which cut the placeholder off (it cut
-     "Enter your ZIP code" too). Stack the button under the box there. Scoped to this page so
-     app.css, whose version key every page carries, is unchanged. */
-  @media (max-width: 560px) {
-    .hero .ziprow { flex-direction: column; align-items: stretch; }
-    .hero .zwrap { max-width: none; }
-  }
-</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=828fb31a">
 </head>
 <body data-nav="explore">
+<!-- THE HOMEPAGE (founder, Revised Index Design — Final Claude-Ready, 2026-09-30). index.html is
+     Explore for everyone: nothing here redirects, follows, saves or subscribes. The two visuals:
+       1. the Development Activity report preview, the approved static asset
+          assets/home-development-activity-report-preview.webp (merged in #1494), and
+       2. the development map, which is NOT an image: it is Map 1 itself, iframed in its embed
+          mode (homesignalmap.html?embed=1). The sample uses Map 1's layout-only preview mode
+          (&preview=1) so STATUS / PROJECT TYPE / REGULATORY RECORDS and the map key all show
+          with no scrollbar inside the frame; a search turns it into the normal interactive embed.
+     There is no second map, no copied filter or classifier, and no map image on this page. -->
 <template id="hs-content">
-  <div class="page">
-    <div class="hero">
-      <h1>See what's changing around your home — from public records you can verify.</h1>
-      <p class="sub">HomeSignal maps development, hearings, and regulated facilities near your ZIP — each item linked to its official source. Coverage depth varies by area; we show what the record says and what it doesn't.</p>
-      <div class="ziprow">
-        <div class="zwrap"><span class="zpin">◉</span><input id="homeZip" type="text" autocomplete="street-address" enterkeyhint="search" aria-label="Zip code or address" placeholder="Enter a zip code or address" onkeydown="if(event.key==='Enter')homeFind()"></div>
-        <button class="find" onclick="homeFind()">Find my community</button>
+  <div class="home-index">
+    <section class="home-index__hero">
+      <div class="home-index__hero-text">
+        <h1 class="home-index__title">See what’s changing around a property.</h1>
+        <p class="home-index__subhead">Development. Government decisions. Public meetings. Local activity.</p>
+        <form class="home-index__search" id="homeSearch" role="search" novalidate>
+          <label class="home-index__sr" for="homeQuery">Address or ZIP code</label>
+          <input class="home-index__search-input" id="homeQuery" type="text" autocomplete="street-address" enterkeyhint="search" placeholder="Enter an address or ZIP code" aria-describedby="homeSearchErr">
+          <button class="home-index__search-btn" id="homeSearchBtn" type="submit">Search</button>
+        </form>
+        <p class="home-index__search-error" id="homeSearchErr" role="alert" hidden></p>
+        <p class="home-index__helper">No account required.</p>
       </div>
-      <div class="ziperr" id="homeZipErr" role="alert" hidden style="font-size:13.5px;color:#c23b34;margin-top:10px"></div>
-      <div class="freeline">Free — already following an area? <a href="properties.html">Go to My Places →</a></div>
-    </div>
 
-    <div class="homesec">
-      <div class="trio">
-        <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with official record links on every item.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
-        <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language from the public record — what is known, what isn't published yet, and where you can still weigh in.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
-        <div class="twin"><div class="ic">◔</div><div class="k">Act on it</div><h3>What you can do</h3><p>A clear next step on every item, and a heads-up before comment windows and votes close — while you can still weigh in.</p><div class="tchips"><span class="tc">Comment</span><span class="tc">Attend</span><span class="tc">Follow</span><span class="tc">Noted</span></div></div>
+      <!-- THE ONE ENTERPRISE MESSAGE on this page (there is no bottom banner). The launch gate
+           was cleared by separate merged orders: Navigation v3 (#1517) linked
+           development-activity.html from the shared header, and #1555 (founder, 2026-10-02,
+           "list it sooner, without checkout") made it index, follow and put it in the
+           sitemap, with its commerce buttons hidden. So this card links it. This page changes
+           no pricing, entitlement, robots, sitemap or checkout. -->
+      <aside class="home-index__enterprise-card" aria-labelledby="homeEnterpriseHeading">
+        <div class="home-index__enterprise-text">
+          <p class="home-index__eyebrow">For real estate professionals</p>
+          <h2 class="home-index__enterprise-heading" id="homeEnterpriseHeading">Development Activity reports for agents &amp; brokerages.</h2>
+          <p class="home-index__enterprise-body">Know what’s changing around a property before your client does.</p>
+          <a class="home-index__enterprise-cta" id="homeEnterpriseCta" href="development-activity.html">Explore Enterprise →</a>
+        </div>
+        <img src="assets/home-development-activity-report-preview.webp"
+             class="home-index__report-preview"
+             alt="Sample HomeSignal Development Activity report pages"
+             width="1448" height="1086" decoding="async">
+      </aside>
+    </section>
+
+    <section class="home-index__results" id="homeExploreResults" aria-labelledby="homeResultsHeading">
+      <div class="home-index__results-head">
+        <div>
+          <h2 class="home-index__results-heading" id="homeResultsHeading" tabindex="-1">See an example: 78657 · Horseshoe Bay, Texas</h2>
+          <p class="home-index__results-sub" id="homeResultsSub" hidden></p>
+        </div>
+        <a class="home-index__results-cta" id="homeMapCta" href="homesignalmap.html?zip=78657">Explore this ZIP →</a>
       </div>
-    </div>
-
-    <div class="homesec">
-      <h2>This is what you'll see.</h2>
-      <p class="s2">Every change traced to a public record — and what you can do about it while the window is open.</p>
-      <div class="previewwrap">
-        <div id="homePreview"><!-- a real Del Valle card, rendered from data --></div>
-        <div class="previewcap" id="homePreviewCap">A real card from the Del Valle, TX community. Enter your ZIP to see your own.</div>
+      <div class="home-index__results-grid" id="homeResultsGrid">
+        <div class="home-index__map-preview is-sample" id="homeMapWrap">
+          <iframe class="home-index__map-frame" id="homeMapFrame"
+                  src="homesignalmap.html?embed=1&amp;preview=1&amp;zip=78657"
+                  title="Sample HomeSignal development map"
+                  loading="lazy"
+                  tabindex="-1"></iframe>
+        </div>
+        <div class="home-index__records" id="homeRecords">
+          <h3 class="home-index__records-heading" id="homeRecordsHeading">Recent development records in 78657</h3>
+          <div class="home-index__record-list" id="homeRecordList" role="status" aria-live="polite">Loading recent records…</div>
+          <a class="home-index__see-all" id="homeSeeAll" href="development.html?zip=78657">See all development →</a>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="trustpanel">
-      <div class="badge">Neutral · Sourced · Non-partisan</div>
-      <h2>Built on public records. Free to follow your community.</h2>
-      <p>Every alert links back to the permit, agenda, or filing it came from. We don't take positions and we don't sell your personal information — we help you see what's changing and decide for yourself.</p>
-    </div>
+    <section class="home-index__feature-row" aria-label="What HomeSignal covers">
+      <div class="home-index__feature"><h3>Development</h3><p>Proposed, approved and operating projects on the map.</p></div>
+      <div class="home-index__feature"><h3>Government</h3><p>Permits, zoning and public notices.</p></div>
+      <div class="home-index__feature"><h3>Meetings</h3><p>City council, planning and other upcoming meetings.</p></div>
+      <div class="home-index__feature"><h3>Local news</h3><p>Development, local issues and community updates.</p></div>
+    </section>
 
-    <div class="homecta">
-      <h2>Know what's changing around your home.</h2>
-      <p>Enter your ZIP to open the map — no account needed to start. Record depth varies by county.</p>
-      <button class="big" onclick="HS.openLoc()">Find my community</button>
-    </div>
+    <section class="home-index__how" aria-labelledby="homeHowHeading">
+      <h2 class="home-index__how-heading" id="homeHowHeading">How HomeSignal works</h2>
+      <ol class="home-index__steps">
+        <li class="home-index__step"><span class="home-index__step-num" aria-hidden="true">1</span><div><h3>Search an address or ZIP</h3><p>Find a property or explore a ZIP.</p></div></li>
+        <li class="home-index__step"><span class="home-index__step-num" aria-hidden="true">2</span><div><h3>See what’s changing</h3><p>See development on the map, plus government activity, meetings and local updates.</p></div></li>
+        <li class="home-index__step"><span class="home-index__step-num" aria-hidden="true">3</span><div><h3>Follow what matters</h3><p>Save places and get updates over time.</p></div></li>
+      </ol>
+    </section>
+
+    <p class="home-index__trust">Built from public records. Every item links to its source.</p>
   </div>
 </template>
 
@@ -83,85 +118,222 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=74ada1e6"></script>
-<script src="lib/landing.js?v=3234626b"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=c50ecfcd"></script>
+<script src="shell.js?v=d7982f94"></script>
 <script>
-  // The box takes a zip code or an address (founder, 2026-10-01). A ZIP goes straight to its
-  // community, as before. An address is confirmed against U.S. Census records by the same
-  // geocode-address service that "Add an address" and Map 1 use, and its confirmed ZIP then
-  // takes the ZIP path. The address only finds the ZIP: it is not saved, not put in the URL,
-  // and not recorded (the lookup event carries the ZIP alone, as Map 1's does).
-  var homeBusy = false, homeLogged = null;
-  function homeMsg(text, isError) {
-    var box = document.getElementById('homeZipErr');
+(function () {
+  // EXPLORE SEARCH. Read-only discovery: a search never follows, saves, subscribes, changes a
+  // primary place, opens the coverage-request form, or touches browser history. It turns the
+  // sample map into Map 1's normal interactive embed for the ZIP or the confirmed address, and
+  // the visitor stays on this page.
+  //
+  // ONE RUN ID. Every submit increments homeSearchRunId, and every async completion compares
+  // the value it captured before it writes anything, so a slow answer for an earlier search
+  // can never overwrite a newer one.
+  var SAMPLE_ZIP = '78657';
+  var homeSearchRunId = 0;
+  // The last address that recorded a lookup event, so searching it again records no second one.
+  var homeLogged = null;
+  var sampleObserver = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- the map ----------------------------------------------------------------------
+  // THE SAMPLE IS AUTO-SIZED, NEVER GIVEN A FIXED HEIGHT. Map 1's preview document is as tall
+  // as its content; this sets the iframe to that height on load and whenever it changes. The
+  // canvas height inside it follows this page's breakpoint (430 / 400 / 340 px), passed as a
+  // CSS variable, because the frame's own width cannot tell a desktop column from a tablet one.
+  function previewCanvasPx() {
+    var w = window.innerWidth || document.documentElement.clientWidth;
+    return w >= 1024 ? 430 : (w >= 768 ? 400 : 340);
+  }
+  function isSample() { var w = $('homeMapWrap'); return !!(w && w.classList.contains('is-sample')); }
+  function sampleDoc() {
+    var f = $('homeMapFrame');
+    try { return f && f.contentDocument && f.contentDocument.documentElement ? f.contentDocument : null; }
+    catch (e) { return null; }
+  }
+  function sizeSample() {
+    if (!isSample()) return;
+    var f = $('homeMapFrame'), d = sampleDoc();
+    if (!d) return;
+    d.documentElement.style.setProperty('--hs-preview-map-h', previewCanvasPx() + 'px');
+    // The root's scrollHeight is never less than the frame's own height, so it can report
+    // growth but never shrinkage. Collapse the frame for the one synchronous measurement,
+    // then set it: nothing paints in between.
+    f.style.height = '0px';
+    f.style.height = Math.ceil(d.documentElement.scrollHeight) + 'px';
+  }
+  function watchSample() {
+    if (!isSample()) return;
+    var d = sampleDoc();
+    if (!d) return;
+    if (sampleObserver) sampleObserver.disconnect();
+    if (window.ResizeObserver) {
+      var win = d.defaultView || window;
+      var RO = win.ResizeObserver || window.ResizeObserver;
+      sampleObserver = new RO(function () { sizeSample(); });
+      sampleObserver.observe(d.documentElement);
+    }
+    sizeSample();
+  }
+  // A NEW IFRAME ELEMENT, NOT A NEW src. Navigating an existing iframe adds an entry to the
+  // tab's history, so the browser's Back button would step the map back through earlier
+  // searches; a search must not touch history. A fresh element's first load adds none. There
+  // is still exactly one iframe on the page, and it is still Map 1.
+  function goLive(src, title) {
+    var wrap = $('homeMapWrap'), old = $('homeMapFrame');
+    if (sampleObserver) { sampleObserver.disconnect(); sampleObserver = null; }
+    wrap.classList.remove('is-sample');
+    if (old.getAttribute('src') === src) { old.title = title; return; }
+    var f = document.createElement('iframe');
+    f.id = 'homeMapFrame';
+    f.className = old.className;
+    f.title = title;              // the live heights are CSS: 760 / 700 / 660 px by breakpoint
+    f.setAttribute('src', src);
+    old.replaceWith(f);
+  }
+
+  // ---- the local records column --------------------------------------------------------
+  // The list beside the map is HS.data.projects(zip): local permit and planning records, in
+  // the order the read returns them, the first three only when the read is complete. It does
+  // not claim to be every Map 1 marker (the map also draws other planes). Type and lifecycle
+  // labels come from lib/project-type.js and are never decided here.
+  var esc = function (s) { return HS.esc(s == null ? '' : String(s)); };
+  function isHttp(u) { return /^https?:\/\//i.test(String(u || '')); }
+  function recordCard(p) {
+    var t = (typeof HS.canonicalProjectType === 'function') ? HS.canonicalProjectType(p) : null;
+    if (!t && p) console.warn('homepage: no canonical Type for development record', p.id);
+    var lc = (typeof HS.canonicalLifecycle === 'function') ? HS.canonicalLifecycle(p) : null;
+    var badges = (t ? '<span class="home-index__badge" data-type-key="' + esc(t.typeKey) + '">' + esc(t.label) + '</span>' : '')
+      + (lc ? '<span class="home-index__badge home-index__badge--stage" data-lifecycle="' + esc(lc.key) + '">' + esc(lc.label) + '</span>' : '');
+    var name = esc(p.name || 'Development record');
+    var title = p.id
+      ? '<a class="home-index__record-name" href="development.html?id=' + encodeURIComponent(p.id) + '">' + name + '</a>'
+      : '<span class="home-index__record-name">' + name + '</span>';
+    var meta = [];
+    if (p.stage) meta.push(esc(p.stage));
+    if (isHttp(p.source_ref)) meta.push('<a href="' + esc(p.source_ref) + '" target="_blank" rel="noopener">Official record ↗</a>');
+    return '<article class="home-index__record">'
+      + (badges ? '<div class="home-index__record-badges">' + badges + '</div>' : '')
+      + title
+      + (meta.length ? '<div class="home-index__record-meta">' + meta.join(' · ') + '</div>' : '')
+      + '</article>';
+  }
+  function setRecordsMessage(text) { $('homeRecordList').innerHTML = '<p class="home-index__records-note">' + esc(text) + '</p>'; }
+  async function loadRecords(zip, runId, emptyText) {
+    var projects = null;
+    try { projects = await HS.data.projects(zip, null); } catch (e) { projects = null; }
+    if (runId !== homeSearchRunId) return;
+    if (!projects || projects.complete !== true) { setRecordsMessage('Recent development list unavailable right now.'); return; }
+    if (!projects.length) { setRecordsMessage(emptyText); return; }
+    $('homeRecordList').innerHTML = projects.slice(0, 3).map(recordCard).join('');
+  }
+
+  // ---- results state -----------------------------------------------------------------
+  function showResults(mode) {
+    // 'zip' shows the records column and both ZIP links; 'address' hides all three, because
+    // the full-page Map 1 has no address route and a ZIP list beside a 2-mile map would be
+    // a different area.
+    var zipMode = mode === 'zip';
+    $('homeRecords').hidden = !zipMode;
+    $('homeSeeAll').hidden = !zipMode;
+    $('homeMapCta').hidden = !zipMode;
+    $('homeResultsGrid').classList.toggle('home-index__results-grid--full', !zipMode);
+  }
+  function revealResults() {
+    var sec = $('homeExploreResults');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    $('homeResultsHeading').focus({ preventScroll: true });
+  }
+  function searchError(text) {
+    var box = $('homeSearchErr');
     box.textContent = text || '';
-    box.style.color = isError ? '#c23b34' : '';
     box.hidden = !text;
   }
-  async function goZip(z) {
-    if (await HS.data.isCovered(z)) location.href = 'community.html?zip=' + z;
-    else { HS.openLoc(); document.getElementById('locZip').value = z; HS.findCommunity(); }
+  function setBusy(busy) {
+    var b = $('homeSearchBtn');
+    b.disabled = !!busy;
+    if (busy) b.setAttribute('aria-busy', 'true'); else b.setAttribute('aria-busy', 'false');
   }
-  async function homeFind() {
-    var el = document.getElementById('homeZip'), q = el.value.trim();
-    if (homeBusy) return;
-    homeMsg('');
-    var zip = q.match(/^(\d{5})(?:-\d{4})?$/);
-    if (zip) { el.style.borderColor = ''; return goZip(zip[1]); }
+
+  function searchZip(zip, runId) {
+    setBusy(false);
+    goLive('homesignalmap.html?embed=1&zip=' + zip, 'Development map for ZIP ' + zip);
+    showResults('zip');
+    $('homeResultsHeading').textContent = 'ZIP ' + zip;
+    $('homeResultsSub').hidden = true;
+    $('homeMapCta').textContent = 'Open full development map →';
+    $('homeMapCta').setAttribute('href', 'homesignalmap.html?zip=' + zip);
+    $('homeSeeAll').setAttribute('href', 'development.html?zip=' + zip);
+    $('homeRecordsHeading').textContent = 'Recent development records in ' + zip;
+    $('homeRecordList').textContent = 'Loading recent records…';
+    revealResults();
+    // Place name only: the map never waits for it, and a missing row leaves "ZIP <zip>".
+    (async function () {
+      var c = null;
+      try { c = await HS.data.community(zip); } catch (e) { c = null; }
+      if (runId !== homeSearchRunId) return;
+      if (c && c.name) $('homeResultsHeading').textContent = zip + ' · ' + c.name + (c.state ? ', ' + c.state : '');
+    })();
+    loadRecords(zip, runId, 'No local permit/planning records to list here.');
+  }
+
+  async function searchAddress(q, runId) {
+    setBusy(true);
+    var res = await HS.resolveAddress(q);
+    if (runId !== homeSearchRunId) return;
+    setBusy(false);
+    // A failure says so under the box and changes nothing else on the page.
+    if (!res.ok) { searchError(res.message); return; }
+    var m = res.match;
+    // The entry-family count of address lookups (docs/events-entry-family.sql). It carries the
+    // confirmed ZIP alone, never the address, exactly as the homepage recorded it before.
+    try {
+      if (HS.logEvent && homeLogged !== q) { homeLogged = q; HS.logEvent('property_lookup', { zip_code: m.zip }); }
+    } catch (e) { /* a lookup event never blocks the search */ }
+    goLive('homesignalmap.html?embed=1&lat=' + encodeURIComponent(m.lat) + '&lng=' + encodeURIComponent(m.lng) + '&radius=2',
+      'Development within 2 miles of ' + m.matchedAddress);
+    showResults('address');
+    $('homeResultsHeading').textContent = m.matchedAddress;
+    $('homeResultsSub').textContent = 'Development within 2 miles of this address.';
+    $('homeResultsSub').hidden = false;
+    $('homeMapCta').removeAttribute('href');
+    $('homeSeeAll').removeAttribute('href');
+    revealResults();
+  }
+
+  function submit(e) {
+    if (e) e.preventDefault();
+    var q = String($('homeQuery').value || '').trim();
+    var runId = ++homeSearchRunId;
+    searchError('');
+    if (/^\d{5}$/.test(q)) { searchZip(q, runId); return; }
     // The same minimum the Add-an-address box asks for before it calls the geocoder.
     if (q.length < 8 || q.indexOf(' ') < 0) {
-      el.style.borderColor = '#c23b34'; el.focus();
-      homeMsg('Enter a 5-digit zip code, or a street address with its city or ZIP.', true);
+      setBusy(false);
+      searchError('Enter a 5-digit ZIP code, or a street address with its city or ZIP.');
+      $('homeQuery').focus();
       return;
     }
-    el.style.borderColor = '';
-    if (HS_CONFIG.DATA_SOURCE !== 'supabase') { homeMsg('Searching by address needs the live site.', true); return; }
-    var btn = document.querySelector('.ziprow .find');
-    homeBusy = true;
-    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
-    homeMsg('Looking up the official address…');
-    var m = null, unavailable = false;
-    try {
-      var r = await HS.sb().functions.invoke('geocode-address', { body: { address: q } });
-      if (r.error) unavailable = true;
-      else m = (r.data && r.data.match) || null;
-    } catch (e) { unavailable = true; }
-    homeBusy = false;
-    if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
-    if (unavailable) {
-      homeMsg("The address service couldn't be reached — please try again in a minute.", true);
-      return;
-    }
-    var mz = m ? String(m.zip == null ? '' : m.zip) : '';
-    if (!/^\d{5}$/.test(mz)) {
-      el.style.borderColor = '#c23b34';
-      homeMsg("We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.", true);
-      return;
-    }
-    homeMsg('');
-    try {
-      if (HS.logEvent && homeLogged !== q) { homeLogged = q; HS.logEvent('property_lookup', { zip_code: mz }); }
-    } catch (e) {}
-    return goZip(mz);
+    searchAddress(q, runId);
   }
-  HS.onReady(async function () {
-    // index.html is Explore for everyone (founder navigation plan v3): lib/landing.js now
-    // keeps every visitor here. The call stays so the decision keeps its one home.
-    var dest = HS.landingFor(HS.state.session, HS.state.activeProperty);
-    if (dest) { location.replace(dest); return; }
-    // The preview is the SAMPLE card its caption names (Del Valle, TX). It used to be built
-    // from the visitor's own ZIP and saved Address, so anyone outside 78617 read a card
-    // from their own area captioned as Del Valle. That stayed rare while signed-in residents
-    // were bounced to the dashboard; with the bounce gone it would reach every one of them.
-    var changes = await HS.data.changes(HS_CONFIG.DEFAULT_ZIP, null);
-    var flagship = changes.find(function (c) { return c.related_project_id; }) || changes[0];
-    if (flagship) {
-      // render a real story card as the homepage preview
-      document.getElementById('homePreview').innerHTML = HS.tpl.storyCard(flagship);
-    }
+
+  HS.onReady(function () {
+    $('homeSearch').addEventListener('submit', submit);
+    var f = $('homeMapFrame');
+    f.addEventListener('load', function () { watchSample(); });
+    // The frame is in the page from the moment the shell injects it, so Map 1 can finish
+    // loading before this runs. about:blank also reads "complete", hence the URL check.
+    var d = sampleDoc();
+    if (d && d.readyState === 'complete' && /homesignalmap\.html/.test(String(d.location && d.location.href))) watchSample();
+    window.addEventListener('resize', function () { sizeSample(); });
+    // The sample list: one read of the sample ZIP. Search replaces it.
+    loadRecords(SAMPLE_ZIP, homeSearchRunId, 'No local permit/planning records to list here.');
   });
+})();
 </script>
 </body>
 </html>
