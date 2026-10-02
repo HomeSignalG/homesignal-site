@@ -165,7 +165,28 @@ const mapEntries = NAV.filter((n) => /map/i.test(n.href));
 ok(mapEntries.length === 0, 'A-021 no map entry in the sidebar — Maps was folded', mapEntries);
 ok(!/href="maps\.html"/.test(navBlock), 'the retired second map is not in the sidebar');
 ok(!/href="today\.html"/.test(navBlock), 'A-020 Today is not in the sidebar');
-ok(!/href="community\.html"/.test(navBlock), 'A-021 Zip Code Activity is not in the sidebar');
+// The Explore DROPDOWN (founder, 2026-10-02) lists the ZIP page as "Activity", the map as
+// "Development Map" and the development list as "Quality of Life Impact". They are
+// sub-entries with no data-nav, so they never light a section and never count as primary
+// items; read the sidebar without the dropdown for the primary-item checks.
+const exploreSub = (navBlock.match(/<div class="navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
+const navPrimary = navBlock.replace(exploreSub, '');
+ok(!/href="community\.html"/.test(navPrimary), 'A-021 Zip Code Activity is not a primary sidebar item');
+const subLinks = [...exploreSub.matchAll(/<a href="([^"]+)"\s+data-sub="([a-z]+)">([^<]+)<\/a>/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
+ok(JSON.stringify(subLinks) === JSON.stringify([
+  'development.html|qol|Quality of Life Impact',
+  'homesignalmap.html|map|Development Map',
+  'community.html|activity|Activity']),
+  'the Explore dropdown is exactly Quality of Life Impact, Development Map, Activity, in that order', subLinks);
+ok(!/data-nav=/.test(exploreSub), '...and none of the three carries a data-nav, so none lights a section');
+const zipNavLiteral = (shellJsSrc.match(/HS\.ZIP_NAV_PAGES = \[([^\]]*)\]/) || [, ''])[1];
+ok(subLinks.length === 3 && subLinks.every((l) => zipNavLiteral.indexOf("'" + l.split('|')[0] + "'") >= 0),
+  '...and all three are ZIP_NAV_PAGES targets, so paintNavHrefs stamps the viewed ZIP on them');
+for (const [f, tok] of [['development.html', 'qol'], ['homesignalmap.html', 'map'], ['community.html', 'activity']])
+  ok(new RegExp('<body data-nav="explore" data-explore="' + tok + '">').test(read(f)),
+    f + ' names its dropdown entry with data-explore="' + tok + '"');
+ok(/data-explore="activity"/.test(read('scripts/gen_zip_pages.py')),
+  'the generated /community/<zip>/ documents name the Activity entry too');
 
 // The retired pages are redirect stubs, not deletions.
 // ⚠️ reports.html LEFT THIS LIST on 2026-09-11, by explicit authorization naming A-019. It

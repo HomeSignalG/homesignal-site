@@ -31,6 +31,24 @@
   .nav a:hover{background:#193024;color:#eaf3ee}
   .nav a.on{background:var(--green);color:#fff}
   .nav a.on .ic{opacity:1}
+  /* Explore dropdown (founder, 2026-10-02): Quality of Life Impact, Development Map, Activity.
+     Open on every Explore page, closed elsewhere; the caret flips it either way. The page
+     says which entry is current with body[data-explore]. */
+  .navgroup{position:relative;display:flex;flex-direction:column;gap:2px}
+  .navgroup > a{padding-right:40px}
+  .navcaret{position:absolute;right:4px;top:4px;width:30px;height:28px;border:none;border-radius:7px;background:transparent;color:#a9bcb1;font-size:13px;line-height:28px;padding:0;transition:transform .15s;transform:rotate(-90deg)}
+  .navcaret:hover{background:rgba(255,255,255,.12);color:#fff}
+  .navgroup > a.on + .navcaret{color:#fff}
+  .navsub{display:none;flex-direction:column;gap:1px;margin:0 0 4px}
+  .nav .navsub a{padding:7px 11px 7px 39px;font-size:13px;color:#93a89c}
+  .nav .navsub a:hover{color:#eaf3ee}
+  body[data-nav="explore"] .navsub,.navgroup.open .navsub{display:flex}
+  body[data-nav="explore"] .navcaret,.navgroup.open .navcaret{transform:none}
+  .navgroup.shut .navsub{display:none}
+  .navgroup.shut .navcaret{transform:rotate(-90deg)}
+  body[data-explore="qol"] .navsub a[data-sub="qol"],
+  body[data-explore="map"] .navsub a[data-sub="map"],
+  body[data-explore="activity"] .navsub a[data-sub="activity"]{background:#193024;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--green-2)}
   .side .grow{flex:1}
   .upsell{background:#193024;border:1px solid #24402f;border-radius:12px;padding:14px}
   .upsell .t{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px}

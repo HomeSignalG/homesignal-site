@@ -40,7 +40,16 @@ for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
 // v3 (founder navigation plan, 2026-09-30): Development LEFT the primary nav. Like Map 1 in
 // A-021, the PAGE stays and stays reachable (ZIP_NAV_PAGES below, the map's list link, the
 // Address dossier's "All projects"); only its sidebar entry went, and it now lights Explore.
-ok(!/href="development\.html"/.test(shellHtml), 'v3 Development is NO LONGER a sidebar item — it is an Explore child');
+// The Explore DROPDOWN (founder, 2026-10-02) links development.html and homesignalmap.html as
+// sub-entries, never as primary items, so the two checks below read the sidebar WITHOUT it,
+// and the dropdown is pinned on its own.
+const exploreSub = (shellHtml.match(/<div class="navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
+const shellPrimary = shellHtml.replace(exploreSub, '');
+ok(exploreSub.length > 0, 'the Explore dropdown block is found (control for the two checks below)');
+ok(!/href="development\.html"/.test(shellPrimary), 'v3 Development is NO LONGER a primary sidebar item — it is an Explore child');
+ok(/<a href="development\.html"\s+data-sub="qol">Quality of Life Impact<\/a>/.test(exploreSub)
+   && !/data-nav=/.test(exploreSub),
+  'the Explore dropdown links it as "Quality of Life Impact", with no data-nav of its own');
 ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "explore"');
 // ⚠️ RETARGETED IN PHASE 8, ONE LINE, AND THE DEVELOPMENT CONTRACT IS UNCHANGED IN
 // SUBSTANCE. This line used to read `A-008 Maps is STILL in the nav — not folded`, which
@@ -49,8 +58,8 @@ ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "e
 // DESIGN — and the thing it was really protecting (Map 1 continues to exist and stay
 // reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
 // Everything else in this file is byte-identical to Phase 6.
-ok(!/href="homesignalmap\.html"/.test(shellHtml),
-  'A-021 Maps is NO LONGER a sidebar item (an Explore child since v3)',
+ok(!/href="homesignalmap\.html"/.test(shellPrimary) && /<a href="homesignalmap\.html"\s+data-sub="map">Development Map<\/a>/.test(exploreSub),
+  'A-021 Maps is NO LONGER a primary sidebar item; the Explore dropdown lists it as "Development Map"',
   (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
 ok(/<body data-nav="explore"/.test(map),
   'v3 ...and Map 1 declares "explore", so visiting it lights Explore');

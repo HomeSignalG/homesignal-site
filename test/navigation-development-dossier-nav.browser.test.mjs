@@ -86,8 +86,11 @@ async function waitReady() {
 
 async function chrome() {
   return page.evaluate(() => {
-    const links = [...document.querySelectorAll('#hs-nav a')];
+    // Primary items carry data-nav. The Explore dropdown's entries (founder, 2026-10-02)
+    // carry none and are read separately as `sub`.
+    const links = [...document.querySelectorAll('#hs-nav a[data-nav]')];
     return {
+      sub: [...document.querySelectorAll('#hs-explore-sub a')].map(a => a.getAttribute('data-sub') + '|' + a.getAttribute('href')),
       tokens: links.map(a => a.getAttribute('data-nav')),
       hrefs: links.map(a => a.getAttribute('href')),
       lit: links.filter(a => a.classList.contains('on')).map(a => a.getAttribute('data-nav')),
@@ -112,9 +115,19 @@ const onDossier = await chrome();
 ok(onDossier.tokens.join('|') === 'explore|props|enterprise',
   'dossier: the sidebar is Explore, My Places, Enterprise (plan v3)', onDossier.tokens);
 ok(onDossier.hrefs.every(h => (h || '').split('?')[0] !== 'development.html'),
-  'dossier: no sidebar link targets development.html, so none can drop the dossier id', onDossier.hrefs);
+  'dossier: no PRIMARY sidebar item targets development.html', onDossier.hrefs);
+// The dropdown's Quality of Life Impact entry is the one sidebar link to development.html.
+// On a dossier it KEEPS the record id, as the 2026-09-12 ruling requires of the sidebar's
+// development link ("Clicking Development on a project dossier must stay on that dossier"),
+// so Viewing never falls off the project. The other two carry the viewed ZIP only.
+const qolHref = (onDossier.sub[0] || '').split('|')[1] || '';
+ok(onDossier.sub.length === 3 && /^qol\|development\.html\?/.test(onDossier.sub[0])
+   && /[?&]zip=78617(&|$)/.test(qolHref) && /[?&]id=proj-datacenter(&|$)/.test(qolHref),
+  'dossier: the Quality of Life Impact entry keeps the ZIP AND the dossier id', onDossier.sub);
+ok(onDossier.sub[1] === 'map|homesignalmap.html?zip=78617' && onDossier.sub[2] === 'activity|community.html?zip=78617',
+  'dossier: Development Map and Activity carry the viewed ZIP and nothing else', onDossier.sub);
 ok(JSON.stringify(onDossier.hrefs) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
-  'dossier: sidebar hrefs are unstamped section links (no ZIP, no project id)', onDossier.hrefs);
+  'dossier: primary sidebar hrefs are unstamped section links (no ZIP, no project id)', onDossier.hrefs);
 ok(JSON.stringify(onDossier.lit) === JSON.stringify(['explore']),
   'dossier: Explore is the one lit item (the development list is part of Explore)', onDossier.lit);
 ok(!!onDossier.back && /development\.html\?zip=78617/.test(onDossier.back) && onDossier.back.indexOf('id=') < 0,
@@ -126,6 +139,8 @@ await page.waitForFunction(() => !!document.querySelector('#hs-slot a[data-znav=
 const onList = await chrome();
 ok(onList.tokens.join('|') === 'explore|props|enterprise' && JSON.stringify(onList.lit) === JSON.stringify(['explore']),
   'list: same three items, Explore lit', onList);
+ok(JSON.stringify(onList.sub) === JSON.stringify(['qol|development.html?zip=78617', 'map|homesignalmap.html?zip=78617', 'activity|community.html?zip=78617']),
+  'list: the dropdown entries carry the viewed ZIP, and the list link carries no record id', onList.sub);
 ok(onList.mapLinks.length > 0 && onList.mapLinks.every(h => h === 'homesignalmap.html?zip=78617'),
   'list: "View Development Map" carries the viewed ZIP and nothing else', onList.mapLinks);
 

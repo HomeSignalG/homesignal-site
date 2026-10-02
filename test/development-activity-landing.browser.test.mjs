@@ -95,7 +95,8 @@ const page = D.page;
 
 console.log('--- 1. the shared shell, and nothing but the shared shell ---');
 const shell = await page.evaluate(() => ({
-  navLinks: [...document.querySelectorAll('#hs-nav a')].map((a) => a.getAttribute('href').split('?')[0]),
+  // Primary items carry data-nav; the Explore dropdown's entries (founder, 2026-10-02) do not.
+  navLinks: [...document.querySelectorAll('#hs-nav a[data-nav]')].map((a) => a.getAttribute('href').split('?')[0]),
   sidebars: document.querySelectorAll('.side').length,
   navs: document.querySelectorAll('nav').length,
   lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),

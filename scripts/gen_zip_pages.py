@@ -774,7 +774,7 @@ def _items(items, heading, empty, kind):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=20814d85">\n'
+APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=79649c4d">\n'
 
 
 def render(p, built):
@@ -914,7 +914,9 @@ def render(p, built):
         # data-nav="explore": this document loads the shared shell, and the public ZIP page
         # is an Explore child (founder navigation plan v3), the same identity community.html
         # declares. The city/project/project-list/guide families below carry no shell.
-        f'<body data-nav="explore" data-zip="{esc(z)}">\n{body}\n'
+        # data-explore="activity" marks this page's entry in the Explore dropdown (founder,
+        # 2026-10-02), the same marker community.html carries.
+        f'<body data-nav="explore" data-zip="{esc(z)}" data-explore="activity">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'

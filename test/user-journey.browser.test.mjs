@@ -272,11 +272,16 @@ await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domc
 await waitShell();
 ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
   '3 there is no Maps sidebar entry (A-021, kept by plan v3)');
-ok(await page.locator('.nav a').count() === 3,
-  '3 ...and the sidebar is the three primary items (plan v3)', await page.locator('.nav a').count());
-ok((await page.locator('.nav a').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+// Primary items are the links that carry data-nav. The Explore dropdown's three entries
+// (founder, 2026-10-02) carry none, so they are counted separately.
+ok(await page.locator('.nav a[data-nav]').count() === 3,
+  '3 ...and the sidebar is the three primary items (plan v3)', await page.locator('.nav a[data-nav]').count());
+ok((await page.locator('.nav a[data-nav]').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
      === 'explore|props|enterprise',
   '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
+ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.nav a').count() === 6,
+  '3 ...plus the three Explore dropdown entries, and nothing else in the sidebar',
+  await page.locator('.nav a').count());
 // The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
 c = await chrome();
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',

@@ -118,7 +118,7 @@ ok(!/repPreview|impact model|updated today/.test(strip(read('reports.html'))),
 // LEFTOVER 10 CLOSED 2026-10-01 (founder navigation plan v3). It recorded a stale "This page
 // is MAPS." narration sitting above data-nav="dev". v3 re-tokened Map 1 to Explore, so the
 // comment had to be rewritten anyway; it now names the section the token actually lights.
-ok(!/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="explore">/.test(read('homesignalmap.html'))
+ok(!/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="explore"[ >]/.test(read('homesignalmap.html'))
    && /Map 1 belongs to EXPLORE/.test(read('homesignalmap.html')),
   'LEFTOVER 10 CLOSED: the narration above Map 1\'s data-nav="explore" now matches what it lights');
 

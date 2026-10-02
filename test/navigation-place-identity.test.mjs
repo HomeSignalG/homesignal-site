@@ -78,10 +78,14 @@ ok(!/locLabel/.test(cpage),
 console.log('--- Fix 6 did not grow the sidebar or add a place label to it ---');
 const navBlock = (shellHtml.match(/<nav class="nav" id="hs-nav">[\s\S]*?<\/nav>/) || [''])[0];
 ok(navBlock.length > 0, 'the sidebar block was found');
-ok((navBlock.match(/<a /g) || []).length === 3,
-  'the sidebar is EXACTLY THREE primary items (v3)', (navBlock.match(/data-nav="[a-z]+"/g) || []));
-ok(!/href="community\.html"/.test(navBlock),
-  'the ZIP hub is still not a primary sidebar item');
+// The Explore dropdown (founder, 2026-10-02) adds three SUB-entries; primary items are the
+// links that carry data-nav, and there are still exactly three.
+const exploreSub = (navBlock.match(/<div class="navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
+const navPrimary = navBlock.replace(exploreSub, '');
+ok((navPrimary.match(/<a /g) || []).length === 3,
+  'the sidebar is EXACTLY THREE primary items (v3)', (navPrimary.match(/data-nav="[a-z]+"/g) || []));
+ok(!/href="community\.html"/.test(navPrimary) && /href="community\.html"\s+data-sub="activity"/.test(exploreSub),
+  'the ZIP hub is still not a primary sidebar item — it is the Explore dropdown\'s "Activity"');
 // A persistent sidebar place label is explicitly deferred — the place lives in Viewing.
 ok(!/state\.zip|viewedLabel|locLabel|setViewLabel/.test(navBlock),
   'no place label was added to the sidebar in this unit', navBlock.slice(0, 120));
