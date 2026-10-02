@@ -21,7 +21,9 @@ export const RIGHTS_AB = { version: 1, cleared: [
 ] };
 export const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
 
-export const row = (k, d, fam, x = {}) => ({ source_key: k, feature_id: 'pt:' + k, registry_id: fam, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...x });
+/** A spatial-read row. Its display point is `d` miles due north of the subject unless `x` says otherwise (the map's direction, 100526 step 2). */
+export const row = (k, d, fam, x = {}) => ({ source_key: k, feature_id: 'pt:' + k, registry_id: fam, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false,
+  marker_lat: 44.04612 + d / 69.05, marker_lng: -122.98123, ...x });
 export const proj = (k, fam, x = {}) => ({
   source_key: k, registry_id: fam, record_kind: 'development', name: 'Record ' + k, type: 'Residential', type_raw: null, status: 'Proposed',
   stage: null, developer: null, size: null, investment: null, submitted_at: '2026-09-10', date_kind: 'filed', address: '005 King',

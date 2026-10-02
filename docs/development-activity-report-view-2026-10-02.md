@@ -1,4 +1,10 @@
-# The Development Activity report view — Order I, step 1 (2026-10-02)
+# The Development Activity report view — Order I, step 1, then build step 3 (2026-10-02)
+
+> **Updated the same day for build step 3** (`docs/development-activity-build-steps-100526.md`): the view now draws the whole
+> layout of the 100526 plan (`docs/development-activity-plan-100526.md`, Visual Layout Contract), on top of build step 2's engine
+> (#1569: 0.5 mile, `sections.by_stage`, `render.bearings_deg`, `render.review`). §3, §4, §5 and §6 describe the view as it is now;
+> the Order I text they replace is kept where it explains a decision that still holds. It still has **no caller**: build step 4 adds
+> the private review page.
 
 Plan: `docs/development-activity-plan-2026-09-30.md`, Order I ("Redesign the customer report only after the data contract is proven",
 lines 2404-2424; Customer-Facing Visual Layout Contract, lines 525-780). Rulings: `docs/development-activity-founder-rulings-2026-09-30.md`
@@ -49,31 +55,35 @@ the layout can be proven against the engine's real output **before** any custome
 
 ## 3. What it renders
 
-In this order, and **only the sections that have data** (plan lines 2410-2418; the mobile order in lines 713-735 is the same for the sections built):
+In the 100526 plan's order (Visual Layout Contract). A section with nothing to say is left out, except the three stage sections,
+which are always drawn when the report has any record, so a reader sees that a stage is empty rather than missing:
 
 | # | section | what the engine supplies | what the view shows |
 |---|---|---|---|
-| 0 | property / address | the caller's display string; `report.radius_mi`, `zip`, `as_of` | the ruled eyebrow (R6), the address as **text** (or "Address unavailable"), "Within 1 mile · ZIP 97477 · As of Sep 29, 2026" |
-| 1 | **What Changed Recently** | `sections.what_changed_recently`, and `homesignal_detected_changes` on the project | the hero, **only** for a project that carries a detected change: counts of **official records** by the ledger's own event type (each record once, by its newest change), "Most recent: <Type> — <name> · <distance> · <change, detected date> · Official record: <publisher event>" |
-| 2 | **Recent Official Activity** | `sections.recent_official_activity`, `publisher_event` | the hero when there is no detected change, otherwise the second section: counts by the publisher's own event label, "Most recent". A publisher date is never called a HomeSignal change |
-| – | Things to Review With Your Client | nothing: no rules exist | **not built** |
-| – | Development Activity Map | no plot coordinate is emitted | **not built** |
-| 5 | **Approved / Coming** | `by_lifecycle.approved` | one card per record |
-| 6 | **Proposed / Under Review** | `by_lifecycle.proposed` (a decided application is proposed) | one card per record; never the word "coming" |
-| – | Permitted / Under Construction | no lifecycle key, no source rule (R2) | **not built** |
-| 8 | **Change History** | detected-change entries and the publisher event | per record, two labelled lanes, **Official record** and **HomeSignal detected** (from → to, in plain field names); hidden when there is neither |
-| 9 | **Official evidence & coverage** | `coverage.limitations[].text`, `recent_days`, `as_of` | the engine's limitation text **verbatim**, what "recent" means, the plan's scope lines (1261, 1265) and standard disclosure (1763), quoted from the plan and checked against it (behaviour test 9a-9c) |
-| – | Compare · Watch · Share · PDF, brokerage identity | Orders J and K | **not built** |
+| 0 | **header** | the caller's address, label, brokerage and agent strings; `report.radius_mi`, `zip`, `as_of` | the ruled eyebrow (R6), the address as **text** (or "Address unavailable"), an optional client label, "Within 0.5 miles · ZIP 84302 · As of Oct 2, 2026", and on the right the brokerage · agent and "Generated <as_of>" when supplied |
+| 1 | **What Changed Around This Property** | `sections.what_changed_recently`, `homesignal_detected_changes` | the hero, **only** for a record that carries a detected change: counts of official records by the ledger's event type, "Most recent: …", then "On the record within 0.5 miles: N permitted / under construction · N approved / coming · N proposed / under review." |
+| 2 | **Recent Official Activity** | `sections.recent_official_activity`, `publisher_event` | the hero when nothing was detected, otherwise the second section; a publisher date is never called a HomeSignal change. When neither has data, a measured zero: "0 New official records in the last 90 days", "Among the official records in this report." Never a claim about the area |
+| 3 | **Type and stage** | each staged record's `type.key` and `stage.key` | two chip rows, **Type** (All, then the canonical Type labels from `lib/project-type.js` when it is loaded, in the plan's order) and **Stage** (All, the three stages), with counts. They show and hide cards and map markers only, through the `hidden` attribute; the report itself does not change |
+| 4 | **Things to Review With Your Client** | `render.review` (up to 3, nearest first; response-only) | for each: distance · Type · STAGE, the name, the publisher's own stage (or official event), one neutral prompt per stage ("Review: The published construction timing and project details."), the official link, and "It is not a prediction of any effect on the property." |
+| 5 | **Development Activity Map** | `render.distances_mi`, `render.bearings_deg` (response-only) | a plain diagram, no street map (no basemap is cleared): the property in the centre, rings at 0.5 and 0.25 mile, each staged record at its distance (to scale) and direction, shaped by stage and numbered like its card. Left out when the response carries no positions (a reopened report) |
+| 6 | **Approved / Coming** | `sections.by_stage.approved` | one card per record |
+| 7 | **Proposed / Under Review** | `sections.by_stage.proposed` | one card per record; never the word "coming" |
+| 8 | **Permitted / Under Construction** | `sections.by_stage.permitted` (the publisher's stage says a permit was issued or construction is under way, step 2) | one card per record |
+| 9 | **Change History** | detected changes and publisher events | two labelled lanes per record, **Official record** and **HomeSignal detected**. When empty: "HomeSignal recorded no status change …" only once the ledger is change-ready, otherwise "Change history begins once HomeSignal has observed these records at least twice." |
+| 10 | **Official evidence & coverage** | `coverage.limitations[].text`, `recent_days`, `as_of` | the engine's limitation text verbatim, what "recent" means, the plan's scope lines and the standard disclosure |
+| 11 | **Report actions** | none yet | Compare property, Watch property, Share report, Download PDF, as inert buttons (`aria-disabled`) with "Available soon" (build steps 8–10). Not "coming soon": the word "coming" is kept for the Approved / Coming stage |
 
-A **card** (plan lines 592-606) is: title; lifecycle as **text and a shape** (solid circle approved, dashed hollow circle proposed, solid square
-operating, hollow diamond unknown, so it reads in greyscale); HomeSignal Type; distance **only if this response carries it**; the publisher's own
-status word under its own label; the official record and the detected change under **separate** labels; an "Official source" link **only for an
-http(s) URL**, carrying the cleared source's attribution when there is one.
+A **stage card** is: title; the stage as **text and a shape** (solid circle approved, dashed hollow circle proposed, solid square permitted);
+the Type; the distance and "Map N" when this response carries them; then labelled lines — **HomeSignal lifecycle** (the engine's own label),
+**Publisher stage**, **Publisher status**, **Why it is in this section** (only for a permitted record, quoting the engine's stage evidence),
+**First detected by HomeSignal** (the ledger's first observation), the official event and the detected change under separate labels; the
+official link. A **hero row** (a record the hero names that no stage section carries, such as an operating record with a recent event) keeps
+the Order I card, with its lifecycle shape.
 
 **What it never shows** (plan lines 685-696): it does not read `storage_blockers`, `storable`, `rights` / HOLD, `INTERNAL_VIEW`,
-`source_family` or any registry id, `change_ready`, `homesignal_observation`, the coverage state, a limitation `code`, `report_id`, or a hash, and it
-never PRINTS `project_id` (it reads that one key only to look records up: the card map, the distance lookup and the staged map). The structural suite fails if the module reads a key outside the closed set of thirteen snake_case keys it does (2a-2b), and the
-behaviour suite scans five outputs (customer, cold start, the shipped empty state, the internal view, a truncated area) for 50 internal strings (4b).
+`source_family` or any registry id, `change_ready` as a label, `observation_count`, the coverage state, a limitation `code`, `report_id`, or a
+hash, and it never PRINTS `project_id` (it reads it only to look records up). The structural suite fails if the module reads a key outside
+its closed set of nineteen snake_case keys (2a-2b), and the behaviour suite scans five outputs for 50 internal strings (4b).
 
 ## 4. Decisions taken by default (the founder may change any of them)
 
@@ -81,13 +91,15 @@ From the audit (`founder_decisions_needed`); none is invented here:
 
 1. **What "the data contract is proven" means** is not defined in any doc. Default: build the data-independent view now and hold any customer
    exposure until a signed-in production call has succeeded and at least one source family is rights-cleared. This unit exposes nothing.
-2. **Things to Review** is not built (no eligibility, ranking, cap or wording exists).
+2. ~~**Things to Review** is not built.~~ **Built in step 3** from the engine's `render.review` (step 2: up to 3 staged records, nearest
+   first, a tie going to the stronger stage). The view ranks nothing; the prompt wording per stage is the plan's, made neutral.
 3. **Operating and unknown records** appear in What Changed / Recent Official Activity and in Change History, never in a stage section, and
    an unknown one is labelled "Lifecycle unknown" **only when the record carries a recent publisher event or a detected change.** An unknown-lifecycle
    record with neither is included by the engine (`by_lifecycle.unknown`) and is **not shown anywhere in step 1**, with no sentence saying it was left
    out (reproduced through the real handler by the independent review; pinned by behaviour check 3p). **Open decision for the founder:** show it,
    count it, or leave it.
-4. **Permitted / Under Construction** is omitted until a per-source rule exists.
+4. ~~**Permitted / Under Construction** is omitted.~~ **Built in step 3** on step 2's rule (`stage-evidence-1`, a closed list of the
+   publisher's own stage words).
 5. **Which source families to clear** is not an Order I decision; until it is made a customer sees only the limitation text.
 
 Taken while building (the audit left them open; each is a small change to reverse):
@@ -96,8 +108,8 @@ Taken while building (the audit left them open; each is a small change to revers
    owns those messages and the credit rule (R5, open).
 7. **A zero-record report with no limitation says nothing about absence.** The engine judges coverage on records returned (D-G7), so it cannot
    support "no activity", and plan hard rule 66 allows a zero-activity report only with healthy applicable feeds. Wording for that case is a founder call.
-8. **Cards follow the engine's order**, which in a stage section is by project id. The view sorts and ranks nothing (a nearest-first or newest-first
-   order is a presentation choice, not made here).
+8. **Cards follow the engine's order**, which in a stage section is by project id. The view sorts and ranks nothing. The map numbers the
+   staged records in that same order (approved, proposed, permitted), and each card shows its number.
 9. **Hero counts** use the unit "official records" (a source record is not a proven real-world project, audit B 2.7) and count each record once
    under its newest change. The plain-language labels for the ledger's three event types ("Status changed", "First detected by HomeSignal",
    "Source record updated"; anything else reads "Change detected") and for its 14 fact fields are mine; the vocabulary they label is the ledger's.
@@ -114,7 +126,8 @@ Taken while building (the audit left them open; each is a small change to revers
 - **Nothing a resident or customer sees changes.** No page loads the module, the engine stays admin-only with an empty rights list, and the
   landing page's sample report (`development-activity.html`) is not edited. Two copies of the hierarchy now exist (that sample's inline script and
   this module); the shared stage labels are pinned equal (structural 5a-5c), and unifying them is a later, visible change to a deployed page.
-- **No map, no Things to Review, no Permitted / Under Construction, no action bar, no brokerage identity, no entitlement.**
+- **No entitlement, and the four actions do nothing yet.** The map, Things to Review, Permitted / Under Construction, the filters and the
+  brokerage header are built (step 3); the header fills only from what a caller passes (build step 7 fills it from the account).
 - **No network, storage, location, clock or private-context call**, and no Type, lifecycle, change, rights or ranking rule (pinned: structural 1-3).
 - **Not exercised in production.** The engine's signed-in path has never been called there; the response shape for a real address has only been
   produced offline, by the real handler. What is near a real address was not seen.
@@ -127,10 +140,17 @@ All offline; nothing here touches production.
 
 | suite | what | result (final run) |
 |---|---|---|
-| `test/da-report-view.test.mjs` | the view over the **real handler's** output: order, hero, lifecycle, internal strings, coverage, escaping, links, address, engine order, history lanes, non-reports, plan quotes | 110 checks, 0 failed |
-| `test/da-report-view-structure.test.mjs` | pure; closed read set; no authority, change, rights or ranking rule; escape and link validators; address read in one place; stage labels equal the landing page's; no caller | 53 checks, 0 failed |
-| `test/da-report-view.browser.test.mjs` | Chromium: no overflow at 390 and 1280, sections stacked in the mobile order, one-column cards, lifecycle text and shape visible, tappable links, keyboard focus, 4.5:1 contrast on every element measured, hostile text runs nothing, no network request | 36 checks, 0 failed (headless Chromium) |
-| `test/da_report_view_mutants.py` | prohibited mutations, each verified to apply and each killed on exit code by a named check (manual, like the other module loops: CI runs the tests, not the loop) | 87 mutations: 87 killed, 0 survived, 0 harness faults; 77 first killed by the two offline suites and 10 by the browser suite (the presentation ones) |
+| `test/da-report-view.test.mjs` | the view over the **real handler's** output: the 100526 order, hero and stage summary, stage and lifecycle shapes, the Permitted rule as shown, filters, Things to Review, the map (to scale, north up, numbered like the cards, no basemap, left out without positions), header and action bar, internal strings, coverage, escaping, links, address, engine order, history lanes, non-reports, plan quotes | 148 checks, 0 failed |
+| `test/da-report-view-structure.test.mjs` | pure; closed read set; no authority, change, rights or ranking rule; escape and link validators; address read in one place; stage labels equal the landing page's; no caller | 59 checks, 0 failed |
+| `test/da-report-view.browser.test.mjs` | Chromium: no overflow at 390 and 1280, sections stacked in the mobile order, one-column cards, stage text and shape visible, tappable links, keyboard focus (links and filter chips), 4.5:1 contrast on every element measured, hostile text runs nothing, no network request; the filters show and hide cards and markers together, combine, restore, work from the keyboard, and still hide on a host page whose CSS sets `display` | 47 checks, 0 failed (headless Chromium) |
+| `test/da_report_view_mutants.py` | prohibited mutations, each verified to apply and each killed on exit code by a named check (manual, like the other module loops: CI runs the tests, not the loop) | 144 mutations: 144 killed, 0 survived, 0 harness faults; 127 first killed by the two offline suites and 17 by the browser suite |
+
+**Step 3's first mutation run killed 133 of 144.** The 11 survivors were gaps in the tests, not in the view, and each now has a named
+check: a hostile name on a hero row (6c2); no action bar on an empty report (10v2); the stage summary's counts (10w); the filter note (10x);
+the map's marker shapes (10y); a record whose own stage contradicts the list it is in (10z); a record named twice in an older response
+(10aa); a review list naming an unstaged record (10ab); four distinct lifecycle shapes (10ac); and a host stylesheet that sets `display`
+on `article` and `g`, which would otherwise show a filtered-out card (browser 7h). One mutation could never change the output (a direction
+defaulted where the distance was also missing) and was replaced by one that can (`map_bearing_defaulted`, killed by 10r).
 
 The behaviour suite builds every response with the real request handler, and test 0b proves the wire report equals `assemble()` called directly on
 the same inputs, byte for byte, so the view is tested against the engine's true output and not a hand-made shape. Two defects were found in the proof
