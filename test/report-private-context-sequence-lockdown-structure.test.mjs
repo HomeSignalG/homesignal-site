@@ -92,10 +92,16 @@ ok(count(MUT, /^    '[a-z_]+': \[/gm) >= 9 && /partial_revoke_and_no_post/.test(
 // ── 7. CI runs it, and the record names it ───────────────────────────────────────────────────────────────────────────────
 ok(count(WF, /docs\/report-private-context-sequence-lockdown\.sql/g) >= 2 && /report_private_context_pg\/sequence_lockdown\.sh/.test(WF),
   '7: the workflow triggers on the SQL (push and pull request) and runs the harness', count(WF, /docs\/report-private-context-sequence-lockdown\.sql/g));
-const ENTRY_AT = STATUS.indexOf('Open event counter found in production');
+// Anchored on the entry's own bullet marker: the title is also quoted in the file's "Last updated" line, and an anchor on the bare
+// title would slice from there and judge the wrong text.
+const ENTRY_AT = STATUS.indexOf('- **Open event counter found in production');
 const ENTRY = ENTRY_AT >= 0 ? STATUS.slice(ENTRY_AT, ENTRY_AT + 5200) : '';
-ok(ENTRY.length > 3000 && /report-private-context-sequence-lockdown\.sql/.test(ENTRY) && OTHERS.every((t) => ENTRY.includes(t)) && /NOT applied/.test(ENTRY.slice(0, 400)),
-  '7b: the status file records the finding, names the four other counters for their owners, and says in its first lines that this fix is NOT applied', ENTRY.length);
+// The entry was written while the fix was parked ("NOT applied") and was then applied to production on 2026-10-02 (db-sql run
+// 37020139550). The pin follows the truth: the first lines say APPLIED, the run that did it is named, the present-tense "parked and
+// NOT applied" sentence is gone (the finding's own before-state keeps the past tense), and the four other counters stay named.
+ok(ENTRY.length > 3000 && /report-private-context-sequence-lockdown\.sql/.test(ENTRY) && OTHERS.every((t) => ENTRY.includes(t))
+    && /APPLIED to production 2026-10-02/.test(ENTRY.slice(0, 400)) && /37020139550/.test(ENTRY) && !/is parked and NOT applied/.test(ENTRY),
+  '7b: the status file records the finding, names the four other counters for their owners, says in its first lines that this fix was APPLIED and by which run, and no longer says it is parked', ENTRY.length);
 
 console.log(`\n${n - bad}/${n} pass`);
 process.exit(bad ? 1 : 0);
