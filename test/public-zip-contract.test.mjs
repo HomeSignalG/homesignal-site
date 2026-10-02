@@ -113,10 +113,15 @@ ok(cp.includes('＋ Follow this zip code') && cp.includes('✓ Following'),
   'PS-001 the public Follow copy is ZIP-code language (U+FF0B), including its followed state');
 ok(cp.includes("What\\'s changing across your zip code"),
   'PS-001 the standfirst names the zip code, not a community');
-ok(cp.includes('eyebrow">ZIP Codes<') && cp.includes('Your zip codes'),
-  'PS-001 the page eyebrow and followed-list heading say ZIP Codes');
-ok(/class="eyebrow">ZIP Codes<\/p>/.test(gen),
-  'PS-001 the generated document\'s SSR eyebrow is ZIP Codes too');
+// Founder, 2026-10-02: the page is called Activity (the Explore menu entry), so its eyebrow
+// says Activity in all three hydrated states and in the generated document. "Your zip codes"
+// stays: that heading names the Place type (followed ZIP codes), not this page.
+ok((cp.match(/eyebrow">Activity</g) || []).length === 3 && !cp.includes('eyebrow">ZIP Codes<'),
+  'PS-001 the page eyebrow says Activity in all three states (not covered, honest-empty, normal)');
+ok(cp.includes('Your zip codes'),
+  'PS-001 the followed-list heading still says Your zip codes (the Place type, not the page name)');
+ok(/class="eyebrow">Activity<\/p>/.test(gen) && !/class="eyebrow">ZIP Codes<\/p>/.test(gen),
+  'PS-001 the generated document\'s SSR eyebrow is Activity too');
 ok(/id="commFollowBtn"/.test(cp), 'PS-001 ...on the same control id');
 ok(/View Development Map →/.test(cp) && /HS\.navHref\('homesignalmap\.html', zip\)/.test(cp),
   'PS-001 "View Development Map →" still targets Map 1, not the development list');

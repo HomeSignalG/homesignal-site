@@ -847,7 +847,7 @@ def render(p, built):
                   f'{project_list_path(z)}">All {npl} project{"s" if npl != 1 else ""} on record '
                   f'in {esc(z)}</a></nav>')
     body = (
-        f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
+        f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
         f'<p>{lead} that apply to the whole of '
         f'ZIP {esc(z)}{county_bit}.</p></header>'
@@ -945,7 +945,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=e5f52c17"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=43830487"></script>\n'
+        '<script src="/lib/community-page.js?v=9d8d7f6e"></script>\n'
         "</body>\n</html>\n")
 
 
