@@ -6,6 +6,7 @@
     test/development-activity-trial-function.test.mjs   (the trial function, offline, with its real data layer)
     test/single-customer-generation-path.test.mjs       (P4/P5i/P5j: who may name the trial function, and create stays admin-only)
     test/development-activity-reports.browser.test.mjs  (the customer page opens the exact link the function makes)
+    test/evaluation-entitlement-structure.test.mjs      (§4: the shared module names exactly the database functions it calls)
 
 exit non-zero. It edits one file in place, runs the suites, and ALWAYS restores it, even on error or ^C. An anchor that does not match
 exactly once is a harness fault, never a pass. Exit 0 if every mutation was killed, 1 if any survived, 2 on a harness fault.
@@ -26,6 +27,7 @@ BRO = 'test/development-activity-review.browser.test.mjs'
 FNT = 'test/development-activity-trial-function.test.mjs'
 GEN = 'test/single-customer-generation-path.test.mjs'
 RBRO = 'test/development-activity-reports.browser.test.mjs'
+ESTR = 'test/evaluation-entitlement-structure.test.mjs'
 M = {}
 
 
@@ -59,6 +61,8 @@ m('link_to_another_host', "export const INVITE_PAGE = 'https://homesignal.net/de
 m('malformed_token_made_into_a_link', '  if (!INVITE_TOKEN.test(token)) throw new DataUnavailable(\'shape\');\n  return INVITE_PAGE', '  return INVITE_PAGE', [FNT], READS)
 m('invite_lifetime_set_here', "p_seat_limit: t.seatLimit, p_expires_at: t.expiresAt });", "p_seat_limit: t.seatLimit, p_expires_at: t.expiresAt, p_invite_ttl: '90 days' });", [FNT], READS)
 m('database_refusal_called_unavailable', "      if (error) throw new TrialRejected('refused');", "      if (error) throw new DataUnavailable('refused');", [FNT], READS)
+m('second_database_function_called', "      const { data, error } = await rpc('evaluation_create', {",
+  "      await rpc('evaluation_invite_mint', { p_evaluation_id: null, p_role: 'agent' }).catch(() => null);\n      const { data, error } = await rpc('evaluation_create', {", [ESTR], READS)
 m('two_rows_accepted', "      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');\n      const r = data[0];\n      if (!r || typeof r.owner_token",
   "      if (!Array.isArray(data) || data.length === 0) throw new DataUnavailable('shape');\n      const r = data[0];\n      if (!r || typeof r.owner_token", [FNT], READS)
 
@@ -96,7 +100,7 @@ def main():
     if only - set(M):
         print('HARNESS — unknown mutation(s): ' + ', '.join(sorted(only - set(M))))
         return 2
-    passed, which, line = run([SRC, BRO, FNT, GEN, RBRO])
+    passed, which, line = run([SRC, BRO, FNT, GEN, RBRO, ESTR])
     if not passed:
         print('HARNESS — the unmutated tree does not pass %s (%s)' % (which, line))
         return 2
