@@ -164,7 +164,7 @@ first unit, the way Order F was the first unit of the snapshot.
   private, and for how long, stays with the private layer, which this file does not name, read, open a need on or start a
   clock on · who may share or revoke is **not here** (see 8.5).
 - **Shortcut check** (run 2026-10-02 on the tree this was built from, `6faedf4`): `grep -rIl report_share` over the repo
-  matches only the files this unit adds or amends (the SQL, the module, the suites, the workflow, the status doc);
+  matches only the files this unit adds or amends (the SQL, the suites, the workflow, the status doc; the module is named `report-share.ts`, which that pattern does not match, and the sibling `homesignal-ingest` checkout was searched separately: its token-hash code is unsubscribe, consent and confirm-alerts only, with no share or snapshot code);
   `grep -rIlE "share_token|shareToken|share_link|shareLink|token_sha256|revoked_at"` over `.sql/.js/.mjs/.ts/.html` finds one
   other file, `docs/epa-recovery-rpcs.sql`, which uses `revoked_at` for an unrelated EPA recovery token. No second share,
   token, revocation or link-expiry mechanism exists. The legacy NYC page's raw-address share URL is a different thing and is
@@ -243,9 +243,9 @@ the snapshot file (the foreign key points there).
 
 Run on a disposable Postgres, not on production. Hashes in the suite are computed outside the database.
 
-- `test/report_share_pg` (`run.sh`, `suite.sql`, `mutate.py`): **51 checks**; the file **applies twice with an identical
+- `test/report_share_pg` (`run.sh`, `suite.sql`, `mutate.py`): **52 checks** (L02b, added after the independent review, proves the event table's identity sequence is closed to anon, authenticated, service_role and PUBLIC); the file **applies twice with an identical
   definition fingerprint**; the snapshot, private-layer and need tables are fingerprinted before and after and **read
-  UNTOUCHED**; the rollback is proven on a populated database; it **refuses without the snapshot table**; and **73 prohibited
+  UNTOUCHED**; the rollback is proven on a populated database; it **refuses without the snapshot table**; and **75 prohibited
   mutations are each killed by a named check** (the run fails on a survivor, a harness fault or a crash). Its checks include
   the expiry boundary at, one microsecond before and one microsecond after the instant; revoked beating expired; every
   other column change refused, including each one combined with a revoke; update, delete and truncate refused on both
@@ -253,8 +253,8 @@ Run on a disposable Postgres, not on production. Hashes in the suite are compute
   snapshot row unchanged, after a verified-privacy-request purge of the report's private context.
 - `test/report-share.test.mjs`: **44 module checks** against a vector computed outside the module; and
   `test/report_share_module_mutants.py`: **23 mutants of the module**, each killed by a named check (a crash does not count).
-- `test/report-share-structure.test.mjs`: **58 structural pins** on the SQL, the module and the harness; and
-  `test/report_share_pin_mutants.py`: **71 mutations of the pins' own inputs**, each of which turns the named pin red.
+- `test/report-share-structure.test.mjs`: **60 structural pins** on the SQL, the module and the harness (10c searches workflows, `data/` and script-like documents for a share function or its RPC route, so a caller that hides outside the code directories still turns a pin red); and
+  `test/report_share_pin_mutants.py`: **73 mutations of the pins' own inputs**, each of which turns the named pin red.
 - `test/report-snapshot-structure.test.mjs` now carries **47 pins**: pin 3's allow-list gained `docs/report-share.sql`, and
   new pin 3d asserts that file names `report_snapshot` exactly once, as the foreign-key reference, and never reads or writes
   the table.

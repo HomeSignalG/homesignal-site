@@ -466,6 +466,14 @@ select pg_temp._ck('L02 anon and authenticated hold NO privilege on either table
   and not exists (select 1 from pg_class c, aclexplode(c.relacl) a
                    where c.oid in ('public.report_share'::regclass, 'public.report_share_event'::regclass) and a.grantee = 0),
   null);
+select pg_temp._ck('L02b the identity SEQUENCE behind report_share_event.event_id is closed too: anon, authenticated and service_role hold no usage, select or update on it, and PUBLIC holds none (the F-order tables inherit Supabase default sequence grants unless revoked; a setval to the maximum would make every later share fail)',
+  (select count(*) >= 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'S' and c.relname like 'report\_share\_%')
+  and not exists (select 1 from pg_class c, unnest(array['anon', 'authenticated', 'service_role']) r, unnest(array['usage', 'select', 'update']) p
+                   where c.relnamespace = 'public'::regnamespace and c.relkind = 'S' and c.relname like 'report\_share\_%'
+                     and has_sequence_privilege(r, c.oid, p))
+  and not exists (select 1 from pg_class c, aclexplode(c.relacl) a
+                   where c.relnamespace = 'public'::regnamespace and c.relkind = 'S' and c.relname like 'report\_share\_%' and a.grantee = 0),
+  null);
 select pg_temp._ck('L03 service_role holds SELECT and nothing else on both tables: it cannot insert, update, delete, truncate, reference or add a trigger, so every share goes through the functions',
   has_table_privilege('service_role', 'public.report_share', 'select') and has_table_privilege('service_role', 'public.report_share_event', 'select')
   and not exists (select 1 from unnest(array['insert', 'update', 'delete', 'truncate', 'references', 'trigger']) p, unnest(array['public.report_share', 'public.report_share_event']) t

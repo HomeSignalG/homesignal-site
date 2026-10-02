@@ -106,7 +106,9 @@ mut('no_rls_on_events', SHARE_TEST, {SQL: [("alter table public.report_share_eve
 mut('table_privileges_not_revoked', SHARE_TEST, {SQL: [("revoke all on public.report_share       from public, anon, authenticated, service_role;\n", "", 1)]}, ['8'])
 mut('service_role_can_insert', SHARE_TEST, {SQL: [appended("grant insert on public.report_share to service_role;")]}, ['8b'])
 mut('anon_can_read_events', SHARE_TEST, {SQL: [("grant select on public.report_share_event to service_role;\n", "grant select on public.report_share_event to service_role, anon;\n", 1)]}, ['8b'])
-mut('lock_loop_matches_the_wrong_prefix', SHARE_TEST, {SQL: [("like 'report\\_share\\_%'", "like 'report\\_snapshot\\_%'", 1)]}, ['8c'])
+mut('lock_loop_matches_the_wrong_prefix', SHARE_TEST, {SQL: [("p.proname like 'report\\_share\\_%'", "p.proname like 'report\\_snapshot\\_%'", 1)]}, ['8c'])
+mut('sequence_loop_matches_the_wrong_prefix', SHARE_TEST, {SQL: [("c.relname like 'report\\_share\\_%'", "c.relname like 'report\\_snapshot\\_%'", 1)]}, ['6a2'])
+mut('sequence_revoke_drops_service_role', SHARE_TEST, {SQL: [("revoke all on sequence %s from public, anon, authenticated, service_role", "revoke all on sequence %s from public, anon, authenticated", 1)]}, ['6a2'])
 mut('a_second_function_grant', SHARE_TEST, {SQL: [appended("grant execute on function public.report_share_resolve(text) to authenticated;")]}, ['8c'])
 mut('revoke_not_security_definer', SHARE_TEST, {SQL: [("create or replace function public.report_share_revoke(p_share uuid)\nreturns boolean\nlanguage plpgsql security definer set search_path = public, pg_temp", "create or replace function public.report_share_revoke(p_share uuid)\nreturns boolean\nlanguage plpgsql set search_path = public, pg_temp", 1)]}, ['8d'])
 # ---- 9. additive, reversible ------------------------------------------------------------------------------------------------------------------

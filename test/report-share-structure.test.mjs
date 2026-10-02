@@ -150,7 +150,10 @@ ok(['report_share', 'report_share_event'].every((t) => new RegExp('alter table p
   ok(JSON.stringify(grants.sort()) === JSON.stringify(['select | public.report_share | service_role', 'select | public.report_share_event | service_role']) && !/\bcreate policy\b/i.test(SQL),
     '8b: the ONLY table grants are SELECT on the two tables to service_role — no INSERT, UPDATE or DELETE to anyone, and nothing to anon, authenticated or PUBLIC', grants.join(' ; '));
 }
-ok(/like 'report\\_share\\_%'/.test(SQL) && /revoke all on function %s from public, anon, authenticated/.test(SQL) && /grant execute on function %s to service_role/.test(SQL)
+ok(/relkind = 'S' and c\.relname like 'report\\_share\\_%'/.test(SQL) && /revoke all on sequence %s from public, anon, authenticated, service_role/.test(SQL)
+   && /format\('%I\.%I', n\.nspname, c\.relname\)/.test(SQL),
+  '6a2: the identity sequence behind report_share_event.event_id is revoked from public, anon, authenticated AND service_role by a COMPUTED, schema-qualified loop over this file\'s own prefix (rule 9: nothing here is readable or writable by an API role)');
+ok(/p\.proname like 'report\\_share\\_%'/.test(SQL) && /revoke all on function %s from public, anon, authenticated/.test(SQL) && /grant execute on function %s to service_role/.test(SQL)
    && (SQL.match(/\bgrant execute\b/g) || []).length === 1,
   '8c: every report_share_ function is locked by a COMPUTED loop (the snapshot and private-layer loops do not match this prefix), then granted to service_role only — and no function is granted anywhere else');
 {
@@ -194,6 +197,13 @@ ok(scanned.length > 50 && scanned.includes('supabase/functions/_shared/report-sn
 ok(namesShare.length === 1 && namesShare[0] === 'docs/report-share.sql',
   '10: nothing outside the SQL of record names a share object or function — no page, script, edge function or other SQL creates, revokes or resolves a share', namesShare.join(','));
 const importsModule = scanned.filter((f) => f !== 'supabase/functions/_shared/report-share.ts' && /report-share(\.ts|\.js)?['"`]/.test(readFileSync(join(ROOT, f), 'utf8')));
+// The scan above stops at the code directories. A workflow that curls the RPC, or a data file that calls it, is also a caller, so the
+// FUNCTION names (not the table names, which this unit's own workflow path filters mention) are searched in the places a caller could hide.
+const HIDING = [...walk('.github'), ...walk('data'), ...walk('docs').filter((f) => /\.(md|mjs|js|json|yml)$/.test(f))];
+const callsFunction = HIDING.filter((f) => /report_share_(create|revoke|resolve)\b|rpc\/report_share/.test(readFileSync(join(ROOT, f), 'utf8')) && f !== 'docs/development-activity-status-2026-09-30.md'
+  && !/^docs\/(report-snapshot-contract|report-private-context-contract|development-activity-)/.test(f));
+ok(HIDING.length > 30 && HIDING.some((f) => f.startsWith('.github/workflows/')) && callsFunction.length === 0,
+  '10c: no workflow, data file or script-like document calls a share function or its RPC route (the design documents that DESCRIBE the functions are exempt by name; a workflow or data file is not)', HIDING.length + ' files; ' + callsFunction.join(','));
 ok(existsSync(join(ROOT, 'supabase/functions/_shared/report-share.ts')) && importsModule.length === 0,
   '10b: nothing imports the share module — there is no caller, no endpoint and no page (the first endpoint must sit behind the admin gate, and is a later unit)', importsModule.join(','));
 {

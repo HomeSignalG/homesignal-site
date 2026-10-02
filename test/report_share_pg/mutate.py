@@ -84,6 +84,7 @@ GRANT_EVENT = "grant select on public.report_share_event to service_role;\n"
 LOCK_LOOP_BODY = ("    execute format('revoke all on function %s from public, anon, authenticated', f.sig);\n"
                   "    execute format('grant execute on function %s to service_role', f.sig);\n")
 LOCK_END = "  end loop;\nend $lock$;\n"
+SEQ_REVOKE = "    execute format('revoke all on sequence %s from public, anon, authenticated, service_role', s.sq);\n"
 
 
 def resolve_variant(returns, branches, extra_decl='', head=RESOLVE_HEAD):
@@ -190,6 +191,8 @@ MUTATIONS = {
     'anon_can_execute': [(LOCK_END, LOCK_END + "grant execute on function public.report_share_resolve(text) to anon;\n", 1)],
     'authenticated_can_create': [(LOCK_END, LOCK_END + "grant execute on function public.report_share_create(uuid, text, timestamptz) to authenticated;\n", 1)],
     'functions_unlocked': [("execute format('revoke all on function %s from public, anon, authenticated', f.sig);", "execute format('select 1 /* %s */', f.sig);", 1)],
+    'sequence_default_grants': [(SEQ_REVOKE, "    null;\n", 1)],
+    'sequence_granted_to_anon': [(SEQ_REVOKE, SEQ_REVOKE + "    execute format('grant usage, update on sequence %s to anon', s.sq);\n", 1)],
     'no_rls_on_shares': [(RLS_SHARE, "", 1)],
     'no_rls_on_events': [(RLS_EVENT, "", 1)],
     'share_table_default_grants': [(REVOKE_SHARE, "", 1)],

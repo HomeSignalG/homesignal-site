@@ -35,7 +35,7 @@ Last updated: 2026-10-01, in the PR for Order K0 (the brokerage account spine: b
 6. Durable report snapshot (`report_id` vs `content_hash`) — **storage layer done (Order F);** the
    customer-facing use of it waits for Orders G, J and L.
 7. Secure share + print/PDF + disclosure + audit trail — **open.** Its first piece, the share-link primitive (Order J, unit J1), is built and
-   proven on a disposable Postgres and not applied; the client view, print/PDF, disclosure and audit trail are not started.
+   proven on a disposable Postgres and not applied; the client view, print/PDF, disclosure and the audit trail with actor and brokerage are not started (J1 carries only a two-kind share-event log with no actor).
 8. Agent Workspace + Brokerage Admin — **open.**
 9. Canonical commercial property-intelligence API — **open.** One generation path, and it
    must be national: the only report engine in the tree today answers NYC addresses.

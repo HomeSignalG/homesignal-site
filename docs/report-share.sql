@@ -47,7 +47,8 @@
 --   8. The audit log has two event kinds, created and revoked, and no other column that could hold text: no actor, no label,
 --      no IP address, no user agent, no referrer. Nothing here records that a link was OPENED (a privacy question that is
 --      not settled; docs/report-snapshot-contract-2026-09-30.md §8.6).
---   9. Nothing here is readable or writable by anon or authenticated. service_role may SELECT and may EXECUTE the three
+--   9. Nothing here is readable or writable by anon or authenticated (the two tables, the functions, and the event table's
+--      identity sequence, which Supabase's default privileges would otherwise open). service_role may SELECT and may EXECUTE the three
 --      functions; it cannot INSERT, UPDATE or DELETE directly, so every share goes through them.
 --
 -- WHAT THIS DOES NOT DECIDE (recorded, not solved)
@@ -206,6 +207,20 @@ revoke all on public.report_share       from public, anon, authenticated, servic
 revoke all on public.report_share_event from public, anon, authenticated, service_role;
 grant select on public.report_share       to service_role;
 grant select on public.report_share_event to service_role;
+
+-- The event table's identity column owns a SEQUENCE, and Supabase's default privileges grant every new sequence in `public`
+-- to anon, authenticated and service_role as well. Left alone, anon could setval it to the maximum and make every later
+-- report_share_create fail. Computed over this file's own prefix (a typed name would stop covering the next sequence). The
+-- writers are SECURITY DEFINER functions owned by the migration role, which keeps its own privilege on the sequence.
+do $seq$
+declare s record;
+begin
+  for s in select format('%I.%I', n.nspname, c.relname) as sq
+             from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind = 'S' and c.relname like 'report\_share\_%' loop
+    execute format('revoke all on sequence %s from public, anon, authenticated, service_role', s.sq);
+  end loop;
+end $seq$;
 
 -- Every report_share_ function, computed rather than typed (a list typed here would silently stop covering the next
 -- function added). The report_snapshot_ and report_private_context_ loops do not match this prefix, so this file carries
