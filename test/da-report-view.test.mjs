@@ -161,6 +161,19 @@ const html = view(W), htmlCold = view(WCOLD), htmlNone = view(WNONE), htmlInt = 
     '3k operating and unknown records are in NO stage section (the default for open decision 3)');
   ok(/Highway 99 Widening/.test(sec(html, 'activity').html) && /Fire Station 12/.test(sec(html, 'activity').html), '3l they are named in Recent Official Activity instead, where their recent event is');
   ok(!/Quiet Operating Plant/.test(html) && /Quiet Operating Plant/.test(JSON.stringify(RICH.projects)), '3m an operating record with no event is not on the page (the engine keeps it out; R3), and it was in the input (control)');
+  {
+    // The quiet UNKNOWN record (found by the independent review): an unknown-lifecycle record with no recent event and no detected change is INCLUDED by
+    // the engine and drawn nowhere by this step. That is a recorded decision (open decision 3 in the design doc), not an accident, so it is pinned here
+    // in both halves: the engine has it, the view omits it, and the page makes no claim that there was nothing to show.
+    const WQ = await wire({ ...RICH, rows: [row('k-unk-quiet', 0.4, FAM_B)], projects: [proj('k-unk-quiet', FAM_B, { name: 'Quiet Unknown Record', type: 'Civic/Public', status: 'On file', date_kind: 'scheduled', submitted_at: '2027-01-01' })], ledger: [], events: [] });
+    const hq = view(WQ);
+    ok(WQ.status === 'OK' && WQ.coverage_state === 'REPORT_READY' && WQ.report.projects.some((p) => p.name === 'Quiet Unknown Record') && WQ.report.sections.by_lifecycle.unknown.length === 1,
+      '3p-engine the engine INCLUDES a quiet unknown-lifecycle record (REPORT_READY, listed in projects and in by_lifecycle.unknown): this is what the view is judged against');
+    ok(!/Quiet Unknown Record/.test(hq) && keysOf(hq) === 'evidence',
+      '3p-view step 1 draws a quiet unknown record NOWHERE (only the scope and evidence section renders): a recorded decision, open for the founder (show it, count it, or leave it)', keysOf(hq));
+    ok(!/no development activity|nothing to show|no records|no projects/i.test(textOf(hq)),
+      '3p-claim and the page makes no absence claim over it: it never says there was no activity or nothing to show');
+  }
   // the view follows the engine's key, not the publisher's word
   const doctored = clone(W);
   doctored.report.projects.find((p) => p.project_id === 'k-approved').lifecycle = { key: 'unknown', label: 'Lifecycle unknown' };

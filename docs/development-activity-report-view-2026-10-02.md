@@ -71,8 +71,8 @@ status word under its own label; the official record and the detected change und
 http(s) URL**, carrying the cleared source's attribution when there is one.
 
 **What it never shows** (plan lines 685-696): it does not read `storage_blockers`, `storable`, `rights` / HOLD, `INTERNAL_VIEW`,
-`source_family` or any registry id, `change_ready`, `homesignal_observation`, the coverage state, a limitation `code`, `report_id`, a hash, or
-`project_id`. The structural suite fails if the module reads a key outside the closed set of thirteen snake_case keys it does (2a-2b), and the
+`source_family` or any registry id, `change_ready`, `homesignal_observation`, the coverage state, a limitation `code`, `report_id`, or a hash, and it
+never PRINTS `project_id` (it reads that one key only to look records up: the card map, the distance lookup and the staged map). The structural suite fails if the module reads a key outside the closed set of thirteen snake_case keys it does (2a-2b), and the
 behaviour suite scans five outputs (customer, cold start, the shipped empty state, the internal view, a truncated area) for 50 internal strings (4b).
 
 ## 4. Decisions taken by default (the founder may change any of them)
@@ -83,7 +83,10 @@ From the audit (`founder_decisions_needed`); none is invented here:
    exposure until a signed-in production call has succeeded and at least one source family is rights-cleared. This unit exposes nothing.
 2. **Things to Review** is not built (no eligibility, ranking, cap or wording exists).
 3. **Operating and unknown records** appear in What Changed / Recent Official Activity and in Change History, never in a stage section, and
-   an unknown one is labelled "Lifecycle unknown".
+   an unknown one is labelled "Lifecycle unknown" **only when the record carries a recent publisher event or a detected change.** An unknown-lifecycle
+   record with neither is included by the engine (`by_lifecycle.unknown`) and is **not shown anywhere in step 1**, with no sentence saying it was left
+   out (reproduced through the real handler by the independent review; pinned by behaviour check 3p). **Open decision for the founder:** show it,
+   count it, or leave it.
 4. **Permitted / Under Construction** is omitted until a per-source rule exists.
 5. **Which source families to clear** is not an Order I decision; until it is made a customer sees only the limitation text.
 
