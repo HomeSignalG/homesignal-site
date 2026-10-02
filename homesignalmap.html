@@ -34,13 +34,17 @@
 <script>
 (function(){
   try {
-    if (new URL(window.location.href).searchParams.get("embed") === "1") {
+    var q = new URL(window.location.href).searchParams;
+    if (q.get("embed") === "1") {
       document.documentElement.classList.add("hs-embed");
+      // PREVIEW (?embed=1&preview=1) — the homepage's sample map. Layout only: see the
+      // .hs-embed.hs-preview rules below. Never set without embed=1.
+      if (q.get("preview") === "1") document.documentElement.classList.add("hs-preview");
     }
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="app.css?v=79649c4d"/>
+<link rel="stylesheet" href="app.css?v=c8cac6cb"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -608,6 +612,23 @@
   .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
   .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
 
+  /* ===================== PREVIEW (?embed=1&preview=1) ===================== */
+  /* The homepage's sample map (founder, Revised Index Design, 2026-09-30). The fixed-frame
+     rules above fit the card INTO the host's iframe height; the preview turns that around:
+     the document is as tall as its content, so STATUS / PROJECT TYPE / REGULATORY RECORDS and
+     the map key all show with no internal scrollbar, and the host sizes the iframe to this
+     document's scrollHeight. The map canvas has a fixed height: --hs-preview-map-h, which the
+     host sets by its own breakpoint (430px / 400px / 340px), default 430px.
+     LAYOUT ONLY. No control is hidden, renamed, restyled or re-created; no data, marker or
+     filter rule changes. Every rule is scoped to .hs-embed.hs-preview, so full-page Map 1 and
+     every other embed are unchanged. */
+  .hs-embed.hs-preview,
+  .hs-embed.hs-preview body{height:auto;min-height:0;overflow:hidden}
+  .hs-embed.hs-preview .app{min-height:0}
+  .hs-embed.hs-preview .card.mapcard{display:block;height:auto}
+  .hs-embed.hs-preview .maprow{max-height:none;overflow:visible}
+  .hs-embed.hs-preview .map-frame{height:var(--hs-preview-map-h,430px);min-height:0}
+
 /* Map 1 -> Development list back link: ZIP pages only. */
 .devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}
 </style>
@@ -893,7 +914,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=c50ecfcd"></script>
+<script src="shell.js?v=0d72ddbf"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->

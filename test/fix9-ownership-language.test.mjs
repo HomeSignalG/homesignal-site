@@ -81,8 +81,8 @@ for (const f of IN_APP_JS.concat(['dashboard.html', 'properties.html', 'property
 
 console.log('--- current geography is Viewing, never Your home ---');
 const shell = strip(read('shell.js'));
-ok(/\$\('locLabel'\)\.textContent = \(p && homeIsCurrent\)\s*\?\s*\('Viewing · ' \+ p\.address\)/.test(shell),
-  'address-in-view chip is "Viewing · <street>"');
+ok(/const text = \(p && homeIsCurrent\)\s*\?\s*\('Viewing · ' \+ p\.address\)/.test(shell),
+  'address-in-view label is "Viewing · <street>" (viewingChip, the one decision behind HS.viewingLabel)');
 ok(/'Viewing · ' \+ viewedLabel\(\)/.test(shell),
   'ZIP / area chip is "Viewing · <label>"');
 ok(!/'Your home · '/.test(shell),

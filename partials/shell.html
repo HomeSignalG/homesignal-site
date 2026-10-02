@@ -1,96 +1,75 @@
-<!-- HomeSignal shared shell — full frame (sidebar + top bar) + all modals, with a
-     #hs-slot where each page's content drops in. Injected identically into every page
-     by shell.js (hard rule: byte-identical menu). Markup lifted from the approved mockup;
-     nav hrefs point at the real pages. -->
-<div class="sidebackdrop" id="sidebackdrop"></div>
+<!-- HomeSignal shared shell — the header, the footer and every modal, with a #hs-slot where
+     each page's content drops in. Injected identically into every page by shell.js (hard
+     rule: byte-identical menu). Nav hrefs point at the real pages. -->
 <div class="app">
 
-<aside class="side" id="hs-side">
-  <a class="logo" href="index.html"><span class="mk" style="background:var(--green)"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span> <span>Home<span style="color:var(--green-2)">Signal</span></span></a>
-  <nav class="nav" id="hs-nav">
-    <div class="navgroup" id="hs-explore">
-      <a href="index.html"               data-nav="explore"><span class="ic">◈</span> Explore</a>
-      <button type="button" class="navcaret" id="hs-explore-toggle" aria-controls="hs-explore-sub" aria-label="Show or hide the Explore pages" onclick="var g=this.parentNode,o=getComputedStyle(document.getElementById('hs-explore-sub')).display!=='none';g.classList.toggle('open',!o);g.classList.toggle('shut',o);this.setAttribute('aria-expanded',String(!o))">▾</button>
-      <div class="navsub" id="hs-explore-sub">
-        <a href="development.html"   data-sub="qol">Quality of Life Impact</a>
-        <a href="homesignalmap.html" data-sub="map">Development Map</a>
-        <a href="community.html"     data-sub="activity">Activity</a>
+<!-- THE HORIZONTAL HEADER (founder, Revised Index Design, 2026-09-30). It replaced the left
+     sidebar and the old top bar. The three primary items are navigation plan v3's (Explore |
+     My Places | Enterprise); this layout is the later decision on how they are shown.
+       Explore = index.html. community.html, homesignalmap.html (Map 1), development.html,
+         property.html, reports.html and every generated /community/<zip>/ page declare
+         data-nav="explore" and light it.
+       My Places = properties.html. dashboard.html ("What's Changed") and alerts.html ("Alert
+         Settings") declare data-nav="props"; properties.html links both.
+       Enterprise = development-activity.html, which declares data-nav="enterprise".
+     The active item names the SECTION a page belongs to, not the page that linked to it.
+     Support pages (How It Works, About, Contact, Privacy, Terms) light nothing.
+     ONE nav element serves both widths. At 1024px and wider it is the horizontal row; at
+     1023px and narrower it is the panel the Menu button opens. There is no second copy.
+     Left the header, and kept: the Viewing switcher (HS.openSwitcher), Add an address
+     (HS.addHome), Add a zip code (HS.openLoc), the notification bell (alerts.html) and Go
+     Premium (the premiumModal). My Places carries the add buttons and both links.
+     Do not re-add Dashboard, Alerts, Development, About, a search icon or Sign up here. -->
+<header class="hs-header" id="hs-top">
+  <div class="hs-header__inner">
+    <a class="hs-brand" href="index.html"><span class="hs-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span style="color:var(--green-2)">Signal</span></span></a>
+    <nav class="hs-nav" id="hs-nav" aria-label="Primary">
+      <!-- THE EXPLORE DROPDOWN (founder, 2026-10-02): Explore's three pages, under these
+           names. "Quality of Life Impact" is development.html (it was "What's being built —
+           and how it impacts you"); "Development Map" is Map 1; "Activity" is the ZIP page.
+           The entries carry no data-nav, so they never light a primary item, and shell.js
+           stamps the viewed ZIP on them like any #hs-nav link to a ZIP_NAV_PAGES page.
+           Wide: the ▾ button opens a menu under Explore; a click outside or Escape closes
+           it. Compact (the Menu panel): the three are listed under Explore, always shown.
+           Each page names its entry with body[data-explore], and that entry is marked. -->
+      <div class="hs-navgroup" id="hs-explore">
+        <a href="index.html" data-nav="explore">Explore</a>
+        <button type="button" class="hs-navcaret" id="hs-explore-toggle" aria-label="Explore pages" aria-expanded="false" aria-controls="hs-explore-sub">▾</button>
+        <div class="hs-navsub" id="hs-explore-sub">
+          <a href="development.html" data-sub="qol">Quality of Life Impact</a>
+          <a href="homesignalmap.html" data-sub="map">Development Map</a>
+          <a href="community.html" data-sub="activity">Activity</a>
+        </div>
       </div>
+      <a href="properties.html" data-nav="props">My Places</a>
+      <a href="development-activity.html" data-nav="enterprise">Enterprise</a>
+    </nav>
+    <div class="hs-header__actions">
+      <button class="hs-header__share" type="button" id="hs-share" onclick="HS.openModal('shareModal')">Share</button>
+      <button class="hs-header__signin" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
+      <button class="avatar hs-header__avatar" type="button" id="hs-avatar" title="Account" aria-label="Account" onclick="HS.onAvatar()">··</button>
+      <button class="hs-header__menu" type="button" id="hs-menubtn" aria-label="Menu" aria-expanded="false" aria-controls="hs-nav" onclick="HS.toggleMenu()">☰</button>
     </div>
-    <a href="properties.html"          data-nav="props"><span class="ic">⌂</span> My Places</a>
-    <a href="development-activity.html" data-nav="enterprise"><span class="ic">▦</span> Enterprise</a>
-    <!-- THREE PRIMARY ITEMS (founder navigation plan v3, 2026-09-30). This reverses A-021
-         (#1140, "FOUR CONTAINERS": Dashboard | Alerts | Development | My Places) under that
-         plan. No page was retired; every page below still exists and is still reachable.
-           Explore = index.html. community.html, homesignalmap.html (Map 1),
-             development.html and every generated /community/<zip>/ page declare
-             data-nav="explore" and light it. None has a primary item of its own. The ZIP
-             search opens the public ZIP page; its "View Development Map" opens Map 1; Map 1
-             in ZIP mode links back to the development list, as does an Address page's
-             "All projects"; My Places and the Dashboard link project dossiers.
-           My Places = properties.html. dashboard.html ("What's Changed"), alerts.html
-             ("Alert Settings"), property.html and reports.html declare data-nav="props".
-             properties.html links the first two; the bell still opens alerts.html.
-           Enterprise = development-activity.html, which declares data-nav="enterprise".
-             Linking it here makes it VISIBLE only. It stays noindex, out of the sitemap,
-             and its self-service buttons stay inert until a separate launch order.
-         The active item names the SECTION a page belongs to, not the page that linked to it.
-         alerts.html, development.html, homesignalmap.html and community.html are still
-         ZIP_NAV_PAGES (shell.js, lib/view-zip.js): leaving the menu did not take them out of
-         ZIP routing. None of these three PRIMARY links is a ZIP_NAV_PAGES target, so none
-         carries ?zip=. Do not re-add Dashboard, Alerts, Development or Maps as primary items
-         to make an old test green.
-         THE EXPLORE DROPDOWN (founder, 2026-10-02) is the one exception, and it is a
-         sub-menu, not three more primary items: Quality of Life Impact (development.html),
-         Development Map (homesignalmap.html) and Activity (community.html). They carry no
-         data-nav, so they never light a section; shell.js's paintNavHrefs stamps the viewed
-         ZIP on them like any other #hs-nav link to a ZIP_NAV_PAGES page. The sub-menu is open
-         on every Explore page (body[data-nav="explore"], app.css) and closed elsewhere; the
-         caret toggles it. Each of the three pages names itself with body[data-explore], and
-         app.css marks the matching entry, so no script decides which one is current.
-         This is ONE shell: the public ZIP page gets these same three items and the dropdown. -->
-  </nav>
-  <div class="grow"></div>
-  <div class="upsell">
-    <div class="t">Get the full picture</div>
-    <div class="d">Premium reports, property intelligence &amp; more.</div>
-    <button type="button" onclick="HS.openModal('premiumModal')">Go Premium</button>
   </div>
-  <!-- Support links. Two rows, because five links do not fit the 236px sidebar on one
-       (measured: "How It Works" wrapped to three lines). Terms is a section of
-       privacy.html; terms.html is only a legacy redirect. No data-nav here, and no <nav>
-       element: these are not primary items and must never light one. -->
-  <div class="sidefoot">
-    <a href="how-it-works.html">How It Works</a>
-    <span class="dot">·</span>
-    <a href="about.html">About</a>
-    <span class="dot">·</span>
-    <a href="contact.html">Contact</a>
-  </div>
-  <div class="sidefoot" style="padding-top:2px">
-    <a href="privacy.html">Privacy</a>
-    <span class="dot">·</span>
-    <a href="privacy.html#terms">Terms</a>
-  </div>
-</aside>
+</header>
 
 <div class="main">
-<div class="top" id="hs-top">
-  <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
-  <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
-  <div class="topadds">
-    <button class="wchip topadd" type="button" id="hsAddAddress" aria-label="Add an address" onclick="HS.addHome()">＋ <span class="topadd-full">Add an address</span><span class="topadd-short">Address</span></button>
-    <button class="wchip topadd" type="button" id="hsAddZip" aria-label="Add a zip code" onclick="HS.openLoc()">＋ <span class="topadd-full">Add a zip code</span><span class="topadd-short">ZIP</span></button>
-  </div>
-  <div class="sp"></div>
-  <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
-  <button class="ib" type="button" aria-label="Notifications" onclick="HS.navTo('alerts.html')">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
-  <button class="sharebtn" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
-  <div class="avatar" id="hs-avatar" title="Account" onclick="HS.onAvatar()">··</div>
-</div>
-
   <div id="hs-slot"><!-- page content injected here --></div>
-  </div><!-- /.main -->
+</div><!-- /.main -->
+
+<!-- THE ONE SHARED FOOTER. Support links live here, never in the primary nav. Terms is a
+     section of privacy.html (terms.html is a retired redirect that drops the #terms anchor).
+     Hidden in Map 1's embed mode (.hs-embed), like the header. No data-nav: these links never
+     light a primary item. -->
+<footer class="hs-footer" id="hs-footer">
+  <nav class="hs-footer__links" aria-label="Site information">
+    <a href="how-it-works.html">How It Works</a>
+    <a href="about.html">About</a>
+    <a href="contact.html">Contact</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="privacy.html#terms">Terms</a>
+  </nav>
+</footer>
 </div><!-- /.app -->
 
 <!-- ======= LOCATION / REQUEST ZIP CODE MODAL ======= -->

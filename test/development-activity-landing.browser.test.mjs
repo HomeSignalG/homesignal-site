@@ -98,19 +98,25 @@ const shell = await page.evaluate(() => ({
   // Primary items carry data-nav; the Explore dropdown's entries (founder, 2026-10-02) do not.
   navLinks: [...document.querySelectorAll('#hs-nav a[data-nav]')].map((a) => a.getAttribute('href').split('?')[0]),
   sidebars: document.querySelectorAll('.side').length,
+  // The shared chrome carries two <nav> elements: the header's primary nav and the footer's
+  // site-information links. Count them by name, so a page that adds its own <nav> still fails.
   navs: document.querySelectorAll('nav').length,
+  chromeNavs: document.querySelectorAll('#hs-top nav, #hs-footer nav').length,
   lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),
-  logo: document.querySelectorAll('.logo').length,
+  logo: document.querySelectorAll('.hs-brand').length,
   upsell: document.querySelectorAll('.upsell').length,
   top: document.querySelectorAll('#hs-top').length,
+  footer: document.querySelectorAll('#hs-footer').length,
   inSlot: !!document.querySelector('#hs-slot .page.da'),
   outsideSlot: document.querySelectorAll('.da').length - document.querySelectorAll('#hs-slot .da, #hs-slot .da *').length
 }));
 ok(JSON.stringify(shell.navLinks) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
-  'the sidebar is the three primary items: Explore, My Places, Enterprise (plan v3)', shell.navLinks);
-ok(shell.sidebars === 1 && shell.logo === 1 && shell.top === 1 && shell.navs === 1, 'one sidebar, one logo, one top bar, one <nav>: the page adds none', shell);
+  'the header nav is the three primary items: Explore, My Places, Enterprise', shell.navLinks);
+ok(shell.sidebars === 0 && shell.logo === 1 && shell.top === 1 && shell.footer === 1 && shell.upsell === 0
+   && shell.chromeNavs === 2 && shell.navs === 2,
+  'one header, one logo, one footer, no sidebar, and only the chrome\'s two <nav>s: the page adds none', shell);
 ok(JSON.stringify(shell.lit) === JSON.stringify(['enterprise']),
-  'exactly one sidebar entry is lit, and it is Enterprise: this page is the Enterprise item (plan v3)', shell.lit);
+  'exactly one header item is lit, and it is Enterprise: this page is the Enterprise item', shell.lit);
 ok(shell.inSlot, 'the page content is mounted in the shell slot');
 
 console.log('--- 2. the sample keeps the real report hierarchy ---');

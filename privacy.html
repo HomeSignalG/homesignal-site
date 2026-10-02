@@ -7,7 +7,7 @@
 <link rel="canonical" href="https://homesignal.net/privacy.html">
 <title>HomeSignal — Privacy &amp; Terms</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<link rel="stylesheet" href="app.css?v=79649c4d">
+<link rel="stylesheet" href="app.css?v=c8cac6cb">
 </head>
 <body data-nav="">
 <template id="hs-content">
@@ -64,7 +64,7 @@
 <script src="lib/templates.js?v=74ada1e6"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=c50ecfcd"></script>
+<script src="shell.js?v=0d72ddbf"></script>
 <script>
   // privacy.html#terms is the shell's "Terms" link. Three things the browser cannot do here
   // on its own:
@@ -72,13 +72,13 @@
   //     the browser's own jump to #terms finds nothing and the page opens at the top. Jump
   //     the moment the shell inserts the page. That happens before the account reads, so a
   //     signed-in resident is not yanked to Terms seconds after they started reading.
-  //  2. The top bar is sticky and wraps taller on phones, so a plain jump leaves the heading
-  //     underneath it. Give the target a scroll margin as tall as the bar.
-  //  3. On this page Terms is a jump within the page, not a page load, so nothing closes the
-  //     phone drawer behind it (shell.js closes it only for the primary nav links).
+  //  2. The header is sticky, so a plain jump leaves the heading underneath it. Give the
+  //     target a scroll margin as tall as the header.
+  //  3. On this page the footer's Terms link is a jump within the page, not a page load, so
+  //     its target needs the same scroll margin before the browser jumps.
   (function () {
     function clearTopBar(el) {
-      var bar = document.querySelector('.top');
+      var bar = document.getElementById('hs-top');
       el.style.scrollMarginTop = (bar ? Math.ceil(bar.getBoundingClientRect().height) : 0) + 12 + 'px';
     }
     function hashTarget() {
@@ -99,18 +99,16 @@
       watch.observe(document.body, { childList: true, subtree: true });
       HS.onReady(function () { watch.disconnect(); });
     }
-    // The top bar can change height once the account is read. Re-aim then, but only if the
-    // reader has not scrolled since the jump.
+    // The header can change once the account is read. Re-aim then, but only if the reader
+    // has not scrolled since the jump.
     HS.onReady(function () {
       if (landedAt !== null && Math.abs(window.scrollY - landedAt) < 2) jump();
     });
     document.addEventListener('click', function (e) {
-      var a = e.target && e.target.closest ? e.target.closest('#hs-side a[href*="#"]') : null;
+      var a = e.target && e.target.closest ? e.target.closest('#hs-footer a[href*="#"]') : null;
       if (!a || a.pathname !== location.pathname || !a.hash) return;
       var el = document.getElementById(a.hash.slice(1));
       if (el) clearTopBar(el);
-      var side = document.getElementById('hs-side');
-      if (side && side.classList.contains('open')) HS.toggleMenu();
     });
   })();
 </script>

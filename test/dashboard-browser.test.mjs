@@ -136,7 +136,7 @@ try {
     return {
       main: heads('.cols > div:first-child'),
       rail: heads('.cols > div:last-child'),
-      viewing: (document.getElementById('locLabel') || {}).textContent || '',
+      viewing: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : '',
       sub: (document.getElementById('dashSub') || {}).textContent || ''
     };
   });

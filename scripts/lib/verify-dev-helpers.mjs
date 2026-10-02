@@ -257,8 +257,8 @@ export function assertZip(zip, rep, isIndexable, st) {
   const wantFac = (rep.counts && rep.counts.facilities != null) ? rep.counts.facilities : null;
   const sites = Array.isArray(rep.sites) ? rep.sites : [];
 
-  // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
-  if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
+  // Every tracker page must render the shared site header (Revised Index Design, #1562).
+  if (!st.shell) fails.push(`ZIP ${zip}: site header shell did not render (old layout?)`);
   // SUBSTANCE GATE: indexable iff the stamped flag is true AND the page rendered content.
   const renderedForPolicy = st.rendered != null ? st.rendered : sites;
   const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);

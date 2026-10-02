@@ -173,9 +173,17 @@
     get(k) { try { return sessionStorage.getItem('hs:' + k); } catch (e) { return null; } },
     set(k, v) { try { if (v == null) sessionStorage.removeItem('hs:' + k); else sessionStorage.setItem('hs:' + k, String(v)); } catch (e) {} }
   };
+  // AN EMBEDDED MAP IS NOT THE VISITOR'S BROWSING CONTEXT. Map 1's embed mode
+  // (homesignalmap.html?embed=1, class hs-embed set in its <head> before this file runs) is
+  // iframed by other pages, and a same-origin iframe shares this tab's sessionStorage. The
+  // homepage's sample map (?embed=1&preview=1&zip=78657) would otherwise write 78657 as the
+  // tab's viewed ZIP on every visit, so the visitor's next page would open a ZIP they never
+  // chose. An embed reads the tab's context like any page; it never writes it, and it never
+  // opens the onboarding flow (the host page owns that).
+  const IS_EMBED = document.documentElement.classList.contains('hs-embed');
   function captureUrlViewZip() {
     const z = HS.parseZipParam(location.search);
-    if (z) SS.set('viewZip', z);
+    if (z && !IS_EMBED) SS.set('viewZip', z);
     return z;
   }
   let _zip = HS.resolveViewedZip({
@@ -217,7 +225,7 @@
       z = String(z).trim();
       if (!/^\d{5}$/.test(z) || z === _zip) return;
       _zip = z;
-      SS.set('viewZip', z);
+      if (!IS_EMBED) SS.set('viewZip', z);
       paintTopbar();
     },
     enumerable: true,
@@ -659,20 +667,11 @@
   }
 
   async function saveOnboardingAddress(addr) {
-    const O = window.HSOnboarding;
-    let m = null, unavailable = false;
-    try {
-      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: addr } });
-      if (r.error) unavailable = true;
-      else m = (r.data && r.data.match) || null;
-    } catch (e) { unavailable = true; }
-    if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
-    if (!m || !m.zip) {
-      throw new Error("We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.");
-    }
-    if (!O.validCoords(m.lat, m.lng)) {
-      throw new Error("We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.");
-    }
+    // The one resolver (HS.resolveAddress, below) owns the call and its three honest
+    // failure messages; onboarding only saves what it confirmed.
+    const res = await HS.resolveAddress(addr);
+    if (!res.ok) throw new Error(res.message);
+    const m = res.match;
     const row = {
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
@@ -898,14 +897,35 @@
     if (reqEmail) reqEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.submitOnboardingRequest(); });
   }
 
-  HS.toggleMenu = function () {
-    document.querySelector('.side').classList.toggle('open');
-    $('sidebackdrop').classList.toggle('show');
-  };
-  function closeMenu() {
-    const s = document.querySelector('.side'); if (s) s.classList.remove('open');
-    const b = $('sidebackdrop'); if (b) b.classList.remove('show');
+  // THE COMPACT MENU (1023px and narrower). The header's one nav element becomes a panel
+  // under the header; the Menu button opens and closes it. It closes after a navigation,
+  // on Escape, and on a click outside the header. At 1024px and wider the CSS shows the nav
+  // as the horizontal row whatever this class says, so a stale open state cannot hide it.
+  function setMenuOpen(open) {
+    const head = $('hs-top'); if (!head) return;
+    head.classList.toggle('menu-open', !!open);
+    const btn = $('hs-menubtn'); if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
+  HS.toggleMenu = function () {
+    const head = $('hs-top');
+    setMenuOpen(!(head && head.classList.contains('menu-open')));
+  };
+  function closeMenu() { setMenuOpen(false); }
+
+  // THE EXPLORE DROPDOWN (founder, 2026-10-02). On wide screens the ▾ button beside Explore
+  // opens and closes the menu of Explore's three pages (Quality of Life Impact, Development
+  // Map, Activity); a click outside it, Escape or picking an entry closes it. In the compact
+  // Menu panel the CSS always lists the three under Explore, so this class changes nothing
+  // there.
+  function setExploreOpen(open) {
+    const g = $('hs-explore'); if (!g) return;
+    g.classList.toggle('open', !!open);
+    const b = $('hs-explore-toggle'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  HS.toggleExplore = function () {
+    const g = $('hs-explore');
+    setExploreOpen(!(g && g.classList.contains('open')));
+  };
 
   // -------------------------------------------------------------- session ----
   async function bootSession() {
@@ -1247,48 +1267,62 @@
   };
   function viewedLabel() { return state.viewLabel || ('ZIP ' + state.zip); }
 
-  function paintTopbar() {
+  // THE VIEWING LABEL — which place the page is showing. It used to be painted into the
+  // Viewing chip in the top bar. The horizontal header (founder, Revised Index Design,
+  // 2026-09-30) took that chip out of the global chrome; residents switch places from My
+  // Places. The DECISION is kept, in one place, so a future surface (or a page that carries
+  // its own #locLabel) names the place the same way. HS.viewingLabel() returns
+  // { text, title }; paintTopbar paints #locLabel only where a page still has one.
+  function viewingChip() {
     const p = state.activeProperty;
+    // CURRENT GEOGRAPHY is always "Viewing · …" (Fix 9). A saved address in the
+    // viewed ZIP is named as the thing in view — never as "your home". The full
+    // logged address (street, city, state ZIP) rides in the hover tooltip.
+    //
+    // SAVED ADDRESS IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
+    // print the saved address on every page regardless of what the page was showing,
+    // so a Del Valle address browsing ?zip=80210 read as the Denver page's location
+    // (founder-observed on production, 2026-09-04). The address is named as the
+    // current context only when the page is actually showing its ZIP — the same
+    // gate HS.realHome() already applies to the page-level context line. Otherwise
+    // the control names the CURRENT VIEW. Nothing about the saved place changes:
+    // it stays saved, stays active, and stays one tap away in the switcher.
+    //
+    // ...AND A ZIP PAGE IS A ZIP PLACE (founder-observed on production 2026-09-15, at
+    // /community.html?zip=78617 reading "Viewing · 13313 COOMES DR"). The 2026-09-04 gate
+    // fixed the OTHER ZIP only; inside the address's own ZIP the address still won, so a
+    // resident holding an address in 78617 could never see the ZIP Place "Del Valle (78617)"
+    // named — not by opening its page, not by tapping its chip, because those chips are
+    // plain links and hydrate re-elects any in-ZIP address as the active one on every load.
+    // A page that IS a Place declares it (HS.setViewPlaceType) and that declaration wins.
+    // The address stays saved, stays the active property, and still anchors home-relative
+    // data; only the question "which Place am I looking at" is answered by the page.
+    const myZip = LS.get('myZip', null);
+    const homeIsCurrent = !!(p && String(p.zip) === String(state.zip)
+      && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
+    const text = (p && homeIsCurrent)
+      ? ('Viewing · ' + p.address)
+      : ((p || myZip)
+        ? ('Viewing · ' + viewedLabel())
+        : (HS.isSample()
+          ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
+          : ('Viewing · ' + viewedLabel())));
+    const title = p
+      ? (homeIsCurrent
+        ? ('Viewing ' + HS.homeAddressLine(p) + ' — tap to switch')
+        : ('Viewing ' + viewedLabel() + ' — a saved place is still '
+           + HS.homeAddressLine(p) + '. Tap to switch.'))
+      : 'Tap to set your area';
+    return { text: text, title: title };
+  }
+  HS.viewingLabel = function () { return viewingChip(); };
+
+  function paintTopbar() {
     if ($('locLabel')) {
-      // CURRENT GEOGRAPHY is always "Viewing · …" (Fix 9). A saved address in the
-      // viewed ZIP is named as the thing in view — never as "your home". The full
-      // logged address (street, city, state ZIP) rides in the hover tooltip.
-      //
-      // SAVED ADDRESS IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
-      // print the saved address on every page regardless of what the page was showing,
-      // so a Del Valle address browsing ?zip=80210 read as the Denver page's location
-      // (founder-observed on production, 2026-09-04). The address is named as the
-      // current context only when the page is actually showing its ZIP — the same
-      // gate HS.realHome() already applies to the page-level context line. Otherwise
-      // the control names the CURRENT VIEW. Nothing about the saved place changes:
-      // it stays saved, stays active, and stays one tap away in the switcher.
-      //
-      // ...AND A ZIP PAGE IS A ZIP PLACE (founder-observed on production 2026-09-15, at
-      // /community.html?zip=78617 reading "Viewing · 13313 COOMES DR"). The 2026-09-04 gate
-      // fixed the OTHER ZIP only; inside the address's own ZIP the address still won, so a
-      // resident holding an address in 78617 could never see the ZIP Place "Del Valle (78617)"
-      // named — not by opening its page, not by tapping its chip, because those chips are
-      // plain links and hydrate re-elects any in-ZIP address as the active one on every load.
-      // A page that IS a Place declares it (HS.setViewPlaceType) and that declaration wins.
-      // The address stays saved, stays the active property, and still anchors home-relative
-      // data; only the question "which Place am I looking at" is answered by the page.
-      const myZip = LS.get('myZip', null);
-      const homeIsCurrent = !!(p && String(p.zip) === String(state.zip)
-        && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
-      $('locLabel').textContent = (p && homeIsCurrent)
-        ? ('Viewing · ' + p.address)
-        : ((p || myZip)
-          ? ('Viewing · ' + viewedLabel())
-          : (HS.isSample()
-            ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
-            : ('Viewing · ' + viewedLabel())));
+      const chip = viewingChip();
+      $('locLabel').textContent = chip.text;
       const locWrap = $('locLabel').closest('.loc');
-      if (locWrap) locWrap.title = p
-        ? (homeIsCurrent
-          ? ('Viewing ' + HS.homeAddressLine(p) + ' — tap to switch')
-          : ('Viewing ' + viewedLabel() + ' — a saved place is still '
-             + HS.homeAddressLine(p) + '. Tap to switch.'))
-        : 'Tap to set your area';
+      if (locWrap) locWrap.title = chip.title;
     }
     const av = $('hs-avatar');
     if (av) {
@@ -1434,30 +1468,57 @@
     if (state.session && !state.session.demo) HS.openHome();
     else if (HS.openLoc) HS.openLoc();
   };
+  // THE ONE ADDRESS RESOLVER. Every place that turns a typed address into a confirmed
+  // point asks this function: the homepage Explore search, HS.findHome() (Add an address)
+  // and saveOnboardingAddress(). It is the only caller of the geocode-address edge function
+  // in this file. Via that function because the Census API sends no CORS headers, so the
+  // browser can't call it directly (found live 2026-07-16: a perfectly valid address failed
+  // for every visitor). The function returns {match} or a 502 'geocoder_unavailable', so a
+  // service outage and a genuine no-match get DIFFERENT honest messages.
+  //
+  // It never throws for an expected outcome. It returns exactly one of:
+  //   { ok: true,  match: { matchedAddress, lat, lng, zip, city, state } }
+  //   { ok: false, reason: 'unavailable',    message: … }   the service could not be reached
+  //   { ok: false, reason: 'no_match',       message: … }   the Census could not confirm it
+  //   { ok: false, reason: 'invalid_coords', message: … }   confirmed, but not a usable point
+  // It saves nothing and changes no state: saving is each caller's own explicit step.
+  // A valid point is lib/onboarding.js's validCoords, the one definition of that rule. If
+  // that library cannot be loaded, no point can be confirmed valid, so the answer is
+  // invalid_coords rather than a point nobody checked.
+  const RESOLVE_MESSAGES = {
+    unavailable: "The address service couldn't be reached — please try again in a minute.",
+    no_match: "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.",
+    invalid_coords: "We couldn't confirm a valid location for that address — try again or enter your ZIP code instead."
+  };
+  function resolveFailure(reason) { return { ok: false, reason: reason, message: RESOLVE_MESSAGES[reason] }; }
+  HS.resolveAddress = async function (address) {
+    let m = null;
+    try {
+      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: address } });
+      if (r.error) return resolveFailure('unavailable');
+      m = (r.data && r.data.match) || null;
+    } catch (e) { return resolveFailure('unavailable'); }
+    const zip = m && m.zip != null ? String(m.zip) : '';
+    if (!m || !/^\d{5}$/.test(zip)) return resolveFailure('no_match');
+    try { await loadOnboardingLib(); } catch (e) { /* judged below */ }
+    const O = window.HSOnboarding;
+    if (!O || !O.validCoords(m.lat, m.lng)) return resolveFailure('invalid_coords');
+    return {
+      ok: true,
+      match: {
+        matchedAddress: m.matchedAddress || '', lat: m.lat, lng: m.lng, zip: zip,
+        city: m.city || null, state: m.state || null
+      }
+    };
+  };
   HS.findHome = async function () {
     const el = $('homeAddr'), q = el.value.trim();
     if (q.length < 8 || q.indexOf(' ') < 0) { el.style.borderColor = '#c23b34'; el.focus(); return; }
     el.style.borderColor = '';
     $('homeMsg').textContent = 'Looking up the official address…';
-    // Via the geocode-address edge function — the Census API sends no CORS
-    // headers, so the browser can't call it directly (found live 2026-07-16:
-    // a perfectly valid address failed for every visitor). The function
-    // returns {match} or a 502 'geocoder_unavailable', so a service outage
-    // and a genuine no-match get DIFFERENT honest messages.
-    let m = null, unavailable = false;
-    try {
-      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: q } });
-      if (r.error) unavailable = true;
-      else m = (r.data && r.data.match) || null;
-    } catch (e) { unavailable = true; }
-    if (unavailable) {
-      $('homeMsg').textContent = "The address service couldn't be reached — please try again in a minute.";
-      return;
-    }
-    if (!m || m.lat == null || m.lng == null || !m.zip) {
-      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.";
-      return;
-    }
+    const res = await HS.resolveAddress(q);
+    if (!res.ok) { $('homeMsg').textContent = res.message; return; }
+    const m = res.match;
     _homeMatch = m;
     _homeInput = q;
     $('homeMatched').textContent = m.matchedAddress || q;
@@ -2366,12 +2427,39 @@
     const slot = root.querySelector('#hs-slot');
     if (tpl && slot) slot.appendChild(tpl.content.cloneNode(true));
     document.body.insertBefore(root, document.body.firstChild);
-    $('sidebackdrop').addEventListener('click', closeMenu);
-    // active nav
+    // active nav: the page's <body data-nav> names its section. One item at most, and the
+    // Enterprise item only on the Enterprise page.
     const nav = document.body.dataset.nav;
-    if (nav) { const a = document.querySelector('.nav a[data-nav="' + nav + '"]'); if (a) a.classList.add('on'); }
-    // close menu on nav click (mobile)
-    document.querySelectorAll('.nav a').forEach(a => a.addEventListener('click', closeMenu));
+    if (nav) {
+      const a = document.querySelector('.hs-nav a[data-nav="' + nav + '"]');
+      if (a) { a.classList.add('on'); a.setAttribute('aria-current', 'page'); }
+    }
+    // close the compact menu on a nav click, on Escape, and on a click outside the header
+    document.querySelectorAll('.hs-nav a').forEach(a => a.addEventListener('click', closeMenu));
+    document.addEventListener('keydown', function (e) {
+      const head = $('hs-top');
+      if (e.key !== 'Escape' || !head || !head.classList.contains('menu-open')) return;
+      closeMenu();
+      const btn = $('hs-menubtn'); if (btn) btn.focus();
+    });
+    document.addEventListener('click', function (e) {
+      const head = $('hs-top');
+      if (head && head.classList.contains('menu-open') && !head.contains(e.target)) closeMenu();
+    });
+    // the Explore dropdown: its button toggles it; an entry, Escape or a click outside closes it
+    const exploreBtn = $('hs-explore-toggle');
+    if (exploreBtn) exploreBtn.addEventListener('click', HS.toggleExplore);
+    document.querySelectorAll('#hs-explore-sub a').forEach(a => a.addEventListener('click', () => setExploreOpen(false)));
+    document.addEventListener('keydown', function (e) {
+      const g = $('hs-explore');
+      if (e.key !== 'Escape' || !g || !g.classList.contains('open')) return;
+      setExploreOpen(false);
+      if (exploreBtn) exploreBtn.focus();
+    });
+    document.addEventListener('click', function (e) {
+      const g = $('hs-explore');
+      if (g && g.classList.contains('open') && !g.contains(e.target)) setExploreOpen(false);
+    });
   }
 
   // Cross-device sync of followed communities. On a signed-in boot, merge the
@@ -2495,7 +2583,7 @@
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
-    if (HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
+    if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     _resolveReady(HS);
   }
 

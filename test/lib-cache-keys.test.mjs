@@ -44,13 +44,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // fix in one of them that a warm browser never fetches would leave a paid report built on
 // a stale allowlist or a stale query window. That is the silent class this file exists to
 // stop, and it is the reason the report page keys them rather than joining KNOWN_KEYLESS.
-// lib/landing.js joined the set with the navigation plan v3 (2026-09-30). It decides whether
-// index.html bounces a signed-in resident to the Dashboard, and v3 removed that bounce. Loaded
-// keyless, a warm browser could keep the old copy and keep bouncing residents away from
-// Explore after the deploy, which is exactly the silent class this file exists to stop.
+// lib/landing.js joined the set with the navigation plan v3 (2026-09-30) and LEFT it with the
+// Revised Index Design (founder, 2026-09-30): index.html no longer loads it or calls
+// HS.landingFor (the file itself is unchanged), and no page loads it, so there is no tag whose
+// key could go stale. If a page loads it again, add it back here.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
-  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/landing.js'];
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 

@@ -41,12 +41,12 @@ for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
 // A-021, the PAGE stays and stays reachable (ZIP_NAV_PAGES below, the map's list link, the
 // Address dossier's "All projects"); only its sidebar entry went, and it now lights Explore.
 // The Explore DROPDOWN (founder, 2026-10-02) links development.html and homesignalmap.html as
-// sub-entries, never as primary items, so the two checks below read the sidebar WITHOUT it,
+// sub-entries, never as primary items, so the two checks below read the header nav WITHOUT it,
 // and the dropdown is pinned on its own.
-const exploreSub = (shellHtml.match(/<div class="navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
+const exploreSub = (shellHtml.match(/<div class="hs-navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
 const shellPrimary = shellHtml.replace(exploreSub, '');
 ok(exploreSub.length > 0, 'the Explore dropdown block is found (control for the two checks below)');
-ok(!/href="development\.html"/.test(shellPrimary), 'v3 Development is NO LONGER a primary sidebar item — it is an Explore child');
+ok(!/href="development\.html"/.test(shellPrimary), 'v3 Development is NO LONGER a primary nav item — it is an Explore child');
 ok(/<a href="development\.html"\s+data-sub="qol">Quality of Life Impact<\/a>/.test(exploreSub)
    && !/data-nav=/.test(exploreSub),
   'the Explore dropdown links it as "Quality of Life Impact", with no data-nav of its own');
@@ -59,7 +59,7 @@ ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "e
 // reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
 // Everything else in this file is byte-identical to Phase 6.
 ok(!/href="homesignalmap\.html"/.test(shellPrimary) && /<a href="homesignalmap\.html"\s+data-sub="map">Development Map<\/a>/.test(exploreSub),
-  'A-021 Maps is NO LONGER a primary sidebar item; the Explore dropdown lists it as "Development Map"',
+  'A-021 Maps is NO LONGER a primary nav item; the Explore dropdown lists it as "Development Map"',
   (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
 ok(/<body data-nav="explore"/.test(map),
   'v3 ...and Map 1 declares "explore", so visiting it lights Explore');

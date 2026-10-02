@@ -179,8 +179,16 @@ ok(!committedMap.includes(PAGE) || (inSitemap && indexable && !visibleInert),
 // Enterprise item that drifted to another href would silently stop pointing here.
 const shellSrc = read('partials/shell.html');
 const shellLinks = shellSrc.match(/<a\s+href="development-activity\.html"[^>]*>/g) || [];
-ok(JSON.stringify(linkedFrom) === JSON.stringify(['partials/shell.html']),
-  'TRIPWIRE: while its commerce buttons are inert, the ONLY thing that links the page is the shell\'s Enterprise item', linkedFrom);
+// The Revised Index Design (founder, 2026-09-30) adds exactly ONE more reviewed entry point,
+// for the state #1555 created (page listed, commerce hidden): the homepage's upper-right
+// Enterprise card, whose "Explore Enterprise →" links here. There is no bottom banner, so the
+// homepage links the page exactly once. Any further link is still an unreviewed entry point.
+ok(JSON.stringify(linkedFrom) === JSON.stringify(['index.html', 'partials/shell.html']),
+  'TRIPWIRE: while its commerce buttons are inert, the ONLY things that link the page are the shell\'s Enterprise item and the homepage\'s Enterprise card', linkedFrom);
+const homeSrc = read('index.html').replace(/<!--[\s\S]*?-->/g, '');
+const homeLinks = homeSrc.match(/<a\b[^>]*href="development-activity\.html"[^>]*>[\s\S]*?<\/a>/g) || [];
+ok(homeLinks.length === 1 && /id="homeEnterpriseCta"/.test(homeLinks[0]) && />Explore Enterprise →<\/a>$/.test(homeLinks[0]),
+  'the homepage links it exactly once: the Enterprise card\'s "Explore Enterprise →" (no bottom banner)', homeLinks);
 ok(shellLinks.length === 1 && /data-nav="enterprise"/.test(shellLinks[0])
    && /<a\s+href="development-activity\.html"[^>]*>[\s\S]{0,80}?Enterprise<\/a>/.test(shellSrc),
   'v3 the shell links it exactly once, as the "Enterprise" primary item', shellLinks);
