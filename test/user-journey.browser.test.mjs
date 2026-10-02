@@ -274,11 +274,15 @@ await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domc
 await waitShell();
 ok(await page.locator('.hs-nav a[data-nav="maps"]').count() === 0,
   '3 there is no Maps primary item (A-021, kept by plan v3)');
-ok(await page.locator('.hs-nav a').count() === 3,
-  '3 ...and the primary nav is the three items (plan v3)', await page.locator('.hs-nav a').count());
-ok((await page.locator('.hs-nav a').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+// Primary items are the links that carry data-nav; the Explore dropdown (founder,
+// 2026-10-02) adds three sub-entries that carry none.
+ok(await page.locator('.hs-nav a[data-nav]').count() === 3,
+  '3 ...and the primary nav is the three items (plan v3)', await page.locator('.hs-nav a[data-nav]').count());
+ok((await page.locator('.hs-nav a[data-nav]').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
      === 'explore|props|enterprise',
   '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
+ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.hs-nav a').count() === 6,
+  '3 ...plus the Explore dropdown\'s three pages, and nothing else', await page.locator('.hs-nav a').count());
 // The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
 c = await chrome();
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',

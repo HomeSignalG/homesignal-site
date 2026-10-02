@@ -610,6 +610,20 @@ body.onboarding-lock{overflow:hidden}
 .hs-header__avatar{position:relative;border:none;padding:0;cursor:pointer;font-family:inherit}
 .hs-header__menu{display:none;width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px;color:var(--ink-2);align-items:center;justify-content:center;flex:none}
 .hs-header a:focus-visible,.hs-header button:focus-visible,.hs-footer a:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+/* The Explore dropdown (founder, 2026-10-02): Quality of Life Impact, Development Map,
+   Activity. Wide: the ▾ button opens a menu under Explore (shell.js sets .open). The page
+   you are on is marked through body[data-explore]. */
+.hs-navgroup{position:relative;display:flex;align-items:center;gap:2px}
+.hs-navcaret{display:inline-flex;align-items:center;justify-content:center;width:28px;height:44px;padding:0;border:none;border-radius:8px;background:transparent;font-size:13px;color:var(--ink-2);cursor:pointer;transition:transform .15s}
+.hs-navcaret:hover{background:var(--line-2);color:var(--ink)}
+.hs-navgroup.open .hs-navcaret{transform:rotate(180deg)}
+.hs-navsub{display:none;position:absolute;top:100%;left:-12px;z-index:60;min-width:230px;padding:6px;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.hs-navgroup.open .hs-navsub{display:flex}
+.hs-nav .hs-navsub a{min-height:40px;padding:0 12px;border-radius:8px;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.hs-nav .hs-navsub a:hover{background:var(--line-2);color:var(--ink)}
+body[data-explore="qol"] .hs-navsub a[data-sub="qol"],
+body[data-explore="map"] .hs-navsub a[data-sub="map"],
+body[data-explore="activity"] .hs-navsub a[data-sub="activity"]{font-weight:600;color:var(--ink);box-shadow:inset 3px 0 0 var(--green)}
 @media (max-width:1023px){
   .hs-header__inner{padding:0 24px}
   .hs-header__menu{display:inline-flex}
@@ -617,6 +631,12 @@ body.onboarding-lock{overflow:hidden}
   .hs-header.menu-open .hs-nav{display:flex}
   .hs-nav a{padding:0 4px;border-bottom:1px solid var(--line-2)}
   .hs-nav a:last-child{border-bottom:none}
+  /* Compact: the three Explore pages are listed under Explore, always shown, no button. */
+  .hs-navgroup{display:block;border-bottom:1px solid var(--line-2)}
+  .hs-navgroup > a{display:flex;border-bottom:none}
+  .hs-navcaret{display:none}
+  .hs-navsub,.hs-navgroup.open .hs-navsub{display:flex;position:static;min-width:0;padding:0 0 6px 16px;border:none;border-radius:0;box-shadow:none}
+  .hs-nav .hs-navsub a{min-height:44px;border-bottom:none}
 }
 @media (max-width:767px){
   .hs-header__inner{padding:0 16px}

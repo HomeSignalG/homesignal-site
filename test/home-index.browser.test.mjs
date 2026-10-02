@@ -320,7 +320,9 @@ for (const [w, h, want, live] of [[1280, 900, 430, 760], [1024, 768, 430, 760], 
 }
 
 // ──────────────────────────────────────────────────────────────── 7: compact header ──
-console.log('--- 7. compact header: logo, Share, Sign in, Menu; the panel holds exactly three items ---');
+// The panel holds the three primary items, with the Explore dropdown's three pages (founder,
+// 2026-10-02) listed under Explore.
+console.log('--- 7. compact header: logo, Share, Sign in, Menu; the panel holds the three items ---');
 for (const [w, h] of [[390, 844], [768, 1024]]) {
   const { ctx, page, errors } = await open(browser, base, '/index.html', { stub: STUB, width: w, height: h });
   const vis = () => page.evaluate(() => {
@@ -339,8 +341,8 @@ for (const [w, h] of [[390, 844], [768, 1024]]) {
   ok(c0.logo && c0.share && c0.signin && c0.menu && c0.menuSize === '44x44' && c0.nav.length === 0, '7 ' + w + 'px: logo, Share, Sign in and a 44×44 Menu; nav closed', c0);
   await page.click('#hs-menubtn');
   const c1 = await vis();
-  ok(JSON.stringify(c1.nav) === JSON.stringify(['Explore', 'My Places', 'Enterprise']) && c1.expanded === 'true' && c1.linkH >= 44,
-    '7 ' + w + 'px: the panel holds exactly Explore, My Places, Enterprise (44px targets)', c1);
+  ok(JSON.stringify(c1.nav) === JSON.stringify(['Explore', 'Quality of Life Impact', 'Development Map', 'Activity', 'My Places', 'Enterprise']) && c1.expanded === 'true' && c1.linkH >= 44,
+    '7 ' + w + 'px: the panel holds Explore (with its three pages under it), My Places, Enterprise (44px targets)', c1);
   await page.keyboard.press('Escape');
   const c2 = await vis();
   ok(c2.nav.length === 0 && c2.expanded === 'false', '7 ' + w + 'px: Escape closes it', c2);

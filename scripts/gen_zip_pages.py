@@ -774,7 +774,7 @@ def _items(items, heading, empty, kind):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=828fb31a">\n'
+APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=c8cac6cb">\n'
 
 
 def render(p, built):
@@ -904,17 +904,18 @@ def render(p, built):
         "object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
         'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
-        # frame-src/child-src 'self': the AUTHENTICATED ZIP context map is a same-origin
-        # iframe of homesignalmap.html. An anonymous visitor never renders it, so these
-        # two directives are the ONLY public-byte change the Place-maps work leaves on this
-        # document - lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
+        # frame-src/child-src 'self': the ZIP page's map is a same-origin iframe of
+        # homesignalmap.html, shown to every visitor since 2026-10-02 (it was signed-in
+        # only before). lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
         + APP_CSS_LINK + '</head>\n'
         # data-nav="explore": this document loads the shared shell, and the public ZIP page
         # is an Explore child (founder navigation plan v3), the same identity community.html
         # declares. The city/project/project-list/guide families below carry no shell.
-        f'<body data-nav="explore" data-zip="{esc(z)}">\n{body}\n'
+        # data-explore="activity": it is the Activity page in the Explore dropdown, as
+        # community.html is (founder, 2026-10-02).
+        f'<body data-nav="explore" data-zip="{esc(z)}" data-explore="activity">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
@@ -942,7 +943,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=d7982f94"></script>\n'
+        '<script src="/shell.js?v=0d72ddbf"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=43830487"></script>\n'
         "</body>\n</html>\n")

@@ -24,7 +24,23 @@
   <div class="hs-header__inner">
     <a class="hs-brand" href="index.html"><span class="hs-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span style="color:var(--green-2)">Signal</span></span></a>
     <nav class="hs-nav" id="hs-nav" aria-label="Primary">
-      <a href="index.html" data-nav="explore">Explore</a>
+      <!-- THE EXPLORE DROPDOWN (founder, 2026-10-02): Explore's three pages, under these
+           names. "Quality of Life Impact" is development.html (it was "What's being built —
+           and how it impacts you"); "Development Map" is Map 1; "Activity" is the ZIP page.
+           The entries carry no data-nav, so they never light a primary item, and shell.js
+           stamps the viewed ZIP on them like any #hs-nav link to a ZIP_NAV_PAGES page.
+           Wide: the ▾ button opens a menu under Explore; a click outside or Escape closes
+           it. Compact (the Menu panel): the three are listed under Explore, always shown.
+           Each page names its entry with body[data-explore], and that entry is marked. -->
+      <div class="hs-navgroup" id="hs-explore">
+        <a href="index.html" data-nav="explore">Explore</a>
+        <button type="button" class="hs-navcaret" id="hs-explore-toggle" aria-label="Explore pages" aria-expanded="false" aria-controls="hs-explore-sub">▾</button>
+        <div class="hs-navsub" id="hs-explore-sub">
+          <a href="development.html" data-sub="qol">Quality of Life Impact</a>
+          <a href="homesignalmap.html" data-sub="map">Development Map</a>
+          <a href="community.html" data-sub="activity">Activity</a>
+        </div>
+      </div>
       <a href="properties.html" data-nav="props">My Places</a>
       <a href="development-activity.html" data-nav="enterprise">Enterprise</a>
     </nav>

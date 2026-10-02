@@ -912,6 +912,21 @@
   };
   function closeMenu() { setMenuOpen(false); }
 
+  // THE EXPLORE DROPDOWN (founder, 2026-10-02). On wide screens the ▾ button beside Explore
+  // opens and closes the menu of Explore's three pages (Quality of Life Impact, Development
+  // Map, Activity); a click outside it, Escape or picking an entry closes it. In the compact
+  // Menu panel the CSS always lists the three under Explore, so this class changes nothing
+  // there.
+  function setExploreOpen(open) {
+    const g = $('hs-explore'); if (!g) return;
+    g.classList.toggle('open', !!open);
+    const b = $('hs-explore-toggle'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  HS.toggleExplore = function () {
+    const g = $('hs-explore');
+    setExploreOpen(!(g && g.classList.contains('open')));
+  };
+
   // -------------------------------------------------------------- session ----
   async function bootSession() {
     if ((CFG.DATA_SOURCE === 'supabase') && window.supabase) {
@@ -2430,6 +2445,20 @@
     document.addEventListener('click', function (e) {
       const head = $('hs-top');
       if (head && head.classList.contains('menu-open') && !head.contains(e.target)) closeMenu();
+    });
+    // the Explore dropdown: its button toggles it; an entry, Escape or a click outside closes it
+    const exploreBtn = $('hs-explore-toggle');
+    if (exploreBtn) exploreBtn.addEventListener('click', HS.toggleExplore);
+    document.querySelectorAll('#hs-explore-sub a').forEach(a => a.addEventListener('click', () => setExploreOpen(false)));
+    document.addEventListener('keydown', function (e) {
+      const g = $('hs-explore');
+      if (e.key !== 'Escape' || !g || !g.classList.contains('open')) return;
+      setExploreOpen(false);
+      if (exploreBtn) exploreBtn.focus();
+    });
+    document.addEventListener('click', function (e) {
+      const g = $('hs-explore');
+      if (g && g.classList.contains('open') && !g.contains(e.target)) setExploreOpen(false);
     });
   }
 

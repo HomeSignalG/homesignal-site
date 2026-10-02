@@ -146,7 +146,9 @@ const waitReady = (page) => page.waitForFunction(() => window.HS && window.HS.re
   .then(() => page.evaluate(() => window.HS.ready));
 
 const chrome = (page) => page.evaluate(() => {
-  const links = [...document.querySelectorAll('#hs-nav a')];
+  // Primary items carry data-nav. The Explore dropdown's three entries (founder, 2026-10-02)
+  // carry none; §8 reads them on their own.
+  const links = [...document.querySelectorAll('#hs-nav a[data-nav]')];
   return {
     path: location.pathname,
     tokens: links.map((a) => a.getAttribute('data-nav')),
@@ -432,6 +434,107 @@ const ent = await D.page.evaluate(() => ({
 }));
 ok(ent.robots === 'index, follow', '7 development-activity.html is index, follow (listed 2026-10-02, buttons hidden)', ent.robots);
 ok(JSON.stringify(ent.lit) === JSON.stringify(['enterprise']), '7 ...and lights Enterprise', ent.lit);
+
+// ═══ 8. The Explore dropdown (founder, 2026-10-02) ═══
+// "Quality of Life Impact" (development.html), "Development Map" (homesignalmap.html) and
+// "Activity" (community.html), under Explore in the header. Wide: the ▾ button opens it; an
+// entry, Escape or a click outside closes it. The current page's entry is marked, and every
+// entry carries the viewed ZIP. Compact: the Menu panel lists the three under Explore.
+console.log('--- 8. the Explore dropdown ---');
+const dropdown = (page) => page.evaluate(() => {
+  const sub = document.getElementById('hs-explore-sub');
+  const links = sub ? [...sub.querySelectorAll('a')] : [];
+  const r = sub ? sub.getBoundingClientRect() : null;
+  const btn = document.getElementById('hs-explore-toggle');
+  return {
+    open: !!sub && getComputedStyle(sub).display !== 'none' && r.height > 0,
+    labels: links.map((a) => a.textContent.trim()),
+    hrefs: links.map((a) => a.getAttribute('href')),
+    navs: links.map((a) => a.getAttribute('data-nav')),
+    current: links.filter((a) => getComputedStyle(a).fontWeight === '600').map((a) => a.getAttribute('data-sub')),
+    caret: !!btn && getComputedStyle(btn).display !== 'none',
+    expanded: btn ? btn.getAttribute('aria-expanded') : null,
+    focusOnCaret: document.activeElement === btn,
+    lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),
+  };
+});
+const zipOf = (h) => ((h || '').match(/[?&]zip=(\d{5})/) || [])[1] || null;
+for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/homesignalmap.html?zip=78617', 'map'], ['/community.html?zip=78617', 'activity']]) {
+  await D.page.goto(base + path, { waitUntil: 'domcontentloaded' });
+  await waitReady(D.page);
+  await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
+  let d = await dropdown(D.page);
+  ok(!d.open && d.caret && d.expanded === 'false', '8 ' + path + ': the dropdown starts closed, with its ▾ button beside Explore', d);
+  await D.page.click('#hs-explore-toggle');
+  d = await dropdown(D.page);
+  ok(d.open && d.expanded === 'true', '8 ' + path + ': the ▾ button opens it', d);
+  ok(d.labels.join('|') === 'Quality of Life Impact|Development Map|Activity', '8 ' + path + ': ...listing the three pages by their names', d.labels);
+  ok(d.hrefs.map((h) => h.split('?')[0]).join('|') === 'development.html|homesignalmap.html|community.html'
+     && d.hrefs.every((h) => zipOf(h) === '78617'),
+    '8 ' + path + ': ...each opening its page for the viewed ZIP 78617', d.hrefs);
+  ok(d.navs.every((n) => n === null) && JSON.stringify(d.lit) === JSON.stringify(['explore']),
+    '8 ' + path + ': ...without lighting any section but Explore', d);
+  ok(JSON.stringify(d.current) === JSON.stringify([want]), '8 ' + path + ': ...and marks "' + want + '" as the current page', d.current);
+}
+// Following an entry lands on that page, for the same ZIP.
+await D.page.goto(base + '/development.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitReady(D.page);
+await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
+await D.page.click('#hs-explore-toggle');
+await Promise.all([D.page.waitForURL(/community\.html\?zip=78617/, { timeout: 30000 }), D.page.click('#hs-explore-sub a[data-sub="activity"]')]);
+ok(/\/community\.html\?zip=78617$/.test(new URL(D.page.url()).pathname + new URL(D.page.url()).search),
+  '8 clicking Activity opens the ZIP page for the same ZIP', D.page.url());
+// The button closes it again; Escape and a click outside close it too.
+await waitReady(D.page);
+await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
+await D.page.click('#hs-explore-toggle');
+await D.page.click('#hs-explore-toggle');
+let dd = await dropdown(D.page);
+ok(!dd.open && dd.expanded === 'false', '8 the ▾ button closes it again', dd);
+await D.page.click('#hs-explore-toggle');
+await D.page.keyboard.press('Escape');
+dd = await dropdown(D.page);
+ok(!dd.open && dd.expanded === 'false' && dd.focusOnCaret, '8 Escape closes it and returns focus to the ▾ button', dd);
+await D.page.click('#hs-explore-toggle');
+await D.page.mouse.click(640, 700);
+dd = await dropdown(D.page);
+ok(!dd.open && dd.expanded === 'false', '8 a click outside closes it', dd);
+// Off Explore it works the same, with no entry marked current.
+for (const path of ['/properties.html', '/index.html']) {
+  await D.page.goto(base + path, { waitUntil: 'domcontentloaded' });
+  await waitReady(D.page);
+  await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
+  dd = await dropdown(D.page);
+  ok(!dd.open && dd.caret, '8 ' + path + ': the dropdown starts closed', dd);
+  await D.page.click('#hs-explore-toggle');
+  dd = await dropdown(D.page);
+  ok(dd.open && dd.current.length === 0 && dd.labels.length === 3, '8 ' + path + ': the ▾ button opens it, with no entry marked current', dd);
+}
+// Compact: the Menu panel lists the three pages under Explore, with no ▾ button. Measured on
+// the ZIP page: Map 1 at 390px already scrolls sideways by 29px with the menu closed (its
+// view switcher, the same on main), which is not this menu's to fix.
+{
+  const M = await newPage({ width: 390, height: 844 });
+  await M.page.goto(base + '/community.html?zip=78617', { waitUntil: 'domcontentloaded' });
+  await waitReady(M.page);
+  await M.page.waitForSelector('#hs-menubtn', { timeout: 30000 });
+  await M.page.click('#hs-menubtn');
+  const m = await M.page.evaluate(() => {
+    const v = (e) => !!(e && e.offsetParent !== null);
+    return {
+      items: [...document.querySelectorAll('#hs-nav a')].filter(v).map((a) => a.textContent.trim()),
+      caret: v(document.getElementById('hs-explore-toggle')),
+      current: [...document.querySelectorAll('#hs-explore-sub a')].filter((a) => getComputedStyle(a).fontWeight === '600').map((a) => a.getAttribute('data-sub')),
+      minH: Math.min(...[...document.querySelectorAll('#hs-nav a')].filter(v).map((a) => a.getBoundingClientRect().height)),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|Enterprise',
+    '8 phone: the Menu panel lists the three pages under Explore', m.items);
+  ok(!m.caret && JSON.stringify(m.current) === JSON.stringify(['activity']) && m.minH >= 44 && m.overflow === 0,
+    '8 phone: no ▾ button, the current page marked, 44px targets, no sideways scroll', m);
+  await M.ctx.close();
+}
 
 ok(D.errors.filter((e) => !/\bL is not defined|maplibregl|THREE\b/.test(e)).length === 0,
   'no uncaught page errors outside the stubbed map libraries', D.errors);
