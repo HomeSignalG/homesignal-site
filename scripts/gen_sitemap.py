@@ -106,11 +106,24 @@ def url_el(loc, freq, pri):
             f"    <changefreq>{freq}</changefreq>\n    <priority>{pri}</priority>\n  </url>")
 
 
+def withheld_zips():
+    """ZIP pages taken off the live site (lib/withheld-zip-pages.json, founder 2026-10-01).
+    Missing or malformed is an error, never an empty set."""
+    path = os.path.join(os.path.dirname(__file__), "..", "lib", "withheld-zip-pages.json")
+    doc = json.load(open(path, encoding="utf-8"))
+    zips = doc.get("zips")
+    if not isinstance(zips, list) or not all(isinstance(z, str) and re.fullmatch(r"\d{5}", z) for z in zips):
+        print(f"ERROR: {path} must carry a list of 5-digit ZIP strings under 'zips'")
+        sys.exit(1)
+    return set(zips)
+
+
 def main():
     index_zips = fetch_index_zips()
     if not index_zips:
         print("ERROR: fetched 0 indexable ZIPs — refusing to overwrite sitemap.xml")
         sys.exit(1)
+    index_zips -= withheld_zips()   # a withheld ZIP page is never advertised
     # Ramp: keep everything already listed that still qualifies; add at most
     # MAX_NEW_URLS_PER_RUN newcomers per run. De-qualified URLs drop immediately.
     listed = previously_listed_zips() & index_zips

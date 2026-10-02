@@ -38,6 +38,7 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { assertCommunityRow, indexable } from './lib/verify-communities-assert.mjs';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { loadDeployedWithheld, readWithheldInPage, judgeWithheld } from './lib/withheld-zips-live.mjs';
 import {
   loadZipStateCrosswalk,
   assertQuarantineIsHonest,
@@ -103,11 +104,14 @@ async function readPage(page, zip) {
   try {
     await page.waitForFunction(() => {
       const p = document.getElementById('commPage');
-      return !!(p && p.textContent && p.textContent.trim().length > 0);
+      return !!document.getElementById('hs-withheld')     // the shell's withheld-ZIP notice
+        || !!(p && p.textContent && p.textContent.trim().length > 0);
     }, { timeout: 45000 });
   } catch (e) {
     throw new Error(`community.html?zip=${zip}: #commPage never rendered within 45s (${String(e && e.message).slice(0, 80)})`);
   }
+  const wh = await page.evaluate(readWithheldInPage);
+  if (wh.withheld) return { ...wh, withheldNotice: true };
   return page.evaluate(() => {
     const p = document.getElementById('commPage');
     const robots = (document.getElementById('robots-meta') || {}).getAttribute
@@ -179,6 +183,10 @@ async function main() {
   // Phase 0 first: the model check is cheap and browser-free, so a geographic
   // modeling defect is reported even if the page walk later has trouble.
   const modelFails = await verifyZipStateModel();
+  // WITHHELD ZIP PAGES (founder, 2026-10-01): the list the live site serves.
+  const WH = await loadDeployedWithheld(SITE_BASE);
+  console.log('Withheld ZIP pages: ' + WH.note);
+  let withheldOk = 0;
 
   let walked = [];
   for (let last = ''; ;) {
@@ -210,7 +218,7 @@ async function main() {
     const rows = await rest(`communities?select=zip_codes&level=eq.zip&order=id.asc&limit=4000`);
     for (const row of rows) {
       for (const z of (row.zip_codes || [])) {
-        if (/^\d{5}$/.test(z) && !materializedZips.has(z) && !nonUt.includes(z)) { nonUt.push(z); break; }
+        if (/^\d{5}$/.test(z) && !materializedZips.has(z) && !WH.zips.has(z) && !nonUt.includes(z)) { nonUt.push(z); break; }
       }
       if (nonUt.length >= 4) break;
     }
@@ -233,6 +241,12 @@ async function main() {
       const row = walked[i];
       try {
         const st = await readPage(page, row.zip);
+        if (WH.zips.has(row.zip) || st.withheldNotice) {
+          const wf = judgeWithheld(row.zip, WH.zips.has(row.zip), st);
+          if (wf.length) fails.push(...wf);
+          else { withheldOk++; console.log(`  ✓ ${row.zip} → withheld: "not available" notice, noindex`); }
+          continue;
+        }
         const res = await assertCommunityRow(row, st, async (zip) =>
           (await rest(`app_community_meta?select=zip,data_quality,indexable&zip=eq.${encodeURIComponent(zip)}`))[0] || null);
         if (res.reRead) reReads++;
@@ -274,6 +288,7 @@ async function main() {
     `- Materialized pages checked: **${walked.length}** (all must render their stamped state and stay noindex; `
       + `${nIdx} carry the development gate, which is /community/<zip>/'s business, not this page's)`,
     `- Rows re-read after a mid-walk materializer change: **${reReads}**`,
+    `- Withheld ZIP pages (lib/withheld-zip-pages.json, as deployed): **${WH.zips.size}**, of which **${withheldOk}** were walked and showed the noindex "not available" notice`,
     `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Cross-state ZIP model violations: **${modelFails.length}** (every ZIP page vs the authoritative USPS state)`,
     `- Failed: **${fails.length}**`,

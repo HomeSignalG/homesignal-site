@@ -25,6 +25,7 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { loadDeployedWithheld } from './lib/withheld-zips-live.mjs';
 surfaceBanner('verify-coverage-state');
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
@@ -334,7 +335,11 @@ for (const s of sample) {
 // The rendered `data-coverage-state` attribute carries whatever the view says, so the
 // expected value is read from the row rather than hardcoded — that is what lets one
 // rendering test cover both the pre-split and post-split shapes.
-const pickRow = (pred) => rows.find(pred);
+// A withheld ZIP page (lib/withheld-zip-pages.json, founder 2026-10-01) shows the shell's
+// "not available" notice instead of its coverage copy, so it is never a render sample.
+const WH = await loadDeployedWithheld(SITE_BASE);
+console.log('Withheld ZIP pages: ' + WH.note);
+const pickRow = (pred) => rows.find((r) => !WH.zips.has(r.zip) && pred(r));
 const rFacOnly = pickRow(r => nz(r).core === 'honestly_empty' && nz(r).overlay === 'overlay_records');
 // ⚠️ THE HONEST-EMPTY SAMPLE MUST MATCH THE PAGE'S OWN CONDITION, NOT ITS COMPLEMENT.
 // lib/community-page.js renders the "we checked every supported public source … including

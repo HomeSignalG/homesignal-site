@@ -81,7 +81,12 @@ Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. 
 - 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
   - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
     established);
-  - the 47 ZIPs the dataset flags as decommissioned;
+  - the 47 ZIPs the dataset flags as decommissioned — ⏸️ **pages WITHHELD 2026-10-01** (founder:
+    "retire the 47 zip code pages, take them off live site until i can investigate further").
+    `lib/withheld-zip-pages.json` (computed from the Fix 4 record) is read by `shell.js` (noindex
+    "not available" notice on every ZIP page) and `scripts/gen_zip_pages.py` (no document, no
+    sitemap entry). Registry and database untouched; restore a ZIP by moving it to `restored`.
+    Founder's review still open;
   - the 52 active standard ZIPs with no Census ZCTA;
   - the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.
 
