@@ -249,6 +249,15 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 > `evaluation_invite_redeem`) now live in one shared module, `supabase/functions/_shared/evaluation-reads.ts`, used by both functions,
 > and §4 pins that module and the snapshot module as the only callers. `evaluation_create` and `evaluation_invite_mint` are still
 > called by nothing (step 5d). Record: the engine doc, "Step 5c".
+>
+> **Dated note, 2026-10-02 (build step 5d).** `evaluation_create` now has its first caller:
+> - the trial function's `create` action, for a signed-in admin only (`dashboard_admins`, refused before any field is read);
+> - reached through the same shared module, `createTrial`.
+>
+> It passes the name, the optional seat limit and the optional end date. The owner invite keeps the database's default 14 days
+> (D-L4). No seat limit or end date is chosen by default (D-L2, D-L3): an admin types them or leaves them blank. The owner invite
+> link is returned once, to that admin, and only the token's hash is stored. `evaluation_invite_mint` (an owner inviting agents) is
+> still called by nothing. Record: the engine doc, "Step 5d".
 
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.

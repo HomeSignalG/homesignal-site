@@ -20,6 +20,11 @@
    admin-gate.ts). The page decides nothing about a report: the engine decides
    what is in it, and lib/da-report-view.js draws it. Nothing is saved.
 
+   Build step 5d adds "Start a brokerage trial": it asks the
+   development-activity-trial function, which creates a trial only for a signed-
+   in admin, and shows the owner invite link it returns, once. The page keeps
+   the link only in the open page: never in browser storage.
+
    Standalone like gov-archive.html: the resident app shell carries navigation
    and a signed-out experience that do not belong on an operator tool.
    ============================================================================ */
@@ -37,8 +42,14 @@ header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch
 form{display:grid;gap:12px}
 .row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
 label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
-input[type=text]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
-input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+input[type=text],input[type=number]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
+input[type=text]:focus-visible,input[type=number]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+[hidden]{display:none!important}
+.card h2{margin:0 0 6px;font-size:17px}
+#tstatus{margin:12px 0 0;font-size:14px;min-height:1.5em}
+#tstatus.err{color:var(--red);font-weight:600}
+#tresult{display:grid;gap:10px;margin-top:12px}
+#tlink{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
 fieldset{border:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
 legend{font-size:13px;font-weight:600;color:var(--muted);padding:0;margin-bottom:4px}
 fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var(--ink);font-size:14px}
@@ -68,7 +79,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
   <div class="in">
     <div>
       <h1>Development Activity — private review</h1>
-      <p class="meta">For HomeSignal admins only. Type any U.S. address to see the report a client would get for it. Reports are made live and nothing is saved.</p>
+      <p class="meta">For HomeSignal admins only. Type any U.S. address to see the report a client would get for it. Reports are made live and nothing is saved. Below the report, you can start a brokerage's trial.</p>
     </div>
     <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
   </div>
@@ -98,6 +109,26 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
   <p id="viewnote" hidden></p>
   <p id="creditnote" hidden></p>
   <div id="report"></div>
+  <section class="card" aria-labelledby="trial-h">
+    <h2 id="trial-h">Start a brokerage trial</h2>
+    <p class="hint">This creates the brokerage's account, its free-report trial and a link for its owner. The owner opens the link, signs in and can then make reports. HomeSignal shows the link only once.</p>
+    <form id="tf" novalidate>
+      <label>Brokerage name
+        <input type="text" id="tname" maxlength="120" placeholder="Acme Realty" required>
+      </label>
+      <div class="row">
+        <label>Agent seats (optional)<input type="number" id="tseats" min="0" max="1000" step="1" inputmode="numeric" placeholder="No limit"></label>
+        <label>Trial length in days (optional)<input type="number" id="tdays" min="1" max="365" step="1" inputmode="numeric" placeholder="No end date"></label>
+      </div>
+      <button type="submit" class="go" id="tgo">Create trial and owner link</button>
+    </form>
+    <p id="tstatus" role="status" aria-live="polite"></p>
+    <div id="tresult" hidden>
+      <label>Owner invite link<input type="text" id="tlink" readonly></label>
+      <button type="button" class="go" id="tcopy">Copy link</button>
+      <p class="hint" id="tnote"></p>
+    </div>
+  </section>
 </main>
 
 <div id="auth-overlay" class="auth-overlay">
@@ -126,8 +157,9 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
   var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
   var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
   var FN = SB_URL + '/functions/v1/get-development-activity-report';
+  var TRIAL_FN = SB_URL + '/functions/v1/development-activity-trial';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
-  var session = null, pending = false, busy = false;
+  var session = null, pending = false, busy = false, creating = false, pendingTrial = false;
   var step = 'email', pendingEmail = '';
   function $(id){ return document.getElementById(id); }
 
@@ -178,7 +210,10 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (pending) { pending = false; run(); }
+      if (pendingTrial) { pendingTrial = false; createTrial(); }
     } else {
+      // the owner link belongs to the admin who created it: it leaves the page with them
+      $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';
       var b = document.createElement('button'); b.type = 'button'; b.id = 'signin'; b.textContent = 'Sign in';
       b.addEventListener('click', openAuth);
       who.appendChild(b);
@@ -259,15 +294,95 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     $('creditnote').textContent = cl; $('creditnote').hidden = !cl;
   }
 
+  // ---- a brokerage's trial (build step 5d) ---------------------------------------------------------------------
+  // The function creates the trial, and only for a signed-in admin. It checks every field; the page only says, in plain words, what the
+  // function answered. The owner link is shown once and kept nowhere but this open page.
+  function tsay(text, isError){ var s=$('tstatus'); s.textContent=text||''; s.className=isError?'err':''; }
+  /** A box that may be left blank: null when blank, NaN when it is not a whole number. The function checks the range. */
+  function wholeOrNull(id){ var v=($(id).value||'').trim(); if(!v) return null; return /^\d+$/.test(v) ? Number(v) : NaN; }
+  var UNKNOWN = 'HomeSignal could not confirm whether the trial was created. If it was, nobody has its owner link, and that link stops working on its own. You can create the trial again.';
+  /** What to tell the admin for each answer that is not a new trial. Null when the answer does not say whether a trial was made. */
+  function trialMessage(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 403) return 'This account is not on the HomeSignal admin list, so it cannot create trials.';
+    if (httpStatus === 400 && body.detail === 'brokerage_name') return 'Enter the brokerage name: up to 120 characters, on one line.';
+    if (httpStatus === 400 && body.detail === 'seat_limit') return 'Agent seats must be a whole number from 0 to 1000, or left blank for no limit.';
+    if (httpStatus === 400 && body.detail === 'trial_days') return 'Trial length must be a whole number of days from 1 to 365, or left blank for no end date.';
+    if (httpStatus === 400) return 'The request was not accepted. Check the fields and try again.';
+    if (httpStatus === 413) return 'The request was too large.';
+    if (httpStatus === 422) return 'The database refused to create this trial. Nothing was created.';
+    return null;
+  }
+  function dateWords(iso){
+    var d = iso ? new Date(iso) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  }
+  async function createTrial(){
+    if (creating) return;
+    var name = ($('tname').value || '').trim();
+    if (!name) { tsay('Enter the brokerage name.', true); $('tname').focus(); return; }
+    var seats = wholeOrNull('tseats'), days = wholeOrNull('tdays');
+    if (Number.isNaN(seats)) { tsay('Agent seats must be a whole number, or left blank for no limit.', true); $('tseats').focus(); return; }
+    if (Number.isNaN(days)) { tsay('Trial length must be a whole number of days, or left blank for no end date.', true); $('tdays').focus(); return; }
+    if (!session) { pendingTrial = true; tsay('Sign in to create a trial.', false); openAuth(); return; }
+    var payload = { action: 'create', brokerage_name: name };
+    if (seats !== null) payload.seat_limit = seats;
+    if (days !== null) payload.trial_days = days;
+    creating = true; $('tgo').disabled = true; $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';
+    tsay('Creating the trial…', false);
+    var httpStatus = 0, body = null;
+    try {
+      var res = await fetch(TRIAL_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SB_ANON },
+        body: JSON.stringify(payload)
+      });
+      httpStatus = res.status;
+      try { body = await res.json(); } catch (e) { body = null; }
+    } catch (e) {
+      creating = false; $('tgo').disabled = false;
+      tsay(UNKNOWN, true);
+      return;
+    }
+    creating = false; $('tgo').disabled = false;
+    if (httpStatus === 401) { session = null; pendingTrial = true; openAuth(); }
+    var link = body && typeof body.invite_link === 'string' ? body.invite_link : '';
+    if (httpStatus === 200 && body && body.status === 'OK' && /^https:\/\/homesignal\.net\/[^\s#]+#invite=hse1_[0-9a-f]{64}$/.test(link)) {
+      var seatsWords = body.seat_limit === null ? 'no limit on agent seats' : body.seat_limit === 1 ? '1 agent seat' : body.seat_limit + ' agent seats';
+      var ends = dateWords(body.trial_ends_at), until = dateWords(body.invite_expires_at);
+      tsay('Trial created for ' + body.brokerage_name + ': ' + seatsWords + ', ' + (ends ? 'ends ' + ends : 'no end date') + '.', false);
+      $('tlink').value = link;
+      $('tnote').textContent = 'Send this link only to the owner of ' + body.brokerage_name + ': the first person to open it and sign in becomes the trial\u2019s owner. '
+        + (until ? 'It works until ' + until + '. ' : '') + 'HomeSignal shows it only this once.';
+      $('tcopy').textContent = 'Copy link';
+      $('tresult').hidden = false;
+      $('tname').value = ''; $('tseats').value = ''; $('tdays').value = '';
+      return;
+    }
+    tsay(trialMessage(httpStatus, body) || UNKNOWN, true);
+  }
+  function copyLink(){
+    var v = $('tlink').value;
+    if (!v) return;
+    function select(){ $('tlink').focus(); $('tlink').select(); $('tcopy').textContent = 'Selected: press Ctrl+C or \u2318C'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('tcopy').textContent = 'Copied'; }, select);
+      else select();
+    } catch (e) { select(); }
+  }
+
   document.addEventListener('DOMContentLoaded', function(){
     $('signin').addEventListener('click', openAuth);
-    $('auth-close').addEventListener('click', function(){ pending = false; closeAuth(); });
+    $('auth-close').addEventListener('click', function(){ pending = false; pendingTrial = false; closeAuth(); });
     $('auth-submit').addEventListener('click', function(){ if(step==='code') verifyCode(); else sendCode(); });
     $('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') sendCode(); });
     $('auth-code').addEventListener('keydown', function(e){ if(e.key==='Enter') verifyCode(); });
     $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
-    $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pending = false; closeAuth(); } });
+    $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pending = false; pendingTrial = false; closeAuth(); } });
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
+    $('tf').addEventListener('submit', function(e){ e.preventDefault(); createTrial(); });
+    $('tcopy').addEventListener('click', copyLink);
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
     client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
   });

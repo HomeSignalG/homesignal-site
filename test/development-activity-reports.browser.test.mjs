@@ -147,7 +147,11 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 // ---- 1. the invite link: joined once, the token gone from the address bar and the tab ------------------------------------------------
 {
   const w = world({ trial: null });
-  const { ctx, page, errors, trials, foreign } = await open({ w, signedIn: false, hash: '#invite=' + TOKEN });
+  // the link exactly as the trial function hands it to the admin who created the trial (build step 5d): its path is this page and its
+  // fragment is what this page reads, so a change to either half of the invite link fails here
+  const link = new URL(E.inviteLink(TOKEN));
+  ok(link.origin === 'https://homesignal.net' && link.pathname === PAGE, '1-0 the invite link the server makes points at this page', link.href);
+  const { ctx, page, errors, trials, foreign } = await open({ w, signedIn: false, hash: link.hash });
   ok((await page.evaluate(() => location.hash)) === '' && !(await page.evaluate(() => location.href)).includes('hse1_'), '1a the invite token is removed from the address bar on load');
   ok(/join your brokerage/.test(await text(page, '#trial-count')) && trials.length === 0, '1b signed out, the page asks the person to sign in to join, and calls nothing');
   await page.click('#signin');

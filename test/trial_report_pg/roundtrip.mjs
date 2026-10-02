@@ -1,5 +1,6 @@
-// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b and 5c).
-// Joining the trial goes through the real handler and data layer of development-activity-trial (5c); making reports goes through
+// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c and 5d).
+// Creating the trial (5d, an admin) and joining it (5c) go through the real handler and data layer of development-activity-trial;
+// making reports goes through
 // the real request handler and the real data layer of get-development-activity-report, the real snapshot module and the real
 // SQL of record (account spine, private context, snapshot, evaluation entitlement). The only translation is the network: a
 // request the data layer would send to PostgREST is run as the same database function call through psql, and a database
@@ -31,6 +32,9 @@ const RPC = {
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
   report_private_context_read: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_private_context_read(:'c'::uuid) t", { c: a.p_context }],
   evaluation_invite_redeem: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_redeem(:'t', :'u'::uuid) t", { t: a.p_token, u: a.p_user_id }],
+  // PostgREST passes a JSON null as SQL null; psql variables cannot carry one, so '' stands for null here and nowhere else
+  evaluation_create: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_create(:'n', nullif(:'s', '')::integer, nullif(:'e', '')::timestamptz) t",
+    { n: a.p_brokerage_name, s: a.p_seat_limit === null ? '' : String(a.p_seat_limit), e: a.p_expires_at === null ? '' : a.p_expires_at }],
 };
 const seen = [];
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
@@ -60,18 +64,42 @@ async function fetchToSql(url, init = {}) {
 // ---- the people: one who joins a fresh evaluation through the trial function, and others who do not ----------------------------
 const MEMBER = 'a1111111-1111-4111-8111-111111111111', STRANGER = 'b2222222-2222-4222-8222-222222222222', LATE = 'c3333333-3333-4333-8333-333333333333';
 one("insert into auth.users (id, email) values (:'a'::uuid, 'agent@example.test'), (:'b'::uuid, 'someone@example.test'), (:'c'::uuid, 'late@example.test')", { a: MEMBER, b: STRANGER, c: LATE });
-const [evalId, token] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Round Trip Realty')").split(' ');
-async function trialAsk(userId, body) {
+async function trialAsk(userId, body, admin = false) {
   const real = TD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc' }, fetchToSql);
-  const h = TH.makeHandler({ ...real, authenticate: async () => ({ email: 'someone@example.test', id: userId }), isAdmin: async () => false });
+  const h = TH.makeHandler({ ...real, authenticate: async () => ({ email: 'someone@example.test', id: userId }), isAdmin: async () => admin });
   const res = await h(new Request('https://x/functions/v1/development-activity-trial',
     { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
 }
 const members = () => Number(one('select count(*) from public.brokerage_member'));
+const tally = () => one("select (select count(*) from public.brokerage_account) || ' ' || (select count(*) from public.evaluation) || ' ' || (select count(*) from public.evaluation_invite)");
+const ADMIN = 'd4444444-4444-4444-8444-444444444444';
+one("insert into auth.users (id, email) values (:'d'::uuid, 'founder@example.test')", { d: ADMIN });
+
+// ---- 0-. creating the trial, through the trial function (build step 5d) ---------------------------------------------------------------------
+let t = await trialAsk(STRANGER, { action: 'create', brokerage_name: 'Round Trip Realty' });
+ok(t.status === 403 && t.json.error === 'forbidden' && tally() === '0 0 0' && !seen.some((x) => /evaluation_create/.test(x)),
+  '0-a a signed-in person who is not an admin cannot create a trial: nothing is written, and the database function is never called', t.json);
+t = await trialAsk(ADMIN, { action: 'create', brokerage_name: '  Round Trip Realty ' }, true);
+ok(t.status === 200 && t.json.brokerage_name === 'Round Trip Realty' && t.json.seat_limit === null && t.json.trial_ends_at === null
+   && /^https:\/\/homesignal\.net\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link),
+  '0-b an admin creates a trial: the answer is the owner invite link', t.json);
+const token = new URL(t.json.invite_link).hash.slice('#invite='.length);
+const evalId = one("select e.evaluation_id from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Round Trip Realty'");
+ok(tally() === '1 1 1' && one("select status || ' ' || coalesce(seat_limit::text, 'none') || ' ' || coalesce(expires_at::text, 'none') from public.evaluation where evaluation_id = :'e'::uuid", { e: evalId }) === 'active none none',
+  '0-c the database holds one brokerage account (named as typed, trimmed), one active trial with no seat limit and no end date, and one invite');
+ok(one("select count(*) from public.evaluation_invite where evaluation_id = :'e'::uuid and role = 'owner' and status = 'open' and token_hash = encode(sha256(convert_to(:'t', 'UTF8')), 'hex')", { e: evalId, t: token }) === '1',
+  '0-d the link carries the token of that trial\'s one OPEN OWNER invite (only its hash is stored)');
+ok(Math.abs(Date.parse(t.json.invite_expires_at) - Date.now() - 14 * 86_400_000) < 120_000, '0-e the invite lives the database\'s default 14 days (D-L4)', t.json.invite_expires_at);
+ok(!new RegExp(evalId + '|' + one("select brokerage_id from public.evaluation where evaluation_id = :'e'::uuid", { e: evalId })).test(JSON.stringify(t.json)), '0-f the answer carries neither the trial\'s id nor the brokerage\'s');
+t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Bounded Realty', seat_limit: 2, trial_days: 30 }, true);
+const bounded = one("select e.seat_limit || ' ' || extract(epoch from e.expires_at - e.created_at)::bigint from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Bounded Realty'").split(' ');
+ok(t.status === 200 && bounded[0] === '2' && Math.abs(Number(bounded[1]) - 30 * 86_400) < 120, '0-g a seat limit and a length reach the database as typed: 2 seats, ending 30 days after creation', bounded);
+t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Bad Seats Realty', seat_limit: -1 }, true);
+ok(t.status === 400 && t.json.detail === 'seat_limit' && tally() === '2 2 2', '0-h a refused field never reaches the database: nothing more is written', t.json);
 
 // ---- 0. joining, through the trial function (build step 5c) -------------------------------------------------------------------------
-let t = await trialAsk(MEMBER, { action: 'status' });
+t = await trialAsk(MEMBER, { action: 'status' });
 ok(t.status === 200 && t.json.access === 'none' && t.json.trial === null, '0a before joining, the person has no trial', t.json);
 t = await trialAsk(MEMBER, { action: 'redeem', token });
 ok(t.status === 200 && t.json.role === 'owner' && t.json.replayed === false && t.json.access === 'trial' && t.json.trial.credits_remaining === 20 && t.json.trial.credits_used === 0,
@@ -86,7 +114,8 @@ const before0 = seen.length;
 t = await trialAsk(STRANGER, { action: 'redeem', token: 'hse1_' + 'g'.repeat(64) });
 ok(t.status === 400 && t.json.error === 'invite_unusable' && !seen.slice(before0).some((x) => /evaluation_invite_redeem/.test(x)), '0g a malformed token never reaches the database');
 // a second brokerage: its owner invite cannot be used by someone who already belongs to one; its agent seats can be full
-const [, token2] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Other Realty', 0)").split(' ');
+t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Other Realty', seat_limit: 0 }, true);
+const token2 = new URL(t.json.invite_link).hash.slice('#invite='.length);
 t = await trialAsk(MEMBER, { action: 'redeem', token: token2 });
 ok(t.status === 409 && t.json.error === 'already_a_member' && members() === 1, '0h a person already in a brokerage cannot join another (one membership per person)', t.json);
 const [ev3] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Seatless Realty', 0)").split(' ');

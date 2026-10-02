@@ -31,6 +31,8 @@
  *       launch (build step 13), asks only for the customer view, and reads its invite token from the URL fragment only. Who may
  *       make a report is still the report function's gate (an admin, or a member of an active trial); being able to load the
  *       page grants nothing.
+ *       (build step 5d, 2026-10-02) the review page is admitted for the trial function too, for one action: an admin creating a
+ *       brokerage's trial. P5i/P5j keep that action admin-only in the function, and the page asking for nothing else.
  *
  * WHEN THE CUSTOMER SURFACE ARRIVES (Orders K, L, I): P4 is the pin that must then change, DELIBERATELY, in the
  * same change that puts the entitlement check in supabase/functions/_shared/admin-gate.ts. Until then the only
@@ -155,14 +157,15 @@ ok(htmlWithHost.length === 0, 'P3f no staged page carries the City host (its CSP
 // ---- P4: who may call the report engine: the admin review page, and the customer page for invited trial members -----
 // ALLOWED[slug] is the complete list of staged files that may name it. Build step 4 admitted the private review page for the report
 // engine; P5 below keeps that page an operator tool. Build step 5c admits the customer page for the report engine and the trial
-// function, and nothing else; P6 below keeps it reachable only by invite until launch (build step 13).
+// function, and nothing else; P6 below keeps it reachable only by invite until launch (build step 13). Build step 5d admits the review
+// page for the trial function, to create a trial; P5i/P5j below keep that an admin's act.
 const REVIEW_PAGE = 'development-activity-review.html';
 const CUSTOMER_PAGE = 'development-activity-reports.html';
 const ALLOWED = {
   'get-future-surroundings-report': [],
   'get-development-activity-report': [CUSTOMER_PAGE, REVIEW_PAGE].sort(),
   'follow-development-report': [],
-  'development-activity-trial': [CUSTOMER_PAGE],
+  'development-activity-trial': [CUSTOMER_PAGE, REVIEW_PAGE].sort(),
 };
 for (const s of SLUGS) {
   const hits = [...content].filter(([, body]) => slugRe(s).test(body)).map(([f]) => f).sort();
@@ -191,6 +194,14 @@ ok(/if \(!who\.admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(
    && /if \(t\.status === 'active' && !t\.expired\) return 'active';/.test(gate),
   'P5g the gate still refuses a caller with no token (401), and a signed-in caller who is neither an admin nor a member of an active, unexpired trial (403)');
 ok(!/service_role|SERVICE_ROLE/.test(review), 'P5h the review page carries no service-role key; it uses the public browser key and the signed-in user\'s own token');
+// build step 5d: the review page asks the trial function for one thing, an admin creating a trial; the function refuses anyone else first
+ok((review.match(/action: '[a-z]+'/g) || []).join() === "action: 'create'" && !/location\.hash/.test(review),
+  'P5i the review page asks the trial function only to create a trial: it never joins one, reads one, or reads an invite from its own address');
+const trialSrc = readRepo('supabase/functions/development-activity-trial/handler.ts');
+const iCreate = trialSrc.indexOf("if (action === 'create') {"), iAdmin = trialSrc.indexOf("if (!who.admin) return reply(req, { error: 'forbidden' }, 403);", iCreate),
+  iFields = trialSrc.indexOf('trialRequest(body', iCreate), iMake = trialSrc.indexOf('deps.createTrial(', iCreate);
+ok(iCreate > 0 && iAdmin > iCreate && iFields > iAdmin && iMake > iFields && (trialSrc.match(/deps\.createTrial\(/g) || []).length === 1,
+  'P5j in the trial function, creating a trial refuses anyone who is not an admin before a field is read, and is the only call that creates one', { iCreate, iAdmin, iFields, iMake });
 
 // ---- P6: the customer page (build step 5c) is reached only by invite until launch, and asks only for the customer view ----------
 const cust = content.get(CUSTOMER_PAGE) || '';

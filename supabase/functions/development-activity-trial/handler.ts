@@ -1,22 +1,25 @@
-// development-activity-trial — joining a brokerage's 20-report trial, and reading one's own trial (Development Activity build
-// step 5c; docs/development-activity-build-steps-100526.md).
+// development-activity-trial — joining a brokerage's 20-report trial, reading one's own trial (Development Activity build step 5c),
+// and creating a trial (step 5d; docs/development-activity-build-steps-100526.md).
 //
-// TWO ACTIONS, both for the signed-in person only:
+// THREE ACTIONS:
 //   status   whether this person can make reports here, and how many free reports their brokerage's trial has left.
 //   redeem   join a trial with an invite token (the one in the invite link). The same person using their own invite again
 //            is told so and nothing changes.
+//   create   ADMIN ONLY (dashboard_admins): create a brokerage's trial and its owner invite. The invite link is in the answer,
+//            once; nothing else on HomeSignal can show it again.
 //
 // WHO DECIDES WHAT. The database decides membership, the count and whether an invite may be used (docs/evaluation-entitlement.sql,
 // Order L1), through _shared/evaluation-reads.ts. Whether a trial may make reports now is _shared/admin-gate.ts trialStanding, the
 // same reading the report function's gate uses. Making and charging reports is get-development-activity-report, never this function.
 //
-// WHAT IT NEVER RETURNS: an evaluation id, a brokerage id, an invite id, or anything about another person.
+// WHAT IT NEVER RETURNS: an evaluation id, a brokerage id, an invite id, or anything about another person. The one secret it returns
+// is the owner invite link, to the admin who just created the trial.
 //
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { authorizeSignedIn, corsFor, readBounded, reply, TOO_LARGE, trialStanding, trialSummary } from '../_shared/admin-gate.ts';
 import type { AdminGateDeps, TrialState } from '../_shared/admin-gate.ts';
-import { AlreadyAMember, InviteUnusable, SeatLimitReached } from '../_shared/evaluation-reads.ts';
-import type { Redeemed } from '../_shared/evaluation-reads.ts';
+import { AlreadyAMember, InviteUnusable, SeatLimitReached, TrialRejected } from '../_shared/evaluation-reads.ts';
+import type { CreatedTrial, NewTrial, Redeemed } from '../_shared/evaluation-reads.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
 export { DataUnavailable };
@@ -24,15 +27,40 @@ export { DataUnavailable };
 export type Deps = AdminGateDeps & {
   trialOf: (userId: string) => Promise<TrialState | null>;
   redeemInvite: (token: string, userId: string) => Promise<Redeemed>;
+  createTrial: (t: NewTrial) => Promise<CreatedTrial>;
+  now: () => Date;
 };
 
 export const CAPABILITY = {
   product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-  method: 'POST { action: "status" } | { action: "redeem", token }',
-  access: 'signed-in user; answers only about their own trial',
+  method: 'POST { action: "status" } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? }',
+  access: 'signed-in user; answers only about their own trial. create: an internal admin (dashboard_admins) only',
   stores_reports: false,
-  writes: ['a brokerage membership, when the signed-in person redeems an invite'],
+  writes: ['a brokerage membership, when the signed-in person redeems an invite',
+    'a brokerage account, its trial and its owner invite, when an admin creates a trial'],
 };
+
+/** The longest brokerage name accepted, and the bounds of the two optional numbers. Input checks only: none is a product limit. */
+export const NAME_MAX = 120, SEATS_MAX = 1000, DAYS_MAX = 365;
+const DAY_MS = 86_400_000;
+
+/**
+ * An admin's request to create a trial, checked before the database is asked. Returns the trial to create, or the name of the field
+ * that is wrong. A blank seat limit is "no limit" (D-L2) and a blank length is "no end date" (D-L3): this function invents neither.
+ * The owner invite lives the database's default 14 days (D-L4); the request cannot change it.
+ */
+export function trialRequest(body: Record<string, unknown>, now: Date): NewTrial | 'brokerage_name' | 'seat_limit' | 'trial_days' {
+  const name = typeof body.brokerage_name === 'string' ? body.brokerage_name.trim() : '';
+  if (!name || name.length > NAME_MAX || /[\u0000-\u001f\u007f]/.test(name)) return 'brokerage_name';
+  const seats = body.seat_limit, days = body.trial_days;
+  if (seats !== undefined && seats !== null && !(Number.isInteger(seats) && (seats as number) >= 0 && (seats as number) <= SEATS_MAX)) return 'seat_limit';
+  if (days !== undefined && days !== null && !(Number.isInteger(days) && (days as number) >= 1 && (days as number) <= DAYS_MAX)) return 'trial_days';
+  return {
+    brokerageName: name,
+    seatLimit: seats === undefined || seats === null ? null : seats as number,
+    expiresAt: days === undefined || days === null ? null : new Date(now.getTime() + (days as number) * DAY_MS).toISOString(),
+  };
+}
 
 /**
  * How the report function will treat this person, and their trial in plain counts. `access` is 'admin' (served as an admin: never
@@ -76,6 +104,23 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
           throw e;
         }
         return reply(req, { status: 'OK', role: joined.role, replayed: joined.replayed, ...standingOf(who.admin, await deps.trialOf(who.userId)) });
+      }
+      if (action === 'create') {
+        // an admin's act: refused for anyone else before a single field is looked at
+        if (!who.admin) return reply(req, { error: 'forbidden' }, 403);
+        const wanted = trialRequest(body as Record<string, unknown>, deps.now());
+        if (typeof wanted === 'string') return reply(req, { error: 'bad_request', detail: wanted }, 400);
+        let made: CreatedTrial;
+        try {
+          made = await deps.createTrial(wanted);
+        } catch (e) {
+          if (e instanceof TrialRejected) return reply(req, { error: 'rejected' }, 422);
+          throw e;
+        }
+        return reply(req, {
+          status: 'OK', brokerage_name: wanted.brokerageName, seat_limit: wanted.seatLimit, trial_ends_at: wanted.expiresAt,
+          invite_link: made.invite_link, invite_expires_at: made.invite_expires_at,
+        });
       }
       return reply(req, { error: 'bad_request' }, 400);
     } catch (e) {
