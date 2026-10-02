@@ -928,7 +928,7 @@ def render(p, built):
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
-        '<script src="/lib/templates.js?v=74ada1e6"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=49ae3c36"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -945,7 +945,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=e5f52c17"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=9d8d7f6e"></script>\n'
+        '<script src="/lib/community-page.js?v=b487b306"></script>\n'
         "</body>\n</html>\n")
 
 
