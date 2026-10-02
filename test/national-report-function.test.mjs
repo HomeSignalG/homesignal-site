@@ -96,8 +96,12 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok((await post({ address: 'nospacesatallinthisaddress' })).status === 400, '2a an address with no space: 400');
   ok((await post({ address: 'x '.repeat(101) })).status === 400, '2a an address over 200 characters: 400');
   ok((await post({ address: 12345678 })).status === 400 && (await post({})).status === 400, '2a a non-string or missing address: 400');
-  ok((await post({ ...REQ, radius_mi: 3 })).status === 400 && (await post({ ...REQ, radius_mi: 'wide' })).status === 400, '2b a radius that is not 0.5, 1, 2 or 5: 400');
-  for (const r of [0.5, 1, 2, 5, '2']) ok((await post({ ...REQ, radius_mi: r })).status === 200, '2b radius ' + JSON.stringify(r) + ' is accepted');
+  // 100526 plan, ruling 7: every report is 0.5 mile. 1, 2 and 5 are radii the spatial read knows, and a report still refuses them.
+  for (const r of [3, 'wide', 1, 2, 5, '2', 0.3]) {
+    const res = await post({ ...REQ, radius_mi: r });
+    ok(res.status === 400 && res.json.detail === 'radius_mi must be 0.5', '2b radius ' + JSON.stringify(r) + ' is refused: a report is 0.5 mile', res.json);
+  }
+  for (const r of [0.5, '0.5']) ok((await post({ ...REQ, radius_mi: r })).status === 200, '2b radius ' + JSON.stringify(r) + ' is accepted');
   ok((await post({ ...REQ, view: 'staff' })).status === 400, '2c an unknown view: 400');
   ok((await post({ ...REQ, label: 'x'.repeat(81) })).status === 400 && (await post({ ...REQ, label: 5 })).status === 400, '2d a label over 80 characters, or not a string: 400');
   const unk = await post({ ...REQ, client_name: 'Homer' });
@@ -108,7 +112,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const declared = await call(f(), REQ, { ...AUTH, 'content-length': '999999' });
   ok(declared.status === 413, '2g a declared length over the bound is refused before the body is read');
   const get = await call(f(), null, {}, 'GET');
-  ok(get.status === 200 && get.json.stores_reports === false && get.json.radius_mi.join() === '0.5,1,2,5', '2h GET returns the capability (no data), and says it stores nothing');
+  ok(get.status === 200 && get.json.stores_reports === false && get.json.radius_mi.join() === '0.5', '2h GET returns the capability (no data), and says it stores nothing');
   ok((await call(f(), null, AUTH, 'DELETE')).status === 405, '2h other methods: 405');
 }
 
@@ -175,9 +179,9 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const asked = [];
   const d2 = fakes({ radius: async (lat, lng, rad) => { asked.push([lat, lng, rad]); return []; } });
   const dflt = await call(d2.deps, REQ, AUTH);
-  ok(asked.length === 1 && asked[0][2] === 1 && dflt.json.report.radius_mi === 1, '4j with no radius given, the canonical read is asked for 1 mile and the report says so', asked);
-  const two = await call(fakes({ radius: async (a, b, rad) => { asked.push(rad); return []; } }).deps, { ...REQ, radius_mi: 2 }, AUTH);
-  ok(asked[1] === 2 && two.json.report.radius_mi === 2, '4j and a stated radius is the one asked for');
+  ok(asked.length === 1 && asked[0][2] === 0.5 && dflt.json.report.radius_mi === 0.5, '4j with no radius given, the canonical read is asked for 0.5 mile and the report says so', asked);
+  const half = await call(fakes({ radius: async (a, b, rad) => { asked.push(rad); return []; } }).deps, { ...REQ, radius_mi: 0.5 }, AUTH);
+  ok(asked[1] === 0.5 && half.json.report.radius_mi === 0.5, '4j and a stated 0.5 is the one asked for');
 
   const internal = await call(fakes({ rights: { version: 1, cleared: [] } }).deps, { ...REQ, view: 'internal' }, AUTH);
   ok(internal.json.storable === false && internal.json.storage_blockers.includes('INTERNAL_VIEW') && internal.json.report.projects.every((p) => p.rights === 'HOLD'),

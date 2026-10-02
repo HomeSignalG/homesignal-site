@@ -49,7 +49,13 @@ const all = Object.values(src).map(code).join('\n');
   ok(/\/functions\/v1\/geocode-address/.test(src.data), '2a the address is resolved by the existing geocode-address function');
   ok(!/census\.gov|geocoding\./i.test(all), '2b there is no second geocoder client in the function');
   ok(/rpc\/n5_projects_within_radius/.test(src.data) && /p_radius_mi/.test(src.data), '2c nearby projects come from the canonical spatial read');
-  ok(!/ST_DWithin|st_distance|haversine|earth_distance/i.test(all) && !/Math\.(sin|cos|atan2|asin)\(/.test(all), '2d and no distance is computed here');
+  // The one place trigonometry is allowed is bearingDeg (the map's direction, 100526 step 2). It returns a direction, never a
+  // distance, and its result goes only to the response-only block. Everything else stays free of geometry.
+  const bearingFn = /export function bearingDeg\([\s\S]*?\n\}/.exec(src.module);
+  const allButBearing = bearingFn ? all.replace(code(bearingFn[0]), '') : all;
+  ok(!!bearingFn && !/ST_DWithin|st_distance|haversine|earth_distance/i.test(all) && !/Math\.(sin|cos|atan2|asin)\(/.test(allButBearing), '2d and no distance is computed here (trigonometry only inside bearingDeg)');
+  ok(!!bearingFn && !/distance/i.test(code(bearingFn[0])) && /bearings\[p\.source_key\] = b;/.test(src.module) && (src.module.match(/bearingDeg\(/g) || []).length === 2,
+    '2d2 bearingDeg computes no distance, and its one caller writes only the response-only bearings');
   ok(/canonical_zip_registry/.test(src.data), '2e ZIP support is asked of canonical_zip_registry');
   ok(/dev_change_event_reportable/.test(src.reads) && !/dev_change_event\?/.test(code(src.reads)) && !/dev_change_event\?/.test(code(src.data)), '2f changes are read from the ledger\'s reportable view, never the raw event table');
   ok(!/get-future-surroundings-report|nyc-v1|allowlist\.ts|soda|socrata/i.test(all), '2g the legacy NYC engine is not a dependency: there is one commercial engine');

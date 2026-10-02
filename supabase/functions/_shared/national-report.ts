@@ -20,7 +20,7 @@
 //   intelligence  permanent, hashed, and the body of a stored snapshot. Holds no address, no coordinate of the
 //                 subject, no distance from it, no bearing.
 //   privateContext  the customer's address and the point derived from it. Deletable.
-//   renderOnly    distances from the subject, for the response only. Never stored.
+//   renderOnly    distances and map directions from the subject, for the response only. Never stored.
 // They are built separately and never split afterwards, so there is no step at which the address was ever
 // inside the permanent object.
 import './project-type.generated.js';
@@ -28,11 +28,17 @@ import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
 
 export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
-export const REPORT_VERSION = 'development-activity-national-1';
+/** national-2 (2026-10-02, 100526 plan step 2): adds the Stage dimension (`stage`, `sections.by_stage`, `stage_rule_version`). */
+export const REPORT_VERSION = 'development-activity-national-2';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
 export const ALLOWED_RADII = [0.5, 1, 2, 5];
+/**
+ * THE report radius (100526 plan, ruling 7): every Phase 1 report, free or paid, is 0.5 mile, and no customer chooses it.
+ * The canonical spatial read still accepts the other radii; the request handler is what refuses them for a report.
+ */
+export const REPORT_RADIUS_MI = 0.5;
 /**
  * The publisher date kinds that record something that HAPPENED. `scheduled` and `estimated` are plans, not
  * events. Measured over app_projects (2026-09-29): the same column also carries sentinels (1900-01-01,
@@ -43,6 +49,98 @@ export const EVENT_KINDS: Record<string, string> = {
   filed: 'Filed', issued: 'Issued', decided: 'Decided', awarded: 'Awarded', completed: 'Completed', hearing: 'Hearing',
 };
 export const LIFECYCLE_ORDER = ['approved', 'proposed', 'operating', 'unknown'] as const;
+
+// ── the Stage dimension (100526 plan, rulings 2 and 3; "Customer-facing primary section assignment") ──────────────
+//
+// Stage is a PRESENTATION of the evidence, never a fifth lifecycle key. A current project sits in exactly one of three
+// stages, strongest supported first:
+//   permitted  Permitted / Under Construction — the publisher's OWN stage says a permit was issued or construction is
+//              under way, and the canonical lifecycle is approved or unknown;
+//   approved   Approved / Coming — lifecycle approved, without that evidence;
+//   proposed   Proposed / Under Review — lifecycle proposed.
+// Operating records and unknown records without the evidence have no stage (ruling 3: no "What Exists Today").
+// Never inferred from a type, a date or an approval: only the words below, after normaliseStage(), count.
+
+/** Bump whenever STAGE_EVIDENCE changes: the report carries it, so a stored report says which list judged it. */
+export const STAGE_RULE_VERSION = 'stage-evidence-1';
+/**
+ * The publisher stage values that SAY a permit was issued or construction is under way. A closed list, taken from the
+ * stage values in a 3% sample of production `app_projects` development rows on 2026-10-02
+ * (docs/development-activity-build-steps-100526.md, step 2). A value not named here stays in Approved / Coming.
+ * Deliberately NOT named, with the reason:
+ *   'construction work program', 'in the 2026 county construction program', 'design and construct' ... a plan, not work;
+ *   'construction (pending)', 'to be issued', 'approved for permitting', 'phased permitting' ............. not yet issued;
+ *   'co issued', 'c of o issued', 'certificate of occupancy issued', 'tco issued', 'construction completed' ... finished;
+ *   'decision issued' ...................................................................................... a decision, not a permit;
+ *   'new building', 'phased construction', 'new non-building structure' ............................... a permit CLASS (Denver);
+ *   'permit printed', 'underway' ........................................................................... not clear enough.
+ */
+export const STAGE_EVIDENCE: Readonly<Record<string, 'permit_issued' | 'under_construction'>> = Object.freeze({
+  'issued': 'permit_issued',
+  'permit issued': 'permit_issued',
+  'permits issued': 'permit_issued',
+  'permit(s) issued': 'permit_issued',
+  'active - issued': 'permit_issued',
+  'issued full': 'permit_issued',
+  'issued (nca)': 'permit_issued',
+  'issued - amendment pending': 'permit_issued',
+  'reissued': 'permit_issued',
+  're-issued': 'permit_issued',
+  'under construction': 'under_construction',
+  'construction': 'under_construction',
+  'construction started': 'under_construction',
+  'construction underway': 'under_construction',
+  'in construction': 'under_construction',
+  'construction (missing dates)': 'under_construction',
+  'permit issued / construction started': 'under_construction',
+});
+export const STAGE_EVIDENCE_LABELS = { permit_issued: 'Permit issued', under_construction: 'Under construction' } as const;
+export const STAGE_ORDER = ['approved', 'proposed', 'permitted'] as const;
+export type Stage = typeof STAGE_ORDER[number];
+export const STAGE_LABELS: Record<Stage, string> = {
+  approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction',
+};
+
+/** Lower case, trimmed, a leading phase number removed ("05_Construction", "5. ISSUED", "2 - Design"), spaces collapsed. */
+export function normaliseStage(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  return raw.toLowerCase().trim().replace(/^\d+\s*[._)-]\s*/, '').replace(/\s+/g, ' ').trim();
+}
+
+/** What the publisher's own stage says, when it says a permit was issued or construction is under way; otherwise null. */
+export function stageEvidence(publisherStage: unknown): { kind: 'permit_issued' | 'under_construction'; label: string } | null {
+  const k = normaliseStage(publisherStage);
+  if (!k || !Object.prototype.hasOwnProperty.call(STAGE_EVIDENCE, k)) return null;
+  const kind = STAGE_EVIDENCE[k];
+  return { kind, label: STAGE_EVIDENCE_LABELS[kind] };
+}
+
+/** THE one assignment of a current project to a Stage. Null means it is in no stage section. */
+export function presentationStage(lifecycleKey: string, publisherStage: unknown): Stage | null {
+  const ev = stageEvidence(publisherStage);
+  if (ev && (lifecycleKey === 'approved' || lifecycleKey === 'unknown')) return 'permitted';
+  if (lifecycleKey === 'approved') return 'approved';
+  if (lifecycleKey === 'proposed') return 'proposed';
+  return null;
+}
+
+/**
+ * How many projects "Things to Review With Your Client" lists (100526 plan, "Things to Review"). A presentation default, not a
+ * founder-set value. The list is the nearest current projects (those in a stage section), so it is measured from the subject and
+ * lives in the response-only block: a stored report carries no distance and therefore no such list.
+ */
+export const REVIEW_LIMIT = 3;
+const STAGE_STRENGTH: Record<Stage, number> = { permitted: 0, approved: 1, proposed: 2 };
+
+/** Initial compass bearing, in whole degrees, from one point to another. For the response only, never stored. */
+export function bearingDeg(fromLat: number, fromLng: number, toLat: number, toLng: number): number | null {
+  if (![fromLat, fromLng, toLat, toLng].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+  const r = Math.PI / 180;
+  const y = Math.sin((toLng - fromLng) * r) * Math.cos(toLat * r);
+  const x = Math.cos(fromLat * r) * Math.sin(toLat * r) - Math.sin(fromLat * r) * Math.cos(toLat * r) * Math.cos((toLng - fromLng) * r);
+  if (x === 0 && y === 0) return null;
+  return Math.round(((Math.atan2(y, x) / r) + 360) % 360) % 360;
+}
 
 export type Lifecycle = 'proposed' | 'approved' | 'operating' | 'unknown';
 export type CoverageState = 'OUTSIDE_COVERAGE' | 'LIMITED_COVERAGE' | 'REPORT_READY' | 'CHANGE_READY';
@@ -55,6 +153,8 @@ export type RightsRegistry = { version: number; cleared: RightsEntry[] };
 export type RadiusRow = {
   source_key: string; feature_id: string; registry_id: string | null; provenance: string;
   distance_mi: number; geometry_type: string; has_more: boolean;
+  /** the RPC's display point for this geometry instance; used only for the map's direction, never stored */
+  marker_lat?: number | null; marker_lng?: number | null;
 };
 /** The columns of public.app_projects the report reads. */
 export type ProjectRow = {
@@ -97,7 +197,7 @@ export type Assembled = {
   privateContext: PrivateContext | null;
   engineInputs: Record<string, unknown> | null;
   /** for the response only: never stored, never hashed */
-  renderOnly: { distances_mi: Record<string, number>; internal?: Record<string, unknown> };
+  renderOnly: { distances_mi: Record<string, number>; bearings_deg: Record<string, number>; review: string[]; internal?: Record<string, unknown> };
   /** every reason this report may not be stored as a customer snapshot; empty means it may */
   storage_blockers: string[];
 };
@@ -278,7 +378,7 @@ export function assemble(input: AssembleInput): Assembled {
   if (!input.zip_supported) {
     return {
       coverage_state: 'OUTSIDE_COVERAGE', intelligence: null, privateContext: null, engineInputs: null,
-      renderOnly: { distances_mi: {} }, storage_blockers: ['OUTSIDE_COVERAGE'],
+      renderOnly: { distances_mi: {}, bearings_deg: {}, review: [] }, storage_blockers: ['OUTSIDE_COVERAGE'],
     };
   }
 
@@ -286,11 +386,13 @@ export function assemble(input: AssembleInput): Assembled {
   const cleared = new Map(rights.cleared.map((e) => [e.registry_id, e]));
   const truncated = input.rows.some((r) => r.has_more === true);
 
-  // nearest distance per project (a project may own several geometry instances)
+  // nearest distance per project (a project may own several geometry instances); its direction is taken from that instance's
+  // display point, so on the map a line or an area is drawn at its true nearest distance and in an approximate direction
   const distance = new Map<string, number>();
+  const nearest = new Map<string, RadiusRow>();
   for (const r of input.rows) {
     const cur = distance.get(r.source_key);
-    if (cur === undefined || r.distance_mi < cur) distance.set(r.source_key, r.distance_mi);
+    if (cur === undefined || r.distance_mi < cur) { distance.set(r.source_key, r.distance_mi); nearest.set(r.source_key, r); }
   }
   const ledger = new Map(input.ledger.map((l) => [l.identity_key, l]));
   const eventsByKey = new Map<string, ReportableEvent[]>();
@@ -306,6 +408,8 @@ export function assemble(input: AssembleInput): Assembled {
   const whatChanged: Array<{ project_id: string; at: string }> = [];
   const recentOfficial: Array<{ project_id: string; at: string }> = [];
   const byLifecycle: Record<Lifecycle, string[]> = { approved: [], proposed: [], operating: [], unknown: [] };
+  const byStage: Record<Stage, string[]> = { approved: [], proposed: [], permitted: [] };
+  const bearings: Record<string, number> = {};
   const familiesIncluded = new Set<string>();
   const distances: Record<string, number> = {};
   let anyChangeReady = false;
@@ -333,6 +437,8 @@ export function assemble(input: AssembleInput): Assembled {
     // R3 / default D-4: an operating record is not a standing inventory. It appears only when it carries an event in the window.
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
+    const stage = presentationStage(lc.key, p.stage);
+    const evidence = stage === 'permitted' ? stageEvidence(p.stage) : null;
     const entry: Entry = {
       project_id: p.source_key,
       source_family: family || null,
@@ -340,6 +446,7 @@ export function assemble(input: AssembleInput): Assembled {
       address: p.address,
       type: t ? { key: t.typeKey, label: t.label } : null,
       lifecycle: { key: lc.key, label: lc.label },
+      stage: stage ? { key: stage, label: STAGE_LABELS[stage], ...(evidence ? { evidence: evidence.label } : {}) } : null,
       publisher_status: p.status,
       publisher_stage: p.stage,
       publisher_event: ev,
@@ -352,9 +459,15 @@ export function assemble(input: AssembleInput): Assembled {
     if (view === 'internal') entry.rights = grant ? 'CLEARED' : 'HOLD';
     projects.push(entry);
     distances[p.source_key] = distance.get(p.source_key)!;
+    const near = nearest.get(p.source_key);
+    if (near && typeof near.marker_lat === 'number' && typeof near.marker_lng === 'number') {
+      const b = bearingDeg(subject.lat, subject.lng, near.marker_lat, near.marker_lng);
+      if (b !== null) bearings[p.source_key] = b;
+    }
     familiesIncluded.add(family);
     if (led && led.change_ready) anyChangeReady = true;
     byLifecycle[lc.key as Lifecycle].push(p.source_key);
+    if (stage) byStage[stage].push(p.source_key);
     if (changeCounts) whatChanged.push({ project_id: p.source_key, at: String(material[0].observed_at) });
     else if (ev) recentOfficial.push({ project_id: p.source_key, at: ev.date });
     if (changeCounts) {
@@ -364,6 +477,13 @@ export function assemble(input: AssembleInput): Assembled {
   const order = (list: Array<{ project_id: string; at: string }>) =>
     list.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.project_id < b.project_id ? -1 : 1)).map((x) => x.project_id);
   for (const k of LIFECYCLE_ORDER) byLifecycle[k].sort();
+  for (const k of STAGE_ORDER) byStage[k].sort();
+  // Things to Review: the nearest projects in a stage section; on a tie, the stronger stage, then the project id
+  const stageOf = new Map<string, Stage>();
+  for (const k of STAGE_ORDER) for (const id of byStage[k]) stageOf.set(id, k);
+  const review = [...stageOf.keys()].sort((a, b) =>
+    (distances[a] - distances[b]) || (STAGE_STRENGTH[stageOf.get(a)!] - STAGE_STRENGTH[stageOf.get(b)!]) || (a < b ? -1 : a > b ? 1 : 0))
+    .slice(0, REVIEW_LIMIT);
 
   // ── coverage: only what the inputs can support, and it says so ──
   const limitations: Array<{ code: string; text: string }> = [];
@@ -386,6 +506,7 @@ export function assemble(input: AssembleInput): Assembled {
     zip: subject.zip,
     radius_mi,
     recent_days: RECENT_DAYS,
+    stage_rule_version: STAGE_RULE_VERSION,
     coverage: {
       zip_supported: true,
       state,
@@ -399,6 +520,7 @@ export function assemble(input: AssembleInput): Assembled {
       what_changed_recently: order(whatChanged),
       recent_official_activity: order(recentOfficial),
       by_lifecycle: byLifecycle,
+      by_stage: byStage,
     },
     projects,
   };
@@ -421,11 +543,13 @@ export function assemble(input: AssembleInput): Assembled {
     intelligence,
     privateContext,
     engineInputs: {
-      engine: REPORT_VERSION, zip: subject.zip, radius_mi, recent_days: RECENT_DAYS,
+      engine: REPORT_VERSION, zip: subject.zip, radius_mi, recent_days: RECENT_DAYS, stage_rule_version: STAGE_RULE_VERSION,
       rights_registry_version: rights.version, cleared_families: rights.cleared.length,
     },
     renderOnly: {
       distances_mi: distances,
+      bearings_deg: bearings,
+      review,
       ...(view === 'internal' ? { internal: { excluded } } : {}),
     },
     storage_blockers: blockers,

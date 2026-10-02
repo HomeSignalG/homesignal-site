@@ -14,7 +14,7 @@
 // test fails if it does). `assemble` says whether a report COULD be stored (`storage_blockers`); the response reports
 // it and stores nothing. Storing a real customer report waits for the gates in report-private-context-contract §6.
 import {
-  addDays, ALLOWED_RADII, assemble, dayOf, parseRadius, RECENT_DAYS, validateRights,
+  addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, validateRights,
 } from '../_shared/national-report.ts';
 import { authorizeAdmin, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
@@ -49,7 +49,7 @@ export function capability() {
   return {
     product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
     method: 'POST { address, radius_mi?, view?, label? }',
-    radius_mi: ALLOWED_RADII,
+    radius_mi: [REPORT_RADIUS_MI],
     recent_days: RECENT_DAYS,
     access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
     stores_reports: false,
@@ -81,8 +81,9 @@ export function makeHandler(deps: Deps) {
     if (unknown.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + unknown[0] }, 400);
     const address = typeof b.address === 'string' ? b.address.trim() : '';
     if (address.length < 8 || address.length > 200 || address.indexOf(' ') < 0) return reply(req, { error: 'invalid_request', detail: 'address' }, 400);
-    const radius = b.radius_mi === undefined ? 1 : parseRadius(b.radius_mi);
-    if (radius === null) return reply(req, { error: 'invalid_request', detail: 'radius_mi must be one of ' + ALLOWED_RADII.join(', ') }, 400);
+    // 100526 plan, ruling 7: a report is always 0.5 mile. `radius_mi` may be omitted or say 0.5; anything else is refused.
+    const radius = b.radius_mi === undefined ? REPORT_RADIUS_MI : parseRadius(b.radius_mi);
+    if (radius !== REPORT_RADIUS_MI) return reply(req, { error: 'invalid_request', detail: 'radius_mi must be ' + REPORT_RADIUS_MI }, 400);
     const view = (b.view === undefined ? 'customer' : b.view) as View;
     if (view !== 'customer' && view !== 'internal') return reply(req, { error: 'invalid_request', detail: 'view' }, 400);
     let label: string | undefined;
