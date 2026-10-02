@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-01, in the receipt PR for the Follow / Changes Since Report function (#1516, merged `5937254`; deployed 22:31–22:32Z: `follow-development-report` v1 and the refactored `get-development-activity-report` v2; anon-key refusals and capability reads verified live; **no signed-in call made**, follow doc §9). The receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z) is merged (#1514); the receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
+Last updated: 2026-10-01, in the PR for Order K0 (the brokerage account spine: built as parked SQL, **not applied**). Before it, in the receipt PR for the Follow / Changes Since Report function (#1516, merged `5937254`; deployed 22:31–22:32Z: `follow-development-report` v1 and the refactored `get-development-activity-report` v2; anon-key refusals and capability reads verified live; **no signed-in call made**, follow doc §9). The receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z) is merged (#1514); the receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -131,7 +131,7 @@ Last updated: 2026-10-01, in the receipt PR for the Follow / Changes Since Repor
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
 - J. Secure stored-report delivery — open.
-- K. Agent Workspace + Brokerage Admin — open.
+- K. Agent Workspace + Brokerage Admin — open. **K0, the first safe step, is built and is NOT applied** (account spine built, not applied; no go to apply it to production is recorded). `docs/brokerage-account-spine.sql` (parked SQL of record, rollback at its foot) adds `public.brokerage_account`, `public.brokerage_member` and the one resolver `public.brokerage_membership_of(user_id)`: an explicit membership of a Supabase Auth user in one brokerage, as owner or agent, with one active membership per user, closed vocabularies, and a last-active-owner guard. The tables are empty and unreadable by anon, authenticated and service_role (the `dashboard_admins` posture) and are reached only through the resolver; they hold no address, label, client, email, credit, quota, price or invite token; nothing reads or writes them, and no gate, edge function or page changed (`_shared/admin-gate.ts` still answers from `dashboard_admins`). Proof: `test/brokerage_account_pg` (suite, an owner race between two sessions, a second apply, a poisoned state, 59 prohibited mutations), `test/brokerage-account-structure.test.mjs`, `test/brokerage_account_mutants.py`; design, the six defaults D-K1..D-K6 the founder may change, and what the rest of K needs from J and L: `docs/development-activity-agent-workspace-2026-10-01.md`. **Not built, and not buildable yet:** the Agent Workspace and Brokerage Admin surfaces, agent invites, usage and "reports remaining", recent reports across devices, ownership of a Follow, share and audit trail, and the plan control — they need report ownership (Order J) and entitlement and quota (Orders L and M).
 - L. Evaluation build and security tests — open.
 - M. Paid continuation path — open.
 - N. End-to-end launch gate — open.
