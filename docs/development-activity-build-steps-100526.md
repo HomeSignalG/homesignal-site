@@ -62,7 +62,7 @@ through once each step is complete").
    development, or that proves **"No development activity"**, uses one free report; a report that is empty
    because of **"No data ingested"** does not. Until HomeSignal can prove "No development activity" for an
    address, an empty report is "No data ingested" and is free.
-   Four pull requests:
+   Four pull requests, and a fifth added after 5d:
    - ~~**5a. The outcome and the one credit rule.**~~ *(Done: #1579 merged as `ba59f16`.*
      - *`get-development-activity-report` was deployed from `main` by run `37051044339`: version 4 → 5 at
        2026-10-02 18:58Z. All 11 deployed files read back byte-identical to `main`, and the JWT check is still on.*
@@ -116,7 +116,35 @@ through once each step is complete").
      - Open before step 13:
        - the free-report rate limit (from 5b);
        - how PostgREST turns the database's refusals into HTTP answers. It is checkable once 5d can make a test trial.
-   - **5d. Creating a trial.** An admin way to create a brokerage's trial and its owner invite.
+   - ~~**5d. Creating a trial.**~~ An admin way to create a brokerage's trial and its owner invite.
+     *(Done: #1588 merged as `dd24753`.*
+     - *Two functions deployed from `main` at 2026-10-02 23:22Z, each with the JWT check on:*
+       - *`development-activity-trial` went from version 1 to 2 (run `37077195563`).*
+       - *`get-development-activity-report` went from version 7 to 8 (run `37077205513`). It imports the changed
+         `_shared/evaluation-reads.ts`.*
+       - *Follow is unchanged: its files did not change.*
+     - *All 18 deployed files (6 + 12) read back byte-identical to `main`, and no imported file is missing.*
+     - *Live probe 23:22Z:*
+       - *The trial function's capability answer names the `create` action as admin-only.*
+       - *A create request with no token is refused by the gateway with 401.*
+       - *With only the public key, our own gate refuses with 401: `create`, `status`, and a report request.*
+     - *Pages run `37077192771` deployed at 23:23Z. Read back from homesignal.net at 23:24Z, each byte-identical to
+       `main` by md5:*
+       - *the review page, `4a74693f…` (noindex, with "Start a brokerage trial");*
+       - *`robots.txt`, `c6ec81ff…`.*
+     - *Production still holds 0 trials. The first one is created by the founder, signed in on the review page.)*
+     - The trial function's `create` action is for admins only, refused before a field is read. It checks the name, an
+       optional seat limit and an optional length (blank means none; nothing is invented). It then creates the account,
+       the trial and the owner invite in the database's one transaction, and returns the owner link once, with no id.
+     - The invite link has one form, in `_shared/evaluation-reads.ts`. The customer page reads exactly that form.
+     - Open before step 13:
+       - an owner cannot yet invite agents (`evaluation_invite_mint`);
+       - the free-report rate limit;
+       - checking how PostgREST turns the database's refusals into HTTP answers, now possible with a test trial.
+   - **5e. Agents join the trial.** *(Added 2026-10-02, after 5d.)* The trial's 20 reports are shared by a
+     brokerage's agents, so its owner needs a way to invite them. That is `evaluation_invite_mint` with the owner as
+     actor: agent invites only, within the seat limit, through the same invite link and the same customer page.
+     Step 5 is struck when 5e is done.
 6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
 7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
 8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
