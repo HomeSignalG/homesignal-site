@@ -170,6 +170,24 @@ if (mod) {
   ok(body && body.evidence.visual.scope === 'project', '2b: …and records project scope');
   ok(body && !('zip_scope_reason' in body.evidence.visual),
     '2c: …with no zip_scope_reason, which must be absent rather than null when it does not apply');
+  // Map 1 step (a), 2026-10-02: a project picture records whether its pin was checked
+  // against the post's own record. A result that did not carry the check is recorded false.
+  ok(body && body.evidence.visual.record_match === false,
+    '2d: a project attach whose result did not run the record check records record_match false');
+  patches.length = 0;
+  await mod.attach(draft, 'maps/80210/p1-abc.png',
+    { ...projResult, recordMatch: true, recordCheckedAt: '2026-10-02T00:00:00.000Z' }, proj, 'project');
+  const body2 = patches.length ? patches[patches.length - 1].body : null;
+  ok(body2 && body2.evidence.visual.record_match === true
+     && body2.evidence.visual.record_checked_at === '2026-10-02T00:00:00.000Z'
+     && Array.isArray(body2.evidence.visual.record_checked_fields)
+     && body2.evidence.visual.record_checked_fields.join(',') === 'name,status,submitted_at,type,type_raw,source_ref,date_kind',
+    '2e: …and one that did records record_match true, when, and which fields were compared');
+  patches.length = 0;
+  await mod.attach(draft, 'maps/80210/zip-abc.png', okResult({}), null, 'zip');
+  const body3 = patches.length ? patches[patches.length - 1].body : null;
+  ok(body3 && !('record_match' in body3.evidence.visual),
+    '2f: control — a ZIP-scope picture carries no record check (there is no record to show)');
 }
 
 // ── §3 THE GUARD IS LOUD, NOT SILENT ─────────────────────────────────────────────────
@@ -248,11 +266,22 @@ if (mod && typeof mod.projectPinRefusal === 'function') {
     '5h: …and the write sets no picture');
   ok(typeof vis.attempted_key === 'string' && vis.attempted_key.startsWith('v1|80210|p1|'),
     `5i: …keyed at PROJECT scope, so the retry clock is about this project (got ${JSON.stringify(vis.attempted_key)})`);
+  ok(vis.record_match === false && !('record_mismatch' in vis),
+    '5j: …and any picture the draft still holds is unbound (record_match false), with no mismatch text when that was not the reason');
+  patches.length = 0;
+  await mod.projectPinRefusal({ ...pinDraft, evidence: { ...pinDraft.evidence,
+    visual: { scope: 'project', popup_open: true, record_match: true } } }, 'lbl', [],
+    'Map 1\'s pin for this project shows a different record (name "A" on the post, "B" on the pin)',
+    'Map 1\'s pin for this project shows a different record (name "A" on the post, "B" on the pin)');
+  const w2 = patches.filter((x) => x.method === 'PATCH');
+  const v2 = (w2.length && w2[0].body.evidence.visual) || {};
+  ok(v2.record_match === false && /name "A" on the post, "B" on the pin/.test(v2.record_mismatch || ''),
+    '5k: a wrong-record refusal overwrites an earlier record_match true and keeps the comparison\'s words');
   delete globalThis.__TEST_ABSENCE;
 }
 
 // ── §6 …AND EVERY RECORD-REFUSAL EXIT REACHES IT ─────────────────────────────────────
-ok(/^async function projectPinRefusal\(d, label, results, why\)/m.test(SRC),
+ok(/^async function projectPinRefusal\(d, label, results, why, mismatch\)/m.test(SRC),
   '6a: the refusal is declared at MODULE scope with every value passed explicitly');
 const refusalCalls = (SRC.match(/await pinRefusal\(/g) || []).length;
 ok(refusalCalls === 5,

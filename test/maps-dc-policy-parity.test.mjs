@@ -77,6 +77,8 @@ function buildRow(c) {
   // 2026-10-01 the binding requires it (founder: a post about a project shows its own pin,
   // popup open). The absence post has no project and no popup.
   if (evidence.project_id) evidence.visual.popup_open = true;
+  // …and, since 2026-10-02, that its pin shows the post's own record (Map 1 step (a)).
+  if (evidence.project_id) evidence.visual.record_match = true;
   if (!m.drop_capture_policy) evidence.visual.capture_policy = capture_policy;
 
   const post = {

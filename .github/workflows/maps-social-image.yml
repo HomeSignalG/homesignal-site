@@ -70,6 +70,9 @@ on:
       stamp_types:
         description: 'true = record the canonical Map 1 Development Type (evidence.visual.type_key) on drafts that already hold a current capture; no new screenshots. Combine with dry=true to preview.'
         default: 'false'
+      stamp_record_match:
+        description: 'true = check that existing project pictures show the post''s own record (the picture''s popup name AND Map 1 now) and record it (evidence.visual.record_match) on drafts and approved posts; no new screenshots. Combine with dry=true to preview.'
+        default: 'false'
 
 permissions:
   contents: read
@@ -144,6 +147,7 @@ jobs:
             ${{ inputs.dry == 'true' && '--dry' || '' }} \
             ${{ inputs.recapture == 'true' && '--recapture' || '' }} \
             ${{ inputs.stamp_types == 'true' && '--stamp-types' || '' }} \
+            ${{ inputs.stamp_record_match == 'true' && '--stamp-record-match' || '' }} \
             --out "$GITHUB_WORKSPACE/maps-social-out"
 
       - name: Upload the captured images as a run artifact (review copy)

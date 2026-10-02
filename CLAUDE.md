@@ -1788,6 +1788,30 @@ draft unapprovable. **Posts with no project keep the ZIP map and are correct as 
   migration.
 - The rest of this section is the dated record of the 2026-09-22 ruling.
 
+⚖️ **AND THE PIN MUST SHOW THE POST'S OWN RECORD — Map 1 step (a), first part (founder-approved
+2026-10-01; built 2026-10-02).** Map 1 draws one pin per `source_key` and fills its popup from one
+row of that key, so where several records share a key the popup can show another one. Measured
+2026-10-02 over the 28 MAPS posts tied to a project: 3 drafts did (10475 "NB WRIGHT AVENUE" shown
+as "FO WRIGHT AVENUE"; 78703 the 2026 Public Storage amendment shown as the 1996 retail center;
+33004 bridge 86010000 shown as 86016000); 0 approved or published posts did.
+- **No Map 1 change.** The reader already returns, per pin, the content the popup prints. The
+  capture job compares it with the post's live record (`HS.mapsPinRecordMismatch`: name, status,
+  date, type, source type, record link, date meaning) before it opens the browser, refuses a
+  mismatch as `CAPTURE_INELIGIBLE` with `record_match: false`, and records `record_match: true` on
+  a good picture.
+- 🔑 **It compares content, never row ids.** The pin's row is often another row with identical
+  content (1 of 2 approved posts, 8 of 13 published), and an id comparison would refuse them.
+- A project picture is bound only when it records `record_match` true. Pictures taken before the
+  check are checked once by `--stamp-record-match` (workflow input `stamp_record_match`), which
+  needs both the picture's own popup name and Map 1 now to match. It writes evidence alone, so an
+  approved post's payload fingerprint does not move, and it never writes an approved post that
+  fails.
+- The database half is homesignal-ingest migration `20261002010000` (approval and publication
+  refuse a project picture without `record_match` true). It is applied only after the stamp
+  pass, so it cannot refuse an approved post that was never checked; the parity harness reads it.
+- Tests: `test/maps-pin-record-match.test.mjs` (the rule on the real shapes, the binding, and the
+  stamp pass executed against a stubbed database); fixture cases 15 and 16.
+
 **§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
 MAPS post that cannot truthfully pin its record does **not** fall through to no image — it
 falls back to the map of its own ZIP, which is a real screenshot of a real page and is what a
