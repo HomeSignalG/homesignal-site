@@ -90,7 +90,32 @@ through once each step is complete").
      - The report function serves invited trial members the customer view, and calls the database's
        `evaluation_report_issue` only when the rule says a report uses a free report.
      - Open before step 13: there is no rate limit on free trial reports.
-   - **5c. The customer page.** Invite link, sign-in, make a report, "reports remaining".
+   - ~~**5c. The customer page.**~~ Invite link, sign-in, make a report, "reports remaining".
+     *(Done: #1586 merged as `70f6879`.*
+     - *Three functions deployed from `main` at 2026-10-02 22:45–22:47Z (runs `37074116333`, `37074118191`,
+       `37074252338`), each with the JWT check on:*
+       - *`development-activity-trial` is new, at version 1.*
+       - *`get-development-activity-report` went from version 6 to 7, because its data layer changed.*
+       - *`follow-development-report` went from version 2 to 3. It shares the changed `admin-gate.ts` and
+         `service-rest.ts`.*
+     - *All 29 deployed files (6 + 12 + 11) read back byte-identical to `main`, and no imported file is missing.*
+     - *Live probe 22:45Z:*
+       - *Each function's capability answer returns 200. A call with no token is refused by the gateway with 401.*
+       - *With only the public key, our own gate refuses with 401: the trial function's `status` and `redeem`,
+         and a report request.*
+       - *Follow, after its redeploy (22:48Z), is unchanged: capability 200, and the public key is refused with 401.*
+     - *Pages run `37074109746` deployed at 22:48Z. Read back from homesignal.net at 22:48Z, each byte-identical
+       to `main` by md5:*
+       - *the page `development-activity-reports.html`, `f86a6cfe…` (noindex);*
+       - *`robots.txt`, `c6ec81ff…`, which disallows the page.*
+     - *Production still holds 0 evaluations, invites, credits, events, brokerages, members and stored reports. Nobody
+       can join a trial until step 5d creates one.)*
+     - The page reads an invite from the link's fragment (never sent to a server) and removes it from the address bar.
+       It allows sign-in that creates an account, shows "N free reports left", and asks only for the customer view.
+     - The trial function answers only about the signed-in person, and never returns an id.
+     - Open before step 13:
+       - the free-report rate limit (from 5b);
+       - how PostgREST turns the database's refusals into HTTP answers. It is checkable once 5d can make a test trial.
    - **5d. Creating a trial.** An admin way to create a brokerage's trial and its owner invite.
 6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
 7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
