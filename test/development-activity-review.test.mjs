@@ -7,7 +7,9 @@
 //   2. it holds no privileged key: the one key in it is the public anon key, and the function gets the signed-in user's own token;
 //   3. it calls one function and decides nothing: no table, RPC or storage read; no radius; no Type, stage or rights rule;
 //   4. it saves nothing: no browser storage, and no write anywhere;
-//   5. sign-in never creates an account (the allowlist is by email, and only existing accounts can be on it).
+//   5. sign-in never creates an account (the allowlist is by email, and only existing accounts can be on it);
+//   7. (build step 5d) "Start a brokerage trial": the page asks the trial function to create a trial and shows the owner link it
+//      returns, once; it builds no link itself, keeps it in no storage, clears it on sign-out, and its words match the function's checks.
 // test/development-activity-review.browser.test.mjs drives the page itself; test/single-customer-generation-path.test.mjs (P4, P5)
 // keeps it the ONLY shipped page that may call the report engine.
 // Run: node test/development-activity-review.test.mjs
@@ -39,8 +41,9 @@ ok(/shouldCreateUser:\s*false/.test(code) && !/shouldCreateUser:\s*true/.test(co
 
 // ---- 3. one function, no decisions -------------------------------------------------------------------------------------------------------
 const urls = [...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]);
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co']) && /var FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code),
-  '3a the only endpoint it names is the report function on this project', urls);
+ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co']) && /var FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code)
+   && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code) && (code.match(/\/functions\/v1\//g) || []).length === 2,
+  '3a the only endpoints it names are the report function and (build step 5d) the trial function, on this project', urls);
 ok(!/\.from\(|\.rpc\(|\.storage\b|\.functions\.invoke\(/.test(code), '3b no table, RPC, storage or other function read: the report function is the only data path');
 ok(/body: JSON\.stringify\(\{ address: address, view: view \}\)/.test(code) && !/radius/i.test(code), '3c it sends only the address and the view; it never sets a radius (a report is always 0.5 mile, ruling 7)');
 ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|report-rights|\.cleared\b|\.rights\b|\.stage\.key|\.lifecycle\.key/.test(code), '3d no lifecycle, Type, stage or rights rule on the page');
@@ -66,6 +69,32 @@ ok(credit.length > 100 && /var c = body && body\.credit;/.test(credit) && /if \(
   '6a whether a report would use a free report is read from the function\'s own answer (body.credit.uses_report), once');
 ok(!/\.projects|\.activity|\.outcome|\.coverage|storable|storage_blockers/.test(credit) && /c\.reason === 'NO_DATA_INGESTED'/.test(credit), '6b the credit line looks at nothing else: no project count, outcome, coverage or storage decision is made on the page');
 ok(/creditnote/.test(page) && /\$\('creditnote'\)\.hidden = !cl;/.test(code) && /\$\('creditnote'\)\.hidden = true;/.test(code), '6c it is cleared before each report and shown only when there is a line to show');
+
+// ---- 7. a brokerage's trial (build step 5d): the function creates it; the page shows its answer once -----------------------------------------
+const H = await import('../supabase/functions/development-activity-trial/handler.ts');
+const create = (code.match(/async function createTrial\(\)\{[\s\S]*?\n  \}/) || [''])[0];
+ok(create.length > 500 && /await fetch\(TRIAL_FN, \{/.test(create) && /'Authorization': 'Bearer ' \+ session\.access_token/.test(create) && (code.match(/fetch\(TRIAL_FN/g) || []).length === 1,
+  '7a the trial function is called from one place, with the signed-in admin\'s own token');
+ok(/var payload = \{ action: 'create', brokerage_name: name \};/.test(create) && /if \(seats !== null\) payload\.seat_limit = seats;/.test(create)
+   && /if \(days !== null\) payload\.trial_days = days;/.test(create) && (create.match(/payload\.[a-z_]+ =/g) || []).length === 2,
+  '7b it sends the action, the name, and the seat limit and length only when they were typed (blank means none)');
+ok(/var link = body && typeof body\.invite_link === 'string' \? body\.invite_link : '';/.test(create) && /\$\('tlink'\)\.value = link;/.test(create)
+   && !/'#invite='|development-activity-reports/.test(page),
+  '7c the link shown is the function\'s own answer: the page builds no invite link and does not name the customer page');
+const onSess = (code.match(/function onSession\(s\)\{[\s\S]*?\n  \}/) || [''])[0];
+const iElse = onSess.indexOf('} else {'), iClear = onSess.indexOf("$('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';");
+ok(!/localStorage|sessionStorage|indexedDB|document\.cookie/.test(code) && iElse > 0 && iClear > iElse,
+  '7d the link is kept in no browser storage, and is cleared when the admin signs out');
+const tm = (code.match(/function trialMessage\(httpStatus, body\)\{[\s\S]*?\n  \}/) || [''])[0];
+ok(new RegExp('up to ' + H.NAME_MAX + ' characters').test(tm) && new RegExp('from 0 to ' + H.SEATS_MAX).test(tm) && new RegExp('from 1 to ' + H.DAYS_MAX).test(tm)
+   && new RegExp('id="tname" maxlength="' + H.NAME_MAX + '"').test(page) && new RegExp('id="tseats" min="0" max="' + H.SEATS_MAX + '"').test(page)
+   && new RegExp('id="tdays" min="1" max="' + H.DAYS_MAX + '"').test(page),
+  '7e the page\'s words and its boxes\' limits match the function\'s own checks (the function decides; the page only says it)');
+ok(/httpStatus === 401/.test(tm) && /httpStatus === 403/.test(tm) && /httpStatus === 422\) return 'The database refused to create this trial\. Nothing was created\.'/.test(tm)
+   && /could not confirm whether the trial was created/.test(code) && /tsay\(trialMessage\(httpStatus, body\) \|\| UNKNOWN, true\)/.test(create) && /tsay\(UNKNOWN, true\);/.test(create),
+  '7f a refusal says nothing was created; a lost or unknown answer says the trial may or may not exist (never that it failed)');
+ok(/if \(creating\) return;/.test(create) && /creating = true; \$\('tgo'\)\.disabled = true;/.test(create), '7g a second press while a request is in flight does nothing');
+ok(!/\b20\b/.test(create) && !/\b14\b/.test(create), '7h the page states no report count and no invite lifetime of its own (the database holds both)');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

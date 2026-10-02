@@ -229,6 +229,81 @@ property:
   today.
 - The rate-limit gap from 5b is unchanged.
 
+**Step 5d (2026-10-02): creating a brokerage's trial.**
+
+**The action: `create`, on `development-activity-trial`, for admins only.**
+- It runs after the function's own sign-in gate. Before a single field is read, it refuses anyone not on `dashboard_admins` with 403.
+- It checks every field before the database is asked:
+  - `brokerage_name`: required, trimmed, at most 120 characters, no control characters or line breaks;
+  - `seat_limit`: optional, a whole number from 0 to 1000; left out (or null) means no limit (D-L2);
+  - `trial_days`: optional, a whole number from 1 to 365; left out (or null) means no end date (D-L3).
+- A wrong field is 400 `bad_request`, with `detail` naming the field. The bounds are input checks, not product limits.
+- It then calls `public.evaluation_create` through `_shared/evaluation-reads.ts` `createTrial`. That function makes the brokerage's
+  account, its trial and the first OWNER invite in one transaction. The invite lives the database's default 14 days (D-L4); the
+  request cannot change that.
+- **The answer** is the trimmed name, the seat limit, the end date (or null), the **owner invite link** and its expiry.
+  - It carries no id: not the account's, the trial's or the invite's.
+  - The link is the one secret the function ever returns, and only to the admin who just created the trial. HomeSignal stores
+    only the invite's hash, so nothing can show the link again.
+- **A database refusal is 422 `rejected`.** Its function is one transaction, so nothing was created.
+- **An unreachable database is 502**, and the trial may or may not exist.
+
+**The invite link has one form, written in one place:** `_shared/evaluation-reads.ts` `inviteLink`, giving
+`https://homesignal.net/development-activity-reports.html#invite=<token>`.
+- The customer page reads exactly this. `test/development-activity-trial-function.test.mjs` 6w runs the page's own fragment
+  reader on the link, and the customer page's browser test opens the link the server makes.
+- The review page builds no link of its own and does not name the customer page.
+
+**The page: "Start a brokerage trial", on the private review page** (`development-activity-review.html`, admin only).
+- Fields: brokerage name, agent seats (optional), trial length in days (optional).
+- On success it says what was created and shows the owner link, with a "Copy link" button and who to send it to: the first person
+  to open it and sign in becomes the trial's owner. It also says until when the link works, and that it is shown only once.
+- The link is kept only in the open page: never in browser storage. Signing out takes it off the page.
+- The form is cleared after a trial is created, so a second press cannot repeat it by accident. A press while a request is in
+  flight does nothing.
+- Signed out, pressing "Create" opens the sign-in. After the code, the waiting trial is created once.
+- A refusal says nothing was created. A lost or unknown answer says HomeSignal could not confirm whether the trial was created;
+  it never says the trial failed.
+
+**Decisions taken by default (the founder may change any of them):**
+- **D-5d-1.** Creating a trial is an admin act on the existing review page and the existing trial function. There is no new page
+  and no new function.
+- **D-5d-2.** No seat limit or end date is chosen for the founder: both are optional fields, blank means none, and the page
+  invents neither. The plan names no number (evaluation doc, open questions 4 and 5).
+- **D-5d-3.** A lost answer is not retried automatically. If the trial was created, it sits unused: it has no members, and its
+  owner link expires after 14 days. Creating it again makes a second account with the same name. Revoking the unused one is
+  `public.evaluation_revoke` (SQL; no page yet).
+
+**Proof:**
+- `test/development-activity-trial-function.test.mjs`, now 102 checks. §6:
+  - the admin gate before any field;
+  - every field rule, at the edge and past it;
+  - the answer's exact fields;
+  - the refusal mapping;
+  - the real data layer's exact requests;
+  - the one form of the link, and that the customer page reads it.
+- `test/development-activity-review.test.mjs` (35) and `test/development-activity-review.browser.test.mjs` (53). In the
+  browser, the trial function is answered by its real handler.
+- `test/single-customer-generation-path.test.mjs`:
+  - P4 now admits the review page for the trial function;
+  - P5i: the review page asks for nothing but `create` and never reads its own address's fragment;
+  - P5j: `create` refuses a non-admin before reading a field, and is the only call that creates a trial.
+- `test/trial_report_pg`, now 36 checks. Creating goes through the real handler, data layer and shipped SQL:
+  - a non-admin writes nothing;
+  - an admin's trial is one account, one active trial and one open owner invite, whose hash matches the link's token;
+  - the 14-day lifetime;
+  - no id in the answer;
+  - a seat limit and length reach the database as typed;
+  - a refused field writes nothing.
+- `test/development_activity_trial_create_mutants.py`: prohibited mutations, all killed (count in the PR).
+
+**Still open, stated:**
+- An owner cannot yet invite agents. That is `evaluation_invite_mint` with the owner as actor, on the customer page; nothing calls
+  it yet. Until it exists, a trial's only member is its owner.
+- The rate-limit gap from 5b is unchanged.
+- How PostgREST turns the database's refusals into HTTP answers is still unchecked against production. It becomes checkable once a
+  test trial exists.
+
 `publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.

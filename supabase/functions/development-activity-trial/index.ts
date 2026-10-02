@@ -1,9 +1,10 @@
-// development-activity-trial — join a brokerage's Development Activity trial, and read one's own trial (build step 5c).
+// development-activity-trial — join a brokerage's Development Activity trial, read one's own trial (build step 5c), and, for an
+// admin, create a brokerage's trial and its owner invite (build step 5d).
 //
 // Wiring only. The request logic is handler.ts, the reads are data.ts, every trial call is _shared/evaluation-reads.ts and the gate
 // is _shared/admin-gate.ts. JWT verification stays ON (supabase/config.toml), and the handler additionally requires a real signed-in
 // user: the anon key passes the gateway, so the gateway alone is not a gate.
-// Docs: docs/development-activity-report-engine-2026-09-30.md, "Step 5c".
+// Docs: docs/development-activity-report-engine-2026-09-30.md, "Step 5c" and "Step 5d".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { makeDeps } from './data.ts';
 import { makeHandler } from './handler.ts';

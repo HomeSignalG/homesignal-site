@@ -241,7 +241,7 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_share_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsh.log
-      - name: Joining a trial and making trial reports go through the real handlers, data layers, snapshot module and evaluation SQL; charged once, never twice, refused when used up
+      - name: Creating a trial (admins only), joining it and making trial reports go through the real handlers, data layers, snapshot module and evaluation SQL; charged once, never twice, refused when used up
         env:
           PGHOST: localhost
           PGPORT: '5432'

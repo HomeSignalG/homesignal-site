@@ -7,7 +7,10 @@
 //      whether it was a replay, and never an id even when the database returns them;
 //   4. the real data layer: exactly the requests it makes (the user lookup, the allow-list, the two database functions, with the
 //      service key), and a failure to reach the database is "unavailable", never "refused";
-//   5. trialStanding, the ONE reading of a trial's state, which the report gate and this function share.
+//   5. trialStanding, the ONE reading of a trial's state, which the report gate and this function share;
+//   6. create (build step 5d): admins only, refused for anyone else before a field is read; every field checked before the database
+//      is asked; the answer is the invite link and its expiry, once, and never an id; the real data layer's exact request; the one
+//      form of the invite link, and that the customer page reads it.
 // test/trial_report_pg drives the same handler and data layer against the real SQL.
 // Run: node test/development-activity-trial-function.test.mjs
 const H = await import('../supabase/functions/development-activity-trial/handler.ts');
@@ -21,6 +24,7 @@ const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++
 const UID = 'a1111111-1111-4111-8111-111111111111';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const ACTIVE = { status: 'active', credits_used: 3, credits_remaining: 17, expired: false };
+const NOW = new Date('2026-10-02T12:00:00Z');
 const calls = [];
 function deps(over = {}) {
   const rec = (name, f) => async (...a) => { calls.push([name, ...a]); return f(...a); };
@@ -29,6 +33,8 @@ function deps(over = {}) {
     isAdmin: rec('isAdmin', over.isAdmin ?? (async () => false)),
     trialOf: rec('trialOf', over.trialOf ?? (async () => ACTIVE)),
     redeemInvite: rec('redeemInvite', over.redeemInvite ?? (async () => ({ role: 'agent', replayed: false }))),
+    createTrial: rec('createTrial', over.createTrial ?? (async () => ({ invite_link: E.inviteLink(TOKEN), invite_expires_at: '2026-10-16T12:00:00+00:00' }))),
+    now: over.now ?? (() => NOW),
   };
 }
 async function ask(d, body, { method = 'POST', auth = 'Bearer t', raw } = {}) {
@@ -176,6 +182,99 @@ ok(S('active', false) === 'active' && S('active', true) === 'ended' && S('comple
 const gateSrc = (await import('node:fs')).readFileSync(new URL('../supabase/functions/_shared/admin-gate.ts', import.meta.url), 'utf8');
 ok((gateSrc.match(/trialStanding\(/g) || []).length === 2 && /const standing = trialStanding\(trial\);/.test(gateSrc),
   '5b the report gate reads a trial through trialStanding and nothing else (its definition plus its one use)');
+
+// ---- 6. create (build step 5d): an admin creates a brokerage's trial and its owner invite -----------------------------------------------------------
+const LINK = 'https://homesignal.net/development-activity-reports.html#invite=' + TOKEN;
+const admin = (over = {}) => deps({ isAdmin: async () => true, ...over });
+r = await ask(deps(), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 403 && r.json.error === 'forbidden' && named('createTrial').length === 0, '6a a signed-in person who is not an admin cannot create a trial: 403, and the database is not asked', r.json);
+r = await ask(deps(), { action: 'create', brokerage_name: '', seat_limit: 'x' });
+ok(r.status === 403 && named('createTrial').length === 0, '6b and is refused before any field is looked at (a broken request from a non-admin is 403, not 400)', r.json);
+r = await ask(deps({ isAdmin: async () => true, authenticate: async () => null }), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 401 && named('createTrial').length === 0, '6c the public anon key (no user) cannot create a trial: 401');
+r = await ask(admin(), { action: 'create', brokerage_name: '  Acme Realty  ', seat_limit: 5, trial_days: 30 });
+ok(r.status === 200 && r.json.status === 'OK' && r.json.brokerage_name === 'Acme Realty' && r.json.seat_limit === 5 && r.json.trial_ends_at === '2026-11-01T12:00:00.000Z'
+   && r.json.invite_link === LINK && r.json.invite_expires_at === '2026-10-16T12:00:00+00:00',
+  '6d an admin creates a trial: the trimmed name, the seat limit, the end date 30 days from now, and the owner invite link with its expiry', r.json);
+ok(JSON.stringify(named('createTrial').map((c) => c[1])) === JSON.stringify([{ brokerageName: 'Acme Realty', seatLimit: 5, expiresAt: '2026-11-01T12:00:00.000Z' }]),
+  '6e the database is asked once, with exactly the checked fields', named('createTrial'));
+ok(JSON.stringify(Object.keys(r.json).sort()) === JSON.stringify(['brokerage_name', 'invite_expires_at', 'invite_link', 'seat_limit', 'status', 'trial_ends_at'])
+   && named('trialOf').length === 0, '6f the answer holds only those fields (no id of any kind), and no trial is read', Object.keys(r.json));
+r = await ask(admin(), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 200 && r.json.seat_limit === null && r.json.trial_ends_at === null
+   && JSON.stringify(named('createTrial')[0][1]) === JSON.stringify({ brokerageName: 'Acme Realty', seatLimit: null, expiresAt: null }),
+  '6g with only a name: no seat limit and no end date (D-L2, D-L3); nothing is invented', r.json);
+r = await ask(admin(), { action: 'create', brokerage_name: 'Acme Realty', seat_limit: null, trial_days: null });
+ok(r.status === 200 && JSON.stringify(named('createTrial')[0][1]) === JSON.stringify({ brokerageName: 'Acme Realty', seatLimit: null, expiresAt: null }), '6h null means none, the same as leaving a field out');
+const BAD = [
+  ['brokerage_name', 'missing', { brokerage_name: undefined }], ['brokerage_name', 'empty', { brokerage_name: '' }], ['brokerage_name', 'only spaces', { brokerage_name: '   ' }],
+  ['brokerage_name', 'too long', { brokerage_name: 'A'.repeat(H.NAME_MAX + 1) }], ['brokerage_name', 'a line break', { brokerage_name: 'Acme\nRealty' }],
+  ['brokerage_name', 'a control character', { brokerage_name: 'Acme\u0007Realty' }], ['brokerage_name', 'a number', { brokerage_name: 5 }],
+  ['seat_limit', 'negative', { seat_limit: -1 }], ['seat_limit', 'a fraction', { seat_limit: 1.5 }], ['seat_limit', 'text', { seat_limit: '5' }],
+  ['seat_limit', 'over the bound', { seat_limit: H.SEATS_MAX + 1 }], ['seat_limit', 'true', { seat_limit: true }],
+  ['trial_days', 'zero', { trial_days: 0 }], ['trial_days', 'over a year', { trial_days: H.DAYS_MAX + 1 }], ['trial_days', 'a fraction', { trial_days: 2.5 }],
+  ['trial_days', 'text', { trial_days: '30' }], ['trial_days', 'false', { trial_days: false }],
+];
+for (const [field, label, extra] of BAD) {
+  r = await ask(admin(), { action: 'create', brokerage_name: 'Acme Realty', ...extra });
+  ok(r.status === 400 && r.json.error === 'bad_request' && r.json.detail === field && named('createTrial').length === 0,
+    '6i ' + field + ' ' + label + ': 400 naming the field, and the database is not asked', r.json);
+}
+for (const [label, extra, want] of [['a 120-character name', { brokerage_name: 'A'.repeat(H.NAME_MAX) }, { brokerageName: 'A'.repeat(H.NAME_MAX) }],
+  ['no agent seats (owner only)', { seat_limit: 0 }, { seatLimit: 0 }], ['the largest seat limit', { seat_limit: H.SEATS_MAX }, { seatLimit: H.SEATS_MAX }],
+  ['one day', { trial_days: 1 }, { expiresAt: '2026-10-03T12:00:00.000Z' }], ['a year', { trial_days: H.DAYS_MAX }, { expiresAt: '2027-10-02T12:00:00.000Z' }]]) {
+  r = await ask(admin(), { action: 'create', brokerage_name: 'Acme Realty', ...extra });
+  const got = named('createTrial')[0] && named('createTrial')[0][1];
+  ok(r.status === 200 && got && Object.entries(want).every(([k, v]) => got[k] === v), '6j accepted at the edge: ' + label, got);
+}
+ok(H.NAME_MAX === 120 && H.SEATS_MAX === 1000 && H.DAYS_MAX === 365, '6k the input bounds are the ones documented (input checks, not product limits)');
+r = await ask(admin({ createTrial: async () => { throw new E.TrialRejected('x'); } }), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 422 && r.json.error === 'rejected', '6l the database refusing to create the trial: 422 "rejected" (its function is one transaction, so nothing was created)', r.json);
+r = await ask(admin({ createTrial: async () => { throw new H.DataUnavailable('x'); } }), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 502 && r.json.error === 'data_unavailable', '6m the database unreachable: 502, never "rejected" (the trial may or may not exist)', r.json);
+r = await ask(admin({ createTrial: async () => { throw new Error('boom ' + TOKEN); } }), { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 500 && r.json.error === 'internal' && !r.text.includes(TOKEN), '6n an unexpected failure: 500, and its message is not returned');
+
+// the real data layer
+const IS_ADMIN = [/dashboard_admins/, () => json([{ email: 'agent@example.test' }])];
+const CREATED = [/\/rest\/v1\/rpc\/evaluation_create$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', brokerage_id: 'b0000000-0000-4000-8000-000000000002',
+  invite_id: 'f0000000-0000-4000-8000-000000000003', owner_token: TOKEN, invite_expires_at: '2026-10-16T12:00:00.123456+00:00' }])];
+r = await real([USER, IS_ADMIN, CREATED], { action: 'create', brokerage_name: 'Acme Realty', seat_limit: 3 });
+ok(r.status === 200 && r.json.invite_link === LINK && r.json.invite_expires_at === '2026-10-16T12:00:00.123456+00:00' && r.json.seat_limit === 3,
+  '6o create through the real data layer: the owner invite comes back as the link', r.json);
+ok(JSON.stringify(seen.map((x) => x.method + ' ' + x.path.split('?')[0])) === JSON.stringify(['GET /auth/v1/user', 'GET /rest/v1/dashboard_admins', 'POST /rest/v1/rpc/evaluation_create']),
+  '6p exactly three requests: who the token belongs to, the allow-list, and evaluation_create', seen.map((x) => x.path));
+const createReq = seen.find((x) => /evaluation_create/.test(x.path));
+ok(createReq.headers.Authorization === 'Bearer svc-key' && JSON.stringify(createReq.body) === JSON.stringify({ p_brokerage_name: 'Acme Realty', p_seat_limit: 3, p_expires_at: null }),
+  '6q evaluation_create is called with the service key and exactly the name, seat limit and end date (the invite lifetime is the database\'s own default)', createReq.body);
+ok(!/e0000000|b0000000|f0000000/.test(JSON.stringify(r.json)), '6r none of the three ids the database returned reaches the answer');
+r = await real([USER, NOT_ADMIN, CREATED], { action: 'create', brokerage_name: 'Acme Realty' });
+ok(r.status === 403 && !seen.some((x) => /evaluation_create/.test(x.path)), '6s a signed-in person not on the allow-list: 403, and evaluation_create is never called');
+for (const [label, route, status] of [
+  ['a refusal (HTTP 400 with a message)', () => json({ code: '23514', message: 'new row violates check constraint' }, 400), 422],
+  ['a 5xx', () => json({ message: 'down' }, 503), 502], ['the network failing', () => { throw new Error('reset'); }, 502],
+  ['a token of the wrong shape', () => json([{ owner_token: 'hse1_short', invite_expires_at: '2026-10-16T12:00:00+00:00' }]), 502],
+  ['no expiry', () => json([{ owner_token: TOKEN }]), 502], ['two rows', () => json([{ owner_token: TOKEN, invite_expires_at: '2026-10-16' }, { owner_token: TOKEN, invite_expires_at: '2026-10-16' }]), 502],
+  ['no row', () => json([]), 502]]) {
+  r = await real([USER, IS_ADMIN, [/evaluation_create/, route]], { action: 'create', brokerage_name: 'Acme Realty' });
+  ok(r.status === status && !JSON.stringify(r.json).includes('hse1_'), '6t the database answering with ' + label + ' → ' + status + ', and no token in the answer', r.json);
+}
+
+// the one form of the invite link, and the page that reads it
+ok(E.INVITE_PAGE === 'https://homesignal.net/development-activity-reports.html' && E.inviteLink(TOKEN) === LINK, '6u the invite link is the customer page with the token in the fragment');
+let threw = false; try { E.inviteLink('hse1_nope'); } catch (e) { threw = e instanceof H.DataUnavailable; }
+ok(threw, '6v a token of the wrong shape is never made into a link');
+{
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../development-activity-reports.html', import.meta.url), 'utf8');
+  const stager = fs.readFileSync(new URL('../scripts/stage_site.py', import.meta.url), 'utf8');
+  const m = /var m = (\/[^\n]*\/)\.exec\(location\.hash \|\| ''\);/.exec(page);
+  const read = m && new Function('h', 'var x = ' + m[1] + '.exec(h); return x && x[1];');
+  ok(read && read(new URL(LINK).hash) === TOKEN && stager.includes("'development-activity-reports.html'"),
+    '6w the customer page reads exactly this link: its own fragment reader, run on the link\'s fragment, gives back the token (and the page is staged)');
+}
+ok(/action: "create"/.test(H.CAPABILITY.method) && /admin/.test(H.CAPABILITY.access) && H.CAPABILITY.writes.some((w) => /owner invite/.test(w)) && !/evaluation_/.test(JSON.stringify(H.CAPABILITY)),
+  '6x the capability names the create action, says it is for admins, lists what it writes, and names no database function');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

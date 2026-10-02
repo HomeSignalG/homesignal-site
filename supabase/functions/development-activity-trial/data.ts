@@ -13,5 +13,8 @@ export type Config = { url: string; serviceKey: string };
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { rpc, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
   const evaluation = makeEvaluationReads(rpc);
-  return { authenticate, isAdmin, trialOf: evaluation.trialOf, redeemInvite: evaluation.redeemInvite };
+  return {
+    authenticate, isAdmin, trialOf: evaluation.trialOf, redeemInvite: evaluation.redeemInvite, createTrial: evaluation.createTrial,
+    now: () => new Date(),
+  };
 }
