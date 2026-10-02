@@ -73,5 +73,23 @@ export function makeServiceReads(cfg: { url: string; serviceKey: string }, fetch
     return rows.length === 1 && rows[0].email === email;
   }
 
-  return { base, svc, rest, authenticate, isAdmin };
+  /**
+   * A database function, called as the service. A refusal the database raised (a 4xx carrying its message, e.g. EVALUATION_COMPLETE)
+   * is returned as `error` for the caller to name; a failure to reach it, or a 5xx, is DataUnavailable (never "refused").
+   */
+  const rpc: ServiceRpc = async (fn, args) => {
+    let r: Response;
+    try {
+      r = await fetchFn(base + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { ...svc, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+    } catch { throw new DataUnavailable('network'); }
+    const j = await r.json().catch(() => null);
+    if (r.ok) return { data: j, error: null };
+    if (r.status < 500 && j && typeof j.message === 'string') return { data: null, error: { message: j.message } };
+    throw new DataUnavailable('http ' + r.status);
+  };
+
+  return { base, svc, rest, rpc, authenticate, isAdmin };
 }
+
+/** A database function call: its rows, or the message of the refusal it raised. */
+export type ServiceRpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;

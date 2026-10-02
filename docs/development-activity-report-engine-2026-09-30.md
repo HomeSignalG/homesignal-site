@@ -173,6 +173,62 @@ property:
 - Nothing yet creates a trial (build step 5d) or lets a member use one from a page (5c). Production holds 0 evaluations,
   so no one can reach the trial path today.
 
+**Step 5c (2026-10-02): the customer page and joining a trial.**
+
+**The page: `development-activity-reports.html`.**
+- It is reached from an invite link: `development-activity-reports.html#invite=hse1_…`.
+- Like the review page, it is noindex, disallowed in robots.txt, in no sitemap or navigation, and linked from no other page. The
+  landing page's hidden buttons point to it at launch (step 13).
+- **The invite token rides in the URL fragment**, which the browser never sends to a server. The page removes it from the address
+  bar as soon as it has read it.
+- It keeps the token in this tab's storage (`sessionStorage`) only until the trial function has answered it, so a reload during
+  sign-in does not lose the invite. Nothing else is stored: no address, no report.
+- **Sign-in may create an account**, unlike the review page, because an invited person usually has none. An account alone grants
+  nothing: both functions answer only about the signed-in person, and the report function serves only an admin or an active trial
+  member.
+- **It shows "N free reports left"**, from the trial function on load and from the report function's own count after each report.
+- **It asks only for the customer view.** It draws the report with the same shared report view as the review page, and puts
+  the report function's charge decision into words. It decides nothing about charging itself.
+- **Each report request carries a random v4 key made once.**
+  - After a lost answer, pressing "Make report" again for the same address resends the same key. If the server had already
+    charged the first request, the retry gets that report back with `replayed: true` and nothing more is charged.
+  - Any answer from the server ends the request, so the next report gets a new key.
+  - An admin's request carries no key, because the report function refuses one.
+
+**The function: `development-activity-trial`** (`verify_jwt` on). Any signed-in user with an id may call it
+(`_shared/admin-gate.ts` `authorizeSignedIn`); it answers only about that person. It has two actions:
+- **`status`** says how the report function will treat this person:
+  - `access` is one of `admin`, `trial`, `complete`, `ended` or `none`;
+  - the trial is described by its counts only, never an id.
+- **`redeem`** joins a trial with an invite token, through `public.evaluation_invite_redeem`:
+  - the same person opening their own invite again gets `replayed: true`;
+  - an unusable invite is 400 `invite_unusable` (the database's one generic refusal);
+  - someone already in a brokerage gets 409 `already_a_member`;
+  - a trial with no free seats gives 409 `seat_limit_reached`;
+  - an unreachable database is 502, never a refusal.
+
+**One path, not two:**
+- `_shared/evaluation-reads.ts` is now the one place an edge function names the trial's database functions (status and
+  redemption). Both functions use it; charging stays in the snapshot module.
+- The database-call helper moved to `_shared/service-rest.ts`.
+- `trialStanding` in `_shared/admin-gate.ts` is the one reading of whether a trial may make reports. The report gate refuses on
+  it, and the trial function reports it.
+
+**Proof:**
+- `test/development-activity-trial-function.test.mjs` (52 checks).
+- The page: `test/development-activity-reports.test.mjs` (36) and `test/development-activity-reports.browser.test.mjs` (33).
+  In the browser test, both functions are answered by their real handlers.
+- `test/trial_report_pg`, now 28 checks: joining goes through the real trial handler and data layer against the shipped SQL.
+  - Covered: the invite used once, a replay, someone else's used invite, a malformed token, already a member, no free seats,
+    and "complete" after 20.
+- `test/development_activity_reports_mutants.py`: 36 prohibited mutations, all killed.
+
+**Still open, stated:**
+- Nothing yet creates a trial or its owner invite from a page or function (step 5d), and no owner can invite agents yet
+  (`evaluation_invite_mint` with an owner as actor). Production holds 0 evaluations, so no one can reach the page's trial path
+  today.
+- The rate-limit gap from 5b is unchanged.
+
 `publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.

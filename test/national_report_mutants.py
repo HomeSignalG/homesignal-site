@@ -189,15 +189,17 @@ m('replay_shows_the_fresh_report', HAN, "status: 'OK', coverage_state: stored?.c
 m('replay_said_charged', HAN, "credit, charged: false, replayed: true, ...used,", "credit, charged: true, replayed: true, ...used,")
 m('trial_counts_from_before_the_charge', HAN, "      const used = { trial: { status: issued.credit.evaluation_status, credits_used: issued.credit.credits_used, credits_remaining: issued.credit.credits_remaining } };",
   "      const used = trialInfo;")
-m('gate_lets_a_complete_trial_in', GATE, "  if (trial.status === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);\n", "")
-m('gate_ignores_expiry', GATE, "  if (trial.status !== 'active' || trial.expired) return", "  if (trial.status !== 'active') return")
-m('gate_ignores_status', GATE, "  if (trial.status !== 'active' || trial.expired) return", "  if (trial.expired) return")
+m('gate_lets_a_complete_trial_in', GATE, "  if (standing === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);\n", "")
+# build step 5c: the gate reads a trial through trialStanding, the one reading shared with the trial function
+m('gate_ignores_expiry', GATE, "  if (t.status === 'active' && !t.expired) return 'active';", "  if (t.status === 'active') return 'active';")
+m('gate_ignores_status', GATE, "  if (t.status === 'active' && !t.expired) return 'active';", "  if (!t.expired) return 'active';")
 m('gate_trial_read_failure_admits', GATE, "  try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }",
   "  try { trial = await deps.trialOf(who.user.id); } catch { trial = { status: 'active', credits_used: 0, credits_remaining: 20, expired: false }; }")
 m('gate_admin_check_skipped', GATE, "  if (who.admin) return { kind: 'admin' };\n", "")
 m('gate_reports_ids', GATE, "  return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining };", "  return t;")
-m('data_trial_takes_extra_rows', DAT, "      if (data.length !== 1 || !t ||", "      if (!t ||")
-m('data_5xx_is_a_refusal', DAT, "    if (r.status < 500 && j && typeof j.message === 'string')", "    if (j && typeof j.message === 'string')")
+# build step 5c: the trial read moved to _shared/evaluation-reads.ts and the database-call helper to _shared/service-rest.ts
+m('data_trial_takes_extra_rows', 'supabase/functions/_shared/evaluation-reads.ts', "      if (data.length !== 1 || !t ||", "      if (!t ||")
+m('data_5xx_is_a_refusal', REST, "    if (r.status < 500 && j && typeof j.message === 'string')", "    if (j && typeof j.message === 'string')")
 m('data_context_lets_purged_match', DAT, "      if (!c || c.state !== 'active' || typeof c.address !== 'string') return 'unknown';", "      if (!c || typeof c.address !== 'string') return 'unknown';")
 m('data_context_exact_text', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return c.address === address ? 'match' : 'mismatch';")
 m('data_context_hands_out_the_address', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return norm(c.address) === norm(address) ? 'match' : c.address;")

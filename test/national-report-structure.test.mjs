@@ -37,10 +37,11 @@ const all = Object.values(src).map(code).join('\n');
   ok(gen.startsWith('// GENERATED FILE — DO NOT EDIT'), '1b and says on its first line that it is generated');
   ok(/canonicalProjectType\(/.test(code(src.module)) && /canonicalLifecycle\(/.test(code(src.module)), '1c the module asks the authority for Type and lifecycle');
   ok(!/CATEGORY_REGISTRY|function classifyProjectType|function lifecycleKey|LIFECYCLE_LABELS/.test(all), '1d and defines no Type or lifecycle rule of its own');
-  // the one exception is the trial gate comparing an EVALUATION's status (docs/evaluation-entitlement.sql), not a publisher word
-  const trialStatus = /if \(trial\.status !== 'active' \|\| trial\.expired\)|if \(!c \|\| c\.state !== 'active' \|\|/g;
-  ok((all.match(trialStatus) || []).length === 2 && !/['"](built|active|on file)['"]/i.test(all.replace(trialStatus, '')),
-    '1e nor maps any publisher status word to a lifecycle key (the two named exceptions compare an EVALUATION status and a private context\'s state, never a publisher word)');
+  // the named exceptions read an EVALUATION's status (docs/evaluation-entitlement.sql; one reading, trialStanding, and the gate's use of
+  // it) and a private context's state, never a publisher word
+  const trialStatus = /export function trialStanding\(t: TrialState\): 'active' \| 'complete' \| 'ended' \{[\s\S]*?\n\}|if \(standing !== 'active'\)|if \(!c \|\| c\.state !== 'active' \|\|/g;
+  ok((all.match(trialStatus) || []).length === 3 && !/['"](built|active|on file)['"]/i.test(all.replace(trialStatus, '')),
+    '1e nor maps any publisher status word to a lifecycle key (the named exceptions read an EVALUATION status, in trialStanding and the gate\'s one use of it, and a private context\'s state, never a publisher word)');
   ok(/import '\.\/project-type\.generated\.js';/.test(src.module), '1f the module loads the generated copy, and only that (not lib/, which is outside the function bundle)');
   ok(!/from ['"][^'"]*\/lib\//.test(all), '1g nothing in the function reaches outside its own tree');
   const gen2 = read('scripts/gen-project-type-module.mjs');
@@ -88,9 +89,13 @@ const all = Object.values(src).map(code).join('\n');
   ok(/stored: false,\n          report_id: null,/.test(src.handler) && /charged: false,/.test(src.handler), '3e an uncharged report states it stored nothing and charged nothing');
   ok(!/\.insert\(|method: 'PUT'|method: 'PATCH'|method: 'DELETE'/.test(all), '3f and the data layer makes no write of any kind');
   const methods = [...src.data.matchAll(/method: '([A-Z]+)'/g)].map((m) => m[1]);
-  const rpcs = [...dataCode.matchAll(/call\('(\w+)'/g)].map((m) => m[1]);
-  ok(methods.length === 3 && methods.every((m) => m === 'POST') && JSON.stringify(rpcs) === '["evaluation_usage","report_private_context_read"]' && /issueEvaluationReport\(call,/.test(dataCode),
-    '3g the only POSTs are the geocoder call, the spatial read, and the one database-function helper, used for exactly three functions: the trial read, the private-context check, and (through the snapshot module) the charged issue', [methods, rpcs]);
+  const rpcs = [...dataCode.matchAll(/\brpc\('(\w+)'/g)].map((m) => m[1]);
+  const restCode = code(read('supabase/functions/_shared/service-rest.ts'));
+  ok(methods.length === 2 && methods.every((m) => m === 'POST') && JSON.stringify(rpcs) === '["report_private_context_read"]'
+     && /issueEvaluationReport\(rpc,/.test(dataCode) && /const evaluation = makeEvaluationReads\(rpc\);/.test(dataCode) && /trialOf: evaluation\.trialOf,/.test(dataCode)
+     && /const \{ base, svc, rest, rpc, authenticate, isAdmin \} = makeServiceReads\(cfg, fetchFn\);/.test(dataCode)
+     && (restCode.match(/method: 'POST'/g) || []).length === 1 && /base \+ '\/rest\/v1\/rpc\/' \+ fn/.test(restCode),
+    '3g the only POSTs here are the geocoder call and the spatial read; every database function goes through the ONE helper in service-rest.ts: the private-context check here, the trial read through _shared/evaluation-reads.ts, and the charged issue through the snapshot module', [methods, rpcs]);
 }
 
 // ---- 4. the access model ---------------------------------------------------------------------------------------------------------------

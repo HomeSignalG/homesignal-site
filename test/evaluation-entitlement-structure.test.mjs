@@ -157,19 +157,28 @@ const namingOurs = SCAN.filter((f) => OURS.test(code(f)));
 ok(SCAN.length > 200 && SCAN.some((f) => f.startsWith('.github/workflows/')) && SCAN.some((f) => f.startsWith('data/')) && SCAN.some((f) => f.startsWith('docs/')) && namingOurs.includes(SQL_FILE)
    && OURS.test(stripSql('select 1 from public.evaluation_credit;')) && !OURS.test(stripSql('-- evaluation_credit in a comment\nselect 1;')),
   '4-control: the scan covers the code directories, the workflows, data/, every non-prose file under docs/ and the root files, finds the SQL of record, flags a planted use and ignores a comment', SCAN.length + ' files');
-// Build step 5b (2026-10-02) is "the handler work": the report function now reads a member's trial (evaluation_usage) and charges a trial
-// report (evaluation_report_issue, through the one shared snapshot module). Those two files are the whole of the change; nothing else names it.
-const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts', SNAP_MOD = 'supabase/functions/_shared/report-snapshot.ts';
+// Build step 5b (2026-10-02) is "the handler work": the report function reads a member's trial (evaluation_usage) and charges a trial
+// report (evaluation_report_issue, through the one shared snapshot module). Build step 5c moves the trial read into ONE shared module,
+// _shared/evaluation-reads.ts, used by both the report function and the trial function (which also redeems an invite there).
+const EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts', SNAP_MOD = 'supabase/functions/_shared/report-snapshot.ts';
 const namesIn = (f) => [...new Set([...code(f).matchAll(new RegExp(OURS.source, 'g'))].map((m) => m[0]))].sort();
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, REPORT_DATA, SNAP_MOD].sort())
-   && JSON.stringify(namesIn(REPORT_DATA)) === '["evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL, exactly two files name this layer in code: the report function\'s data layer reads a member\'s trial (evaluation_usage only), and the shared snapshot module charges through evaluation_report_issue only — no page, script, workflow, data file or other SQL', namingOurs.join(','));
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, EVAL_READS, SNAP_MOD].sort())
+   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
+  '4: outside its SQL, exactly two files name this layer in code: the shared trial module reads a member\'s trial and redeems an invite (evaluation_usage, evaluation_invite_redeem only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 const strip4 = (t) => stripJs(t);
 const NAMES_L1 = /evaluation_(report_issue|invite|credit|event|create|revoke|usage|check)|public\.evaluation\b|brokerage/i;
 ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLLOW.length > 1500 && HAN_REPORT.length > 1500
    && ![GATE, REST, HAN_FOLLOW, HAN_REPORT].some((t) => NAMES_L1.test(strip4(t)))
    && JSON.stringify([...strip4(SNAPMOD).matchAll(new RegExp(NAMES_L1.source, 'gi'))].map((m) => m[0])) === '["evaluation_report_issue"]',
   '4b: the gate, the service reader and both report handlers name no evaluation table or function and no brokerage (the gate asks deps.trialOf; the decision stays in the database), and the snapshot module names only the issue function it calls');
+{
+  const TH = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/handler.ts'), 'utf8');
+  const TD = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/data.ts'), 'utf8');
+  ok(TH.length > 1500 && TD.length > 300 && ![TH, TD].some((t) => OURS.test(strip4(t)))
+     && /const evaluation = makeEvaluationReads\(rpc\);/.test(strip4(TD)) && /trialOf: evaluation\.trialOf, redeemInvite: evaluation\.redeemInvite/.test(strip4(TD))
+     && !/evaluation_id|brokerage_id|invite_id/.test(strip4(TH)),
+    '4b2: the trial function (build step 5c) names no evaluation function and no id: it asks the shared trial module, and never returns an evaluation, brokerage or invite id');
+}
 const callers = SCAN.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
 ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/report-snapshot.ts') && callers.includes(SQL_FILE)
    && callers.every((f) => [SNAP_FILE, 'supabase/functions/_shared/report-snapshot.ts', SQL_FILE].includes(f)),

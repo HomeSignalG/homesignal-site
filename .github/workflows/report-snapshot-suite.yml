@@ -86,6 +86,8 @@ on:
       - 'docs/brokerage-account-spine.sql'
       - 'supabase/functions/get-development-activity-report/**'
       - 'supabase/functions/_shared/credit-rule.ts'
+      - 'supabase/functions/_shared/evaluation-reads.ts'
+      - 'supabase/functions/development-activity-trial/**'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -126,6 +128,8 @@ on:
       - 'docs/brokerage-account-spine.sql'
       - 'supabase/functions/get-development-activity-report/**'
       - 'supabase/functions/_shared/credit-rule.ts'
+      - 'supabase/functions/_shared/evaluation-reads.ts'
+      - 'supabase/functions/development-activity-trial/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -237,7 +241,7 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_share_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsh.log
-      - name: A trial report goes through the real handler, data layer, snapshot module and evaluation SQL; charged once, never twice, refused when used up
+      - name: Joining a trial and making trial reports go through the real handlers, data layers, snapshot module and evaluation SQL; charged once, never twice, refused when used up
         env:
           PGHOST: localhost
           PGPORT: '5432'

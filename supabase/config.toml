@@ -24,3 +24,8 @@ verify_jwt = true
 # signed-in, allow-listed user (the same shared gate as the national report). Not in the deploy workflow's --no-verify-jwt exception.
 [functions.follow-development-report]
 verify_jwt = true
+
+# Joining a brokerage's Development Activity trial, and reading one's own trial (build step 5c). JWT stays ON, and the handler
+# additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.development-activity-trial]
+verify_jwt = true
