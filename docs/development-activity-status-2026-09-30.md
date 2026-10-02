@@ -8,7 +8,7 @@ Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
 Nothing is struck on the strength of a branch, a draft PR or a dry run. Only this file
 is edited as work lands; the plan and the rulings are frozen.
 
-Last updated: 2026-10-02, in the docs PR that records the production apply of K0, J1, M0 and L1 on the founder's "go" (receipt: the "Applied to production" entry under Order M; the J, K, L and M entries keep their dated pre-apply text, each with an APPLIED note at its front, so a line below that says "not applied" is the text from before that apply, not the state); before that 2026-10-02, in the Order M step M0 PR (a payment-event ledger, built and not applied; Order M stays open); before that 2026-10-01, in the PR for Order K0 (the brokerage account spine: built as parked SQL, **not applied**). Before it, in the receipt PR for the Follow / Changes Since Report function (#1516, merged `5937254`; deployed 22:31–22:32Z: `follow-development-report` v1 and the refactored `get-development-activity-report` v2; anon-key refusals and capability reads verified live; **no signed-in call made**, follow doc §9). The receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z) is merged (#1514); the receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
+Last updated: 2026-10-02, in the docs PR that records the production apply of the event-counter lock-down on the founder's "yes" (run 37020139550; receipt: the entry "Open event counter found in production", in the Immediate Product Execution Order list after Order M); before that 2026-10-02, in the docs PR that records the production apply of K0, J1, M0 and L1 on the founder's "go" (receipt: the "Applied to production" entry under Order M; the J, K, L and M entries keep their dated pre-apply text, each with an APPLIED note at its front, so a line below that says "not applied" is the text from before that apply, not the state); before that 2026-10-02, in the Order M step M0 PR (a payment-event ledger, built and not applied; Order M stays open); before that 2026-10-01, in the PR for Order K0 (the brokerage account spine: built as parked SQL, **not applied**). Before it, in the receipt PR for the Follow / Changes Since Report function (#1516, merged `5937254`; deployed 22:31–22:32Z: `follow-development-report` v1 and the refactored `get-development-activity-report` v2; anon-key refusals and capability reads verified live; **no signed-in call made**, follow doc §9). The receipt of the recurring observation job (#1512, applied 17:53Z, first monitor tick ok at 18:10Z) is merged (#1514); the receipts of the purge schedule (#1502) and of ledger option (b) (#1506) are merged (#1509).
 
 ## Master steps (plan "Master Step Plan")
 
@@ -192,12 +192,26 @@ Last updated: 2026-10-02, in the docs PR that records the production apply of K0
   - **Not exercised:** no function was called on production and no row was written (behaviour is proven on disposable PostgreSQL 16 locally and 17 in CI, not on production); the
     `performance` advisor; API-gateway request logs (the database's own settings were read: `log_statement = ddl`, `log_min_duration_statement = -1`,
     `log_parameter_max_length_on_error = 0`, so a function-call argument is not statement-logged, but a handler's request log is a separate question for the handler PR).
-- **Open event counter found in production, 2026-10-02 (read-only); the fix for this layer's one is parked and NOT applied (it needs its own go).** Of the 33 identity or serial
-  sequences in `public`, 5 are usable (`USAGE`, `SELECT` or `UPDATE`) by `anon` and `authenticated` while the table each belongs to is closed to them. One is this layer's:
+- **Open event counter found in production, 2026-10-02 (read-only); the fix for this layer's one was APPLIED to production 2026-10-02 14:28Z** (the founder's "yes", run `37020139550`,
+  receipt in the first sub-bullet). Until then it was parked and not applied, and the text below is the finding as measured before the apply. Of the 33 identity or serial
+  sequences in `public`, 5 were usable (`USAGE`, `SELECT` or `UPDATE`) by `anon` and `authenticated` while the table each belongs to is closed to them. One was this layer's:
   `report_private_context_event_event_id_seq`, from the privacy layer applied 2026-09-29, whose lock-down covered the three tables and the functions and never named the counter.
   The other four belong to other workstreams and are **not touched here**, only named for their owners: `dc_acquisition_run_run_seq_seq` (the data-centre pipeline),
   `local_news_geo_migration_rows_id_seq` (Local News), `maps_dc_generation_request_id_seq` (the MAPS dashboard) and `source_document_events_event_id_seq` (the government source
   archive). The Order J, K, L and M layers applied today are not among the five (their files revoke their counters by a computed loop, which is the pattern to copy).
+  - **APPLIED and read back, 2026-10-02 14:28Z (the founder's "yes" to applying it once its PR merged).** PR #1554 merged as `ac34eba`; `db-sql.yml` run `37020139550` ran
+    `docs/report-private-context-sequence-lockdown.sql` from `main` at that commit (job `run-sql`, `HTTP 201`, empty result, 6 s). The file applied is byte-identical to the one on `main`, which is why its own
+    header is unchanged and still says it was parked when it merged. Read back on production at 14:29Z, each beside its before-value taken at 14:28Z:
+    - **The counter is closed.** Its ACL went from `anon`, `authenticated` and `service_role` each holding `USAGE`, `SELECT` and `UPDATE` to `{postgres=rwU/postgres}`; `has_sequence_privilege` is
+      `false` for those three roles on all three privileges (nine checks) and `true` for the owner, so the definer writers keep the counter.
+    - **The defect shape went 5 → 4**, this layer's gone and the four others named above still open and untouched (control: 33 sequences before and after). Say which definition: the 5 and the 4 are
+      sequences usable by `anon` or `authenticated` **while their own table grants those roles nothing**. A wider count, sequences usable by those two roles at all, went 29 → 28; the other 24 sit under tables that
+      themselves grant `anon` or `authenticated` access. That is a different question, not examined here and not touched.
+    - **Nothing else moved.** The layer's 12 functions fingerprint unchanged (`14dccb45…`, n = 12; md5 over `name:md5(prosrc)` sorted `collate "C"`), the counter value is still 50 and the event table still has 0 rows.
+    - **Not shown by this read-back, and said so:** that a writer still works after the revoke. The disposable-PostgreSQL proof shows it (a definer writer creating a context and its audit event as `service_role`,
+      after the revoke). On production it was deliberately **not** run, because a successful call would create a row and move the counter. The purge schedule (pg_cron job 70, `5,20,35,50 * * * *`) is a weaker witness
+      than it looks: `report_private_context_purge_due` does not itself touch the event table (its `_purge` writes events only when something is due, and nothing is), so a clean run shows the schedule intact, not that the counter path works.
+    - **Rollback** is the one-line `GRANT` in the file's footer; not needed.
   - **What it could do, without inflation.** `UPDATE` on a sequence is `setval()`: a role that could call it could push the counter to its maximum and make every later insert into the
     audit log fail, which here includes private-context creation and purge; `USAGE` is `nextval()`, which burns ids. **I know of no REST route to either** (PostgREST does not expose
     sequences and `pg_catalog.nextval` is not in an exposed schema). That was **not tested end to end**, because a successful test would itself move a production counter. A hardening gap, not a known exposure.
@@ -206,7 +220,7 @@ Last updated: 2026-10-02, in the docs PR that records the production apply of K0
     success if it found no sequence, and refuses if any non-owner grantee remains. Every writer is a `SECURITY DEFINER` function owned by the owner, so no writer changes. Proof on a disposable
     PostgreSQL 16: `test/report_private_context_pg/sequence_lockdown.sh` reproduces the gap first (the three roles and PUBLIC can use the counter, and `anon` `nextval` and `authenticated` `setval`
     succeed), then shows it closed, a definer writer still creating a context and its audit event, a later sequence on the layer closed, an unrelated sequence untouched, a second apply a no-op, both refusals; 25 checks
-    and 10 prohibited mutations, all killed. `test/report-private-context-sequence-lockdown-structure.test.mjs` pins the file's shape. **Not exercised:** the file on production (nothing applied), PostgreSQL 17 locally (CI runs 17).
+    and 10 prohibited mutations, all killed. `test/report-private-context-sequence-lockdown-structure.test.mjs` pins the file's shape. **Not exercised at the time of the PR:** the file on production (nothing was applied yet; it was applied afterwards, see the first sub-bullet), PostgreSQL 17 locally (CI runs 17, and the PR's `snapshot` check ran this harness there, green).
 - N. End-to-end launch gate — open.
 - O. Mass outreach — open.
 - P. Convert to 3–5 paid pilots — open.
