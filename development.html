@@ -181,7 +181,10 @@ HS.onReady(async function () {
         page.innerHTML =
           '<div class="ph"><div class="eyebrow">Development</div><h1>Quality of Life Impact</h1>'
           + '<p style="max-width:none">' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p>'
-          + '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div></div>'
+          // With a ZIP the preview below carries its own "View full Development Map →", so the
+          // header link would be a duplicate; without one there is no preview, so it stays.
+          + (S.zip ? '' : '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div>')
+          + '</div>'
           + (S.zip
             ? '<div class="devmap-preview" id="devMapPreview" style="margin:0 0 20px">'
               + '<iframe id="devMapFrame" title="Development Map for ZIP ' + HS.esc(S.zip) + '" loading="lazy" '
