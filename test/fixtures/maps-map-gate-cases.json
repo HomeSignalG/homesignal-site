@@ -268,7 +268,8 @@
               "dual_identity_target": false
             }
           },
-          "popup_open": true
+          "popup_open": true,
+          "record_match": true
         }
       }
     },
@@ -357,7 +358,8 @@
               "dual_identity_target": false
             }
           },
-          "popup_open": true
+          "popup_open": true,
+          "record_match": true
         }
       }
     },
@@ -626,6 +628,156 @@
               "dual_identity_target": false
             }
           }
+        }
+      }
+    },
+    {
+      "name": "15 REFUSED (Map 1 step (a), 2026-10-02): a project pin that does not record showing the post's own record",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "project",
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "project",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "project",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": true,
+              "target_sought": true,
+              "on_map_total": 3,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          },
+          "popup_open": true
+        }
+      }
+    },
+    {
+      "name": "16 REFUSED (Map 1 step (a), 2026-10-02): a project pin recorded as showing a different record",
+      "zip": "12345",
+      "image": true,
+      "derive_scope": "project",
+      "js": false,
+      "sql": false,
+      "evidence": {
+        "project_id": "11111111-2222-3333-4444-555555555555",
+        "theme": "datacenter",
+        "lat": 1.0,
+        "lng": 2.0,
+        "type": "Industrial",
+        "type_raw": "Industrial",
+        "status": "Approved",
+        "project_name": "Fixture DC",
+        "source_key": "arcgis:fx:1",
+        "visual": {
+          "scope": "project",
+          "capture_key": "@derive",
+          "status": "REAL_MAP_VISUAL",
+          "capture_policy": {
+            "policy": "dc-map-state@1",
+            "scope": "project",
+            "applied": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "final": {
+              "statuses": {
+                "operating": true,
+                "approved": true,
+                "proposed": true,
+                "unknown": true
+              },
+              "types": {
+                "datacenter": true,
+                "industrial": false,
+                "residential": false,
+                "infrastructure": false,
+                "commercial": false,
+                "civic": false,
+                "other": false
+              },
+              "regulatory": false
+            },
+            "rendered": {
+              "target_on_map": true,
+              "target_sought": true,
+              "on_map_total": 3,
+              "non_datacenter_development_on_map": 0,
+              "regulatory_only_on_map": 0,
+              "regulatory_badges_drawn": 0,
+              "dual_identity_target": false
+            }
+          },
+          "popup_open": true,
+          "record_match": false,
+          "record_mismatch": "Map 1's pin for this project shows a different record (name \"NB WRIGHT AVENUE\" on the post, \"FO WRIGHT AVENUE\" on the pin)"
         }
       }
     }

@@ -314,11 +314,18 @@ async function authoritativePresence(zip, sourceKey) {
   // hunt for a marker that does not exist. Running the same builder here is what keeps one
   // definition of the rendered set instead of two.
   const sites = HS.zipAuthSitesFrom(j);
+  // THE CONTENT MAP 1 PRINTS FOR THIS PIN. The reader returns one entry per source_key and
+  // the page builds the popup from it, so this is what the picture's popup will say. It is
+  // compared with the post's own record before anything is photographed
+  // (HS.mapsPinRecordMismatch).
+  const entry = Array.isArray(j?.projects)
+    ? (j.projects.find((p) => p && p.project_ref === sourceKey) || null) : null;
   return {
     status: j?.status || 'unknown',
     markers: markers ? markers.length : null,
     rendered: sites.length,
     present: sites.some((s) => s && s.zip_project_ref === sourceKey),
+    entry,
   };
 }
 
@@ -329,6 +336,7 @@ async function authoritativePresence(zip, sourceKey) {
  */
 async function liveProject(projectId) {
   const rows = await api(`app_projects?select=id,zip,name,type,status,lat,lng,record_kind,source_key,provenance`
+    + `,${HS.MAPS_PIN_RECORD_FIELDS.join(',')}`
     + `&id=eq.${encodeURIComponent(projectId)}&limit=1`);
   return rows[0] || null;
 }
@@ -445,6 +453,18 @@ async function capture(page, draft, proj, theme) {
       record_url: (hit.s && hit.s.record_url) || null,
     };
   }, [proj.source_key]);
+
+  // THE DRAWN PIN MUST CARRY THIS RECORD'S NAME. The record comparison already ran on the
+  // reader's content before the browser opened; this is the same question asked of the
+  // marker the page actually drew, so a page that drew different content than the reader
+  // returned a moment earlier is refused rather than photographed.
+  if (found.found && (proj.name || '') !== found.label) {
+    return {
+      ok: false,
+      reason: `the pin Map 1 drew is labelled ${JSON.stringify(found.label.slice(0, 80))}, not `
+        + `${JSON.stringify(String(proj.name || '').slice(0, 80))}, so it does not show this post's record`,
+    };
+  }
 
   if (!found.found) {
     if (theme === 'datacenter') {
@@ -853,12 +873,16 @@ async function finishCapture(d, label, r, proj, results) {
 // CAPTURE_INELIGIBLE is the state that means exactly this ("cannot be photographed on its
 // ZIP page yet"), and its long retry floor brings the row back in case the record becomes
 // drawable. It is kept at module scope so its body can be executed offline.
-async function projectPinRefusal(d, label, results, why) {
+async function projectPinRefusal(d, label, results, why, mismatch) {
   const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
   const reason = `The project's own pin could not be shown on Map 1: ${why}. A post about a `
     + 'project must show its own pin with its popup open (founder ruling 2026-10-01), so no '
     + 'ZIP map stands in for it.';
-  const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, reason, theme, 'project');
+  // ANY picture this draft still holds can no longer be said to show its record, so it is
+  // unbound here (record_match false), not merely left as it was. `record_mismatch` carries
+  // the comparison's own words when that is the reason, for the dashboard.
+  const extra = { record_match: false, ...(mismatch ? { record_mismatch: mismatch } : {}) };
+  const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, reason, theme, 'project', extra);
   results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason, theme,
     ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
 }
@@ -900,9 +924,101 @@ async function stampTypes() {
   if (tally.problem) process.exitCode = 1;
 }
 
+/**
+ * --stamp-record-match: Map 1 step (a) for pictures taken BEFORE the record check existed.
+ *
+ * A picture of a project records `record_match` only since 2026-10-02, and without it the
+ * picture is not bound (lib/maps-capture-binding.js). This pass checks the pictures that
+ * already exist instead of re-photographing them, and needs two things to agree:
+ *
+ *   1. the PICTURE: the name its popup showed (`visual.marker_label`, recorded at the
+ *      shutter) is this post's record's name; and
+ *   2. MAP 1 NOW: the content the reader returns for this pin matches this post's record on
+ *      every field (HS.mapsPinRecordMismatch, the same rule a live capture uses).
+ *
+ * Both agree -> `record_match: true`, evidence only. Map 1 now differs -> a draft is refused
+ * (record_match false, CAPTURE_INELIGIBLE), exactly as a live capture would refuse it.
+ * Only the picture is out of date -> nothing is written; the draft stays unbound and the
+ * next capture run re-photographs it.
+ *
+ * APPROVED ROWS. The founder approved an exact payload, and the approval binds it by
+ * hs_social_payload_fingerprint (post text, link, embed, image path, hashtags). Evidence is
+ * not in that fingerprint, so writing `record_match` moves neither the payload nor the
+ * status; the write pins status=approved and the revision, and the row is re-read
+ * afterwards to prove every fingerprint input is unchanged. An approved row that fails
+ * either check is never written: the run reports it and fails.
+ */
+async function stampRecordMatch() {
+  const FP = ['status', 'post_text', 'source_url', 'embed_kind', 'embed', 'image_bucket_path', 'hashtags'];
+  const q = 'social_posts?select=id,zip,tile,post_text,source_url,embed_kind,embed,hashtags,evidence,'
+    + 'image_bucket_path,status,content_family,revision'
+    + '&content_family=eq.MAPS&status=in.(draft,approved)&order=id.asc&limit=5000'
+    + (ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '');
+  const rows = await api(q);
+  const tally = { examined: 0, no_project: 0, not_project_picture: 0, already: 0, stamped: 0,
+    picture_stale: 0, refused: 0, approved_failed: 0, stale: 0 };
+  const results = [];
+  const touchedApproved = [];
+  for (const d of rows) {
+    tally.examined++;
+    const pid = d.evidence && d.evidence.project_id;
+    const v = (d.evidence && d.evidence.visual) || {};
+    if (!pid) { tally.no_project++; continue; }
+    if (!d.image_bucket_path || HS.mapsCaptureStoredScope(v, d) !== 'project') { tally.not_project_picture++; continue; }
+    if (v.record_match === true || v.record_match === 'true') { tally.already++; continue; }
+    const label = `${d.zip} ${d.evidence.project_name || ''}`.trim();
+    const proj = await liveProject(pid);
+    const auth = proj ? await authoritativePresence(d.zip, proj.source_key) : null;
+    const now = !proj ? 'the project row is no longer in app_projects'
+      : !auth.present ? `the project is not drawn on its ZIP's Map 1 page (status ${auth.status})`
+        : HS.mapsPinRecordMismatch(auth.entry, proj);
+    const pictureOk = !!proj && typeof v.marker_label === 'string' && v.marker_label === (proj.name || '');
+    console.log(`  ${d.status} ${d.id} zip=${d.zip} map1_now=${now ? 'DIFFERS' : 'matches'} picture=${pictureOk ? 'matches' : 'differs'}${now ? ` -- ${now}` : ''}`);
+    if (now || !pictureOk) {
+      if (d.status === 'approved') { tally.approved_failed++; continue; }
+      if (now) {
+        tally.refused++;
+        if (!DRY) await projectPinRefusal(d, label, results, now, now);
+      } else {
+        tally.picture_stale++;
+      }
+      continue;
+    }
+    if (DRY) { tally.stamped++; continue; }
+    const visual = { ...v, record_match: true, record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: new Date().toISOString(), record_checked_by: 'stamp-record-match' };
+    const w = await guardedPatch(d, { evidence: { ...d.evidence, visual } }, d.status);
+    if (!w.ok) { tally.stale++; continue; }
+    tally.stamped++;
+    if (d.status === 'approved') touchedApproved.push(d);
+  }
+  // PROVE THE APPROVED PAYLOADS DID NOT MOVE. Every input of hs_social_payload_fingerprint,
+  // and the status, re-read from the database and compared with what was read before.
+  if (touchedApproved.length) {
+    const after = await api(`social_posts?select=id,${FP.join(',')}&id=in.(${touchedApproved.map((d) => d.id).join(',')})`);
+    for (const d of touchedApproved) {
+      const a = after.find((x) => x.id === d.id);
+      const moved = FP.filter((f) => JSON.stringify(a && a[f]) !== JSON.stringify(d[f]));
+      if (!a || moved.length) {
+        throw new Error(`REFUSING TO REPORT SUCCESS: approved row ${d.id} changed ${moved.join(', ') || 'unreadable'}`);
+      }
+    }
+    console.log(`stamp-record-match: ${touchedApproved.length} approved row(s) re-read; status and every payload-fingerprint input unchanged`);
+  }
+  console.log(`stamp-record-match ${DRY ? '(DRY) ' : ''}${JSON.stringify(tally)}`);
+  const parts = tally.no_project + tally.not_project_picture + tally.already + tally.stamped
+    + tally.picture_stale + tally.refused + tally.approved_failed + tally.stale;
+  if (parts !== tally.examined) throw new Error(`stamp-record-match partition ${parts} != examined ${tally.examined}`);
+  if (tally.approved_failed) {
+    console.error(`stamp-record-match: ${tally.approved_failed} APPROVED post(s) show a different record or could not be checked; nothing was written to them`);
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
   if (has('--stamp-types')) { await stampTypes(); return; }
+  if (has('--stamp-record-match')) { await stampRecordMatch(); return; }
   const drafts = await selectDrafts();
   if (has('--list')) {
     for (const d of drafts) {
@@ -998,6 +1114,13 @@ async function main() {
       continue;
     }
 
+    // ⚖️ MAP 1 STEP (a): THE PIN MUST SHOW THIS POST'S OWN RECORD. Map 1 draws one pin per
+    // source_key; where several records share a key its popup can show another one. Compared
+    // on content, before the browser opens (HS.mapsPinRecordMismatch).
+    const mismatch = HS.mapsPinRecordMismatch(auth.entry, proj);
+    if (mismatch) { await projectPinRefusal(d, label, results, mismatch, mismatch); continue; }
+    const recordCheckedAt = new Date().toISOString();
+
     // THEME — from the SHIPPED predicate the Acquisition Dashboard uses, so the image this
     // row gets is decided by the same rule that put the row in the Data Center Theme queue.
     const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
@@ -1007,7 +1130,7 @@ async function main() {
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
     if (r.theme === undefined) r.theme = theme || null;
-    if (r.ok) r.authMarkers = auth.markers;
+    if (r.ok) { r.authMarkers = auth.markers; r.recordMatch = true; r.recordCheckedAt = recordCheckedAt; }
     await finishCapture(d, label, r, proj, results);
   }
 
@@ -1098,8 +1221,11 @@ async function proveNothingApproved(ids) {
 // precondition failed. The run reports the draft as skipped/stale and leaves the old image
 // and the old evidence exactly as they are. It never re-reads and retries, and it never
 // drops a filter to make the write land.
-async function guardedPatch(draft, body) {
-  const q = `social_posts?id=eq.${draft.id}&status=eq.draft&revision=eq.${Number(draft.revision)}`;
+async function guardedPatch(draft, body, status = 'draft') {
+  // `status` is pinned in the WHERE clause, never moved. Only --stamp-record-match passes
+  // anything but 'draft', and it writes evidence alone (see stampRecordMatch).
+  if (status !== 'draft' && status !== 'approved') throw new Error(`guardedPatch: status ${status}`);
+  const q = `social_posts?id=eq.${draft.id}&status=eq.${status}&revision=eq.${Number(draft.revision)}`;
   const rows = await api(q, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
@@ -1181,6 +1307,12 @@ async function attach(draft, objectPath, r, proj, scope) {
       popup_open: r.checks.popupOpen,
       popup_text: r.checks.popupText,
       halo_present: r.checks.haloPresent,
+      // Map 1 step (a): the pin's content was compared with this post's record before the
+      // shutter (HS.mapsPinRecordMismatch) and the drawn pin carried the record's name.
+      // Anything but an explicit true leaves the picture unbound.
+      record_match: r.recordMatch === true,
+      record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: r.recordCheckedAt || null,
     }),
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
@@ -1277,9 +1409,9 @@ async function attach(draft, objectPath, r, proj, scope) {
 // thrown capture there is no result object to read it from, and re-deriving it from the
 // draft alone would key the refusal at `project` for a ZIP attempt — so the key-moved
 // release in `mapsCaptureDue` would fire every run and the backoff would never hold.
-async function recordOutcome(draft, state, reason, theme, scope) {
+async function recordOutcome(draft, state, reason, theme, scope, extra) {
   const prev = draft.evidence || {};
-  const prevVisual = prev.visual || {};
+  const prevVisual = { ...(prev.visual || {}), ...(extra || {}) };
   // An ineligible outcome does not burn an attempt: attempts measure how often our capture
   // was tried and failed, and no number of retries fixes a project that is not in the ZIP's
   // authoritative set. It gets the long floor instead.

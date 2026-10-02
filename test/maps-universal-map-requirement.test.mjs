@@ -104,8 +104,9 @@ const capture = (d, scope, opts) => {
   p.image_bucket_path = `maps/${o.pathZip || p.zip}/x.png`;
   const visual = { state: S.READY, captured_at: new Date().toISOString() };
   if (!o.dropScope) visual.scope = scope;
-  // A real project capture records its popup open (the job refuses the shot otherwise).
-  if (scope === 'project') visual.popup_open = true;
+  // A real project capture records its popup open (the job refuses the shot otherwise), and
+  // since 2026-10-02 that its pin shows the post's own record (Map 1 step (a)).
+  if (scope === 'project') { visual.popup_open = true; visual.record_match = true; }
   if (HS.mapsDcCapturePolicyApplies(p)) visual.capture_policy = policyBlob(scope);
   visual.capture_key = o.key !== undefined ? o.key : HS.mapsCaptureKey(o.keyFrom || p, scope);
   p.evidence.visual = visual;
@@ -279,6 +280,23 @@ ok(HS.mapsCaptureBound(noPopup) === false && /popup as open/.test(HS.mapsMapGate
   '7c: a project pin that does not record its popup open is refused too');
 ok(HS.mapsCaptureBound(capture(draftFor(SCENARIOS[0]), 'project')) === true,
   '7d: control — the same project pin WITH its popup open binds');
+// Map 1 step (a), 2026-10-02: the pin must also show the post's own record.
+const noRecordCheck = capture(draftFor(SCENARIOS[0]), 'project');
+delete noRecordCheck.evidence.visual.record_match;
+ok(HS.mapsCaptureBound(noRecordCheck) === false
+   && /does not record that its pin shows this post's own record/.test(HS.mapsMapGateBlock(noRecordCheck)),
+  '7e: a project pin taken before the record check is not bound until it has been checked');
+const otherRecord = capture(draftFor(SCENARIOS[0]), 'project');
+otherRecord.evidence.visual.record_match = false;
+otherRecord.evidence.visual.record_mismatch = 'Map 1\'s pin for this project shows a different record (name "A" on the post, "B" on the pin)';
+ok(HS.mapsCaptureBound(otherRecord) === false
+   && /shows a different record from this post's own record/.test(HS.mapsMapGateBlock(otherRecord))
+   && /name "A" on the post, "B" on the pin/.test(HS.mapsMapGateBlock(otherRecord)),
+  '7f: a project pin recorded as showing another record is refused, with the comparison\'s own words');
+const absenceCtl = capture(draftFor(SCENARIOS[1]), 'zip');
+ok(SCENARIOS[1].subject === 'absence' && !('record_match' in absenceCtl.evidence.visual)
+   && HS.mapsCaptureBound(absenceCtl) === true,
+  '7g: control — a post with no project still binds on its ZIP map with no record check (there is no record to show)');
 
 // ═══ 8. NO SPECIAL-CASE POPULATION ANYWHERE (§13) ════════════════════════════════════
 const SRC = ['maps-capture-binding', 'maps-capture-policy', 'maps-social-theme']
@@ -329,7 +347,7 @@ for (const cond of [
 }
 ok(/await pinRefusal\(why\)/.test(GEN),
   '8b: …and so is a project outside the ZIP\'s authoritative development set');
-ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project'\)/.test(GEN)
+ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project', extra\)/.test(GEN)
     && !/zipMapFallback|zipFallback\(/.test(GEN),
   '8b: the refusal records CAPTURE_INELIGIBLE at project scope, and the ZIP-map fallback is gone');
 // WHAT THE PICTURE IS OF IS WRITTEN DOWN. Without this, a ZIP capture is indistinguishable
