@@ -118,9 +118,10 @@ for (const fam of ['stagechip', 'typechip', 'regchip'])
 
 // ---- A-008: map -> list now exists (founder, 2026-09-26: "should have back button so you
 // can go back to list"). One link, ZIP-stamped through the shared data-znav mechanism. ----
-ok(/<a class="backbtn devlist-back" href="development\.html" data-znav="development\.html"/.test(map),
-  'A-008 Map 1 carries ONE ZIP-stamped link back into the development list',
-  (map.match(/.{0,40}development\.html.{0,40}/) || [])[0]);
+// SUPERSEDED (founder, 2026-10-02): the page navigates through the Explore dropdown, so the
+// back link is removed and must not return.
+ok(!/devlist-back/.test(map) && !/Back to Quality of Life/.test(map),
+  'A-008 Map 1 carries no back link (navigation is the Explore dropdown)');
 ok(/See it on the map/.test(dev) && /homesignalmap\.html/.test(dev),
   'A-008 list -> map ("See it on the map") is the direction that DOES exist');
 

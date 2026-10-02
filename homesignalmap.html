@@ -629,8 +629,6 @@
   .hs-embed.hs-preview .maprow{max-height:none;overflow:visible}
   .hs-embed.hs-preview .map-frame{height:var(--hs-preview-map-h,430px);min-height:0}
 
-/* Map 1 -> Development list back link: ZIP pages only. */
-.devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
@@ -648,7 +646,6 @@
 <template id="hs-content">
   <div class="wrap">
     <div class="head">
-      <a class="backbtn devlist-back" href="development.html" data-znav="development.html" style="text-decoration:none">← Back to Quality of Life Impact</a>
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
       <h1>Development around your home</h1>
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
@@ -2105,7 +2102,7 @@ HS.onReady(function(){
     // directly above results that say "Showing development within 2 miles of". A resident
     // reads top-down, so the biggest, first thing on the page was still making the
     // whole-ZIP claim over near-home results — measured on main, 2026-09-06: address mode
-    // rendered kicker "Development overview" / H1 "ZIP 78617".
+    // rendered kicker "Development map" / H1 "ZIP 78617".
     // loadZip() already restores all four for the ZIP view, so this is the missing half of
     // a switch that was only ever written in one direction.
     var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Address view";
@@ -2326,10 +2323,10 @@ HS.onReady(function(){
         // (indexability is driven by the stamped substance flag, not the state — see loadZip top)
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
         // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
-        // resident sees at a glance they're on the right ZIP page; "Development overview" is
+        // resident sees at a glance they're on the right ZIP page; "Development map" is
         // the small kicker above it.
         var label = zipPlaceLabel(rows, zip);
-        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development overview";
+        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development map";
         var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
         document.title = "Development around " + label + " — HomeSignal";
         // One canvas, two scopes - say so, in six words, rather than letting the caption
@@ -2346,7 +2343,7 @@ HS.onReady(function(){
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
-    $("eyebrow").textContent = "Development overview";
+    $("eyebrow").textContent = "Development map";
     var _h1z = document.querySelector(".head h1"); if(_h1z) _h1z.textContent = "ZIP " + zip;
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
