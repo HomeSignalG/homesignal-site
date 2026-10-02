@@ -45,7 +45,10 @@ ANON = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6In
 BASE = "https://homesignal.net"
 STATIC = [("/", "weekly", "1.0"), ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
-          ("/privacy.html", "yearly", "0.3")]
+          ("/privacy.html", "yearly", "0.3"),
+          # The Enterprise page (founder, 2026-10-02): listed with its inert commerce buttons
+          # hidden. test/development-activity-landing.test.mjs pins that pairing.
+          ("/development-activity.html", "monthly", "0.6")]
 STEP = 1000
 # Ramp throttle: max community ZIPs ADDED per run vs the previous sitemap (§11.3).
 MAX_NEW_URLS_PER_RUN = 250
