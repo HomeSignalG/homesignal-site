@@ -16,6 +16,10 @@ Last updated: 2026-10-02, in the docs PR that records the production apply of th
 2. Complete corporate data-rights clearance — **open.** Classifications come from
    `docs/corporate-output-source-rights-audit-2026-09-27.md` (verdict NOT YET; HOLD stays
    HOLD, ruling R4). Separate gate; does not change the 12,722-ZIP architecture.
+   **Utah first, development only (founder, 2026-10-02):** the Utah report is development only, not government notices, upcoming meetings or local news, so the
+   sources that matter are the four Utah registry families in `app_projects` (UDOT points and lines, Salt Lake City planning petitions, Provo planning applications;
+   UDOT is 92.7% of Utah's development rows) plus EPA facilities. All still HOLD, none cleared; the publishers' own posted wording grants nothing. Requests are **drafted, not
+   sent** (only a human can send): `docs/corporate-output-utah-clearance-2026-10-02.md`.
 3. Remove unsupported prediction claims — **open.** The merged U01 (#1458) touched the
    legacy page only; it has not been checked against Step 3's text, so nothing is struck.
    - 3A. Build the Change Intelligence Contract — **open; Order B audit done** (see below).
