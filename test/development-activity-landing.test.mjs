@@ -13,13 +13,14 @@
 //      every var(--token) it names is defined there.
 //   4. NOTHING PROMISES WHAT DOES NOT EXIST. The free-evaluation and $79 checkout buttons are
 //      inert until entitlement and checkout ship (plan sections 18 and 25). The page IS deployed
-//      (founder, 2026-09-29) and noindex, and is not in the sitemap. The founder's navigation
-//      plan v3 (2026-09-30) made it VISIBLE as the shell's "Enterprise" item and nothing more:
-//      it is linked exactly once, from partials/shell.html, and nothing else links it. That
-//      supersedes the 2026-09-29 "linked from nowhere" state, which was a session's addition
-//      to the founder's "deploy", never a founder ruling. Visibility is not launch: the page
-//      may be INDEXED or enter the SITEMAP only once its buttons are live, so launching out of
-//      order still fails this file.
+//      (founder, 2026-09-29). The founder's navigation plan v3 (2026-09-30) made it VISIBLE as
+//      the shell's "Enterprise" item and nothing more: it is linked exactly once, from
+//      partials/shell.html, and nothing else links it. The founder then ruled (2026-10-02,
+//      "list it sooner, without checkout") that the page is INDEXED and in the SITEMAP now,
+//      with its inert buttons HIDDEN (each inside a <div data-commerce hidden>) and the
+//      "Contact us for Enterprise Pricing" link as its working action. So the rule this file
+//      enforces is: an inert button may never be VISIBLE on an indexable or listed page.
+//      Un-hiding a button before it works, while the page is indexed, fails this file.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -148,14 +149,31 @@ ok(!/href="[^"]*(checkout|lemonsqueezy|stripe|billing|subscribe)/i.test(markup) 
   'the page links to no checkout or payment processor and its code calls none');
 ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the inert buttons are not wired to sign-in, which would imply an entitlement that is not there');
 const inert = cta.some((c) => /aria-disabled="true"/.test(c.tag));
+// sitemap.xml is not a link a visitor follows: it is judged by the sitemap tripwire below.
 const otherSources = ['index.html', 'about.html', 'contact.html', 'how-it-works.html', 'privacy.html', 'terms.html', 'dashboard.html', 'alerts.html',
   'development.html', 'properties.html', 'property.html', 'reports.html', 'community.html', 'homesignalmap.html', 'partials/shell.html', 'shell.js',
-  'sitemap.xml', 'scripts/gen_zip_pages.py', 'lib/community-page.js'];
+  'scripts/gen_zip_pages.py', 'lib/community-page.js'];
 const linkedFrom = otherSources.filter((f) => { try { return read(f).includes(PAGE); } catch (e) { return false; } });
 ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_site.py allowlist, so it publishes');
-ok(noindex, 'the page is noindex (dark: reachable by URL, not discoverable by search)');
-ok(!(inert && !noindex), 'TRIPWIRE: a page with inert commerce buttons must stay noindex');
-ok(!(inSitemap && (noindex || inert)), 'TRIPWIRE: the page enters the sitemap only when it is indexable and its commerce buttons are live', { inSitemap, noindex, inert });
+// Founder, 2026-10-02: listed now, with the inert buttons hidden. Each commerce button sits,
+// with its "Opens at launch." note, inside its own <div data-commerce hidden>, and nothing else does.
+const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^>]*data-cta="[^"]+"[^>]*>[^<]*<\/button>)\s*<span class="da-soon">Opens at launch\.<\/span>\s*<\/div>/g)]
+  .map((m) => ({ hidden: !!m[1], tag: m[2] }));
+// Counted, not matched by tag: three buttons share one tag, so a tag match would let an unhidden
+// "Start with 20 free reports" borrow a hidden sibling's wrapper.
+const isInert = (tag) => /aria-disabled="true"/.test(tag);
+const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
+ok(wrappers.length === 4 && (markup.match(/data-commerce/g) || []).length === 4 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
+  'each of the four commerce buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
+ok(wrappers.every((w) => w.hidden) && !visibleInert, 'HIDDEN (founder, 2026-10-02): every inert commerce button is inside a hidden wrapper', wrappers);
+ok(/\[hidden\]\{display:none!important\}/.test(cssBlock), 'the page CSS makes [hidden] win over any display rule, so a hidden wrapper cannot reappear');
+const indexable = /<meta name="robots" content="index, follow">/.test(src) && !/noindex/i.test(noComments);
+ok(indexable && !noindex, 'LISTED (founder, 2026-10-02): the page is index, follow, like about.html and contact.html');
+ok(!(visibleInert && !noindex), 'TRIPWIRE: a page that shows an inert commerce button must stay noindex', { visibleInert, noindex });
+ok(!(inSitemap && (noindex || visibleInert)), 'TRIPWIRE: the page is in the sitemap only while it is indexable and shows no inert commerce button', { inSitemap, noindex, visibleInert });
+const committedMap = read('sitemap.xml');
+ok(!committedMap.includes(PAGE) || (inSitemap && indexable && !visibleInert),
+  'TRIPWIRE: the committed sitemap.xml lists the page only when the generator does and the page may be listed');
 // v3 (founder navigation plan, 2026-09-30): the shell's Enterprise item is the ONE link to this
 // page. Any other link while the buttons are inert is a second, unreviewed entry point, and an
 // Enterprise item that drifted to another href would silently stop pointing here.
@@ -166,7 +184,9 @@ ok(JSON.stringify(linkedFrom) === JSON.stringify(['partials/shell.html']),
 ok(shellLinks.length === 1 && /data-nav="enterprise"/.test(shellLinks[0])
    && /<a\s+href="development-activity\.html"[^>]*>[\s\S]{0,80}?Enterprise<\/a>/.test(shellSrc),
   'v3 the shell links it exactly once, as the "Enterprise" primary item', shellLinks);
-ok(!inSitemap, 'LINKED, NOT LAUNCHED: still not in the sitemap', { inSitemap });
+ok(inSitemap, 'LISTED: the page is in the sitemap generator\'s static list (scripts/gen_sitemap.py STATIC)', { inSitemap });
+ok(!/data-commerce[^>]*>[\s\S]*?id="daEnterprise"[\s\S]*?<\/div>/.test(markup.replace(/<div data-commerce[^>]*>[\s\S]*?<\/span>\s*<\/div>/g, '')),
+  'the working action, Contact us for Enterprise Pricing, is not inside a commerce wrapper (the browser test checks it is visible)');
 ok(!/HS\.data\.(projects|facilities)|from\('app_projects'\)|rpc\(/.test(noComments), 'the sample reads no production project data: it is labelled illustrative and shows no real record');
 ok(/Sample Development Activity report\. The property, projects, distances and dates below are illustrative entries, not records for a real address\./.test(text), 'the sample is labelled illustrative in plain words');
 

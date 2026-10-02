@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- LINKED, NOT LAUNCHED. Deployed 2026-09-29 (founder: "deploy") as noindex, unlinked and absent
-     from the sitemap, because the plan's launch blockers are still open (100126 plan, section 25):
-     the free-evaluation entitlement and the $79/month checkout do not exist yet, so the commerce
-     buttons are inert. The founder's navigation plan v3 (2026-09-30) then made the page VISIBLE as
-     the shell's "Enterprise" item and nothing more: it is linked exactly once, from
-     partials/shell.html, and lights Enterprise (data-nav="enterprise"). Visibility is not launch.
-     To LAUNCH: make those buttons live, remove this noindex tag and add the page to sitemap STATIC
-     (scripts/gen_sitemap.py). test/development-activity-landing.test.mjs fails if either is done
-     while the buttons are inert, or if anything other than the shell's Enterprise item links here. -->
-<meta name="robots" content="noindex, nofollow">
+<!-- LISTED, NOT LAUNCHED. Deployed 2026-09-29 noindex and unlinked; the founder's navigation plan
+     v3 (2026-09-30) made it the shell's "Enterprise" item, linked once, from partials/shell.html.
+     Founder, 2026-10-02 ("list it sooner, without checkout"): the page may be indexed and is in the
+     sitemap NOW, because its commerce buttons are HIDDEN. The free-evaluation entitlement and the
+     $79/month checkout still do not exist (100126 plan, section 25), so every button stays inert
+     (aria-disabled) and sits inside a <div data-commerce hidden>. To LAUNCH: make the buttons live,
+     then remove `hidden` from those four divs. test/development-activity-landing.test.mjs fails if
+     an inert button is visible on an indexable page, or if anything other than the shell's
+     Enterprise item links here. -->
+<meta name="robots" content="index, follow">
 <link rel="canonical" href="https://homesignal.net/development-activity.html">
 <title>HomeSignal — Development Activity</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
@@ -152,7 +152,7 @@
       <h1>Know what’s changing around a property before your client does.</h1>
       <p class="da-lede">HomeSignal shows development that is proposed, approved, permitted and under construction around a property—organized from covered official sources into one client-ready Development Activity report.</p>
       <div class="da-actions">
-        <div>
+        <div data-commerce hidden>
           <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
           <span class="da-soon">Opens at launch.</span>
         </div>
@@ -341,7 +341,7 @@
           <p class="da-band">Start Free</p>
           <div class="da-price da-sm">20 Development Activity reports free</div>
           <p>No credit card required.</p>
-          <div>
+          <div data-commerce hidden>
             <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
             <span class="da-soon">Opens at launch.</span>
           </div>
@@ -357,7 +357,7 @@
             <li>Download or print existing reports.</li>
             <li>Cancel anytime.</li>
           </ul>
-          <div>
+          <div data-commerce hidden>
             <button type="button" class="mbtn da-off" data-cta="join" aria-disabled="true">Join for $79/month</button>
             <span class="da-soon">Opens at launch.</span>
           </div>
@@ -375,7 +375,7 @@
       <h2>You know what’s there.<br>HomeSignal shows you what’s changing.</h2>
       <p>Start with 20 Development Activity reports free. No credit card required.</p>
       <div class="da-actions" style="margin-top:14px">
-        <div>
+        <div data-commerce hidden>
           <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start with 20 free reports</button>
           <span class="da-soon">Opens at launch.</span>
         </div>
@@ -407,8 +407,8 @@
        the Type filter narrows the same list across all three Stage sections. Stage labels are display
        groupings only and create no lifecycle value (founder ruling R2). Every count is computed from
        the entries below, so the numbers on the page cannot disagree with the list.
-   The three commerce buttons are deliberately inert (aria-disabled): the 20-report entitlement and the
-   $79/month checkout are launch blockers (plan sections 18 and 25). */
+   The commerce buttons are inert (aria-disabled) and HIDDEN (founder, 2026-10-02): the 20-report entitlement
+   and the $79/month checkout are launch blockers (plan sections 18 and 25). */
 (function () {
   'use strict';
 

@@ -434,15 +434,15 @@ ok(sd.openBefore && !sd.clickError && sd.ready === false,
   '6 slow sign-in: the drawer was open and Terms was tapped before the reads finished (positive control)', sd);
 ok(!sd.sideOpen && !sd.backdrop, '6 slow sign-in: tapping Terms closes the drawer without waiting for the reads', sd);
 
-// ═══ 7. Enterprise is linked, still noindex ═══
-console.log('--- 7. Enterprise stays noindex ---');
+// ═══ 7. Enterprise is linked and listed (founder, 2026-10-02: commerce buttons hidden) ═══
+console.log('--- 7. Enterprise is index, follow ---');
 await D.page.goto(base + '/development-activity.html', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 const ent = await D.page.evaluate(() => ({
   robots: (document.querySelector('meta[name="robots"]') || {}).content || '',
   lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav'))
 }));
-ok(/noindex/.test(ent.robots), '7 development-activity.html is still noindex', ent.robots);
+ok(ent.robots === 'index, follow', '7 development-activity.html is index, follow (listed 2026-10-02, buttons hidden)', ent.robots);
 ok(JSON.stringify(ent.lit) === JSON.stringify(['enterprise']), '7 ...and lights Enterprise', ent.lit);
 
 ok(D.errors.filter((e) => !/\bL is not defined|maplibregl|THREE\b/.test(e)).length === 0,

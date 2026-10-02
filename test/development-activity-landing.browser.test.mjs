@@ -6,7 +6,9 @@
 //   * the sample report keeps the real hierarchy, and Type and Stage are two separate fields;
 //   * selecting a Type filters that Type across ALL THREE Stage sections at once, dims the same
 //     projects on the evidence plot, and shows an honest empty line where a Stage has none;
-//   * the commerce buttons do nothing (entitlement and checkout do not exist);
+//   * the commerce buttons are hidden and do nothing (entitlement and checkout do not exist; the
+//     founder listed the page on 2026-10-02 with the buttons hidden), and the Enterprise contact
+//     link is the visible, working action;
 //   * the coverage check answers only what it can prove, and says so when it cannot;
 //   * a phone-width viewport does not scroll sideways.
 //
@@ -198,7 +200,7 @@ await page.click('#daPlot .da-mk >> nth=3');
 const sel4 = await page.evaluate(() => document.querySelector('.da-card[data-n="4"]').classList.contains('sel') && !document.querySelector('.da-card[data-n="1"]').classList.contains('sel'));
 ok(sel4, 'selecting a marker selects its project card');
 
-console.log('--- 6. the commerce buttons are inert; Enterprise is a real link ---');
+console.log('--- 6. the commerce buttons are hidden and inert; Enterprise is a real link ---');
 // Positive control: the same probe DOES see a modal when one is really open, so a zero below means something.
 const probe = () => page.evaluate(() => document.querySelectorAll('.overlay.show, .overlay.open, .modal.show').length);
 await page.evaluate(() => HS.openModal('premiumModal'));
@@ -206,11 +208,28 @@ const controlOpen = await probe();
 await page.evaluate(() => HS.closeModal('premiumModal'));
 ok(controlOpen > 0 && (await probe()) === 0, 'control: an opened modal is visible to the probe used below', controlOpen);
 const urlBefore = page.url();
-const btns = await page.$$('[data-cta]');
-for (const b of btns) await b.click({ force: true });
+const seen = await page.evaluate(() => {
+  const vis = (n) => n.offsetParent !== null && n.getClientRects().length > 0;
+  const soon = [...document.querySelectorAll('.da-soon')];
+  return {
+    buttons: document.querySelectorAll('[data-cta]').length,
+    visibleButtons: [...document.querySelectorAll('[data-cta]')].filter(vis).length,
+    soon: soon.length,
+    visibleSoon: soon.filter(vis).length,
+    // Positive control for the visibility probe: the coverage button IS visible.
+    control: vis(document.getElementById('daCoverBtn')),
+    enterpriseVisible: vis(document.getElementById('daEnterprise'))
+  };
+});
+ok(seen.control && seen.buttons === 4 && seen.visibleButtons === 0,
+  'HIDDEN (founder, 2026-10-02): all four commerce buttons are on the page and none is visible (control: the coverage button is)', seen);
+ok(seen.soon === 4 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
+ok(seen.enterpriseVisible, 'Contact us for Enterprise Pricing → is visible: it is the page\'s working action', seen);
+// A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
+await page.$$eval('[data-cta]', (bs) => bs.forEach((b) => b.click()));
 const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
-ok(btns.length === 4 && page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
-  'clicking any of the four commerce buttons opens nothing and goes nowhere', { count: btns.length, url: page.url(), afterClicks });
+ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
+  'clicking any of the four commerce buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
 ok((await page.$$eval('[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
 ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us for Enterprise Pricing →'), 'Contact us for Enterprise Pricing → opens the existing contact page');
 ok(await page.$eval('#daHeroCheck', (a) => a.getAttribute('href') === '#coverage'), 'Check coverage → jumps to the coverage check near the hero');
