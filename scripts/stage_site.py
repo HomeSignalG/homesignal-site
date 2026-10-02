@@ -57,6 +57,9 @@ ROOT_FILES = (
     # Internal, admin-only (build step 4 of docs/development-activity-build-steps-100526.md): noindex, robots-disallowed,
     # linked from nowhere. The function it calls refuses anyone not signed in and on dashboard_admins.
     'development-activity-review.html',
+    # The customer page for invited trial members (build step 5c): noindex, robots-disallowed, reached from an invite link and
+    # linked from no other page yet. Both functions it calls answer only a signed-in person, about that person.
+    'development-activity-reports.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',

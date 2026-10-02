@@ -243,6 +243,12 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 >
 > `test/evaluation-entitlement-structure.test.mjs` §4 now pins exactly those callers. The rate-limit gap below is still open.
 > Record: `docs/development-activity-report-engine-2026-09-30.md`, "Step 5b".
+>
+> **Dated note, 2026-10-02 (build step 5c).** A person joins a trial through the new `development-activity-trial` function, which
+> calls `evaluation_invite_redeem` with the signed-in person's own id. The trial reads (`evaluation_usage`,
+> `evaluation_invite_redeem`) now live in one shared module, `supabase/functions/_shared/evaluation-reads.ts`, used by both functions,
+> and §4 pins that module and the snapshot module as the only callers. `evaluation_create` and `evaluation_invite_mint` are still
+> called by nothing (step 5d). Record: the engine doc, "Step 5c".
 
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.

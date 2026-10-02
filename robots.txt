@@ -28,6 +28,7 @@ Disallow: /share-text.html
 Disallow: /acquisition.html
 Disallow: /gov-archive.html
 Disallow: /development-activity-review.html
+Disallow: /development-activity-reports.html
 
 Sitemap: https://homesignal.net/sitemap.xml
 # One sitemap per page family, so Search Console measures each family separately. Every URL

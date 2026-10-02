@@ -26,12 +26,19 @@
  *       mode (get-address-report, verify_jwt=false), the audit's founder decision 2.
  *   P5  the one admitted page is internal: noindex, robots-disallowed, named by no other staged file, and the function it calls
  *       still refuses anyone who is not a signed-in admin (authorizeAdmin runs before anything the caller typed is read).
+ *   P6  (build step 5c, 2026-10-02) the CUSTOMER page, development-activity-reports.html, is admitted for the report engine and
+ *       the trial function (development-activity-trial). It is noindex, robots-disallowed, named by no other staged file until
+ *       launch (build step 13), asks only for the customer view, and reads its invite token from the URL fragment only. Who may
+ *       make a report is still the report function's gate (an admin, or a member of an active trial); being able to load the
+ *       page grants nothing.
  *
  * WHEN THE CUSTOMER SURFACE ARRIVES (Orders K, L, I): P4 is the pin that must then change, DELIBERATELY, in the
  * same change that puts the entitlement check in supabase/functions/_shared/admin-gate.ts. Until then the only
  * shipped page that may call get-development-activity-report is the admin review page, and none may call
  * follow-development-report or get-future-surroundings-report. (Changed deliberately for build step 4, 2026-10-02:
- * the function's gate is unchanged, so the page gives no one who is not an admin a way to make a report.)
+ * the function's gate is unchanged, so the page gives no one who is not an admin a way to make a report. Changed
+ * deliberately again for build step 5c, 2026-10-02: the customer page is the entitlement-gated surface this paragraph
+ * anticipated; the gate it relies on is authorizeReportCaller, in admin-gate.ts.)
  *
  * STATED LIMIT of P4: it finds the ordinary spelling of a slug. A page that builds the name by concatenation is
  * not caught. The authority for who may call a function is the gate in admin-gate.ts (the anon key is refused),
@@ -74,7 +81,7 @@ const ENGINE = [
   ['the NYC V1 browser globals', /\bHSNycV1(?:Soda)?\b/]
 ];
 // P4 — the three functions named by Order H (NOT get-address-report: Map 1 address mode is a consumer surface outside this pin).
-const SLUGS = ['get-future-surroundings-report', 'get-development-activity-report', 'follow-development-report'];
+const SLUGS = ['get-future-surroundings-report', 'get-development-activity-report', 'follow-development-report', 'development-activity-trial'];
 const slugRe = (s) => new RegExp(s);
 
 const TEXT = /\.(?:html|js|mjs|json|css|xml|txt|svg)$/i;
@@ -145,11 +152,18 @@ ok(ENGINE.every(([, re]) => re.test(readRepo(LEGACY_PAGE))),
 const htmlWithHost = pages.filter((p) => ENGINE[0][1].test(content.get(p) || ''));
 ok(htmlWithHost.length === 0, 'P3f no staged page carries the City host (its CSP connect-src or anywhere else)', htmlWithHost);
 
-// ---- P4: the customer-callable allowlist is empty; one admin page may call the report engine ---------------------
-// ALLOWED[slug] is the complete list of staged files that may name it. Build step 4 admits the private review page for the report
-// engine and nothing else; P5 below keeps that page an operator tool.
+// ---- P4: who may call the report engine: the admin review page, and the customer page for invited trial members -----
+// ALLOWED[slug] is the complete list of staged files that may name it. Build step 4 admitted the private review page for the report
+// engine; P5 below keeps that page an operator tool. Build step 5c admits the customer page for the report engine and the trial
+// function, and nothing else; P6 below keeps it reachable only by invite until launch (build step 13).
 const REVIEW_PAGE = 'development-activity-review.html';
-const ALLOWED = { 'get-future-surroundings-report': [], 'get-development-activity-report': [REVIEW_PAGE], 'follow-development-report': [] };
+const CUSTOMER_PAGE = 'development-activity-reports.html';
+const ALLOWED = {
+  'get-future-surroundings-report': [],
+  'get-development-activity-report': [CUSTOMER_PAGE, REVIEW_PAGE].sort(),
+  'follow-development-report': [],
+  'development-activity-trial': [CUSTOMER_PAGE],
+};
 for (const s of SLUGS) {
   const hits = [...content].filter(([, body]) => slugRe(s).test(body)).map(([f]) => f).sort();
   ok(JSON.stringify(hits) === JSON.stringify(ALLOWED[s]),
@@ -157,7 +171,7 @@ for (const s of SLUGS) {
 }
 const cfg = readRepo('supabase/config.toml');
 ok(SLUGS.every((s) => slugRe(s).test(cfg)),
-  'P4d control: the same three patterns match supabase/config.toml, so the zeros above are not an empty search');
+  'P4d control: the same four patterns match supabase/config.toml, so the zeros above are not an empty search');
 
 // ---- P5: the one admitted page stays an operator tool ---------------------------------------------------------------
 const review = content.get(REVIEW_PAGE) || '';
@@ -173,9 +187,29 @@ const gate = readRepo('supabase/functions/_shared/admin-gate.ts');
 const iGate = handler.indexOf('await authorizeReportCaller(req, deps)'), iBody = handler.indexOf('await readBounded(req)');
 ok(iGate > 0 && iBody > iGate, 'P5f the function still runs its gate before it reads anything the caller sent', { iGate, iBody });
 ok(/if \(!who\.admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(!token\) return reply\(req, \{ error: 'unauthorized' \}, 401\)/.test(gate)
-   && /if \(!trial\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(trial\.status !== 'active' \|\| trial\.expired\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate),
+   && /if \(!trial\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(standing !== 'active'\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate)
+   && /if \(t\.status === 'active' && !t\.expired\) return 'active';/.test(gate),
   'P5g the gate still refuses a caller with no token (401), and a signed-in caller who is neither an admin nor a member of an active, unexpired trial (403)');
 ok(!/service_role|SERVICE_ROLE/.test(review), 'P5h the review page carries no service-role key; it uses the public browser key and the signed-in user\'s own token');
+
+// ---- P6: the customer page (build step 5c) is reached only by invite until launch, and asks only for the customer view ----------
+const cust = content.get(CUSTOMER_PAGE) || '';
+ok(cust.length > 0, 'P6a control: the customer page is staged and was read, so the checks below are about the shipped file');
+ok(/<meta name="robots" content="noindex, nofollow">/.test(cust) && /<meta name="referrer" content="no-referrer">/.test(cust),
+  'P6b the customer page is noindex, nofollow, and sends no referrer');
+ok(new RegExp('^Disallow: /' + CUSTOMER_PAGE.replace('.', '\\.') + '$', 'm').test(robots), 'P6c the staged robots.txt Disallows the customer page');
+const linkingCust = [...content].filter(([f, body]) => f !== CUSTOMER_PAGE && f !== 'robots.txt' && body.includes(CUSTOMER_PAGE)).map(([f]) => f);
+ok(linkingCust.length === 0, 'P6d no other staged file names the customer page yet: it is reached from an invite link; the landing page links it at launch (build step 13)', linkingCust);
+ok(robots.includes(CUSTOMER_PAGE) && readRepo('scripts/stage_site.py').includes("'" + CUSTOMER_PAGE + "'"), 'P6e control: the same detector finds the page name where it really is');
+ok(!/service_role|SERVICE_ROLE/.test(cust) && /view: 'customer'/.test(cust) && !/'internal'/.test(cust),
+  'P6f the customer page carries no service-role key and only ever asks for the customer view');
+ok(/location\.hash/.test(cust) && !/searchParams|URLSearchParams/.test(cust) && (cust.match(/location\.search/g) || []).length === 1
+   && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(cust),
+  'P6g the invite token is read from the URL fragment only (never sent to a server) and removed from the address bar');
+const trialHandler = readRepo('supabase/functions/development-activity-trial/handler.ts');
+const tGate = trialHandler.indexOf('await authorizeSignedIn(req, deps)'), tBody = trialHandler.indexOf('await readBounded(req)');
+ok(tGate > 0 && tBody > tGate && /if \(!who\.user\.id\) return reply\(req, \{ error: 'forbidden' \}, 403\);\n  return \{ userId: who\.user\.id, admin: who\.admin \};/.test(gate),
+  'P6h the trial function runs its gate (a signed-in user with an id) before it reads anything the caller sent', { tGate, tBody });
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);

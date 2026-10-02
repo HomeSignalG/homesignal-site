@@ -12,9 +12,8 @@ import {
 } from '../_shared/service-rest.ts';
 import { makeChangeReads } from '../_shared/change-reads.ts';
 import { issueEvaluationReport } from '../_shared/report-snapshot.ts';
-import type { SnapshotRpc } from '../_shared/report-snapshot.ts';
+import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
 import { norm } from '../_shared/national-report.ts';
-import type { TrialState } from '../_shared/admin-gate.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
 import type { ProjectRow, RadiusRow } from '../_shared/national-report.ts';
 import { RADIUS_ROW_LIMIT } from './handler.ts';
@@ -23,24 +22,12 @@ export { POSTGREST_ROW_CAP, quoteIn };
 export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
-  const { base, svc, rest, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
+  const { base, svc, rest, rpc, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
   // the ledger, the reportable events and the source health: one definition, shared with Changes Since Report
   const changeReads = makeChangeReads(rest);
 
-  /**
-   * A database function, called as the service. A refusal the database raised (a 4xx carrying its message, e.g. EVALUATION_COMPLETE)
-   * is returned as `error` for the caller to name; a failure to reach it, or a 5xx, is DataUnavailable (never "refused").
-   */
-  const call: SnapshotRpc = async (fn, args) => {
-    let r: Response;
-    try {
-      r = await fetchFn(base + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { ...svc, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
-    } catch { throw new DataUnavailable('network'); }
-    const j = await r.json().catch(() => null);
-    if (r.ok) return { data: j, error: null };
-    if (r.status < 500 && j && typeof j.message === 'string') return { data: null, error: { message: j.message } };
-    throw new DataUnavailable('http ' + r.status);
-  };
+  // the trial: one definition, shared with the trial function (_shared/evaluation-reads.ts)
+  const evaluation = makeEvaluationReads(rpc);
 
   return {
     now: cfg.now ?? (() => new Date()),
@@ -104,20 +91,10 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     ...changeReads,
 
     // ── the trial (build step 5b): every one of these goes through a database function that owns the decision ──
-    async trialOf(userId): Promise<TrialState | null> {
-      const { data, error } = await call('evaluation_usage', { p_user_id: userId });
-      if (error) throw new DataUnavailable('evaluation_usage');
-      if (!Array.isArray(data)) throw new DataUnavailable('shape');
-      if (data.length === 0) return null;
-      const t = data[0];
-      if (data.length !== 1 || !t || typeof t.status !== 'string' || !Number.isInteger(t.credits_used) || !Number.isInteger(t.credits_remaining) || typeof t.expired !== 'boolean') {
-        throw new DataUnavailable('shape');
-      }
-      return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining, expired: t.expired };
-    },
+    trialOf: evaluation.trialOf,
 
     issue(userId, idempotencyKey, intelligence, privateContext, opts) {
-      return issueEvaluationReport(call, { userId, idempotencyKey }, intelligence, privateContext, opts);
+      return issueEvaluationReport(rpc, { userId, idempotencyKey }, intelligence, privateContext, opts);
     },
 
     async storedReport(reportId) {
@@ -128,7 +105,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     // A retried key returns the FIRST report (D-L6). Whether it is the same property is asked of its private context; the address read
     // stays inside this function, and only the answer leaves it.
     async contextMatches(contextId, address) {
-      const { data, error } = await call('report_private_context_read', { p_context: contextId });
+      const { data, error } = await rpc('report_private_context_read', { p_context: contextId });
       if (error || !Array.isArray(data)) throw new DataUnavailable('private context');
       const c = data.length === 1 ? data[0] : null;
       if (!c || c.state !== 'active' || typeof c.address !== 'string') return 'unknown';

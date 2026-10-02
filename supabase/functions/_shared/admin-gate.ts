@@ -89,6 +89,17 @@ export function trialSummary(t: TrialState) {
   return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining };
 }
 
+/**
+ * Whether a trial may make reports now: 'active', 'complete' (its 20 reports are used) or 'ended' (revoked, expired, or any status
+ * this code does not know). The ONE reading of a trial's state: the report gate refuses on it and the trial page shows it.
+ */
+export function trialStanding(t: TrialState): 'active' | 'complete' | 'ended' {
+  // a trial whose 20 reports are used is over; making more reports (even free ones) is the paid product's (Order M)
+  if (t.status === 'complete') return 'complete';
+  if (t.status === 'active' && !t.expired) return 'active';
+  return 'ended';
+}
+
 export async function authorizeReportCaller(req: Request, deps: ReportGateDeps): Promise<Response | ReportCaller> {
   const who = await identify(req, deps);
   if (who instanceof Response) return who;
@@ -97,8 +108,22 @@ export async function authorizeReportCaller(req: Request, deps: ReportGateDeps):
   let trial: TrialState | null;
   try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }
   if (!trial) return reply(req, { error: 'forbidden' }, 403);
-  // a trial whose 20 reports are used is over; making more reports (even free ones) is the paid product's (Order M)
-  if (trial.status === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);
-  if (trial.status !== 'active' || trial.expired) return reply(req, { error: 'forbidden' }, 403);
+  const standing = trialStanding(trial);
+  if (standing === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);
+  if (standing !== 'active') return reply(req, { error: 'forbidden' }, 403);
   return { kind: 'trial', userId: who.user.id, trial };
+}
+
+// ── ANY SIGNED-IN PERSON (build step 5c): the trial function's gate ──────────────────────────────────────────────────────────────
+//
+// Joining a trial and reading one's own trial need a real signed-in user (with an id: everything about a trial is keyed on the auth
+// user, never an email), and nothing more: being signed in grants nothing, because the database answers only for that user's own
+// membership. Whether they are an admin travels with them, so the page knows the report function will serve them as an admin.
+export type SignedInCaller = { userId: string; admin: boolean };
+
+export async function authorizeSignedIn(req: Request, deps: AdminGateDeps): Promise<Response | SignedInCaller> {
+  const who = await identify(req, deps);
+  if (who instanceof Response) return who;
+  if (!who.user.id) return reply(req, { error: 'forbidden' }, 403);
+  return { userId: who.user.id, admin: who.admin };
 }

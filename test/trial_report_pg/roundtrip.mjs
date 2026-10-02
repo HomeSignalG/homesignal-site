@@ -1,5 +1,6 @@
-// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build step 5b).
-// The real request handler and the real data layer of get-development-activity-report, the real snapshot module and the real
+// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b and 5c).
+// Joining the trial goes through the real handler and data layer of development-activity-trial (5c); making reports goes through
+// the real request handler and the real data layer of get-development-activity-report, the real snapshot module and the real
 // SQL of record (account spine, private context, snapshot, evaluation entitlement). The only translation is the network: a
 // request the data layer would send to PostgREST is run as the same database function call through psql, and a database
 // refusal comes back the way PostgREST returns it (HTTP 400, its message). The engine's inputs (geocode, spatial read, project
@@ -9,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 
 const H = await import('../../supabase/functions/get-development-activity-report/handler.ts');
 const D = await import('../../supabase/functions/get-development-activity-report/data.ts');
+const TH = await import('../../supabase/functions/development-activity-trial/handler.ts');
+const TD = await import('../../supabase/functions/development-activity-trial/data.ts');
 
 let n = 0, bad = 0;
 const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m + (d !== undefined ? '  [' + JSON.stringify(d) + ']' : '')); } };
@@ -27,6 +30,7 @@ const RPC = {
   evaluation_report_issue: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
   report_private_context_read: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_private_context_read(:'c'::uuid) t", { c: a.p_context }],
+  evaluation_invite_redeem: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_redeem(:'t', :'u'::uuid) t", { t: a.p_token, u: a.p_user_id }],
 };
 const seen = [];
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
@@ -53,11 +57,42 @@ async function fetchToSql(url, init = {}) {
   throw new Error('unexpected request ' + u.pathname);
 }
 
-// ---- the people: a member of a fresh evaluation, and someone who is not ---------------------------------------------------------
-const MEMBER = 'a1111111-1111-4111-8111-111111111111', STRANGER = 'b2222222-2222-4222-8222-222222222222';
-one("insert into auth.users (id, email) values (:'a'::uuid, 'agent@example.test'), (:'b'::uuid, 'someone@example.test')", { a: MEMBER, b: STRANGER });
+// ---- the people: one who joins a fresh evaluation through the trial function, and others who do not ----------------------------
+const MEMBER = 'a1111111-1111-4111-8111-111111111111', STRANGER = 'b2222222-2222-4222-8222-222222222222', LATE = 'c3333333-3333-4333-8333-333333333333';
+one("insert into auth.users (id, email) values (:'a'::uuid, 'agent@example.test'), (:'b'::uuid, 'someone@example.test'), (:'c'::uuid, 'late@example.test')", { a: MEMBER, b: STRANGER, c: LATE });
 const [evalId, token] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Round Trip Realty')").split(' ');
-one("select role from public.evaluation_invite_redeem(:'t', :'u'::uuid)", { t: token, u: MEMBER });
+async function trialAsk(userId, body) {
+  const real = TD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc' }, fetchToSql);
+  const h = TH.makeHandler({ ...real, authenticate: async () => ({ email: 'someone@example.test', id: userId }), isAdmin: async () => false });
+  const res = await h(new Request('https://x/functions/v1/development-activity-trial',
+    { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+  return { status: res.status, json: await res.json() };
+}
+const members = () => Number(one('select count(*) from public.brokerage_member'));
+
+// ---- 0. joining, through the trial function (build step 5c) -------------------------------------------------------------------------
+let t = await trialAsk(MEMBER, { action: 'status' });
+ok(t.status === 200 && t.json.access === 'none' && t.json.trial === null, '0a before joining, the person has no trial', t.json);
+t = await trialAsk(MEMBER, { action: 'redeem', token });
+ok(t.status === 200 && t.json.role === 'owner' && t.json.replayed === false && t.json.access === 'trial' && t.json.trial.credits_remaining === 20 && t.json.trial.credits_used === 0,
+  '0b the invite link joins the trial: owner, twenty free reports left', t.json);
+ok(members() === 1 && one("select user_id || ' ' || role from public.brokerage_member") === MEMBER + ' owner', '0c the database holds one membership, for that person, as owner');
+ok(!JSON.stringify(t.json).includes(evalId), '0d the answer carries no evaluation id');
+t = await trialAsk(MEMBER, { action: 'redeem', token });
+ok(t.status === 200 && t.json.replayed === true && members() === 1, '0e opening the same invite again is a replay: nothing changes', t.json);
+t = await trialAsk(STRANGER, { action: 'redeem', token });
+ok(t.status === 400 && t.json.error === 'invite_unusable' && members() === 1, '0f someone else cannot use an invite that is already used', t.json);
+const before0 = seen.length;
+t = await trialAsk(STRANGER, { action: 'redeem', token: 'hse1_' + 'g'.repeat(64) });
+ok(t.status === 400 && t.json.error === 'invite_unusable' && !seen.slice(before0).some((x) => /evaluation_invite_redeem/.test(x)), '0g a malformed token never reaches the database');
+// a second brokerage: its owner invite cannot be used by someone who already belongs to one; its agent seats can be full
+const [, token2] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Other Realty', 0)").split(' ');
+t = await trialAsk(MEMBER, { action: 'redeem', token: token2 });
+ok(t.status === 409 && t.json.error === 'already_a_member' && members() === 1, '0h a person already in a brokerage cannot join another (one membership per person)', t.json);
+const [ev3] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('Seatless Realty', 0)").split(' ');
+const agentToken = one("select token from public.evaluation_invite_mint(:'e'::uuid, 'agent')", { e: ev3 });
+t = await trialAsk(LATE, { action: 'redeem', token: agentToken });
+ok(t.status === 409 && t.json.error === 'seat_limit_reached' && members() === 1, '0i an agent invite on a trial with no free seats is refused', t.json);
 
 // ---- the engine's inputs, as in test/national_report_pg ------------------------------------------------------------------------
 const FAM = 'wsdot-project-delivery-plan-proposed';
@@ -133,6 +168,9 @@ ok(r.status === 403 && r.json.error === 'evaluation_complete' && r.json.trial.cr
 ok(seen.slice(before).every((s) => /evaluation_usage/.test(s)) && count('evaluation_credit') === 20, '6c and nothing past the trial read ran: no report made, nothing charged');
 const ord = one("select string_agg(ordinal::text, ',' order by ordinal) from public.evaluation_credit");
 ok(ord === Array.from({ length: 20 }, (_, i) => i + 1).join(','), '6d the ledger is the ordinals 1 to 20, no gap', ord);
+t = await trialAsk(MEMBER, { action: 'status' });
+ok(t.status === 200 && t.json.access === 'complete' && t.json.trial.credits_remaining === 0 && t.json.trial.credits_used === 20,
+  '6e the trial function now says the trial is complete: twenty used, none left', t.json);
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
