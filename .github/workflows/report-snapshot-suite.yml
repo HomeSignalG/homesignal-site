@@ -31,8 +31,16 @@ name: report-snapshot-suite
 #      relations it is allowed plus the gate's allow-list and user lookup and the two need functions. Not shipped, and stated: the
 #      transport is a PostgREST translator, the sign-in and allow-list are canned, and the failure TABLE under the source-health view
 #      and the roles are stand-ins (the view the reader queries is production's own, sliced from docs/dev-change-baseline.sql).
+#   6. the SHARE-LINK PRIMITIVE (docs/report-share.sql; Order J unit J1): an opaque, revocable, optionally expiring link to one
+#      stored report. The database holds only the SHA-256 of the token, decides in ONE function whether a link is usable
+#      (ACTIVE / EXPIRED / REVOKED / UNKNOWN, revoked beating expired, the report handed back only for ACTIVE), never changes an
+#      expiry and never undoes a revoke, and touches nothing of the snapshot or the private layer; a share survives a purge of
+#      its report's private context. Against the REAL snapshot and private-layer SQL: the checks, a second apply, the rollback
+#      with shares stored, the refusal without the snapshot table, and every prohibited mutation, each of which MUST fail a
+#      NAMED check of the suite (a mutation that only crashes it fails the run). No caller, no endpoint, no page.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
+# test/report-share.test.mjs, test/report-share-structure.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
 # other offline suite.
 #
@@ -63,6 +71,11 @@ on:
       - 'supabase/functions/_shared/service-rest.ts'
       - 'supabase/functions/_shared/admin-gate.ts'
       - 'supabase/functions/follow-development-report/**'
+      - 'docs/report-share.sql'
+      - 'test/report_share_pg/**'
+      - 'test/report-share-structure.test.mjs'
+      - 'test/report-share.test.mjs'
+      - 'supabase/functions/_shared/report-share.ts'
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
       - 'docs/dev-change-baseline.sql'
@@ -91,6 +104,11 @@ on:
       - 'supabase/functions/_shared/service-rest.ts'
       - 'supabase/functions/_shared/admin-gate.ts'
       - 'supabase/functions/follow-development-report/**'
+      - 'docs/report-share.sql'
+      - 'test/report_share_pg/**'
+      - 'test/report-share-structure.test.mjs'
+      - 'test/report-share.test.mjs'
+      - 'supabase/functions/_shared/report-share.ts'
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
       - 'docs/dev-change-baseline.sql'
@@ -185,3 +203,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/changes_since_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/csr.log
+      - name: The share-link primitive passes; it applies twice and rolls back exactly; it touches nothing it depends on; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_share_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsh.log

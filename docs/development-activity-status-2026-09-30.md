@@ -34,7 +34,8 @@ Last updated: 2026-10-01, in the PR for Order K0 (the brokerage account spine: b
    `follow-development-report` bundles the same generated file but stores a report's lifecycle as stored, so it was not redeployed.
 6. Durable report snapshot (`report_id` vs `content_hash`) — **storage layer done (Order F);** the
    customer-facing use of it waits for Orders G, J and L.
-7. Secure share + print/PDF + disclosure + audit trail — **open.**
+7. Secure share + print/PDF + disclosure + audit trail — **open.** Its first piece, the share-link primitive (Order J, unit J1), is built and
+   proven on a disposable Postgres and not applied; the client view, print/PDF, disclosure and the audit trail with actor and brokerage are not started (J1 carries only a two-kind share-event log with no actor).
 8. Agent Workspace + Brokerage Admin — **open.**
 9. Canonical commercial property-intelligence API — **open.** One generation path, and it
    must be national: the only report engine in the tree today answers NYC addresses.
@@ -130,7 +131,18 @@ Last updated: 2026-10-01, in the PR for Order K0 (the brokerage account spine: b
   appeared near the property after the report. **Not built:** notifications, ownership of a Follow (Order K).
 - H. Remove the quota bypass — open.
 - I. Redesign the report, only after the data contract is proven — open.
-- J. Secure stored-report delivery — open.
+- J. Secure stored-report delivery — **open.** Split (audit 2026-10-01): **J1** the share-link primitive now; **J2** the read-only client view,
+  disclosure and print, after Order I; **J3** the audit trail with actor and brokerage, after Orders K and L. **J1 is built and proven on a
+  disposable Postgres, and is NOT applied to production, has no caller, no endpoint and no page, and changes nothing a customer, resident or the
+  founder can see** (`docs/report-share.sql`, `supabase/functions/_shared/report-share.ts`; design, proof and limits in
+  `docs/report-snapshot-contract-2026-09-30.md` §8). It means: a table of share links that stores only the SHA-256 of an opaque 256-bit token (the
+  database never sees the token, so a lost link is revoked and reissued, never recovered); optional expiry computed at read time; revocation that
+  can never be undone and an expiry that can never move; one function that decides whether a link is usable (`report_share_resolve`: ACTIVE,
+  EXPIRED, REVOKED, UNKNOWN, revoked beating expired, the report handed back only for ACTIVE); an audit log with two event kinds and no free text,
+  IP address, user agent or actor; and a share that survives a purge of its report's private context. **Not struck:** J1 completes none of Order
+  J. **Open and not answered by J1** (founder, privacy and legal calls; §8.6): what ends a stored report's `report` need (so its 90-day clock can
+  start); whether a client who opens a link sees the subject address while the context is active; what client-view events may be recorded;
+  the label policy; print/PDF and the default share expiry. The legacy NYC page's raw-address share URL is untouched (R6).
 - K. Agent Workspace + Brokerage Admin — open. **K0, the first safe step, is built and is NOT applied** (account spine built, not applied; no go to apply it to production is recorded). `docs/brokerage-account-spine.sql` (parked SQL of record, rollback at its foot) adds `public.brokerage_account`, `public.brokerage_member` and the one resolver `public.brokerage_membership_of(user_id)`: an explicit membership of a Supabase Auth user in one brokerage, as owner or agent, with one active membership per user, closed vocabularies, and a last-active-owner guard. The tables are empty and unreadable by anon, authenticated and service_role (the `dashboard_admins` posture) and are reached only through the resolver; they hold no address, label, client, email, credit, quota, price or invite token; nothing reads or writes them, and no gate, edge function or page changed (`_shared/admin-gate.ts` still answers from `dashboard_admins`). Proof: `test/brokerage_account_pg` (suite, an owner race between two sessions, a second apply, a poisoned state, 59 prohibited mutations), `test/brokerage-account-structure.test.mjs`, `test/brokerage_account_mutants.py`; design, the six defaults D-K1..D-K6 the founder may change, and what the rest of K needs from J and L: `docs/development-activity-agent-workspace-2026-10-01.md`. **Not built, and not buildable yet:** the Agent Workspace and Brokerage Admin surfaces, agent invites, usage and "reports remaining", recent reports across devices, ownership of a Follow, share and audit trail, and the plan control — they need report ownership (Order J) and entitlement and quota (Orders L and M).
 - L. Evaluation build and security tests — open.
 - M. Paid continuation path — open.
