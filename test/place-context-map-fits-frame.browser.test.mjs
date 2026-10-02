@@ -140,9 +140,11 @@ const geometry = (page) => page.evaluate(() => {
 });
 
 // ── 1. THE EMBED DOCUMENT DOES NOT OVERFLOW ITS FRAME ─────────────────────────────
-// 520px is the height the defect was reported at; 720px is the height the hosts pass
-// today. Both are asserted, because the fix must not depend on the host's number.
-for (const [w, h] of [[868, 520], [868, 720], [358, 620]]) {
+// 520px is the height the defect was reported at; 720px is the height the Address host
+// passes. Both are asserted, because the fix must not depend on the host's number. 400 and
+// 300 are the compact preview the ZIP page and development.html pass (clamp(300px,42vw,400px)):
+// desktop height and phone floor (founder, 2026-10-02: the ZIP map is "at the top and small").
+for (const [w, h] of [[868, 520], [868, 720], [358, 620], [868, 400], [358, 300]]) {
   const page = await open(w, h, true);
   const g = await geometry(page);
   ok(g.docOverflow === 0, '1 embed ' + w + 'x' + h + ' — the card fits the frame, nothing to scroll',
@@ -188,6 +190,21 @@ for (const [w, h] of [[868, 520], [868, 720], [358, 620]]) {
   await page.context().close();
 }
 
+// ── 2h. THE SAME ZOOM CLICK IN THE COMPACT PREVIEW ────────────────────────────────
+// At 400px the panel scrolls inside its own box; a zoom click must still not scroll the
+// embed document, or the controls leave the small frame the same way they did at 520.
+{
+  const page = await open(868, 400, true);
+  await page.click('.leaflet-control-zoom-in');
+  await page.waitForTimeout(700);
+  const g = await geometry(page);
+  ok(g.scrollTop === 0, '2h a zoom click in the 400px preview does not scroll the embed document',
+    'scrollTop=' + g.scrollTop);
+  ok(g.status.onScreen && g.panel.display !== 'none',
+    '2i ...and the STATUS controls are still on screen', 'status=' + g.status.onScreen);
+  await page.context().close();
+}
+
 // ── 3. THE PANEL IS NEVER HIDDEN TO MAKE ROOM ─────────────────────────────────────
 // place-context-map.test.mjs pins this in the CSS TEXT. Here it is measured on the
 // rendered embed, which is the claim that matters: fitting the frame must not have been
@@ -201,17 +218,32 @@ for (const [w, h] of [[868, 520], [868, 720], [358, 620]]) {
 }
 
 // ── 4. BOTH HOSTS GIVE THE FRAME ENOUGH ROOM ──────────────────────────────────────
-// The panel needs 288px at desktop widths, so a 320px frame could only ever have shown
-// the panel and a 32px strip of map. The floor is pinned so a silent revert to 320 fails.
+// The Address host: the panel needs 288px at desktop widths, so a 320px frame of that host
+// could only ever have shown the panel and a 32px strip of map. Its floor is pinned so a
+// silent revert to 320 fails.
 const HEIGHT = /height:clamp\((\d+)px,\s*58vw,\s*(\d+)px\)/;
-for (const [file, what] of [['lib/community-page.js', 'the ZIP host'], ['property.html', 'the Address host']]) {
-  const src = readFileSync(join(REPO, file), 'utf8');
+{
+  const src = readFileSync(join(REPO, 'property.html'), 'utf8');
   const m = src.match(HEIGHT);
-  ok(!!m, '4 ' + what + ' sizes the context-map iframe with a clamp', m ? m[0] : 'NO MATCH');
+  ok(!!m, '4 the Address host sizes the context-map iframe with a clamp', m ? m[0] : 'NO MATCH');
   ok(!!m && Number(m[1]) >= 520, '4a ...whose floor leaves room for the panel and a map',
     m ? m[1] + 'px' : 'n/a');
   ok(!!m && Number(m[2]) >= Number(m[1]), '4b ...and whose ceiling is not below its floor',
     m ? m[1] + '..' + m[2] : 'n/a');
+}
+// The ZIP host (founder, 2026-10-02): a SMALL preview, the size development.html uses. It
+// fits because the embed's panel scrolls inside its own box — §1 measures exactly the floor
+// (358x300) and the desktop height (868x400) this clamp produces, so the floor may not drop
+// below what §1 proved, and the ceiling may not exceed the height §1 measured on desktop.
+const COMPACT = /height:clamp\((\d+)px,\s*42vw,\s*(\d+)px\)/;
+{
+  const src = readFileSync(join(REPO, 'lib/community-page.js'), 'utf8');
+  const m = src.match(COMPACT);
+  ok(!!m, '4c the ZIP host sizes its preview with the compact clamp', m ? m[0] : 'NO MATCH');
+  ok(!!m && Number(m[1]) >= 300 && Number(m[2]) <= 400 && Number(m[2]) >= Number(m[1]),
+    '4d ...whose floor and ceiling sit inside the 300..400px §1 measured as fitting',
+    m ? m[1] + '..' + m[2] : 'n/a');
+  ok(!HEIGHT.test(src), '4e ...and the ZIP host no longer carries the tall 58vw frame');
 }
 
 // ── 5. COUNTERFACTUAL: THE FULL PAGE IS NOT AN EMBED ──────────────────────────────

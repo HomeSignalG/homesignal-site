@@ -3938,6 +3938,18 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     iframes went `clamp(320px,58vw,520px)` → **`clamp(560px,58vw,720px)`**
     (`lib/community-page.js`, `property.html`), so the map gets 363px at desktop / 252px on a
     phone instead of 217px / 78px.
+  - ⚖️ **SUPERSEDED FOR THE ZIP HOST, 2026-10-02 (founder: "a map should be on this page …
+    at the top and small but you can click on View Development Map … to expand to full map
+    development page").** The ZIP page map is now shown to EVERY visitor, signed in or not,
+    at development.html's preview size `clamp(300px,42vw,400px)`, with "View full Development
+    Map →" (`#zipMapFull`) under it on the parent. This reverses the 2026-09-10 A-022 posture
+    that kept the map signed-in only (#1141 closed); ZIP health keeps that gate. The map fits
+    the small frame the same way development.html's does: the panel scrolls inside its own
+    box and the map keeps its 160px minimum, measured at 868x400 and 358x300 (fits-frame §1,
+    §2h, §4c–4e). `property.html` keeps its 560px floor (§4a). A signed-out visitor sees the
+    pins and controls but not the ZIP outline, because `public.app_zcta_boundary` is still
+    not granted to anon (`docs/app-zcta-boundary.sql`); changing that grant is a separate
+    database decision. Pinned by `test/zip-map-preview.browser.test.mjs`.
   - **Full-page Map 1 is UNTOUCHED** — measured `.map-frame` still 600px at 1280x900, and the
     change is four `.hs-embed` rules. Pinned by `test/place-context-map-fits-frame.browser.test.mjs`
     (24 checks), proven load-bearing by three mutations: reverting the CSS reproduces the
