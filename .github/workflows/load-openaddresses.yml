@@ -26,6 +26,10 @@ on:
         description: 'Parse + report only, do not write ("1" to enable)'
         required: false
         default: ''
+      check_dc_failures:
+        description: 'With dry_run=1: also report how many data-centre addresses the ladder could not match this load WOULD match ("1" to enable). Read-only.'
+        required: false
+        default: ''
   schedule:
     - cron: '19 8 1 * *'   # 08:19 UTC on the 1st of each month — the self-expanding refresh:
                            # re-derives scope from property_reports, so a newly-ingested state's
@@ -46,4 +50,5 @@ jobs:
           ZIPS: ${{ github.event.inputs.zips }}
           STATES: ${{ github.event.inputs.states }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CHECK_DC_FAILURES: ${{ github.event.inputs.check_dc_failures }}
         run: python3 scripts/load-openaddresses.py

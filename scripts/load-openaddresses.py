@@ -198,6 +198,59 @@ def parse_region(region: str, states: set, zips: set, tmp: Path):
                 yield (canonical_addr(addr), lat, lng, state, name.split("/")[-1], classify_match_type(row))
 
 
+# ── read-only measurement: how many of the data-centre addresses the shared ladder could not match
+# would THIS load match? (2026-10-02. Writes nothing; used with DRY_RUN=1 to decide, on evidence,
+# whether a load improves Map 1's address check before any row is written.) ────────────────────────
+_UNIT_RE = re.compile(r",?\s*(?:\b(?:SUITE|STE|UNIT|BLDG|BUILDING|APT|FLOOR|FL)\b\.?\s+|#\s*)[A-Z0-9\-]+\b", re.I)
+
+
+def strip_unit(canon: str) -> str:
+    """The same address with a trailing ', SUITE 304'-style unit removed (the loader never stores one)."""
+    return re.sub(r"\s+", " ", _UNIT_RE.sub("", canon)).strip().rstrip(",")
+
+
+def dc_hit_report(failing: dict, loaded: set) -> dict:
+    """failing: {geocoder_query -> canonical_addr} for addresses the ladder could not match.
+    loaded: the canonical addresses this run would load.
+    exact      = the ladder's own lookup key is present, so datasetRung WOULD hit it today;
+    unit_only  = present only once the unit is stripped, so datasetRung would still MISS
+                 (the ladder looks up the unit-bearing key) -- reported separately, never added to exact."""
+    exact, unit_only, with_unit = [], [], 0
+    for q, canon in failing.items():
+        has_unit = strip_unit(canon) != canon
+        with_unit += has_unit
+        if canon in loaded:
+            exact.append(q)
+        elif has_unit and strip_unit(canon) in loaded:
+            unit_only.append(q)
+    return {"failing": len(failing), "with_unit": with_unit, "exact": exact, "unit_only": unit_only}
+
+
+def dc_failing_queries() -> dict:
+    """{geocoder_query: canonical_addr} for every admitted data-centre query the ladder rejected as
+    REJECTED_NO_MATCH. Paginated (PostgREST silently caps at 1,000 rows)."""
+    failing_q = set()
+    off = 0
+    while True:
+        rows = rest_get("dc_observation_derived_point?select=geocoder_query&verdict=eq.REJECTED_NO_MATCH"
+                        f"&admitted=eq.true&geocoder_query=not.is.null&limit=1000&offset={off}&order=geocoder_query")
+        failing_q.update(r["geocoder_query"] for r in rows)
+        if len(rows) < 1000:
+            break
+        off += 1000
+    canon, off = {}, 0
+    while True:
+        rows = rest_get("dc_address_geocode?select=geocoder_query,canonical_addr&limit=1000"
+                        f"&offset={off}&order=derivation_id")
+        for r in rows:
+            if r["geocoder_query"] in failing_q and r.get("canonical_addr"):
+                canon[r["geocoder_query"]] = r["canonical_addr"]
+        if len(rows) < 1000:
+            break
+        off += 1000
+    return canon
+
+
 # ── upsert ───────────────────────────────────────────────────────────────────────────────────
 def upsert(rows: list) -> int:
     if DRY_RUN or not rows:
@@ -279,6 +332,20 @@ def main() -> int:
     print(f"  distinct canonical addresses: {len(seen)}")
     print(f"  rows written:                 {total_written}")
     print(f"  quarantined member errors:    {quarantined}")
+    if DRY_RUN and os.environ.get("CHECK_DC_FAILURES", "").strip() == "1":
+        failing = dc_failing_queries()
+        rep = dc_hit_report(failing, seen)
+        print("\nDATA-CENTRE ADDRESS MATCH PREVIEW (read-only)")
+        print(f"  addresses the ladder could not match:        {rep['failing']}")
+        print(f"    of which carry a suite/unit:               {rep['with_unit']}")
+        print(f"  WOULD MATCH today (exact ladder key):         {len(rep['exact'])}")
+        print(f"  would match only if the unit were stripped:   {len(rep['unit_only'])}  (NOT a hit: the ladder looks up the unit-bearing key)")
+        print(f"  loaded set size (control, must be > 0):       {len(seen)}")
+        for q in rep["exact"][:60]:
+            print("   HIT  " + q)
+        for q in rep["unit_only"][:30]:
+            print("   UNIT " + q)
+
     if seen and not DRY_RUN:
         try:
             sample = rest_get("national_address_points?select=*&limit=3&order=canonical_addr")
