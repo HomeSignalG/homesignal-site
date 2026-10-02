@@ -60,5 +60,12 @@ for (const [what, re] of [['not an admin (403)', /httpStatus === 403/], ['sign-i
 }
 ok(!/say\([^)]*(body\.error|body\.status|body\.detail)/.test(code), '5b no raw error code is ever printed to the operator');
 
+// ---- 6. the credit line: the function's rule, put into words, and nothing decided here (founder ruling R5) ----------------------------------
+const credit = (code.match(/function creditLine\(body\)\{[\s\S]*?\n  \}/) || [''])[0];
+ok(credit.length > 100 && /var c = body && body\.credit;/.test(credit) && /if \(c\.uses_report === true\)/.test(credit) && (code.match(/uses_report/g) || []).length === 1,
+  '6a whether a report would use a free report is read from the function\'s own answer (body.credit.uses_report), once');
+ok(!/\.projects|\.activity|\.outcome|\.coverage|storable|storage_blockers/.test(credit) && /c\.reason === 'NO_DATA_INGESTED'/.test(credit), '6b the credit line looks at nothing else: no project count, outcome, coverage or storage decision is made on the page');
+ok(/creditnote/.test(page) && /\$\('creditnote'\)\.hidden = !cl;/.test(code) && /\$\('creditnote'\)\.hidden = true;/.test(code), '6c it is cleared before each report and shown only when there is a line to show');
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

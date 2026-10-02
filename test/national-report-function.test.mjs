@@ -121,12 +121,14 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   let f = fakes({ geocode: async () => null });
   const nomatch = await call(f.deps, REQ, AUTH);
   ok(nomatch.json.status === 'ADDRESS_NOT_RESOLVED' && nomatch.json.report === null && nomatch.json.stored === false, '3a an unresolved address: a status, no report');
+  ok(nomatch.json.credit && nomatch.json.credit.uses_report === false && nomatch.json.credit.reason === 'NOT_A_REPORT', '3a and it never uses a free report', nomatch.json.credit);
   f = fakes({ geocode: async () => null }); await call(f.deps, REQ, AUTH);
   ok(!f.calls.includes('zipSupported') && !f.calls.includes('radius'), '3a and no coverage or spatial read runs');
 
   f = fakes({ zipSupported: async () => false });
   const outside = await call(f.deps, REQ, AUTH);
   ok(outside.json.status === 'OUTSIDE_COVERAGE' && outside.json.zip === '97477' && outside.json.report === null, '3b a ZIP outside the 12,722: OUTSIDE_COVERAGE, no report');
+  ok(outside.json.credit && outside.json.credit.uses_report === false && outside.json.credit.reason === 'NOT_A_REPORT', '3b and it never uses a free report', outside.json.credit);
   f = fakes({ zipSupported: async () => false }); await call(f.deps, REQ, AUTH);
   ok(!f.calls.includes('radius') && !f.calls.includes('hydrate'), '3b and nothing beyond the coverage check ran');
 
@@ -188,6 +190,17 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     '4h the internal view labels every record HOLD and reports itself not storable');
   const cust = await call(fakes({ rights: { version: 1, cleared: [] } }).deps, REQ, AUTH);
   ok(cust.json.report.projects.length === 0 && cust.json.coverage_state === 'LIMITED_COVERAGE', '4i with nothing cleared, the customer view is an honest LIMITED report with no records');
+
+  // founder ruling R5: every answer carries the one credit decision, and nothing here charges anything
+  const cr = (x) => x && [x.uses_report, x.reason, x.rule_version].join('|');
+  ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-1' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+    '4k a customer report that shows development would use one free report, and says which rule decided it', r.json.credit);
+  ok(cr(cust.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1' && cust.json.report.activity.label === 'No data ingested',
+    '4l the shipped state (nothing cleared): the customer report says "No data ingested" and would use no free report', cust.json.credit);
+  ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-1', '4m the operator\'s internal view is never charged', internal.json.credit);
+  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1', '4n an empty radius under a cleared source is still "No data ingested", not "No development activity"', dflt.json.credit);
+  ok(r.json.stored === false && r.json.report_id === null && !('charged' in r.json) && !('credits_used' in r.json), '4o and nothing is charged or stored by this endpoint');
+  ok(H.capability().credit_rule === 'credit-rule-1', '4p the capability names the credit rule');
 }
 
 // ---- 5. cross-origin ----------------------------------------------------------------------------------------

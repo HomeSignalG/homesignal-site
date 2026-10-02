@@ -28,8 +28,11 @@ import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
 
 export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
-/** national-2 (2026-10-02, 100526 plan step 2): adds the Stage dimension (`stage`, `sections.by_stage`, `stage_rule_version`). */
-export const REPORT_VERSION = 'development-activity-national-2';
+/**
+ * national-2 (2026-10-02, 100526 plan step 2): adds the Stage dimension (`stage`, `sections.by_stage`, `stage_rule_version`).
+ * national-3 (2026-10-02, step 5, founder ruling R5): adds `activity`, the report's outcome ("No development activity" vs "No data ingested").
+ */
+export const REPORT_VERSION = 'development-activity-national-3';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -177,6 +180,35 @@ export type WrittenEvent = ReportableEvent & { created_at: string };
 export type SourceHealth = {
   registry_id: string; fetch_failures_24h: number; blocked_24h: number; truncated_24h: number;
 };
+// ── the report's outcome (founder ruling R5, 2026-10-02: docs/development-activity-founder-ruling-r5-2026-10-02.md) ────────────
+//
+// A report says one of three things, and the two empty ones are never confused:
+//   DEVELOPMENT_SHOWN        the report shows at least one development record;
+//   NO_DEVELOPMENT_ACTIVITY  HomeSignal can PROVE its official development data for this address is coming in, and it shows no
+//                            development within the report radius. A real answer: it uses one free report;
+//   NO_DATA_INGESTED         the report is empty and HomeSignal cannot prove its data is coming in (no source cleared for paying
+//                            customers, a source not read, no source covering the area, or no way to tell which). HomeSignal's gap,
+//                            not an answer about the area: it never uses a free report.
+// A query that returns no rows is not proof (plan line 1338). The proof is the Maps workbook's VERIFIED ZERO, whose inputs for the
+// development family are not defined yet (freshness SLA_UNDEFINED), so today an empty report is ALWAYS "No data ingested".
+// NO_DEVELOPMENT_ACTIVITY becomes reachable only through a reviewed change to activityOutcome() with its own tests, never a setting.
+
+/** Bump whenever activityOutcome() or the labels change: the report carries it, so a stored report says which rule judged it. */
+export const ACTIVITY_RULE_VERSION = 'activity-outcome-1';
+export const ACTIVITY_OUTCOMES = ['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_DATA_INGESTED'] as const;
+export type ActivityOutcome = typeof ACTIVITY_OUTCOMES[number];
+/** The founder's words, exactly ("lets be more clear and write \"no devlopment activity\" vs \"no data ingested\""). */
+export const ACTIVITY_LABELS: Readonly<Record<ActivityOutcome, string>> = Object.freeze({
+  DEVELOPMENT_SHOWN: 'Development shown',
+  NO_DEVELOPMENT_ACTIVITY: 'No development activity',
+  NO_DATA_INGESTED: 'No data ingested',
+});
+
+/** THE one decision of what a report's outcome is. Today it has no proof of ingestion to read, so an empty report is "No data ingested". */
+export function activityOutcome(projectsInReport: number): ActivityOutcome {
+  return Number.isInteger(projectsInReport) && projectsInReport > 0 ? 'DEVELOPMENT_SHOWN' : 'NO_DATA_INGESTED';
+}
+
 export type Subject = {
   /** exactly what the customer typed */
   address: string;
@@ -498,6 +530,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   if (sourcesNotFullyRead(input.health, familiesIncluded)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
   const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
+  const outcome = activityOutcome(projects.length);
 
   const intelligence: Record<string, unknown> = {
     product: PRODUCT_NAME,
@@ -507,6 +540,7 @@ export function assemble(input: AssembleInput): Assembled {
     radius_mi,
     recent_days: RECENT_DAYS,
     stage_rule_version: STAGE_RULE_VERSION,
+    activity: { outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION },
     coverage: {
       zip_supported: true,
       state,
@@ -544,7 +578,7 @@ export function assemble(input: AssembleInput): Assembled {
     privateContext,
     engineInputs: {
       engine: REPORT_VERSION, zip: subject.zip, radius_mi, recent_days: RECENT_DAYS, stage_rule_version: STAGE_RULE_VERSION,
-      rights_registry_version: rights.version, cleared_families: rights.cleared.length,
+      activity_rule_version: ACTIVITY_RULE_VERSION, rights_registry_version: rights.version, cleared_families: rights.cleared.length,
     },
     renderOnly: {
       distances_mi: distances,

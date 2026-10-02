@@ -58,6 +58,21 @@ through once each step is complete").
 5. **Free trial sign-up.** Invite link, sign-in, 20 shared reports, "reports remaining". The 20-report limit
    is already enforced in the database (Order L1, applied 2026-10-02).
    *Founder decision first:* does a report with limited coverage use up a free report? (ruling R5)
+   **Answered 2026-10-02** (`docs/development-activity-founder-ruling-r5-2026-10-02.md`): a report that shows
+   development, or that proves **"No development activity"**, uses one free report; a report that is empty
+   because of **"No data ingested"** does not. Until HomeSignal can prove "No development activity" for an
+   address, an empty report is "No data ingested" and is free.
+   Four pull requests:
+   - **5a. The outcome and the one credit rule.**
+     - The report engine names every report's outcome: "No development activity" vs "No data ingested" (`report.activity`).
+     - One versioned function (`_shared/credit-rule.ts`) says whether a report uses a free report.
+     - An empty report says "No data ingested" in plain words.
+     - The review page shows the founder whether a customer would be charged.
+     - Nothing is charged yet.
+   - **5b. Trial reports.** The report function serves invited trial members the customer view, and calls the
+     database's `evaluation_report_issue` only when the rule says a report uses a free report.
+   - **5c. The customer page.** Invite link, sign-in, make a report, "reports remaining".
+   - **5d. Creating a trial.** An admin way to create a brokerage's trial and its owner invite.
 6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
 7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
 8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
@@ -82,7 +97,7 @@ through once each step is complete").
 | When | What |
 |---|---|
 | After step 4 | Review the layout with 84302 |
-| Before step 5 | Does a limited-coverage report use up a free report? |
+| ~~Before step 5~~ | ~~Does a limited-coverage report use up a free report?~~ Answered 2026-10-02: "No development activity" is charged, "No data ingested" is not. |
 | Before step 8 | How long share links last; whether the client sees the address |
 | Step 11 | Create the Lemon Squeezy product and make one test payment |
 | Any time, needed by step 12 | Send the Utah permission requests |

@@ -118,6 +118,22 @@ check itself had at first — a value filling a whole JSON string has no space o
   stored: false, report_id: null, storable, storage_blockers }
 ```
 
+**Added since (2026-10-02).** `report_version` is `development-activity-national-3`. Step 2 of the 100526 build added
+`stage_rule_version`, `sections.by_stage`, each project's `stage`, and `render.bearings_deg` / `render.review`. Step 5a added:
+- `report.activity: { outcome, label, rule_version }`, the report's outcome (founder ruling R5,
+  `docs/development-activity-founder-ruling-r5-2026-10-02.md`):
+  - `DEVELOPMENT_SHOWN` ("Development shown");
+  - `NO_DEVELOPMENT_ACTIVITY` ("No development activity"), only once HomeSignal can prove its data for the address is coming
+    in, which nothing can yet;
+  - `NO_DATA_INGESTED` ("No data ingested"), every empty report today.
+
+  `activityOutcome()` decides it, from the number of projects in this report after the rights gate. `activity_rule_version`
+  is in the engine inputs.
+- `credit: { uses_report, reason, rule_version }` on every report and on `ADDRESS_NOT_RESOLVED` / `OUTSIDE_COVERAGE`. It
+  says whether a trial customer's report would use one of the 20 free reports.
+  - The one owner is `_shared/credit-rule.ts` `creditDecision()`.
+  - This endpoint charges nothing.
+
 `publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.

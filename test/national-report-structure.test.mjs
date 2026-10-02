@@ -156,5 +156,32 @@ const all = Object.values(src).map(code).join('\n');
   ok(!/mock|stub|fake/i.test(code(rt).replace(/\/\/.*$/gm, '')), '8i and uses no stand-in for either');
 }
 
+// ---- 9. ONE owner for the report's outcome and ONE for the credit decision (founder ruling R5, 2026-10-02) --------------------------
+{
+  const CR = 'supabase/functions/_shared/credit-rule.ts';
+  const cr = read(CR), crc = code(cr);
+  ok(!/\bDeno\b|process\.env|\brequire\(|\bfetch\(/.test(crc), '9a the credit rule is pure: no environment, no runtime global, no network');
+  ok(/^import \{ ACTIVITY_OUTCOMES, ACTIVITY_RULE_VERSION \} from '\.\/national-report\.ts';$/m.test(cr) && (crc.match(/^import /gm) || []).length === 1,
+    '9b it imports only the outcome vocabulary and its version from the engine (it judges the engine\'s answer, it does not re-derive it)');
+  ok(/const CHARGED: ReadonlySet<string> = new Set\(\['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY'\]\);/.test(crc) && !/NO_DATA_INGESTED/.test(crc.replace(/export const CREDIT_REASONS[\s\S]*?\] as const;/, '')),
+    '9c the charged outcomes are exactly the two that answer the question about the area; "No data ingested" is never in the charged set');
+  const fnFiles = [];
+  const walk = (d) => { for (const e of readdirSync(join(root, d))) { const q = d + '/' + e; if (statSync(join(root, q)).isDirectory()) walk(q); else if (/\.(ts|js|mjs|html)$/.test(e)) fnFiles.push(q); } };
+  walk('supabase/functions'); walk('lib');
+  for (const e of readdirSync(root)) if (/\.html$/.test(e)) fnFiles.push(e);
+  const defines = (re) => fnFiles.filter((f) => re.test(code(read(f))));
+  ok(defines(/function creditDecision\(/).join() === CR, '9d creditDecision is defined in one file across every function, lib module and page', defines(/function creditDecision\(/));
+  ok(defines(/function activityOutcome\(/).join() === MOD, '9e activityOutcome is defined in one file', defines(/function activityOutcome\(/));
+  ok(defines(/uses_report\s*:/).join() === CR, '9f nothing but the credit rule writes a uses_report answer', defines(/uses_report\s*:/));
+  const mod = code(src.module);
+  ok((mod.match(/activityOutcome\(/g) || []).length === 2 && /const outcome = activityOutcome\(projects\.length\);/.test(mod),
+    '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the rights gate), never the spatial answer');
+  const fnBody = /export function activityOutcome\([\s\S]*?\n\}/.exec(mod);
+  ok(!!fnBody && !/NO_DEVELOPMENT_ACTIVITY/.test(fnBody[0]), '9h today\'s outcome rule cannot return "No development activity": that needs the VERIFIED ZERO proof, which has no inputs yet');
+  ok(/credit: creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\)/.test(code(src.handler))
+    && (code(src.handler).match(/creditDecision\(/g) || []).length === 3, '9i the handler asks the rule for every report and every no-report answer, and decides nothing itself');
+  ok(!/evaluation_report_issue|evaluation_usage|report_credit/.test(code(src.handler) + code(src.data)), '9j this operator endpoint charges nothing: it never calls the credit ledger');
+}
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

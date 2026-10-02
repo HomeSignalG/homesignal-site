@@ -49,6 +49,13 @@ m('wrong_view_sent', "  function viewChoice(){ var v=document.querySelector('inp
 m('second_endpoint', "  var FN = SB_URL + '/functions/v1/get-development-activity-report';",
   "  var FN = SB_URL + '/functions/v1/get-development-activity-report'; fetch('https://example.com/beacon').catch(function(){});")
 
+# ---- the credit line (founder ruling R5): the function's answer in words, never the page's own decision ----------------------------------------
+m('credit_decided_from_project_count', "    if (c.uses_report === true) {", "    if (body.report && body.report.projects.length > 0) {")
+m('credit_line_never_shown', "    $('creditnote').textContent = cl; $('creditnote').hidden = !cl;", "    $('creditnote').textContent = cl;", [BRO])
+m('credit_line_not_cleared', "    $('viewnote').hidden = true; $('creditnote').hidden = true; $('report').textContent = '';", "    $('viewnote').hidden = true; $('report').textContent = '';")
+m('no_data_ingested_reason_dropped', "    if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';\n", "", [BRO])
+m('internal_view_said_charged', "    if (c.reason === 'INTERNAL_VIEW') return", "    if (c.reason === 'INTERNAL_VIEW_X') return", [BRO])
+
 
 def run(tests):
     for t in tests:
