@@ -1,4 +1,5 @@
-// THE DEVELOPMENT ACTIVITY REPORT VIEW — structural pins (Development Activity plan, Order I, step 1).
+// THE DEVELOPMENT ACTIVITY REPORT VIEW — structural pins (Development Activity plan, Order I; the full layout is step 3 of
+// docs/development-activity-build-steps-100526.md).
 // Each pin defends an invariant a behavioural test cannot see, because breaking it changes no output today: the view is pure, it reads
 // a CLOSED set of response keys, it holds no Type, lifecycle, change, rights or ranking rule, it names nothing private, and it has no
 // caller. Reads source text only. A pin that names a string it forbids reads the module with its COMMENTS STRIPPED (the header
@@ -37,40 +38,58 @@ const C = code(SRC);
   ok(!/\b(Date|Intl|Math\.random|performance)\b|toLocale/.test(C), '1b it reads no clock and no locale: the same input gives the same output anywhere');
   ok(!/\bimport\b|\bexport\b|\brequire\b/.test(C), '1c it imports nothing: it needs only `window`');
   ok(!/\.sort\(|\.reverse\(|\.splice\(/.test(C) && /\.filter\(/.test(C) && /\.map\(/.test(C), '1d it sorts and reorders nothing (a view that sorts is a view that ranks), and it does filter and map (control)');
-  ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 1, '1e the only DOM write is mount() setting innerHTML to its own html() output, once');
+  ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 1, '1e the only markup write is mount() setting innerHTML to its own html() output, once');
+  const enh = (C.match(/function enhance\(el\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+  const attrWrites = [...C.matchAll(/(setAttribute|removeAttribute)\('([^']+)'/g)].map((m) => m[2]);
+  ok(enh.length > 200 && attrWrites.length === 5 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 5
+    && attrWrites.every((a, i) => enh.includes(a)), '1e2 the filters (enhance) change only two attributes, hidden and aria-pressed, and nothing else on the page', attrWrites);
   ok(!/url\(|@import/.test(C) && !/['"]https?:/.test(C), '1f the stylesheet and the markup fetch nothing, and no http URL is written into the module (only the pattern that validates one)');
 }
 
 // ---- 2. it reads a CLOSED set of response keys, and none of the internal ones -------------------------------------------------------------
 {
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
-  const EXPECT = ['as_of', 'by_lifecycle', 'detected_at', 'distances_mi', 'event_type', 'homesignal_detected_changes', 'project_id', 'publisher_event', 'publisher_status', 'radius_mi',
-    'recent_days', 'recent_official_activity', 'what_changed_recently'];
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirteen (a new one must be added here on purpose)', snake);
+  const EXPECT = ['as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'project_id',
+    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'what_changed_recently'];
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these nineteen (a new one must be added here on purpose)', snake);
+  // three keys step 1 kept internal are now shown on purpose (100526 plan: a card shows "First detected", and Change History says whether
+  // HomeSignal has observed long enough), each read in ONE function and printed only as a date or a sentence
+  ok((C.match(/homesignal_observation/g) || []).length === 2 && (C.match(/first_observed_at/g) || []).length === 1 && /function firstDetected\(p\) \{ return isObj\(p\.homesignal_observation\) \? day\(p\.homesignal_observation\.first_observed_at\) : ''; \}/.test(C),
+    '2a2 the ledger\'s first observation is read in firstDetected() only, and only as a day');
+  ok((C.match(/change_ready/g) || []).length === 1 && /var msg = cov\.change_ready === true/.test(C), '2a3 the ledger\'s readiness is read once, to choose between two fixed Change History sentences');
   const INTERNAL = ['report_private_context', 'report_snapshot', 'private_context', 'snapshot', 'report_id', 'content_hash', 'storage_blockers', 'storable', 'source_family', 'source_families_in_report',
-    'registry_id', 'change_ready', 'homesignal_observation', 'observation_count', 'first_observed_at', 'last_observed_at', 'assessment_basis', 'coverage_state', 'INTERNAL_VIEW',
+    'registry_id', 'observation_count', 'last_observed_at', 'assessment_basis', 'coverage_state', 'INTERNAL_VIEW',
     'CONTAINS_UNCLEARED', 'HOLD', 'CLEARED', 'rights', 'matched_address', 'latitude', 'longitude', 'normalized_address', 'property_key', 'label_in_body', 'audit_ref', 'cleared_on'];
   const named = INTERNAL.filter((t) => new RegExp('(^|[^A-Za-z_])' + t + '($|[^A-Za-z_])').test(C));
   ok(named.length === 0, '2b the code names no private-context or snapshot symbol, and none of the internal keys the engine carries (storage_blockers, rights, registry ids, change_ready, hashes, report ids)', named);
   ok(INTERNAL.every((t) => new RegExp('(^|[^A-Za-z_])' + t + '($|[^A-Za-z_])').test(' ' + INTERNAL.join(' ') + ' ')), '2b (control) the matcher finds each of those names when it is present');
-  ok(!/\.(stored|stage|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|address|feature_id)\b/.test(C), '2c it reads none of the record fields it does not show (stage, developer, size, investment, address, dates, raw type, ids)');
+  ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|address|feature_id)\b/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, address, dates, raw type, ids)');
+  ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
   ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
-  ok((C.match(/publisher_status/g) || []).length === 1 && /var status = txt\(p\.publisher_status\);/.test(C) && /line\('Publisher status', status\)/.test(C), '2e the publisher\'s status word is read once, and only to be printed under its own label');
-  ok(!/\.type\.key|typeKey/.test(C) && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C), '2f it reads Type only as the engine\'s label and lifecycle only as the engine\'s key and label');
+  ok((C.match(/publisher_status/g) || []).length === 2 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\('Publisher status', status\)/g) || []).length === 2,
+    '2e the publisher\'s status word is read in the two card builders, and only to be printed under its own label');
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 4
+    && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter; lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
 {
-  const AUTH = ['CATEGORY_REGISTRY', 'classifyProjectType', 'canonicalLifecycle', 'canonicalProjectType', 'lifecycleKey', 'LIFECYCLE_LABELS', 'LIFECYCLE_KEYS', 'statusKey', 'TYPE_EXACT', 'HS.projectType', 'isActiveUndecided', 'browsingBucket'];
-  ok(AUTH.every((t) => !C.includes(t)), '3a the module does not call, import or copy the Type or lifecycle authority (lib/project-type.js)', AUTH.filter((t) => C.includes(t)));
+  const AUTH = ['classifyProjectType', 'canonicalLifecycle', 'canonicalProjectType', 'lifecycleKey', 'LIFECYCLE_LABELS', 'LIFECYCLE_KEYS', 'statusKey', 'TYPE_EXACT', 'isActiveUndecided', 'browsingBucket', 'TYPE_FILTER_KEYS'];
+  ok(AUTH.every((t) => !C.includes(t)), '3a the module does not call or copy the Type or lifecycle authority (lib/project-type.js)', AUTH.filter((t) => C.includes(t)));
+  const regUses = [...C.matchAll(/CATEGORY_REGISTRY/g)].length, reg = (C.match(/function filtersSection\(current, stageFor\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(regUses === 2 && (reg.match(/CATEGORY_REGISTRY/g) || []).length === 2 && /reg\[k\]\.isFacility \? txt\(reg\[k\]\.label\)/.test(reg) && !/classify|canonical/.test(reg),
+    '3a2 the Type authority\'s registry is read in ONE place, the Type filter, for its labels only (and a regulated facility is never offered as a Type, ruling 1)');
   ok(!/['"](decided|on file|built|active)['"]/i.test(C), '3b no publisher status word is mapped to anything: the code carries no status vocabulary at all');
   ok(/var SHAPES = \{\s*approved:[\s\S]*proposed:[\s\S]*operating:[\s\S]*unknown:[\s\S]*\};/.test(C) && /['"](decided|on file|built|active)['"]/i.test("x 'Decided' y"),
     '3b (control) the only lifecycle words in the code are the four keys of the shape table, and the status-word scan can see a status word');
   ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),
     '3c the module owns no change rule and no window: it does not decide what changed or what is recent (and carries no day-count of its own)');
   ok(!/validateRights|report-rights|cleared\b|attribution\s*[:=]\s*['"]/.test(C) && !/rights/i.test(C), '3d it owns no rights rule: it cannot say whether a source may appear, and invents no attribution');
-  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|nearest|closest)\b/i.test(C), '3e it ranks nothing (the plan names no ranking, and Things to Review has no rule)');
-  ok(!/Things to Review|Permitted \/ Under Construction|What Exists Today|Development Activity Map|Compare|\bWatch\b|\bShare\b|\bPDF\b|Download/.test(C), '3f it has no copy for the sections the plan lists but the engine cannot supply: Things to Review, Permitted / Under Construction, the map, the action bar');
+  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|nearest|closest)\b/i.test(C) && /response\.render\.review/.test(C), '3e it ranks nothing: Things to Review is the engine\'s own list (render.review), shown in the engine\'s order');
+  ok(/Things to Review With Your Client/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
+    '3f the 100526 sections are written (Things to Review, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
+  ok((C.match(/aria-disabled="true"/g) || []).length === 1 && !/addEventListener\('click'[\s\S]{0,200}da-rv-act/.test(C), '3f2 the action bar\'s buttons are switched off, and nothing listens to them');
   ok(!/\bno (recent |new |official )*(development )?activity|nothing (found|nearby|to report)|no development (was )?found/i.test(C), '3g it has no wording that claims there was no activity (plan hard rule 66)');
   ok(!/\.coverage_state\b|\.stored\b|LIMITED_COVERAGE|REPORT_READY|CHANGE_READY/.test(C), '3h it never reads or prints the coverage state: the report speaks through the engine\'s limitation text');
 }
@@ -88,8 +107,11 @@ const C = code(SRC);
   const subjectUses = [...C.matchAll(/\bsubject\b/g)].length, inHeader = [...head.matchAll(/\bsubject\b/g)].length;
   ok(subjectUses > 0 && subjectUses === inHeader, '4f the caller\'s address is read in ONE function, header(), and nowhere else', { subjectUses, inHeader });
   const optReads = [...C.matchAll(/opts\.(\w+)/g)].map((m) => m[1]);
-  ok(optReads.length > 0 && optReads.every((k) => k === 'subject'), '4g opts is read for the address only: there is no other caller-supplied input', optReads);
-  ok(!/\bid="|setAttribute|dataset|data-(?!lifecycle)/.test(C), '4h the markup writes no id, no setAttribute and no data-* other than the whitelisted lifecycle key');
+  ok(optReads.length > 0 && optReads.every((k) => ['subject', 'label', 'brokerage', 'agent'].includes(k)) && ['label', 'brokerage', 'agent'].every((k) => head.includes('opts.' + k)),
+    '4g opts carries the address, the client label, the brokerage and the agent, and is read in header() only', optReads);
+  const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-filter', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
+    '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, and the filter keys', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
 
@@ -101,7 +123,8 @@ const C = code(SRC);
   ok(landingTest.includes("['Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction'].every(") , '5b and the landing page test still pins exactly those three');
   ok(C.includes("approved: 'Approved / Coming'") && C.includes("proposed: 'Proposed / Under Review'") && labels[0] === 'Approved / Coming' && labels[1] === 'Proposed / Under Review',
     '5c the view\'s two stage labels equal the landing page\'s (so a label change must be made in both places on purpose)');
-  ok(!C.includes('Permitted / Under Construction'), '5d the third landing label is NOT carried: R2 has no such lifecycle key and no source rule exists for it');
+  ok(C.includes("permitted: 'Permitted / Under Construction'") && labels[2] === 'Permitted / Under Construction' && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
+    '5d the third landing label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
   ok(C.includes("var EYEBROW = 'HOMESIGNAL DEVELOPMENT ACTIVITY';"), '5e the eyebrow is the ruled one (R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
 }

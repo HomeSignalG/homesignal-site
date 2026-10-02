@@ -13,7 +13,10 @@ through once each step is complete").
 
 1. ~~**Save the 100526 plan in Git.**~~ It is the plan the remaining build follows; the 2026-09-30 plan stays
    as a dated record. *(Done in the pull request that adds this file.)*
-2. **Report engine: fixed 0.5-mile radius, the Permitted / Under Construction rule, and map positions.**
+2. ~~**Report engine: fixed 0.5-mile radius, the Permitted / Under Construction rule, and map positions.**~~
+   *(Done: #1569 merged as `d453d5b`; `get-development-activity-report` deployed from `main` by run
+   `37040242758`, version 3 → 4 at 2026-10-02 17:22Z. All 10 deployed files read back byte-identical to
+   `main`, JWT check still on, and an unsigned call returns 401.)*
    - Radius: 0.5 mile is the default and the only radius a report uses (plan ruling 7). Today the engine
      defaults to 1 mile and also accepts 2 and 5.
    - Permitted / Under Construction: a project goes there only when the publisher's own stage says a permit

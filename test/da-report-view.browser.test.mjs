@@ -1,4 +1,5 @@
-// THE DEVELOPMENT ACTIVITY REPORT VIEW — driven in a real browser (Development Activity plan, Order I, step 1).
+// THE DEVELOPMENT ACTIVITY REPORT VIEW — driven in a real browser (Development Activity plan, Order I; the full layout is step 3 of
+// docs/development-activity-build-steps-100526.md).
 //
 // test/da-report-view.test.mjs proves WHAT the view says, from its HTML string. This proves how it LIVES on a page, which a string cannot:
 //   * a phone-width viewport (390px) has no horizontal overflow, even with long unbroken publisher text, and the sections stack in the
@@ -87,7 +88,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-card').length,
   }));
-  ok(info.h2.join('|') === 'What Changed Recently|Recent Official Activity|Approved / Coming|Proposed / Under Review|Change History|Official evidence & coverage', '1c the six sections render as headings, in the plan\'s order', info.h2);
+  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Type and stage|Things to Review With Your Client|Development Activity Map|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
+    '1c the sections render as headings, in the 100526 plan\'s order', info.h2);
   ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight cards', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
   ok(await page.evaluate(() => document.querySelectorAll('#da-rv-style').length) === 1, '1e mounting again does not add a second stylesheet');
@@ -99,7 +101,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const bg = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0)) return c.slice(0, 3); } return [255, 255, 255]; };
     const ratio = (el) => { const f = rgb(getComputedStyle(el).color).slice(0, 3), b = bg(el); const a = lum(f), d = lum(b); return (Math.max(a, d) + 0.05) / (Math.min(a, d) + 0.05); };
     const pick = (sel) => [...document.querySelectorAll(sel)].map((e) => [sel, +ratio(e).toFixed(2)]);
-    return [].concat(pick('.da-rv-lifetext'), pick('.da-rv-life'), pick('.da-rv-metric span'), pick('.da-rv-line'), pick('.da-rv-link'), pick('.da-rv-p'), pick('.da-rv-tag'), pick('.da-rv-eyebrow'), pick('.da-rv-meta'), pick('.da-rv-h2'), pick('.da-rv-ev'));
+    return [].concat(pick('.da-rv-lifetext'), pick('.da-rv-life'), pick('.da-rv-metric span'), pick('.da-rv-line'), pick('.da-rv-link'), pick('.da-rv-p'), pick('.da-rv-tag'), pick('.da-rv-eyebrow'), pick('.da-rv-meta'), pick('.da-rv-h2'), pick('.da-rv-ev'),
+      pick('.da-rv-stage'), pick('.da-rv-chip'), pick('.da-rv-chipn'), pick('.da-rv-flab'), pick('.da-rv-revmeta'), pick('.da-rv-onrecord'), pick('.da-rv-act'), pick('.da-rv-soon'), pick('.da-rv-gen'), pick('.da-rv-legend li'));
   });
   const worst = contrast.reduce((m, c) => (c[1] < m[1] ? c : m), ['', 99]);
   ok(contrast.length > 60 && worst[1] >= 4.5, '1f every text colour measured (' + contrast.length + ' elements: lifecycle labels, counts, lines, links, evidence copy) has at least 4.5:1 contrast; the lowest is ' + worst[0] + ' at ' + worst[1], worst);
@@ -130,8 +133,13 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { secs, cols, cardW, headBottom: head.bottom + scrollY, viewport: innerWidth };
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
-  const PLAN_MOBILE = ['What Changed Recently', 'Recent Official Activity', 'Approved / Coming', 'Proposed / Under Review', 'Change History', 'Official evidence & coverage'];
-  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the plan\'s mobile order (what changed, then the stage sections, then history, then evidence) for the sections this step builds');
+  const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Things to Review With Your Client', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
+    'Permitted / Under Construction', 'Change History', 'Official evidence & coverage'];
+  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the plan\'s mobile order: what changed, the filters, things to review, the map, the three stages, history, evidence', lay.secs.map((s) => s.label));
+  const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
+  ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
+  const plot = await page.evaluate(() => { const r = document.querySelector('.da-rv-plot').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 0.5]; });
+  ok(plot[0] >= 300 && plot[1] >= 300 && plot[2], '2c3 the map is legible on a phone (at least 300px square) and fits the screen', plot);
   ok(lay.cols.length > 0 && lay.cols.every((c) => c === 1), '2d cards stack in ONE column on a phone', lay.cols);
   ok(lay.cardW.every((w) => w <= lay.viewport - 20 && w >= 200), '2e each card fits the screen and is wide enough to read', lay.cardW.map(Math.round));
   const vis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-card')].map((c) => {
@@ -141,7 +149,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   }));
   ok(vis.length === 8 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card without opening anything (8 of 8)', vis);
   const links = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width)]; }));
-  ok(links.length === 8 && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link is at least 32px tall and 60px wide on a phone: tappable', links);
+  ok(links.length === 11 && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (8 cards, 3 review items) is at least 32px tall and 60px wide on a phone: tappable', links);
+  const chipsH = await page.evaluate(() => [...document.querySelectorAll('.da-rv-chip, .da-rv-act')].map((b) => Math.round(b.getBoundingClientRect().height)));
+  ok(chipsH.length >= 8 && chipsH.every((h) => h >= 36), '2g2 every filter chip and action button is at least 36px tall on a phone', chipsH);
   const sr = await page.evaluate(() => { const e = document.querySelector('.da-rv-sr'); const r = e.getBoundingClientRect(); return [r.width, r.height]; });
   ok(sr[0] <= 2 && sr[1] <= 2, '2h the record name added to each link for screen readers takes up no room');
   await ctx.close();
@@ -154,21 +164,24 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   await mount(page, W, ADDRESS);
   const probe = () => page.evaluate(() => {
     const a = document.activeElement;
-    if (!a || !a.classList || !a.classList.contains('da-rv-link')) return { link: false, tag: a ? a.tagName : null, inReport: !!(a && a.closest && a.closest('.da-rv')) };
-    const cs = getComputedStyle(a), r = a.getBoundingClientRect(), card = a.closest('.da-rv-card').getBoundingClientRect();
-    return { link: true, href: a.getAttribute('href'), outline: cs.outlineStyle, outlineWidth: parseFloat(cs.outlineWidth), cardTop: Math.round(card.top + scrollY), inView: r.top >= 0 && r.bottom <= innerHeight };
+    const inReport = !!(a && a.closest && a.closest('.da-rv'));
+    if (!inReport) return { inReport: false, tag: a ? a.tagName : null };
+    const cs = getComputedStyle(a), r = a.getBoundingClientRect(), box = (a.closest('.da-rv-card, .da-rv-rev') || a).getBoundingClientRect();
+    return { inReport: true, kind: a.classList.contains('da-rv-link') ? 'link' : a.classList.contains('da-rv-chip') ? 'chip' : a.classList.contains('da-rv-act') ? 'action' : a.tagName,
+      href: a.getAttribute('href'), outline: cs.outlineStyle, outlineWidth: parseFloat(cs.outlineWidth), top: Math.round(box.top + scrollY), inView: r.top >= 0 && r.bottom <= innerHeight };
   });
   const seq = [];
-  for (let i = 0; i < 8; i++) { await page.keyboard.press('Tab'); seq.push(await probe()); }
-  await page.keyboard.press('Tab');
-  const ninth = await probe();
-  const reached = seq.filter((s) => s.link);
-  ok(reached.length === 8 && ninth.inReport === false, '3a Tab reaches all eight source links, one per press, and the ninth press leaves the report: it holds no other control', { links: seq.map((s) => s.link), ninth });
-  ok(reached.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link shows a visible focus ring of at least 2px', reached.map((s) => s.outline + ' ' + s.outlineWidth));
-  ok(reached.every((s, i) => i === 0 || s.cardTop >= reached[i - 1].cardTop), '3c focus follows reading order: card by card, top to bottom (cards in one row share a top)', reached.map((s) => s.cardTop));
+  for (let i = 0; i < 60; i++) { await page.keyboard.press('Tab'); const p = await probe(); if (!p.inReport) { seq.push(p); break; } seq.push(p); }
+  const inside = seq.filter((s) => s.inReport), left = seq[seq.length - 1];
+  const reached = inside.filter((s) => s.kind === 'link');
+  const kinds = inside.map((s) => s.kind);
+  ok(reached.length === 11 && kinds.filter((k) => k === 'chip').length === 8 && kinds.filter((k) => k === 'action').length === 4 && kinds.every((k) => ['link', 'chip', 'action'].includes(k)) && left.inReport === false,
+    '3a Tab reaches every source link (11), every filter chip (8) and the four actions, one per press, and then leaves the report: it holds no other control', kinds.join(','));
+  ok(inside.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link, chip and action shows a visible focus ring of at least 2px', inside.filter((s) => !(s.outline !== 'none' && s.outlineWidth >= 2)).map((s) => s.kind));
+  ok(inside.every((s, i) => i === 0 || s.top >= inside[i - 1].top - 1), '3c focus follows reading order, top to bottom (items in one row share a top)', inside.map((s) => s.top));
   ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view');
   const hrefs = reached.map((s) => s.href);
-  ok(new Set(hrefs).size === 8 && hrefs.every((h) => /^https:\/\/example\.gov\/records\/k-/.test(h)), '3e the eight links are the eight records\' own official sources', hrefs);
+  ok(new Set(hrefs).size === 8 && hrefs.every((h) => /^https:\/\/example\.gov\/records\/k-/.test(h)), '3e the links are the eight records\' own official sources (a Things to Review item links to its record\'s source)', [...new Set(hrefs)]);
   const attrs = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => a.target + ' ' + a.rel));
   ok(attrs.every((a) => a === '_blank noopener noreferrer'), '3f each opens in a new tab with noopener noreferrer');
   await ctx.close();
@@ -184,10 +197,10 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     imgs: document.querySelectorAll('.da-rv img, .da-rv iframe, .da-rv script, .da-rv object, .da-rv embed, .da-rv form, .da-rv input').length,
     onattrs: [...document.querySelectorAll('.da-rv *')].reduce((n, e) => n + [...e.attributes].filter((a) => /^on/i.test(a.name)).length, 0),
     text: document.querySelector('.da-rv').textContent,
-    svgs: document.querySelectorAll('.da-rv svg').length, shapeSvgs: document.querySelectorAll('.da-rv svg.da-rv-shape').length,
+    svgs: document.querySelectorAll('.da-rv svg').length, shapeSvgs: document.querySelectorAll('.da-rv svg.da-rv-shape').length, plots: document.querySelectorAll('.da-rv svg.da-rv-plot').length,
   }));
   ok(r.pwned === null, '4a nothing ran: window.__pwned is still undefined after rendering script, img onerror, svg onload and iframe srcdoc payloads', r.pwned);
-  ok(r.imgs === 0 && r.onattrs === 0 && r.svgs === r.shapeSvgs, '4b and no script, img, iframe, form or input element exists, no on* attribute, and every svg is one of ours', r);
+  ok(r.imgs === 0 && r.onattrs === 0 && r.svgs === r.shapeSvgs + r.plots && r.plots === 1, '4b and no script, img, iframe, form or input element exists, no on* attribute, and every svg is one of ours (the shapes and the one map)', r);
   ok(r.text.includes('<script>window.__pwned=1</script>') && r.text.includes('"><svg onload="window.__pwned=3">') && r.text.includes('<img src=x onerror="window.__pwned=5">'), '4c the hostile text is visible as text, not dropped');
   const hrefs = await page.evaluate(() => [...document.querySelectorAll('.da-rv a')].map((a) => a.getAttribute('href')));
   ok(hrefs.every((h) => /^https:\/\/example\.gov\//.test(h)), '4d every link on the page still goes to an https record URL');
@@ -228,6 +241,54 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   const r2 = await mount(page, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false }, ADDRESS);
   ok(r2 === false && (await page.evaluate(() => document.getElementById('host').innerHTML)) === '', '6b ADDRESS_NOT_RESOLVED likewise');
   ok((await page.evaluate(() => window.HS.daReportView.mount(null, {}, {}))) === false, '6c mount(null) is a no-op that returns false');
+  await ctx.close();
+}
+
+// ---- 7. the Type and Stage filters (100526 plan): presentation only, map and cards in step ------------------------------------------------------------
+{
+  const { ctx, page, errors } = await open(1280, 900);
+  await mount(page, W, ADDRESS);
+  const state = () => page.evaluate(() => {
+    const vis = (sel) => [...document.querySelectorAll(sel)].filter((e) => !e.hasAttribute('hidden') && e.getBoundingClientRect().height > 0).length;
+    return {
+      cards: { approved: vis('.da-rv-sec--approved .da-rv-card'), proposed: vis('.da-rv-sec--proposed .da-rv-card'), permitted: vis('.da-rv-sec--permitted .da-rv-card') },
+      marks: vis('.da-rv-mk'), noMatch: [...document.querySelectorAll('.da-rv-nomatch')].filter((e) => !e.hasAttribute('hidden')).map((e) => e.closest('.da-rv-sec').getAttribute('aria-label')),
+      pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => b.dataset.daFilter + ':' + b.dataset.daValue).sort().join(),
+      counts: document.querySelector('.da-rv-sec--proposed .da-rv-count').textContent, review: document.querySelectorAll('.da-rv-rev').length, hero: !!document.querySelector('.da-rv-hero'),
+    };
+  });
+  const s0 = await state();
+  ok(JSON.stringify(s0.cards) === '{"approved":2,"proposed":4,"permitted":0}' && s0.marks === 6 && s0.pressed === 'stage:all,type:all', '7a at rest: All and All are pressed, every staged card and map marker is shown', s0);
+  await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
+  const s1 = await state();
+  ok(JSON.stringify(s1.cards) === '{"approved":0,"proposed":4,"permitted":0}' && s1.marks === 4 && s1.pressed === 'stage:proposed,type:all' && s1.noMatch.join() === 'Approved / Coming',
+    '7b Stage = Proposed / Under Review: only proposed cards and markers stay, and Approved / Coming says nothing in it matches the filters', s1);
+  await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="residential"]');
+  const s2 = await state();
+  ok(JSON.stringify(s2.cards) === '{"approved":0,"proposed":1,"permitted":0}' && s2.marks === 1 && s2.pressed === 'stage:proposed,type:residential', '7c Type and Stage combine: Residential + Proposed leaves the one proposed residential record, on the map and in the list', s2);
+  ok(s2.counts === '4 official records' && s2.review === 3 && s2.hero, '7d filtering changes what is shown, never the report: the section count, Things to Review and the hero are unchanged', s2);
+  await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="all"]');
+  await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
+  const s3 = await state();
+  ok(JSON.stringify(s3.cards) === JSON.stringify(s0.cards) && s3.marks === s0.marks && s3.noMatch.length === 0, '7e All and All bring everything back', s3);
+  await page.focus('.da-rv-chip[data-da-filter="stage"][data-da-value="approved"]');
+  await page.keyboard.press('Enter');
+  ok((await state()).pressed === 'stage:approved,type:all', '7f a chip works from the keyboard (Enter)');
+  await ctx.close();
+  ok(errors.length === 0, '7g no page error and no console error', errors);
+}
+{
+  // A host page whose own CSS sets display on articles, paragraphs and SVG groups (normalize.css does this for article) would otherwise
+  // show a card the filter hid: the view's own rule must win. Visibility here is measured by layout alone, never by the attribute.
+  const { ctx, page } = await open(1280, 900);
+  await page.addStyleTag({ content: 'article,p,li,g{display:block}' });
+  await mount(page, W, ADDRESS);
+  await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
+  const laidOut = await page.evaluate(() => ({
+    approved: [...document.querySelectorAll('.da-rv-sec--approved .da-rv-card')].filter((e) => e.getBoundingClientRect().height > 0).length,
+    marks: [...document.querySelectorAll('.da-rv-mk')].filter((e) => e.getBoundingClientRect().height > 0).length,
+  }));
+  ok(laidOut.approved === 0 && laidOut.marks === 4, '7h on a host page whose CSS sets display on article and g, a filtered-out card and marker still take no space', laidOut);
   await ctx.close();
 }
 
