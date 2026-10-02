@@ -27,6 +27,8 @@ on:
       - 'docs/map1-zip-read-char5.rollback.sql'
       - 'docs/map1-representative-newest.sql'
       - 'docs/map1-representative-newest.rollback.sql'
+      - 'docs/map1-representative-pick.sql'
+      - 'docs/map1-representative-pick.rollback.sql'
       - 'test/n5_generation_pg/**'
       - 'test/n5-generation-publish.test.mjs'
       - 'scripts/n5_orchestrate.py'
@@ -121,6 +123,14 @@ jobs:
         run: |
           set -o pipefail
           python3 test/n5_generation_pg/run_map1_representative.py 2>&1 | tee /tmp/map1-representative.log
+
+      - name: Run Map 1's stored-pick proof (docs/map1-representative-pick.sql, base + cost + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_pick.py 2>&1 | tee /tmp/map1-pick.log
 
       - name: Run Part G's rollback proof (undo, refuse twice, re-apply)
         if: always()
