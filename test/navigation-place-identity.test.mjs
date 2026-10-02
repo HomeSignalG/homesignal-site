@@ -75,11 +75,12 @@ ok(!/locLabel/.test(cpage),
   'the ZIP hub does not write the top-bar label directly — it goes through the shared API',
   (cpage.match(/.{0,40}locLabel.{0,40}/) || [])[0]);
 
-console.log('--- Fix 6 did not grow the sidebar or add a place label to it ---');
-const navBlock = (shellHtml.match(/<nav class="nav" id="hs-nav">[\s\S]*?<\/nav>/) || [''])[0];
-ok(navBlock.length > 0, 'the sidebar block was found');
+console.log('--- Fix 6 did not grow the primary nav or add a place label to it ---');
+// The sidebar became the horizontal header's nav (founder, Revised Index Design, 2026-09-30).
+const navBlock = (shellHtml.match(/<nav class="hs-nav" id="hs-nav"[^>]*>[\s\S]*?<\/nav>/) || [''])[0];
+ok(navBlock.length > 0, 'the primary nav block was found');
 ok((navBlock.match(/<a /g) || []).length === 3,
-  'the sidebar is EXACTLY THREE primary items (v3)', (navBlock.match(/data-nav="[a-z]+"/g) || []));
+  'the primary nav is EXACTLY THREE items (v3)', (navBlock.match(/data-nav="[a-z]+"/g) || []));
 ok(!/href="community\.html"/.test(navBlock),
   'the ZIP hub is still not a primary sidebar item');
 // A persistent sidebar place label is explicitly deferred — the place lives in Viewing.

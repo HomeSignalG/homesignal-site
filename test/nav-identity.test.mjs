@@ -13,7 +13,9 @@
 //
 // The mechanism it protects, in shell.js::injectShell:
 //   const nav = document.body.dataset.nav;
-//   document.querySelector('.nav a[data-nav="' + nav + '"]').classList.add('on');
+//   document.querySelector('.hs-nav a[data-nav="' + nav + '"]').classList.add('on');
+// The sidebar became a horizontal header on 2026-09-30 (founder, Revised Index Design); the
+// mechanism is the same: one token in, one lit link out.
 // One token in, one highlighted link out. So a page's token IS its navigation identity.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -41,19 +43,19 @@ const HIDDEN_SECTIONS = {};
 
 // ── the sidebar, as shipped ──────────────────────────────────────────────────────────────
 const shellHtml = read('partials/shell.html');
-const navBlock = (shellHtml.match(/<nav class="nav"[\s\S]*?<\/nav>/) || [''])[0];
-ok(navBlock.length > 0, 'the shared sidebar block is present in partials/shell.html');
+const navBlock = (shellHtml.match(/<nav class="hs-nav"[\s\S]*?<\/nav>/) || [''])[0];
+ok(navBlock.length > 0, 'the shared header nav block is present in partials/shell.html');
 
 const NAV = [];
 const linkRe = /<a\s+href="([^"]+)"[^>]*data-nav="([^"]*)"/g;
 let m;
 while ((m = linkRe.exec(navBlock))) NAV.push({ href: m[1], token: m[2] });
-ok(NAV.length === 3, 'v3 the sidebar is EXACTLY THREE primary items', NAV);
+ok(NAV.length === 3, 'v3 the primary nav is EXACTLY THREE items', NAV);
 ok(NAV.map((n) => n.token).join('|') === 'explore|props|enterprise',
   'v3 ...in order: Explore, My Places, Enterprise', NAV.map((n) => n.token));
 ok(NAV.map((n) => n.href).join('|') === 'index.html|properties.html|development-activity.html',
   'v3 ...pointing at index.html, properties.html and development-activity.html', NAV.map((n) => n.href));
-ok(/<a class="logo" href="index\.html">/.test(shellHtml),
+ok(/<a class="hs-brand" href="index\.html">/.test(shellHtml),
   'v3 the HomeSignal logo opens Explore (index.html)');
 
 const tokenForHref = Object.create(null);
@@ -119,9 +121,12 @@ const tokenOf = (f) => (declared.find((d) => d.file === f) || {}).token;
 // page belongs to, never the page that linked to it: Map 1 reached from My Places still
 // lights Explore. Do NOT re-add a Maps, Development, Dashboard or Alerts entry to make an
 // old pin green.
-for (const f of ['index.html', 'community.html', 'homesignalmap.html', 'development.html'])
-  ok(tokenOf(f) === 'explore', 'v3 ' + f + ' is an Explore page', tokenOf(f));
-for (const f of ['properties.html', 'property.html', 'dashboard.html', 'alerts.html', 'reports.html'])
+// The Revised Index Design (founder, 2026-09-30, audited against a later main than v3) moved
+// property.html and reports.html into the Explore group: "active state on index/community/
+// property/homesignalmap/development/reports = Explore; properties/dashboard/alerts = My Places".
+for (const f of ['index.html', 'community.html', 'homesignalmap.html', 'development.html', 'property.html', 'reports.html'])
+  ok(tokenOf(f) === 'explore', f + ' is an Explore page', tokenOf(f));
+for (const f of ['properties.html', 'dashboard.html', 'alerts.html'])
   ok(tokenOf(f) === 'props', 'v3 ' + f + ' sits under My Places', tokenOf(f));
 ok(tokenOf('development-activity.html') === 'enterprise',
   'v3 development-activity.html lights Enterprise', tokenOf('development-activity.html'));
@@ -216,8 +221,8 @@ const propSrc    = read('property.html');
 const reportsCode = strip(reportsSrc);   // the pins about what the page DOES read this one
 
 // It is a real page on the shared shell, not a stub and not a bespoke error screen.
-ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="props">/.test(reportsSrc),
-  'reports.html is a real page on the shared shell (#hs-content), under My Places');
+ok(/<template id="hs-content">/.test(reportsSrc) && /<body data-nav="explore">/.test(reportsSrc),
+  'reports.html is a real page on the shared shell (#hs-content), in the Explore group');
 ok(!/location\.replace/.test(reportsSrc),
   'reports.html no longer redirects — a resident who clicks the CTA lands here');
 
@@ -287,8 +292,9 @@ ok(!/myZip|viewZip|DEFAULT_ZIP|activeProperty/.test(reportsLogic),
 const shellJs = read('shell.js');
 ok(/document\.body\.dataset\.nav/.test(shellJs),
   'shell.js still reads the page\'s declared identity');
-ok(/\.nav a\[data-nav="'\s*\+\s*nav\s*\+\s*'"\]/.test(shellJs) && /classList\.add\('on'\)/.test(shellJs),
-  'shell.js still lights exactly the one sidebar link that matches it');
+ok(/\.hs-nav a\[data-nav="'\s*\+\s*nav\s*\+\s*'"\]/.test(shellJs) && /classList\.add\('on'\)/.test(shellJs)
+   && /setAttribute\('aria-current', 'page'\)/.test(shellJs),
+  'shell.js still lights exactly the one nav link that matches it, and marks it aria-current="page"');
 
 console.log(fails ? '\n' + fails + ' nav-identity assertion(s) FAILED.' : '\nAll nav-identity assertions passed.');
 process.exit(fails ? 1 : 0);

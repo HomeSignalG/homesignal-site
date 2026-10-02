@@ -110,7 +110,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 
 async function go(path) {
   const url = path.startsWith('http') ? path : base + path;

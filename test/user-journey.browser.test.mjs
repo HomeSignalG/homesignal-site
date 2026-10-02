@@ -169,12 +169,14 @@ await page.route('**/*', async (route) => {
 
 // What the shared chrome is telling the resident, right now.
 const chrome = () => page.evaluate(() => {
-  const on = [].slice.call(document.querySelectorAll('.nav a.on'));
-  const el = document.getElementById('locLabel');
+  const on = [].slice.call(document.querySelectorAll('.hs-nav a.on'));
+  // The Viewing chip left the global header (founder, Revised Index Design, 2026-09-30); the
+  // decision it painted is HS.viewingLabel(), the one place the shell still makes it.
+  const vl = (window.HS && HS.viewingLabel) ? HS.viewingLabel() : null;
   return {
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
-    locLabel: el ? el.textContent.trim() : null,
+    locLabel: vl ? vl.text.trim() : null,
     kDev: (document.getElementById('kDev') || {}).textContent || null,
     kFac: (document.getElementById('kFac') || {}).textContent || null,
     totalTileShown: (() => { const t = document.getElementById('ccTot');
@@ -184,13 +186,13 @@ const chrome = () => page.evaluate(() => {
     hero: (document.querySelector('.sub') || {}).textContent || '',
     facMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance !== 'development').length,
     devMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance === 'development').length,
-    locTitle: (() => { const w = el && el.closest('.loc'); return w ? (w.getAttribute('title') || '') : ''; })(),
+    locTitle: vl ? (vl.title || '') : '',
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
       ? { address: HS.state.activeProperty.address, zip: HS.state.activeProperty.zip } : null,
     path: location.pathname, search: location.search
   };
 });
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 // Sign-in state cannot be created offline, so the REAL saved home is installed directly into
 // the shipped state and repainted through the shipped path (HS.setViewLabel -> paintTopbar).
 const installSavedHome = (home) => page.evaluate((h) => {
@@ -270,11 +272,11 @@ ok(z.distances === 0, '6 no radius distance is attached in ZIP mode', z.distance
 // on, and the two IN-PRODUCT paths A-021 kept are exercised in its place.
 await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
-ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
-  '3 there is no Maps sidebar entry (A-021, kept by plan v3)');
-ok(await page.locator('.nav a').count() === 3,
-  '3 ...and the sidebar is the three primary items (plan v3)', await page.locator('.nav a').count());
-ok((await page.locator('.nav a').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+ok(await page.locator('.hs-nav a[data-nav="maps"]').count() === 0,
+  '3 there is no Maps primary item (A-021, kept by plan v3)');
+ok(await page.locator('.hs-nav a').count() === 3,
+  '3 ...and the primary nav is the three items (plan v3)', await page.locator('.hs-nav a').count());
+ok((await page.locator('.hs-nav a').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
      === 'explore|props|enterprise',
   '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
 // The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
@@ -306,7 +308,7 @@ const dash = await page.evaluate(() => {
     strip: document.querySelectorAll('#dashStrip').length,
     main: heads(main), rail: heads(rail),
     text: document.body.innerText,
-    viewing: (document.getElementById('locLabel') || {}).textContent || ''
+    viewing: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : ''
   };
 });
 info('4 Dashboard structure', { main: dash.main, rail: dash.rail, viewing: dash.viewing });
