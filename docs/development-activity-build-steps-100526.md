@@ -76,8 +76,20 @@ through once each step is complete").
      - An empty report says "No data ingested" in plain words.
      - The review page shows the founder whether a customer would be charged.
      - Nothing is charged yet.
-   - **5b. Trial reports.** The report function serves invited trial members the customer view, and calls the
-     database's `evaluation_report_issue` only when the rule says a report uses a free report.
+   - ~~**5b. Trial reports.**~~ *(Done: #1581 merged as `41ca4b9`.*
+     - *`get-development-activity-report` was deployed from `main` by run `37055169415`: version 5 → 6 at
+       2026-10-02 19:36Z. All 11 deployed files read back byte-identical to `main`, and the JWT check is still on.*
+     - *`follow-development-report` shares two of the changed files (`admin-gate.ts`, `service-rest.ts`), so it was
+       redeployed from `main` too, by run `37055431044`: version 1 → 2 at 19:39Z. All 11 of its files read back
+       byte-identical to `main`.*
+     - *Live probe 19:38Z: the capability answer now names invited trial members (customer view only) and says only a
+       charged trial report is stored. A call with no token, and a call with only the public key, are both refused
+       with 401. Follow's probe at 19:39Z, after its redeploy, is unchanged: capability 200, the public key refused with 401.*
+     - *Production still holds 0 evaluations, 0 credits and 0 stored reports, so nobody can reach the trial path
+       yet. `report-rights.json` still clears no source, so every report is "No data ingested": free and not stored.)*
+     - The report function serves invited trial members the customer view, and calls the database's
+       `evaluation_report_issue` only when the rule says a report uses a free report.
+     - Open before step 13: there is no rate limit on free trial reports.
    - **5c. The customer page.** Invite link, sign-in, make a report, "reports remaining".
    - **5d. Creating a trial.** An admin way to create a brokerage's trial and its owner invite.
 6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
