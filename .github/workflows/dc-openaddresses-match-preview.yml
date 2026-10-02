@@ -1,0 +1,68 @@
+name: dc-openaddresses-match-preview
+
+# READ-ONLY. How many of the data-centre addresses the shared geocoder ladder could not match would the
+# OpenAddresses loader's points match? Writes NOTHING: the evidence is read in a read-only SQL step, the
+# loader runs in DRY_RUN with a dummy key (it never reaches the database when ZIPS and STATES are given),
+# and the report is printed to the job log. Decision input only; loading is a separate, explicit act.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-openaddresses-match-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Read the failing addresses (READ ONLY transaction)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          PGOPTIONS='-c default_transaction_read_only=on' \
+            psql "$SUPABASE_DB_URL" -X -q -tA -v ON_ERROR_STOP=1 -P pager=off \
+                 -f docs/dc-openaddresses-failing-inputs.sql > /tmp/dc-failing.tsv
+          echo "failing addresses read: $(grep -c . /tmp/dc-failing.tsv)"
+          test "$(grep -c . /tmp/dc-failing.tsv)" -gt 0
+
+      - name: Derive the ZIP and state scope from those addresses
+        id: scope
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import re
+          zips, states = set(), set()
+          for line in open("/tmp/dc-failing.tsv", encoding="utf-8"):
+              m = re.search(r", ([A-Za-z]{2}) (\d{5})", line.split("\t")[0])
+              if m:
+                  states.add(m.group(1).upper()); zips.add(m.group(2))
+          assert zips and states, "no ZIP/state could be parsed - refusing"
+          print("zips=" + ",".join(sorted(zips)))
+          print("states=" + ",".join(sorted(states)))
+          PY
+
+      - name: Dry-run the loader and print the match preview (writes nothing)
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: dry-run-unused
+          DRY_RUN: '1'
+          ZIPS: ${{ steps.scope.outputs.zips }}
+          STATES: ${{ steps.scope.outputs.states }}
+          DC_FAILING_FILE: /tmp/dc-failing.tsv
+        run: python3 scripts/load-openaddresses.py

@@ -226,30 +226,19 @@ def dc_hit_report(failing: dict, loaded: set) -> dict:
     return {"failing": len(failing), "with_unit": with_unit, "exact": exact, "unit_only": unit_only}
 
 
-def dc_failing_queries() -> dict:
-    """{geocoder_query: canonical_addr} for every admitted data-centre query the ladder rejected as
-    REJECTED_NO_MATCH. Paginated (PostgREST silently caps at 1,000 rows)."""
-    failing_q = set()
-    off = 0
-    while True:
-        rows = rest_get("dc_observation_derived_point?select=geocoder_query&verdict=eq.REJECTED_NO_MATCH"
-                        f"&admitted=eq.true&geocoder_query=not.is.null&limit=1000&offset={off}&order=geocoder_query")
-        failing_q.update(r["geocoder_query"] for r in rows)
-        if len(rows) < 1000:
-            break
-        off += 1000
-    canon, off = {}, 0
-    while True:
-        rows = rest_get("dc_address_geocode?select=geocoder_query,canonical_addr&limit=1000"
-                        f"&offset={off}&order=derivation_id")
-        for r in rows:
-            if r["geocoder_query"] in failing_q and r.get("canonical_addr"):
-                canon[r["geocoder_query"]] = r["canonical_addr"]
-        if len(rows) < 1000:
-            break
-        off += 1000
-    return canon
-
+def read_failing_file(path: str) -> dict:
+    """{geocoder_query: canonical_addr} from a tab-separated file written by the workflow's READ-ONLY
+    SQL step (docs/dc-openaddresses-failing-inputs.sql). This script never reads the evidence tables
+    itself: it sits under scripts/, which the Step 2A isolation gate treats as resident-facing."""
+    out = {}
+    for line in open(path, encoding="utf-8"):
+        line = line.rstrip("\n")
+        if not line.strip():
+            continue
+        q, _, canon = line.partition("\t")
+        if q and canon:
+            out[q] = canon
+    return out
 
 # ── upsert ───────────────────────────────────────────────────────────────────────────────────
 def upsert(rows: list) -> int:
@@ -332,8 +321,8 @@ def main() -> int:
     print(f"  distinct canonical addresses: {len(seen)}")
     print(f"  rows written:                 {total_written}")
     print(f"  quarantined member errors:    {quarantined}")
-    if DRY_RUN and os.environ.get("CHECK_DC_FAILURES", "").strip() == "1":
-        failing = dc_failing_queries()
+    if DRY_RUN and os.environ.get("DC_FAILING_FILE", "").strip():
+        failing = read_failing_file(os.environ["DC_FAILING_FILE"].strip())
         rep = dc_hit_report(failing, seen)
         print("\nDATA-CENTRE ADDRESS MATCH PREVIEW (read-only)")
         print(f"  addresses the ladder could not match:        {rep['failing']}")

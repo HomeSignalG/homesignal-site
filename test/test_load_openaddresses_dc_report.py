@@ -28,4 +28,12 @@ chk("an absent address is neither", "q-d" in r["exact"] + r["unit_only"], False)
 chk("failing and with_unit are counted", (r["failing"], r["with_unit"]), (4, 1))
 chk("control: an empty loaded set reports zero hits", oa.dc_hit_report({"q-a": A}, set())["exact"], [])
 chk("control: a loaded unit-bearing key IS an exact hit", oa.dc_hit_report({"q-c": C}, {C})["exact"], ["q-c"])
+import tempfile
+with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8") as f:
+    f.write("1 A St, Dallas, TX 75201\t1 A ST, DALLAS, TX 75201\n\n2 B St, Reno, NV 89434\t2 B ST, RENO, NV 89434\nmalformed-line-no-tab\n")
+got = oa.read_failing_file(f.name)
+chk("read_failing_file keeps tab-separated rows, skips blanks and malformed lines", got, {"1 A St, Dallas, TX 75201": "1 A ST, DALLAS, TX 75201", "2 B St, Reno, NV 89434": "2 B ST, RENO, NV 89434"})
+os.unlink(f.name)
+src = open(os.path.join(os.path.dirname(__file__), "..", "scripts", "load-openaddresses.py"), encoding="utf-8").read()
+chk("the script names no evidence table (the Step 2A isolation gate treats scripts/ as resident-facing)", [n for n in ("dc_observation_derived_point", "dc_address_geocode", "dc_source_observation") if n in src], [])
 sys.exit(1 if fails else 0)
