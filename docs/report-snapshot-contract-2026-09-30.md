@@ -239,6 +239,10 @@ first unit, the way Order F was the first unit of the snapshot.
 
 ### 8.7 Applying it (a separate step with its own go; this change does not apply it)
 
+**UPDATE 2026-10-02: the go was given and J1 was applied** (`db-sql.yml` run `37015952315` from `main` `eb33f50`: all five function bodies md5-equal to the file, both tables empty, row level
+security on, no policy, `SELECT` to `service_role` only; status file, "Applied to production"). The text below is the dated pre-apply text; it says to apply "with the stored migration" fingerprinted,
+and this path stores no ledger row, so the fingerprint was taken on the function bodies instead.
+
 `docs/report-share.sql` is additive and idempotent, refuses to run unless `public.report_snapshot` exists, and ends with the
 statements that remove it. Apply it the way Orders F and F2 were applied: from the committed file, with the stored migration
 text's md5 compared to the file's md5 afterwards, and a read-back of owner, RLS, privileges (asked of the database with

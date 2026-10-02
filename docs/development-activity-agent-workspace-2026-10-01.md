@@ -7,7 +7,8 @@ Owner/Admin Visual Contract, Workspace Navigation Separation) and Hard Rules 30 
 
 SQL of record: `docs/brokerage-account-spine.sql` — **PARKED, NOT APPLIED to production.** Applying new schema to production
 needs its own founder go (CLAUDE.md §3 stop list; the earlier schema orders each recorded one). Nothing in this unit calls, reads or
-writes the new tables.
+writes the new tables. **UPDATE 2026-10-02: the go was given and the spine was applied** (`db-sql.yml` run `37015869854`, both function bodies md5-equal to the file, both tables empty,
+row level security on, no policy; status file, "Applied to production"). The text above is the dated pre-apply text.
 
 ## 1. What this is, in one paragraph
 
