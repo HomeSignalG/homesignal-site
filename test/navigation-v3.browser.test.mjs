@@ -437,15 +437,21 @@ ok(JSON.stringify(ent.lit) === JSON.stringify(['enterprise']), '7 ...and lights 
 
 // ═══ 8. The Explore dropdown (founder, 2026-10-02) ═══
 // "Quality of Life Impact" (development.html), "Development Map" (homesignalmap.html) and
-// "Activity" (community.html), under Explore in the header. Wide: the ▾ button opens it; an
-// entry, Escape or a click outside closes it. The current page's entry is marked, and every
-// entry carries the viewed ZIP. Compact: the Menu panel lists the three under Explore.
+// "Activity" (community.html), under Explore in the header. Wide: hovering Explore opens it
+// ("if you hover over explore the drop down should be obvious"); the chevron beside Explore
+// opens it too, and then an entry, Escape or a click outside closes it. The current page's
+// entry is marked, and every entry carries the viewed ZIP. Compact: the Menu panel lists the
+// three under Explore. The mouse is parked away from the header before every "closed" check,
+// because hovering is itself a way to open it.
 console.log('--- 8. the Explore dropdown ---');
 const dropdown = (page) => page.evaluate(() => {
   const sub = document.getElementById('hs-explore-sub');
   const links = sub ? [...sub.querySelectorAll('a')] : [];
   const r = sub ? sub.getBoundingClientRect() : null;
   const btn = document.getElementById('hs-explore-toggle');
+  const svg = btn && btn.querySelector('svg');
+  const sr = svg ? svg.getBoundingClientRect() : { width: 0, height: 0 };
+  const br = btn ? btn.getBoundingClientRect() : { width: 0, height: 0 };
   return {
     open: !!sub && getComputedStyle(sub).display !== 'none' && r.height > 0,
     labels: links.map((a) => a.textContent.trim()),
@@ -453,21 +459,26 @@ const dropdown = (page) => page.evaluate(() => {
     navs: links.map((a) => a.getAttribute('data-nav')),
     current: links.filter((a) => getComputedStyle(a).fontWeight === '600').map((a) => a.getAttribute('data-sub')),
     caret: !!btn && getComputedStyle(btn).display !== 'none',
+    chevron: Math.round(sr.width) + 'x' + Math.round(sr.height),
+    button: Math.round(br.width) + 'x' + Math.round(br.height),
     expanded: btn ? btn.getAttribute('aria-expanded') : null,
     focusOnCaret: document.activeElement === btn,
     lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),
   };
 });
+const away = () => D.page.mouse.move(640, 700);
 const zipOf = (h) => ((h || '').match(/[?&]zip=(\d{5})/) || [])[1] || null;
 for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/homesignalmap.html?zip=78617', 'map'], ['/community.html?zip=78617', 'activity']]) {
+  await away();
   await D.page.goto(base + path, { waitUntil: 'domcontentloaded' });
   await waitReady(D.page);
   await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
   let d = await dropdown(D.page);
-  ok(!d.open && d.caret && d.expanded === 'false', '8 ' + path + ': the dropdown starts closed, with its ▾ button beside Explore', d);
-  await D.page.click('#hs-explore-toggle');
+  ok(!d.open && d.caret && d.expanded === 'false', '8 ' + path + ': the dropdown starts closed, with its chevron beside Explore', d);
+  ok(d.chevron === '18x18' && d.button === '30x44', '8 ' + path + ': ...an 18px chevron on a 30x44 button, big enough to see and to tap', d);
+  await D.page.hover('#hs-nav a[data-nav="explore"]');
   d = await dropdown(D.page);
-  ok(d.open && d.expanded === 'true', '8 ' + path + ': the ▾ button opens it', d);
+  ok(d.open, '8 ' + path + ': hovering Explore opens it', d);
   ok(d.labels.join('|') === 'Quality of Life Impact|Development Map|Activity', '8 ' + path + ': ...listing the three pages by their names', d.labels);
   ok(d.hrefs.map((h) => h.split('?')[0]).join('|') === 'development.html|homesignalmap.html|community.html'
      && d.hrefs.every((h) => zipOf(h) === '78617'),
@@ -475,42 +486,57 @@ for (const [path, want] of [['/development.html?zip=78617', 'qol'], ['/homesigna
   ok(d.navs.every((n) => n === null) && JSON.stringify(d.lit) === JSON.stringify(['explore']),
     '8 ' + path + ': ...without lighting any section but Explore', d);
   ok(JSON.stringify(d.current) === JSON.stringify([want]), '8 ' + path + ': ...and marks "' + want + '" as the current page', d.current);
+  await D.page.hover('#hs-explore-sub a[data-sub="activity"]');
+  d = await dropdown(D.page);
+  ok(d.open, '8 ' + path + ': ...and stays open while the pointer moves down into it', d);
+  await away();
+  d = await dropdown(D.page);
+  ok(!d.open, '8 ' + path + ': moving the pointer away closes it', d);
 }
 // Following an entry lands on that page, for the same ZIP.
+await away();
 await D.page.goto(base + '/development.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
-await D.page.click('#hs-explore-toggle');
+await D.page.hover('#hs-nav a[data-nav="explore"]');
 await Promise.all([D.page.waitForURL(/community\.html\?zip=78617/, { timeout: 30000 }), D.page.click('#hs-explore-sub a[data-sub="activity"]')]);
 ok(/\/community\.html\?zip=78617$/.test(new URL(D.page.url()).pathname + new URL(D.page.url()).search),
   '8 clicking Activity opens the ZIP page for the same ZIP', D.page.url());
-// The button closes it again; Escape and a click outside close it too.
+// The chevron opens it without hovering (touch, keyboard) and closes it again; Escape and a
+// click outside close it too.
 await waitReady(D.page);
 await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
 await D.page.click('#hs-explore-toggle');
-await D.page.click('#hs-explore-toggle');
+await away();
 let dd = await dropdown(D.page);
-ok(!dd.open && dd.expanded === 'false', '8 the ▾ button closes it again', dd);
+ok(dd.open && dd.expanded === 'true', '8 the chevron opens it, and it stays open after the pointer leaves', dd);
 await D.page.click('#hs-explore-toggle');
+await away();
+dd = await dropdown(D.page);
+ok(!dd.open && dd.expanded === 'false', '8 the chevron closes it again', dd);
+await D.page.click('#hs-explore-toggle');
+await away();
 await D.page.keyboard.press('Escape');
 dd = await dropdown(D.page);
-ok(!dd.open && dd.expanded === 'false' && dd.focusOnCaret, '8 Escape closes it and returns focus to the ▾ button', dd);
+ok(!dd.open && dd.expanded === 'false' && dd.focusOnCaret, '8 Escape closes it and returns focus to the chevron', dd);
 await D.page.click('#hs-explore-toggle');
 await D.page.mouse.click(640, 700);
 dd = await dropdown(D.page);
 ok(!dd.open && dd.expanded === 'false', '8 a click outside closes it', dd);
 // Off Explore it works the same, with no entry marked current.
 for (const path of ['/properties.html', '/index.html']) {
+  await away();
   await D.page.goto(base + path, { waitUntil: 'domcontentloaded' });
   await waitReady(D.page);
   await D.page.waitForSelector('#hs-explore-toggle', { state: 'attached', timeout: 30000 });
   dd = await dropdown(D.page);
   ok(!dd.open && dd.caret, '8 ' + path + ': the dropdown starts closed', dd);
-  await D.page.click('#hs-explore-toggle');
+  await D.page.hover('#hs-nav a[data-nav="explore"]');
   dd = await dropdown(D.page);
-  ok(dd.open && dd.current.length === 0 && dd.labels.length === 3, '8 ' + path + ': the ▾ button opens it, with no entry marked current', dd);
+  ok(dd.open && dd.current.length === 0 && dd.labels.length === 3, '8 ' + path + ': hovering Explore opens it, with no entry marked current', dd);
 }
-// Compact: the Menu panel lists the three pages under Explore, with no ▾ button. Measured on
+await away();
+// Compact: the Menu panel lists the three pages under Explore, with no chevron. Measured on
 // the ZIP page: Map 1 at 390px already scrolls sideways by 29px with the menu closed (its
 // view switcher, the same on main), which is not this menu's to fix.
 {
@@ -532,7 +558,7 @@ for (const path of ['/properties.html', '/index.html']) {
   ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|Enterprise',
     '8 phone: the Menu panel lists the three pages under Explore', m.items);
   ok(!m.caret && JSON.stringify(m.current) === JSON.stringify(['activity']) && m.minH >= 44 && m.overflow === 0,
-    '8 phone: no ▾ button, the current page marked, 44px targets, no sideways scroll', m);
+    '8 phone: no chevron, the current page marked, 44px targets, no sideways scroll', m);
   await M.ctx.close();
 }
 

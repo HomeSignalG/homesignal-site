@@ -611,12 +611,14 @@ body.onboarding-lock{overflow:hidden}
 .hs-header__menu{display:none;width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px;color:var(--ink-2);align-items:center;justify-content:center;flex:none}
 .hs-header a:focus-visible,.hs-header button:focus-visible,.hs-footer a:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
 /* The Explore dropdown (founder, 2026-10-02): Quality of Life Impact, Development Map,
-   Activity. Wide: the ▾ button opens a menu under Explore (shell.js sets .open). The page
-   you are on is marked through body[data-explore]. */
-.hs-navgroup{position:relative;display:flex;align-items:center;gap:2px}
-.hs-navcaret{display:inline-flex;align-items:center;justify-content:center;width:28px;height:44px;padding:0;border:none;border-radius:8px;background:transparent;font-size:13px;color:var(--ink-2);cursor:pointer;transition:transform .15s}
-.hs-navcaret:hover{background:var(--line-2);color:var(--ink)}
-.hs-navgroup.open .hs-navcaret{transform:rotate(180deg)}
+   Activity. Wide: hovering Explore opens a menu under it; the chevron beside Explore opens
+   it too (shell.js sets .open), for touch and keyboard. The page you are on is marked
+   through body[data-explore]. */
+.hs-navgroup{position:relative;display:flex;align-items:center;gap:0}
+.hs-navcaret{display:inline-flex;align-items:center;justify-content:center;width:30px;height:44px;margin-left:2px;padding:0;border:none;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer}
+.hs-navcaret svg{width:18px;height:18px;transition:transform .15s}
+.hs-navcaret:hover{background:var(--line-2)}
+.hs-navgroup.open .hs-navcaret svg{transform:rotate(180deg)}
 .hs-navsub{display:none;position:absolute;top:100%;left:-12px;z-index:60;min-width:230px;padding:6px;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 .hs-navgroup.open .hs-navsub{display:flex}
 .hs-nav .hs-navsub a{min-height:40px;padding:0 12px;border-radius:8px;font-size:14px;color:var(--ink-2);white-space:nowrap}
@@ -624,6 +626,11 @@ body.onboarding-lock{overflow:hidden}
 body[data-explore="qol"] .hs-navsub a[data-sub="qol"],
 body[data-explore="map"] .hs-navsub a[data-sub="map"],
 body[data-explore="activity"] .hs-navsub a[data-sub="activity"]{font-weight:600;color:var(--ink);box-shadow:inset 3px 0 0 var(--green)}
+@media (hover:hover) and (min-width:1024px){
+  .hs-navgroup:hover .hs-navsub{display:flex}
+  .hs-navgroup:hover .hs-navcaret svg{transform:rotate(180deg)}
+  .hs-navgroup:hover > a{color:var(--ink)}
+}
 @media (max-width:1023px){
   .hs-header__inner{padding:0 24px}
   .hs-header__menu{display:inline-flex}
