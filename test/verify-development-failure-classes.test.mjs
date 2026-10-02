@@ -144,7 +144,7 @@ const repFac = (n, unavailable) => ({
 }
 {
   const f = assertZip('78617', { counts: {}, sites: [] }, false, state({ shell: false, rendered: [] })).fails;
-  ok(has(f, /sidebar shell did not render/), 'the shell check still fires');
+  ok(has(f, /site header shell did not render/), 'the shell check still fires');
 }
 
 // ---- CLASS C, the product's own receipt ------------------------------------------------

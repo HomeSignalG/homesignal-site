@@ -41,7 +41,7 @@ const failedPageKey = (msg) => {
 };
 // Verbatim shapes from scripts/lib/verify-dev-helpers.mjs and verify-development.mjs.
 const fails = [
-  'ZIP 19350: new sidebar shell did not render (old layout?)',
+  'ZIP 19350: site header shell did not render (old layout?)',
   'ZIP 19350: robots="index, follow" (indexable=true) violates the substance gate (expected noindex; flag=true, sites=0)',
   'ZIP 19350: 3 record(s) whose label contradicts its dot colour [a, b, c] (stage/colour must agree)',
   'RUN-REPORT 19350: engine HTTP 500',

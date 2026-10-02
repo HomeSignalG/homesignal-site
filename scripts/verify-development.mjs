@@ -268,7 +268,7 @@ async function renderZipPage(page, zip) {
       zipFacilities: window.__HS_ZIP_FACILITIES || null,
       mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
       mislabeled,
-      shell: !!document.querySelector('.side, .nav'),                 // new left-sidebar shell present
+      shell: !!document.querySelector('#hs-top .hs-nav a'),           // the shared header shell (#1562)
       robots: rm ? (rm.getAttribute('content') || '') : '',
     };
   });
@@ -539,7 +539,7 @@ async function main() {
     [/malformed record_url/,                     'malformed-record_url'],
     [/rendered as a precise point/,              'jurisdiction-scope-as-point'],
     [/UNRECOGNISED\s+lifecycle/,                  'unrecognised-lifecycle'],
-    [/sidebar shell did not render/,             'shell-missing'],
+    [/site header shell did not render/,         'shell-missing'],
     [/map did not initialize/,                   'map-dead'],
     [/^TIME BUDGET/,                             'run-truncated'],
   ];
