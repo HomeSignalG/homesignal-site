@@ -107,6 +107,57 @@ function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * Everything both writers check BEFORE the database is asked: the shapes, the subject-relative keys, the body and its hash. ONE
+ * definition, so the evaluation path (issueEvaluationReport) can never store a body this module would refuse.
+ */
+async function prepare(
+  who: string,
+  intelligence: Record<string, unknown>,
+  privateContext: PrivateContext | null,
+  opts: { reportVersion: string; engineInputs: Record<string, unknown> },
+): Promise<{ body: string; contentHash: string }> {
+  if (!isObject(intelligence)) throw new Error(who + ': the intelligence must be an object');
+  if (typeof opts.reportVersion !== 'string' || !opts.reportVersion.trim()) {
+    throw new Error(who + ': reportVersion is required');
+  }
+  if (!isObject(opts.engineInputs)) throw new Error(who + ': engineInputs must be an object');
+  if (privateContext !== null) {
+    if (!isObject(privateContext) || typeof privateContext.address !== 'string' || !privateContext.address.trim()) {
+      throw new Error(who + ': a private context must be an object with a non-blank address (pass null when there is none)');
+    }
+  }
+
+  const body = snapshotBodyOf(intelligence);
+  if (privateContext !== null) {
+    const leaked = subjectRelativeKeys(JSON.parse(body));
+    if (leaked.length) {
+      throw new Error(who + ': the permanent body carries measurements taken from the subject property (' + leaked.join(', ')
+        + '); they are derived from the private point and would locate it. Compute them at render time from the private context.');
+    }
+  }
+  return { body, contentHash: await sha256Hex(body) };
+}
+
+/** The database's answer about the stored row, checked the same way for both writers. */
+function confirmedRow(who: string, data: unknown, privateContext: PrivateContext | null) {
+  const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
+  if (!isObject(row)) throw new Error(who + ': the database did not return exactly one stored snapshot');
+  const reportId = row.report_id;
+  const generatedAt = row.generated_at;
+  const contextId = row.private_context_id ?? null;
+  if (typeof reportId !== 'string' || !UUID_V4.test(reportId)) {
+    throw new Error(who + ': the database returned no well-formed report_id');
+  }
+  if (typeof generatedAt !== 'string' || Number.isNaN(Date.parse(generatedAt))) {
+    throw new Error(who + ': the database returned no generated_at');
+  }
+  if (privateContext !== null ? (typeof contextId !== 'string' || !UUID_V4.test(contextId)) : contextId !== null) {
+    throw new Error(who + ': the database did not confirm the private context it was given');
+  }
+  return { row, reportId: reportId as string, generatedAt: generatedAt as string, contextId: contextId as string | null };
+}
+
+/**
  * Store one report and return its envelope. Fails closed: if the database did not confirm a stored
  * row with a well-formed id (and, when a private context was supplied, a well-formed reference to it),
  * nothing is returned, so a caller can never hand out a report_id that does not exist. Issuing the same
@@ -122,26 +173,7 @@ export async function issueSnapshot(
   privateContext: PrivateContext | null,
   opts: { reportVersion: string; engineInputs: Record<string, unknown> },
 ): Promise<SnapshotEnvelope> {
-  if (!isObject(intelligence)) throw new Error('issueSnapshot: the intelligence must be an object');
-  if (typeof opts.reportVersion !== 'string' || !opts.reportVersion.trim()) {
-    throw new Error('issueSnapshot: reportVersion is required');
-  }
-  if (!isObject(opts.engineInputs)) throw new Error('issueSnapshot: engineInputs must be an object');
-  if (privateContext !== null) {
-    if (!isObject(privateContext) || typeof privateContext.address !== 'string' || !privateContext.address.trim()) {
-      throw new Error('issueSnapshot: a private context must be an object with a non-blank address (pass null when there is none)');
-    }
-  }
-
-  const body = snapshotBodyOf(intelligence);
-  if (privateContext !== null) {
-    const leaked = subjectRelativeKeys(JSON.parse(body));
-    if (leaked.length) {
-      throw new Error('issueSnapshot: the permanent body carries measurements taken from the subject property (' + leaked.join(', ')
-        + '); they are derived from the private point and would locate it. Compute them at render time from the private context.');
-    }
-  }
-  const contentHash = await sha256Hex(body);
+  const { body, contentHash } = await prepare('issueSnapshot', intelligence, privateContext, opts);
   const { data, error } = await rpc('report_snapshot_issue', {
     p_body: body,
     p_content_hash: contentHash,
@@ -151,20 +183,7 @@ export async function issueSnapshot(
   });
   if (error) throw new Error('issueSnapshot: the snapshot was not stored: ' + error.message);
 
-  const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
-  if (!isObject(row)) throw new Error('issueSnapshot: the database did not return exactly one stored snapshot');
-  const reportId = row.report_id;
-  const generatedAt = row.generated_at;
-  const contextId = row.private_context_id ?? null;
-  if (typeof reportId !== 'string' || !UUID_V4.test(reportId)) {
-    throw new Error('issueSnapshot: the database returned no well-formed report_id');
-  }
-  if (typeof generatedAt !== 'string' || Number.isNaN(Date.parse(generatedAt))) {
-    throw new Error('issueSnapshot: the database returned no generated_at');
-  }
-  if (privateContext !== null ? (typeof contextId !== 'string' || !UUID_V4.test(contextId)) : contextId !== null) {
-    throw new Error('issueSnapshot: the database did not confirm the private context it was given');
-  }
+  const { reportId, generatedAt, contextId } = confirmedRow('issueSnapshot', data, privateContext);
   return {
     report_id: reportId,
     content_hash: contentHash,
@@ -173,6 +192,74 @@ export async function issueSnapshot(
     private_context_id: contextId as string | null,
     // parsed from the stored text, so what is returned is what is stored
     report: JSON.parse(body),
+  };
+}
+
+// ── the evaluation path: a stored report that uses one of a brokerage's free reports (build step 5b) ─────────────────────
+//
+// public.evaluation_report_issue (docs/evaluation-entitlement.sql) stores the snapshot AND appends the credit in ONE transaction: it
+// is the only way a trial report is stored. The caller decides WHETHER to call it (_shared/credit-rule.ts, founder ruling R5); this
+// module only prepares the body exactly as issueSnapshot does and reads the answer back.
+
+/** The trial's 20 reports are used up (EV002). Nothing was stored and nothing was charged. */
+export class EvaluationComplete extends Error {}
+/** The person is not an active member of an active, unexpired evaluation (EV003). Nothing was stored and nothing was charged. */
+export class NotEntitled extends Error {}
+
+export type EvaluationCredit = { ordinal: number; credits_used: number; credits_remaining: number; evaluation_status: string };
+/**
+ * A NEW report: stored now and charged now, with the body this call prepared. A REPLAY: the same idempotency key was already
+ * charged, so the database returned the FIRST report's id and charged nothing; its body is the stored one, which the caller must
+ * read back (and must check it is the same property: the key is bound to the evaluation, never to the address, D-L6).
+ */
+export type EvaluationIssue =
+  | (SnapshotEnvelope & { replayed: false; credit: EvaluationCredit })
+  | { replayed: true; report_id: string; generated_at: string; private_context_id: string | null; credit: EvaluationCredit };
+
+const UUID_ANY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export async function issueEvaluationReport(
+  rpc: SnapshotRpc,
+  who: { userId: string; idempotencyKey: string },
+  intelligence: Record<string, unknown>,
+  privateContext: PrivateContext | null,
+  opts: { reportVersion: string; engineInputs: Record<string, unknown> },
+): Promise<EvaluationIssue> {
+  if (!who || typeof who.userId !== 'string' || !UUID_ANY.test(who.userId)) throw new Error('issueEvaluationReport: a user id is required');
+  if (typeof who.idempotencyKey !== 'string' || !UUID_V4.test(who.idempotencyKey)) throw new Error('issueEvaluationReport: a random (v4) idempotency key is required');
+  const { body, contentHash } = await prepare('issueEvaluationReport', intelligence, privateContext, opts);
+  const { data, error } = await rpc('evaluation_report_issue', {
+    p_user_id: who.userId,
+    p_idempotency_key: who.idempotencyKey,
+    p_body: body,
+    p_content_hash: contentHash,
+    p_report_version: opts.reportVersion,
+    p_engine_inputs: opts.engineInputs,
+    p_private: privateContext,
+  });
+  if (error) {
+    // the database's refusals carry their name as the message (docs/evaluation-entitlement.sql, ERRORS); anything else is a failure
+    if (error.message === 'EVALUATION_COMPLETE') throw new EvaluationComplete('the evaluation\'s reports are used up');
+    if (error.message === 'NOT_ENTITLED') throw new NotEntitled('not an active evaluation member');
+    throw new Error('issueEvaluationReport: the report was not stored: ' + error.message);
+  }
+  const { row, reportId, generatedAt, contextId } = confirmedRow('issueEvaluationReport', data, privateContext);
+  const n = (k: string) => (Number.isInteger(row[k]) ? (row[k] as number) : NaN);
+  const credit: EvaluationCredit = { ordinal: n('credit_ordinal'), credits_used: n('credits_used'), credits_remaining: n('credits_remaining'),
+    evaluation_status: typeof row.evaluation_status === 'string' ? row.evaluation_status : '' };
+  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean') {
+    throw new Error('issueEvaluationReport: the database did not confirm the credit');
+  }
+  if (row.replayed) return { replayed: true, report_id: reportId, generated_at: generatedAt, private_context_id: contextId, credit };
+  return {
+    replayed: false,
+    report_id: reportId,
+    content_hash: contentHash,
+    report_version: opts.reportVersion,
+    generated_at: generatedAt,
+    private_context_id: contextId,
+    report: JSON.parse(body),
+    credit,
   };
 }
 

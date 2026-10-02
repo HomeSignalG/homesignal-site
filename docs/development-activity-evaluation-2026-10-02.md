@@ -236,6 +236,14 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 
 ## 8. What this does NOT do (stated, not hidden)
 
+> **Dated note, 2026-10-02 (build step 5b).** This section describes L1 as built: dark. Step 5b is "the handler work" it names:
+> - the report function now reads a member's trial (`evaluation_usage`);
+> - it charges a trial report through `evaluation_report_issue`, only when the one credit rule says so;
+> - on a retried key it checks the private context.
+>
+> `test/evaluation-entitlement-structure.test.mjs` §4 now pins exactly those callers. The rate-limit gap below is still open.
+> Record: `docs/development-activity-report-engine-2026-09-30.md`, "Step 5b".
+
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.
 - **`report_snapshot_issue` stays directly executable by `service_role`.** A future function could still store a report without a credit.

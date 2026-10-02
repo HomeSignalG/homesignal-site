@@ -37,7 +37,10 @@ const all = Object.values(src).map(code).join('\n');
   ok(gen.startsWith('// GENERATED FILE — DO NOT EDIT'), '1b and says on its first line that it is generated');
   ok(/canonicalProjectType\(/.test(code(src.module)) && /canonicalLifecycle\(/.test(code(src.module)), '1c the module asks the authority for Type and lifecycle');
   ok(!/CATEGORY_REGISTRY|function classifyProjectType|function lifecycleKey|LIFECYCLE_LABELS/.test(all), '1d and defines no Type or lifecycle rule of its own');
-  ok(!/['"](built|active|on file)['"]/i.test(all), '1e nor maps any publisher status word to a lifecycle key');
+  // the one exception is the trial gate comparing an EVALUATION's status (docs/evaluation-entitlement.sql), not a publisher word
+  const trialStatus = /if \(trial\.status !== 'active' \|\| trial\.expired\)|if \(!c \|\| c\.state !== 'active' \|\|/g;
+  ok((all.match(trialStatus) || []).length === 2 && !/['"](built|active|on file)['"]/i.test(all.replace(trialStatus, '')),
+    '1e nor maps any publisher status word to a lifecycle key (the two named exceptions compare an EVALUATION status and a private context\'s state, never a publisher word)');
   ok(/import '\.\/project-type\.generated\.js';/.test(src.module), '1f the module loads the generated copy, and only that (not lib/, which is outside the function bundle)');
   ok(!/from ['"][^'"]*\/lib\//.test(all), '1g nothing in the function reaches outside its own tree');
   const gen2 = read('scripts/gen-project-type-module.mjs');
@@ -64,20 +67,30 @@ const all = Object.values(src).map(code).join('\n');
   ok(fnDirs.includes('get-future-surroundings-report'), '2i (control) the legacy engine still exists, so 2g is a real absence and not an empty search');
 }
 
-// ---- 3. nothing is stored -------------------------------------------------------------------------------------------------------------
+// ---- 3. nothing is stored without a credit (build step 5b: only a charged trial report, through the evaluation's one transaction) -------------
 {
   const inFn = readdirSync(join(root, FN)).map((f) => read(FN + '/' + f)).join('\n');
-  ok(!/issueSnapshot|report_snapshot_issue|report-snapshot\.ts/.test(code(inFn)), '3a the edge function never calls or imports the snapshot writer');
-  ok(!/report_private_context|report_snapshot/.test(code(inFn)), '3b and names neither table');
+  const fnCode = code(inFn), dataCode = code(src.data), hanCode = code(src.handler);
+  ok(!/issueSnapshot|report_snapshot_issue/.test(fnCode) && (dataCode.match(/issueEvaluationReport\(/g) || []).length === 1 && !/issueEvaluationReport/.test(hanCode),
+    '3a the edge function never calls the plain snapshot writer: its ONE store is issueEvaluationReport (snapshot + credit, one transaction), called once, from the data layer');
+  ok((hanCode.match(/deps\.issue\(/g) || []).length === 1 && /if \(!trial \|\| !credit\.uses_report\) \{\n\s*return reply\(req, \{[\s\S]*?\}\);\n\s*\}\n\s*\n\s*\n?\s*let issued: EvaluationIssue;/.test(hanCode),
+    '3a2 and the handler reaches it only past the one branch that returns for an admin, and for a report the credit rule does not charge');
+  const tablesNamed = [...fnCode.matchAll(/report_private_context\w*|report_snapshot\w*/g)].map((m) => m[0]);
+  ok(JSON.stringify(tablesNamed) === '["report_snapshot","report_private_context_read"]'
+    && /rest<\{ body: string \}>\('report_snapshot\?select=body&report_id=eq\.' \+ encodeURIComponent\(reportId\)\)/.test(dataCode)
+    && /return norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch';/.test(dataCode) && !/c\.(normalized_address|latitude|longitude|label|property_keys)/.test(dataCode),
+    '3b it names the stored report once (its body, by id, for a retried key) and the private context once (its address compared inside the data layer; only match / mismatch / unknown leaves it)', tablesNamed);
   ok(/import \{ snapshotBodyOf, subjectRelativeKeys \} from '\.\/report-snapshot\.ts';/.test(src.module), '3c the module imports only the pure body and key helpers from the snapshot module');
   const callers = [];
   const walk = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walk(p); else if (/\.(ts|js|mjs)$/.test(e) && /report_snapshot_issue/.test(code(read(p)))) callers.push(p); } };
   walk('supabase/functions');
   ok(callers.join() === 'supabase/functions/_shared/report-snapshot.ts', '3d across every edge function the writer is named by its own module and nothing else', callers);
-  ok(/stored: false/.test(src.handler) && /report_id: null/.test(src.handler), '3e the response states it stored nothing');
+  ok(/stored: false,\n          report_id: null,/.test(src.handler) && /charged: false,/.test(src.handler), '3e an uncharged report states it stored nothing and charged nothing');
   ok(!/\.insert\(|method: 'PUT'|method: 'PATCH'|method: 'DELETE'/.test(all), '3f and the data layer makes no write of any kind');
   const methods = [...src.data.matchAll(/method: '([A-Z]+)'/g)].map((m) => m[1]);
-  ok(methods.length === 2 && methods.every((m) => m === 'POST'), '3g the only POSTs are the geocoder call and the spatial read (a read-only RPC)', methods);
+  const rpcs = [...dataCode.matchAll(/call\('(\w+)'/g)].map((m) => m[1]);
+  ok(methods.length === 3 && methods.every((m) => m === 'POST') && JSON.stringify(rpcs) === '["evaluation_usage","report_private_context_read"]' && /issueEvaluationReport\(call,/.test(dataCode),
+    '3g the only POSTs are the geocoder call, the spatial read, and the one database-function helper, used for exactly three functions: the trial read, the private-context check, and (through the snapshot module) the charged issue', [methods, rpcs]);
 }
 
 // ---- 4. the access model ---------------------------------------------------------------------------------------------------------------
@@ -91,8 +104,8 @@ const all = Object.values(src).map(code).join('\n');
   const g = code(src.gate);
   const at = (s) => h.indexOf(s);
   const gat = (s) => g.indexOf(s);
-  ok(at('authorizeAdmin(req, deps)') > 0 && at('authorizeAdmin(req, deps)') < at('readBounded(req)') && at('readBounded(req)') < at('deps.geocode('),
-    '4c the order is: the shared gate (authenticate, then allow-list), then read the body, then any geocode or data read', [at('authorizeAdmin(req, deps)'), at('readBounded(req)'), at('deps.geocode(')]);
+  ok(at('authorizeReportCaller(req, deps)') > 0 && at('authorizeReportCaller(req, deps)') < at('readBounded(req)') && at('readBounded(req)') < at('deps.geocode(') && !/authorizeAdmin\(/.test(h),
+    '4c the order is: the shared gate (authenticate, then an admin or an active trial member), then read the body, then any geocode or data read', [at('authorizeReportCaller(req, deps)'), at('readBounded(req)'), at('deps.geocode(')]);
   ok(gat('deps.authenticate(') > 0 && gat('deps.authenticate(') < gat('deps.isAdmin('), '4c the gate itself authenticates before it asks the allow-list', [gat('deps.authenticate('), gat('deps.isAdmin(')]);
   ok(!/auth\/v1\/user|dashboard_admins\?|rows\[0\]\.email|deps\.authenticate\(|deps\.isAdmin\(/.test(h + code(src.data)), '4c and the handler and the report reads carry NO copy of the gate: it lives once, in the shared modules');
   ok(!/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(h + g), '4d there is no wildcard CORS origin');
@@ -116,7 +129,7 @@ const all = Object.values(src).map(code).join('\n');
 {
   const reg = JSON.parse(read('supabase/functions/_shared/report-rights.json'));
   ok(Array.isArray(reg.cleared) && reg.cleared.length === 0,
-    '6a NO SOURCE FAMILY IS CLEARED. Adding one is a recorded clearance (audit reference, date, attribution), and this pin is edited in the same change so the decision is visible twice', reg.cleared.length);
+    '6a NO SOURCE FAMILY IS CLEARED. Adding one is a recorded clearance (audit reference, date, attribution), and this pin is edited in the same change so the decision is visible twice. Since build step 5b it also switches on charging and storing trial reports: re-read docs/report-private-context-contract-2026-09-30.md §6 (gates 1, 2, 5) in that change', reg.cleared.length);
   ok(/corporate-output-source-rights-audit-2026-09-27\.md/.test(reg.authority) && /HOLD is never cleared/.test(reg.rule), '6b the registry names its authority and says a HOLD is never cleared');
   ok(existsSync(join(root, reg.authority)), '6c and the authority file exists');
   ok(/report-rights\.json/.test(src.index) && /rights/.test(code(src.handler)) && /validateRights\(/.test(code(src.module)), '6d the function loads that file and validates it on every request');
@@ -178,9 +191,11 @@ const all = Object.values(src).map(code).join('\n');
     '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the rights gate), never the spatial answer');
   const fnBody = /export function activityOutcome\([\s\S]*?\n\}/.exec(mod);
   ok(!!fnBody && !/NO_DEVELOPMENT_ACTIVITY/.test(fnBody[0]), '9h today\'s outcome rule cannot return "No development activity": that needs the VERIFIED ZERO proof, which has no inputs yet');
-  ok(/credit: creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\)/.test(code(src.handler))
+  ok(/const credit = creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\);/.test(code(src.handler))
     && (code(src.handler).match(/creditDecision\(/g) || []).length === 3, '9i the handler asks the rule for every report and every no-report answer, and decides nothing itself');
-  ok(!/evaluation_report_issue|evaluation_usage|report_credit/.test(code(src.handler) + code(src.data)), '9j this operator endpoint charges nothing: it never calls the credit ledger');
+  ok(!/evaluation_report_issue|evaluation_usage|report_credit/.test(code(src.handler)) && !/evaluation_report_issue|evaluation_credit/.test(code(src.data))
+    && /if \(!trial \|\| !credit\.uses_report\)/.test(code(src.handler)),
+    '9j the handler names no ledger; the data layer charges only through the snapshot module; and an admin, or a report the rule does not charge, never reaches it');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

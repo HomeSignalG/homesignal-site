@@ -157,13 +157,19 @@ const namingOurs = SCAN.filter((f) => OURS.test(code(f)));
 ok(SCAN.length > 200 && SCAN.some((f) => f.startsWith('.github/workflows/')) && SCAN.some((f) => f.startsWith('data/')) && SCAN.some((f) => f.startsWith('docs/')) && namingOurs.includes(SQL_FILE)
    && OURS.test(stripSql('select 1 from public.evaluation_credit;')) && !OURS.test(stripSql('-- evaluation_credit in a comment\nselect 1;')),
   '4-control: the scan covers the code directories, the workflows, data/, every non-prose file under docs/ and the root files, finds the SQL of record, flags a planted use and ignores a comment', SCAN.length + ' files');
-ok(namingOurs.length === 1 && namingOurs[0] === SQL_FILE,
-  '4: nothing else in the repository (no page, script, edge function, workflow, data file or other SQL) names an evaluation table or function in code — the layer is DARK; the callers are Order L2 and the handler work, each with its own review', namingOurs.join(','));
+// Build step 5b (2026-10-02) is "the handler work": the report function now reads a member's trial (evaluation_usage) and charges a trial
+// report (evaluation_report_issue, through the one shared snapshot module). Those two files are the whole of the change; nothing else names it.
+const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts', SNAP_MOD = 'supabase/functions/_shared/report-snapshot.ts';
+const namesIn = (f) => [...new Set([...code(f).matchAll(new RegExp(OURS.source, 'g'))].map((m) => m[0]))].sort();
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, REPORT_DATA, SNAP_MOD].sort())
+   && JSON.stringify(namesIn(REPORT_DATA)) === '["evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
+  '4: outside its SQL, exactly two files name this layer in code: the report function\'s data layer reads a member\'s trial (evaluation_usage only), and the shared snapshot module charges through evaluation_report_issue only — no page, script, workflow, data file or other SQL', namingOurs.join(','));
 const strip4 = (t) => stripJs(t);
 const NAMES_L1 = /evaluation_(report_issue|invite|credit|event|create|revoke|usage|check)|public\.evaluation\b|brokerage/i;
 ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLLOW.length > 1500 && HAN_REPORT.length > 1500
-   && ![GATE, REST, SNAPMOD, HAN_FOLLOW, HAN_REPORT].some((t) => NAMES_L1.test(strip4(t))),
-  '4b: the admin gate, the service reader, the shared snapshot module and both report handlers do not mention an evaluation or a brokerage at all — the entitlement is not read by any handler, and the gate is not a second place that decides it');
+   && ![GATE, REST, HAN_FOLLOW, HAN_REPORT].some((t) => NAMES_L1.test(strip4(t)))
+   && JSON.stringify([...strip4(SNAPMOD).matchAll(new RegExp(NAMES_L1.source, 'gi'))].map((m) => m[0])) === '["evaluation_report_issue"]',
+  '4b: the gate, the service reader and both report handlers name no evaluation table or function and no brokerage (the gate asks deps.trialOf; the decision stays in the database), and the snapshot module names only the issue function it calls');
 const callers = SCAN.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
 ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/report-snapshot.ts') && callers.includes(SQL_FILE)
    && callers.every((f) => [SNAP_FILE, 'supabase/functions/_shared/report-snapshot.ts', SQL_FILE].includes(f)),
@@ -171,8 +177,9 @@ ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/r
 const calls = (SQL.match(/report_snapshot_issue\(/g) || []).length;
 ok(calls === 2 && /from public\.report_snapshot_issue\(p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) s;/.test(ISSUE) && (ISSUE.match(/report_snapshot_issue\(/g) || []).length === 1,
   '4d: the writer is called ONCE, inside evaluation_report_issue (the other mention is the precondition\'s existence check), with the body, hash, version, engine inputs and private context passed straight through');
-ok(/stores_reports: false/.test(strip4(HAN_REPORT)) && /stores_reports: false/.test(strip4(HAN_FOLLOW)) && !/issueSnapshot|report-snapshot/.test(strip4(HAN_REPORT)),
-  '4e: the national report handler still stores nothing and does not import the snapshot module; this unit changed no handler');
+ok(/stores_reports: false/.test(strip4(HAN_FOLLOW)) && !/issueSnapshot\b/.test(strip4(HAN_REPORT)) && (strip4(HAN_REPORT).match(/deps\.issue\(/g) || []).length === 1
+   && /if \(!trial \|\| !credit\.uses_report\)/.test(strip4(HAN_REPORT)),
+  '4e: the Follow handler still stores nothing; the report handler never calls the plain snapshot writer and stores only a trial report the credit rule charges, through this layer\'s issue function, once');
 ok(/dashboard_admins\?select=email&limit=1&email=eq\./.test(strip4(REST)) && /rows\.length === 1 && rows\[0\]\.email === email/.test(strip4(REST))
    && /deps\.isAdmin\(user\.email\)/.test(strip4(GATE)) && /authorizeAdmin/.test(strip4(GATE)),
   '4f: the gate is unchanged: service-rest.ts still answers "is this an admin" from public.dashboard_admins by exact email and admin-gate.ts still asks isAdmin of the signed-in user');

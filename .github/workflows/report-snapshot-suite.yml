@@ -80,6 +80,12 @@ on:
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
       - 'docs/dev-change-baseline.sql'
+      - 'test/trial_report_pg/**'
+      - 'test/evaluation_entitlement_pg/fixture.sql'
+      - 'docs/evaluation-entitlement.sql'
+      - 'docs/brokerage-account-spine.sql'
+      - 'supabase/functions/get-development-activity-report/**'
+      - 'supabase/functions/_shared/credit-rule.ts'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -114,6 +120,12 @@ on:
       - 'docs/dev-change-reportable.sql'
       - 'docs/dev-change-ledger.sql'
       - 'docs/dev-change-baseline.sql'
+      - 'test/trial_report_pg/**'
+      - 'test/evaluation_entitlement_pg/fixture.sql'
+      - 'docs/evaluation-entitlement.sql'
+      - 'docs/brokerage-account-spine.sql'
+      - 'supabase/functions/get-development-activity-report/**'
+      - 'supabase/functions/_shared/credit-rule.ts'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -225,3 +237,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_share_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsh.log
+      - name: A trial report goes through the real handler, data layer, snapshot module and evaluation SQL; charged once, never twice, refused when used up
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/trial_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/trial.log

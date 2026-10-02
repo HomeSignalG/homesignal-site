@@ -127,6 +127,19 @@ prove:
 **The open parts of gates 1, 2 and 5 keep "store a real customer report" switched off, and gate 4 is closed on a deployed function whose refusals and capability are verified live, and on its disposable-Postgres proof, but not on a production answer: an allow-listed admin has not yet called it** (the function is deployed, v1; the Follow's limits above are decisions for Orders J and K). Nothing calls the writer, so that is the current state; this document is the checklist for
 turning it on.
 
+> **Dated note, 2026-10-02 (build step 5b).** A path that stores a real customer report now exists:
+> - a trial report the credit rule charges is stored through `public.evaluation_report_issue`;
+> - which calls this writer in one transaction with its credit.
+>
+> It is **unreachable today**, for two reasons:
+> - `supabase/functions/_shared/report-rights.json` clears no source, so every trial report is "No data ingested" and is never
+>   charged or stored;
+> - production holds no evaluation.
+>
+> **Clearing the first source turns it on.** That change is the moment to re-read gates 1, 2 and 5 above. Until then, the
+> statement above stands as written.
+
+
 ## 7. Decisions taken by default in this unit (the founder may change any of them)
 
 - **D-1. Distances from the subject are private-derived, not permanent.** The founder listed exact property

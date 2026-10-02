@@ -27,7 +27,7 @@ CFG = 'supabase/config.toml'
 WF = '.github/workflows/deploy-edge-functions.yml'
 REG = 'supabase/functions/_shared/report-rights.json'
 GEN = 'supabase/functions/_shared/project-type.generated.js'
-TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs']
+TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs']
 
 # name -> list of (file, old, new)
 M = {}
@@ -102,7 +102,7 @@ m('any_radius_accepted', MOD, "return ALLOWED_RADII.includes(n) ? n : null;", "r
 # ---- who may ask ----------------------------------------------------------------------------------------------------------------------------
 m('missing_token_proceeds', GATE, "if (!token) return reply(req, { error: 'unauthorized' }, 401);", "void 0;")
 m('anon_key_becomes_a_user', GATE, "if (!user || !user.email) return reply(req, { error: 'unauthorized' }, 401);", "user = user ?? { email: 'anonymous' };")
-m('admin_check_skipped', GATE, "if (!admin) return reply(req, { error: 'forbidden' }, 403);", "void 0;")
+m('admin_check_skipped', GATE, "if (!who.admin) return reply(req, { error: 'forbidden' }, 403);", "void 0;")
 m('admin_read_failure_passes', GATE, "try { admin = await deps.isAdmin(user.email); } catch { return reply(req, { error: 'unavailable' }, 502); }", "try { admin = await deps.isAdmin(user.email); } catch { admin = true; }")
 m('auth_failure_passes', GATE, "try { user = await deps.authenticate(token); } catch { return reply(req, { error: 'unavailable' }, 502); }", "try { user = await deps.authenticate(token); } catch { user = { email: 'founder@example.com' }; }")
 m('unknown_fields_ignored', HAN, "if (unknown.length) return reply(", "if (false) return reply(")
@@ -116,13 +116,13 @@ m('data_failure_returns_ok', HAN, "if (e instanceof DataUnavailable) return repl
 m('error_message_echoed', HAN, "return reply(req, { error: 'internal' }, 500);", "return reply(req, { error: String((e as any)?.message) }, 500);")
 m('cors_wildcard', GATE, "if (origin && ALLOWED_ORIGINS.includes(origin)) h['Access-Control-Allow-Origin'] = origin;", "h['Access-Control-Allow-Origin'] = '*';")
 m('response_cacheable', GATE, "'Cache-Control': 'no-store'", "'Cache-Control': 'public, max-age=3600'")
-m('response_claims_stored', HAN, "stored: false,\n        report_id: null,", "stored: true,\n        report_id: null,")
+m('response_claims_stored', HAN, "stored: false,\n          report_id: null,", "stored: true,\n          report_id: null,")
 m('storable_always_true', HAN, "const storable = out.storage_blockers.length === 0;", "const storable = true;")
 m('events_window_wrong', HAN, "const since = addDays(dayOf(deps.now()), -RECENT_DAYS);", "const since = dayOf(deps.now());")
 m('keys_not_deduped', HAN, "const keys = [...new Set(rows.map((r) => r.source_key))].sort();", "const keys = rows.map((r) => r.source_key);")
 m('unresolved_address_reports', HAN, "if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null,", "if (!g) return reply(req, { status: 'OK', report: null,")
-m('outside_coverage_proceeds', HAN, "if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }) });", "void 0;")
-m('capability_claims_storage', HAN, "stores_reports: false,", "stores_reports: true,")
+m('outside_coverage_proceeds', HAN, "if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }), ...trialInfo });", "void 0;")
+m('capability_claims_storage', HAN, "stores_reports: 'only a trial report that uses a free report (credit rule); never an admin report',", "stores_reports: true,")
 m('handler_logs_the_address', HAN, "const address = typeof b.address === 'string' ? b.address.trim() : '';", "const address = typeof b.address === 'string' ? b.address.trim() : ''; console.log(address);")
 m('handler_imports_the_writer', HAN, "export { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };", "import { issueSnapshot } from '../_shared/report-snapshot.ts'; void issueSnapshot;\nexport { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };")
 # ---- the reads ------------------------------------------------------------------------------------------------------------------------------
@@ -169,12 +169,44 @@ m('credit_accepts_truthy_storable', CR, "if (input.storable !== true)", "if (!in
 m('credit_ignores_outcome_rule_version', CR, "a.rule_version !== ACTIVITY_RULE_VERSION\n    || ", "")
 m('credit_charges_unknown', CR, "    return decide(false, 'UNRECOGNISED');", "    return decide(true, 'UNRECOGNISED');")
 m('credit_rule_unversioned', CR, "export const CREDIT_RULE_VERSION = 'credit-rule-1';", "export const CREDIT_RULE_VERSION = 'credit-rule';")
-m('handler_credit_dropped', HAN, "        credit: creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable }),\n", "")
+m('handler_credit_dropped', HAN, "          credit,\n          charged: false,", "          charged: false,")
 m('handler_credit_view_forced', HAN, "creditDecision({ status: 'OK', view, activity:", "creditDecision({ status: 'OK', view: 'customer', activity:")
 m('handler_credit_storable_forced', HAN, "activity: out.intelligence?.activity, storable })", "activity: out.intelligence?.activity, storable: true })")
-m('handler_no_credit_on_unresolved', HAN, ", credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }) });", " });")
-m('handler_decides_credit_itself', HAN, "        credit: creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable }),", "        credit: { uses_report: out.intelligence?.projects?.length > 0, reason: 'DEVELOPMENT_SHOWN', rule_version: CREDIT_RULE_VERSION },")
+m('handler_no_credit_on_unresolved', HAN, ", credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }), ...trialInfo });", ", ...trialInfo });")
+m('handler_decides_credit_itself', HAN, "      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable });", "      const credit = { uses_report: (out.intelligence?.projects as unknown[])?.length > 0, reason: 'DEVELOPMENT_SHOWN', rule_version: CREDIT_RULE_VERSION };")
 m('handler_charges_the_ledger', DAT, "export function makeDeps(", "export const _charge = 'rpc/evaluation_report_issue';\nexport function makeDeps(")
+# ---- the trial (build step 5b) -----------------------------------------------------------------------------------------------------------
+SNAP = 'supabase/functions/_shared/report-snapshot.ts'
+m('trial_sees_internal_view', HAN, "    if (trial && view !== 'customer') return reply(req, { error: 'forbidden' }, 403);\n", "")
+m('trial_key_optional', HAN, "    if (b.idempotency_key !== undefined || trial) {", "    if (b.idempotency_key !== undefined) {")
+m('trial_key_any_uuid', HAN, "const IDEMPOTENCY_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;", "const IDEMPOTENCY_KEY = /^[0-9a-f-]{36}$/;")
+m('charge_without_the_rule', HAN, "      if (!trial || !credit.uses_report) {", "      if (!trial) {")
+m('refusal_still_gives_the_report', HAN, "        if (e instanceof EvaluationComplete) return reply(req, { error: 'evaluation_complete' }, 403);",
+  "        if (e instanceof EvaluationComplete) return reply(req, { error: 'evaluation_complete', report: out.intelligence }, 403);")
+m('replay_not_checked', HAN, "        if (same !== 'match') return reply(req, { error: 'idempotency_key_reused' }, 409);\n", "")
+m('replay_unknown_accepted', HAN, "        if (same !== 'match') return reply", "        if (same === 'mismatch') return reply")
+m('replay_shows_the_fresh_report', HAN, "status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: stored,", "status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: out.intelligence,")
+m('replay_said_charged', HAN, "credit, charged: false, replayed: true, ...used,", "credit, charged: true, replayed: true, ...used,")
+m('trial_counts_from_before_the_charge', HAN, "      const used = { trial: { status: issued.credit.evaluation_status, credits_used: issued.credit.credits_used, credits_remaining: issued.credit.credits_remaining } };",
+  "      const used = trialInfo;")
+m('gate_lets_a_complete_trial_in', GATE, "  if (trial.status === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);\n", "")
+m('gate_ignores_expiry', GATE, "  if (trial.status !== 'active' || trial.expired) return", "  if (trial.status !== 'active') return")
+m('gate_ignores_status', GATE, "  if (trial.status !== 'active' || trial.expired) return", "  if (trial.expired) return")
+m('gate_trial_read_failure_admits', GATE, "  try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }",
+  "  try { trial = await deps.trialOf(who.user.id); } catch { trial = { status: 'active', credits_used: 0, credits_remaining: 20, expired: false }; }")
+m('gate_admin_check_skipped', GATE, "  if (who.admin) return { kind: 'admin' };\n", "")
+m('gate_reports_ids', GATE, "  return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining };", "  return t;")
+m('data_trial_takes_extra_rows', DAT, "      if (data.length !== 1 || !t ||", "      if (!t ||")
+m('data_5xx_is_a_refusal', DAT, "    if (r.status < 500 && j && typeof j.message === 'string')", "    if (j && typeof j.message === 'string')")
+m('data_context_lets_purged_match', DAT, "      if (!c || c.state !== 'active' || typeof c.address !== 'string') return 'unknown';", "      if (!c || typeof c.address !== 'string') return 'unknown';")
+m('data_context_exact_text', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return c.address === address ? 'match' : 'mismatch';")
+m('data_context_hands_out_the_address', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return norm(c.address) === norm(address) ? 'match' : c.address;")
+m('snapshot_trial_skips_prepare', SNAP, "  const { body, contentHash } = await prepare('issueEvaluationReport', intelligence, privateContext, opts);",
+  "  const body = JSON.stringify(intelligence); const contentHash = await sha256Hex(body);")
+m('snapshot_complete_not_named', SNAP, "    if (error.message === 'EVALUATION_COMPLETE') throw new EvaluationComplete('the evaluation\\'s reports are used up');\n", "")
+m('snapshot_credit_unchecked', SNAP, "  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean') {",
+  "  if (false) {")
+m('snapshot_replay_returns_this_body', SNAP, "  if (row.replayed) return { replayed: true, report_id: reportId, generated_at: generatedAt, private_context_id: contextId, credit };\n", "")
 
 RSW = '.github/workflows/report-snapshot-suite.yml'
 RUN = 'test/national_report_pg/run.sh'

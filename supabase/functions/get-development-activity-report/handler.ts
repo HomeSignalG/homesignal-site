@@ -4,23 +4,25 @@
 // environment and calls no network: everything external arrives through `Deps`, so the whole request path is
 // testable without Deno or a database (test/national-report-function.test.mjs).
 //
-// WHO MAY CALL IT is _shared/admin-gate.ts (`authorizeAdmin`), the ONE gate every internal function uses: a signed-in user whose
-// email is in public.dashboard_admins. The gateway's JWT check alone is not enough, because the public anon key is a validly
-// signed token. That is an internal diagnostic surface, which is what the plan permits before the account, entitlement and
-// quota units (Orders H and L) exist; it is NOT a customer surface and cannot function as an unlimited customer generator.
-// When those units land, the entitlement check replaces `isAdmin` in the shared gate.
+// WHO MAY CALL IT is _shared/admin-gate.ts (`authorizeReportCaller`). The gateway's JWT check alone is not enough, because the public
+// anon key is a validly signed token. Two callers pass:
+//   an ADMIN (email in public.dashboard_admins): either view, never charged, nothing stored, exactly as before build step 5b;
+//   a TRIAL MEMBER (public.evaluation_usage: an active, unexpired brokerage evaluation): the customer view only, with a page-minted
+//     idempotency key. Anyone else is refused before the body is read.
 //
-// NOTHING IS STORED. This function never calls the snapshot writer and does not import issueSnapshot (a structural
-// test fails if it does). `assemble` says whether a report COULD be stored (`storage_blockers`); the response reports
-// it and stores nothing. Storing a real customer report waits for the gates in report-private-context-contract §6.
-//
-// WHETHER A REPORT WOULD USE A FREE REPORT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every
-// answer that is a report or says why there is none carries its decision as `credit`; nothing here charges anything.
+// WHETHER A REPORT USES A FREE REPORT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every answer that
+// is a report or says why there is none carries its decision as `credit`. Only a trial report the rule charges is stored, and only
+// through public.evaluation_report_issue (via _shared/report-snapshot.ts `issueEvaluationReport`), which stores the snapshot and the
+// credit in ONE transaction. This function never calls the plain snapshot writer (`issueSnapshot`), so no report is stored without a
+// credit; a structural test fails if it does. A retried key returns the first report, and only if it is about the same property (D-L6).
 import {
-  addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, validateRights,
+  addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateRights,
 } from '../_shared/national-report.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
-import { authorizeAdmin, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
+import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
+import type { TrialState } from '../_shared/admin-gate.ts';
+import { EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
+import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 import type {
   LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth, View,
@@ -44,7 +46,16 @@ export type Deps = {
   ledger: (keys: string[]) => Promise<LedgerProject[]>;
   events: (keys: string[], sinceDay: string) => Promise<ReportableEvent[]>;
   health: (families: string[]) => Promise<SourceHealth[]>;
+  // the trial (build step 5b)
+  trialOf: (userId: string) => Promise<TrialState | null>;
+  issue: (userId: string, idempotencyKey: string, intelligence: Record<string, unknown>, privateContext: PrivateContext | null,
+    opts: { reportVersion: string; engineInputs: Record<string, unknown> }) => Promise<EvaluationIssue>;
+  storedReport: (reportId: string) => Promise<string | null>;
+  contextMatches: (contextId: string, address: string) => Promise<'match' | 'mismatch' | 'unknown'>;
 };
+
+/** A random (v4) UUID the trial page mints once per report request, and repeats only when it retries that same request. */
+const IDEMPOTENCY_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /** The geocoder itself could not be reached (distinct from "no match"). */
 export class GeocoderUnavailable extends Error {}
@@ -52,11 +63,11 @@ export class GeocoderUnavailable extends Error {}
 export function capability() {
   return {
     product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-    method: 'POST { address, radius_mi?, view?, label? }',
+    method: 'POST { address, radius_mi?, view?, label?, idempotency_key? }',
     radius_mi: [REPORT_RADIUS_MI],
     recent_days: RECENT_DAYS,
-    access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
-    stores_reports: false,
+    access: 'signed-in: an internal admin (dashboard_admins), or an invited trial member with an active trial (customer view only).',
+    stores_reports: 'only a trial report that uses a free report (credit rule); never an admin report',
     credit_rule: CREDIT_RULE_VERSION,
   };
 }
@@ -73,16 +84,17 @@ export function makeHandler(deps: Deps) {
     if (req.method === 'GET') return reply(req, capability());
     if (req.method !== 'POST') return reply(req, { error: 'GET for the capability, POST to generate' }, 405);
 
-    // 1. who is asking — the one shared gate: a signed-in user, then an allow-listed one
-    const denied = await authorizeAdmin(req, deps);
-    if (denied) return denied;
+    // 1. who is asking — the one shared gate: a signed-in user, then an admin or an active trial member
+    const caller = await authorizeReportCaller(req, deps);
+    if (caller instanceof Response) return caller;
+    const trial = caller.kind === 'trial' ? caller : null;
 
     // 2. what they asked — bounded, validated, and nothing unknown accepted
     const raw = await readBounded(req);
     if (raw === TOO_LARGE) return reply(req, { error: 'request_too_large' }, 413);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return reply(req, { error: 'invalid_request' }, 400);
     const b = raw as Record<string, unknown>;
-    const unknown = Object.keys(b).filter((k) => !['address', 'radius_mi', 'view', 'label'].includes(k));
+    const unknown = Object.keys(b).filter((k) => !['address', 'radius_mi', 'view', 'label', 'idempotency_key'].includes(k));
     if (unknown.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + unknown[0] }, 400);
     const address = typeof b.address === 'string' ? b.address.trim() : '';
     if (address.length < 8 || address.length > 200 || address.indexOf(' ') < 0) return reply(req, { error: 'invalid_request', detail: 'address' }, 400);
@@ -91,6 +103,16 @@ export function makeHandler(deps: Deps) {
     if (radius !== REPORT_RADIUS_MI) return reply(req, { error: 'invalid_request', detail: 'radius_mi must be ' + REPORT_RADIUS_MI }, 400);
     const view = (b.view === undefined ? 'customer' : b.view) as View;
     if (view !== 'customer' && view !== 'internal') return reply(req, { error: 'invalid_request', detail: 'view' }, 400);
+    // a trial member sees exactly what a paying customer sees, and nothing an internal view would show
+    if (trial && view !== 'customer') return reply(req, { error: 'forbidden' }, 403);
+    // a trial report needs the page's key, so a retried request can never be charged twice; an admin report stores nothing and takes none
+    let idempotencyKey: string | null = null;
+    if (b.idempotency_key !== undefined || trial) {
+      if (!trial) return reply(req, { error: 'invalid_request', detail: 'idempotency_key is for trial reports' }, 400);
+      if (typeof b.idempotency_key !== 'string' || !IDEMPOTENCY_KEY.test(b.idempotency_key)) return reply(req, { error: 'invalid_request', detail: 'idempotency_key' }, 400);
+      idempotencyKey = b.idempotency_key;
+    }
+    const trialInfo = trial ? { trial: trialSummary(trial.trial) } : {};
     let label: string | undefined;
     if (b.label !== undefined) {
       if (typeof b.label !== 'string' || b.label.length > 80) return reply(req, { error: 'invalid_request', detail: 'label' }, 400);
@@ -102,9 +124,9 @@ export function makeHandler(deps: Deps) {
 
       // 3. resolve the address, then the ZIP — before any credit-shaped decision
       const g = await deps.geocode(address);
-      if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false, credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }) });
+      if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false, credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }), ...trialInfo });
       const supported = await deps.zipSupported(g.zip);
-      if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }) });
+      if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }), ...trialInfo });
 
       // 4. the canonical reads
       const rows = await deps.radius(g.lat, g.lng, radius);
@@ -123,20 +145,53 @@ export function makeHandler(deps: Deps) {
         rows, projects, ledger, events, health,
       });
       const storable = out.storage_blockers.length === 0;
+      // whether this report uses one of the free reports: the ONE rule (founder ruling R5). An admin is never charged and nothing is stored
+      // for one; a trial report that the rule does not charge ("No data ingested", a report that cannot be stored) is also stored nowhere
+      const credit = creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable });
+      if (!trial || !credit.uses_report) {
+        return reply(req, {
+          status: 'OK',
+          coverage_state: out.coverage_state,
+          report: out.intelligence,
+          // for this response only: measured from the subject, so never part of the permanent report
+          render: out.renderOnly,
+          stored: false,
+          report_id: null,
+          storable,
+          storage_blockers: out.storage_blockers,
+          credit,
+          charged: false,
+          ...trialInfo,
+        });
+      }
+
+      // 6. a trial report that uses a free report: stored and charged in ONE database transaction (evaluation_report_issue)
+      let issued: EvaluationIssue;
+      try {
+        issued = await deps.issue(trial.userId, idempotencyKey!, out.intelligence!, out.privateContext,
+          { reportVersion: REPORT_VERSION, engineInputs: out.engineInputs! });
+      } catch (e) {
+        // a refusal stores nothing and charges nothing, and returns no report (a report given anyway would be a free report)
+        if (e instanceof EvaluationComplete) return reply(req, { error: 'evaluation_complete' }, 403);
+        if (e instanceof NotEntitled) return reply(req, { error: 'forbidden' }, 403);
+        throw e;
+      }
+      const used = { trial: { status: issued.credit.evaluation_status, credits_used: issued.credit.credits_used, credits_remaining: issued.credit.credits_remaining } };
+      if (issued.replayed) {
+        // the key was already charged: the answer is the FIRST report, and only if it is about this same property (D-L6)
+        const same = issued.private_context_id ? await deps.contextMatches(issued.private_context_id, address) : 'unknown';
+        if (same !== 'match') return reply(req, { error: 'idempotency_key_reused' }, 409);
+        const body = await deps.storedReport(issued.report_id);
+        if (body === null) throw new DataUnavailable('stored report');
+        const stored = JSON.parse(body);
+        return reply(req, {
+          status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: stored, render: out.renderOnly,
+          stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: false, replayed: true, ...used,
+        });
+      }
       return reply(req, {
-        status: 'OK',
-        coverage_state: out.coverage_state,
-        report: out.intelligence,
-        // for this response only: measured from the subject, so never part of the permanent report
-        render: out.renderOnly,
-        // nothing is stored by this endpoint; these say whether the report COULD be, later
-        stored: false,
-        report_id: null,
-        storable,
-        storage_blockers: out.storage_blockers,
-        // whether a trial customer's report would use one of the free reports (founder ruling R5). Nothing is charged here: this
-        // endpoint is the operator's, and the trial handler (build step 5) is what calls the credit ledger when this says so
-        credit: creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable }),
+        status: 'OK', coverage_state: out.coverage_state, report: issued.report, render: out.renderOnly,
+        stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: true, replayed: false, ...used,
       });
     } catch (e) {
       if (e instanceof GeocoderUnavailable) return reply(req, { error: 'geocoder_unavailable' }, 502);
