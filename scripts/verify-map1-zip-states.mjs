@@ -217,6 +217,10 @@ for (const c of CASES.filter((c) => c.zip)) {
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
       notMeasured: /not measured yet/i.test(txt),
+      // Founder wording 2026-10-02: a ZIP with no Census area (producer 'not_measured') says so,
+      // in the sentence pinned whole by test/zip-no-mapped-area-copy.test.mjs. Only a ZIP waiting
+      // on a build (producer 'unknown', the synthetic pending case) still says "not measured yet".
+      noMappedArea: /has no mapped area\. The Census does not draw a boundary for this ZIP code/.test(txt),
       couldNotRead: /could not be read/i.test(txt),
       // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
       // `could not be read` is lib/zip-authoritative.js::zipAuthNote — a statement about the
@@ -286,8 +290,8 @@ for (const c of CASES.filter((c) => c.zip)) {
      `${m.devWithDistance} offenders`);
 
   if (c.kind === 'pending') {
-    ok(m.notMeasured && !m.couldNotRead,
-       `${c.zip}: states the honest not-measured status, NOT a read failure`,
+    ok(m.notMeasured && !m.noMappedArea && !m.couldNotRead,
+       `${c.zip}: states the honest not-measured status, NOT a read failure or a missing area`,
        `not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
     ok(m.addressCta, `${c.zip}: directs the resident to address mode`);
     ok(m.noCircle,   `${c.zip}: and says it will not estimate from a circle`);
@@ -295,16 +299,19 @@ for (const c of CASES.filter((c) => c.zip)) {
   }
   if (c.kind === 'authoritative') {
     ok(m.dev > 0, `${c.zip}: still renders whole-ZIP development (regression control)`, `dev=${m.dev}`);
-    ok(!m.notMeasured && !m.couldNotRead,
-       `${c.zip}: makes no not-measured and no failure claim`);
+    ok(!m.notMeasured && !m.noMappedArea && !m.couldNotRead,
+       `${c.zip}: makes no not-measured, no-area and no failure claim`);
     ok(m.wholeZip, `${c.zip}: claims the measurement across the WHOLE ZIP`);
   }
   if (c.kind === 'not_measured') {
-    ok(m.notMeasured && !m.couldNotRead, `${c.zip}: genuine not_measured wording unchanged`);
+    ok(m.noMappedArea && !m.notMeasured && !m.couldNotRead,
+       `${c.zip}: says it has no mapped area (founder wording), never "not measured yet"`,
+       `no-mapped-area=${m.noMappedArea} not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
+    ok(m.addressCta, `${c.zip}: directs the resident to address mode`);
     ok(m.dev === 0, `${c.zip}: renders no development`, `dev=${m.dev}`);
   }
   if (c.kind === 'measured_zero') {
-    ok(!m.notMeasured, `${c.zip}: a MEASURED zero never claims to be unmeasured`);
+    ok(!m.notMeasured && !m.noMappedArea, `${c.zip}: a MEASURED zero never claims to be unmeasured or unmapped`);
     ok(m.wholeZip, `${c.zip}: it asserts a real whole-ZIP measurement`);
     ok(m.dev === 0, `${c.zip}: and shows nothing, because there is nothing`, `dev=${m.dev}`);
   }

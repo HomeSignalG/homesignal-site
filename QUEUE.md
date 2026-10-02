@@ -88,7 +88,15 @@ Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. 
     sitemap entry). Registry and database untouched; restore a ZIP by moving it to `restored`.
     Founder's review still open;
   - the 52 active standard ZIPs with no Census ZCTA;
-  - the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.
+  - ~~the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.~~
+    ✅ **DONE 2026-10-02 (founder wording, "use this"):** *"ZIP 10048 has no mapped area. The
+    Census does not draw a boundary for this ZIP code — usually because it serves PO boxes or a
+    single organization rather than streets — so we can't show development records for it. Enter
+    a street address to see development around that address."* One owner,
+    `HS.zipNoMappedAreaFact` in `lib/zip-authoritative.js`, on Map 1 and the ZIP / development
+    pages; pinned whole in `test/zip-no-mapped-area-copy.test.mjs`. Only a ZIP waiting on a
+    build (producer status `unknown`) keeps "not measured yet". Not changed: the city pages' short
+    "not yet measured — not counted" tag beside these ZIPs.
 
   The registry and the page copy were not touched.
 

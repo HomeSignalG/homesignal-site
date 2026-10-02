@@ -666,17 +666,20 @@ const nm = await page.evaluate(() => ({
   dev: (document.getElementById('cDev') || {}).textContent || ''
 }));
 info('not-measured ZIP 84999', nm);
-ok(/not measured yet/i.test(nm.fresh),
-  '14a the page SAYS the ZIP is not measured yet', nm.fresh);
-ok(/will not estimate/i.test(nm.fresh),
-  '14b ...and says it will not estimate from a circle, so 0 is never implied', nm.fresh);
+// 84999 answers status 'not_measured' (no Census area), so since the founder's 2026-10-02
+// wording it says it has no mapped area — never "not measured yet", which is kept for a ZIP
+// waiting on a build (pinned in test/zip-no-mapped-area-copy.test.mjs).
+ok(/ZIP 84999 has no mapped area\. The Census does not draw a boundary for this ZIP code/.test(nm.fresh),
+  '14a the page SAYS the ZIP has no mapped area', nm.fresh);
+ok(/we can't show development records for it/.test(nm.fresh) && !/not measured yet/i.test(nm.fresh),
+  '14b ...and that it cannot show records there, so 0 is never implied', nm.fresh);
 // Matched on the address-mode OFFER, not the literal 'street address' — that phrase named a
 // shape the geocoder never required and left the note. What must not regress is that the
 // not-measured state still points somewhere real, so removing the sentence still fails 14c.
 ok(/\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(nm.fresh),
   '14c ...and offers the address view as the way to get a real answer', nm.fresh);
 // The distinction that matters: not-measured must not read as a measured zero.
-ok(!/^0 projects across/i.test(nm.fresh.trim()),
+ok(!/^0 projects across/i.test(nm.fresh),
   '14d not-measured is never phrased as a measured zero', nm.fresh);
 // THE COUNTER MUST AGREE WITH THE SENTENCE. An unmeasured ZIP drops its radius-derived
 // development rather than passing it off as whole-ZIP, so the surviving count is 0 because we
