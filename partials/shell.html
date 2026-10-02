@@ -29,12 +29,14 @@
            and how it impacts you"); "Development Map" is Map 1; "Activity" is the ZIP page.
            The entries carry no data-nav, so they never light a primary item, and shell.js
            stamps the viewed ZIP on them like any #hs-nav link to a ZIP_NAV_PAGES page.
-           Wide: the ▾ button opens a menu under Explore; a click outside or Escape closes
-           it. Compact (the Menu panel): the three are listed under Explore, always shown.
+           Wide: hovering Explore opens a menu under it (founder, 2026-10-02: "if you hover
+           over explore the drop down should be obvious"); the chevron beside Explore also
+           opens it, for touch and keyboard, and then a click outside or Escape closes it.
+           Compact (the Menu panel): the three are listed under Explore, always shown.
            Each page names its entry with body[data-explore], and that entry is marked. -->
       <div class="hs-navgroup" id="hs-explore">
         <a href="index.html" data-nav="explore">Explore</a>
-        <button type="button" class="hs-navcaret" id="hs-explore-toggle" aria-label="Explore pages" aria-expanded="false" aria-controls="hs-explore-sub">▾</button>
+        <button type="button" class="hs-navcaret" id="hs-explore-toggle" aria-label="Explore pages" aria-expanded="false" aria-controls="hs-explore-sub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <div class="hs-navsub" id="hs-explore-sub">
           <a href="development.html" data-sub="qol">Quality of Life Impact</a>
           <a href="homesignalmap.html" data-sub="map">Development Map</a>

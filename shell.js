@@ -912,11 +912,11 @@
   };
   function closeMenu() { setMenuOpen(false); }
 
-  // THE EXPLORE DROPDOWN (founder, 2026-10-02). On wide screens the ▾ button beside Explore
-  // opens and closes the menu of Explore's three pages (Quality of Life Impact, Development
-  // Map, Activity); a click outside it, Escape or picking an entry closes it. In the compact
-  // Menu panel the CSS always lists the three under Explore, so this class changes nothing
-  // there.
+  // THE EXPLORE DROPDOWN (founder, 2026-10-02). On wide screens hovering Explore opens the
+  // menu of Explore's three pages (Quality of Life Impact, Development Map, Activity) in CSS;
+  // the chevron beside Explore opens and closes it here, for touch and keyboard, and a click
+  // outside it, Escape or picking an entry closes it. In the compact Menu panel the CSS
+  // always lists the three under Explore, so this class changes nothing there.
   function setExploreOpen(open) {
     const g = $('hs-explore'); if (!g) return;
     g.classList.toggle('open', !!open);
