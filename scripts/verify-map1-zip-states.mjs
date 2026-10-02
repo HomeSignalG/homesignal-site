@@ -221,6 +221,10 @@ for (const c of CASES.filter((c) => c.zip)) {
       // in the sentence pinned whole by test/zip-no-mapped-area-copy.test.mjs. Only a ZIP waiting
       // on a build (producer 'unknown', the synthetic pending case) still says "not measured yet".
       noMappedArea: /has no mapped area\. The Census does not draw a boundary for this ZIP code/.test(txt),
+      // WHICH WORDING THE DEPLOYED PAGE SHIPS. This job runs on the push that changes the
+      // wording, against production, before that change is deployed — so it must judge the
+      // contract the live page actually carries, never the one in this checkout.
+      shipsNoAreaCopy: !!(window.HS && typeof window.HS.zipNoMappedAreaFact === 'function'),
       couldNotRead: /could not be read/i.test(txt),
       // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
       // `could not be read` is lib/zip-authoritative.js::zipAuthNote — a statement about the
@@ -304,9 +308,17 @@ for (const c of CASES.filter((c) => c.zip)) {
     ok(m.wholeZip, `${c.zip}: claims the measurement across the WHOLE ZIP`);
   }
   if (c.kind === 'not_measured') {
-    ok(m.noMappedArea && !m.notMeasured && !m.couldNotRead,
-       `${c.zip}: says it has no mapped area (founder wording), never "not measured yet"`,
-       `no-mapped-area=${m.noMappedArea} not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
+    if (m.shipsNoAreaCopy) {
+      ok(m.noMappedArea && !m.notMeasured && !m.couldNotRead,
+         `${c.zip}: says it has no mapped area (founder wording), never "not measured yet"`,
+         `no-mapped-area=${m.noMappedArea} not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
+    } else {
+      // The deployed page predates the 2026-10-02 wording: its own contract is the old sentence.
+      console.log(`   note: ${c.zip}: the deployed page predates the no-mapped-area wording; judged on the old sentence`);
+      ok(m.notMeasured && !m.noMappedArea && !m.couldNotRead,
+         `${c.zip}: (pre-deploy) the deployed page's not_measured wording`,
+         `no-mapped-area=${m.noMappedArea} not-measured=${m.notMeasured} could-not-read=${m.couldNotRead}`);
+    }
     ok(m.addressCta, `${c.zip}: directs the resident to address mode`);
     ok(m.dev === 0, `${c.zip}: renders no development`, `dev=${m.dev}`);
   }
