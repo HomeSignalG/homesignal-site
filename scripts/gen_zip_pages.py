@@ -925,7 +925,7 @@ def render(p, built):
         # instead of an absence sentence. Same parity rule as gov-notice-copy.js below —
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
-        '<script src="/lib/zip-authoritative.js?v=20260922a"></script>\n'
+        '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
         '<script src="/lib/templates.js?v=74ada1e6"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
@@ -944,7 +944,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=c50ecfcd"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=7ab1d735"></script>\n'
+        '<script src="/lib/community-page.js?v=787a001f"></script>\n'
         "</body>\n</html>\n")
 
 

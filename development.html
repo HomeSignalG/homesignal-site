@@ -22,7 +22,7 @@
      app_projects_for_zip's {unavailable, zip_geography_status} envelope through
      HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
      verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
-<script src="lib/zip-authoritative.js?v=20260922a"></script>
+<script src="lib/zip-authoritative.js?v=20261002a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=74ada1e6"></script>
@@ -82,7 +82,7 @@ HS.onReady(async function () {
   var devOutcome = (projects && projects.outcome) || 'unavailable';
   var devReadComplete = projects.complete === true && devOutcome === 'complete';
   var devUnreadNote = devReadComplete ? ''
-    : (window.HS && HS.zipAuthUnmeasuredFact ? HS.zipAuthUnmeasuredFact(devOutcome, S.zip) : '');
+    : (window.HS && HS.zipAuthUnmeasuredFact ? HS.zipAuthUnmeasuredFact(devOutcome, S.zip, projects && projects.reason) : '');
   // The coverage block NAMES SOURCES and asserts what was checked (lib/coverage-copy.js),
   // so it may only be built on a read that actually happened.
   if (devReadComplete && !projects.length && !facilities.length && community) {
