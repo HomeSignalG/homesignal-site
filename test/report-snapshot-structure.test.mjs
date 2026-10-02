@@ -90,8 +90,12 @@ const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
 // report_id) and never reads one; 3d pins that it names the table nowhere but in that foreign key. Anything else naming the
 // table is still a consumer nobody designed.
 const SHARE_SQL = 'docs/report-share.sql';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the one reader is the Follow / Changes Since Report data layer; the one reference is the share-link foreign key, 3d)', namesTable.join(','));
+// Order L1 (docs/evaluation-entitlement.sql, parked and unapplied): the credit ledger REFERENCES this table (a foreign key, so a credit always links a
+// stored report) and the replay branch of its issue function reads one stored report back by id. It never writes the table: the only writer it calls is
+// report_snapshot_issue. test/evaluation-entitlement-structure.test.mjs pins that.
+const EVALUATION_SQL = 'docs/evaluation-entitlement.sql';
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the one reader is the Follow / Changes Since Report data layer; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
 {
   const t = codeOf(SHARE_SQL).replace(/'(?:[^']|'')*'/g, "''");
   const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
@@ -111,8 +115,8 @@ ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA
     '3b: the one reader names the table twice, in two SELECTs for one report each (the body and identity; the context handle alone), and has no write verb (control: it does name it)', uses);
 }
 const callsWriter = scanned.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
-ok(callsWriter.every((f) => ['docs/report-snapshot.sql', 'supabase/functions/_shared/report-snapshot.ts'].includes(f)),
-  '3c: the writer is called from one place only, the shared module', callsWriter.join(','));
+ok(callsWriter.every((f) => ['docs/report-snapshot.sql', 'supabase/functions/_shared/report-snapshot.ts', EVALUATION_SQL].includes(f)),
+  '3c: the writer is called from the shared module and, inside ONE transaction with its ledger row, from the evaluation entitlement\'s issue function (docs/evaluation-entitlement.sql, the credit); nowhere else', callsWriter.join(','));
 
 // ── 4. one place mints a report identity; the two legacy fingerprint sites are named, not extended ─────
 const assigners = scanned.filter((f) => !f.startsWith('test/') && /\b(draft|report|out|result)\.report_id\s*=[^=]/.test(readFileSync(join(ROOT, f), 'utf8')));
