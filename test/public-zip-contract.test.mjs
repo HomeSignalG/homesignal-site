@@ -122,6 +122,17 @@ ok(cp.includes('Your zip codes'),
   'PS-001 the followed-list heading still says Your zip codes (the Place type, not the page name)');
 ok(/class="eyebrow">Activity<\/p>/.test(gen) && !/class="eyebrow">ZIP Codes<\/p>/.test(gen),
   'PS-001 the generated document\'s SSR eyebrow is Activity too');
+// Founder, 2026-10-02: the browser TAB says Activity as well, matching the Explore menu and the
+// other Explore pages' tabs (development.html is "Quality of Life Impact"). The page's script
+// never rewrites document.title (only the withheld-ZIP notice does, in shell.js).
+const communityHtml = read('community.html');
+ok(/<title>HomeSignal — Activity<\/title>/.test(communityHtml) && !/<title>HomeSignal — Community<\/title>/.test(communityHtml),
+  'PS-001 the Activity page\'s browser tab title is "HomeSignal — Activity"');
+// The generated /community/<zip>/ document keeps its search-facing title on purpose: it tells a
+// search engine what the page holds ("<place> — local government notices, meetings & news"),
+// which "Activity" would not. Pinned so a future sweep for the word cannot flatten it.
+ok(gen.includes('local government notices, meetings & news | HomeSignal'),
+  'PS-001 the generated document keeps its search-facing title (deliberately not "Activity")');
 ok(/id="commFollowBtn"/.test(cp), 'PS-001 ...on the same control id');
 ok(/View Development Map →/.test(cp) && /HS\.navHref\('homesignalmap\.html', zip\)/.test(cp),
   'PS-001 "View Development Map →" still targets Map 1, not the development list');
