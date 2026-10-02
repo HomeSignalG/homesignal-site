@@ -35,6 +35,23 @@ lowest id.
 Then MUTATION: in a fresh database per mutation, the file is broken one way and the suite
 must go red. A mutation that does not change the file SURVIVES.
 
+THE INGEST HALF. The third reader, public.app_development_projects_for_zips (the Rule D /
+project-page read), is owned by homesignal-ingest, a PRIVATE repo this repo's CI cannot read.
+When INGEST_ROOT points at an ingest checkout, the same database also proves its migration:
+  I0  CONTROL: its previous DDL of record (20260928160000) shows the LOWEST-ID row
+  I1  the new migration is refused while the shared rule is missing, and nothing changes
+  I2  after this repo's file, it applies; the body fingerprints to its own recorded state;
+      only service_role and the owner may run it
+  I3  it shows the NEWEST row on every member; everything else it answers is identical
+      (which members, attributes_missing, sizes-only and paged modes)
+  I4  a drifted live reader is refused, and nothing changes
+  I5  no call to the rule is left in its plan (inlined)
+  I6  applying again does nothing; re-applying 20260928160000 restores the previous body and
+      answers, after which this repo's rollback drops the rule
+plus one mutation (the reader keeps its own lowest-id pick, with consistent fingerprints).
+homesignal-ingest's check-map1-representative-pg.yml clones this repo and runs it with
+REQUIRE_INGEST=1, so there an absent ingest half is a failure, never a skip.
+
 Target: N5_TEST_DSN (a THROWAWAY server), exactly as run_suite.py.
 """
 import hashlib
@@ -537,6 +554,182 @@ def mutant_red(c, text):
     return False, "all behaviour checks passed"
 
 
+INGEST_ROOT = os.environ.get("INGEST_ROOT", "").strip()
+REQUIRE_INGEST = os.environ.get("REQUIRE_INGEST", "") == "1"
+ING_FN = "public.app_development_projects_for_zips(text[],text,boolean,text,integer)"
+ING_PREV_MD5 = "028854397028bdf21912fed84a738886"
+
+
+def ingest_files():
+    mig = os.path.join(INGEST_ROOT, "supabase", "migrations")
+    prev = os.path.join(mig, "20260928160000_app_development_projects_for_zips_identity.sql")
+    new = sorted(f for f in os.listdir(mig) if f.endswith("_app_development_projects_for_zips_newest.sql"))
+    return prev, (os.path.join(mig, new[-1]) if new else None)
+
+
+def ingest_post_md5(text):
+    body = re.search(r"as \$fn\$(.*?)\$fn\$;", text, re.S).group(1)
+    return hashlib.md5(body.encode()).hexdigest()
+
+
+ING_DESC = {"id", "community_id", "name", "type", "type_raw", "address", "status", "date_kind",
+            "submitted_at", "source_ref", "source_seq", "record_kind", "registry_id", "source_key_basis"}
+
+
+def ingest_answers(conn):
+    """(newest-row check input, everything-else) for the Rule D reader over every fixture ZIP,
+    in all three modes."""
+    picks, rest = {}, {}
+    full = q1(conn, "select public.app_development_projects_for_zips(%s, 'development')", (list(rs.ZIPS),))
+    for z in full["zips"]:
+        for p in z["projects"] or []:
+            if not p.get("attributes_missing"):
+                picks[(z["zip"], p["source_key"])] = p["id"]
+        z = dict(z)
+        if z["projects"] is not None:
+            z["projects"] = [{k: v for k, v in p.items() if k not in ING_DESC} for p in z["projects"]]
+        rest[z["zip"]] = z
+    rest["generation_id"] = full["generation_id"]
+    rest["sizes"] = q1(conn, "select public.app_development_projects_for_zips(%s, 'development', true)",
+                       (list(rs.ZIPS),))
+    page = q1(conn, "select public.app_development_projects_for_zips(array['11101'], 'development', false, null, 2)")
+    rest["page"] = {k: v for k, v in page.items() if k != "zips"}
+    rest["page_keys"] = [(p["source_key"], p.get("attributes_missing")) for p in page["zips"][0]["projects"]]
+    return picks, json.dumps(rest, sort_keys=True, default=str)
+
+
+def ingest_want(conn, pick):
+    by_key = rows_by_key(conn)
+    out = {}
+    for m in q(conn, """select zcta5::text as z, source_key from geo.n5_serving_membership
+                         where record_kind = 'development'"""):
+        r = pick(by_key.get(m["source_key"], []))
+        if r is not None:
+            out[(m["z"], m["source_key"])] = r["id"]
+    return out
+
+
+def ingest_plan_has_rule_call(conn):
+    """(plans captured, Function Scan nodes that call the rule) inside the Rule D reader."""
+    for st in ("load 'auto_explain'", "set auto_explain.log_min_duration = 0",
+               "set auto_explain.log_nested_statements = on", "set auto_explain.log_format = 'json'",
+               "set enable_seqscan = off", "discard plans", "set log_min_messages = panic",
+               "set client_min_messages = log"):
+        q(conn, st)
+    plans = []
+    dec = json.JSONDecoder()
+    try:
+        del conn.notices[:]
+        q(conn, "select public.app_development_projects_for_zips(array['11101','11102'], 'development')")
+        for n in conn.notices:
+            at = n.find("plan:")
+            start = n.find("{", at) if at >= 0 else -1
+            if start >= 0:
+                plans.append(dec.raw_decode(n[start:])[0])
+    finally:
+        q(conn, "reset client_min_messages")
+        q(conn, "reset log_min_messages")
+        q(conn, "reset enable_seqscan")
+        q(conn, "set auto_explain.log_min_duration = -1")
+    calls, keyed = [], 0
+    for p in plans:
+        stack = [p["Plan"]]
+        while stack:
+            node = stack.pop()
+            stack.extend(node.get("Plans", []))
+            if node.get("Node Type") == "Function Scan" and node.get("Function Name") == "app_project_representative":
+                calls.append(node.get("Function Name"))
+            if node.get("Relation Name") == "app_projects" and "source_key" in (node.get("Index Cond") or ""):
+                keyed += 1
+    return len(plans), calls, keyed
+
+
+def run_ingest():
+    s = rs.Suite(None, "map1-representative/ingest")
+    prev_path, new_path = ingest_files()
+    prev, new = open(prev_path).read(), open(new_path).read()
+    post = ingest_post_md5(new)
+    db = "map1_rep_ing"
+    c = rs.fresh_db(db)
+    try:
+        build(c)
+        q(c, prev)
+        before_picks, before_rest = ingest_answers(c)
+        s.ok("I0 CONTROL: the previous DDL of record (md5 02885439...) shows the LOWEST-ID row",
+             md5_of(c, ING_FN) == ING_PREV_MD5 and before_picks == ingest_want(c, lowest)
+             and before_picks != ingest_want(c, newest), md5_of(c, ING_FN))
+        err = refusal(c, new)
+        s.ok("I1 the new migration is refused while the shared rule is missing, and nothing changed",
+             err is not None and "does not exist" in err and md5_of(c, ING_FN) == ING_PREV_MD5, err)
+        apply(c)
+        acl_before = q1(c, ATTRS, (ING_FN,))
+        q(c, new)
+        s.ok(f"I2 after this repo's file it applies; body md5 {post[:8]}...; owner, grants and SET clauses "
+             "unchanged; only service_role and the owner may run it",
+             md5_of(c, ING_FN) == post and q1(c, ATTRS, (ING_FN,)) == acl_before
+             and not q1(c, "select has_function_privilege('anon', to_regprocedure(%s), 'execute')", (ING_FN,))
+             and not q1(c, "select has_function_privilege('authenticated', to_regprocedure(%s), 'execute')", (ING_FN,))
+             and q1(c, "select has_function_privilege('service_role', to_regprocedure(%s), 'execute')", (ING_FN,)),
+             q1(c, ATTRS, (ING_FN,)))
+        after_picks, after_rest = ingest_answers(c)
+        s.ok("I3 it shows the NEWEST row on every member; everything else it answers is identical",
+             after_picks == ingest_want(c, newest) and after_rest == before_rest,
+             [k for k in after_picks if after_picks[k] != ingest_want(c, newest).get(k)][:3])
+        with c.cursor() as cur:
+            cur.execute("begin")
+            cur.execute(f"""do $d$ begin execute replace(pg_get_functiondef('{ING_FN}'::regprocedure),
+                            '  v_out jsonb;', '  v_out jsonb; -- drift'); end $d$""")
+            err = None
+            try:
+                cur.execute(new)
+            except psycopg2.Error as e:
+                err = str(e).splitlines()[0]
+            cur.execute("rollback")
+        s.ok("I4 a drifted live reader is refused, and nothing changed",
+             err is not None and "drifted" in err and md5_of(c, ING_FN) == post, err)
+        plans, called, keyed = ingest_plan_has_rule_call(c)
+        s.ok("I5 no call to the rule is left in the reader's plan (inlined): app_projects is read by an "
+             "index keyed on source_key", plans > 0 and not called and keyed >= 1,
+             f"{plans} plans, {len(called)} rule calls, {keyed} keyed reads")
+        q(c, new)
+        same = md5_of(c, ING_FN) == post
+        q(c, prev)
+        rb_b, rb_a = rollback_parts()
+        q(c, rb_b)
+        q(c, rb_a)
+        s.ok("I6 applying again does nothing; re-applying 20260928160000 restores the previous body and "
+             "answers; this repo's rollback then drops the rule",
+             same and md5_of(c, ING_FN) == ING_PREV_MD5 and ingest_answers(c) == (before_picks, before_rest)
+             and md5_of(c, REP) is None)
+    finally:
+        c.close()
+        rs.drop_db(db)
+
+    # one mutation: the reader keeps its own lowest-id pick (with a consistent fingerprint)
+    lat_new = "          from public.app_project_representative(m.source_key, 'development') p\n"
+    lat_old = ("          from public.app_projects p\n         where p.source_key = m.source_key\n"
+               "           and p.record_kind = 'development'\n         order by p.id asc\n         limit 1\n")
+    mutant = new.replace(lat_new, lat_old, 1)
+    mutant = mutant.replace(post, ingest_post_md5(mutant))
+    killed = False
+    if mutant != new:
+        c = rs.fresh_db("map1_rep_ing_mut")
+        try:
+            build(c)
+            q(c, prev)
+            apply(c)
+            try:
+                q(c, mutant)
+                killed = ingest_answers(c)[0] != ingest_want(c, newest)
+            except psycopg2.Error:
+                killed = True
+        finally:
+            c.close()
+            rs.drop_db("map1_rep_ing_mut")
+    print(f"{'KILLED' if killed else 'SURVIVED'} — I-M1 the Rule D reader keeps its own lowest-id pick")
+    return s, (0 if killed else 1)
+
+
 def run_mutations():
     survivors = []
     original = open(DOC).read()
@@ -572,14 +765,26 @@ def main():
     print("\n" + "=" * 60)
     print("MUTATION PASS — each broken file must turn the suite red")
     survivors = run_mutations()
+    ing_fails, ing_survivors, ing_line = [], 0, "INGEST HALF: SKIPPED (INGEST_ROOT not set)"
+    if INGEST_ROOT and ingest_files()[1]:
+        print("\n" + "=" * 60)
+        print("INGEST HALF — public.app_development_projects_for_zips (homesignal-ingest)")
+        ing, ing_survivors = run_ingest()
+        ing_fails = ing.failed()
+        ing_line = (f"INGEST HALF: {len(ing.results) - len(ing_fails)} PASS / {len(ing_fails)} FAIL · "
+                    f"MUTATIONS: {1 - ing_survivors} killed / {ing_survivors} survived")
+    elif REQUIRE_INGEST:
+        ing_fails = ["REQUIRE_INGEST=1 but no ingest checkout with the new migration at INGEST_ROOT"]
+        ing_line = "INGEST HALF: REQUIRED AND MISSING"
     print("\n" + "=" * 60)
     print(f"MAP1-REPRESENTATIVE: {len(base.results) - len(fails)} PASS / {len(fails)} FAIL · MUTATIONS: "
           f"{len(MUTATIONS) - len(survivors)} killed / {len(survivors)} survived")
-    for f in fails:
+    print(ing_line)
+    for f in fails + ing_fails:
         print(f"FAIL — {f}")
     for m in survivors:
         print(f"FAIL — mutation survived: {m}")
-    return 1 if (fails or survivors) else 0
+    return 1 if (fails or survivors or ing_fails or ing_survivors) else 0
 
 
 if __name__ == "__main__":
