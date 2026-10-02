@@ -64,6 +64,13 @@ STAMP = ("  if new.status = 'deactivated' then\n"
          "  end if;\n")
 OWNER_COND = "  if old.role = 'owner' and (new.role <> 'owner' or new.status <> 'active') then"
 LOCK = "    perform 1 from public.brokerage_account a where a.id = old.brokerage_id for no key update;\n"
+ISOLATION = ("    if current_setting('transaction_isolation') <> 'read committed' then\n"
+             "      raise exception 'brokerage_member: removing or demoting an owner needs READ COMMITTED (the last-owner check cannot be serialised at %)',\n"
+             "        current_setting('transaction_isolation') using errcode = '55000';\n"
+             "    end if;\n")
+ACL_CHECK = ("    if exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.oid = t::regclass and a.grantee <> c.relowner) then\n"
+             "      raise exception 'brokerage_account_spine: % is accessible to a role other than its owner', t;\n"
+             "    end if;\n")
 ACTIVE_BROKERAGE = ("    if exists (select 1 from public.brokerage_account a where a.id = old.brokerage_id and a.status = 'active')\n"
                     "       and not exists")
 OTHER_OWNER = "where m.brokerage_id = old.brokerage_id and m.id <> old.id and m.role = 'owner' and m.status = 'active') then"
@@ -108,6 +115,9 @@ MUTATIONS = {
     'guard_counts_agents_as_owners': [(OTHER_OWNER, "where m.brokerage_id = old.brokerage_id and m.id <> old.id and m.status = 'active') then", 1)],
     'guard_applies_to_inactive_brokerages': [(ACTIVE_BROKERAGE, "    if true\n       and not exists", 1)],
     'guard_without_lock': [(LOCK, "", 1)],
+    'guard_ignores_isolation_level': [(ISOLATION, "", 1)],
+    'guard_isolation_check_refuses_everything': [(ISOLATION, ISOLATION.replace("<> 'read committed'", "is not null"), 1)],
+    'post_condition_reads_only_typed_roles': [(ACL_CHECK, "", 1)],
     # ---- identity, history, the clock ---------------------------------------------------------------------------------
     'identity_columns_can_change': [(IDENTITY, "", 1)],
     'deactivation_not_terminal': [(TERMINAL, "", 1)],
@@ -178,9 +188,9 @@ PG_ONLY = set()
 
 # The mutations whose executable check is the poisoned-apply check, not the suite (the post-condition is invisible to a suite that
 # runs against a state the apply already left good).
-POISON = {'post_condition_removed'}
+POISON = {'post_condition_removed', 'post_condition_reads_only_typed_roles'}
 # ... and the one only two sessions at once can see: with the lock gone each owner removal sees the other owner still active.
-RACE = {'guard_without_lock'}
+RACE = {'guard_without_lock', 'guard_ignores_isolation_level', 'guard_isolation_check_refuses_everything'}
 
 
 def _rep(text, old, new, count, name):

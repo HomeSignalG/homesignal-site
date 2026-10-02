@@ -121,8 +121,9 @@ ok(!/\bcreate\s+policy\b/i.test(SQL) && !/\bforce row level security\b/i.test(SQ
 ok((SQL.match(/\bgrant\b/gi) || []).length === 1 && /execute format\('grant execute on function %s to service_role', f\.sig\);/.test(SQL),
   '6c: the ONLY grant in the file is execute on a function to service_role, inside the computed loop — no table is granted to anybody');
 ok(/p\.proname like 'brokerage\\_member%'/.test(SQL) && /p\.prorettype = 'trigger'::regtype/.test(SQL) && /if not f\.is_trigger then/.test(SQL)
-   && /revoke all on function %s from public, anon, authenticated, service_role/.test(SQL),
-  '6d: the function lock is a COMPUTED loop over this file\'s own prefix (a typed list would stop covering the next function, and a wider prefix would re-lock a later order\'s functions); a trigger function is granted to nobody');
+   && /revoke all on function %s from public, anon, authenticated, service_role/.test(SQL)
+   && /format\('%I\.%I\(%s\)', n\.nspname, p\.proname, pg_get_function_identity_arguments\(p\.oid\)\)/.test(SQL),
+  '6d: the function lock is a COMPUTED loop over this file\'s own prefix, naming each function by its SCHEMA-QUALIFIED identity (a typed list would stop covering the next function, a wider prefix would re-lock a later order\'s functions, and an unqualified name could re-target a same-named function in an earlier schema); a trigger function is granted to nobody');
 ok((SQL.match(/security definer/g) || []).length === 1 && /security definer set search_path = public, pg_temp/.test(RESOLVER)
    && (SQL.match(/set search_path = public, pg_temp/g) || []).length === 2,
   '6e: exactly one function is security definer — the resolver — and both functions pin their search_path');
@@ -148,6 +149,9 @@ ok(/old\.role = 'owner' and \(new\.role <> 'owner' or new\.status <> 'active'\)/
 ok(/perform 1 from public\.brokerage_account a where a\.id = old\.brokerage_id for no key update;/.test(GUARD)
    && GUARD.indexOf('for no key update') < GUARD.indexOf('the last active owner'),
   '7f: concurrent removals of two owners are serialised on the brokerage row BEFORE the check, so both cannot pass it and leave none');
+ok(/if current_setting\('transaction_isolation'\) <> 'read committed' then\s+raise exception 'brokerage_member: removing or demoting an owner needs READ COMMITTED[^']*',\s*current_setting\('transaction_isolation'\) using errcode = '55000';\s+end if;/.test(GUARD)
+   && GUARD.indexOf("transaction_isolation") > GUARD.indexOf("old.role = 'owner'") && GUARD.indexOf("transaction_isolation") < GUARD.indexOf('for no key update'),
+  '7i: an owner removal above READ COMMITTED is REFUSED, inside the owner branch and BEFORE the row lock: the lock refreshes what the check sees only at READ COMMITTED, so at REPEATABLE READ two owners could both be removed (measured: zero left)');
 ok(/new\.id <> old\.id or new\.brokerage_id <> old\.brokerage_id or new\.user_id <> old\.user_id or new\.joined_at <> old\.joined_at/.test(GUARD)
    && /old\.status = 'deactivated'[\s\S]{0,200}terminal/.test(GUARD) && /new\.deactivated_at := now\(\);/.test(GUARD),
   '7g: identity columns never change, a deactivated membership is terminal (re-joining is a new row), and the deactivation time is stamped by the database, never taken from the caller');
@@ -177,8 +181,9 @@ ok(/ROLLBACK/.test(RAW) && tail.includes('drop table if exists public.brokerage_
    && tail.includes('drop function if exists public.brokerage_membership_of(uuid);') && /FIRST/.test(tail),
   '9e: the ROLLBACK block names both tables and the resolver, and says to roll back anything a later order hung off them first');
 ok(/do \$post\$[\s\S]*relrowsecurity[\s\S]*pg_policy[\s\S]*has_table_privilege\(r, t, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'\)[\s\S]*end \$post\$;/.test(SQL)
-   && (SQL.match(/raise exception 'brokerage_account_spine:/g) || []).length === 5,
-  '9f: the file ends with a fail-closed post-condition (RLS on, no policy, no API-role privilege on either table) and has two preconditions: a half-applied or poisoned state stops the apply');
+   && /aclexplode\(c\.relacl\)[\s\S]*a\.grantee <> c\.relowner/.test(SQL.slice(SQL.indexOf('do $post$')))
+   && (SQL.match(/raise exception 'brokerage_account_spine:/g) || []).length === 6,
+  '9f: the file ends with a fail-closed post-condition (RLS on, no policy, no API-role privilege on either table, and no grantee at all but the owner, read from the whole ACL) and has two preconditions: a half-applied or poisoned state stops the apply');
 const localisms = SQL.match(/\b(nyc|new york|manhattan|brooklyn|bronx|queens|staten|dob|socrata|arcgis|legistar|granicus|tucson|phoenix|denver|utah|texas)\b/gi) || [];
 ok(localisms.length === 0, '9g: no city, state, market or source-vendor literal', localisms.join(','));
 
@@ -190,7 +195,7 @@ ok(checkIds.size >= 45, '10: the executable suite carries at least 45 checks', c
 ok(sqlMutNames.length >= 50 && new Set(sqlMutNames).size === sqlMutNames.length && fileMutNames.length >= 14 && new Set([...sqlMutNames, ...fileMutNames]).size === sqlMutNames.length + fileMutNames.length,
   '10b: the harness carries at least 50 distinct prohibited mutations of the SQL and 14 of the files around it', sqlMutNames.length + ' + ' + fileMutNames.length);
 ok(['no_one_active_membership_index', 'no_guard_trigger', 'guard_counts_deactivated_owner', 'guard_ignores_demotion', 'guard_without_lock', 'functions_unlocked', 'authenticated_can_read_member',
-    'policy_for_authenticated', 'resolver_ignores_member_status', 'resolver_ignores_brokerage_status', 'resolver_security_invoker', 'resolver_overload_by_email', 'member_has_email_column',
+    'policy_for_authenticated', 'resolver_ignores_member_status', 'resolver_ignores_brokerage_status', 'guard_ignores_isolation_level', 'post_condition_reads_only_typed_roles', 'resolver_security_invoker', 'resolver_overload_by_email', 'member_has_email_column',
     'account_has_email_domain_column', 'account_has_address_column', 'member_has_label_column', 'account_has_credits_column', 'account_has_quota_column', 'file_seeds_a_row', 'fk_not_cascade',
     'post_condition_removed', 'deactivation_time_from_caller', 'identity_columns_can_change', 'deactivation_not_terminal', 'service_role_can_read_member']
      .every((m) => sqlMutNames.includes(m))

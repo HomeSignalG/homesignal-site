@@ -72,7 +72,7 @@ re-check, from the repository, is stated.
 | The internal-function gate is `public.dashboard_admins` by exact email; its header says the entitlement check replaces `isAdmin` | `supabase/functions/_shared/admin-gate.ts` header, `_shared/service-rest.ts` line 70 | re-read, true |
 | No brokerage, organization, seat, entitlement, invite, credit, workspace or report-ownership table or function exists in production | audit, `information_schema` and `pg_proc` reads with a positive control | **UNVERIFIED here** (not repeated) |
 | Production counts: `auth.users` 28, `public.users` 15, `app_follows` 18, `app_properties` 8, `public.subscriptions` 0 | audit | **UNVERIFIED here** |
-| `report_snapshot` has no owner column and 0 rows; the F-order SQL says the owner column arrives with the unit that creates the account tables | `docs/report-snapshot.sql`; audit for the row count | the SQL half re-read; the count **UNVERIFIED here** |
+| `report_snapshot` has no owner column and 0 rows; the F-order SQL says the owner column arrives with the unit that creates the account tables (**superseded by this design:** K0 adds no owner column; ownership will be Order J's own row keyed by `report_id`, so `docs/report-snapshot.sql` lines 70-73 no longer describe the plan) | `docs/report-snapshot.sql`; audit for the row count | the SQL half re-read; the count **UNVERIFIED here** |
 | `public.users` (alert-subscription system) has no foreign key to `auth.users` and is not a membership candidate | audit read of `pg_constraint`; `CLAUDE.md` §6.5 | **UNVERIFIED here** |
 | The Enterprise nav item links to the marketing landing, which is not an Agent Workspace | `partials/shell.html`, `development-activity.html` (audit) | not re-read; **UNVERIFIED here** |
 
@@ -159,11 +159,22 @@ the team table (Order J and the Step 8 contract) must carry `report_id`, dates a
   `dashboard_admins`; when Orders J and L land, the resolver is read **in the gate**, never called from a handler (a second gate).
 - It creates no row and runs no schedule. The tables are empty.
 - Supabase's advisor reports a table with row level security on and no policy as informational; here that is the intended posture
-  (the `dashboard_admins` posture). The advisor was **not run** (no database tool was used in this build).
+  (stricter than the `dashboard_admins` posture, which revokes anon and authenticated only and leaves `service_role` reading it
+  directly; here `service_role` is revoked too, so every future writer must be a SECURITY DEFINER function or a migration). The advisor
+  was **not run** (no database tool was used in this build).
 - A brokerage with no active owner can exist (D-K4), and between creating a brokerage and inserting its first owner there is a moment
   with none; Order L's creation function should do both in one transaction.
-- Serialisation of two owner removals holds at the default READ COMMITTED isolation (what PostgREST and the migration role use); the
-  race test in `run.sh` runs at that level.
+- Serialisation of two owner removals holds only at READ COMMITTED (the default for PostgREST and the migration role). An independent
+  review reproduced the failure above it on PostgreSQL 16: two sessions each removing a different owner at REPEATABLE READ both
+  committed and left **zero** owners (READ COMMITTED left one; SERIALIZABLE left one through a serialisation failure), because waiting
+  on the row lock does not refresh a REPEATABLE READ snapshot. The guard therefore REFUSES an owner removal or demotion at any level
+  but READ COMMITTED (errcode 55000, message "needs READ COMMITTED"), before it takes the lock. `run.sh` proves both halves: the refusal
+  at REPEATABLE READ and SERIALIZABLE, and the same removal succeeding at READ COMMITTED (so a blanket refusal cannot pass); three
+  mutations (check removed, check refusing everything, lock removed) are each killed by the race or isolation step. Every writer
+  Order L adds must remove owners at READ COMMITTED.
+- The ACL post-condition reads the table's whole ACL (no grantee but the owner) instead of a typed role list, so a grant to an
+  unnamed role, to PUBLIC, or a privilege a newer PostgreSQL adds (MAINTAIN) stops the apply; the function lock names each function by
+  its schema-qualified identity so a same-named function in an earlier schema cannot be re-targeted.
 
 ## 7. What K1 and later need from J and L
 
@@ -194,9 +205,9 @@ started for the purpose (the pg harness is also wired for PostgreSQL 17 in CI by
 
 | # | Command (from the worktree) | Decisive output |
 |---|---|---|
-| 1 | `PGHOST=<socket> PGUSER=postgres PGDATABASE=brokerage_disposable bash test/brokerage_account_pg/run.sh` | `SHIPPED: 48 checks, 0 failed` · `CONCURRENT: two sessions removing the two owners of one brokerage at once leave exactly one` · `APPLIED TWICE with an identical definition` · `POISONED: a pre-existing policy stops the apply, and a stray grant is revoked by it` · then 59 lines `KILLED`, 0 `SURVIVED`, 0 `HARNESS`, exit 0 |
-| 2 | `node test/brokerage-account-structure.test.mjs` | `56 passed, 0 failed of 56` |
-| 3 | `python3 test/brokerage_account_mutants.py` | `85 killed, 0 survived, 0 skipped (database only), 0 harness fault(s), of 85` (59 edits of the SQL and 26 of the files around it; every file is restored byte for byte after each, and the working tree then holds only this unit's files) |
+| 1 | `PGHOST=<socket> PGUSER=postgres PGDATABASE=brokerage_disposable bash test/brokerage_account_pg/run.sh` | `SHIPPED: 48 checks, 0 failed` · `CONCURRENT: two sessions removing the two owners of one brokerage at once leave exactly one` · `ISOLATION: removing an owner at REPEATABLE READ or SERIALIZABLE is refused; at READ COMMITTED it goes through` · `APPLIED TWICE with an identical definition` · `POISONED: a pre-existing policy stops the apply, and a stray grant is revoked by it` · then 62 lines `KILLED`, 0 `SURVIVED`, 0 `HARNESS`, exit 0 (counted from the saved log) |
+| 2 | `node test/brokerage-account-structure.test.mjs` | `57 passed, 0 failed of 57` |
+| 3 | `python3 test/brokerage_account_mutants.py` | `88 killed, 0 survived, 0 skipped (database only), 0 harness fault(s), of 88` (62 edits of the SQL and 26 of the files around it; every file is restored byte for byte after each, and the working tree then holds only this unit's files) |
 | 4 | `node scripts/run-unit-tests.mjs --offline` (the mode the required CI check runs) | `All 289 unit test file(s) passed (mode=offline).` |
 | 5 | `node scripts/run-unit-tests.mjs --browser` (the 46 browser-backed suites; they need Playwright and exercise pages, none of which this unit touches) | 46 suites ran: 31 passed and `15 test file(s) failed`. **All 15 fail identically on a pristine export of `origin/main` at `ea0d1db`** (`git archive` into a scratch directory with the same `node_modules`; this worktree was not touched): the same FAIL and PASS counts where a suite prints them (`map1-dc-type-lifecycle` 18 and 18, `map1-national-plane-failure` 21 and 70, `map1-dual-identity` 14 and 10, `map1-stage-filter-chips` 11 and 40, `map1-type-filter-chips` 8 and 52, `maps-datacenter-capture-state` 16 and 3, `user-journey` 6 and 103, `map1-all-types-off` 9 and 23, `map1-regulatory-toggle` 3 and 19, `place-context-map-fits-frame` 3 and 4, `acquisition-video-producer-workflow` 1 and 31), and exit 1 on both for the four that crash before printing counts. This unit adds no HTML, JS or lib file. **The cause was not investigated**; the Map 1 suites draw 0 markers here, and a sandbox with no network egress is a guess, UNVERIFIED. So "the full suite finishes with `All N unit test file(s) passed`" is true of the required offline mode (item 4) and **not** of the browser mode in this environment, on `main` or on this branch. |
 
@@ -211,14 +222,15 @@ one email, at most one row per person, signature and volatility); **L01–L07** 
 API role or PUBLIC, 24 refused reads and writes asked AS each role, the resolver executable by `service_role` alone and nobody able to
 execute the guard, one security-definer function with a pinned search path, and nothing else in the spine; **S01** no setup step raised.
 
-The prohibited mutations (59 of the SQL; the audit's eleven and 48 more) include: dropping the one-active index, making it non-partial or
+The prohibited mutations (62 of the SQL; the audit's eleven and 51 more) include: dropping the one-active index, making it non-partial or
 per brokerage; dropping the last-owner trigger; ignoring its demotion arm or its deactivation arm; counting a deactivated owner, the row
 itself, an owner of another brokerage or an agent as "another owner"; applying the guard to inactive brokerages; **removing its lock (killed
-only by the two-session race)**; widening any vocabulary; dropping a CHECK or the cascade; widening grants to `authenticated`, `anon` or
+only by the two-session race)**; **removing the isolation-level refusal, or making it refuse at READ COMMITTED too (both killed only by the race and
+isolation steps, added after the independent review)**; widening any vocabulary; dropping a CHECK or the cascade; widening grants to `authenticated`, `anon` or
 `service_role`; adding a policy; skipping the revoke from PUBLIC; granting the trigger function; the resolver ignoring member status or
 brokerage status, going SECURITY INVOKER, unpinning its search path, taking an email, or matching an email domain; any of nine forbidden
 columns (email, email domain, address, label, credits, quota, price, invite token, client name); seeding a row; adding an invite table or a
-credits function; **removing the post-condition (killed only by the poisoned-state check)**. The 26 file mutations include a gate, a
+credits function; **removing the post-condition, or its whole-ACL read (each killed only by the poisoned-state check)**. The 26 file mutations include a gate, a
 handler or a lib file naming the tables or the resolver, the service reader no longer reading `dashboard_admins`, the gate no longer asking
 `isAdmin`, the SQL naming a resident or report table, arming a schedule, deleting or dropping, losing its rollback or its NOT APPLIED
 marker, the status file striking Order K or Master Step 8, the workflow holding a secret, gaining a schedule or ceasing to run on the SQL.

@@ -29,7 +29,11 @@
 --   * A membership is active exactly when it has no deactivation time, and the deactivation time is stamped by
 --     the database at the moment of deactivation, never taken from the caller.
 --   * The LAST ACTIVE OWNER of an ACTIVE brokerage cannot be deactivated or demoted. Concurrent attempts on
---     two owners are serialised on the brokerage row, so both cannot pass the check and leave none.
+--     two owners are serialised on the brokerage row, so both cannot pass the check and leave none. That holds
+--     at READ COMMITTED, the only isolation level where waiting on the row lock also refreshes what the check
+--     sees. At REPEATABLE READ or SERIALIZABLE the guard REFUSES any owner removal (errcode 55000) instead of
+--     risking a brokerage left with no owner (measured on PostgreSQL 16: REPEATABLE READ left zero). Every
+--     writer Order L adds must therefore remove owners at READ COMMITTED, the default.
 --   * Identity columns (id, brokerage, user, joined time) never change, and a deactivated membership is
 --     terminal: a person who leaves and returns is a NEW membership row. (D-K5.)
 --   * Deleting an auth user (an account deletion or a privacy request) is never blocked by this spine: their
@@ -38,9 +42,10 @@
 --     and what to do about it belongs to Order L. (D-K4.)
 --   * Membership is by user id only. The resolver takes a user id, never an email or a domain.
 --
--- ACCESS: system-only (the dashboard_admins posture). RLS on, NO policy, every privilege on both tables
--- revoked from public, anon, authenticated AND service_role: the only way in is the resolver, executable by
--- service_role alone. Nothing in this file writes a row, and no caller exists: there are no writers until the
+-- ACCESS: system-only, STRICTER than the dashboard_admins posture (which revokes anon and authenticated only and
+-- leaves service_role reading it directly). RLS on, NO policy, every privilege on both tables revoked from
+-- public, anon, authenticated AND service_role: the only way in is the resolver, executable by service_role
+-- alone, so every future writer is a SECURITY DEFINER function or a migration. Nothing in this file writes a row, and no caller exists: there are no writers until the
 -- invite flow of Order L (D-K3). The tables are empty.
 --
 -- THE GATE IS UNCHANGED. supabase/functions/_shared/admin-gate.ts still answers "who may call an internal
@@ -108,6 +113,13 @@ begin
     new.deactivated_at := now();                 -- stamped here, never taken from the caller
   end if;
   if old.role = 'owner' and (new.role <> 'owner' or new.status <> 'active') then
+    -- The row lock below serialises two removals only if the waiter then re-reads committed data. Above READ
+    -- COMMITTED the transaction keeps its old snapshot, so the second remover would still see the first owner
+    -- active and both would commit. Refuse rather than allow that.
+    if current_setting('transaction_isolation') <> 'read committed' then
+      raise exception 'brokerage_member: removing or demoting an owner needs READ COMMITTED (the last-owner check cannot be serialised at %)',
+        current_setting('transaction_isolation') using errcode = '55000';
+    end if;
     -- Serialise concurrent removals of owners of ONE brokerage: without this, two sessions each deactivating a
     -- different owner both see the other still active, both pass, and none is left.
     perform 1 from public.brokerage_account a where a.id = old.brokerage_id for no key update;
@@ -152,7 +164,8 @@ revoke all on public.brokerage_member  from public, anon, authenticated, service
 do $lock$
 declare f record;
 begin
-  for f in select p.oid::regprocedure as sig, (p.prorettype = 'trigger'::regtype) as is_trigger
+  for f in select format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) as sig,
+                  (p.prorettype = 'trigger'::regtype) as is_trigger
              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname = 'public' and p.proname like 'brokerage\_member%' loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f.sig);
@@ -181,6 +194,11 @@ begin
         raise exception 'brokerage_account_spine: role % holds a privilege on %', r, t;
       end if;
     end loop;
+    -- Computed, not typed: no grantee at all except the owner (this also covers PUBLIC and privileges a newer
+    -- PostgreSQL adds, such as MAINTAIN, which the typed list above does not name).
+    if exists (select 1 from pg_class c, aclexplode(c.relacl) a where c.oid = t::regclass and a.grantee <> c.relowner) then
+      raise exception 'brokerage_account_spine: % is accessible to a role other than its owner', t;
+    end if;
   end loop;
 end $post$;
 
