@@ -1,7 +1,13 @@
 # Development Activity — plan status (living document)
 
-Governs with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
-`66257cc790c566c6b25644225899659385b973d8b1e6b02f94f7272a3a92955c`) and
+**Governing plan since 2026-10-02: `docs/development-activity-plan-100526.md`** (the founder's upload, saved
+unchanged, sha256 `82491934c1b2ff3d8f5e2f34753fe69f6e1f35603b1b7bce09f914c61a230e22`). Its build is tracked
+step by step in `docs/development-activity-build-steps-100526.md`, which is struck through as each step lands.
+Where it differs from the earlier plan (a fixed 0.5-mile radius; Type and Stage filters; a Permitted / Under
+Construction section; $79/month for 100 reports), the 100526 plan governs.
+
+Before that it governed with `docs/development-activity-plan-2026-09-30.md` (frozen, sha256
+`66257cc790c566c6b25644225899659385b973d8b1e6b02f94f7272a3a92955c`), which stays as a dated record, and
 `docs/development-activity-founder-rulings-2026-09-30.md`.
 
 **How to read it.** ~~Struck through~~ = done, and "done" means **merged to `main`**.
