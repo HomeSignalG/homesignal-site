@@ -249,7 +249,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-2', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-3', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
 
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
@@ -303,7 +303,7 @@ const FIELD = {
   ok(ids(r.intelligence.projects.map((p) => p.project_id)) === 'ka,kb', '8a projects are sorted by project id; a project not in the spatial answer is not added', ids(r.intelligence.projects.map((p) => p.project_id)));
   const r2 = run({ rows: [row('kc', 0.2), row('kd', 0.2), row('ke', 0.2)], projects: [proj('kc', { source_ref: '' }), proj('kd', { source_ref: null }), proj('ke', { record_kind: 'facility' })] });
   ok(r2.intelligence.projects.length === 0, '8b a record with no source URL, or that is not a development record, is not in the report');
-  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-2' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
+  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-3' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
   ok(M.parseRadius(0.5) === 0.5 && M.parseRadius('2') === 2 && M.parseRadius(3) === null && M.parseRadius('') === null && M.parseRadius(null) === null && M.parseRadius('x') === null, '8d only the four canonical radii parse');
   ok(throws(() => run({ radius_mi: 3 })) !== null && throws(() => run({ view: 'staff' })) !== null && throws(() => run({ subject: { ...SUBJECT, zip: '9747' } })) !== null && throws(() => run({ subject: { ...SUBJECT, address: '  ' } })) !== null
     && throws(() => run({ subject: { ...SUBJECT, lat: NaN } })) !== null, '8e a bad radius, view, ZIP, blank address or non-finite point is refused');
@@ -370,6 +370,69 @@ const FIELD = {
     ledger: [], events: [], health: [] });
   ok(JSON.stringify(tie.renderOnly.review) === '["t:b","t:c","t:a"]', '9o a tie in distance goes to the stronger stage (Permitted, Approved, Proposed); a record in no stage section is never listed', tie.renderOnly.review);
   ok(!JSON.stringify(out.intelligence).includes('review'), '9p the review list is response-only: it is measured from the subject');
+}
+
+// ---- 10. the report's outcome: "No development activity" vs "No data ingested" (founder ruling R5, 2026-10-02) -----------------
+{
+  ok(JSON.stringify(M.ACTIVITY_LABELS) === JSON.stringify({ DEVELOPMENT_SHOWN: 'Development shown', NO_DEVELOPMENT_ACTIVITY: 'No development activity', NO_DATA_INGESTED: 'No data ingested' })
+    && JSON.stringify([...M.ACTIVITY_OUTCOMES]) === '["DEVELOPMENT_SHOWN","NO_DEVELOPMENT_ACTIVITY","NO_DATA_INGESTED"]' && M.ACTIVITY_RULE_VERSION === 'activity-outcome-1',
+    '10a three outcomes, in the founder\'s words, under a versioned rule');
+  ok(M.activityOutcome(1) === 'DEVELOPMENT_SHOWN' && M.activityOutcome(40) === 'DEVELOPMENT_SHOWN', '10b a report with development records shows development');
+  const zeros = [0, -1, 0.5, NaN, Infinity, null, undefined, '3'];
+  ok(zeros.every((v) => M.activityOutcome(v) === 'NO_DATA_INGESTED'), '10c an empty report, or a count that is not a whole number, is "No data ingested"', zeros.map((v) => M.activityOutcome(v)));
+  // NO_DEVELOPMENT_ACTIVITY needs the VERIFIED ZERO proof, which has no inputs yet: no input of today's rule can reach it
+  const reach = new Set([...Array(50).keys(), -5, 1.5, NaN, null].map((v) => M.activityOutcome(v)));
+  ok(!reach.has('NO_DEVELOPMENT_ACTIVITY'), '10d "No development activity" is unreachable until HomeSignal can prove its data for an address is coming in', [...reach]);
+
+  const projects = [proj('k1'), proj('k2', { registry_id: 'austin-site-plan-cases', name: 'Menchaca Apartments' })];
+  const rows = [row('k1', 0.2), row('k2', 0.4, { registry_id: 'austin-site-plan-cases' })];
+  const shipped = run({ rights: RIGHTS_NONE, rows, projects });
+  ok(JSON.stringify(shipped.intelligence.activity) === JSON.stringify({ outcome: 'NO_DATA_INGESTED', label: 'No data ingested', rule_version: 'activity-outcome-1' }),
+    '10e the shipped state (nothing cleared): records exist nearby, the customer report shows none, and it says "No data ingested" — never "No development activity"', shipped.intelligence.activity);
+  const internal = run({ rights: RIGHTS_NONE, rows, projects, view: 'internal' });
+  ok(internal.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && internal.intelligence.projects.length === 2, '10f the internal view, which shows uncleared records, shows development');
+  const nothing = run({ rights: RIGHTS_A, rows: [], projects: [] });
+  ok(nothing.intelligence.activity.outcome === 'NO_DATA_INGESTED' && nothing.coverage_state === 'REPORT_READY',
+    '10g a cleared source with no record in the radius is still "No data ingested": a query that returns nothing is not proof (plan line 1338)', [nothing.intelligence.activity.outcome, nothing.coverage_state]);
+  const shown = run({ rights: RIGHTS_A, rows, projects });
+  ok(shown.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && shown.coverage_state === 'LIMITED_COVERAGE', '10h development shown with a coverage limitation is still development shown');
+  ok(S.subjectRelativeKeys(JSON.parse(body(shipped))).length === 0 && Object.keys(shipped.intelligence.activity).join() === 'outcome,label,rule_version',
+    '10i the outcome is part of the permanent report (a reopened report says the same words) and carries nothing about the subject');
+  ok(shipped.engineInputs.activity_rule_version === 'activity-outcome-1', '10j the engine inputs record which outcome rule judged it');
+}
+
+// ---- 11. the credit rule: which reports use a free report (founder ruling R5; supabase/functions/_shared/credit-rule.ts) -------------
+{
+  const C = await import('../supabase/functions/_shared/credit-rule.ts');
+  const act = (outcome) => ({ outcome, label: M.ACTIVITY_LABELS[outcome], rule_version: M.ACTIVITY_RULE_VERSION });
+  const d = (o) => { const x = C.creditDecision(o); return [x.uses_report, x.reason, x.rule_version].join('|'); };
+  ok(C.CREDIT_RULE_VERSION === 'credit-rule-1', '11a the rule is versioned');
+  ok(d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'true|DEVELOPMENT_SHOWN|credit-rule-1', '11b a customer report that shows development uses one free report');
+  ok(d({ status: 'OK', view: 'customer', activity: act('NO_DEVELOPMENT_ACTIVITY'), storable: true }) === 'true|NO_DEVELOPMENT_ACTIVITY|credit-rule-1', '11c a proven "No development activity" uses one free report (a real answer)');
+  ok(d({ status: 'OK', view: 'customer', activity: act('NO_DATA_INGESTED'), storable: true }) === 'false|NO_DATA_INGESTED|credit-rule-1', '11d "No data ingested" never uses one (HomeSignal\'s gap)');
+  ok(d({ status: 'OK', view: 'internal', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|INTERNAL_VIEW|credit-rule-1', '11e the operator\'s internal view is never charged');
+  ok(d({ status: 'ADDRESS_NOT_RESOLVED' }) === 'false|NOT_A_REPORT|credit-rule-1' && d({ status: 'OUTSIDE_COVERAGE', view: 'customer' }) === 'false|NOT_A_REPORT|credit-rule-1'
+    && d({ status: 'ok', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|NOT_A_REPORT|credit-rule-1' && d(null) === 'false|NOT_A_REPORT|credit-rule-1',
+    '11f an unresolved address, a ZIP not covered, or any status but OK is not a report and is never charged');
+  ok(d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: false }) === 'false|NOT_STORABLE|credit-rule-1'
+    && d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN') }) === 'false|NOT_STORABLE|credit-rule-1'
+    && d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: 'true' }) === 'false|NOT_STORABLE|credit-rule-1',
+    '11g a report that cannot be stored (so cannot be issued) is never charged');
+  const strange = [undefined, null, {}, { outcome: 'DEVELOPMENT_SHOWN' }, { outcome: 'DEVELOPMENT_SHOWN', rule_version: 'activity-outcome-0' },
+    { outcome: 'NO_ACTIVITY', rule_version: 'activity-outcome-1' }, { outcome: 'development_shown', rule_version: 'activity-outcome-1' }, 'DEVELOPMENT_SHOWN', ['DEVELOPMENT_SHOWN']];
+  ok(strange.every((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true }) === 'false|UNRECOGNISED|credit-rule-1'),
+    '11h an outcome the rule does not recognise, or one judged by another outcome rule, is never charged (fail closed toward the customer)', strange.map((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true })));
+  ok(d({ status: 'OK', view: 'staff', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|INTERNAL_VIEW|credit-rule-1', '11i only the customer view can be charged');
+  // the engine and the rule agree end to end: the shipped state is never charged; a cleared record shown is
+  const projects = [proj('k1')];
+  const rows = [row('k1', 0.2)];
+  const today = run({ rights: RIGHTS_NONE, rows, projects });
+  const cleared = run({ rights: RIGHTS_A, rows, projects });
+  const ask = (r, view) => C.creditDecision({ status: 'OK', view, activity: r.intelligence.activity, storable: r.storage_blockers.length === 0 });
+  ok(ask(today, 'customer').uses_report === false && ask(today, 'customer').reason === 'NO_DATA_INGESTED', '11j today (nothing cleared) every customer report is free: "No data ingested"');
+  ok(ask(cleared, 'customer').uses_report === true && ask(cleared, 'customer').reason === 'DEVELOPMENT_SHOWN', '11k once a source is cleared and its record is shown, the report uses one free report');
+  ok(Object.keys(C.creditDecision({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true })).join() === 'uses_report,reason,rule_version',
+    '11l the decision carries only whether, why and which rule');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

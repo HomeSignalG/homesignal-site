@@ -13,9 +13,13 @@
 // NOTHING IS STORED. This function never calls the snapshot writer and does not import issueSnapshot (a structural
 // test fails if it does). `assemble` says whether a report COULD be stored (`storage_blockers`); the response reports
 // it and stores nothing. Storing a real customer report waits for the gates in report-private-context-contract §6.
+//
+// WHETHER A REPORT WOULD USE A FREE REPORT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every
+// answer that is a report or says why there is none carries its decision as `credit`; nothing here charges anything.
 import {
   addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, validateRights,
 } from '../_shared/national-report.ts';
+import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeAdmin, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 import type {
@@ -53,6 +57,7 @@ export function capability() {
     recent_days: RECENT_DAYS,
     access: 'signed-in internal user only (JWT + dashboard_admins). Not a customer surface.',
     stores_reports: false,
+    credit_rule: CREDIT_RULE_VERSION,
   };
 }
 
@@ -97,9 +102,9 @@ export function makeHandler(deps: Deps) {
 
       // 3. resolve the address, then the ZIP — before any credit-shaped decision
       const g = await deps.geocode(address);
-      if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false });
+      if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false, credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }) });
       const supported = await deps.zipSupported(g.zip);
-      if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false });
+      if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }) });
 
       // 4. the canonical reads
       const rows = await deps.radius(g.lat, g.lng, radius);
@@ -117,6 +122,7 @@ export function makeHandler(deps: Deps) {
         subject: { address, matched_address: g.matchedAddress, lat: g.lat, lng: g.lng, zip: g.zip, ...(label ? { label } : {}) },
         rows, projects, ledger, events, health,
       });
+      const storable = out.storage_blockers.length === 0;
       return reply(req, {
         status: 'OK',
         coverage_state: out.coverage_state,
@@ -126,8 +132,11 @@ export function makeHandler(deps: Deps) {
         // nothing is stored by this endpoint; these say whether the report COULD be, later
         stored: false,
         report_id: null,
-        storable: out.storage_blockers.length === 0,
+        storable,
         storage_blockers: out.storage_blockers,
+        // whether a trial customer's report would use one of the free reports (founder ruling R5). Nothing is charged here: this
+        // endpoint is the operator's, and the trial handler (build step 5) is what calls the credit ledger when this says so
+        credit: creditDecision({ status: 'OK', view, activity: out.intelligence?.activity, storable }),
       });
     } catch (e) {
       if (e instanceof GeocoderUnavailable) return reply(req, { error: 'geocoder_unavailable' }, 502);

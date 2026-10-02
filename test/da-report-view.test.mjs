@@ -77,7 +77,7 @@ const html = view(W), htmlCold = view(WCOLD), htmlNone = view(WNONE), htmlInt = 
   ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Type and stage, Things to Review, the map, the three stages, Change History, Evidence', keysOf(html));
   ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Type and stage | Things to Review With Your Client | Development Activity Map | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
     '1b the section titles are the plan\'s (ruling 3 and the visual layout contract)', sections(html).map((s) => s.label));
-  ok(keysOf(htmlNone) === 'evidence', '1c an empty report renders only Official evidence & coverage', keysOf(htmlNone));
+  ok(keysOf(htmlNone) === 'outcome,evidence', '1c an empty report renders only its outcome and Official evidence & coverage', keysOf(htmlNone));
   ok(keysOf(htmlCold) === 'activity,filters,review,map,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
   const quiet = { rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01', name: 'Quiet Approved Plat' })], ledger: [], events: [], health: [] };
   const hq = view(await wire(quiet));
@@ -241,7 +241,37 @@ const html = view(W), htmlCold = view(WCOLD), htmlNone = view(WNONE), htmlInt = 
   const nothingNear = await wire({ rows: [], projects: [], ledger: [], events: [], health: [] });
   ok(nothingNear.report.projects.length === 0 && nothingNear.report.coverage.limitations.length === 0, '5g (control) a cleared-source, zero-record, no-limitation report exists in the engine', nothingNear.report.coverage.limitations);
   const hn = view(nothingNear);
-  ok(keysOf(hn) === 'evidence' && !ABSENCE.test(textOf(hn)) && !/<ul class="da-rv-lims">/.test(hn), '5h it renders the scope and disclosure and makes no statement of absence either (the engine cannot support one: its coverage is judged on records returned)');
+  ok(keysOf(hn) === 'outcome,evidence' && sec(hn, 'outcome').label === 'No data ingested' && !ABSENCE.test(textOf(hn)) && !/<ul class="da-rv-lims">/.test(hn),
+    '5h it says "No data ingested", renders the scope and disclosure, and makes no statement of absence either (a query that returns nothing is not proof, plan line 1338)', keysOf(hn));
+
+  // ---- the outcome, in the founder's words (ruling R5, 2026-10-02): "No development activity" vs "No data ingested" ----
+  const out = sec(htmlNone, 'outcome');
+  ok(out && out.label === 'No data ingested' && /<h2 class="da-rv-h2">No data ingested<\/h2>/.test(out.html) && / da-rv-hero/.test(out.cls),
+    '5j the shipped state: the empty report leads with "No data ingested"', out && out.label);
+  ok(textOf(out.html).includes('HomeSignal cannot yet confirm it receives official development records for this address, so this report cannot say whether there is development nearby. It is not a finding that there is no development.'),
+    '5k and says in plain words that it is HomeSignal\'s gap, not a finding about the area', textOf(out.html));
+  ok(JSON.stringify(Object.fromEntries(Object.entries(V.OUTCOMES).map(([k, o]) => [k, o.title]))) === JSON.stringify({ NO_DATA_INGESTED: M.ACTIVITY_LABELS.NO_DATA_INGESTED, NO_DEVELOPMENT_ACTIVITY: M.ACTIVITY_LABELS.NO_DEVELOPMENT_ACTIVITY }),
+    '5l the view\'s two titles are the engine\'s labels, word for word');
+  const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
+  const hp = view(proven), op = sec(hp, 'outcome');
+  ok(op && op.label === 'No development activity' && textOf(op.html) === 'No development activity HomeSignal\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.',
+    '5m once the engine can prove it, the empty report says "No development activity" and the radius it covers', op && textOf(op.html));
+  const p1 = clone(proven); p1.report.radius_mi = 1;
+  ok(/within 1 mile of this property\.$/.test(textOf(sec(view(p1), 'outcome').html)), '5n one mile is "1 mile"');
+  const p2 = clone(proven); delete p2.report.radius_mi;
+  ok(/show no development near this property\.$/.test(textOf(sec(view(p2), 'outcome').html)), '5n with no radius stated it says "near this property" and invents none');
+  const labelLies = clone(WNONE); labelLies.report.activity = { outcome: 'NO_DATA_INGESTED', label: 'No development activity', rule_version: 'activity-outcome-1' };
+  ok(sec(view(labelLies), 'outcome').label === 'No data ingested', '5o the words come from the outcome CODE, never the label text: a label that disagrees with its code cannot become a claim');
+  const shownButSaysEmpty = clone(W); shownButSaysEmpty.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
+  const shownButIngested = clone(W); shownButIngested.report.activity = { outcome: 'NO_DATA_INGESTED', label: 'No data ingested', rule_version: 'activity-outcome-1' };
+  ok(!sec(view(shownButSaysEmpty), 'outcome') && !sec(view(shownButIngested), 'outcome') && !sec(html, 'outcome'),
+    '5p a report that carries projects never shows an empty-report outcome, whatever the outcome field says');
+  const noField = clone(WNONE); delete noField.report.activity;
+  const odd = clone(WNONE); odd.report.activity = { outcome: 'NO_ACTIVITY' };
+  const notObj = clone(WNONE); notObj.report.activity = 'NO_DEVELOPMENT_ACTIVITY';
+  ok([noField, odd, notObj].every((r) => keysOf(view(r)) === 'evidence'), '5q an older response with no outcome, or an outcome the view does not know, shows no outcome block: the view never infers one from an empty list');
+  ok(W.report.activity.outcome === 'DEVELOPMENT_SHOWN' && WNONE.report.activity.outcome === 'NO_DATA_INGESTED' && WINT.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+    '5r (control) the engine sends the outcome these tests read: development shown when cleared records are shown, "No data ingested" in the shipped customer view');
   const DIST = /\d\.\d mi\b|Under 0\.1 mi/;
   ok(DIST.test(textOf(html)) && DIST.test(textOf(htmlCold)), '5i (control) with render present, distances are shown');
   const noRender = clone(W); delete noRender.render;

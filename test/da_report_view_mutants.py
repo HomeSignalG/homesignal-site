@@ -242,6 +242,20 @@ def first_failure(out):
     return None
 
 
+# ---- the report's outcome (founder ruling R5, 2026-10-02): "No development activity" vs "No data ingested" ---------------------------------------
+m('outcome_from_the_label_text', "var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';",
+  "var key = a && typeof a.label === 'string' ? (a.label === 'No development activity' ? 'NO_DEVELOPMENT_ACTIVITY' : 'NO_DATA_INGESTED') : '';")
+m('outcome_shown_over_projects', "    if (!key || report.projects.length !== 0) return '';", "    if (!key) return '';")
+m('outcome_inferred_from_an_empty_list', "    var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';",
+  "    var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : 'NO_DATA_INGESTED';")
+m('empty_report_claims_no_activity', "    var o = OUTCOMES[key], body = o.body;", "    key = 'NO_DEVELOPMENT_ACTIVITY'; var o = OUTCOMES[key], body = o.body;")
+m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'No development activity',")
+m('no_data_ingested_explanation_dropped', "    return section('outcome', o.title, '<p class=\"da-rv-p da-rv-outcome-p\">' + esc(body) + '</p>', 'da-rv-hero');",
+  "    return section('outcome', o.title, '', 'da-rv-hero');")
+m('outcome_block_not_rendered', "    if (!some) parts.push(outcomeSection(report));\n", "")
+m('outcome_radius_invented', "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' near this property.';", "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' within 0.5 miles of this property.';")
+m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])
+
 def run_tests(tests):
     """-> (passed, which, first failing line). Stops at the first failing suite."""
     for t in tests:

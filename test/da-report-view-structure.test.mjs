@@ -90,7 +90,16 @@ const C = code(SRC);
   ok(/Things to Review With Your Client/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
     '3f the 100526 sections are written (Things to Review, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
   ok((C.match(/aria-disabled="true"/g) || []).length === 1 && !/addEventListener\('click'[\s\S]{0,200}da-rv-act/.test(C), '3f2 the action bar\'s buttons are switched off, and nothing listens to them');
-  ok(!/\bno (recent |new |official )*(development )?activity|nothing (found|nearby|to report)|no development (was )?found/i.test(C), '3g it has no wording that claims there was no activity (plan hard rule 66)');
+  // Founder ruling R5 (2026-10-02): "No development activity" is a real answer when the ENGINE can prove it. The view may write those words
+  // exactly once, as the title it shows for the engine's own NO_DEVELOPMENT_ACTIVITY outcome; any other absence wording is still refused.
+  const ABS = /\bno (recent |new |official )*(development )?activity|nothing (found|nearby|to report)|no development (was )?found/gi;
+  const absHits = [...C.matchAll(ABS)].map((m) => m[0]);
+  ok(absHits.length === 1 && /NO_DEVELOPMENT_ACTIVITY: \{\n\s*title: 'No development activity',/.test(C),
+    '3g the only wording that says there was no activity is the title for the engine\'s own "No development activity" outcome (plan hard rule 66; ruling R5)', absHits);
+  ok((C.match(/report\.activity/g) || []).length === 2 && /var key = a && typeof a\.outcome === 'string' && has\(OUTCOMES, a\.outcome\) \? a\.outcome : '';/.test(C)
+    && /if \(!key \|\| report\.projects\.length !== 0\) return '';/.test(C) && !/a\.label|activity\.label|\.rule_version/.test(C),
+    '3g2 the outcome is read in ONE function, from the engine\'s code only (never its label), and shown only when the report carries no projects');
+  ok(!/projects\.length === 0 \?|NO_DATA_INGESTED['"]?\s*[:=]\s*report|outcome\s*=\s*['"]/.test(C), '3g3 the view never assigns an outcome itself');
   ok(!/\.coverage_state\b|\.stored\b|LIMITED_COVERAGE|REPORT_READY|CHANGE_READY/.test(C), '3h it never reads or prints the coverage state: the report speaks through the engine\'s limitation text');
 }
 

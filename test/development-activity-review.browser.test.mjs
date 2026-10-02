@@ -31,6 +31,7 @@ const FN = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-developmen
 const ADDRESS = '20 N Main St, Brigham City, UT 84302';
 const W_INTERNAL = await wire(RICH, { view: 'internal' });
 const W_CUSTOMER = await wire(RICH, { rights: RIGHTS_SHIPPED });
+const W_CLEARED = await wire(RICH); // a customer view with sources cleared: what a trial report looks like once permissions arrive
 
 // supabase-js stand-in. window.__sb.session is the signed-in session, or null; verifyOtp signs in and tells every listener.
 const SB_STUB = (signedIn) => `
@@ -127,6 +128,8 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   const st = await status(page);
   ok(!st.error && st.text === 'Report ready: ' + W_INTERNAL.report.projects.length + ' official records within 0.5 miles.', '2e the status line counts the report\'s official records', st);
   ok(/Internal view/.test(await page.textContent('#viewnote')), '2f the internal view says it includes records a paying customer would not see');
+  ok(W_INTERNAL.credit.reason === 'INTERNAL_VIEW' && /^The internal view is never charged\./.test(await page.textContent('#creditnote')) && await page.isVisible('#creditnote'),
+    '2f2 and that it is never charged (the function\'s credit rule said so)', await page.textContent('#creditnote'));
   await page.click('#report .da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
   const hidden = await page.$$eval('#report .da-rv-sec--approved .da-rv-card', (c) => c.filter((e) => e.hasAttribute('hidden')).length);
   ok(hidden > 0, '2g the filters work on this page (the view\'s own controls are wired up)', hidden);
@@ -141,8 +144,19 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await make(page);
   await settle(page);
   ok(calls[0].body.view === 'customer', '3a choosing the customer view asks the function for it', calls[0].body);
-  ok(JSON.stringify(await sections(page)) === JSON.stringify(['Official evidence & coverage']) && /Customer view/.test(await page.textContent('#viewnote')),
-    '3b with nothing cleared, the customer view is the coverage notice alone, and the page says which view it is', await sections(page));
+  ok(JSON.stringify(await sections(page)) === JSON.stringify(['No data ingested', 'Official evidence & coverage']) && /Customer view/.test(await page.textContent('#viewnote')),
+    '3b with nothing cleared, the customer view says "No data ingested" over the coverage notice, and the page says which view it is', await sections(page));
+  ok(W_CUSTOMER.credit.uses_report === false && (await page.textContent('#creditnote')) === 'For a trial customer, this report would not use a free report: No data ingested.',
+    '3c the founder sees that today\'s customer report would not use a free report, and why (ruling R5)', await page.textContent('#creditnote'));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ reply: (b) => [200, b && b.view === 'customer' ? W_CLEARED : W_INTERNAL] });
+  await page.check('input[name="view"][value="customer"]');
+  await make(page);
+  await settle(page);
+  ok(W_CLEARED.credit.uses_report === true && (await page.textContent('#creditnote')) === 'For a trial customer, this report would use one of the 20 free reports (development shown).'
+    && !(await sections(page)).includes('No data ingested'), '3d once a source is cleared, a report that shows development would use one free report, and has no outcome notice', await page.textContent('#creditnote'));
   await ctx.close();
 }
 

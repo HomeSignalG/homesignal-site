@@ -96,6 +96,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
   </section>
   <p id="status" role="status" aria-live="polite"></p>
   <p id="viewnote" hidden></p>
+  <p id="creditnote" hidden></p>
   <div id="report"></div>
 </main>
 
@@ -113,7 +114,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
 </div>
 
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=dbfe52f9"></script>
+<script src="lib/da-report-view.js?v=2cb756ec"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================================
@@ -202,6 +203,19 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     if (body.status === 'OUTSIDE_COVERAGE') return 'That address is in ZIP ' + (typeof body.zip === 'string' && /^\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet.';
     return 'Something went wrong making the report. Try again.';
   }
+  /** Whether a trial customer's report would use one of the 20 free reports, as the report function's ONE credit rule decided it
+   *  (body.credit; founder ruling R5). This page decides nothing: it puts the rule's answer into words. */
+  function creditLine(body){
+    var c = body && body.credit;
+    if (!c || typeof c !== 'object') return '';
+    if (c.uses_report === true) {
+      return 'For a trial customer, this report would use one of the 20 free reports (' + (c.reason === 'NO_DEVELOPMENT_ACTIVITY' ? 'No development activity' : 'development shown') + ').';
+    }
+    if (c.reason === 'INTERNAL_VIEW') return 'The internal view is never charged. Choose \u201cWhat a paying customer sees today\u201d to see whether a client\u2019s report would use a free report.';
+    if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';
+    if (c.reason === 'NOT_STORABLE') return 'For a trial customer, this report would not use a free report: it could not be saved.';
+    return 'For a trial customer, this report would not use a free report.';
+  }
   async function run(){
     if (busy) return;
     var address = field('addr');
@@ -209,7 +223,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     if (!session) { pending = true; say('Sign in to make a report.', false); openAuth(); return; }
     var view = viewChoice();
     busy = true; $('go').disabled = true; say('Making the report…', false);
-    $('viewnote').hidden = true; $('report').textContent = '';
+    $('viewnote').hidden = true; $('creditnote').hidden = true; $('report').textContent = '';
     var httpStatus = 0, body = null;
     try {
       var ctl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -241,6 +255,8 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
       ? 'Internal view: it includes records from sources that are not yet cleared for paying customers, so a client would see fewer.'
       : 'Customer view: only records from sources cleared for paying customers.';
     $('viewnote').hidden = false;
+    var cl = creditLine(body);
+    $('creditnote').textContent = cl; $('creditnote').hidden = !cl;
   }
 
   document.addEventListener('DOMContentLoaded', function(){

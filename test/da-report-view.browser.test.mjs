@@ -222,9 +222,13 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   await mount(page, WNONE, ADDRESS);
   const e = await page.evaluate(() => {
     const li = document.querySelector('.da-rv-lims li'), cs = getComputedStyle(li);
-    return { sections: [...document.querySelectorAll('.da-rv-sec')].map((s) => s.getAttribute('aria-label')), text: li.textContent, size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight), hasCards: document.querySelectorAll('.da-rv-card').length };
+    const op = document.querySelector('.da-rv-outcome-p'), ocs = op && getComputedStyle(op), h = op && op.closest('section').querySelector('h2');
+    return { sections: [...document.querySelectorAll('.da-rv-sec')].map((s) => s.getAttribute('aria-label')), text: li.textContent, size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight), hasCards: document.querySelectorAll('.da-rv-card').length,
+      outcome: h ? h.textContent : null, outcomeSize: ocs ? parseFloat(ocs.fontSize) : 0, outcomeVisible: !!(op && op.getBoundingClientRect().height > 0) };
   });
-  ok(e.sections.join() === 'Official evidence & coverage' && e.hasCards === 0 && e.text === 'No official development source for this area is included in this report.', '5b the shipped state (nothing cleared) renders the engine\'s limitation text alone, with no card', e);
+  ok(e.sections.join() === 'No data ingested,Official evidence & coverage' && e.hasCards === 0 && e.text === 'No official development source for this area is included in this report.',
+    '5b the shipped state (nothing cleared) says "No data ingested" over the engine\'s limitation text, with no card (founder ruling R5)', e);
+  ok(e.outcome === 'No data ingested' && e.outcomeVisible && e.outcomeSize >= 16, '5b2 the outcome is a visible heading and a readable sentence (16px or more)', [e.outcome, e.outcomeSize]);
   ok(e.size >= 16 && e.weight >= 600, '5c and that text is drawn prominently (16px or more, semibold), because it is all the page says', [e.size, e.weight]);
   const cold = await mount(page, WCOLD, undefined);
   const c = await page.evaluate(() => ({ addr: document.querySelector('.da-rv-addr').textContent, hero: document.querySelector('.da-rv-hero h2').textContent }));
