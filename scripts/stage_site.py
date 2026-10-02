@@ -66,7 +66,15 @@ ROOT_FILES = (
     'properties.html',
     'property.html',
     'reports.html',
-    'future-surroundings-report.html',
+    # RETIRED FROM THE ARTIFACT 2026-10-01 (Development Activity Order H, first step). The legacy
+    # browser-direct NYC report page, `future-surroundings-report.html`, is deliberately NOT named
+    # here. It generates a report entirely in the visitor's browser against data.cityofnewyork.us,
+    # so no HomeSignal server sees the request and no server-side quota could ever apply to it.
+    # The plan allows one customer-facing generation path (Hard Rule 24). The file and its three
+    # libraries stay in the repository untouched (ruling R6); only the SERVING stops, so the URL
+    # is a plain 404. TO REVERSE: re-add the line  'future-surroundings-report.html',  here and
+    # flip the pins in test/nyc-v1-report.test.mjs 5f and test/single-customer-generation-path.test.mjs P2.
+    # Decision and receipt: docs/order-h-retire-legacy-generator-2026-10-01.md.
     'share-text.html',
     'terms.html',
     'today.html',
