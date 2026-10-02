@@ -130,7 +130,7 @@ Last updated: 2026-10-02, in the Order M step M0 PR (a payment-event ledger, bui
   and keeps (required, a random version-4 UUID; the function mints none); D-F3 the overlap is ten minutes, pinned to at least twice the observation job's longest transaction; D-F4 a purged report cannot be followed again; D-F5 unfollow answers `UNFOLLOW_REQUESTED`, not "done". **Not covered, and the answer says so:** projects that
   appeared near the property after the report. **Not built:** notifications, ownership of a Follow (Order K).
 - H. Remove the quota bypass — open.
-- I. Redesign the report, only after the data contract is proven — open.
+- I. Redesign the report, only after the data contract is proven — open. **Step 1 built 2026-10-02, no caller, nothing struck:** `lib/da-report-view.js`, a pure presentation module that renders the national engine's own response in the approved section order (only sections with data), proven offline against the real handler's output (`docs/development-activity-report-view-2026-10-02.md`); no page loads it, so nothing a customer sees has changed. Not built: Things to Review, the map, Permitted / Under Construction, the action bar.
 - J. Secure stored-report delivery — **open.** Split (audit 2026-10-01): **J1** the share-link primitive now; **J2** the read-only client view,
   disclosure and print, after Order I; **J3** the audit trail with actor and brokerage, after Orders K and L. **J1 is built and proven on a
   disposable Postgres, and is NOT applied to production, has no caller, no endpoint and no page, and changes nothing a customer, resident or the
