@@ -100,8 +100,12 @@ const NAMES = /brokerage_account|brokerage_member|brokerage_membership_of/;
 const naming = allFiles.filter((f) => NAMES.test(code(f)));
 ok(allFiles.length > 50 && naming.includes(SQL_FILE) && NAMES.test(stripSql('select 1 from public.brokerage_member;')) && !NAMES.test(stripSql('-- brokerage_member in a comment\nselect 1;')),
   '4-control: the scan covers the code directories, the root files and every docs SQL, finds the SQL of record, flags a planted use and ignores a comment', allFiles.length + ' files');
-ok(naming.length === 1 && naming[0] === SQL_FILE,
-  '4: nothing else in the repository names the tables or the resolver — no page, script, edge function or other SQL reads or writes them yet (Orders J and L design who may)', naming.join(','));
+// Order L1 (docs/evaluation-entitlement.sql, parked and unapplied) is the one reviewed reader and the one WRITER: its redeem function inserts the
+// membership row, and its other functions ask the resolver. test/evaluation-entitlement-structure.test.mjs pins that it only inserts and never updates or
+// deletes a membership, so it cannot reach this spine's owner guard. Nothing else may name them.
+const L1_SQL = 'docs/evaluation-entitlement.sql';
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL]),
+  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) — no page, script, edge function or other SQL reads or writes them (Orders J and the handler work design who may)', naming.join(','));
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 

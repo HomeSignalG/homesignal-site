@@ -80,8 +80,15 @@ pins. The workflow `report-snapshot-suite.yml` runs both database harnesses on P
   only places allowed to assign a `report_id`, so a third cannot appear quietly.
 - **No owner column** on the snapshot or the private context. Whose report it is depends on the account and evaluation
   tables that Order L creates; the column is added, additively, with that unit.
+  **Update (Order L1, 2026-10-02, parked and not applied): ownership lives in the credit ledger, not as a column here.**
+  `public.evaluation_credit` (`docs/evaluation-entitlement.sql`) links each `report_id` to the evaluation that paid for it, one
+  row per report, so the snapshot stays immutable and gains no owner column; which PERSON in the brokerage owns a report is Order
+  J's own row keyed by `report_id` (deletable with the account), because an append-only ledger must not hold a user id.
 - **No retry idempotency.** Issuing twice stores two snapshots. Keying issue on a request key belongs with the credit
   ledger (plan Hard Rule 28), the thing that must not double-count.
+  **Update (Order L1, parked and not applied):** the ledger's `evaluation_report_issue` keys the credit on a caller-chosen
+  idempotency key, unique per evaluation, and returns the stored report on a retry. The snapshot writer itself still stores
+  twice if it is called twice; only that one function may call it for a credit.
 - **No read path, share token or revocation in THIS unit** (Order J). This unit fixes what the private read may return
   after a purge. The share-link primitive (token hash, expiry, revocation, the one resolve decision) is the next unit,
   J1, described in §8; J1 still has no read path and no caller, and Order J as a whole stays open.

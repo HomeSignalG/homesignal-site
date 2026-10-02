@@ -135,6 +135,10 @@ the team table (Order J and the Step 8 contract) must carry `report_id`, dates a
 - **D-K2. Roles are exactly `owner` and `agent`.** No viewer, billing contact or other role until a surface needs one.
 - **D-K3. No writers.** Nothing in the repository creates a brokerage or a member: no function, no edge function, no page. The
   invite flow of Order L is the first writer, and it creates rows through the migration role or its own locked functions.
+  **Update (2026-10-02): Order L1 is now the first writer, in parked SQL that is not applied** (`docs/evaluation-entitlement.sql`,
+  `development-activity-evaluation-2026-10-02.md`): `evaluation_create` inserts the brokerage account with its evaluation and first
+  owner invite in one transaction, and `evaluation_invite_redeem` inserts the membership. It only inserts; it never updates or removes a
+  membership, so it cannot reach this spine's owner guard. K0's own claim stands for K0's SQL: it still contains no writer.
 - **D-K4. Deleting an auth user is never blocked.** An account deletion or a privacy request deletes the person's memberships (the
   foreign key cascades). If they were the last active owner of an active brokerage, the brokerage is left active with no active owner:
   stated, not hidden, and detectable by one query (the suite's B04k runs it and finds exactly the planted case beside a control).
