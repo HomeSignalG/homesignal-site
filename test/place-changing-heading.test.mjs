@@ -111,8 +111,10 @@ ok(/placeChangingHeading\('zip'/.test(cp) && cp.indexOf("placeChangingHeading('z
 ok(/zip=' \+ encodeURIComponent\(zip\)/.test(cp)
   && cp.indexOf("id=\"zipPlaceHeading\"") < cp.indexOf("id=\"zipMapFrame\""),
   '5g the iframe still carries encodeURIComponent(zip) — same variable');
-ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cp),
-  '5h the heading rides inside the existing A-022 session gate');
+// 2026-10-02: the map and its heading are shown to every visitor (founder). The heading
+// still rides INSIDE the map block, so it appears exactly when the map does.
+ok(/var zipContextMap =\s*'<div class="block" id="zipContext">'\s*\+ \(placeHeading \?/.test(cp),
+  '5h the heading rides inside the map block, shown with the map to every visitor');
 
 // ── §6 Map 1 is a third host of the SAME helper ─────────────────────────────
 // #1178 left Map 1's standfirst as "See what is changing in your zip code" on
