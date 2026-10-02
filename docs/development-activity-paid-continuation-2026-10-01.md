@@ -201,6 +201,8 @@ The first six are the audit's. **None is stated as copy anywhere.** The price on
    "Individual accounts receive 20 individual evaluation reports. Brokerage evaluation accounts share 20 reports across their invited evaluation users." It credits the "100126 plan"
    (commit `4ee6e29`), which is not in this repo; the plan's pilot is per brokerage (Order P, rules 38–41) and its own mock shows 500 reports. Decide the billing unit, price, **seats**, monthly allotment,
    whether the 20 free credits count toward it, rollover, and whether a poor-coverage report uses an allotment report (R5).
+   **UPDATE 2026-10-02: the free credits do NOT count toward it** (founder, verbatim: "free report does not count toward a pid subrsciption"; read as the evaluation's 20 credits being separate
+   from, and never deducted from, a paid allotment). Rollover and R5 remain open.
 2. **Failed-payment and cancellation behaviour** — which the plan requires and never defines: grace on `past_due`, cancel at period end versus at once, refunds, and what happens to stored reports and open
    Follow / account needs after cancellation (private-context contract D-4).
 3. **Commercial terms (legal).** The Terms of Use say HomeSignal is for "your own personal, non-commercial purpose" (`privacy.html:53`) and nothing there mentions subscription, billing, refund, cancellation, payment, fee or a processor.
@@ -262,6 +264,9 @@ was placed where a later apostrophe in a comment closed the unterminated quote i
 
 **Not applied.** It is merged without being applied, as Orders F and F2 were, and **applying is a separate step that needs a founder go and, first, a captured payload (§5)**, because the columns are provisional and the table is immutable.
 Apply through the repo's approved path only — `db-sql.yml`, or `apply_migration` from the committed file — and **never** a `begin; … rollback;` dry run against production (CLAUDE.md §7.11: a rolled-back DDL still holds its locks and the platform runs DDL hooks).
+**UPDATE 2026-10-02: it was applied (`db-sql.yml` run `37016041571`, on the founder's "apply all four" go) BEFORE the payload was captured, which is the condition stated just above;
+the question put to the founder did not name it.** The table is empty and nothing writes to it, and the rollback block below is exact while it holds no row, but **no writer may be wired and
+no event recorded until the payload is captured and the provisional columns are confirmed (or the table is dropped and recreated)**. Text above is the dated pre-apply text.
 It has no precondition on any other table, so its order against Orders F and F2 does not matter. The migration text should be fingerprinted against the file after apply (CLAUDE.md claims rules 7–9).
 Rolling back is the commented block at the foot of the file (between `ROLLBACK-BEGIN` and `ROLLBACK-END`); it **deletes recorded events**, so it is appropriate only before the first real one is recorded. The harness runs it and proves it.
 

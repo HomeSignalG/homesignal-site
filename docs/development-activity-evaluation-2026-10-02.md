@@ -215,7 +215,9 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 
 ## 7. Open founder decisions (this unit does not take them; the audit default is taken and nothing is hard-coded)
 
-1. **Go to APPLY the evaluation tables and functions to production** (new schema), after K0's spine. Not given; this PR is parked SQL only.
+1. **Go to APPLY the evaluation tables and functions to production** (new schema), after K0's spine. Not given; this PR is parked SQL only. **UPDATE 2026-10-02: the go was given
+   and K0, then this layer, were applied (status file, "Applied to production"; L1 run `37016093353`, 13-function body fingerprint `a192907348a6601223f3d0ae653df2e5` equal to the file).
+   The sentence before this one is the dated text from before the apply.**
 2. **R5** — whether a limited-coverage or materially insufficient report consumes a credit, and the deterministic versioned threshold.
    It gates only the serving handler, not this layer.
 3. **Self-serve versus invite-only** — default invite-only (D-L1); no signup path is built. If an individual evaluation is in V1, what stops
@@ -224,6 +226,9 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 5. **Evaluation expiry** — optional in the plan, no value recorded. Default none (D-L3).
 6. **Whether a free report counts as paid redistribution** for the source-rights audit, and which source families are cleared for it. Without
    it every customer report is limited coverage today. Not an L1 concern; it decides whether report 1 is worth a credit.
+   **Related founder ruling, 2026-10-02 (verbatim: "free report does not count toward a pid subrsciption"):** the free evaluation reports do not count toward a paid subscription, read as
+   "the 20 free credits are never counted against or deducted from a paid allotment". It matches this layer (the credit ledger is the evaluation's own; D-L7 leaves the paid transition to
+   Order M, which must keep paid usage in its own ledger). **It is not read as answering this item**: whether a free report counts as paid redistribution for the source-rights audit stays open.
 7. **Confirm that the evaluation account, not `public.subscriptions`, is the single entitlement authority for Development Activity,** so the
    map-paywall product and the brokerage evaluation do not become two truth paths. Engineering default stated and built that way; confirm
    because Order M changes the ingest-repo webhook (a cross-repo change this unit does not make).
