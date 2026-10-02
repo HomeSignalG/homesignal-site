@@ -144,16 +144,22 @@ const C = code(SRC);
     }
   };
   walk('.');
+  const REVIEW_PAGE = 'development-activity-review.html';
   const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
-    'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md']);
+    'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md',
+    // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
+    REVIEW_PAGE, 'test/development-activity-review.test.mjs', 'test/development-activity-review.browser.test.mjs', 'test/lib-cache-keys.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
-  ok(stray.length === 0, '6b NO page, lib, script, workflow or edge function names the view: it has no caller', stray);
+  ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its one caller, the private review page (build step 4)', stray);
   const pages = readdirSync(root).filter((f) => f.endsWith('.html')).concat(readdirSync(join(root, 'partials')).map((f) => 'partials/' + f));
-  ok(pages.length > 10 && pages.every((p) => !/da-report-view/.test(read(p))) && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
-    '6c no page, partial, the ZIP-page generator or shell.js loads it (' + pages.length + ' pages scanned), so it needs no ?v= cache key until one does');
+  const loaders = pages.filter((p) => /da-report-view/.test(read(p)));
+  ok(pages.length > 10 && loaders.join() === REVIEW_PAGE && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
+    '6c exactly one page loads it, the private review page; no other page, partial, the ZIP-page generator or shell.js (' + pages.length + ' pages scanned)', loaders);
   const keys = read('test/lib-cache-keys.test.mjs');
-  ok(!/da-report-view/.test(keys), '6d it is not in lib-cache-keys CONTENT_KEYED, which requires a loading page (§1a): the first page that loads it adds it there in the same change');
+  ok(/'lib\/da-report-view\.js'\]/.test(keys) || /'lib\/da-report-view\.js',/.test(keys), '6d now that a page loads it, it is in lib-cache-keys CONTENT_KEYED, so its tag must carry its content hash (§1)');
+  ok(/<meta name="robots" content="noindex, nofollow">/.test(read(REVIEW_PAGE)) && /^Disallow: \/development-activity-review\.html$/m.test(read('robots.txt')),
+    '6d2 its one caller is an internal page: noindex and disallowed in robots.txt (test/single-customer-generation-path.test.mjs P5 pins the rest)');
   const fnTree = [];
   const walkFn = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walkFn(p); else fnTree.push(p); } };
   walkFn('supabase/functions');

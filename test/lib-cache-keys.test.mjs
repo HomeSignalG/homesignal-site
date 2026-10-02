@@ -48,9 +48,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // Revised Index Design (founder, 2026-09-30): index.html no longer loads it or calls
 // HS.landingFor (the file itself is unchanged), and no page loads it, so there is no tag whose
 // key could go stale. If a page loads it again, add it back here.
+// lib/da-report-view.js joined the set with its first page, the private review page (Development Activity build
+// step 4). It is the whole customer report layout, so a fix in it that a warm browser never fetches would show the
+// founder an old layout while the tests prove the new one.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
-  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js'];
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 

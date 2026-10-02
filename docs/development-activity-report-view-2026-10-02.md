@@ -3,8 +3,8 @@
 > **Updated the same day for build step 3** (`docs/development-activity-build-steps-100526.md`): the view now draws the whole
 > layout of the 100526 plan (`docs/development-activity-plan-100526.md`, Visual Layout Contract), on top of build step 2's engine
 > (#1569: 0.5 mile, `sections.by_stage`, `render.bearings_deg`, `render.review`). §3, §4, §5 and §6 describe the view as it is now;
-> the Order I text they replace is kept where it explains a decision that still holds. It still has **no caller**: build step 4 adds
-> the private review page.
+> the Order I text they replace is kept where it explains a decision that still holds. **Its one caller is the private review page**
+> (`development-activity-review.html`, build step 4): admin-only, noindex, robots-disallowed, linked from nowhere.
 
 Plan: `docs/development-activity-plan-2026-09-30.md`, Order I ("Redesign the customer report only after the data contract is proven",
 lines 2404-2424; Customer-Facing Visual Layout Contract, lines 525-780). Rulings: `docs/development-activity-founder-rulings-2026-09-30.md`
@@ -16,7 +16,7 @@ Code: `lib/da-report-view.js`. Proof: `test/da-report-view.test.mjs`, `test/da-r
 
 A pure presentation module. It takes the national engine's own response (`get-development-activity-report`) and returns escaped
 HTML for the customer report, in the approved section order, showing only the sections that have data. It adds **no data**, makes
-**no network or storage call**, and has **no caller**: no page loads it, nothing links to it, the landing-page sample is not edited.
+**no network or storage call**. *(Order I: it had no caller. Since build step 4 one admin-only page loads it; see the note at the top.)* The landing-page sample is not edited.
 Today the engine is admin-only and its rights clearance list is empty, so a customer report has zero records; this module exists so
 the layout can be proven against the engine's real output **before** any customer path (Orders H, J, L) exists.
 
@@ -123,7 +123,7 @@ Taken while building (the audit left them open; each is a small change to revers
 
 ## 5. What this does NOT do
 
-- **Nothing a resident or customer sees changes.** No page loads the module, the engine stays admin-only with an empty rights list, and the
+- **Nothing a resident or customer sees changes.** Only the admin-only review page loads the module, the engine stays admin-only with an empty rights list, and the
   landing page's sample report (`development-activity.html`) is not edited. Two copies of the hierarchy now exist (that sample's inline script and
   this module); the shared stage labels are pinned equal (structural 5a-5c), and unifying them is a later, visible change to a deployed page.
 - **No entitlement, and the four actions do nothing yet.** The map, Things to Review, Permitted / Under Construction, the filters and the
@@ -131,8 +131,8 @@ Taken while building (the audit left them open; each is a small change to revers
 - **No network, storage, location, clock or private-context call**, and no Type, lifecycle, change, rights or ranking rule (pinned: structural 1-3).
 - **Not exercised in production.** The engine's signed-in path has never been called there; the response shape for a real address has only been
   produced offline, by the real handler. What is near a real address was not seen.
-- **No cache key.** `test/lib-cache-keys.test.mjs` §1a requires a loading page for every content-keyed file, and none loads this. The first page that
-  does must add `lib/da-report-view.js` to `CONTENT_KEYED` in the same change (structural 6c-6d pin that nothing loads it today).
+- **Cache key (since build step 4).** The review page loads it as `lib/da-report-view.js?v=<content hash>`, and it is in
+  `test/lib-cache-keys.test.mjs` `CONTENT_KEYED`, so a changed view always reaches the browser (structural 6c-6d2).
 
 ## 6. Proof
 
@@ -141,7 +141,7 @@ All offline; nothing here touches production.
 | suite | what | result (final run) |
 |---|---|---|
 | `test/da-report-view.test.mjs` | the view over the **real handler's** output: the 100526 order, hero and stage summary, stage and lifecycle shapes, the Permitted rule as shown, filters, Things to Review, the map (to scale, north up, numbered like the cards, no basemap, left out without positions), header and action bar, internal strings, coverage, escaping, links, address, engine order, history lanes, non-reports, plan quotes | 148 checks, 0 failed |
-| `test/da-report-view-structure.test.mjs` | pure; closed read set; no authority, change, rights or ranking rule; escape and link validators; address read in one place; stage labels equal the landing page's; no caller | 59 checks, 0 failed |
+| `test/da-report-view-structure.test.mjs` | pure; closed read set; no authority, change, rights or ranking rule; escape and link validators; address read in one place; stage labels equal the landing page's; one caller, the internal review page | 60 checks, 0 failed |
 | `test/da-report-view.browser.test.mjs` | Chromium: no overflow at 390 and 1280, sections stacked in the mobile order, one-column cards, stage text and shape visible, tappable links, keyboard focus (links and filter chips), 4.5:1 contrast on every element measured, hostile text runs nothing, no network request; the filters show and hide cards and markers together, combine, restore, work from the keyboard, and still hide on a host page whose CSS sets `display` | 47 checks, 0 failed (headless Chromium) |
 | `test/da_report_view_mutants.py` | prohibited mutations, each verified to apply and each killed on exit code by a named check (manual, like the other module loops: CI runs the tests, not the loop) | 144 mutations: 144 killed, 0 survived, 0 harness faults; 127 first killed by the two offline suites and 17 by the browser suite |
 

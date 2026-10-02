@@ -27,14 +27,25 @@ through once each step is complete").
    - Map positions: distance and direction from the property, in the response only and never stored (they
      would locate the client's address).
    - The deployed `get-development-activity-report` function is redeployed.
-3. **Report layout in the plan's order.** Header (address, slot for brokerage and agent); What Changed /
+3. ~~**Report layout in the plan's order.**~~ Header (address, slot for brokerage and agent); What Changed /
    Recent Official Activity; Type and Stage filters; Development Activity Map (a plain diagram: property in
    the centre, a 0.5-mile ring, shaped markers, no street map because no basemap is cleared); Things to
    Review With Your Client (the nearest projects, with the plan's review wording); Approved / Coming;
    Proposed / Under Review; Permitted / Under Construction; Change History; Official Evidence & Coverage;
    action bar (Compare, Watch, Share, PDF marked "coming soon" until Part B). Checked at phone width.
+   *(Done: #1575 merged as `a48f380`. Nothing to deploy on its own: no page loaded the view until step 4.
+   The action bar says "Available soon", because "coming" is kept for the Approved / Coming stage.
+   Tests: behaviour 148, structure 59, browser 47; 144 of 144 prohibited mutations caught.)*
 4. **Private review page for the founder.** Signed in, type any address, see the full report. First check:
    20 N Main St, Brigham City, UT 84302.
+   - Page: `development-activity-review.html` (admin only: noindex, disallowed in robots.txt, linked from
+     nowhere, not in the sitemap). Sign-in by emailed code; it never creates an account.
+   - It calls `get-development-activity-report` with the signed-in user's own token. The function still
+     refuses anyone not on `dashboard_admins` (one admin today, the founder).
+   - A choice between every record (internal) and what a paying customer sees today.
+   - Client label, brokerage and agent can be typed to preview the header; they stay on the page.
+   - The single-generation-path test now admits exactly this page for the report engine, and pins that it
+     stays an operator tool (P5).
 
 ## Part B — the customer page
 

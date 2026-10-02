@@ -20,12 +20,18 @@
  *   P2  the legacy page is retired and not deleted: not staged; still in the repository with its libraries (R6);
  *       robots.txt still Disallows it; nothing staged names it except robots.txt.
  *   P3  no staged file loads or names the browser-direct engine, except the three legacy libraries themselves.
- *   P4  no staged file names get-future-surroundings-report, get-development-activity-report or follow-development-report: the allowlist for
- *       THOSE THREE is EMPTY. It does not cover Map 1 address mode (get-address-report, verify_jwt=false), the audit's founder decision 2.
+ *   P4  no staged file names get-future-surroundings-report or follow-development-report, and exactly ONE staged file names
+ *       get-development-activity-report: the private review page (build step 4 of docs/development-activity-build-steps-100526.md).
+ *       It is admitted only while it stays an operator tool, and P5 checks that on every run. It does not cover Map 1 address
+ *       mode (get-address-report, verify_jwt=false), the audit's founder decision 2.
+ *   P5  the one admitted page is internal: noindex, robots-disallowed, named by no other staged file, and the function it calls
+ *       still refuses anyone who is not a signed-in admin (authorizeAdmin runs before anything the caller typed is read).
  *
  * WHEN THE CUSTOMER SURFACE ARRIVES (Orders K, L, I): P4 is the pin that must then change, DELIBERATELY, in the
- * same change that puts the entitlement check in supabase/functions/_shared/admin-gate.ts. Until then no shipped
- * page may call get-development-activity-report, follow-development-report or get-future-surroundings-report.
+ * same change that puts the entitlement check in supabase/functions/_shared/admin-gate.ts. Until then the only
+ * shipped page that may call get-development-activity-report is the admin review page, and none may call
+ * follow-development-report or get-future-surroundings-report. (Changed deliberately for build step 4, 2026-10-02:
+ * the function's gate is unchanged, so the page gives no one who is not an admin a way to make a report.)
  *
  * STATED LIMIT of P4: it finds the ordinary spelling of a slug. A page that builds the name by concatenation is
  * not caught. The authority for who may call a function is the gate in admin-gate.ts (the anon key is refused),
@@ -139,14 +145,35 @@ ok(ENGINE.every(([, re]) => re.test(readRepo(LEGACY_PAGE))),
 const htmlWithHost = pages.filter((p) => ENGINE[0][1].test(content.get(p) || ''));
 ok(htmlWithHost.length === 0, 'P3f no staged page carries the City host (its CSP connect-src or anywhere else)', htmlWithHost);
 
-// ---- P4: the customer-callable allowlist is empty ------------------------------------------------------------------
+// ---- P4: the customer-callable allowlist is empty; one admin page may call the report engine ---------------------
+// ALLOWED[slug] is the complete list of staged files that may name it. Build step 4 admits the private review page for the report
+// engine and nothing else; P5 below keeps that page an operator tool.
+const REVIEW_PAGE = 'development-activity-review.html';
+const ALLOWED = { 'get-future-surroundings-report': [], 'get-development-activity-report': [REVIEW_PAGE], 'follow-development-report': [] };
 for (const s of SLUGS) {
-  const hits = [...content].filter(([, body]) => slugRe(s).test(body)).map(([f]) => f);
-  ok(hits.length === 0, `P4 no staged file names ${s}`, hits);
+  const hits = [...content].filter(([, body]) => slugRe(s).test(body)).map(([f]) => f).sort();
+  ok(JSON.stringify(hits) === JSON.stringify(ALLOWED[s]),
+    ALLOWED[s].length ? `P4 the only staged file naming ${s} is ${ALLOWED[s].join(', ')}` : `P4 no staged file names ${s}`, hits);
 }
 const cfg = readRepo('supabase/config.toml');
 ok(SLUGS.every((s) => slugRe(s).test(cfg)),
   'P4d control: the same three patterns match supabase/config.toml, so the zeros above are not an empty search');
+
+// ---- P5: the one admitted page stays an operator tool ---------------------------------------------------------------
+const review = content.get(REVIEW_PAGE) || '';
+ok(review.length > 0, 'P5a control: the review page is staged and was read, so the checks below are about the shipped file');
+ok(/<meta name="robots" content="noindex, nofollow">/.test(review), 'P5b the review page is noindex, nofollow');
+ok(new RegExp('^Disallow: /' + REVIEW_PAGE.replace('.', '\\.') + '$', 'm').test(robots), 'P5c the staged robots.txt Disallows the review page');
+const linking = [...content].filter(([f, body]) => f !== REVIEW_PAGE && f !== 'robots.txt' && body.includes(REVIEW_PAGE)).map(([f]) => f);
+ok(linking.length === 0, 'P5d no other staged file names the review page: no link, no navigation, no sitemap entry', linking);
+ok(robots.includes(REVIEW_PAGE) && readRepo('scripts/stage_site.py').includes("'" + REVIEW_PAGE + "'"), 'P5e control: the same detector finds the page name where it really is (robots.txt and the stager\'s list), so the empty result above is a real absence');
+const handler = readRepo('supabase/functions/get-development-activity-report/handler.ts');
+const gate = readRepo('supabase/functions/_shared/admin-gate.ts');
+const iGate = handler.indexOf('await authorizeAdmin(req, deps)'), iBody = handler.indexOf('await readBounded(req)');
+ok(iGate > 0 && iBody > iGate, 'P5f the function still runs the admin gate before it reads anything the caller sent', { iGate, iBody });
+ok(/if \(!admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(!token\) return reply\(req, \{ error: 'unauthorized' \}, 401\)/.test(gate),
+  'P5g the gate still refuses a caller with no token (401) and a signed-in caller who is not an admin (403)');
+ok(!/service_role|SERVICE_ROLE/.test(review), 'P5h the review page carries no service-role key; it uses the public browser key and the signed-in user\'s own token');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);
