@@ -4,6 +4,18 @@
 -- all three readers changed together, before/after shown again before anything goes live).
 -- NOT APPLIED. Rollback: docs/map1-representative-newest.rollback.sql (the exact inverse).
 --
+-- ⛔ APPLIED 2026-10-02 14:42Z AND ROLLED BACK ~14:54Z. DO NOT RE-APPLY THIS FILE.
+-- PART B made Map 1 slow: app_projects holds one row per ZIP copy of a record (unique
+-- (zip, source_key, source_seq)), and every copy shares its submitted_at, so the tie-break on
+-- last_seen_at read every copy's heap row. Measured: 333 members in 010xx read 29,541 rows (up
+-- to 1,728 copies of one key); Map 1 for ZIP 30032 took 20.8 s cold (limit 25 s) and 1.4 s
+-- after the rollback; the Rule D refresh died on its first call (57014, run 37022090758).
+-- The local proof's fixture had a handful of copies per key, so it could not see this.
+-- Both readers were restored to their pre-state bodies (4918783a…, f10327fe…, owner, grants
+-- and SET clauses unchanged). STILL PRESENT: the PART A index (harmless) and
+-- public.app_project_representative, called by nothing (its drop is a destructive statement
+-- waiting on the founder's confirmation).
+--
 -- THE DEFECT. Map 1 draws one pin per source_key, and a source_key can carry several
 -- public.app_projects rows: the same record copied into each ZIP it touches, and sometimes
 -- several different records that share the key (an NYC job's FO and NB permits; a 1996 site
