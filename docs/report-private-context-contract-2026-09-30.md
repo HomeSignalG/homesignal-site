@@ -197,7 +197,7 @@ turning it on.
   report is stored**; **54 prohibited mutations, all killed by a named check**.
 - `test/report-snapshot.test.mjs` — 38 checks on the module against a stand-in database; `test/report_snapshot_module_mutants.py`
   — 23 mutations of the module, all killed.
-- `test/report-snapshot-structure.test.mjs` (46 pins) and `test/report-private-context-structure.test.mjs` (43 pins) *(45 and 42 before the Follow change added one each)*;
+- `test/report-snapshot-structure.test.mjs` (47 pins) and `test/report-private-context-structure.test.mjs` (43 pins) *(45 and 42 before the Follow change added one each; the share-link primitive, contract §8 of the snapshot document, then added pin 3d to the first)*;
   eleven mutations of the pins themselves each turned the right pin red.
 - `.github/workflows/report-snapshot-suite.yml` runs both database harnesses on Postgres 17 and holds no Supabase credential.
 

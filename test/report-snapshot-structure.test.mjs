@@ -86,8 +86,19 @@ ok(scanned.length > 50 && namesTable.includes('docs/report-snapshot.sql'),
 // The one reviewed reader (2026-10-01, Follow / Changes Since Report; contract §8.5): the data layer of an internal admin function.
 // 3b pins that it can only SELECT the columns it needs and names the table nowhere else in code.
 const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the one reader is the Follow / Changes Since Report data layer)', namesTable.join(','));
+// The one reference (2026-10-02, Order J unit J1): the share-link SQL. It stores a POINTER to a stored report (a foreign key on
+// report_id) and never reads one; 3d pins that it names the table nowhere but in that foreign key. Anything else naming the
+// table is still a consumer nobody designed.
+const SHARE_SQL = 'docs/report-share.sql';
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the one reader is the Follow / Changes Since Report data layer; the one reference is the share-link foreign key, 3d)', namesTable.join(','));
+{
+  const t = codeOf(SHARE_SQL).replace(/'(?:[^']|'')*'/g, "''");
+  const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
+  ok(namesTable.includes(SHARE_SQL) && uses.length === 1 && uses[0] === 'report_snapshot (report_id)' && /references public\.report_snapshot \(report_id\)/.test(t)
+    && !/\b(select|insert|update|delete|truncate|grant)\b[^;]*\breport_snapshot\b/i.test(t),
+    '3d: the share SQL names the table exactly once, as the foreign key "references public.report_snapshot (report_id)", and never selects, inserts, updates, deletes, truncates or grants it (control: it does name it)', uses);
+}
 {
   const t = readFileSync(join(ROOT, FOLLOW_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
