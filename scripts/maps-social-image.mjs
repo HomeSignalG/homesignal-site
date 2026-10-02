@@ -160,6 +160,13 @@ async function panelSectionsInFrame(page) {
       // Chrome that must NOT be in a social capture. Embed mode removes it; this proves it.
       sidebar_hidden: !document.querySelector('#hs-side')
         || getComputedStyle(document.querySelector('#hs-side')).display === 'none',
+      // The horizontal header and the shared footer replaced the sidebar (Revised Index
+      // Design, #1562), so sidebar_hidden now passes with nothing to look at. Kept under its
+      // historical name (it is stored in panel_in_frame); this is the check that still sees.
+      site_chrome_hidden: ['hs-top', 'hs-footer'].every((id) => {
+        const el = document.getElementById(id);
+        return !el || getComputedStyle(el).display === 'none';
+      }),
       search_form_hidden: !document.querySelector('.wrap>.head')
         || getComputedStyle(document.querySelector('.wrap>.head')).display === 'none',
     };
@@ -198,7 +205,7 @@ async function cardInFrame(page) {
   if (missing.length) {
     return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
   }
-  if (!panel.sidebar_hidden || !panel.search_form_hidden) {
+  if (!panel.sidebar_hidden || !panel.site_chrome_hidden || !panel.search_form_hidden) {
     return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
   }
   const controls = await page.evaluate(() => window.HS.mapsDcCaptureReadControls());

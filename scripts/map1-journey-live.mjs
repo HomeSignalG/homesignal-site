@@ -40,13 +40,15 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
 
 const chrome = () => page.evaluate(() => {
-  const on = [].slice.call(document.querySelectorAll('.nav a.on'));
-  const el = document.getElementById('locLabel');
+  const on = [].slice.call(document.querySelectorAll('.hs-nav a.on'));
+  // The Viewing chip left the header (Revised Index Design, #1562); its decision is still
+  // HS.viewingLabel(), the same text the chip used to paint.
+  const vl = (window.HS && HS.viewingLabel) ? HS.viewingLabel() : null;
   return {
-    navTokens: [].slice.call(document.querySelectorAll('.nav a')).map(a => a.getAttribute('data-nav')),
+    navTokens: [].slice.call(document.querySelectorAll('.hs-nav a')).map(a => a.getAttribute('data-nav')),
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
-    locLabel: el ? el.textContent.trim() : null,
+    locLabel: vl ? vl.text.trim() : null,
     kDev: (document.getElementById('kDev') || {}).textContent || null,
     kFac: (document.getElementById('kFac') || {}).textContent || null,
     totalTileShown: (() => { const t = document.getElementById('ccTot');
@@ -61,7 +63,7 @@ const chrome = () => page.evaluate(() => {
     path: location.pathname, search: location.search
   };
 });
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 60000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 60000 });
 const waitMap = () => page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
 const installSavedHome = () => page.evaluate((h) => {
   HS.state.properties = [h];
@@ -82,7 +84,7 @@ await page.goto(BASE + '/development.html?zip=' + ZIP, { waitUntil: 'domcontentl
 await waitShell();
 let c = await chrome();
 info('development.html', { nav: c.navTokens, active: c.activeTokens });
-ok(c.navTokens.join('|') === V3_NAV, 'A the sidebar is Explore, My Places, Enterprise (plan v3)', c.navTokens);
+ok(c.navTokens.join('|') === V3_NAV, 'A the header nav is Explore, My Places, Enterprise', c.navTokens);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
   'A Explore is the ONLY active item on development.html', c.activeLabels);
 
@@ -92,7 +94,7 @@ await waitShell();
 await waitMap();
 c = await chrome();
 info('homesignalmap.html', { nav: c.navTokens, active: c.activeTokens });
-ok(c.navTokens.join('|') === V3_NAV, 'B the same three sidebar items on Map 1', c.navTokens);
+ok(c.navTokens.join('|') === V3_NAV, 'B the same three header items on Map 1', c.navTokens);
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
   'B Explore is the ONLY active item on Map 1', c.activeLabels);
 

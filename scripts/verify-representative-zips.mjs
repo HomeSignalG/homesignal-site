@@ -212,11 +212,11 @@ async function verifyZipPage(page, spec, cached) {
         // what the page's facility read returned (public.zip_mode_report_sites): status + member count
         zipFacilities: window.__HS_ZIP_FACILITIES || null,
         devText: (document.getElementById('cDev') || {}).textContent || '',
-        shell: !!document.querySelector('.side, .nav'),
+        shell: !!document.querySelector('#hs-top .hs-nav a'),
       };
     });
 
-    if (!st.shell) fail('shell renders', 'sidebar missing');
+    if (!st.shell) fail('shell renders', 'site header missing');
     else pass('shell renders');
 
     if (!st.mapInited) fail('map renders', 'leaflet/canvas not initialized');
