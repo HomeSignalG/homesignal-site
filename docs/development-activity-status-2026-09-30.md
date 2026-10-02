@@ -192,6 +192,21 @@ Last updated: 2026-10-02, in the docs PR that records the production apply of K0
   - **Not exercised:** no function was called on production and no row was written (behaviour is proven on disposable PostgreSQL 16 locally and 17 in CI, not on production); the
     `performance` advisor; API-gateway request logs (the database's own settings were read: `log_statement = ddl`, `log_min_duration_statement = -1`,
     `log_parameter_max_length_on_error = 0`, so a function-call argument is not statement-logged, but a handler's request log is a separate question for the handler PR).
+- **Open event counter found in production, 2026-10-02 (read-only); the fix for this layer's one is parked and NOT applied (it needs its own go).** Of the 33 identity or serial
+  sequences in `public`, 5 are usable (`USAGE`, `SELECT` or `UPDATE`) by `anon` and `authenticated` while the table each belongs to is closed to them. One is this layer's:
+  `report_private_context_event_event_id_seq`, from the privacy layer applied 2026-09-29, whose lock-down covered the three tables and the functions and never named the counter.
+  The other four belong to other workstreams and are **not touched here**, only named for their owners: `dc_acquisition_run_run_seq_seq` (the data-centre pipeline),
+  `local_news_geo_migration_rows_id_seq` (Local News), `maps_dc_generation_request_id_seq` (the MAPS dashboard) and `source_document_events_event_id_seq` (the government source
+  archive). The Order J, K, L and M layers applied today are not among the five (their files revoke their counters by a computed loop, which is the pattern to copy).
+  - **What it could do, without inflation.** `UPDATE` on a sequence is `setval()`: a role that could call it could push the counter to its maximum and make every later insert into the
+    audit log fail, which here includes private-context creation and purge; `USAGE` is `nextval()`, which burns ids. **I know of no REST route to either** (PostgREST does not expose
+    sequences and `pg_catalog.nextval` is not in an exposed schema). That was **not tested end to end**, because a successful test would itself move a production counter. A hardening gap, not a known exposure.
+  - **The fix and its proof.** `docs/report-private-context-sequence-lockdown.sql` revokes every privilege on the sequence(s) owned by a `report_private_context*` table from PUBLIC,
+    `anon`, `authenticated` and `service_role`, found through the dependency catalogue (so a later sequence on the layer is covered), and refuses to run if the table is absent, refuses to report
+    success if it found no sequence, and refuses if any non-owner grantee remains. Every writer is a `SECURITY DEFINER` function owned by the owner, so no writer changes. Proof on a disposable
+    PostgreSQL 16: `test/report_private_context_pg/sequence_lockdown.sh` reproduces the gap first (the three roles and PUBLIC can use the counter, and `anon` `nextval` and `authenticated` `setval`
+    succeed), then shows it closed, a definer writer still creating a context and its audit event, a later sequence on the layer closed, an unrelated sequence untouched, a second apply a no-op, both refusals; 25 checks
+    and 10 prohibited mutations, all killed. `test/report-private-context-sequence-lockdown-structure.test.mjs` pins the file's shape. **Not exercised:** the file on production (nothing applied), PostgreSQL 17 locally (CI runs 17).
 - N. End-to-end launch gate — open.
 - O. Mass outreach — open.
 - P. Convert to 3–5 paid pilots — open.

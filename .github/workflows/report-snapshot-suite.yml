@@ -53,6 +53,7 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
@@ -86,6 +87,7 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
       - 'test/report_private_context_pg/**'
@@ -163,6 +165,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_private_context_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpc.log
+      - name: The event counter is closed to the API roles; a later sequence on the layer is too; an unrelated one is untouched; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_pg/sequence_lockdown.sh 2>&1 | grep -v NOTICE | tee /tmp/rpcseq.log
       - name: The shipped snapshot passes; it applies twice; the Order F table upgrades; every prohibited mutation is killed
         env:
           PGHOST: localhost
