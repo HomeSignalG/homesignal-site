@@ -20,7 +20,8 @@
  *   P2  the legacy page is retired and not deleted: not staged; still in the repository with its libraries (R6);
  *       robots.txt still Disallows it; nothing staged names it except robots.txt.
  *   P3  no staged file loads or names the browser-direct engine, except the three legacy libraries themselves.
- *   P4  no staged file names a report-generating server function: the customer-callable allowlist is EMPTY.
+ *   P4  no staged file names get-future-surroundings-report, get-development-activity-report or follow-development-report: the allowlist for
+ *       THOSE THREE is EMPTY. It does not cover Map 1 address mode (get-address-report, verify_jwt=false), the audit's founder decision 2.
  *
  * WHEN THE CUSTOMER SURFACE ARRIVES (Orders K, L, I): P4 is the pin that must then change, DELIBERATELY, in the
  * same change that puts the entitlement check in supabase/functions/_shared/admin-gate.ts. Until then no shipped
@@ -66,7 +67,7 @@ const ENGINE = [
   ['the NYC V1 libraries by file name', /nyc-v1-(?:soda|report)/],
   ['the NYC V1 browser globals', /\bHSNycV1(?:Soda)?\b/]
 ];
-// P4 — the three report-generating server functions.
+// P4 — the three functions named by Order H (NOT get-address-report: Map 1 address mode is a consumer surface outside this pin).
 const SLUGS = ['get-future-surroundings-report', 'get-development-activity-report', 'follow-development-report'];
 const slugRe = (s) => new RegExp(s);
 

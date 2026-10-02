@@ -53,8 +53,11 @@ not choose. The default is retire, because a static host has no server-side way 
   ```
 
   So today exactly one shipped page can generate a report, it does so in the browser against a third-party host, and no HomeSignal
-  server sees the request. That is the bypass. After this change no shipped page generates a report and no shipped page calls a
-  report-generating server function, and a test (section 4) fails if either comes back.
+  server sees the request. That is the bypass. After this change no shipped page loads the browser-direct NYC engine, and no shipped page names
+  `get-future-surroundings-report`, `get-development-activity-report` or `follow-development-report`; a test (section 4) fails if either comes back.
+  **Outside this pin:** Map 1's address mode (`homesignalmap.html` calls `get-address-report`, deployed with `verify_jwt=false`) and the property dossier are consumer
+  surfaces that this change neither retires nor gates; whether they fall under Hard Rule 24 is the audit's founder decision 2 (default taken: outside, because
+  they store and share no client-ready report). So this change does not make "no ungated report path remains" true, and nothing here should be read as saying so.
 - **Review question** ("one canonical truth path, or a second way to decide the same fact?"): this change creates no second way. It
   removes the only browser-side generator from the artifact and pins that none returns outside the gated path.
 
@@ -119,7 +122,7 @@ does not.
 ## 6. What this does not do (so H is not struck)
 
 - It does not make the quota server-authoritative. No customer identity, entitlement, credit ledger, idempotency or rate limit exists
-  (Orders K, J, L, M). Nothing authorizes a customer on the canonical path, which today admits only a signed-in user in `dashboard_admins`.
+  (Orders K, J and L; M is the paid path and is not a dependency of authorizing a customer). Nothing authorizes a customer on the canonical path, which today admits only a signed-in user in `dashboard_admins`.
 - It does not move customers onto the national path: the rights registry is empty, so a customer report there is LIMITED COVERAGE with no records.
 - It builds no customer report page (Order I) and answers no R5 question.
 
@@ -131,6 +134,8 @@ Re-add `'future-surroundings-report.html',` to `ROOT_FILES` in `scripts/stage_si
 `scripts/stage_site.py`, so the revert deploys on merge, the same as this change does.
 
 ## 8. Proof (each line is a command run in this worktree at base `ea0d1db`, with the decisive output)
+
+**Re-run after rebasing onto `origin/main` `6930905` (2026-10-02):** `node scripts/run-unit-tests.mjs --offline` → `All 290 unit test file(s) passed (mode=offline).`; `node test/single-customer-generation-path.test.mjs` → `ALL PASS`; `node test/nyc-v1-report.test.mjs` → `ALL PASSED`; `python3 test/single_customer_generation_path_mutants.py` → `16 mutations run, 16 killed by the pin they target, 0 survived, 0 harness faults`. The lines below were captured at `ea0d1db`, before the rebase.
 
 **What the artifact contains, before and after** (`python3 scripts/stage_site.py --list-only`, captured before the edit and after it):
 
@@ -201,6 +206,8 @@ retired page locally.
 - **That nothing outside this repository expects the legacy function to be deployed.** The ingest repository was not searched; `.github` here has no reference.
 - **That a merge deploys at once.** `pages.yml`'s push filter (lines 43-68) is `'**'` minus `.github/**`, `docs/**` and `test/**`, then re-including a list of named gate-input
   test files, and `scripts/stage_site.py` is under none of those exclusions, so this merge triggers a Pages build. The workflow's own gates and the deploy were not run here.
-- **Concurrency check (CLAUDE.md), 2026-10-01, `origin/main` at `ea0d1db`: GENUINE GAP.** The audit searched open and recent pull requests for the legacy page and the quota
-  bypass and found none; this worktree fetched `origin/main` and read it, and did not repeat the pull-request search (no GitHub tool was used, by instruction).
+- **Concurrency check (CLAUDE.md), re-run 2026-10-02 against `origin/main` at `6930905` (the base this was rebased onto): GENUINE GAP.** The audit searched open and recent
+  pull requests for the legacy page and the quota bypass and found none; an independent reviewer repeated the search on GitHub (open-PR list and searches for `stage_site`,
+  `future-surroundings`, `browser-direct`, `Order H`) and found nothing touching this work, and the orchestrating session listed the open and 25 most recently closed PRs
+  with the same result. The builder itself used no GitHub tool (by instruction).
   A founder-reverted outcome is not involved: the page was built in #1424 and never reverted.
