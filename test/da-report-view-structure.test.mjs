@@ -146,7 +146,7 @@ const C = code(SRC);
   walk('.');
   const REVIEW_PAGE = 'development-activity-review.html';
   const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
-    'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md',
+    'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md', 'docs/development-activity-build-steps-100526.md',
     // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
     REVIEW_PAGE, 'test/development-activity-review.test.mjs', 'test/development-activity-review.browser.test.mjs', 'test/lib-cache-keys.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
