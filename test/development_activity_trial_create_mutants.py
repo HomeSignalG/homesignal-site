@@ -69,7 +69,8 @@ m('two_rows_accepted', "      if (!Array.isArray(data) || data.length !== 1) thr
 # ---- the review page: shows the function's answer once, keeps it nowhere, says plainly what happened ---------------------------------------------
 m('page_builds_the_link', "      $('tlink').value = link;", "      $('tlink').value = 'https://homesignal.net/development-activity-reports.html#invite=' + link.split('#invite=')[1];", [SRC, GEN], PAGE)
 m('link_kept_in_storage', "      $('tlink').value = link;", "      $('tlink').value = link; try { sessionStorage.setItem('owner-link', link); } catch (e) {}", [SRC, BRO], PAGE)
-m('link_survives_sign_out', "      $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';\n    }", "\n    }", [SRC, BRO], PAGE)
+m('link_survives_sign_out', "      $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';\n      var b = document.createElement('button');",
+  "      var b = document.createElement('button');", [SRC, BRO], PAGE)
 m('lost_answer_called_a_failure', '      tsay(UNKNOWN, true);\n      return;', "      tsay('The database refused to create this trial. Nothing was created.', true);\n      return;", [SRC, BRO], PAGE)
 m('blank_seats_sent_as_zero', '    if (seats !== null) payload.seat_limit = seats;', '    payload.seat_limit = seats || 0;', [SRC, BRO], PAGE)
 m('second_press_while_in_flight', '    if (creating) return;\n    var name', '    var name', [SRC], PAGE)

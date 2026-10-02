@@ -295,7 +295,7 @@ property:
   - no id in the answer;
   - a seat limit and length reach the database as typed;
   - a refused field writes nothing.
-- `test/development_activity_trial_create_mutants.py`: prohibited mutations, all killed (count in the PR).
+- `test/development_activity_trial_create_mutants.py`: 32 prohibited mutations, all killed.
 
 **Still open, stated:**
 - An owner cannot yet invite agents. That is `evaluation_invite_mint` with the owner as actor, on the customer page; nothing calls
