@@ -198,6 +198,48 @@ def parse_region(region: str, states: set, zips: set, tmp: Path):
                 yield (canonical_addr(addr), lat, lng, state, name.split("/")[-1], classify_match_type(row))
 
 
+# ── read-only measurement: how many of the data-centre addresses the shared ladder could not match
+# would THIS load match? (2026-10-02. Writes nothing; used with DRY_RUN=1 to decide, on evidence,
+# whether a load improves Map 1's address check before any row is written.) ────────────────────────
+_UNIT_RE = re.compile(r",?\s*(?:\b(?:SUITE|STE|UNIT|BLDG|BUILDING|APT|FLOOR|FL)\b\.?\s+|#\s*)[A-Z0-9\-]+\b", re.I)
+
+
+def strip_unit(canon: str) -> str:
+    """The same address with a trailing ', SUITE 304'-style unit removed (the loader never stores one)."""
+    return re.sub(r"\s+", " ", _UNIT_RE.sub("", canon)).strip().rstrip(",")
+
+
+def dc_hit_report(failing: dict, loaded: set) -> dict:
+    """failing: {geocoder_query -> canonical_addr} for addresses the ladder could not match.
+    loaded: the canonical addresses this run would load.
+    exact      = the ladder's own lookup key is present, so datasetRung WOULD hit it today;
+    unit_only  = present only once the unit is stripped, so datasetRung would still MISS
+                 (the ladder looks up the unit-bearing key) -- reported separately, never added to exact."""
+    exact, unit_only, with_unit = [], [], 0
+    for q, canon in failing.items():
+        has_unit = strip_unit(canon) != canon
+        with_unit += has_unit
+        if canon in loaded:
+            exact.append(q)
+        elif has_unit and strip_unit(canon) in loaded:
+            unit_only.append(q)
+    return {"failing": len(failing), "with_unit": with_unit, "exact": exact, "unit_only": unit_only}
+
+
+def read_failing_file(path: str) -> dict:
+    """{geocoder_query: canonical_addr} from a tab-separated file written by the workflow's READ-ONLY
+    SQL step (docs/dc-openaddresses-failing-inputs.sql). This script never reads the evidence tables
+    itself: it sits under scripts/, which the Step 2A isolation gate treats as resident-facing."""
+    out = {}
+    for line in open(path, encoding="utf-8"):
+        line = line.rstrip("\n")
+        if not line.strip():
+            continue
+        q, _, canon = line.partition("\t")
+        if q and canon:
+            out[q] = canon
+    return out
+
 # ── upsert ───────────────────────────────────────────────────────────────────────────────────
 def upsert(rows: list) -> int:
     if DRY_RUN or not rows:
@@ -279,6 +321,20 @@ def main() -> int:
     print(f"  distinct canonical addresses: {len(seen)}")
     print(f"  rows written:                 {total_written}")
     print(f"  quarantined member errors:    {quarantined}")
+    if DRY_RUN and os.environ.get("DC_FAILING_FILE", "").strip():
+        failing = read_failing_file(os.environ["DC_FAILING_FILE"].strip())
+        rep = dc_hit_report(failing, seen)
+        print("\nDATA-CENTRE ADDRESS MATCH PREVIEW (read-only)")
+        print(f"  addresses the ladder could not match:        {rep['failing']}")
+        print(f"    of which carry a suite/unit:               {rep['with_unit']}")
+        print(f"  WOULD MATCH today (exact ladder key):         {len(rep['exact'])}")
+        print(f"  would match only if the unit were stripped:   {len(rep['unit_only'])}  (NOT a hit: the ladder looks up the unit-bearing key)")
+        print(f"  loaded set size (control, must be > 0):       {len(seen)}")
+        for q in rep["exact"][:60]:
+            print("   HIT  " + q)
+        for q in rep["unit_only"][:30]:
+            print("   UNIT " + q)
+
     if seen and not DRY_RUN:
         try:
             sample = rest_get("national_address_points?select=*&limit=3&order=canonical_addr")
