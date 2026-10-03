@@ -316,7 +316,9 @@ through once each step is complete").
      `0ad623b3…` and `0d71ffaf…`, equal to the file's. Only `postgres` can run the wrapper; the health read is `service_role`
      only; `anon` and `authenticated` can run neither. The first scheduled fire, 21:33:00Z, succeeded, and the function answered
      `200 {"status":"OK","dry_run":false,"claimed":0,"checked":0,"notified":0,"ended":0,"failed":0,"not_reached":0}`.*
-   - *Monitor check `property_watch_run`: not yet read back. It first appears at the hourly health tick after the schedule was applied (22:10Z).*
+   - *Monitor read back at the first hourly health tick after the schedule (22:10:00Z): check `property_watch_run` is alertable
+     and ok, "check job active; 0 watch(es); none more than 6 hours overdue; none failing; no watch invariant broken"; the monitor
+     now holds 22 checks, none failing and alertable, and no alert was sent. Four scheduled fires (21:33 to 22:03Z) all succeeded.*
    - *Not exercised live: starting, listing or stopping a real watch, a real check of a real property, and a real email. No
      brokerage member and no stored report exist in production (`report_snapshot` holds 0 rows) and none was created, so the
      job claims nothing today. It is proven by the fingerprints above and the tests: 64 checks against a real Postgres (66
