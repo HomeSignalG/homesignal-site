@@ -22,8 +22,9 @@
 // can never charge, store or recompute anything, and the text shown is the text that was stored. An id that is not one of the caller's own
 // brokerage's reports is "not found", the same for another brokerage's and for an unknown one.
 import {
-  addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateRights,
+  assemble, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateRights,
 } from '../_shared/national-report.ts';
+import { readReportInputs } from '../_shared/report-run.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import type { TrialState } from '../_shared/admin-gate.ts';
@@ -37,8 +38,7 @@ import type {
 } from '../_shared/national-report.ts';
 
 export { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };
-/** Rows requested from the canonical spatial read. It reports `has_more`, and a truncated area is disclosed, never hidden. */
-export const RADIUS_ROW_LIMIT = 1000;
+export { RADIUS_ROW_LIMIT } from '../_shared/report-reads.ts';
 
 export type Geocoded = { matchedAddress: string; lat: number; lng: number; zip: string };
 
@@ -188,15 +188,8 @@ export function makeHandler(deps: Deps) {
       // used no free report. Presentation only: it is sent with the response and written nowhere.
       const headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};
 
-      // 4. the canonical reads
-      const rows = await deps.radius(g.lat, g.lng, radius);
-      const keys = [...new Set(rows.map((r) => r.source_key))].sort();
-      const since = addDays(dayOf(deps.now()), -RECENT_DAYS);
-      const [projects, ledger, events] = await Promise.all([
-        deps.hydrate(keys), deps.ledger(keys), deps.events(keys, since),
-      ]);
-      const families = [...new Set(projects.map((p) => p.registry_id).filter((f): f is string => !!f))].sort();
-      const health = families.length ? await deps.health(families) : [];
+      // 4. the canonical reads: the ONE ordering of them, shared with the Watch (_shared/report-run.ts)
+      const { rows, projects, ledger, events, health } = await readReportInputs(deps, { lat: g.lat, lng: g.lng, radiusMi: radius, now: deps.now() });
 
       // 5. compose
       const out = assemble({

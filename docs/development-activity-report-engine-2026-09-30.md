@@ -551,6 +551,38 @@ time. A client opens it with no account. "Download PDF" is the browser's own pri
 carried to step 13); an owner still cannot list or withdraw invite links or remove an agent; opens are not recorded; PostgREST's mapping of the
 database's refusals to HTTP errors is unchecked against production; the signed-in paths are not exercised live.
 
+**Step 9 (2026-10-03): Watch.** The founder's line: "Daily check of the property; email to the agent when a nearby project's official
+status changes." Full record: `docs/development-activity-watch-2026-10-03.md`. Summary:
+
+- **An agent watches the property of one of their brokerage's saved reports.** Once a day, on the watch's own fixed slot, HomeSignal
+  checks what is near the property and, when a nearby project's official status has changed **since the report**, emails the agent one
+  message listing those projects (name, kind, the change in the publisher's own words, the detection date, the official link). A change is
+  emailed once: what an email lists is exactly what is recorded as told, and it is recorded only after the provider accepts the email.
+- **No second decision path.** What counts as a change is the report's own rule (`selectDetectedChanges`, through `changesForProjects`,
+  factored out of Changes Since Report). What is nearby is the report's own assembly (`_shared/report-run.ts`, extracted from the report
+  function). Whether the agent may still use the report is `evaluation_report_open`; who they are is `brokerage_membership_of`; whether the
+  property is still kept is the private layer. The Watch's own rules are only: the fixed daily slot, the back-off, the lease and the told-about
+  ledger.
+- **Database** (`docs/property-watch.sql`): `property_watch` and `property_watch_seen`, sixteen functions, three triggers, service-role only.
+  Every removal of a watch closes its `follow` need by trigger. 25 watches per brokerage. **Schedule** (`docs/property-watch-schedule.sql`):
+  a pg_cron wake every 10 minutes claiming at most 5 due watches (capacity, not cadence), and an alertable `property_watch_run` check in the
+  existing monitor (job state, a watch overdue more than 6 hours, a watch failing 3 times, an invariant).
+- **Edge:** `manage-property-watch` (start, list, stop; signed-in) and `run-property-watch` (system only, `x-signup-secret`). The private layer's
+  one reader gains a third window, `pointOf`, for the daily job alone; the point is never stored, logged, sent or returned.
+- **The email carries no address, label, coordinate or distance** (it goes to an outside provider); it names the report by number and date.
+
+**Decisions taken by default (the founder may change any of them):** D-9-1 once a day on the watch's own slot (the time it was started);
+D-9-2 25 watches per brokerage; D-9-3 "changes" means what Changes Since Report means, counted from the stored report; D-9-4 no address or
+label in the email; D-9-5 a watch whose agent loses standing or whose property is no longer kept ends, without an email; D-9-6 a watch is the
+agent's own, not the brokerage's; D-9-7 failures are retried within the day and shown to the operator by the alarm, not emailed to the agent;
+D-9-8 the recipient is the agent's sign-in email, read at send time and stored nowhere.
+
+**Proof:** `test/property_watch_pg` (64 checks, 66 mutations killed), `test/property_watch_schedule_pg` (44 checks, 38 mutations killed),
+`test/property-watch-changes` (41), `-functions` (128), `-email` (35), `-structure`; CI in `report-snapshot-suite.yml`.
+
+**Still open, stated:** the signed-in start, list and stop and a real email are exercised live only as far as step 9d's read-back says;
+`run-property-watch` has no rate limit beyond its secret; an ended or failing watch is not emailed to the agent.
+
 ## 5. Decisions taken by default (the founder may change any of them)
 
 - **D-G1. Access is a signed-in user in `dashboard_admins`, as an internal diagnostic surface.** The plan permits exactly this

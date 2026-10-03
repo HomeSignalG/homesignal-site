@@ -18,7 +18,7 @@ const FN = 'supabase/functions/get-development-activity-report';
 const MOD = 'supabase/functions/_shared/national-report.ts';
 const GATE = 'supabase/functions/_shared/admin-gate.ts';
 const REST = 'supabase/functions/_shared/service-rest.ts';
-const files = { module: MOD, handler: FN + '/handler.ts', data: FN + '/data.ts', index: FN + '/index.ts', gate: GATE, rest: REST, reads: 'supabase/functions/_shared/change-reads.ts' };
+const files = { module: MOD, handler: FN + '/handler.ts', data: FN + '/data.ts', index: FN + '/index.ts', gate: GATE, rest: REST, reads: 'supabase/functions/_shared/change-reads.ts', reportReads: 'supabase/functions/_shared/report-reads.ts' };
 const src = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, read(f)]));
 const all = Object.values(src).map(code).join('\n');
 
@@ -53,7 +53,9 @@ const all = Object.values(src).map(code).join('\n');
 {
   ok(/\/functions\/v1\/geocode-address/.test(src.data), '2a the address is resolved by the existing geocode-address function');
   ok(!/census\.gov|geocoding\./i.test(all), '2b there is no second geocoder client in the function');
-  ok(/rpc\/n5_projects_within_radius/.test(src.data) && /p_radius_mi/.test(src.data), '2c nearby projects come from the canonical spatial read');
+  // build step 9: the spatial read moved, unchanged, into _shared/report-reads.ts so the report and the Watch call it the same way
+  ok(/rpc\/n5_projects_within_radius/.test(src.reportReads) && /p_radius_mi/.test(src.reportReads) && /radius: reportReads\.radius,/.test(code(src.data)) && !/n5_projects_within_radius/.test(code(src.data)),
+    '2c nearby projects come from the canonical spatial read, defined once (_shared/report-reads.ts) and used by this function through it');
   // The one place trigonometry is allowed is bearingDeg (the map's direction, 100526 step 2). It returns a direction, never a
   // distance, and its result goes only to the response-only block. Everything else stays free of geometry.
   const bearingFn = /export function bearingDeg\([\s\S]*?\n\}/.exec(src.module);
@@ -96,11 +98,11 @@ const all = Object.values(src).map(code).join('\n');
   const methods = [...src.data.matchAll(/method: '([A-Z]+)'/g)].map((m) => m[1]);
   const rpcs = [...dataCode.matchAll(/\brpc\('(\w+)'/g)].map((m) => m[1]);
   const restCode = code(read('supabase/functions/_shared/service-rest.ts'));
-  ok(methods.length === 2 && methods.every((m) => m === 'POST') && JSON.stringify(rpcs) === '["report_private_context_read"]'
+  ok(methods.length === 1 && methods.every((m) => m === 'POST') && (code(src.reportReads).match(/method: 'POST'/g) || []).length === 1 && JSON.stringify(rpcs) === '["report_private_context_read"]'
      && /issueEvaluationReport\(rpc,/.test(dataCode) && /const evaluation = makeEvaluationReads\(rpc\);/.test(dataCode) && /trialOf: evaluation\.trialOf,/.test(dataCode)
      && /const \{ base, svc, rest, rpc, authenticate, isAdmin \} = makeServiceReads\(cfg, fetchFn\);/.test(dataCode)
      && (restCode.match(/method: 'POST'/g) || []).length === 1 && /base \+ '\/rest\/v1\/rpc\/' \+ fn/.test(restCode),
-    '3g the only POSTs here are the geocoder call and the spatial read; every database function goes through the ONE helper in service-rest.ts: the private-context check here, the trial read through _shared/evaluation-reads.ts, and the charged issue through the snapshot module', [methods, rpcs]);
+    '3g the only POSTs here are the geocoder call (this file) and the spatial read (_shared/report-reads.ts, one POST); every database function goes through the ONE helper in service-rest.ts: the private-context check here, the trial read through _shared/evaluation-reads.ts, and the charged issue through the snapshot module', [methods, rpcs]);
 }
 
 // ---- 4. the access model ---------------------------------------------------------------------------------------------------------------

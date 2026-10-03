@@ -40,3 +40,15 @@ verify_jwt = true
 # get-address-report). It answers only a token the database says is usable, reads one stored report and writes nothing.
 [functions.view-shared-report]
 verify_jwt = false
+
+# A brokerage's agent starts, lists and stops watching the property of one of its own stored reports (build step 9). JWT stays ON, and the
+# handler additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-property-watch]
+verify_jwt = true
+
+# The daily check of every watched property (build step 9). Called only by the database's scheduler (pg_cron through pg_net), never by a person
+# or a page. JWT stays ON (the scheduler sends the project's public key, which the gateway accepts) and the handler then requires the project's
+# private SIGNUP_HOOK_SECRET in x-signup-secret, refusing every request when none is configured: the gateway alone is not the gate. Not in the
+# deploy workflow's --no-verify-jwt exception.
+[functions.run-property-watch]
+verify_jwt = true

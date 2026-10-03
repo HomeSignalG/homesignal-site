@@ -44,10 +44,18 @@ name: report-snapshot-suite
 #      snapshot, entitlement, saved-reports and share-primitive SQL: the checks, two REAL concurrent sessions racing for a report's last
 #      place (exactly one wins), a create under REPEATABLE READ refused, a second apply, the rollback with shares stored, the refusal
 #      without the primitive, and every prohibited mutation, each of which MUST fail a NAMED check of the suite.
+#   8. THE WATCH (docs/property-watch.sql, docs/property-watch-schedule.sql; Development Activity build step 9): an agent watches the
+#      property of one of its brokerage's stored reports; a daily system job checks it and emails the agent when a nearby project's official
+#      status changes. Against the REAL account spine, private layer, snapshot, entitlement and saved-reports SQL: the watch layer's checks, two
+#      REAL concurrent sessions racing for a brokerage's last place under the limit of 25 (exactly one wins), two job runs claiming at once (disjoint),
+#      a start under REPEATABLE READ refused, a second apply, the rollback with watches stored (every follow need CLOSED), the refusal without
+#      the saved-reports functions and every prohibited mutation; then the schedule (the pg_cron job, the wrapper, the health read and the
+#      alertable monitor check) against stand-ins for pg_cron, pg_net, the vault and the monitor, with its own exact rollback, refusals and
+#      prohibited mutations. Each mutation MUST fail a NAMED check of the suite (a mutation that only crashes it fails the run).
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
-# test/share-link-functions.test.mjs, test/shared-report-page.test.mjs,
+# test/share-link-functions.test.mjs, test/shared-report-page.test.mjs, test/property-watch-*.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
 # other offline suite.
 #
@@ -103,6 +111,22 @@ on:
       - 'supabase/functions/_shared/private-subject.ts'
       - 'supabase/functions/manage-shared-report/**'
       - 'supabase/functions/view-shared-report/**'
+      - 'docs/property-watch.sql'
+      - 'docs/property-watch-schedule.sql'
+      - 'test/property_watch_pg/**'
+      - 'test/property_watch_schedule_pg/**'
+      - 'test/property-watch-structure.test.mjs'
+      - 'test/property-watch-changes.test.mjs'
+      - 'test/property-watch-functions.test.mjs'
+      - 'test/property-watch-email.test.mjs'
+      - 'supabase/functions/_shared/property-watch.ts'
+      - 'supabase/functions/_shared/watch-reads.ts'
+      - 'supabase/functions/_shared/watch-email.ts'
+      - 'supabase/functions/_shared/email-send.ts'
+      - 'supabase/functions/_shared/report-run.ts'
+      - 'supabase/functions/_shared/report-reads.ts'
+      - 'supabase/functions/manage-property-watch/**'
+      - 'supabase/functions/run-property-watch/**'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -153,6 +177,22 @@ on:
       - 'supabase/functions/_shared/private-subject.ts'
       - 'supabase/functions/manage-shared-report/**'
       - 'supabase/functions/view-shared-report/**'
+      - 'docs/property-watch.sql'
+      - 'docs/property-watch-schedule.sql'
+      - 'test/property_watch_pg/**'
+      - 'test/property_watch_schedule_pg/**'
+      - 'test/property-watch-structure.test.mjs'
+      - 'test/property-watch-changes.test.mjs'
+      - 'test/property-watch-functions.test.mjs'
+      - 'test/property-watch-email.test.mjs'
+      - 'supabase/functions/_shared/property-watch.ts'
+      - 'supabase/functions/_shared/watch-reads.ts'
+      - 'supabase/functions/_shared/watch-email.ts'
+      - 'supabase/functions/_shared/email-send.ts'
+      - 'supabase/functions/_shared/report-run.ts'
+      - 'supabase/functions/_shared/report-reads.ts'
+      - 'supabase/functions/manage-property-watch/**'
+      - 'supabase/functions/run-property-watch/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -284,3 +324,23 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_share_delivery_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsd.log
+      - name: The Watch passes; two sessions racing for a brokerage's last place cannot both have it; two job runs never take the same watch; the rollback closes every follow need; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/property_watch_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pw.log
+      - name: The Watch's schedule, wrapper, health read and monitor check pass; the file applies twice and rolls back exactly; it is refused when what it stands on is missing; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/property_watch_schedule_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pws.log

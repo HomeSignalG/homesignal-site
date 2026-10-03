@@ -172,11 +172,18 @@ const SAVED_SQL = 'docs/saved-reports.sql';
 // share primitive. test/report-share-delivery-structure.test.mjs pins that (1g) and that standing is the SAME check saved reports use (1i).
 const DELIVERY_SQL = 'docs/report-share-delivery.sql';
 const deliveryCode = code(DELIVERY_SQL);
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, EVAL_READS, SNAP_MOD].sort())
+// Build step 9: docs/property-watch.sql is a fourth SQL file that reads the ledger: start asks evaluation_report_open whether a brokerage has standing (the SAME
+// check saved reports use) and the list joins evaluation_credit once to show a report's number. Every row it writes is a row of its own two property_watch tables.
+const WATCH_SQL = 'docs/property-watch.sql';
+const watchCode = code(WATCH_SQL);
+const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, EVAL_READS, SNAP_MOD].sort())
+   && dmlTargets(watchCode).length >= 5 && dmlTargets(watchCode).every((t) => /^property_watch/.test(t))
+   && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(watchCode) && (watchCode.match(new RegExp(OURS.source, 'g')) || []).join() === 'evaluation_credit,evaluation_credit'
    && !/\b(insert\s+into|update|delete\s+from|truncate)\b/i.test(deliveryCode.replace(/'(?:[^']|'')*'/g, "''"))
    && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(deliveryCode)
    && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL (and the read-only saved-reports SQL, build step 6, and the share-delivery SQL, build step 8, which writes no row of this layer), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+  '4: outside its SQL (and the read-only saved-reports SQL, build step 6, the share-delivery SQL, build step 8, and the property-watch SQL, build step 9, which write no row of this layer), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 {
   const ER = code(EVAL_READS);
   const mints = [...ER.matchAll(/rpc\('evaluation_invite_mint', \{([^}]*)\}\)/g)];
