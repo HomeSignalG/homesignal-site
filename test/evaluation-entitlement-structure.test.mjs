@@ -161,12 +161,19 @@ ok(SCAN.length > 200 && SCAN.some((f) => f.startsWith('.github/workflows/')) && 
 // report (evaluation_report_issue, through the one shared snapshot module). Build step 5c moves the trial read into ONE shared module,
 // _shared/evaluation-reads.ts, used by both the report function and the trial function (which also redeems an invite there).
 // Build step 5d gives evaluation_create its first caller, in the same module: the trial function's admin-only create action.
-// evaluation_invite_mint, _invite_revoke and _revoke still have no caller.
+// Build step 5e gives evaluation_invite_mint its first edge-function caller, in the same module: a trial owner invites an agent, the
+// owner passed as the ACTOR so the database decides who may. evaluation_invite_revoke and evaluation_revoke still have no caller.
 const EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts', SNAP_MOD = 'supabase/functions/_shared/report-snapshot.ts';
 const namesIn = (f) => [...new Set([...code(f).matchAll(new RegExp(OURS.source, 'g'))].map((m) => m[0]))].sort();
 ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, EVAL_READS, SNAP_MOD].sort())
-   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL, exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite and (build step 5d) creates a trial (evaluation_usage, evaluation_invite_redeem, evaluation_create only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
+  '4: outside its SQL, exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+{
+  const ER = code(EVAL_READS);
+  const mints = [...ER.matchAll(/rpc\('evaluation_invite_mint', \{([^}]*)\}\)/g)];
+  ok(mints.length === 1 && /^ p_evaluation_id: t\.evaluation_id, p_role: 'agent', p_actor: userId $/.test(mints[0][1]),
+    '4-mint: the one mint call asks for an AGENT invite with the signed-in person as the ACTOR, so the database checks they are an active owner of that very brokerage (D-L8); no call mints without an actor, and none mints an owner', mints.map((m) => m[1]));
+}
 const strip4 = (t) => stripJs(t);
 const NAMES_L1 = /evaluation_(report_issue|invite|credit|event|create|revoke|usage|check)|public\.evaluation\b|brokerage/i;
 ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLLOW.length > 1500 && HAN_REPORT.length > 1500
@@ -178,8 +185,9 @@ ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLL
   const TD = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/data.ts'), 'utf8');
   ok(TH.length > 1500 && TD.length > 300 && ![TH, TD].some((t) => OURS.test(strip4(t)))
      && /const evaluation = makeEvaluationReads\(rpc\);/.test(strip4(TD)) && /trialOf: evaluation\.trialOf, redeemInvite: evaluation\.redeemInvite, createTrial: evaluation\.createTrial,/.test(strip4(TD))
-     && !/evaluation_id|brokerage_id|invite_id/.test(strip4(TH)),
-    '4b2: the trial function (build steps 5c, 5d) names no evaluation function and no id: it asks the shared trial module (status, redeem, create), and never returns an evaluation, brokerage or invite id');
+     && /roleOf: evaluation\.roleOf, inviteAgent: evaluation\.inviteAgent,/.test(strip4(TD))
+     && !/evaluation_id|brokerage_id|invite_id|brokerage_membership_of/.test(strip4(TH)),
+    '4b2: the trial function (build steps 5c, 5d, 5e) names no evaluation function, no resolver and no id: it asks the shared trial module (status, role, redeem, create, invite), and never returns an evaluation, brokerage or invite id');
 }
 const callers = SCAN.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
 ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/report-snapshot.ts') && callers.includes(SQL_FILE)

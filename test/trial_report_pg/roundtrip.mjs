@@ -1,5 +1,6 @@
-// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c and 5d).
-// Creating the trial (5d, an admin) and joining it (5c) go through the real handler and data layer of development-activity-trial;
+// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d and 5e).
+// Creating the trial (5d, an admin), joining it (5c) and an owner inviting agents (5e) go through the real handler and data layer of
+// development-activity-trial;
 // making reports goes through
 // the real request handler and the real data layer of get-development-activity-report, the real snapshot module and the real
 // SQL of record (account spine, private context, snapshot, evaluation entitlement). The only translation is the network: a
@@ -35,6 +36,10 @@ const RPC = {
   // PostgREST passes a JSON null as SQL null; psql variables cannot carry one, so '' stands for null here and nowhere else
   evaluation_create: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_create(:'n', nullif(:'s', '')::integer, nullif(:'e', '')::timestamptz) t",
     { n: a.p_brokerage_name, s: a.p_seat_limit === null ? '' : String(a.p_seat_limit), e: a.p_expires_at === null ? '' : a.p_expires_at }],
+  brokerage_membership_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_membership_of(:'u'::uuid) t", { u: a.p_user_id }],
+  // the lifetime is left to the database's default, as PostgREST does when the argument is not sent
+  evaluation_invite_mint: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid) t",
+    { e: a.p_evaluation_id, r: a.p_role, u: a.p_actor }],
 };
 const seen = [];
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
@@ -123,6 +128,58 @@ const agentToken = one("select token from public.evaluation_invite_mint(:'e'::uu
 t = await trialAsk(LATE, { action: 'redeem', token: agentToken });
 ok(t.status === 409 && t.json.error === 'seat_limit_reached' && members() === 1, '0i an agent invite on a trial with no free seats is refused', t.json);
 
+// ---- 0+. an owner invites agents, through the trial function (build step 5e) ------------------------------------------------------------
+const tokenOf = (link) => new URL(link).hash.slice('#invite='.length);
+const openAgentInvites = (e) => one("select count(*) from public.evaluation_invite where evaluation_id = :'e'::uuid and role = 'agent' and status = 'open'", { e });
+t = await trialAsk(MEMBER, { action: 'status' });
+ok(t.status === 200 && t.json.role === 'owner' && t.json.access === 'trial', '0j the owner\'s status says owner, from the membership resolver', t.json);
+const invitesBefore = Number(one('select count(*) from public.evaluation_invite'));
+t = await trialAsk(MEMBER, { action: 'invite' });
+ok(t.status === 200 && /^https:\/\/homesignal\.net\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link)
+   && JSON.stringify(Object.keys(t.json).sort()) === '["invite_expires_at","invite_link","status"]' && !JSON.stringify(t.json).includes(evalId),
+  '0k the owner makes an agent invite: the answer is the link and its expiry, and no id', t.json);
+const agentLink = t.json.invite_link;
+ok(Number(one('select count(*) from public.evaluation_invite')) === invitesBefore + 1
+   && one("select count(*) from public.evaluation_invite where evaluation_id = :'e'::uuid and role = 'agent' and status = 'open' and token_hash = encode(sha256(convert_to(:'t', 'UTF8')), 'hex')", { e: evalId, t: tokenOf(agentLink) }) === '1'
+   && one("select count(*) from public.evaluation_event where evaluation_id = :'e'::uuid and kind = 'invite_minted' and role = 'agent'", { e: evalId }) === '1',
+  '0l the database holds exactly one new invite: an OPEN AGENT invite of the owner\'s own trial, the link\'s token hashed, and the minting is logged');
+ok(Math.abs(Date.parse(t.json.invite_expires_at) - Date.now() - 14 * 86_400_000) < 120_000, '0m the agent invite lives the database\'s default 14 days (D-L4)', t.json.invite_expires_at);
+t = await trialAsk(LATE, { action: 'redeem', token: tokenOf(agentLink) });
+ok(t.status === 200 && t.json.role === 'agent' && t.json.access === 'trial' && members() === 2
+   && one("select role from public.brokerage_member where user_id = :'u'::uuid", { u: LATE }) === 'agent',
+  '0n the agent opens the link and joins the owner\'s trial as an AGENT, sharing its reports', t.json);
+const invitesNow = Number(one('select count(*) from public.evaluation_invite'));
+t = await trialAsk(LATE, { action: 'invite' });
+ok(t.status === 403 && t.json.error === 'not_owner' && Number(one('select count(*) from public.evaluation_invite')) === invitesNow,
+  '0o an agent cannot invite: the DATABASE refuses (NOT_ENTITLED) and nothing is written', t.json);
+t = await trialAsk(STRANGER, { action: 'invite' });
+ok(t.status === 403 && t.json.error === 'forbidden' && Number(one('select count(*) from public.evaluation_invite')) === invitesNow, '0p a person with no trial cannot invite', t.json);
+t = await trialAsk(ADMIN, { action: 'invite' }, true);
+ok(t.status === 403 && Number(one('select count(*) from public.evaluation_invite')) === invitesNow, '0q being an admin does not make an agent invite');
+// a trial with one agent seat: the owner may make two links, and the second agent to open one is refused (seats are counted at joining)
+const OWNER2 = 'e5555555-5555-4555-8555-555555555555', AGENT_A = 'f6666666-6666-4666-8666-666666666666', AGENT_B = 'a7777777-7777-4777-8777-777777777777';
+one("insert into auth.users (id, email) values (:'o'::uuid, 'owner2@example.test'), (:'a'::uuid, 'a@example.test'), (:'b'::uuid, 'b@example.test')", { o: OWNER2, a: AGENT_A, b: AGENT_B });
+const [evOne, ownerOne] = one("select evaluation_id || ' ' || owner_token from public.evaluation_create('One Seat Realty', 1)").split(' ');
+t = await trialAsk(OWNER2, { action: 'redeem', token: ownerOne });
+ok(t.status === 200 && t.json.role === 'owner', '0r the second owner joins their own trial', t.json);
+const l1 = (await trialAsk(OWNER2, { action: 'invite' })).json.invite_link, l2 = (await trialAsk(OWNER2, { action: 'invite' })).json.invite_link;
+ok(l1 && l2 && l1 !== l2 && openAgentInvites(evOne) === '2', '0s an owner may make one link per agent: two different links, two open agent invites', [l1, l2]);
+t = await trialAsk(AGENT_A, { action: 'redeem', token: tokenOf(l1) });
+const ta = t;
+t = await trialAsk(AGENT_B, { action: 'redeem', token: tokenOf(l2) });
+ok(ta.status === 200 && ta.json.role === 'agent' && t.status === 409 && t.json.error === 'seat_limit_reached'
+   && one("select count(*) from public.brokerage_member m join public.evaluation e on e.brokerage_id = m.brokerage_id where e.evaluation_id = :'e'::uuid and m.role = 'agent'", { e: evOne }) === '1',
+  '0t with one agent seat, the first agent joins and the second is refused: the limit holds however many links the owner made', [ta.json, t.json]);
+// an ended trial: the handler refuses before asking; and if it did ask, the database would refuse on its own
+one("select public.evaluation_revoke(:'e'::uuid)", { e: evOne });
+const invitesRevoked = Number(one('select count(*) from public.evaluation_invite'));
+t = await trialAsk(OWNER2, { action: 'invite' });
+ok(t.status === 409 && t.json.error === 'trial_not_active' && Number(one('select count(*) from public.evaluation_invite')) === invitesRevoked, '0u the owner of a revoked trial cannot invite (409)', t.json);
+let refused = null;
+try { await TD.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc' }, fetchToSql).inviteAgent(OWNER2); } catch (e) { refused = e && e.constructor && e.constructor.name; }
+ok(refused === 'NotEntitled' && Number(one('select count(*) from public.evaluation_invite')) === invitesRevoked,
+  '0v asked directly, the data layer\'s mint is refused by the DATABASE for a revoked trial (NOT_ENTITLED): the handler\'s check is not the only guard', refused);
+
 // ---- the engine's inputs, as in test/national_report_pg ------------------------------------------------------------------------
 const FAM = 'wsdot-project-delivery-plan-proposed';
 const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'round-trip fixture', attribution: 'Data: WSDOT' }] };
@@ -200,6 +257,12 @@ ok(ord === Array.from({ length: 20 }, (_, i) => i + 1).join(','), '6d the ledger
 t = await trialAsk(MEMBER, { action: 'status' });
 ok(t.status === 200 && t.json.access === 'complete' && t.json.trial.credits_remaining === 0 && t.json.trial.credits_used === 20,
   '6e the trial function now says the trial is complete: twenty used, none left', t.json);
+const invitesDone = Number(one('select count(*) from public.evaluation_invite'));
+t = await trialAsk(MEMBER, { action: 'invite' });
+ok(t.status === 409 && t.json.error === 'trial_not_active' && Number(one('select count(*) from public.evaluation_invite')) === invitesDone,
+  '6f the owner of a complete trial cannot invite: an agent joining it could make no report (build step 5e)', t.json);
+t = await trialAsk(LATE, { action: 'status' });
+ok(t.status === 200 && t.json.access === 'complete' && t.json.role === 'agent' && t.json.trial.credits_used === 20, '6g the agent sees the same shared trial: complete, twenty used', t.json);
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
