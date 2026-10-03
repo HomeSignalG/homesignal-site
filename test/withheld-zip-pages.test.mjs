@@ -2,9 +2,11 @@
 // test/withheld-zip-pages.browser.test.mjs; this file pins WHICH ZIPs and that every reader
 // reads the one list.
 //
-// The list was COMPUTED from the Fix 4 record (class DECOMMISSIONED_IN_DATASET), never typed:
-// zips + restored must equal that class exactly, so a hand edit that drops or adds a ZIP fails
-// here. The founder puts a ZIP back by MOVING it from "zips" to "restored".
+// The list holds two groups. The 47 decommissioned ZIPs were COMPUTED from the Fix 4 record (class
+// DECOMMISSIONED_IN_DATASET), never typed. The unverified ZIPs (84684, 84685; founder, 2026-10-03) are
+// described one by one under "unverified", and are NOT claimed retired, invalid, decommissioned or
+// active. zips + restored must equal the two groups exactly, so a hand edit that drops or adds a ZIP
+// fails here. The founder puts a ZIP back by MOVING it from "zips" to "restored".
 //
 // Run: node test/withheld-zip-pages.test.mjs
 import { readFileSync } from 'node:fs';
@@ -39,8 +41,31 @@ const head = lines[0].split(',');
 const iZip = head.indexOf('zip'), iClass = head.indexOf('class');
 const cls = lines.slice(1).map((l) => l.split(',')).filter((r) => r[iClass] === doc.source_class).map((r) => r[iZip]).sort();
 ok(cls.length === 47, '2b the source class holds 47 ZIPs', cls.length);
-ok(JSON.stringify([...zips, ...restored].sort()) === JSON.stringify(cls),
-  '2c withheld + restored = the decommissioned class exactly (nothing typed by hand)');
+const unverified = doc.unverified || {};
+const unverifiedZips = Object.keys(unverified).sort();
+ok(JSON.stringify([...zips, ...restored].sort()) === JSON.stringify([...cls, ...unverifiedZips].sort()),
+  '2c withheld + restored = the decommissioned class + the unverified ZIPs exactly (nothing typed by hand)');
+ok(unverifiedZips.every((z) => !cls.includes(z)), '2d no unverified ZIP is in the decommissioned class');
+ok(zips.length === cls.length + unverifiedZips.length, '2e the 47 decommissioned ZIPs are all still withheld, none dropped');
+
+// §2f UNVERIFIED ZIPs 84684 and 84685 (founder, 2026-10-03). The metadata is pinned whole: a changed
+// word in the notes, a flag flipped, or a claim that the ZIP is retired fails here.
+const NOTES = (label) => `USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and Census 2010/2020 ZCTA datasets. Registry label '${label}' is unsourced and must not be treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may be derived. Re-audit only after USPS or USPS City State Product verification.`;
+const WANT = {
+  '84684': { zip_code: '84684', zip_status: 'unverified', zip_type: 'unknown', is_indexable: false, is_in_sitemap: false, page_action: 'REDIRECT_TO_SEARCH_OR_404', notes: NOTES('West Mountain') },
+  '84685': { zip_code: '84685', zip_status: 'unverified', zip_type: 'unknown', is_indexable: false, is_in_sitemap: false, page_action: 'REDIRECT_TO_SEARCH_OR_404', notes: NOTES('Woodland Hills (84685)') },
+};
+ok(JSON.stringify(unverifiedZips) === '["84684","84685"]', '2f exactly 84684 and 84685 are listed as unverified', unverifiedZips);
+ok(zips.includes('84684') && zips.includes('84685'), '2g both are on the withheld list every reader uses');
+ok(JSON.stringify(unverified) === JSON.stringify(WANT), '2h the audit metadata is exactly the founder-approved record', unverified);
+ok(!restored.includes('84684') && !restored.includes('84685'), '2i neither is restored');
+const claims = /\b(retired|decommissioned|invalid|active)\b/i;
+ok(unverifiedZips.every((z) => !claims.test(unverified[z].notes)), '2j the per-ZIP notes claim neither retired, decommissioned, invalid nor active');
+ok(/^Existence not established/.test(doc.unverified_reason || '') && /Not classified as invalid, retired, decommissioned or geographic\./.test(doc.unverified_reason),
+  '2j2 the group reason says existence is not established and disclaims every classification');
+ok(doc.unverified_source_class === 'NOT_IN_ZIP_DATASET' && lines.slice(1).map((l) => l.split(',')).filter((r) => r[iClass] === 'NOT_IN_ZIP_DATASET').map((r) => r[iZip]).sort().join() === '84684,84685',
+  '2k the Fix 4 record puts exactly these two in NOT_IN_ZIP_DATASET (not in the decommissioned class)');
+ok(!zips.includes('84651') && !zips.includes('84653'), '2l the neighbouring real ZIPs 84651 and 84653 are NOT withheld');
 
 // §3 one list, every reader
 const shell = readFileSync(join(root, 'shell.js'), 'utf8');
@@ -55,6 +80,15 @@ const staged = execFileSync('python3', ['-c',
   'import sys; sys.path.insert(0, "scripts"); import stage_site; print("\\n".join(stage_site.staged_paths(".")))'],
   { cwd: root, encoding: 'utf8' }).split('\n');
 ok(staged.includes('lib/withheld-zip-pages.json'), '3d the Pages artifact ships the list (shell.js fetches it)');
+// 3e/3f: the sitemap generator reads these two ZIPs from the list, and the committed sitemap.xml lists neither
+const wz = execFileSync('python3', ['-c',
+  'import sys; sys.path.insert(0, "scripts"); import gen_sitemap; print(",".join(sorted(gen_sitemap.withheld_zips())))'],
+  { cwd: root, encoding: 'utf8' }).trim().split(',');
+ok(wz.includes('84684') && wz.includes('84685') && wz.length === zips.length, '3e gen_sitemap.withheld_zips() returns both unverified ZIPs (and the whole list)', wz.length);
+const committedSitemap = readFileSync(join(root, 'sitemap.xml'), 'utf8');
+ok(!/zip=8468[45]\b/.test(committedSitemap) && !/\/community\/8468[45]\//.test(committedSitemap),
+  '3f the committed sitemap.xml lists neither ZIP, as community.html, homesignalmap.html or /community/<zip>/');
+ok(zips.every((z) => !committedSitemap.includes('zip=' + z)), '3g the committed sitemap lists no withheld ZIP at all');
 
 // §4 the live verifiers' verdict (scripts/lib/withheld-zips-live.mjs)
 const live = await import('../scripts/lib/withheld-zips-live.mjs');

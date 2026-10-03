@@ -386,7 +386,11 @@
       const r = await fetch(HS.WITHHELD_ZIPS_URL, { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const doc = await r.json();
-      return new Set((doc && Array.isArray(doc.zips) ? doc.zips : []).map(String));
+      const set = new Set((doc && Array.isArray(doc.zips) ? doc.zips : []).map(String));
+      // ZIPs withheld because their existence is UNVERIFIED (founder, 2026-10-03), not because the
+      // dataset lists them as retired. Their notice must not say "retired".
+      set.unverified = new Set(Object.keys((doc && doc.unverified && typeof doc.unverified === 'object') ? doc.unverified : {}).map(String));
+      return set;
     } catch (e) {
       console.warn('withheld ZIP list could not be read; pages draw as before', e);
       return null;
@@ -395,7 +399,7 @@
   // Started as the script loads, so the read runs alongside the shell's own fetches rather
   // than after them.
   const _withheldZipsP = loadWithheldZips();
-  function renderWithheldZip(zip) {
+  function renderWithheldZip(zip, unverified) {
     SS.set('viewZip', null);   // never carry a withheld ZIP onto the next page
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
@@ -404,8 +408,11 @@
     document.title = 'ZIP ' + zip + ' is not available — HomeSignal';
     const html = '<div class="page" id="hs-withheld" data-zip-withheld="' + zip + '"><div class="ph">'
       + '<div class="eyebrow">ZIP Codes</div><h1>ZIP ' + zip + ' is not available</h1>'
-      + '<p>We have taken this ZIP code\'s page down while we review it. Our ZIP code data lists '
-      + zip + ' as retired, so it may no longer be in use.</p>'
+      + (unverified
+        ? '<p>We couldn\'t confirm that ZIP code ' + zip + ' is an active U.S. Postal Service ZIP code, so we don\'t have a page for it. '
+          + 'Check the number, or search by city or address to find your community.</p>'
+        : '<p>We have taken this ZIP code\'s page down while we review it. Our ZIP code data lists '
+          + zip + ' as retired, so it may no longer be in use.</p>')
       + '<p style="margin-top:12px"><a class="inlinebtn" href="/">Look up another ZIP code or address →</a></p>'
       + '</div></div>';
     const slot = $('hs-slot');
@@ -2566,7 +2573,7 @@
       viewedZip: state.zip,
       onZipPage: HS.isZipPagePath(location.pathname)
     });
-    if (withheldZip) { renderWithheldZip(withheldZip); return; }
+    if (withheldZip) { renderWithheldZip(withheldZip, !!(withheld.unverified && withheld.unverified.has(withheldZip))); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();

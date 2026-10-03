@@ -80,7 +80,8 @@ Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. 
   See receipt §5.
 - 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
   - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
-    established);
+    established) — ⏸️ **pages WITHHELD 2026-10-03 as UNVERIFIED** (not retired), same list as the 47;
+    re-audit only after USPS or USPS City State Product verification;
   - the 47 ZIPs the dataset flags as decommissioned — ⏸️ **pages WITHHELD 2026-10-01** (founder:
     "retire the 47 zip code pages, take them off live site until i can investigate further").
     `lib/withheld-zip-pages.json` (computed from the Fix 4 record) is read by `shell.js` (noindex
