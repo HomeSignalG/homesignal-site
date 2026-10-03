@@ -290,7 +290,57 @@ through once each step is complete").
      an owner cannot list or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into
      HTTP answers is unchecked against production; the signed-in paths are not exercised live. Also carried: several older
      mutation harnesses have stale anchors that predate step 7; none guards step 8.
-9. **Watch.** Daily check of the property; email to the agent when a nearby project's official status changes.
+9. ~~**Watch.**~~ Daily check of the property; email to the agent when a nearby project's official status changes.
+   *(Done: #1606 merged as `fc0d700`.*
+   - *Database, applied to production 2026-10-03 21:20:52Z as migration `property_watch` from `docs/property-watch.sql`
+     (file md5 `53191b93…`), run through the committed-file runner `db-sql.yml` (run `37154775387`) because the migration tool
+     timed out twice at its 60-second limit with no effect on the database (checked). It is additive: two tables, sixteen
+     functions, three triggers; no existing table, column or schedule was changed.*
+     - *Read back: the sixteen function bodies fingerprint `83851d0a…`, the constraints `dd40e118…` and the triggers `3fdca4b2…`,
+       each equal to the same fingerprint computed from a fresh build of the committed file. All objects are owned by `postgres`
+       and executable by `service_role` only. The ledger row `property_watch` (version `20261003212052`) was written by hand
+       with its statements left empty, because the runner writes no ledger row.*
+   - *Four functions deployed from `main` on 2026-10-03 (runs `37154837397`, `37154838946`, `37154840674`, `37154842203`):
+     `manage-property-watch` new, version 1; `run-property-watch` new, version 1; `get-development-activity-report` version 12
+     to 13; `follow-development-report` to version 5. Both new functions have the JWT check ON (the scheduler sends the public
+     key); `run-property-watch` also needs the project's private secret. Read back: all four ACTIVE at those versions.*
+   - *Pages deployed. Read back from homesignal.net by md5 and size, byte-identical to `main`: `development-activity-reports.html`
+     (`13c97236…`, 59,418 bytes), `lib/da-report-view.js` (`77714f0a…`, 52,921), `development-activity-review.html`
+     (`e6e4ee31…`, 26,349) and `shared-report.html` (`f8990467…`, 9,901).*
+   - *Dry run, through the database's HTTP client, against the deployed function: with the secret `200 {"status":"OK","dry_run":true,
+     "due":0,"email_configured":true}`. Controls: no secret `401 unauthorized`; a wrong secret `401 unauthorized`; a GET with no
+     secret returns only the function's description (`secret_configured: true`, `email_configured: true`).*
+   - *Schedule applied 2026-10-03 21:24Z from `docs/property-watch-schedule.sql` (file md5 `7b8c0232…`, run `37155011464`;
+     ledger row `property_watch_schedule`, statements empty). Read back: job `property-watch-run` (id 84) is active on
+     `3,13,23,33,43,53 * * * *` and runs `select public.property_watch_run_scheduled()`. The wrapper and the health read fingerprint
+     `0ad623b3…` and `0d71ffaf…`, equal to the file's. Only `postgres` can run the wrapper; the health read is `service_role`
+     only; `anon` and `authenticated` can run neither. The first scheduled fire, 21:33:00Z, succeeded, and the function answered
+     `200 {"status":"OK","dry_run":false,"claimed":0,"checked":0,"notified":0,"ended":0,"failed":0,"not_reached":0}`.*
+   - *Monitor check `property_watch_run`: not yet read back. It first appears at the hourly health tick after the schedule was applied (22:10Z).*
+   - *Not exercised live: starting, listing or stopping a real watch, a real check of a real property, and a real email. No
+     brokerage member and no stored report exist in production (`report_snapshot` holds 0 rows) and none was created, so the
+     job claims nothing today. It is proven by the fingerprints above and the tests: 64 checks against a real Postgres (66
+     deliberate breakages of the SQL, all caught), 44 checks on the schedule (38 breakages caught), 43 on the change rule, 140
+     on the two functions, 35 on the email (address, label, coordinate, distance and agent proved absent), 64 on the structure,
+     153 on the agent's page in Chromium, and 98 breakages of the functions, pages and wiring, all caught.)*
+   - On a saved report the agent presses Watch. HomeSignal then checks the property once a day, on the time of day the watch
+     was started, and emails the agent when something near it has had an official status change since the report. The agent can
+     see the watch (report number, when it was last checked, when it is next due) and stop it at any time, even after a trial ends.
+   - The email carries no street address, client label, coordinate or distance: it gives the report's number and date, each
+     change in the publisher's own words with its official source link, and an "Open the report" button to HomeSignal's
+     reports page. It lists exactly what is recorded as told, and records it only after the email provider accepts the
+     message, so nothing is announced twice and nothing is announced and lost.
+   - Defaults taken, the founder may change any (full list D-9-1 to D-9-8 in `docs/development-activity-watch-2026-10-03.md`):
+     once a day on the start time; 25 watches per brokerage at once; "changes" means what Changes Since Report means, so the first
+     email can list everything recorded since the report was made; a watch is the agent's own, not the brokerage's; the recipient
+     is the agent's sign-in email, read at send time and stored nowhere; the agent is not emailed when a watch ends (standing lost,
+     address purged) or when a check keeps failing, an alarm reports failures instead.
+   - Open before step 13 (unchanged, plus three): the free-report rate limit; the public link endpoint is not rate-limited; an
+     owner cannot list or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into HTTP answers is
+     unchecked against production; the signed-in paths are not exercised live; **`run-property-watch` has no rate limit beyond its
+     private secret and its per-call limit of 5**; **an ended or failing watch is not emailed to the agent (D-9-5, D-9-7)**; **the
+     ledger rows for runner applies (`property_watch`, `property_watch_schedule`) are hand-written backfills with empty statements**.
+     Also carried: several older mutation harnesses have stale anchors that predate step 7; none guards step 9.
 10. **Compare.** Two to five addresses side by side, same report rules.
 11. **$79/month checkout** on the existing Lemon Squeezy connection: 100 reports a month, Billing tab.
     *Founder action:* create the $79 product in Lemon Squeezy and make one test payment.
