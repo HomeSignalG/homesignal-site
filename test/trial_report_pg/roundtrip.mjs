@@ -1,4 +1,4 @@
-// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d, 5e and 6).
+// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d, 5e, 6 and 7).
 // Creating the trial (5d, an admin), joining it (5c) and an owner inviting agents (5e) go through the real handler and data layer of
 // development-activity-trial;
 // making reports goes through
@@ -39,6 +39,8 @@ const RPC = {
   // saved reports (build step 6): two read-only functions
   evaluation_reports_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_reports_of(:'u'::uuid) t", { u: a.p_user_id }],
   evaluation_report_open: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_report_open(:'u'::uuid, :'r'::uuid) t", { u: a.p_user_id, r: a.p_report_id }],
+  // the header (build step 7): one read-only function
+  report_header_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_header_of(:'u'::uuid) t", { u: a.p_user_id }],
   brokerage_membership_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_membership_of(:'u'::uuid) t", { u: a.p_user_id }],
   // the lifetime is left to the database's default, as PostgREST does when the argument is not sent
   evaluation_invite_mint: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid) t",
@@ -215,6 +217,8 @@ let r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(1) });
 ok(r.status === 200 && r.json.charged === true && r.json.stored === true && r.json.replayed === false && r.json.trial.credits_used === 1 && r.json.trial.credits_remaining === 19,
   '1a a trial report that shows development is charged: one used, nineteen left', [r.status, r.json.trial, r.json.error]);
 const firstId = r.json.report_id;
+ok(JSON.stringify(r.json.header) === '{"brokerage":"Round Trip Realty","agent":null}',
+  '1a2 the first report carries its viewer\'s header: the brokerage\'s name from the account, and no name because this person has given none', r.json.header);
 ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1 && one("select report_id from public.evaluation_credit") === firstId,
   '1b the database holds ONE stored report and ONE credit, and the credit points at that report');
 const ctx = JSON.parse(one("select row_to_json(c) from public.report_private_context c join public.report_snapshot s on s.private_context_id = c.context_id where s.report_id = :'r'::uuid", { r: firstId }));
@@ -228,6 +232,11 @@ r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(1) });
 ok(r.status === 200 && r.json.replayed === true && r.json.charged === false && r.json.report_id === firstId && r.json.trial.credits_used === 1,
   '2a a retry with the same key returns the first report and charges nothing', [r.status, r.json.replayed, r.json.trial]);
 ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '2b nothing new is stored or charged');
+// the person gives their name (it lives in their sign-in account: auth.users.raw_user_meta_data); the same retry now shows it, at no cost
+one("update auth.users set raw_user_meta_data = jsonb_build_object('full_name', '  Pat   Agent ') where id = :'u'::uuid", { u: MEMBER });
+r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(1) });
+ok(r.json.replayed === true && r.json.charged === false && JSON.stringify(r.json.header) === '{"brokerage":"Round Trip Realty","agent":"Pat Agent"}' && count('evaluation_credit') === 1,
+  '2c once the person has given a name, the same report shows it (cleaned to one line of plain text), read now, at no cost', r.json.header);
 
 // ---- 3. the same key reused for a different property: refused, nothing shown, nothing charged -------------------------------------
 r = await ask(CLEARED, MEMBER, { address: NEIGHBOUR, idempotency_key: key(1) });
@@ -238,6 +247,7 @@ ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '3b and n
 r = await ask(NONE, MEMBER, { address: NEIGHBOUR, idempotency_key: key(2) });
 ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && r.json.charged === false && r.json.stored === false && r.json.trial.credits_used === 1,
   '4a with nothing cleared the report is "No data ingested": not charged, not stored, still one used', [r.json.charged, r.json.trial]);
+ok(JSON.stringify(r.json.header) === '{"brokerage":"Round Trip Realty","agent":"Pat Agent"}', '4a2 and it carries the same header');
 ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '4b the database is unchanged');
 ok(seen.some((s) => /rpc\/evaluation_report_issue$/.test(s)) && seen.some((s) => /rpc\/report_private_context_read$/.test(s)) && seen.some((s) => /report_snapshot\?select=body/.test(s)),
   '4c (control) the real data layer did reach the issue function, the private-context check and the stored-report read');
@@ -248,7 +258,8 @@ ok(r.status === 403 && r.json.error === 'forbidden', '5a a signed-in person with
 ok(count('evaluation_credit') === 1, '5b and nothing is charged');
 
 // ---- 6. the twentieth report ends the trial; the twenty-first is refused before any work ----------------------------------------------
-for (let i = 10; i < 29; i++) await ask(CLEARED, MEMBER, { address: (100 + i) + ' Evergreen Terrace, Springfield, OR 97477', idempotency_key: key(i) });
+// the second charged report (i = 10) carries a client label, typed with stray spaces: it is kept in the private layer only (build step 7)
+for (let i = 10; i < 29; i++) await ask(CLEARED, MEMBER, { address: (100 + i) + ' Evergreen Terrace, Springfield, OR 97477', idempotency_key: key(i), ...(i === 10 ? { label: ' Smith   buyers ' } : {}) });
 ok(count('evaluation_credit') === 20 && count('report_snapshot') === 20 && one("select status from public.evaluation where evaluation_id = :'e'::uuid", { e: evalId }) === 'complete',
   '6a after twenty charged reports the trial is complete: twenty credits, twenty stored reports', [count('evaluation_credit'), count('report_snapshot')]);
 const before = seen.length;
@@ -294,6 +305,39 @@ ok(snapState() === before7, '7g listing and opening wrote nothing: the same snap
 const agentOpen = await savedAsk(LATE, { action: 'open', report_id: firstId });
 ok(agentOpen.status === 200 && JSON.stringify(agentOpen.json.report) === JSON.stringify(opened.json.report), '7h an agent opens a report the owner made: the same report');
 
+// the header and the client label (build step 7)
+const HDR_ALL = ['Pat Agent', 'Pat   Agent'];
+const second = listed.json.reports.find((x) => x.number === 2);
+const secondOpen = await savedAsk(MEMBER, { action: 'open', report_id: second.report_id });
+ok(secondOpen.status === 200 && secondOpen.json.client_label === 'Smith buyers' && JSON.stringify(secondOpen.json.header) === '{"brokerage":"Round Trip Realty","agent":"Pat Agent"}',
+  '7h2 a reopened report shows its client label (cleaned) and the viewer\'s own header: the brokerage from the account and the name the person gave', [secondOpen.json.client_label, secondOpen.json.header]);
+const secondCtx = one("select private_context_id from public.report_snapshot where report_id = :'r'::uuid", { r: second.report_id });
+ok(one("select label from public.report_private_context where context_id = :'c'::uuid", { c: secondCtx }) === 'Smith   buyers',
+  '7h3 the client label was kept as typed (ends trimmed), in the deletable private layer');
+const secondBody = one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: second.report_id });
+ok(!/Smith|Pat\b|Round Trip Realty/.test(secondBody) && JSON.stringify(secondOpen.json.report) === JSON.stringify(JSON.parse(secondBody)),
+  '7h4 the PERMANENT report holds neither the label, an agent\'s name nor the brokerage\'s name, and a reopened report is that stored body unchanged');
+const publicTables = one("select string_agg(table_name, ',' order by table_name) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'").split(',');
+const holders = (needle) => publicTables.filter((tb) => Number(one('select count(*) from public."' + tb + '" x where x::text like :\'n\'', { n: '%' + needle + '%' })) > 0);
+ok(publicTables.length > 8 && holders('Round Trip Realty').includes('brokerage_account') && holders('742 Evergreen').includes('report_private_context'),
+  '7h5 (control) the scan finds a value where it is kept: the brokerage\'s name on its account and the address in the private layer', publicTables.length);
+ok(HDR_ALL.every((v) => holders(v).length === 0), '7h6 an agent\'s name is written in NO table of this database\'s public schema: it lives in their sign-in account alone', HDR_ALL.map(holders));
+ok(JSON.stringify(holders('Smith')) === '["report_private_context"]' && holders('Smith buyers').length === 0,
+  '7h7 the client label is written in ONE table, the deletable private layer, as typed (the cleaned one-line form is made only when it is shown)', holders('Smith'));
+const lateOpen = await savedAsk(LATE, { action: 'open', report_id: second.report_id });
+ok(lateOpen.status === 200 && lateOpen.json.client_label === 'Smith buyers' && JSON.stringify(lateOpen.json.header) === '{"brokerage":"Round Trip Realty","agent":null}',
+  '7h8 an agent of the same brokerage sees the same label (it is the brokerage\'s) under THEIR OWN header: same brokerage, and no name because they gave none', lateOpen.json.header);
+// a name or the brokerage renamed changes what is shown next time, never what was stored
+const bodyHash = one("select md5(string_agg(body, '|' order by report_id)) from public.report_snapshot");
+one("update auth.users set raw_user_meta_data = jsonb_build_object('full_name', 'Pat Q. Agent') where id = :'u'::uuid", { u: MEMBER });
+one("update public.brokerage_account set name = 'Renamed Realty' where name = 'Round Trip Realty'");
+const renamed = await savedAsk(MEMBER, { action: 'open', report_id: second.report_id });
+ok(JSON.stringify(renamed.json.header) === '{"brokerage":"Renamed Realty","agent":"Pat Q. Agent"}' && JSON.stringify(renamed.json.report) === JSON.stringify(secondOpen.json.report)
+   && one("select md5(string_agg(body, '|' order by report_id)) from public.report_snapshot") === bodyHash,
+  '7h9 a new name and a renamed account show on the next open, and every stored report is byte for byte what it was (the header is read, never copied)', renamed.json.header);
+one("update public.brokerage_account set name = 'Round Trip Realty' where name = 'Renamed Realty'");
+one("update auth.users set raw_user_meta_data = jsonb_build_object('full_name', 'Pat Agent') where id = :'u'::uuid", { u: MEMBER });
+
 // another brokerage: its own reports, and no way into this one
 const NEWBIE = 'a8888888-8888-4888-8888-888888888888', BCODE = 'b9999999-9999-4999-8999-999999999999';
 one("insert into auth.users (id, email) values (:'n'::uuid, 'newbie@example.test')", { n: NEWBIE });
@@ -330,6 +374,13 @@ ok(reopened.status === 200 && reopened.json.address === null && JSON.stringify(r
    && one("select content_hash from public.report_snapshot where report_id = :'r'::uuid", { r: firstId }) === hashBefore,
   '7p the purged report still opens, identical to before, with no address; its stored hash is unchanged (history survives the privacy purge)');
 
+// the label goes with the address when the private layer purges (build step 7)
+one("select public.report_private_context_purge(:'c'::uuid, 'verified_privacy_request')", { c: secondCtx });
+const purgedLabel = await savedAsk(MEMBER, { action: 'open', report_id: second.report_id });
+ok(purgedLabel.status === 200 && purgedLabel.json.client_label === null && purgedLabel.json.address === null && purgedLabel.json.header && purgedLabel.json.header.brokerage === 'Round Trip Realty'
+   && JSON.stringify(purgedLabel.json.report) === JSON.stringify(secondOpen.json.report) && holders('Smith').length === 0,
+  '7p2 after a privacy purge the client label is gone from every table and from the reopened report, which is otherwise identical and still has its header', purgedLabel.json.client_label);
+
 // bad requests
 const badId = await savedAsk(MEMBER, { action: 'open', report_id: 'not-a-uuid' });
 const extra = await savedAsk(MEMBER, { action: 'list', address: HOME });
@@ -358,12 +409,30 @@ ok(r.status === 200 && otherReport !== ''
    && one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: NEWBIE }) === '1'
    && one("select count(*) from public.evaluation_report_open(:'u'::uuid, :'r'::uuid)", { u: NEWBIE, r: otherReport }) === '1',
   '7v while its trial is active and unexpired the other brokerage lists and opens its one report', r.json);
+
+ok(JSON.stringify(r.json.header) === '{"brokerage":"Other Brokerage Realty","agent":null}', '7v2 the other brokerage\'s report carries ITS OWN brokerage name, never the first one\'s', r.json.header);
 one("update public.evaluation e set expires_at = e.created_at + interval '1 second' from public.brokerage_account a where a.id = e.brokerage_id and a.name = 'Other Brokerage Realty' and e.status = 'active'");
 ok(one("select count(*) from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Other Brokerage Realty' and e.status = 'active' and e.expires_at < now()") === '1'
    && one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: NEWBIE }) === '0'
    && one("select count(*) from public.evaluation_report_open(:'u'::uuid, :'r'::uuid)", { u: NEWBIE, r: otherReport }) === '0'
    && count('report_snapshot') === 21,
   '7w once an ACTIVE trial\'s end date has passed the database functions return nothing, and the stored report is still there');
+
+// ---- 8. who has a header (build step 7): the database function itself, called directly ----------------------------------------------------
+const hdrRows = (u) => one("select count(*) from public.report_header_of(:'u'::uuid)", { u });
+ok(hdrRows(STRANGER) === '0' && hdrRows('99999999-9999-4999-8999-999999999999') === '0',
+  '8a a person with no brokerage, and an id that is nobody, have NO header row');
+ok(hdrRows(MEMBER) === '1' && one("select brokerage_name || '|' || agent_name from public.report_header_of(:'u'::uuid)", { u: MEMBER }) === 'Round Trip Realty|Pat Agent',
+  '8b an active member of an active brokerage has exactly one row: the account\'s name and their own', one("select brokerage_name || '|' || coalesce(agent_name, '(none)') from public.report_header_of(:'u'::uuid)", { u: MEMBER }));
+ok(one("select agent_name is null from public.report_header_of(:'u'::uuid)", { u: LATE }) === 't', '8c a member who has given no name has the brokerage and a null name, not an invented one');
+one("update public.brokerage_member set status = 'deactivated' where user_id = :'u'::uuid", { u: LATE });
+ok(hdrRows(LATE) === '0', '8d a DEACTIVATED member has no header (the resolver is the only way in)');
+one("update public.brokerage_account set status = 'suspended' where name = 'Other Brokerage Realty'");
+ok(hdrRows(NEWBIE) === '0', '8e and neither has a member of a SUSPENDED brokerage');
+ok(['anon', 'authenticated', 'public'].every((role) => one("select has_function_privilege(:'r', 'public.report_header_of(uuid)', 'execute')", { r: role }) === 'f')
+   && one("select has_function_privilege('service_role', 'public.report_header_of(uuid)', 'execute')") === 't',
+  '8f the function is executable by the system role alone');
+ok(one("select provolatile::text || prosecdef::text from pg_proc where oid = 'public.report_header_of(uuid)'::regprocedure") === 'strue', '8g it is STABLE and SECURITY DEFINER: it can write nothing');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

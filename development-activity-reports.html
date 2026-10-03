@@ -34,6 +34,11 @@
    Build step 6: a "Saved reports" card lists the reports the brokerage has made and opens one again by its permanent id. Opening is a
    read of what was stored (the report function's `list` and `open` actions): it never makes a report, never uses a free report and
    shows the report exactly as it was saved. Nothing about a saved report is kept in the browser.
+
+   Build step 7: every report a member sees carries a header, "<brokerage> · <agent>" with the optional client label under it. The
+   brokerage's name comes from the account and is not editable here; the agent's name is the person's own, saved to their sign-in
+   account (client.auth.updateUser) from the "Your name on reports" card. The report function sends the header with each report and
+   reads it fresh each time: a report is never stored with a name on it, so a changed name changes every report the next time it is shown.
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -68,6 +73,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #invite-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
 #team-status{margin:0;font-size:14px;min-height:1.5em}
 #team-status.err{color:var(--red);font-weight:600}
+#profile{display:grid;gap:10px}
+#profile h2{margin:0;font-size:17px}
+#profile .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#profile-status{margin:0;font-size:14px;min-height:1.5em}
+#profile-status.err{color:var(--red);font-weight:600}
 #saved{display:grid;gap:10px}
 #saved h2{margin:0;font-size:17px}
 #saved .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
@@ -124,13 +134,22 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     <ul id="saved-list"></ul>
     <p id="saved-status" role="status" aria-live="polite"></p>
   </section>
+  <section class="card" id="profile" aria-labelledby="profile-title" hidden>
+    <h2 id="profile-title">Your name on reports</h2>
+    <p class="sub">Every report you make or reopen shows your brokerage's name and your name at the top. Your brokerage's name comes from its account; your name is whatever you type here.</p>
+    <form id="pf" novalidate>
+      <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
+      <button type="submit" class="go" id="save-name">Save my name</button>
+    </form>
+    <p id="profile-status" role="status" aria-live="polite"></p>
+  </section>
   <section class="card" aria-label="Make a report">
     <form id="rf" novalidate>
       <label>Property address
         <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
       </label>
       <label>Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
-      <p class="hint">The client label only appears in this report's header. It is not saved.</p>
+      <p class="hint">The client label appears in this report's header. A saved report keeps it with the address, not in the report itself, so you see it when you reopen the report.</p>
       <button type="submit" class="go" id="go">Make report</button>
     </form>
   </section>
@@ -169,7 +188,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
-  var savedFresh = false, opening = false;
+  var savedFresh = false, opening = false, savingName = false;
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
@@ -269,9 +288,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('go').disabled = busy || !(a === 'trial' || a === 'admin');
     showTeam(a === 'trial' && role === 'owner');
     showSaved(a === 'trial' || a === 'complete');
+    showProfile(a === 'trial' || a === 'complete');
   }
   function trialUnreadable(){
-    access = null; role = null; showTeam(false); showSaved(false);
+    access = null; role = null; showTeam(false); showSaved(false); showProfile(false);
     $('trial-count').className = 'count out';
     $('trial-count').textContent = 'Your trial could not be read just now';
     $('trial-sub').textContent = 'Reload the page in a minute.';
@@ -308,6 +328,38 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }
     $('team').hidden = !on;
     $('mint').disabled = minting || !on;
+  }
+  // ---- your name on reports (build step 7): the agent's own name, saved to their sign-in account ------------------------------
+  function profileSay(text, isError){ var s=$('profile-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  function ownName(){ var m = session && session.user && session.user.user_metadata; return m && typeof m.full_name === 'string' ? m.full_name : ''; }
+  /** Hide or show the card. Hiding also forgets what was typed, so one person's name is never left in the box for the next. */
+  function showProfile(on){
+    if (!on) { $('profile').hidden = true; $('agent-name').value = ''; profileSay('', false); return; }
+    var was = $('profile').hidden;
+    $('profile').hidden = false;
+    if (was) $('agent-name').value = ownName(); // fill it once; a report being made never overwrites what the person is typing
+  }
+  async function saveName(){
+    if (savingName || !session || !session.user) return;
+    var forUser = session.user.id;
+    var name = ($('agent-name').value || '').replace(/\s+/g, ' ').trim();
+    if (name.length > 80) { profileSay('Use 80 characters or fewer.', true); return; }
+    savingName = true; $('save-name').disabled = true; profileSay('Saving…', false);
+    var res;
+    try { res = await client.auth.updateUser({ data: { full_name: name } }); } catch (e) { res = { error: e || true }; }
+    savingName = false; $('save-name').disabled = false;
+    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
+    if (res && !res.error) {
+      $('agent-name').value = name;
+      profileSay(name ? 'Saved. Reports you make or open from now on show this name.' : 'Your name is removed. Reports you make or open from now on show only your brokerage.', false);
+      return;
+    }
+    profileSay('Your name could not be saved just now. Try again in a minute.', true);
+  }
+  /** The header the report function sent with a report: the brokerage's name and the person's own. The view prints it as text only. */
+  function headerOf(body){
+    var h = body && body.header && typeof body.header === 'object' ? body.header : {};
+    return { brokerage: h.brokerage, agent: h.agent };
   }
   // ---- saved reports (build step 6): the brokerage's stored reports, opened as stored ------------------------------------------
   function savedSay(text, isError){ var s=$('saved-status'); s.textContent=text||''; s.className=isError?'err':''; }
@@ -353,7 +405,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!session || !session.user || session.user.id !== forUser) return;
     var body = r.body || {};
     var V = window.HS && window.HS.daReportView;
-    if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, { subject: typeof body.address === 'string' ? body.address : '' })) {
+    var hd = headerOf(body);
+    if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, {
+      subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
+      brokerage: hd.brokerage, agent: hd.agent
+    })) {
       savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
       $('creditnote').textContent = 'This is the report as it was saved. Opening it did not use a free report.'; $('creditnote').hidden = false;
       return;
@@ -423,12 +479,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (session.user && session.user.id !== was) {
-        role = null; showTeam(false); showSaved(false); // another person's role, invite link and reports are never shown to this one
+        role = null; showTeam(false); showSaved(false); showProfile(false); // another person's role, invite link, reports and name are never shown to this one
         $('report').textContent = ''; $('creditnote').hidden = true; say('', false);
         loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
       }
     } else {
-      access = null; role = null; attempt = null; showTeam(false); showSaved(false);
+      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false);
       $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
@@ -484,6 +540,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     // the same address after a lost answer reuses its key; anything else is a new report
     if (!attempt || attempt.address !== address) attempt = { key: newKey(), address: address };
     var payload = { address: address, view: 'customer' };
+    var clientLabel = field('label'); // optional (build step 7): the function keeps it with the address in its deletable private layer, never in the report
+    if (clientLabel) payload.label = clientLabel;
     if (access === 'trial') payload.idempotency_key = attempt.key; // an admin report is never charged and takes no key
     busy = true; $('go').disabled = true; say('Making the report…', false);
     $('creditnote').hidden = true; $('report').textContent = '';
@@ -500,7 +558,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var ok = r.status === 200 && body.status === 'OK';
     if (!ok) { say(messageFor(r.status, body), true); return; }
     var V = window.HS && window.HS.daReportView;
-    if (!V || !V.mount($('report'), body, { subject: address, label: field('label') })) { say('The report came back but could not be shown.', true); return; }
+    var hd = headerOf(body);
+    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent })) { say('The report came back but could not be shown.', true); return; }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
@@ -518,6 +577,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
     $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pendingRun = false; closeAuth(); } });
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
+    $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });
     $('mint').addEventListener('click', mintInvite);
     $('copy-invite').addEventListener('click', copyInvite);
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });

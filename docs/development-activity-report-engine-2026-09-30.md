@@ -430,6 +430,60 @@ change, and states `from` and `to` for each changed field.
 refusals to HTTP errors against production (all carried to step 13). Saved reports are listed, not searched or paged (at most 20 per
 brokerage today).
 
+**Step 7 (2026-10-03): the brokerage and agent header.** Every customer report now carries a header line, "<brokerage> · <agent>", and
+an optional client label. The shared report view already printed these (`opts.brokerage`, `opts.agent`, `opts.label`, as text only);
+what was missing was where they come from.
+
+- **The brokerage name** is read from the account (`brokerage_account.name`), through the one membership resolver. **The agent's name**
+  is the person's own, saved to their sign-in account (`user_metadata.full_name`). Both are read **when a report is shown** and written
+  nowhere: not in the report text, not in the snapshot, not in the credit ledger. A rename therefore shows on every report from then on,
+  including ones already saved (their stored text is unchanged; only the header line is read fresh).
+- **One read-only database function** (`docs/report-header.sql`; no table, column, trigger or schedule): `report_header_of(user)` returns
+  the brokerage's name and that person's name. STABLE, SECURITY DEFINER, executable by the service role alone. It returns nothing for
+  someone who is not an active member of an active brokerage (a deactivated member or a suspended account gets no header).
+- **One shared reader** (`_shared/evaluation-reads.ts::reportHeader`) calls it. Every name is cleaned in ONE place (`cleanDisplayName`):
+  control, direction-changing and zero-width characters become spaces, runs of spaces collapse, and a name over its limit (agent 80,
+  brokerage 120, client label 80) is **no name** rather than a shortened one (half a name reads as another). A refusal from the read,
+  two rows, or a non-text name is `DataUnavailable`, never an empty header.
+- **The report function** adds `header` to every report it returns (made, replayed, or reopened). For a new report the header is read
+  after the address is geocoded and its ZIP is checked, and **before** the spatial read, the charge or the issue function, so a header
+  that cannot be read costs nothing and shows no report.
+  A reopened report also says `address` and `client_label` from the private layer.
+- **The client label** is typed on the page and sent with the request. It is stored **only** for a report that is stored (one that uses a
+  free report), **only in the deletable private layer** (`report_private_context.label`), beside the address, and purged with it.
+  It is shown again on reopen while the layer keeps it. It is in no public table, no snapshot and no ledger. A report that is not
+  stored ("No data ingested") is not kept at all, so its label is not kept either.
+- **The customer page** has a "Your name on reports" card for a trial member (active or complete). Saving calls the sign-in account's
+  own update. It is hidden and emptied on sign-out and when a different person signs in, and a save that is still on its way when the
+  person changes writes nothing onto the next person's page.
+
+**Decisions taken by default (the founder may change any of them):**
+- **D-7-1.** The agent's name is self-declared (the person types it), kept in the sign-in account, and needs no schema change. HomeSignal
+  does not verify it. The brokerage's name is the account's, set by HomeSignal.
+- **D-7-2.** The header is never stored with a report. A report names whoever is viewing it now, so a saved report seen by a colleague
+  shows the colleague's name and the brokerage's current name.
+- **D-7-3.** The client label lives only in the private layer, with the address, and goes when the address goes. Nothing about a client
+  is permanent.
+- **D-7-4.** An over-long name is dropped, never cut. A name with markup is printed as text.
+
+**Proof:**
+- `test/national-report-function.test.mjs` (171) and `test/saved-reports-function.test.mjs` (62): the header on every report, read before
+  anything is charged, every wrong shape of the read, the cleaning, the label's bound, and the opened report's fields.
+- `test/report-header-structure.test.mjs` (30): the SQL only reads and is system-only; one module reaches it; nothing stores a name; the
+  page keeps nothing in the browser and forgets on sign-out.
+- `test/development-activity-reports.browser.test.mjs` (99): the card, saving, a refused save, an over-long name, a header that cannot
+  be read, markup as text, who is offered the card, a different person signing in, a late save, a phone.
+- `test/trial_report_pg` (94) through the real handler, data layer and shipped SQL: the label sits only in the private layer, no public
+  table holds an agent name, the header is absent from the snapshot, a rename changes the header and not the stored body, and a
+  deactivated member or suspended account gets none.
+- `test/report_header_mutants.py`: 39 prohibited mutations, all killed. The step 6 harness (43), the 5c page harness (36), the 5d and 5e
+  harnesses (32 each), the report view harness (153) and the account harness (88) all still kill every mutation.
+
+**Still open, stated:** several older mutation harnesses have stale anchors that **predate this step** (confirmed on a clean checkout of
+`main`): `national_report_mutants.py` (4 harness faults and 1 survivor, `lifecycle_promoted`), `follow_report_mutants.py` (6),
+`evaluation_entitlement_mutants.py` (1), `single_customer_generation_path_mutants.py` (2) and `development_activity_review_mutants.py`
+(1). They are carried to step 13 with the other open items; none of them guards step 7.
+
 ## 5. Decisions taken by default (the founder may change any of them)
 
 - **D-G1. Access is a signed-in user in `dashboard_admins`, as an internal diagnostic surface.** The plan permits exactly this

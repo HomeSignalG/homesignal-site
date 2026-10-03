@@ -112,11 +112,19 @@ const readsCode = code(EVAL_READS);
 // brokerage_membership_of who the caller is, then join the evaluation's ledger. Pinned: it names the resolver and no account or member table.
 const SAVED_SQL = 'docs/saved-reports.sql';
 const savedCode = code(SAVED_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL])
+// Build step 7 (docs/report-header.sql) adds ONE read-only function that asks the resolver who the caller is, then reads the brokerage's NAME
+// from the account row the resolver pointed at (the name lives on public.brokerage_account and nowhere else). It names the account table in its one join (and in the
+// precondition that it exists), never the member table, and writes nothing: pinned below.
+const HEADER_SQL = 'docs/report-header.sql';
+const headerCode = code(HEADER_SQL);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL])
+   && (headerCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 1 && (headerCode.match(/public\.brokerage_account\b/g) || []).length === 2 && /join public\.brokerage_account a on a\.id = r\.brokerage_id/.test(headerCode) && /to_regclass\('public\.brokerage_account'\)/.test(headerCode) && !/brokerage_member\b/.test(headerCode)
+   && !/\b(insert|update|delete|truncate|alter\s+table|create\s+table|drop\s+table)\b/i.test(headerCode.replace(/drop function if exists[^;]*;/gi, ''))
+   && /\bstable\b/i.test(headerCode) && !/\bvolatile\b/i.test(headerCode)
    && !/brokerage_account|brokerage_member\b/.test(savedCode) && (savedCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 2
    && !/brokerage_account|brokerage_member\b/.test(readsCode) && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
    && /await rpc\('brokerage_membership_of', \{ p_user_id: userId \}\)/.test(readsCode),
-  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
+  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) and the one read-only report-header function (build step 7: the resolver, then the account row it points at for the brokerage\'s name, no write) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 

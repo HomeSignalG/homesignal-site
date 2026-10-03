@@ -39,7 +39,7 @@ const all = Object.values(src).map(code).join('\n');
   ok(!/CATEGORY_REGISTRY|function classifyProjectType|function lifecycleKey|LIFECYCLE_LABELS/.test(all), '1d and defines no Type or lifecycle rule of its own');
   // the named exceptions read an EVALUATION's status (docs/evaluation-entitlement.sql; one reading, trialStanding, and the gate's use of
   // it) and a private context's state, never a publisher word
-  const trialStatus = /export function trialStanding\(t: TrialState\): 'active' \| 'complete' \| 'ended' \{[\s\S]*?\n\}|if \(standing !== 'active' && standing !== 'complete'\)|if \(!c \|\| c\.state !== 'active' \|\||return c && c\.state === 'active' &&/g;
+  const trialStatus = /export function trialStanding\(t: TrialState\): 'active' \| 'complete' \| 'ended' \{[\s\S]*?\n\}|if \(standing !== 'active' && standing !== 'complete'\)|if \(!c \|\| c\.state !== 'active' \|\||if \(!c \|\| c\.state !== 'active'\) return \{/g;
   ok((all.match(trialStatus) || []).length === 4 && !/['"](built|active|on file)['"]/i.test(all.replace(trialStatus, '')),
     '1e nor maps any publisher status word to a lifecycle key (the named exceptions read an EVALUATION status, in trialStanding and the gate\'s one use of it, and a private context\'s state, never a publisher word)');
   ok(/import '\.\/project-type\.generated\.js';/.test(src.module), '1f the module loads the generated copy, and only that (not lib/, which is outside the function bundle)');
@@ -77,12 +77,13 @@ const all = Object.values(src).map(code).join('\n');
   ok((hanCode.match(/deps\.issue\(/g) || []).length === 1 && /if \(!trial \|\| !credit\.uses_report\) \{\n\s*return reply\(req, \{[\s\S]*?\}\);\n\s*\}\n\s*\n\s*\n?\s*let issued: EvaluationIssue;/.test(hanCode),
     '3a2 and the handler reaches it only past the one branch that returns for an admin, and for a report the credit rule does not charge');
   const tablesNamed = [...fnCode.matchAll(/report_private_context\w*|report_snapshot\w*/g)].map((m) => m[0]);
-  // build step 6: the address of a STORED report is read once more, by subjectOf, for the member's own saved-reports list and reopened report
+  // build step 6: the address of a STORED report is read once more, by subjectOf, for the member's own saved-reports list and reopened report;
+  // build step 7 makes that one read return the address AND the client label together (the label is cleaned for printing, and read nowhere else)
   ok(JSON.stringify(tablesNamed) === '["report_snapshot","report_private_context_read","report_private_context_read"]'
-    && /return c && c\.state === 'active' && typeof c\.address === 'string' && c\.address \? c\.address : null;/.test(dataCode)
+    && /return \{ address: typeof c\.address === 'string' && c\.address \? c\.address : null, label: cleanDisplayName\(c\.label, LABEL_MAX\) \};/.test(dataCode) && (dataCode.match(/c\.label/g) || []).length === 1
     && /rest<\{ body: string \}>\('report_snapshot\?select=body&report_id=eq\.' \+ encodeURIComponent\(reportId\)\)/.test(dataCode)
-    && /return norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch';/.test(dataCode) && !/c\.(normalized_address|latitude|longitude|label|property_keys)/.test(dataCode),
-    '3b it names the stored report once (its body, by id, for a retried key) and the private context twice (the address compared inside the data layer, where only match / mismatch / unknown leaves; and, build step 6, a stored report\'s address while the layer still keeps it, for the member\'s own list)', tablesNamed);
+    && /return norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch';/.test(dataCode) && !/c\.(normalized_address|latitude|longitude|property_keys)/.test(dataCode),
+    '3b it names the stored report once (its body, by id, for a retried key) and the private context twice (the address compared inside the data layer, where only match / mismatch / unknown leaves; and, build steps 6 and 7, a stored report\'s address and client label while the layer still keeps them, for the member\'s own list and reopened report)', tablesNamed);
   ok(/import \{ snapshotBodyOf, subjectRelativeKeys \} from '\.\/report-snapshot\.ts';/.test(src.module), '3c the module imports only the pure body and key helpers from the snapshot module');
   const callers = [];
   const walk = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walk(p); else if (/\.(ts|js|mjs)$/.test(e) && /report_snapshot_issue/.test(code(read(p)))) callers.push(p); } };
