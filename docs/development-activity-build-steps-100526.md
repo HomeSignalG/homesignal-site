@@ -206,7 +206,43 @@ through once each step is complete").
      user id by design); reopening reads the stored text and never recomputes it.
    - Open before step 13 (unchanged): the free-report rate limit; an owner cannot list or withdraw invite links or remove an
      agent; how PostgREST turns the database's refusals into HTTP answers is unchecked against production.
-7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
+7. ~~**Brokerage and agent header**~~, filled from the account (brokerage name, agent name, optional client label).
+   *(Done: #1599 merged as `03c7332`.*
+   - *Database, applied to production 2026-10-03 as migration `report_header_of_step7` from `docs/report-header.sql`. It is
+     additive and read-only: one function, no table, column, trigger or schedule.*
+     - *Read back: the function body's md5 equals the committed file's (`d28de102…`). It is STABLE and SECURITY DEFINER,
+       owned by `postgres`, and executable by `service_role` only; `anon` and `authenticated` cannot run it. For an unknown
+       user it returns no rows.*
+     - *Production holds 0 brokerage accounts, so nothing was written and no real header exists to read.*
+   - *Two functions redeployed from `main` on 2026-10-03, each with the JWT check on: `get-development-activity-report`
+     version 10 to 11 and `development-activity-trial` 4 to 5 (runs `37137714632`, `37137737042`, `37137738496`).*
+     - *`follow-development-report` stays at version 4, correctly. It does not import the changed shared module (checked: no
+       import of `evaluation-reads` in its sources or in the shared files it uses, and #1599 changed none of its inputs), so
+       its bundle hash `9d8b52a3…` is the same before and after and the deploy changed nothing. The PR text that said all
+       three functions import the changed file was wrong for this one.*
+   - *Deployed source read back by searching the returned bundles: the shared module carries `report_header_of`,
+     `cleanDisplayName` and both name limits in both functions; the report function's handler carries `headerOf` and
+     `client_label`, and its data layer wires `headerOf`.*
+   - *Live probe: a request with no token is refused by the gateway with 401.*
+   - *Pages deployed the customer page. Read back from homesignal.net, `development-activity-reports.html` is
+     byte-identical to `main` by md5 (`eee99e78…`) and carries the "Your name on reports" card. A read one minute after the
+     merge still returned the previous page; the deploy had not landed yet.*
+   - *Not exercised live: the signed-in header path. No trial member exists in production yet, and none was created. It is
+     proven by the deployed source, the database fingerprint and the tests: 94 checks against a real Postgres, 171 on the
+     report function, 99 in a browser, and 39 deliberate breakages all caught.)*
+   - Every report shows "brokerage · agent" above it, and an optional client label the agent typed. The brokerage name comes
+     from the account; the agent name is the one the person typed in the "Your name on reports" card.
+   - The header is read when a report is shown and kept nowhere, so a report always names whoever is looking at it now. A
+     header that cannot be read shows no report and costs nothing.
+   - The client label is kept only beside the address in the private layer, only for a report that was stored, and goes with
+     the address when that is purged.
+   - Defaults taken, the founder may change any: the agent name is self-declared and not verified; a name over its limit
+     (agent 80, brokerage 120, label 80 characters) is shown as no name rather than cut short.
+   - Open before step 13 (unchanged): the free-report rate limit; an owner cannot list or withdraw invite links or remove an
+     agent; how PostgREST turns the database's refusals into HTTP answers is unchecked against production; the signed-in
+     paths are not exercised live. Also carried: several older mutation harnesses have stale anchors that predate step 7
+     (`national_report`, `follow_report`, `evaluation_entitlement`, `single_customer_generation_path`,
+     `development_activity_review`); none guards step 7.
 8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
    browser's print. *Founder decisions first:* how long a share link lasts; whether the client sees the
    street address.
