@@ -243,9 +243,53 @@ through once each step is complete").
      paths are not exercised live. Also carried: several older mutation harnesses have stale anchors that predate step 7
      (`national_report`, `follow_report`, `evaluation_entitlement`, `single_customer_generation_path`,
      `development_activity_review`); none guards step 7.
-8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
+8. ~~**Share and PDF.**~~ Private read-only link for the client that the agent can revoke; PDF through the
    browser's print. *Founder decisions first:* how long a share link lasts; whether the client sees the
-   street address.
+   street address. *Answered 2026-10-03: 6 months; yes.*
+   *(Done: #1602 merged as `1230849`.*
+   - *Database, applied to production 2026-10-03 as migration `report_share_delivery` from `docs/report-share-delivery.sql`.
+     It is additive: four functions and two constants, no table, column, trigger or schedule.*
+     - *Read back: all six function bodies' md5 equal the committed file's (`evaluation_report_share_create` `7c8b0c8e…`,
+       `evaluation_report_shares_of` `e4feb9dd…`, `evaluation_report_share_revoke` `48f3c852…`, `report_share_open`
+       `baa5e602…`, `report_share_lifetime` `e9b3b24c…`, `report_share_limit` `f6370dce…`), and the stored migration text
+       equals the file by md5 (`68211ef5…`, 17,128 characters). The two reads are STABLE, the four with logic are SECURITY
+       DEFINER, all six are owned by `postgres` and executable by `service_role` only; `anon` and `authenticated` cannot run
+       any of them (0 of 6). The lifetime reads `6 mons`, the cap 25.*
+     - *Control: the share primitive's resolver answers `UNKNOWN` for a made-up hash and `report_share_open` returns no rows
+       for it. Production holds 0 share rows, so nothing was written.*
+   - *Three functions deployed from `main` on 2026-10-03: `view-shared-report` new, version 1, JWT check OFF (run
+     `37144580320`); `manage-shared-report` new, version 1, JWT check on (run `37144606366`); `get-development-activity-report`
+     version 11 to 12 (run `37144608162`), JWT check on. `deploy-edge-functions.yml` now turns the JWT check off for exactly
+     two functions (the report engine and `view-shared-report`), and `supabase/config.toml` records one `verify_jwt = false`.*
+   - *Deployed source of the report function read back by searching the returned bundle: it carries the shared reader
+     `_shared/private-subject.ts` and the `subjectOf` wiring.*
+   - *Live probes, no token of any kind sent, through the database's HTTP client: `view-shared-report` answers a well-formed
+     unknown token and an empty body with its own `404 {"error":"not_found"}` (`no-store`), and a body with an extra field
+     with `400 bad_request`. Control: `manage-shared-report` with no token is refused by the gateway with `401
+     UNAUTHORIZED_NO_AUTH_HEADER`.*
+   - *Pages deployed (run `37144477378`). Read back from homesignal.net, `shared-report.html` (`e092515a…`, 9,901 bytes),
+     `development-activity-reports.html` (`a086e9cf…`), `lib/da-report-view.js` (`5344e835…`) and `robots.txt` (`d4ae529f…`)
+     are byte-identical to `main` by md5 and size.*
+   - *Not exercised live: making, opening and withdrawing a real link. No brokerage member and no stored report exist in
+     production, and none was created. It is proven by the database fingerprints and the tests: 43 checks against a real
+     Postgres (including two real sessions racing for a report's last place), 85 on the two functions, 51 on the structure,
+     36 and 32 on the client's page (the second in Chromium against the real handler), 125 on the agent's page in
+     Chromium, and 81 deliberate breakages all caught (30 in the database, 51 in the functions, pages and wiring).)*
+   - On a saved report the agent gets "Share this report with your client": make a link (shown once, with Copy), see the
+     report's links with their status (Working, Expired, Withdrawn), withdraw one, and Download PDF.
+   - The client opens the link with no account and sees the report, the brokerage's name and the street address (while it
+     is kept). The client sees no agent name, no client label and no other report. A link that is unknown, withdrawn or
+     expired gets one and the same message, so nothing says whether a link ever existed.
+   - A link lasts 6 months and cannot be extended; a lapsed one is replaced. A report may have at most 25 links. The agent can
+     withdraw a link at any time, even after the trial has ended.
+   - Download PDF is the browser's print window ("Save as PDF"); no PDF is made on a server.
+   - Defaults taken, the founder may change any: a link does not remember which agent made it, so any member of the
+     brokerage may see and withdraw it and the client's view names the brokerage, not a person; opens are not recorded, so
+     there is no "viewed" mark; a link keeps working if the trial later ends, and stops if HomeSignal withdraws the account.
+   - Open before step 13 (unchanged, plus one): the free-report rate limit; **the public link endpoint is not rate-limited**;
+     an owner cannot list or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into
+     HTTP answers is unchecked against production; the signed-in paths are not exercised live. Also carried: several older
+     mutation harnesses have stale anchors that predate step 7; none guards step 8.
 9. **Watch.** Daily check of the property; email to the agent when a nearby project's official status changes.
 10. **Compare.** Two to five addresses side by side, same report rules.
 11. **$79/month checkout** on the existing Lemon Squeezy connection: 100 reports a month, Billing tab.
@@ -266,6 +310,6 @@ through once each step is complete").
 |---|---|
 | After step 4 | Review the layout with 84302 |
 | ~~Before step 5~~ | ~~Does a limited-coverage report use up a free report?~~ Answered 2026-10-02: "No development activity" is charged, "No data ingested" is not. |
-| Before step 8 | How long share links last; whether the client sees the address |
+| ~~Before step 8~~ | ~~How long share links last; whether the client sees the address~~ Answered 2026-10-03: 6 months; yes. |
 | Step 11 | Create the Lemon Squeezy product and make one test payment |
 | Any time, needed by step 12 | Send the Utah permission requests |
