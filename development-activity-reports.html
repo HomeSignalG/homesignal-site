@@ -25,6 +25,11 @@
    (get-development-activity-report); joining a trial and the count left are the
    trial function's (development-activity-trial); the report is drawn by
    lib/da-report-view.js, the same view the review page uses.
+
+   Build step 5e: a trial's OWNER also sees "Invite an agent" while the trial
+   is active, and makes one invite link per agent through the trial function.
+   Whether this person may make one is the database's check, not the page's:
+   the page only offers it to an owner and shows the answer.
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -52,6 +57,13 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #status{margin:0;font-size:14px;min-height:1.5em}
 #status.err{color:var(--red);font-weight:600}
 #creditnote{margin:0;font-size:13.5px;color:var(--muted)}
+#team{display:grid;gap:10px}
+#team h2{margin:0;font-size:17px}
+#team .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#minted{display:grid;gap:10px}
+#invite-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+#team-status{margin:0;font-size:14px;min-height:1.5em}
+#team-status.err{color:var(--red);font-weight:600}
 .auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
 .auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
 .auth-modal h2{margin:0 0 4px;font-size:19px}
@@ -81,6 +93,17 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   <section class="card" id="trial" aria-live="polite">
     <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
     <p class="sub" id="trial-sub"></p>
+  </section>
+  <section class="card" id="team" aria-labelledby="team-title" hidden>
+    <h2 id="team-title">Invite an agent</h2>
+    <p class="sub">Each invite link lets one agent join your brokerage's trial and share its free reports. Make a new link for each agent.</p>
+    <button type="button" class="go" id="mint">Make an invite link</button>
+    <div id="minted" hidden>
+      <label>Agent invite link<input type="text" id="invite-link" readonly></label>
+      <button type="button" class="go" id="copy-invite">Copy link</button>
+      <p class="hint" id="invite-note"></p>
+    </div>
+    <p id="team-status" role="status" aria-live="polite"></p>
   </section>
   <section class="card" aria-label="Make a report">
     <form id="rf" novalidate>
@@ -126,7 +149,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var INVITE = /^hse1_[0-9a-f]{64}$/;
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
-  var session = null, access = null, busy = false, pendingRun = false;
+  var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
@@ -224,9 +247,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     }
     if (note) sub.textContent = note + ' ' + sub.textContent;
     $('go').disabled = busy || !(a === 'trial' || a === 'admin');
+    showTeam(a === 'trial' && role === 'owner');
   }
   function trialUnreadable(){
-    access = null;
+    access = null; role = null; showTeam(false);
     $('trial-count').className = 'count out';
     $('trial-count').textContent = 'Your trial could not be read just now';
     $('trial-sub').textContent = 'Reload the page in a minute.';
@@ -243,16 +267,75 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (r.status === 0 || r.status >= 500) { trialUnreadable(); return; } // keep the invite for a reload
       invite = null; store(null);
       if (r.status === 200 && r.body && r.body.status === 'OK') {
+        role = r.body.role;
         showTrial(r.body.access, r.body.trial, r.body.replayed ? '' : 'You have joined your brokerage’s trial.');
         return;
       }
       var note = r.body && REDEEM_NOTE[r.body.error] ? REDEEM_NOTE[r.body.error] : 'That invite link could not be used.';
       var s = await post(TRIAL_FN, { action: 'status' });
-      if (s.status === 200 && s.body && s.body.status === 'OK') showTrial(s.body.access, s.body.trial, note); else trialUnreadable();
+      if (s.status === 200 && s.body && s.body.status === 'OK') { role = s.body.role; showTrial(s.body.access, s.body.trial, note); } else trialUnreadable();
       return;
     }
     var st = await post(TRIAL_FN, { action: 'status' });
-    if (st.status === 200 && st.body && st.body.status === 'OK') showTrial(st.body.access, st.body.trial, ''); else trialUnreadable();
+    if (st.status === 200 && st.body && st.body.status === 'OK') { role = st.body.role; showTrial(st.body.access, st.body.trial, ''); } else trialUnreadable();
+  }
+
+  // ---- an owner invites an agent (build step 5e): one link per agent, shown once -----------------------------------------
+  function teamSay(text, isError){ var s=$('team-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  /** Hide or show the invite card. Hiding it also forgets any link it was showing, so a link is never left for the next person. */
+  function showTeam(on){
+    if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }
+    $('team').hidden = !on;
+    $('mint').disabled = minting || !on;
+  }
+  function dateWords(iso){
+    var d = iso ? new Date(iso) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  }
+  /** What to tell an owner for each answer that is not a new link. Plain words; never a raw error code. */
+  function inviteMessage(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 403 && body.error === 'not_owner') return "Only an owner of your brokerage's trial can invite agents.";
+    if (httpStatus === 403) return 'This account is not part of a trial.';
+    if (httpStatus === 409) return "Agents can be invited only while your brokerage's trial has free reports left.";
+    if (httpStatus === 0 || httpStatus >= 500) return 'The invite link could not be made just now. Try again in a minute.';
+    return 'The invite link could not be made. Try again.';
+  }
+  async function mintInvite(){
+    if (minting || !session || access !== 'trial' || role !== 'owner') return;
+    var forUser = session.user ? session.user.id : null;
+    minting = true; $('mint').disabled = true; $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = '';
+    teamSay('Making the invite link…', false);
+    var r = await post(TRIAL_FN, { action: 'invite' });
+    minting = false;
+    // the person who asked has signed out or changed while the answer was on its way: show them nothing
+    if (!session || !session.user || session.user.id !== forUser) { showTeam(false); return; }
+    $('mint').disabled = false;
+    var body = r.body || {};
+    var link = typeof body.invite_link === 'string' ? body.invite_link : '';
+    if (r.status === 200 && body.status === 'OK' && /^https:\/\/homesignal\.net\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(link)) {
+      var until = dateWords(body.invite_expires_at);
+      teamSay('Invite link made.', false);
+      $('invite-link').value = link;
+      $('invite-note').textContent = 'Send this link to one agent: the first person to open it and sign in joins your brokerage\u2019s trial as an agent. '
+        + (until ? 'It works until ' + until + '. ' : '') + 'If your trial has a limit on agents and it is full, the link cannot be used. HomeSignal shows this link only this once.';
+      $('copy-invite').textContent = 'Copy link';
+      $('minted').hidden = false;
+      return;
+    }
+    if (r.status === 401) { session = null; openAuth(); }
+    if (r.status === 403 || r.status === 409) loadTrial();
+    teamSay(inviteMessage(r.status, body), true);
+  }
+  function copyInvite(){
+    var v = $('invite-link').value;
+    if (!v) return;
+    function select(){ $('invite-link').focus(); $('invite-link').select(); $('copy-invite').textContent = 'Selected: press Ctrl+C or \u2318C'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('copy-invite').textContent = 'Copied'; }, select);
+      else select();
+    } catch (e) { select(); }
   }
 
   function onSession(s){
@@ -266,9 +349,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       var out = document.createElement('button'); out.type = 'button'; out.textContent = 'Sign out';
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
-      if (session.user && session.user.id !== was) loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
+      if (session.user && session.user.id !== was) {
+        role = null; showTeam(false); // another person's role and invite link are never shown to this one
+        loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
+      }
     } else {
-      access = null; attempt = null;
+      access = null; role = null; attempt = null; showTeam(false);
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
       $('trial-sub').textContent = invite ? 'Use the email address the invite was sent to.' : '';
@@ -356,6 +442,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
     $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pendingRun = false; closeAuth(); } });
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
+    $('mint').addEventListener('click', mintInvite);
+    $('copy-invite').addEventListener('click', copyInvite);
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
     client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
   });

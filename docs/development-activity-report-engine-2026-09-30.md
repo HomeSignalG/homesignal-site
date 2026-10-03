@@ -304,6 +304,81 @@ property:
 - How PostgREST turns the database's refusals into HTTP answers is still unchecked against production. It becomes checkable once a
   test trial exists.
 
+**Step 5e (2026-10-02): an owner invites agents.**
+
+**The action: `invite`, on `development-activity-trial`, for an owner of an active trial.**
+- It runs after the function's own sign-in gate and reads nothing the caller sent except the action. A role, an actor or a token in
+  the request is ignored.
+- It reads the person's trial (`trialOf`):
+  - no trial: 403 `forbidden`;
+  - a trial that is not active (its 20 reports used, revoked or expired, read through the shared `trialStanding`):
+    409 `trial_not_active`, because an agent joining it could make no report.
+- It then calls `_shared/evaluation-reads.ts` `inviteAgent`. That reads the person's own evaluation and calls
+  `public.evaluation_invite_mint` with role `agent` and the person as the **actor**.
+  - So the **database** checks, under the evaluation's lock, that this person is an active owner of that very brokerage and that the
+    trial is neither revoked nor expired (D-L8: an owner may mint agent invites only).
+  - The handler does not check the role itself. A database refusal (`NOT_ENTITLED`) is 403 `not_owner`.
+- **The answer** is the agent invite link and its expiry, nothing else.
+  - The link has the one form `inviteLink` writes, so it opens the same customer page and is redeemed by the same `redeem` action.
+  - The evaluation id is used inside the shared module and never leaves it. The invite lives the database's default 14 days (D-L4).
+- **The seat limit is checked when an agent joins**, never when a link is made (D-L2). An owner may make any number of links; once
+  the seats are full, the next agent to open one is told the trial has no free seats left.
+- An unreachable database is 502. An invite made but never seen sits unused and expires on its own.
+
+**The role.** `status` and `redeem` now carry `role`: `owner`, `agent`, or null when the person has no trial.
+- It is read by `roleOf` from the one membership resolver, `public.brokerage_membership_of` (Order K0). It is never re-derived, and
+  the redeem answer no longer echoes the invite's role.
+- It decides only what the page OFFERS. Whether an invite may be made is the database's own check at the moment it is made.
+- `_shared/evaluation-reads.ts` is now the one reader of the resolver outside the SQL, and it reads no account or membership table.
+  `test/brokerage-account-structure.test.mjs` 4 was changed deliberately to admit exactly that one rpc call.
+
+**The page: "Invite an agent", on the customer page** (`development-activity-reports.html`).
+- Shown only to an owner of an active trial (access `trial` and role `owner`, both as the trial function named them). Agents,
+  admins, people with no trial, and owners of a used-up or ended trial do not see it. Using the last free report takes it away.
+- "Make an invite link" shows the link once, in a read-only box, with "Copy link" and a note: send it to one agent; the first person
+  to open it and sign in joins as an agent; until when it works; a full seat limit stops it; HomeSignal shows it only this once.
+- Each press makes a new link (one per agent). The page checks the link's form before showing it and builds no link of its own.
+- The link is kept only in the open page, never in browser storage. Signing out, a different person signing in, and an unreadable
+  trial each take the card and its link away at once. A link that arrives after its person signed out is never shown.
+- Answers in plain words: only an owner can invite; not part of a trial; only while the trial has free reports left; could not be
+  made just now, try again. After a refusal the page reads the trial again.
+
+**Decisions taken by default (the founder may change any of them):**
+- **D-5e-1.** Inviting is offered and allowed only while the trial is active. The database alone would also let an owner mint on a
+  used-up trial; an agent joining it could make no report, so the function refuses first.
+- **D-5e-2.** An owner may make any number of agent links; seats are enforced when an agent joins (D-L2). An owner cannot see,
+  list or withdraw the links they made. Withdrawing one is `public.evaluation_invite_revoke` (SQL; no page yet).
+- **D-5e-3.** No new database object. The invite comes from the existing `evaluation_invite_mint`, the role from the existing
+  `brokerage_membership_of`, and both are already executable by the service role only.
+
+**Proof:**
+- `test/development-activity-trial-function.test.mjs`, now 144 checks.
+  - §2/§3: the role in `status` and `redeem`, read from the resolver for the person's own id, only when they have a trial.
+  - §4: the resolver's wrong shapes and refusals are 502, never a guessed role.
+  - §7: no trial; every non-active standing; the database's refusal; the answer's exact fields; the request carries nothing to the
+    invite; the real data layer's exact five requests (the mint asks for an AGENT invite with the person as ACTOR); every wrong
+    answer shape; the shared module's own refusals.
+- `test/development-activity-reports.test.mjs` (52) and `test/development-activity-reports.browser.test.mjs` (55). In the browser,
+  the trial function is answered by its real handler: who sees the card, one request with only the action, the link and its note,
+  copying, a second link, nothing stored, sign-out, a different person, a refusal, a lost answer, the last report, a phone.
+- `test/evaluation-entitlement-structure.test.mjs` 4 and 4-mint: the shared module now names `evaluation_invite_mint`, in one
+  call, as an AGENT invite with the person as ACTOR.
+- `test/trial_report_pg`, now 51 checks, through the real handler, data layer and shipped SQL:
+  - the owner's link is one new OPEN AGENT invite of their own trial, hashed, and logged;
+  - an agent joins through it and shares the trial;
+  - an agent cannot invite: the database refuses, nothing is written;
+  - with one agent seat, two links are made and the second agent is refused;
+  - a revoked trial refuses in the handler, and the data layer's mint is refused by the database too;
+  - a complete trial refuses.
+- `test/development_activity_trial_invite_mutants.py`: 32 prohibited mutations, all killed (the 5c and 5d harnesses still kill all
+  theirs).
+
+**Still open, stated:**
+- An owner cannot list, see again or withdraw the agent links they made, or remove an agent.
+- The rate-limit gap from 5b is unchanged.
+- How PostgREST turns the database's refusals into HTTP answers is still unchecked against production (now including
+  `NOT_ENTITLED` from the mint).
+
 `publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.

@@ -49,7 +49,7 @@ m('remembers_the_address', "    var payload = { address: address, view: 'custome
 m('invite_from_the_query_string', "var m = /(?:^#|&)invite=([^&]+)/.exec(location.hash || '');", "var m = /(?:^\\?|&)invite=([^&]+)/.exec(location.search || '');")
 m('invite_left_in_the_address_bar', "    if (m) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }\n", '')
 m('invite_kept_after_use', '      invite = null; store(null);\n', '      invite = null;\n', [BRO])
-m('invite_redeemed_on_every_auth_event', '      if (session.user && session.user.id !== was) loadTrial()', '      if (session.user) loadTrial()', [BRO])
+m('invite_redeemed_on_every_auth_event', '      if (session.user && session.user.id !== was) {\n', '      if (session.user) {\n', [BRO])
 m('unusable_invite_unexplained', "    invite_unusable: 'That invite link cannot be used: it may have expired, been used by someone else, or been withdrawn.',\n", '', [BRO])
 m('malformed_invite_sent', '    if (INVITE.test(fromHash)) { store(fromHash); return fromHash; }', '    if (fromHash) { store(fromHash); return fromHash; }', [SRC])
 

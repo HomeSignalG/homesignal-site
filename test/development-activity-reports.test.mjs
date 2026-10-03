@@ -11,7 +11,10 @@
 //      (per tab, until it has been used); the address and the report are never stored;
 //   5. a report request carries a key made once, reused only to retry the same address after a lost answer, so a retry can never use
 //      a second free report; an admin's request carries none;
-//   6. plain words for every answer, and the charge line is the report function's decision put into words.
+//   6. plain words for every answer, and the charge line is the report function's decision put into words;
+//   7. build step 5e: the "Invite an agent" card is offered only to an OWNER of an ACTIVE trial, as the trial function named them; the
+//      link is made by the trial function (never on the page), checked for the one invite-link form, shown in a read-only box with
+//      the HomeSignal-written note, never stored, and forgotten on sign-out, on a change of person, and whenever the card hides.
 // test/development-activity-reports.browser.test.mjs drives the page itself; test/single-customer-generation-path.test.mjs (P4, P6)
 // keeps it one of exactly two shipped pages that may call the report engine.
 // Run: node test/development-activity-reports.test.mjs
@@ -100,6 +103,39 @@ const charge = fn('chargeLine');
 ok(/body\.replayed === true/.test(charge) && /body\.charged === true/.test(charge) && /c\.reason === 'NO_DATA_INGESTED'/.test(charge) && !/uses_report/.test(charge),
   '6c the charge line puts the report function\'s answer (charged, replayed, the credit reason) into words and decides nothing');
 ok(/does not use one/.test(showTrial) && /No data ingested/.test(showTrial), '6d the trial panel says that a "No data ingested" report does not use a free report (founder ruling R5)');
+
+// ---- 7. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------------
+ok(/<section class="card" id="team" aria-labelledby="team-title" hidden>/.test(page) && /<input type="text" id="invite-link" readonly>/.test(page),
+  '7a the invite card is hidden until the trial function names an owner, and the link sits in a read-only box');
+ok(/showTeam\(a === 'trial' && role === 'owner'\);/.test(showTrial) && (code.match(/showTeam\(true\)/g) || []).length === 0,
+  '7b the card shows only for an OWNER of an ACTIVE trial (access "trial"), as the trial function named them; nothing else turns it on');
+ok((code.match(/role = (?:r|s|st)\.body\.role;/g) || []).length === 3 && !/role = '(?:owner|agent)'/.test(code) && !/role = body/.test(code),
+  '7c the page takes the role only from the trial function\'s status or join answer, never sets it itself');
+const mint = fn('mintInvite');
+ok(/await post\(TRIAL_FN, \{ action: 'invite' \}\)/.test(mint) && (code.match(/action: 'invite'/g) || []).length === 1,
+  '7d the link is made by the trial function, through the one helper, with nothing but the action (the server knows who is asking)');
+ok(/\/\^https:\\\/\\\/homesignal\\\.net\\\/development-activity-reports\\\.html#invite=hse1_\[0-9a-f\]\{64\}\$\/\.test\(link\)/.test(mint),
+  '7e only a link of the one invite-link form is shown (the customer page with the token in its fragment)');
+ok(/\$\('invite-link'\)\.value = link;/.test(mint) && !/innerHTML|insertAdjacentHTML|outerHTML/.test(code),
+  '7f the link is set as a value and every message as text: nothing from an answer is parsed as HTML');
+const team = fn('showTeam');
+ok(/if \(!on\) \{ \$\('minted'\)\.hidden = true; \$\('invite-link'\)\.value = '';/.test(team) && /\$\('team'\)\.hidden = !on;/.test(team),
+  '7g hiding the card also forgets the link it showed');
+const onSess = fn('onSession');
+ok(/access = null; role = null; attempt = null; showTeam\(false\);/.test(onSess) && /role = null; showTeam\(false\);[^\n]*\n\s*loadTrial\(\)/.test(onSess)
+   && /access = null; role = null; showTeam\(false\);/.test(fn('trialUnreadable')),
+  '7h signing out, a different person signing in, and an unreadable trial each forget the role and the link');
+ok(/var forUser = session\.user \? session\.user\.id : null;/.test(mint) && /if \(!session \|\| !session\.user \|\| session\.user\.id !== forUser\) \{ showTeam\(false\); return; \}/.test(mint)
+   && mint.indexOf('session.user.id !== forUser') < mint.indexOf("$('invite-link').value = link;"),
+  '7i a link that arrives after its person signed out, or after someone else signed in, is never shown');
+const im = fn('inviteMessage');
+for (const [what, re] of [['sign-in needed (401)', /httpStatus === 401/], ['not an owner', /not_owner/], ['no trial (403)', /httpStatus === 403\)/],
+  ['trial not active (409)', /httpStatus === 409/], ['no answer or a server fault', /httpStatus === 0 \|\| httpStatus >= 500/]]) {
+  ok(re.test(im), '7j the invite card has a plain-words answer for: ' + what);
+}
+ok(!/teamSay\([^)]*(body\.error|body\.status|body\.detail)/.test(code), '7k no raw error code is ever printed on the invite card');
+ok(/shown only this once|only this once/.test(mint) && /one agent/.test(mint) && /limit on agents/.test(mint),
+  '7l the note says the link is for one agent, may be stopped by a full seat limit, and is shown only once');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

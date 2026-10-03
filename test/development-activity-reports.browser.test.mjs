@@ -13,7 +13,10 @@
 //   * a lost answer: pressing again for the same address resends the SAME key and is not charged twice; a new address gets a new key;
 //   * a used-up trial, no trial, an unusable invite, an admin: each in plain words, and "Make report" only for the two kinds of
 //     caller the report function serves; an admin's request carries no key;
-//   * it fits a 390 px screen; nothing else is fetched; no page error.
+//   * it fits a 390 px screen; nothing else is fetched; no page error;
+//   * build step 5e: an OWNER of an active trial sees "Invite an agent" and nobody else does; the link comes from the trial function's
+//     real invite action, is shown once in a read-only box and copied; a refusal and a lost answer are said in plain words and show no
+//     link; signing out, the trial ending and a different person signing in each take the card and its link away.
 // Run: node test/development-activity-reports.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -58,8 +61,9 @@ window.supabase = { createClient: function () { return { auth: {
 } }; } };`;
 
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
-function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok' } = {}) {
-  const w = { used, trial, admin, rights, redeem, made: new Map(), redeemed: 0 };
+const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
+function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok' } = {}) {
+  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0 };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
@@ -68,8 +72,17 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     redeemInvite: async (token) => {
       if (w.redeem === 'unusable' || token !== TOKEN) throw new E.InviteUnusable('x');
       w.redeemed++; if (w.trial === null) w.trial = 'active';
-      return { role: 'agent', replayed: w.redeemed > 1 };
+      return { role: w.role, replayed: w.redeemed > 1 };
     },
+    roleOf: async () => (w.trial === null ? null : w.role),
+    // the database's own check at the moment of minting: an active owner of this brokerage, for an agent invite
+    inviteAgent: async () => {
+      if (w.mint === 'refuse' || w.role !== 'owner' || w.trial !== 'active') throw new E.NotEntitled('x');
+      w.minted++;
+      return { invite_link: E.inviteLink(MINT_TOKEN), invite_expires_at: '2026-10-16T12:00:00.123456+00:00' };
+    },
+    createTrial: async () => { throw new Error('the customer page never creates a trial'); },
+    now: () => NOW,
   });
   const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active' });
   w.reportHandler = RH.makeHandler({
@@ -106,8 +119,9 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false } = {}) {
+async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height } });
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
   const errors = [], reports = [], trials = [], foreign = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
@@ -124,6 +138,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
       const res = await (url === REPORT_FN ? w.reportHandler : w.trialHandler)(new Request(url, { method: 'POST', headers: { authorization: rec.auth || '', 'content-type': 'application/json' }, body: r.postData() }));
       const answer = await res.text();
       if (url === REPORT_FN && lose(body)) return route.abort(); // the server did the work (and charged); only its answer is lost
+      if (url === TRIAL_FN && body && body.action === 'invite' && loseInvite(body)) return route.abort(); // the invite was made; its answer is lost
       return route.fulfill({ status: res.status, contentType: 'application/json', body: answer });
     }
     foreign.push(url); return route.abort();
@@ -273,6 +288,112 @@ for (const [label, w, count, disabled] of [
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok((await page.$$('#report .da-rv-sec')).length > 0 && wide <= 0, '5a on a 390 px screen the report is drawn and the page does not scroll sideways', wide);
+  await ctx.close();
+}
+
+// ---- 6. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------
+const teamShown = (page) => page.$eval('#team', (e) => !e.hidden && e.getBoundingClientRect().height > 0);
+for (const [label, w, count] of [
+  ['an agent', world({ role: 'agent' }), /free reports left/],
+  ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/],
+  ['a person with no trial', world({ trial: null, role: 'owner' }), /not part of a trial/],
+  ['an owner of a used-up trial', world({ role: 'owner', used: 20 }), /All 20 free reports are used/],
+  ['an owner of a revoked trial', world({ role: 'owner', trial: 'revoked' }), /trial has ended/],
+]) {
+  const { ctx, page, errors } = await open({ w });
+  await waitCount(page, count);
+  ok(!(await teamShown(page)) && errors.length === 0, '6a ' + label + ' is not offered "Invite an agent"', errors);
+  await ctx.close();
+}
+{
+  const w = world({ role: 'owner', used: 2 });
+  const { ctx, page, trials, errors, foreign } = await open({ w });
+  await waitCount(page, /^18 free reports left$/);
+  ok(await teamShown(page) && /Invite an agent/.test(await text(page, '#team-title')) && (await page.$eval('#minted', (e) => e.hidden)),
+    '6b an owner of an active trial sees "Invite an agent", with no link yet');
+  await page.click('#mint');
+  await page.waitForFunction(() => !document.getElementById('minted').hidden || /could not/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const inv = trials.filter((t) => t.body && t.body.action === 'invite');
+  ok(inv.length === 1 && JSON.stringify(inv[0].body) === '{"action":"invite"}' && inv[0].auth === 'Bearer user-token' && w.minted === 1,
+    '6c one request to the trial function, with the person\'s own token and nothing but the action, and one invite made', inv.map((t) => t.body));
+  const shown = await page.$eval('#invite-link', (e) => ({ v: e.value, ro: e.readOnly }));
+  ok(shown.v === E.inviteLink(MINT_TOKEN) && shown.ro, '6d the link is the one invite-link form, in a read-only box', shown);
+  const note = await text(page, '#invite-note');
+  ok(/one agent/.test(note) && /October 16, 2026/.test(note) && /limit on agents/.test(note) && /only this once/.test(note),
+    '6e the note says it is for one agent, until when it works, that a full seat limit stops it, and that it is shown once', note);
+  await page.click('#copy-invite');
+  await page.waitForFunction(() => /Copied|Selected/.test(document.getElementById('copy-invite').textContent), null, { timeout: 4000 }).catch(() => {});
+  const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
+  ok(/^Copied$/.test(await text(page, '#copy-invite')) && copied === E.inviteLink(MINT_TOKEN), '6f "Copy link" copies exactly the link', [await text(page, '#copy-invite'), copied]);
+  await page.click('#mint');
+  await page.waitForTimeout(300);
+  ok(w.minted === 2 && (await page.$eval('#invite-link', (e) => e.value)) === E.inviteLink(MINT_TOKEN) && /^Copy link$/.test(await text(page, '#copy-invite')),
+    '6g a second press makes a second link (one per agent), and the copy button starts over');
+  ok((await page.evaluate(() => JSON.stringify(sessionStorage) + JSON.stringify(localStorage))).indexOf('hse1_') === -1, '6h the link is never stored in the browser');
+  await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
+  await page.waitForTimeout(200);
+  ok(!(await teamShown(page)) && (await page.$eval('#invite-link', (e) => e.value)) === '' && (await page.$eval('#minted', (e) => e.hidden)),
+    '6i signing out takes the card away and forgets the link');
+  // signed in again as the owner, a link made, and then a DIFFERENT person signs in on the same tab: in the same moment (before the
+  // page has asked anything about the new person) the card and the owner's link are gone
+  await page.evaluate((s) => { window.__sb.session = s; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', s)); }, { access_token: 'user-token', user: { id: UID, email: 'agent@example.test' } });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => !document.getElementById('team').hidden, null, { timeout: 8000 }).catch(() => {});
+  await page.click('#mint');
+  await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
+  const swap = await page.evaluate(() => {
+    const before = document.getElementById('invite-link').value;
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { before, hidden: document.getElementById('team').hidden, after: document.getElementById('invite-link').value };
+  });
+  ok(swap.before.includes('hse1_') && swap.hidden && swap.after === '', '6q a different person signing in on the tab takes the card and the owner\'s link away at once', swap);
+  ok(errors.length === 0 && foreign.length === 0, '6j no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // the person is an owner when the page loads, but the database refuses at the moment of minting (they were made an agent meanwhile)
+  const w = world({ role: 'owner' });
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  w.mint = 'refuse';
+  await page.click('#mint');
+  await page.waitForFunction(() => /owner/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Only an owner of your brokerage.s trial can invite agents/.test(await text(page, '#team-status')) && (await page.$eval('#invite-link', (e) => e.value)) === '' && w.minted === 0,
+    '6k the database refusing: plain words, and no link', await text(page, '#team-status'));
+  w.mint = 'ok'; w.role = 'agent';
+  await page.click('#mint');
+  await page.waitForFunction(() => document.getElementById('team').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(!(await teamShown(page)) && w.minted === 0, '6l after a refusal the page reads the trial again, and the card goes away once the person is no longer an owner');
+  await ctx.close();
+}
+{
+  const w = world({ role: 'owner' });
+  const { ctx, page } = await open({ w, loseInvite: () => true });
+  await waitCount(page, /free reports left/);
+  await page.click('#mint');
+  await page.waitForFunction(() => /could not be made/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/could not be made just now\. Try again/.test(await text(page, '#team-status')) && (await page.$eval('#invite-link', (e) => e.value)) === '' && !(await page.$eval('#mint', (b) => b.disabled)),
+    '6m a lost answer says to try again, shows no link, and offers the button again (an unseen link simply expires)', await text(page, '#team-status'));
+  await ctx.close();
+}
+{
+  const w = world({ role: 'owner', used: 19 });
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /^1 free report left$/);
+  ok(await teamShown(page), '6n an owner with one report left is offered the card');
+  await make(page);
+  ok(w.used === 20 && !(await teamShown(page)), '6o using the last free report takes the card away (no agent could make a report)');
+  await ctx.close();
+}
+{
+  const w = world({ role: 'owner' });
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  await page.click('#mint');
+  await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(!(await page.$eval('#minted', (e) => e.hidden)) && wide <= 0, '6p on a 390 px screen the link is shown and the page does not scroll sideways', wide);
   await ctx.close();
 }
 

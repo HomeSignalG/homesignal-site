@@ -1,9 +1,10 @@
-// THE BROKERAGE TRIAL, as the edge functions reach it (Development Activity build steps 5b, 5c and 5d).
+// THE BROKERAGE TRIAL, as the edge functions reach it (Development Activity build steps 5b, 5c, 5d and 5e).
 //
-// The database owns every decision here (docs/evaluation-entitlement.sql, Order L1): who is a member, of which evaluation, how many
-// of the 20 reports are used, whether an invite may be redeemed. This file only calls those functions, checks the shape of what
-// comes back, and turns the database's refusal messages into named errors. It is the ONE place an edge function names them, so the
-// report function and the trial function cannot read a trial two different ways. It also holds the one form of an invite link (5d).
+// The database owns every decision here (docs/evaluation-entitlement.sql, Order L1, and docs/brokerage-account-spine.sql, Order K0):
+// who is a member and in what role, of which evaluation, how many of the 20 reports are used, whether an invite may be redeemed, and
+// who may make one. This file only calls those functions, checks the shape of what comes back, and turns the database's refusal
+// messages into named errors. It is the ONE place an edge function names them, so the report function and the trial function cannot
+// read a trial two different ways. It also holds the one form of an invite link (5d).
 // Charging a report is not here: it is public.evaluation_report_issue, reached only through _shared/report-snapshot.ts, because it
 // must store the report in the same transaction.
 //
@@ -20,6 +21,8 @@ export class AlreadyAMember extends Error {}
 export class SeatLimitReached extends Error {}
 /** The database refused to create a trial. Its function is one transaction, so nothing was created. */
 export class TrialRejected extends Error {}
+/** The person may not invite: they belong to no trial, are not an active OWNER of it, or the trial has ended (EV003, NOT_ENTITLED). */
+export class NotEntitled extends Error {}
 
 /** An invite token as public.evaluation_invite_mint makes it. Anything else is refused before the database is asked. */
 export const INVITE_TOKEN = /^hse1_[0-9a-f]{64}$/;
@@ -34,9 +37,15 @@ export function inviteLink(token: string): string {
   return INVITE_PAGE + '#invite=' + token;
 }
 
-export type Redeemed = { role: 'owner' | 'agent'; replayed: boolean };
+export type Role = 'owner' | 'agent';
+export type Redeemed = { role: Role; replayed: boolean };
 /** A new trial's owner invite, as the admin who created it is shown it: once, and never an id. */
 export type CreatedTrial = { invite_link: string; invite_expires_at: string };
+/** An agent invite, as the owner who made it is shown it: once, and never an id (build step 5e). */
+export type CreatedInvite = { invite_link: string; invite_expires_at: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isTime = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
 /** What an admin asks for. A null seat limit or end date means none (D-L2, D-L3); the invite lives the database's default 14 days (D-L4). */
 export type NewTrial = { brokerageName: string; seatLimit: number | null; expiresAt: string | null };
 
@@ -84,10 +93,50 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
       if (error) throw new TrialRejected('refused');
       if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
       const r = data[0];
-      if (!r || typeof r.owner_token !== 'string' || !INVITE_TOKEN.test(r.owner_token) || typeof r.invite_expires_at !== 'string' || !Number.isFinite(Date.parse(r.invite_expires_at))) {
+      if (!r || typeof r.owner_token !== 'string' || !INVITE_TOKEN.test(r.owner_token) || !isTime(r.invite_expires_at)) {
         throw new DataUnavailable('shape');
       }
       return { invite_link: inviteLink(r.owner_token), invite_expires_at: r.invite_expires_at };
+    },
+
+    /**
+     * The person's role in their brokerage, 'owner' or 'agent', or null when they belong to none (build step 5e). Read from the ONE
+     * membership resolver (public.brokerage_membership_of, Order K0), never re-derived. It decides only what the page OFFERS: whether
+     * an invite may be made is the database's own check, at the moment it is made (inviteAgent).
+     */
+    async roleOf(userId: string): Promise<Role | null> {
+      const { data, error } = await rpc('brokerage_membership_of', { p_user_id: userId });
+      if (error) throw new DataUnavailable('brokerage_membership_of');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const r = data[0];
+      if (data.length !== 1 || !r || (r.role !== 'owner' && r.role !== 'agent')) throw new DataUnavailable('shape');
+      return r.role;
+    },
+
+    /**
+     * An OWNER invites an agent to their own brokerage's trial (build step 5e): public.evaluation_invite_mint with the owner as the
+     * actor, so the DATABASE checks, under the evaluation's lock, that this person is an active owner of that very brokerage and that
+     * the trial is neither revoked nor expired, and it can mint an AGENT invite only (D-L8). The seat limit is checked when the invite
+     * is used (redeemInvite), not here (D-L2). The evaluation id is read and used inside this function and never returned; the token
+     * comes back once, as the invite link. The invite lives the database's default 14 days (D-L4).
+     */
+    async inviteAgent(userId: string): Promise<CreatedInvite> {
+      const usage = await rpc('evaluation_usage', { p_user_id: userId });
+      if (usage.error) throw new DataUnavailable('evaluation_usage');
+      if (!Array.isArray(usage.data)) throw new DataUnavailable('shape');
+      if (usage.data.length === 0) throw new NotEntitled('no trial');
+      const t = usage.data[0];
+      if (usage.data.length !== 1 || !t || typeof t.evaluation_id !== 'string' || !UUID.test(t.evaluation_id)) throw new DataUnavailable('shape');
+      const { data, error } = await rpc('evaluation_invite_mint', { p_evaluation_id: t.evaluation_id, p_role: 'agent', p_actor: userId });
+      if (error) {
+        if (error.message === 'NOT_ENTITLED') throw new NotEntitled('refused');
+        throw new DataUnavailable('evaluation_invite_mint');
+      }
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (!r || typeof r.token !== 'string' || !INVITE_TOKEN.test(r.token) || !isTime(r.expires_at)) throw new DataUnavailable('shape');
+      return { invite_link: inviteLink(r.token), invite_expires_at: r.expires_at };
     },
   };
 }

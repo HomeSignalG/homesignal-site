@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c and 5d).
+# A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d and 5e).
 #   1. a fresh DISPOSABLE Postgres gets the shipped account spine, private context, snapshot and evaluation SQL, exactly as
 #      production has them (the fixture adds only the Supabase roles and auth.users);
-#   2. roundtrip.mjs drives the REAL request handlers and data layers of development-activity-trial (creating and joining) and
-#      get-development-activity-report (reports), whose network is translated to psql calls of the same database functions
-#      PostgREST would call, then asserts on what the database holds.
+#   2. roundtrip.mjs drives the REAL request handlers and data layers of development-activity-trial (creating, joining, and an
+#      owner inviting agents) and get-development-activity-report (reports), whose network is translated to psql calls of the
+#      same database functions PostgREST would call, then asserts on what the database holds.
 # Refuses to run against anything that is not named disposable. Holds no Supabase credential.
 set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"

@@ -258,6 +258,15 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 > (D-L4). No seat limit or end date is chosen by default (D-L2, D-L3): an admin types them or leaves them blank. The owner invite
 > link is returned once, to that admin, and only the token's hash is stored. `evaluation_invite_mint` (an owner inviting agents) is
 > still called by nothing. Record: the engine doc, "Step 5d".
+>
+> **Dated note, 2026-10-02 (build step 5e).** `evaluation_invite_mint` now has its first edge-function caller:
+> - the trial function's `invite` action, offered on the customer page to an owner of an active trial;
+> - reached through the same shared module, `inviteAgent`, with role `agent` and the signed-in person as the ACTOR, so the database
+>   itself checks they are an active owner of that brokerage (D-L8).
+>
+> The seat limit is still enforced when an agent joins (D-L2), and the agent invite keeps the database's default 14 days (D-L4). The
+> person's role is read from the one resolver, `brokerage_membership_of`; it decides only what the page offers. No database object
+> was added. `evaluation_invite_revoke` and `evaluation_revoke` are still called by nothing. Record: the engine doc, "Step 5e".
 
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.

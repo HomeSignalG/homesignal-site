@@ -102,10 +102,16 @@ ok(allFiles.length > 50 && naming.includes(SQL_FILE) && NAMES.test(stripSql('sel
   '4-control: the scan covers the code directories, the root files and every docs SQL, finds the SQL of record, flags a planted use and ignores a comment', allFiles.length + ' files');
 // Order L1 (docs/evaluation-entitlement.sql, parked and unapplied) is the one reviewed reader and the one WRITER: its redeem function inserts the
 // membership row, and its other functions ask the resolver. test/evaluation-entitlement-structure.test.mjs pins that it only inserts and never updates or
-// deletes a membership, so it cannot reach this spine's owner guard. Nothing else may name them.
-const L1_SQL = 'docs/evaluation-entitlement.sql';
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL]),
-  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) — no page, script, edge function or other SQL reads or writes them (Orders J and the handler work design who may)', naming.join(','));
+// deletes a membership, so it cannot reach this spine's owner guard. Nothing else may name the TABLES.
+// Development Activity build step 5e (the handler work) adds ONE reader of the RESOLVER, never of a table: the shared trial module
+// (_shared/evaluation-reads.ts) asks brokerage_membership_of for a member's role, so the customer page can offer an owner "Invite an
+// agent". The role only decides what the page OFFERS; whether an invite may be made is evaluation_invite_mint's own check (Order L1).
+const L1_SQL = 'docs/evaluation-entitlement.sql', EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts';
+const readsCode = code(EVAL_READS);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS])
+   && !/brokerage_account|brokerage_member\b/.test(readsCode) && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
+   && /await rpc\('brokerage_membership_of', \{ p_user_id: userId \}\)/.test(readsCode),
+  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 
