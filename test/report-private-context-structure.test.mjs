@@ -155,12 +155,14 @@ ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-sn
   const fn = (t.match(/async contextMatches\(contextId, address\) \{[\s\S]*?\n    \},/) || [''])[0];
   // build step 6 adds the SECOND reader in this file: subjectOf, which returns the address a stored report was made for to a member of the
   // brokerage that made it, and only while the layer still holds it ('active'). Everything else about the first reader is unchanged.
+  // Build step 7: that same read also returns the client label, the one customer-typed field a report's header shows, and no other column.
   const subj = (t.match(/async subjectOf\(contextId\) \{[\s\S]*?\n    \},/) || [''])[0];
   ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read","report_private_context_read"]' && fn.includes('report_private_context_read')
-     && subj.includes('report_private_context_read') && /c\.state === 'active'/.test(subj) && /if \(!contextId\) return null;/.test(subj)
+     && subj.includes('report_private_context_read') && /c\.state !== 'active'/.test(subj) && /if \(!contextId\) return \{ address: null, label: null \};/.test(subj)
+     && (subj.match(/c\.label/g) || []).length === 1 && /label: cleanDisplayName\(c\.label, LABEL_MAX\)/.test(subj) && !/c\.(normalized_address|latitude|longitude|property_keys|purge)/.test(subj)
      && [...fn.matchAll(/return ([^;]+);/g)].map((m) => m[1]).every((r) => /^'unknown'$|^norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch'$/.test(r))
-     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t),
-    '5c4: the report function\'s data layer names the private layer twice, both times the read function: inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares, and inside subjectOf, which returns the address only while the layer holds it (control: it does name it)', names);
+     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t.replace(subj, '')),
+    '5c4: the report function\'s data layer names the private layer twice, both times the read function: inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares, and inside subjectOf, which returns the address and the client label (cleaned for printing) only while the layer holds them, and reads no other column (control: it does name it)', names);
 }
 ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).join() === REPORT_DATA,
   '5d: one FILE calls the function that returns the private values: the report function\'s data layer, for the replay check (compares, returns no value) and, from build step 6, for a saved report\'s own address (subjectOf, shown to its own brokerage while the layer holds it)');

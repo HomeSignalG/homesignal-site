@@ -47,9 +47,9 @@ const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 
 // supabase-js stand-in. window.__sb.session is the signed-in session, or null; verifyOtp signs in and tells every listener. Like the real
 // library, subscribing reports the current session once more (INITIAL_SESSION), so the page hears of one session twice on load.
-const SESSION = "{ access_token: 'user-token', user: { id: '" + UID + "', email: 'agent@example.test' } }";
-const SB_STUB = (signedIn) => `
-window.__sb = { session: ${signedIn ? SESSION : 'null'}, listeners: [], otp: [] };
+const SESSION_OF = (name) => "{ access_token: 'user-token', user: { id: '" + UID + "', email: 'agent@example.test', user_metadata: " + (name ? "{ full_name: " + JSON.stringify(name) + " }" : '{}') + ' } }';
+const SB_STUB = (signedIn, name) => { const SESSION = SESSION_OF(name); return `
+window.__sb = { session: ${signedIn ? SESSION : 'null'}, listeners: [], otp: [], updates: [], updateFails: false };
 window.supabase = { createClient: function () { return { auth: {
   getSession: function () { return Promise.resolve({ data: { session: window.__sb.session } }); },
   onAuthStateChange: function (cb) { window.__sb.listeners.push(cb); setTimeout(function () { cb('INITIAL_SESSION', window.__sb.session); }, 0);
@@ -57,13 +57,22 @@ window.supabase = { createClient: function () { return { auth: {
   signInWithOtp: function (a) { window.__sb.otp.push(a); return Promise.resolve({ error: null }); },
   verifyOtp: function () { window.__sb.session = ${SESSION};
     window.__sb.listeners.forEach(function (cb) { cb('SIGNED_IN', window.__sb.session); }); return Promise.resolve({ error: null }); },
+  // build step 7: the agent's own name is saved to their sign-in account (user_metadata.full_name); the world's header follows what was saved
+  updateUser: function (a) { window.__sb.updates.push(a);
+    if (window.__sb.updateFails) return Promise.resolve({ data: null, error: { message: 'nope' } });
+    // updateHold: the server's answer is on its way and arrives only when the test lets it (after another person has signed in)
+    if (window.__sb.updateHold) return new Promise(function (res) { window.__sb.releaseUpdate = function () { res({ data: null, error: null }); }; });
+    var u = window.__sb.session.user; u.user_metadata = Object.assign({}, u.user_metadata, a.data);
+    if (window.__hsNameSaved) window.__hsNameSaved(a.data.full_name);
+    window.__sb.listeners.forEach(function (cb) { cb('USER_UPDATED', window.__sb.session); });
+    return Promise.resolve({ data: { user: u }, error: null }); },
   signOut: function () { window.__sb.session = null; window.__sb.listeners.forEach(function (cb) { cb('SIGNED_OUT', null); }); return Promise.resolve({}); }
-} }; } };`;
+} }; } };`; };
 
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok' } = {}) {
-  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0 };
+  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
@@ -91,12 +100,12 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     zipSupported: async () => true,
     radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
     trialOf: async () => state(),
-    issue: async (_u, key, intelligence) => {
+    issue: async (_u, key, intelligence, privateContext) => {
       const prior = w.made.get(key);
       if (prior) return { replayed: true, report_id: prior.id, generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, credit: credit() };
       w.used++;
       const id = 'c0000000-0000-4000-8000-' + String(w.used).padStart(12, '0');
-      w.made.set(key, { id, address: w.lastAddress, report: intelligence });
+      w.made.set(key, { id, address: w.lastAddress, label: (privateContext && privateContext.label) || null, report: intelligence });
       return { replayed: false, report_id: id, content_hash: 'h', report_version: 'v', generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, report: intelligence, credit: credit() };
     },
     contextMatches: async (ctx, address) => { const m = w.made.get(ctx.slice(4)); return m && m.address === address ? 'match' : 'mismatch'; },
@@ -113,7 +122,9 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
       for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { report_id: m.id, number: n, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key, body: JSON.stringify(m.report) }; }
       return null;
     },
-    subjectOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return m ? m.address : null; },
+    subjectOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return { address: m ? m.address : null, label: m ? E.cleanDisplayName(m.label, 80) : null }; },
+    // build step 7: the viewer's own header, read when a report is shown
+    headerOf: async () => { if (w.headerFails) throw new RH.DataUnavailable('x'); return w.header; },
   });
   return w;
 }
@@ -132,17 +143,18 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false } = {}) {
+async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '' } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
+  await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
   const errors = [], reports = [], trials = [], foreign = [], saved = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
     const r = route.request(), url = r.url();
     if (url.startsWith(base)) return route.continue();
-    if (url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB(signedIn) });
+    if (url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB(signedIn, name) });
     if (url === REPORT_FN || url === TRIAL_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       const rec = { auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body };
@@ -506,6 +518,155 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   await waitRows(page, 1);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(await savedShown(page) && wide <= 0, '7q on a 390 px screen the list is shown and the page does not scroll sideways', wide);
+  await ctx.close();
+}
+
+// ---- 8. the header and "Your name on reports" (build step 7) -------------------------------------------------------------------------------
+const profileShown = (page) => page.$eval('#profile', (e) => !e.hidden);
+const whoLine = (page) => page.$eval('#report .da-rv-who', (e) => e.textContent.trim()).catch(() => null);
+const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textContent.trim()).catch(() => null);
+{
+  const w = world();
+  const { ctx, page, errors, foreign, reports } = await open({ w });
+  await waitCount(page, /free reports left/);
+  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && /Your name on reports/.test(await text(page, '#profile-title')),
+    '8a a trial member sees the "Your name on reports" card, with the box empty when they have given no name');
+  await page.fill('#label', 'Smith buyers');
+  await make(page);
+  ok(await whoLine(page) === 'Acme Realty' && await labelLine(page) === 'Smith buyers' && reports[0].body.label === 'Smith buyers',
+    '8b a report shows the brokerage\'s name from the account, and the client label the person typed, in its header (no name yet, so none is invented)', [await whoLine(page), await labelLine(page)]);
+  await page.fill('#agent-name', '  Pat   Agent ');
+  await page.click('#save-name');
+  await page.waitForFunction(() => /^Saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const upd = await page.evaluate(() => window.__sb.updates);
+  ok(upd.length === 1 && JSON.stringify(upd[0]) === '{"data":{"full_name":"Pat Agent"}}' && /^Saved/.test(await text(page, '#profile-status')),
+    '8c saving sends ONE update to the sign-in account, with the name as one clean line and nothing else, and says it is saved', upd);
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8c2 and the box shows the cleaned name');
+  await page.fill('#label', ''); // the second report is made with no client label
+  await make(page, OTHER);
+  ok(await whoLine(page) === 'Acme Realty · Pat Agent', '8d the next report\'s header carries the name', await whoLine(page));
+  // reopening an earlier report: its header is the viewer\'s NOW, and its label is the one saved with it
+  await page.waitForFunction(() => document.querySelectorAll('#saved-list button').length === 2, null, { timeout: 8000 }).catch(() => {});
+  await page.click('#saved-list li:last-child button');
+  await page.waitForFunction(() => /Saved report 1/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(await whoLine(page) === 'Acme Realty · Pat Agent' && await labelLine(page) === 'Smith buyers', '8e a reopened report shows the viewer\'s header and the client label saved with it', [await whoLine(page), await labelLine(page)]);
+  await page.click('#saved-list li:first-child button');
+  await page.waitForFunction(() => /Saved report 2/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(await whoLine(page) === 'Acme Realty · Pat Agent' && await labelLine(page) === null, '8e2 a report made with no client label shows none', await labelLine(page));
+  ok((await page.evaluate(() => JSON.stringify(sessionStorage) + JSON.stringify(localStorage))).indexOf('Pat') === -1, '8f the name is kept in the sign-in account only: nothing about it is in the browser\'s storage');
+  ok(errors.length === 0 && foreign.length === 0, '8g no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // the name already on the account is filled in once, and a report being made never overwrites what is being typed
+  const w = world(); w.header = { brokerage: 'Acme Realty', agent: 'Jo Agent' };
+  const { ctx, page } = await open({ w, name: 'Jo Agent' });
+  await waitCount(page, /free reports left/);
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent', '8h the box starts with the name already on the person\'s account');
+  await page.fill('#agent-name', 'Jo Q. Agent');
+  await make(page);
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Q. Agent' && await whoLine(page) === 'Acme Realty · Jo Agent',
+    '8i making a report does not overwrite a name being typed, and the header uses the SAVED name until the person saves', [await page.$eval('#agent-name', (e) => e.value), await whoLine(page)]);
+  await page.fill('#agent-name', '');
+  await page.click('#save-name');
+  await page.waitForFunction(() => /removed/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(JSON.stringify((await page.evaluate(() => window.__sb.updates))[0]) === '{"data":{"full_name":""}}' && /removed/.test(await text(page, '#profile-status')),
+    '8j an empty box removes the name (an empty name is sent, which the server reads as none)');
+  await make(page, OTHER);
+  ok(await whoLine(page) === 'Acme Realty', '8j2 and the next report shows the brokerage alone', await whoLine(page));
+  await ctx.close();
+}
+{
+  // a name that cannot be saved, and one that is too long
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.evaluate(() => { window.__sb.updateFails = true; });
+  await page.fill('#agent-name', 'Pat Agent');
+  await page.click('#save-name');
+  await page.waitForFunction(() => /could not be saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/could not be saved just now/.test(await text(page, '#profile-status')) && (await page.$eval('#profile-status', (e) => e.className)) === 'err' && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent',
+    '8k a refused save says so in plain words and keeps what was typed');
+  await page.evaluate(() => { window.__sb.updateFails = false; window.__sb.updates.length = 0; });
+  await page.$eval('#agent-name', (e) => { e.maxLength = 1000; e.value = 'x'.repeat(81); });
+  await page.click('#save-name');
+  ok(/80 characters or fewer/.test(await text(page, '#profile-status')) && (await page.evaluate(() => window.__sb.updates.length)) === 0, '8l a name over 80 characters is refused by the page and nothing is sent');
+  await ctx.close();
+}
+{
+  // a header that cannot be read costs nothing and shows no report
+  const w = world(); w.headerFails = true;
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  ok(w.used === 0 && (await page.$$('#report .da-rv-sec')).length === 0 && /could not be read just now/.test(await text(page, '#status')),
+    '8m a header that cannot be read: no report, no free report used, and the page says the records could not be read', [w.used, await text(page, '#status')]);
+  await ctx.close();
+}
+{
+  // text is shown as text
+  const w = world(); w.header = { brokerage: '<b>Acme</b> Realty', agent: '<img src=x onerror="window.__pwned=1">' };
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  const who = await page.evaluate(() => ({ text: (document.querySelector('#report .da-rv-who') || {}).textContent || '', imgs: document.querySelectorAll('#report .da-rv-who *').length, pwned: window.__pwned === 1 }));
+  ok(who.text === '<b>Acme</b> Realty · <img src=x onerror="window.__pwned=1">' && who.imgs === 0 && !who.pwned, '8n a name and a brokerage with markup in them are printed as text, never run', who);
+  await ctx.close();
+}
+{
+  // who is offered the card: nobody without a trial, nobody signed out; and the box is emptied for the next person
+  for (const [label, opts] of [['no trial', { trial: null }], ['an ended trial', { trial: 'revoked' }], ['an admin', { trial: null, admin: true }]]) {
+    const { ctx, page } = await open({ w: world(opts), name: 'Pat Agent' });
+    await settled(page);
+    await page.waitForTimeout(300);
+    ok(!(await profileShown(page)), '8o ' + label + ': the card is not offered', label);
+    await ctx.close();
+  }
+  const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
+  await waitCount(page, /free reports left/);
+  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8p (control) a trial member with a name on file sees the card with it filled in');
+  await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
+  await page.waitForTimeout(200);
+  ok(!(await profileShown(page)) && (await page.$eval('#agent-name', (e) => e.value)) === '', '8q signing out hides the card and empties the box');
+  await ctx.close();
+  const o2 = await open({ w: world(), name: 'Pat Agent' });
+  await waitCount(o2.page, /free reports left/);
+  const swap = await o2.page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('profile').hidden, value: document.getElementById('agent-name').value };
+  });
+  ok(swap.hidden && swap.value === '', '8r a different person signing in takes the card and the typed name away at once', swap);
+  await o2.ctx.close();
+}
+{
+  // a save still on its way when ANOTHER person signs in must not write its answer onto that person's page
+  const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
+  await waitCount(page, /free reports left/);
+  await page.evaluate(() => { window.__sb.updateHold = true; });
+  await page.fill('#agent-name', 'Pat Q. Agent');
+  await page.click('#save-name');
+  ok(/Saving/.test(await text(page, '#profile-status')) && (await page.$eval('#save-name', (e) => e.disabled)), '8t (control) while the answer is on its way the page says it is saving and the button waits');
+  await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+  });
+  await page.waitForTimeout(400); // let the new person's own sign-in finish (it clears the card), so a late write could not be wiped by it
+  await page.evaluate(() => window.__sb.releaseUpdate());
+  await page.waitForTimeout(200);
+  const late =await page.evaluate(() => ({ hidden: document.getElementById('profile').hidden, status: document.getElementById('profile-status').textContent,
+    value: document.getElementById('agent-name').value, waiting: document.getElementById('save-name').disabled }));
+  ok(late.hidden && late.status === '' && late.value === '' && !late.waiting,
+    '8t2 a late answer for the first person writes nothing onto the next person\'s page (no "Saved", no name in the box) and the button is free again', late);
+  await ctx.close();
+}
+{
+  const w = world();
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(await profileShown(page) && wide <= 0, '8s on a 390 px screen the card is shown and the page does not scroll sideways', wide);
   await ctx.close();
 }
 

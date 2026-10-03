@@ -12,11 +12,11 @@ import {
 } from '../_shared/service-rest.ts';
 import { makeChangeReads } from '../_shared/change-reads.ts';
 import { issueEvaluationReport } from '../_shared/report-snapshot.ts';
-import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
+import { cleanDisplayName, makeEvaluationReads } from '../_shared/evaluation-reads.ts';
 import { norm } from '../_shared/national-report.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
 import type { ProjectRow, RadiusRow } from '../_shared/national-report.ts';
-import { RADIUS_ROW_LIMIT } from './handler.ts';
+import { LABEL_MAX, RADIUS_ROW_LIMIT } from './handler.ts';
 
 export { POSTGREST_ROW_CAP, quoteIn };
 export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
@@ -106,13 +106,18 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     savedReports: evaluation.savedReports,
     openSavedReport: evaluation.openSavedReport,
 
-    // the address a stored report was made for, from the private layer's own reader; null once the layer no longer keeps it
+    // the header a member's reports carry (build step 7): the brokerage's name and the person's own, read when a report is shown, never stored
+    headerOf: evaluation.reportHeader,
+
+    // the address and the client label a stored report was made for, from the private layer's own reader; both null once the layer no
+    // longer keeps them. The label is cleaned for printing here, the one place it leaves the layer.
     async subjectOf(contextId) {
-      if (!contextId) return null;
+      if (!contextId) return { address: null, label: null };
       const { data, error } = await rpc('report_private_context_read', { p_context: contextId });
       if (error || !Array.isArray(data)) throw new DataUnavailable('private context');
       const c = data.length === 1 ? data[0] : null;
-      return c && c.state === 'active' && typeof c.address === 'string' && c.address ? c.address : null;
+      if (!c || c.state !== 'active') return { address: null, label: null };
+      return { address: typeof c.address === 'string' && c.address ? c.address : null, label: cleanDisplayName(c.label, LABEL_MAX) };
     },
 
     // A retried key returns the FIRST report (D-L6). Whether it is the same property is asked of its private context; the address read

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d and 5e).
+# A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d, 5e, 6 and 7).
 #   1. a fresh DISPOSABLE Postgres gets the shipped account spine, private context, snapshot and evaluation SQL, exactly as
 #      production has them (the fixture adds only the Supabase roles and auth.users);
 #   2. roundtrip.mjs drives the REAL request handlers and data layers of development-activity-trial (creating, joining, and an
@@ -20,4 +20,6 @@ P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1 || { echo "FAIL — the sn
 P -f "$root/docs/evaluation-entitlement.sql" >/dev/null 2>&1 || { echo "FAIL — the evaluation entitlement does not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply a second time"; exit 1; }
+P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply"; exit 1; }
+P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply a second time"; exit 1; }
 exec node "$here/roundtrip.mjs"

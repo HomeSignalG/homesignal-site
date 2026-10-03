@@ -65,9 +65,9 @@ m('list_unbounded', " || data.length > 1000) throw new DataUnavailable('shape');
 m('list_error_called_empty', "      if (error) throw new DataUnavailable('evaluation_reports_of');", "      if (error) return [];", [FNT], READS)
 
 # ---- the data layer: the address is shown only while the private layer keeps it ---------------------------------------------------------------
-m('purged_address_shown', "c && c.state === 'active' && typeof c.address", "c && typeof c.address", [FNT, PG], DATA)
-m('unreadable_layer_called_no_address', "      if (error || !Array.isArray(data)) throw new DataUnavailable('private context');\n      const c = data.length === 1 ? data[0] : null;\n      return c && c.state",
-  "      if (error || !Array.isArray(data)) return null;\n      const c = data.length === 1 ? data[0] : null;\n      return c && c.state", [FNT], DATA)
+m('purged_address_shown', "if (!c || c.state !== 'active') return { address: null, label: null };", "if (!c) return { address: null, label: null };", [FNT, PG], DATA)
+m('unreadable_layer_called_no_address', "      if (error || !Array.isArray(data)) throw new DataUnavailable('private context');\n      const c = data.length === 1 ? data[0] : null;\n      if (!c || c.state !== 'active') return {",
+  "      if (error || !Array.isArray(data)) return { address: null, label: null };\n      const c = data.length === 1 ? data[0] : null;\n      if (!c || c.state !== 'active') return {", [FNT], DATA)
 
 # ---- the report function: who may ask, what is called, what is charged ------------------------------------------------------------------------
 m('admin_may_list', "      if (!trial) return reply(req, { error: 'forbidden' }, 403);\n      try {\n        if (b.action === 'list')",
@@ -76,7 +76,7 @@ m('unknown_action_accepted', "      if (b.action !== 'list' && b.action !== 'ope
 m('extra_field_accepted', "      const extra = Object.keys(b).filter((k) => !allowed.includes(k));\n      if (extra.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + extra[0] }, 400);\n", '', [FNT], HAND)
 m('open_id_unchecked', "if (typeof b.report_id !== 'string' || !UUID.test(b.report_id)) return reply(req, { error: 'invalid_request', detail: 'report_id' }, 400);\n", '', [FNT], HAND)
 m('not_found_called_forbidden', "if (!opened) return reply(req, { error: 'not_found' }, 404);", "if (!opened) return reply(req, { error: 'forbidden' }, 403);", [FNT, BRO, PG], HAND)
-m('reopen_says_charged', "address: await deps.subjectOf(opened.private_context_id), charged: false,", "address: await deps.subjectOf(opened.private_context_id), charged: true,", [FNT, STR, PG], HAND)
+m('reopen_says_charged', "address: subject.address, client_label: subject.label, header, charged: false,", "address: subject.address, client_label: subject.label, header, charged: true,", [FNT, STR, PG], HAND)
 m('reopen_not_marked', "stored: true, reopened: true,", "stored: true,", [FNT, BRO], HAND)
 m('stored_text_unparsed_called_ok', "try { stored = JSON.parse(opened.body); } catch { throw new DataUnavailable('stored report'); }", "try { stored = JSON.parse(opened.body); } catch { stored = {}; }", [FNT], HAND)
 m('complete_trial_may_make_reports', "    if (trial && trial.complete) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial) }, 403);\n", '', [FNT, PG], HAND)
@@ -91,9 +91,9 @@ m('gate_never_says_complete', "complete: standing === 'complete' };", "complete:
 # ---- the customer page ------------------------------------------------------------------------------------------------------------------------
 m('card_for_everyone', "showSaved(a === 'trial' || a === 'complete');", "showSaved(true);", [SRC, BRO, STR], PAGE)
 m('card_survives_sign_out', "access = null; role = null; attempt = null; showTeam(false); showSaved(false);", "access = null; role = null; attempt = null; showTeam(false);", [SRC, BRO], PAGE)
-m('card_survives_a_new_person', "role = null; showTeam(false); showSaved(false); // another person", "role = null; showTeam(false); // another person", [SRC, BRO], PAGE)
+m('card_survives_a_new_person', "role = null; showTeam(false); showSaved(false); showProfile(false); // another person", "role = null; showTeam(false); showProfile(false); // another person", [SRC, BRO], PAGE)
 m('list_kept_in_storage', "    var list = $('saved-list');\n    list.textContent = '';", "    var list = $('saved-list'); try { sessionStorage.setItem('saved', JSON.stringify(body.reports)); } catch (e) {}\n    list.textContent = '';", [SRC, BRO, STR], PAGE)
-m('late_list_shown', "    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way\n", '', [SRC, BRO], PAGE)
+m('late_list_shown', "    var r = await post(REPORT_FN, { action: 'list' });\n    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way\n", "    var r = await post(REPORT_FN, { action: 'list' });\n", [SRC, BRO], PAGE)
 m('open_sends_the_address', "post(REPORT_FN, { action: 'open', report_id: reportId })", "post(REPORT_FN, { action: 'open', report_id: reportId, address: $('addr').value })", [SRC, BRO, STR], PAGE)
 m('open_sends_a_key', "post(REPORT_FN, { action: 'open', report_id: reportId })", "post(REPORT_FN, { action: 'open', report_id: reportId, idempotency_key: crypto.randomUUID() })", [SRC, BRO, STR], PAGE)
 m('open_note_hidden', " Opening it did not use a free report.", "", [SRC, BRO, STR], PAGE)

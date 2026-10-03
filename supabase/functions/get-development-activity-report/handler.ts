@@ -29,7 +29,7 @@ import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, r
 import type { TrialState } from '../_shared/admin-gate.ts';
 import { EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
 import { UUID } from '../_shared/evaluation-reads.ts';
-import type { OpenedReport, SavedReport } from '../_shared/evaluation-reads.ts';
+import type { OpenedReport, ReportHeader, SavedReport } from '../_shared/evaluation-reads.ts';
 import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 import type {
@@ -63,9 +63,14 @@ export type Deps = {
   // saved reports (build step 6)
   savedReports: (userId: string) => Promise<SavedReport[]>;
   openSavedReport: (userId: string, reportId: string) => Promise<OpenedReport | null>;
-  /** The address a stored report was made for, while the private layer still keeps it; null once it has been purged. */
-  subjectOf: (contextId: string | null) => Promise<string | null>;
+  /** The address and client label a stored report was made for, while the private layer still keeps them; null once they have been purged. */
+  subjectOf: (contextId: string | null) => Promise<{ address: string | null; label: string | null }>;
+  // the header (build step 7): the brokerage's name and the person's own, read when a report is shown and stored nowhere
+  headerOf: (userId: string) => Promise<ReportHeader>;
 };
+
+/** The longest client label a request may carry, and the longest one a stored report shows. */
+export const LABEL_MAX = 80;
 
 /** A random (v4) UUID the trial page mints once per report request, and repeats only when it retries that same request. */
 const IDEMPOTENCY_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -120,7 +125,7 @@ export function makeHandler(deps: Deps) {
         if (b.action === 'list') {
           const rows = await deps.savedReports(trial.userId);
           const reports = await Promise.all(rows.map(async (r) => ({
-            report_id: r.report_id, number: r.number, generated_at: r.generated_at, address: await deps.subjectOf(r.private_context_id),
+            report_id: r.report_id, number: r.number, generated_at: r.generated_at, address: (await deps.subjectOf(r.private_context_id)).address,
           })));
           return reply(req, { status: 'OK', reports, trial: trialSummary(trial.trial) });
         }
@@ -130,10 +135,13 @@ export function makeHandler(deps: Deps) {
         let stored: { coverage?: { state?: string } } | null;
         try { stored = JSON.parse(opened.body); } catch { throw new DataUnavailable('stored report'); }
         if (!stored || typeof stored !== 'object') throw new DataUnavailable('stored report');
+        // the header is the viewer's own and is read now (build step 7): the stored report holds neither a name nor a label
+        const subject = await deps.subjectOf(opened.private_context_id);
+        const header = await deps.headerOf(trial.userId);
         return reply(req, {
           status: 'OK', coverage_state: stored.coverage?.state ?? null, report: stored,
           stored: true, reopened: true, report_id: opened.report_id, number: opened.number, generated_at: opened.generated_at,
-          address: await deps.subjectOf(opened.private_context_id), charged: false, trial: trialSummary(trial.trial),
+          address: subject.address, client_label: subject.label, header, charged: false, trial: trialSummary(trial.trial),
         });
       } catch (e) {
         if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
@@ -163,7 +171,7 @@ export function makeHandler(deps: Deps) {
     const trialInfo = trial ? { trial: trialSummary(trial.trial) } : {};
     let label: string | undefined;
     if (b.label !== undefined) {
-      if (typeof b.label !== 'string' || b.label.length > 80) return reply(req, { error: 'invalid_request', detail: 'label' }, 400);
+      if (typeof b.label !== 'string' || b.label.length > LABEL_MAX) return reply(req, { error: 'invalid_request', detail: 'label' }, 400);
       label = b.label.trim() || undefined;
     }
 
@@ -175,6 +183,10 @@ export function makeHandler(deps: Deps) {
       if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null, stored: false, credit: creditDecision({ status: 'ADDRESS_NOT_RESOLVED' }), ...trialInfo });
       const supported = await deps.zipSupported(g.zip);
       if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }), ...trialInfo });
+
+      // the header a trial member's report carries (build step 7): read now, before anything is charged, so a failed read is a 502 that
+      // used no free report. Presentation only: it is sent with the response and written nowhere.
+      const headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};
 
       // 4. the canonical reads
       const rows = await deps.radius(g.lat, g.lng, radius);
@@ -210,6 +222,7 @@ export function makeHandler(deps: Deps) {
           credit,
           charged: false,
           ...trialInfo,
+          ...headerInfo,
         });
       }
 
@@ -234,12 +247,12 @@ export function makeHandler(deps: Deps) {
         const stored = JSON.parse(body);
         return reply(req, {
           status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: stored, render: out.renderOnly,
-          stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: false, replayed: true, ...used,
+          stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: false, replayed: true, ...used, ...headerInfo,
         });
       }
       return reply(req, {
         status: 'OK', coverage_state: out.coverage_state, report: issued.report, render: out.renderOnly,
-        stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: true, replayed: false, ...used,
+        stored: true, report_id: issued.report_id, storable: true, storage_blockers: [], credit, charged: true, replayed: false, ...used, ...headerInfo,
       });
     } catch (e) {
       if (e instanceof GeocoderUnavailable) return reply(req, { error: 'geocoder_unavailable' }, 502);

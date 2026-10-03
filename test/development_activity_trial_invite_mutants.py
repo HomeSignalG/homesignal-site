@@ -70,7 +70,7 @@ m('card_for_every_member', "showTeam(a === 'trial' && role === 'owner');", "show
 m('card_for_an_ended_trial', "showTeam(a === 'trial' && role === 'owner');", "showTeam(role === 'owner');", [SRC, BRO], PAGE)
 m('role_set_by_the_page', "{ role = st.body.role; showTrial(st.body.access, st.body.trial, ''); }", "{ role = 'owner'; showTrial(st.body.access, st.body.trial, ''); }", [SRC, BRO], PAGE)
 m('card_survives_sign_out', '      access = null; role = null; attempt = null; showTeam(false);', '      access = null; role = null; attempt = null;', [SRC, BRO], PAGE)
-m('card_survives_a_new_person', '        role = null; showTeam(false); showSaved(false); // another person', '        showSaved(false); // another person', [SRC, BRO], PAGE)
+m('card_survives_a_new_person', '        role = null; showTeam(false); showSaved(false); showProfile(false); // another person', '        showSaved(false); showProfile(false); // another person', [SRC, BRO], PAGE)
 m('hiding_keeps_the_link', "    if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }\n", '', [SRC, BRO], PAGE)
 m('link_shape_unchecked', "/^https:\\/\\/homesignal\\.net\\/development-activity-reports\\.html#invite=hse1_[0-9a-f]{64}$/.test(link)", 'link', [SRC], PAGE)
 m('late_answer_shown', "    if (!session || !session.user || session.user.id !== forUser) { showTeam(false); return; }\n", '', [SRC], PAGE)

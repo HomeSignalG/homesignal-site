@@ -276,6 +276,12 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 > They write nothing and can charge nothing. They serve an active, unexpired evaluation or a complete one, never a revoked or expired one
 > (D-6-3). The ledger still holds no user id, so every member of a brokerage sees all its reports (D-6-2). The trial gate now lets a
 > COMPLETE trial through and the handler refuses it only for MAKING a report. Record: the engine doc, "Step 6".
+>
+> **Dated note, 2026-10-03 (build step 7).** The membership resolver is now also read for the report header. One more read-only,
+> system-only function (`docs/report-header.sql`), `report_header_of(user)`, joins `brokerage_membership_of` → `brokerage_account` (the
+> brokerage's name) and the person's own `auth.users.raw_user_meta_data ->> 'full_name'`. It writes nothing. The header is read when a
+> report is shown and is stored in no table, snapshot or ledger (D-7-2); the client label sits only in the private layer (D-7-3). It
+> returns nothing for a deactivated member or a suspended account. Record: the engine doc, "Step 7".
 
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.

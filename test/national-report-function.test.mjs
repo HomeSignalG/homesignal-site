@@ -321,6 +321,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const KEY2 = '7d6c5b4a-3928-4170-9e8d-7c6b5a493827';
   const TRIAL = { status: 'active', credits_used: 3, credits_remaining: 17, expired: false };
   const TAUTH = { authorization: 'Bearer trial-token' };
+  const HEADER = { brokerage: 'Acme Realty', agent: 'Pat Agent' }; // build step 7: what the viewer's own header reads
   const trialFakes = (over = {}) => {
     const f = fakes({
       authenticate: async (t) => (t === 'trial-token' ? { email: 'agent@brokerage.example', id: USER } : t === 'user-token' ? { email: 'founder@example.com' } : null),
@@ -335,7 +336,8 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
         private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', report: { stored: 'body' }, credit: { ordinal: 4, credits_used: 4, credits_remaining: 16, evaluation_status: 'active' } }),
       storedReport: async () => JSON.stringify({ stored: 'first', coverage: { state: 'REPORT_READY' } }),
       contextMatches: async () => 'match',
-      ...Object.fromEntries(Object.entries(over).filter(([k]) => ['trialOf', 'issue', 'storedReport', 'contextMatches'].includes(k))),
+      headerOf: async () => HEADER,
+      ...Object.fromEntries(Object.entries(over).filter(([k]) => ['trialOf', 'issue', 'storedReport', 'contextMatches', 'headerOf'].includes(k))),
     })) f.deps[name] = rec(name, fn);
     for (const name of ['authenticate', 'isAdmin']) { const fn = f.deps[name]; f.deps[name] = rec(name, fn); }
     return f;
@@ -434,6 +436,39 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   f = trialFakes({ zipSupported: async () => false });
   r = await call(f.deps, { ...REQ, idempotency_key: KEY2 }, TAUTH);
   ok(r.json.status === 'OUTSIDE_COVERAGE' && cr(r.json.credit) === 'false|NOT_A_REPORT' && !f.calls.includes('issue'), '8j a ZIP HomeSignal does not cover: not charged');
+
+  // the header (build step 7): the viewer's own brokerage and name, read when a report is shown, sent with the response, stored nowhere
+  f = trialFakes();
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(JSON.stringify(r.json.header) === JSON.stringify(HEADER) && f.args.headerOf[0] === USER && f.calls.filter((c) => c === 'headerOf').length === 1,
+    '8k a stored, charged trial report carries the viewer\'s header, asked of the database ONCE by the auth user\'s id', r.json.header);
+  ok(f.calls.indexOf('headerOf') > f.calls.indexOf('zipSupported') && f.calls.indexOf('headerOf') < f.calls.indexOf('issue'),
+    '8k and it is read AFTER the address is known to be covered and BEFORE the charge, so a header that cannot be read costs nothing', f.calls);
+  {
+    const a2 = f.args.issue || [];
+    const everything = JSON.stringify([a2[2], a2[3], a2[4]]);
+    ok(!everything.includes('Acme Realty') && !everything.includes('Pat Agent') && !JSON.stringify(r.json.report).includes('Pat Agent'),
+      '8k2 neither the permanent body, the private context, the engine inputs nor the stored report carries the header: it is presentation, written nowhere');
+  }
+  f = trialFakes({ rights: NONE });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.json.stored === false && r.json.charged === false && JSON.stringify(r.json.header) === JSON.stringify(HEADER), '8k3 a "No data ingested" report (free, not stored) carries the header too');
+  f = trialFakes({ issue: async () => replay });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.json.replayed === true && JSON.stringify(r.json.header) === JSON.stringify(HEADER), '8k4 a replayed report carries the header, read now');
+  f = trialFakes({ headerOf: async () => { throw new H.DataUnavailable('x'); } });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 502 && r.json.error === 'data_unavailable' && r.json.report === undefined && !f.calls.includes('issue') && !f.calls.includes('radius'),
+    '8k5 a header that cannot be read is a 502 with NO report, nothing charged and nothing stored (never a report without its header, never a free report)', [r.status, f.calls]);
+  f = trialFakes({ headerOf: async () => ({ brokerage: null, agent: null }) });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
+  ok(r.status === 200 && JSON.stringify(r.json.header) === '{"brokerage":null,"agent":null}', '8k6 a member with no name on file still gets a report; the header says so with nulls, not made-up words');
+  f = trialFakes({ geocode: async () => null });
+  r = await call(f.deps, { ...REQ, idempotency_key: KEY2 }, TAUTH);
+  ok(r.json.header === undefined && !f.calls.includes('headerOf'), '8k7 an address that cannot be found is not a report, so no header is read for it');
+  f = trialFakes();
+  r = await call(f.deps, REQ, AUTH);
+  ok(r.status === 200 && !('header' in r.json) && !f.calls.includes('headerOf'), '8k8 an admin report has no header and asks for none');
 }
 
 // ---- 9. the data layer's trial reads: each goes through the database function that owns the decision --------------------------------
@@ -504,6 +539,32 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(await d.contextMatches('c', 'x y') === 'unknown', '9g a missing context cannot be checked');
   d = mk([[/rpc\/report_private_context_read/, () => json({}, 500)]]);
   ok(await d.contextMatches('c', 'x y').then(() => false, (e) => e instanceof H.DataUnavailable), '9g a failed read is DataUnavailable');
+
+  // the header read (build step 7): public.report_header_of, by user id; both names cleaned in this one place
+  reqs.length = 0;
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: '  Acme   Realty ', agent_name: 'Pat\nAgent' }])]]);
+  const hd = await d.headerOf(USER);
+  ok(JSON.stringify(hd) === JSON.stringify({ brokerage: 'Acme Realty', agent: 'Pat Agent' }) && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/report_header_of'
+    && reqs[0].init.method === 'POST' && JSON.stringify(JSON.parse(reqs[0].init.body)) === JSON.stringify({ p_user_id: USER }),
+    '9i the header is ONE call to public.report_header_of with the user id and nothing else; line breaks and runs of spaces are made plain', hd);
+  const BIDI = String.fromCharCode(0x202e), ZW = String.fromCharCode(0x200b), BOM = String.fromCharCode(0xfeff), LS = String.fromCharCode(0x2028);
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: 'Acme' + ZW + ' Realty', agent_name: BOM + 'Pat' + BIDI + ' Agent' + LS }])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === JSON.stringify({ brokerage: 'Acme Realty', agent: 'Pat Agent' }), '9i2 direction-changing, zero-width and line-separator characters are removed before a name can be printed');
+  d = mk([[/rpc\/report_header_of/, () => json([])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === '{"brokerage":null,"agent":null}', '9j no membership: no header, and no error');
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: 'Acme Realty', agent_name: null }])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === '{"brokerage":"Acme Realty","agent":null}', '9j a member who gave no name has the brokerage only');
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: 'Acme Realty', agent_name: 'x'.repeat(81) }])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === '{"brokerage":"Acme Realty","agent":null}', '9j2 a name over 80 characters is no name (never a shortened one: half a name reads as another)');
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: 'x'.repeat(121), agent_name: 'x'.repeat(80) }])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === JSON.stringify({ brokerage: null, agent: 'x'.repeat(80) }), '9j2 80 characters is allowed for a person and 120 for a brokerage, and over that is none');
+  d = mk([[/rpc\/report_header_of/, () => json([{ brokerage_name: '   ', agent_name: '' }])]]);
+  ok(JSON.stringify(await d.headerOf(USER)) === '{"brokerage":null,"agent":null}', '9j3 blank names are none');
+  for (const [what, resp] of [['two rows', json([{ brokerage_name: 'A', agent_name: 'B' }, { brokerage_name: 'A', agent_name: 'B' }])], ['a number for a name', json([{ brokerage_name: 'A', agent_name: 7 }])],
+    ['a row that is not an object', json([5])], ['not a list', json({ brokerage_name: 'A' })], ['a 500', json({}, 500)], ['a refusal', json({ message: 'x' }, 400)]]) {
+    d = mk([[/rpc\/report_header_of/, () => resp.clone()]]);
+    ok(await d.headerOf(USER).then(() => false, (e) => e instanceof H.DataUnavailable), '9k ' + what + ' from the header read is DataUnavailable, never an empty header');
+  }
 
   reqs.length = 0;
   d = mk([[/report_snapshot/, () => json([{ body: '{"a":1}' }])]]);

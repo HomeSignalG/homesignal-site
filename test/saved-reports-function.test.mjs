@@ -29,6 +29,8 @@ const ROWS = [
   { report_id: R1, number: 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: CTX1 },
 ];
 const ADDR = { [CTX1]: '742 Evergreen Terrace, Springfield, OR 97477', [CTX2]: null }; // report 2's address has been purged
+const LABEL = { [CTX1]: 'Smith buyers', [CTX2]: null };
+const HEADER = { brokerage: 'Acme Realty', agent: 'Pat Agent' }; // build step 7: the viewer's own header, read when a report is shown
 
 function fakes(over = {}) {
   const calls = [];
@@ -41,7 +43,8 @@ function fakes(over = {}) {
     trialOf: rec('trialOf', async () => ACTIVE),
     savedReports: rec('savedReports', async () => ROWS),
     openSavedReport: rec('openSavedReport', async (_u, id) => (id === R1 ? { ...ROWS[1], body: JSON.stringify(STORED) } : null)),
-    subjectOf: rec('subjectOf', async (c) => (c ? ADDR[c] ?? null : null)),
+    subjectOf: rec('subjectOf', async (c) => ({ address: c ? ADDR[c] ?? null : null, label: c ? LABEL[c] ?? null : null })),
+    headerOf: rec('headerOf', async () => HEADER),
     // everything that makes or charges a report: must never run for a list or an open
     geocode: never('geocode'), zipSupported: never('zipSupported'), radius: never('radius'), hydrate: never('hydrate'), ledger: never('ledger'),
     events: never('events'), health: never('health'), issue: never('issue'), storedReport: never('storedReport'), contextMatches: never('contextMatches'),
@@ -115,7 +118,7 @@ await ask(f.deps, { action: 'open', report_id: R1 });
 const afterOpen = names(f.calls);
 ok(MAKES.every((m) => !afterList.includes(m) && !afterOpen.includes(m)),
   '3a a list and an open reach neither the geocoder, the spatial read, the ledger, the credit rule nor the issue function (nothing can be made, charged or stored)', { afterList, afterOpen });
-ok(JSON.stringify(afterOpen.filter((x) => !['authenticate', 'isAdmin'].includes(x))) === JSON.stringify(['trialOf', 'openSavedReport', 'subjectOf']), '3b an open reads the trial, the one stored report and its address, in that order', afterOpen);
+ok(JSON.stringify(afterOpen.filter((x) => !['authenticate', 'isAdmin'].includes(x))) === JSON.stringify(['trialOf', 'openSavedReport', 'subjectOf', 'headerOf']), '3b an open reads the trial, the one stored report, its address and client label, and the viewer\'s own header, in that order', afterOpen);
 ok(f.calls.find((c) => c[0] === 'openSavedReport')[1] === UID && f.calls.find((c) => c[0] === 'openSavedReport')[2] === R1, '3c it asks for the signed-in person\'s own id and the id they sent');
 
 // ---- 4. what comes back -----------------------------------------------------------------------------------------------------------------------
@@ -132,10 +135,10 @@ ok(r.status === 200 && r.json.status === 'OK' && r.json.reopened === true && r.j
    && r.json.address === '742 Evergreen Terrace, Springfield, OR 97477' && JSON.stringify(r.json.report) === JSON.stringify(STORED) && r.json.coverage_state === 'COVERED',
   '4c an open returns the stored report as stored, flagged reopened and NOT charged, with its number and address', r.json);
 ok(r.json.render === undefined && r.json.credit === undefined && !r.text.includes(CTX1), '4d with no render block (it is measured from a live address and never stored), no credit decision and no handle');
-ok(JSON.stringify(Object.keys(r.json).sort()) === JSON.stringify(['address','charged','coverage_state','generated_at','number','reopened','report','report_id','status','stored','trial'].sort()), '4e exactly those fields', Object.keys(r.json).sort());
-f = fakes({ subjectOf: async () => null });
+ok(JSON.stringify(Object.keys(r.json).sort()) === JSON.stringify(['address','charged','client_label','coverage_state','generated_at','header','number','reopened','report','report_id','status','stored','trial'].sort()), '4e exactly those fields', Object.keys(r.json).sort());
+f = fakes({ subjectOf: async () => ({ address: null, label: null }) });
 r = await ask(f.deps, { action: 'open', report_id: R1 });
-ok(r.status === 200 && r.json.address === null && JSON.stringify(r.json.report) === JSON.stringify(STORED), '4f with the address purged the report is the same, and the address is null');
+ok(r.status === 200 && r.json.address === null && r.json.client_label === null && JSON.stringify(r.json.report) === JSON.stringify(STORED), '4f with the address and label purged the report is the same, and both are null');
 
 // ---- 5. not the caller's report ---------------------------------------------------------------------------------------------------------------
 f = fakes();
@@ -149,6 +152,7 @@ for (const [label, over, body] of [
   ['the list unreadable', { savedReports: async () => { throw new H.DataUnavailable('x'); } }, { action: 'list' }],
   ['the open unreadable', { openSavedReport: async () => { throw new H.DataUnavailable('x'); } }, { action: 'open', report_id: R1 }],
   ['the address unreadable', { subjectOf: async () => { throw new H.DataUnavailable('x'); } }, { action: 'list' }],
+  ['the header unreadable', { headerOf: async () => { throw new H.DataUnavailable('x'); } }, { action: 'open', report_id: R1 }],
   ['a stored report that is not JSON', { openSavedReport: async () => ({ ...ROWS[1], body: '{nope' }) }, { action: 'open', report_id: R1 }],
   ['a stored report that is not an object', { openSavedReport: async () => ({ ...ROWS[1], body: '7' }) }, { action: 'open', report_id: R1 }],
 ]) {
@@ -221,12 +225,15 @@ const mk = (c) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc
   subjectSeen.push(new URL(url).pathname + ' ' + init.body);
   return json(c);
 });
-ok((await mk([{ state: 'active', address: '1 Main St' }]).subjectOf(CTX1)) === '1 Main St' && JSON.stringify(subjectSeen) === JSON.stringify(['/rest/v1/rpc/report_private_context_read ' + JSON.stringify({ p_context: CTX1 })]),
-  '8f the address comes from the private layer\'s own reader, for the one context');
-ok((await mk([{ state: 'purged', address: null }]).subjectOf(CTX1)) === null && (await mk([{ state: 'purged', address: '1 Main St' }]).subjectOf(CTX1)) === null && (await mk([]).subjectOf(CTX1)) === null,
-  '8g a purged context, or one that is gone, gives null (an address is shown only while the layer keeps it)');
+ok(JSON.stringify(await mk([{ state: 'active', address: '1 Main St', label: '  Smith   buyers ' }]).subjectOf(CTX1)) === JSON.stringify({ address: '1 Main St', label: 'Smith buyers' }) && JSON.stringify(subjectSeen) === JSON.stringify(['/rest/v1/rpc/report_private_context_read ' + JSON.stringify({ p_context: CTX1 })]),
+  '8f the address and the label come from the private layer\'s own reader, for the one context (the label printed as clean one-line text)');
+const NOTHING = JSON.stringify({ address: null, label: null });
+ok(JSON.stringify(await mk([{ state: 'purged', address: null, label: null }]).subjectOf(CTX1)) === NOTHING && JSON.stringify(await mk([{ state: 'purged', address: '1 Main St', label: 'Smith buyers' }]).subjectOf(CTX1)) === NOTHING && JSON.stringify(await mk([]).subjectOf(CTX1)) === NOTHING,
+  '8g a purged context, or one that is gone, gives neither (an address and a label are shown only while the layer keeps them)');
+ok(JSON.stringify(await mk([{ state: 'active', address: '1 Main St', label: null }]).subjectOf(CTX1)) === JSON.stringify({ address: '1 Main St', label: null }) && JSON.stringify(await mk([{ state: 'active', address: '1 Main St', label: '   ' }]).subjectOf(CTX1)) === JSON.stringify({ address: '1 Main St', label: null }) && JSON.stringify(await mk([{ state: 'active', address: '1 Main St', label: 'x'.repeat(81) }]).subjectOf(CTX1)) === JSON.stringify({ address: '1 Main St', label: null }),
+  '8g2 no label, a blank label and a label over 80 characters are no label (never a shortened copy)');
 subjectSeen.length = 0;
-ok((await mk([]).subjectOf(null)) === null && subjectSeen.length === 0, '8h a report with no context asks nothing');
+ok(JSON.stringify(await mk([]).subjectOf(null)) === NOTHING && subjectSeen.length === 0, '8h a report with no context asks nothing');
 let thrown = null; try { await mk({ message: 'x' }).subjectOf(CTX1); } catch (e) { thrown = e; }
 ok(thrown instanceof DataUnavailable, '8i an unreadable private layer is a fault, not "no address"');
 

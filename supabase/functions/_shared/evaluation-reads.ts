@@ -42,6 +42,8 @@ export type Role = 'owner' | 'agent';
 export type SavedReport = { report_id: string; number: number; generated_at: string; private_context_id: string | null };
 /** One stored report, opened: the stored text exactly as it was stored. */
 export type OpenedReport = SavedReport & { body: string };
+/** The header a brokerage's member sees on a report (build step 7): presentation only, read when a report is shown and stored nowhere. */
+export type ReportHeader = { brokerage: string | null; agent: string | null };
 export type Redeemed = { role: Role; replayed: boolean };
 /** A new trial's owner invite, as the admin who created it is shown it: once, and never an id. */
 export type CreatedTrial = { invite_link: string; invite_expires_at: string };
@@ -52,6 +54,20 @@ export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const isTime = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
 /** What an admin asks for. A null seat limit or end date means none (D-L2, D-L3); the invite lives the database's default 14 days (D-L4). */
 export type NewTrial = { brokerageName: string; seatLimit: number | null; expiresAt: string | null };
+
+/**
+ * A name that will be PRINTED on a report (build step 7), as one line of plain text: line breaks, control and direction-changing
+ * characters become spaces, runs of spaces collapse, the ends are trimmed. A name that is empty, is not text or is longer than `max` is
+ * `null`, never a shortened copy: half a name on a report reads as a different name. The agent's name is the person's own wording, so
+ * this is the ONE place it is made safe to show (the page shows it as text, never as markup).
+ */
+export function cleanDisplayName(v: unknown, max: number): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
+  return s && Array.from(s).length <= max ? s : null;
+}
+export const AGENT_NAME_MAX = 80;
+export const BROKERAGE_NAME_MAX = 120;
 
 function savedRow(r: unknown): SavedReport {
   const x = r as Record<string, unknown> | null;
@@ -155,6 +171,22 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
         throw new DataUnavailable('shape');
       }
       return { ...savedRow(r), body: r.body };
+    },
+
+    /**
+     * The header a member's reports carry (build step 7): public.report_header_of, which reads the brokerage's name through the one
+     * membership resolver and the person's own name from their account. Both are cleaned here, once. A person with no standing gets
+     * `{ brokerage: null, agent: null }`. Nothing returned is stored by the caller: the header is read each time a report is shown.
+     */
+    async reportHeader(userId: string): Promise<ReportHeader> {
+      const { data, error } = await rpc('report_header_of', { p_user_id: userId });
+      if (error) throw new DataUnavailable('report_header_of');
+      if (!Array.isArray(data) || data.length > 1) throw new DataUnavailable('shape');
+      if (data.length === 0) return { brokerage: null, agent: null };
+      const r = data[0];
+      const text = (v: unknown) => v === null || typeof v === 'string';
+      if (!r || !text(r.brokerage_name) || !text(r.agent_name)) throw new DataUnavailable('shape');
+      return { brokerage: cleanDisplayName(r.brokerage_name, BROKERAGE_NAME_MAX), agent: cleanDisplayName(r.agent_name, AGENT_NAME_MAX) };
     },
 
     /**
