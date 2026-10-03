@@ -2381,7 +2381,26 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     that draws one of them and never resolves `HS.ready`; `gen_zip_pages.py` writes no document,
     sitemap entry or link for them (manifest: documents + withheld = registry). Nothing is deleted
     and `canonical_zip_registry` still holds 12,722. **To restore one, move it from `zips` to
-    `restored`**; `test/withheld-zip-pages.test.mjs` requires zips + restored = the Fix 4 class.
+    `restored`**; `test/withheld-zip-pages.test.mjs` requires zips + restored = the Fix 4 class
+    plus the unverified ZIPs below.
+  - ⏸️ **84684 AND 84685 ARE WITHHELD TOO, AS UNVERIFIED, NOT AS RETIRED (founder, 2026-10-03).** Same
+    list, same mechanism, no redirect. They are in `zips` and described under `unverified`
+    (`zip_status unverified`, `zip_type unknown`, not indexable, not in the sitemap). **The list holds
+    two groups and the notice wording differs**: the 47 read "listed as retired"; these two say we
+    could not confirm the ZIP is an active USPS ZIP. Neither is claimed retired, invalid,
+    decommissioned, active or geographic, and `source_class` / `reason` describe the 47 only.
+    - **Why:** USPS lookup was unreachable (`tools.usps.com` blocked from the sandbox); both are absent
+      from zipcodes 3.0.0 and Census 2010/2020 ZCTA. The names "West Mountain" / "Woodland Hills" are
+      registry labels from Census place points, not USPS assignments. Do not derive locality, county,
+      civic, map or related-ZIP content from them, and do not substitute 84651 (West Mountain's
+      mailing ZIP in web sources) or 84653 (Salem / Woodland Hills) for them.
+    - **Re-audit only after USPS or USPS City State Product verification.** Then move the ZIP from `zips`
+      to `restored` and set its page type from the verified ZIP type.
+    - `canonical_zip_registry` is untouched: 12,722 rows, both ZIPs present (read 2026-10-03).
+    - `scripts/verify-maps-rollout.mjs` no longer walks 84684 (it was the "hardest centroid" probe); no
+      ZIP was substituted. `lib/generated/gov-notice-coverage.json` still lists both (a delivery lookup,
+      never a page). `docs/maps-full-rollout-migration.sql` still carries the Census place points; they
+      are inert while the pages are withheld.
   - The class is decided only by `scripts/fix4_classify_no_boundary_zips.py`. Per-ZIP record:
     `docs/maps-coverage/fix4/no-boundary-zip-classification.csv`. Receipt:
     `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.
