@@ -11,7 +11,7 @@
 // test/zip-coverage.test.mjs runs all three over every entry).
 export function coverageMode(entry) {
   if (!entry) return 'standard';
-  if (entry.page_mode === 'retired') return 'retired';
+  if (entry.page_mode === 'retired' || entry.page_mode === 'unverified') return entry.page_mode;
   if (entry.page_mode === 'standard' && entry.map_coverage === 'zcta') return 'standard';
   if (entry.page_mode === 'specialized_zip') return 'specialized_zip';
   return 'verification_pending';

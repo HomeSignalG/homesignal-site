@@ -38,16 +38,29 @@ export function inviteLink(token: string): string {
 }
 
 export type Role = 'owner' | 'agent';
+/** One of a brokerage's stored reports, as the list shows it. The context handle is for the caller's own address read; it never leaves the report function. */
+export type SavedReport = { report_id: string; number: number; generated_at: string; private_context_id: string | null };
+/** One stored report, opened: the stored text exactly as it was stored. */
+export type OpenedReport = SavedReport & { body: string };
 export type Redeemed = { role: Role; replayed: boolean };
 /** A new trial's owner invite, as the admin who created it is shown it: once, and never an id. */
 export type CreatedTrial = { invite_link: string; invite_expires_at: string };
 /** An agent invite, as the owner who made it is shown it: once, and never an id (build step 5e). */
 export type CreatedInvite = { invite_link: string; invite_expires_at: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isTime = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
 /** What an admin asks for. A null seat limit or end date means none (D-L2, D-L3); the invite lives the database's default 14 days (D-L4). */
 export type NewTrial = { brokerageName: string; seatLimit: number | null; expiresAt: string | null };
+
+function savedRow(r: unknown): SavedReport {
+  const x = r as Record<string, unknown> | null;
+  if (!x || typeof x.report_id !== 'string' || !UUID.test(x.report_id) || !Number.isInteger(x.number) || !isTime(x.generated_at)
+      || !(x.private_context_id === null || (typeof x.private_context_id === 'string' && UUID.test(x.private_context_id)))) {
+    throw new DataUnavailable('shape');
+  }
+  return { report_id: x.report_id, number: x.number as number, generated_at: x.generated_at as string, private_context_id: x.private_context_id as string | null };
+}
 
 export function makeEvaluationReads(rpc: ServiceRpc) {
   return {
@@ -112,6 +125,36 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
       const r = data[0];
       if (data.length !== 1 || !r || (r.role !== 'owner' && r.role !== 'agent')) throw new DataUnavailable('shape');
       return r.role;
+    },
+
+    /**
+     * The brokerage's stored reports, newest first (build step 6): public.evaluation_reports_of, which reads the caller's own brokerage's
+     * ledger through the one membership resolver. A person with no standing gets an empty list. At most the evaluation's 20 reports exist.
+     */
+    async savedReports(userId: string): Promise<SavedReport[]> {
+      const { data, error } = await rpc('evaluation_reports_of', { p_user_id: userId });
+      if (error) throw new DataUnavailable('evaluation_reports_of');
+      if (!Array.isArray(data) || data.length > 1000) throw new DataUnavailable('shape');
+      return data.map(savedRow);
+    },
+
+    /**
+     * ONE stored report by its permanent id (build step 6): public.evaluation_report_open. Null when the id is not one of the caller's own
+     * brokerage's reports (another brokerage's, unknown, or the caller has no standing): the three cannot be told apart. The text is the
+     * stored text, unchanged; this call writes nothing and can charge nothing.
+     */
+    async openSavedReport(userId: string, reportId: string): Promise<OpenedReport | null> {
+      if (!UUID.test(reportId)) return null;
+      const { data, error } = await rpc('evaluation_report_open', { p_user_id: userId, p_report_id: reportId });
+      if (error) throw new DataUnavailable('evaluation_report_open');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const r = data[0];
+      // the database was asked for ONE id: a different id, or a second row, is a fault, never a report to show
+      if (data.length !== 1 || !r || typeof r.report_id !== 'string' || r.report_id.toLowerCase() !== reportId.toLowerCase() || typeof r.body !== 'string') {
+        throw new DataUnavailable('shape');
+      }
+      return { ...savedRow(r), body: r.body };
     },
 
     /**

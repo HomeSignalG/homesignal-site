@@ -253,13 +253,39 @@ console.log('§7 the two calls to action');
   ok(h.extra.focused === 'homeQuery', 'and the cursor is in the address box', h.extra);
 }
 
+// ── §9 ZIPs whose existence is unverified (84684, 84685) ─────────────────────────────────
+console.log('§9 an unverified ZIP has no page: a noindex notice that says only that');
+for (const z of ['84684', '84685']) {
+  for (const path of [`/community.html?zip=${z}`, `/homesignalmap.html?zip=${z}`, `/alerts.html?zip=${z}`, `/homesignalmap.html?zip=${z}&lat=40.3&lng=-111.8&radius=2`]) {
+    const r = await open(path, { keep: async (page) => ({
+      cta: await page.getAttribute('#zcovAddress', 'href'),
+      nearby: await page.evaluate(() => !!document.getElementById('zcovNearby')),
+      h1: await page.evaluate(() => (document.querySelector('h1') || {}).textContent || ''),
+      links: await page.evaluate(() => Array.from(document.querySelectorAll('#hs-slot a')).map((a) => a.getAttribute('href'))) }) });
+    ok(r.retiredPage === 'unverified' && r.panels === 1 && r.mode === 'unverified', `${path} → the unverified notice`, { page: r.retiredPage, mode: r.mode });
+    ok(r.extra.h1 === `ZIP ${z} is not available`, `${path} → heading "ZIP ${z} is not available"`, r.extra.h1);
+    ok(r.panelText.includes(`We couldn't confirm that ZIP code ${z} is an active U.S. Postal Service ZIP code, so we don't have a page for it. Check the number, or search by city or address to find your community.`),
+      `${path} → the founder-approved sentence, whole`, r.panelText);
+    ok(/noindex/.test(r.robots || '') && /nofollow/.test(r.robots || '') && r.canonical === null, `${path} → noindex, nofollow, no canonical`, { robots: r.robots, canonical: r.canonical });
+    ok(r.title === `ZIP ${z} is not available — HomeSignal`, `${path} → page title`, r.title);
+    ok(r.extra.cta === '/' && r.extra.nearby === false && r.extra.links.every((h) => h === '/'), `${path} → one link, to the home page; no nearby-ZIP link, no redirect to another place`, r.extra);
+    ok(!r.mapFrame && !r.leaflet && !r.strip, `${path} → no map, no tiles`);
+    ok(!/retired|invalid|decommission|inactive|no longer in use/i.test(r.bodyText), `${path} → never called retired, invalid, decommissioned or inactive`);
+    ok(r.sessionZip !== z, `${path} → the ZIP is not carried to the next page`, r.sessionZip);
+  }
+}
+for (const z of ['84651', '84653']) {
+  const r = await open(`/homesignalmap.html?zip=${z}`);
+  ok(r.panels === 0 && r.retiredPage === false, `${z} (the real neighbour) → drawn normally, never the notice`, { panels: r.panels });
+}
+
 // ── §8 what the browser actually receives ───────────────────────────────────────────────
 console.log('§8 the coverage JSON the browser fetches carries no internal provenance');
 {
   const res = await fetch(base + '/lib/zip-coverage.json');
   const raw = await res.text();
   const j = JSON.parse(raw);
-  ok(res.status === 200 && Object.keys(j.zips).length === 47, 'the served model lists the 47 ZIPs');
+  ok(res.status === 200 && Object.keys(j.zips).length === 49, 'the served model lists the 47 coverage-limited ZIPs and the 2 unverified ones');
   ok(!/third_party_flag|decommission|verification_notes|postal_status_source|postal_status_verified_at/i.test(raw), 'it contains none of third_party_flag, decommissioned, verification_notes, postal_status_source, postal_status_verified_at');
   ok(Object.values(j.zips).every((e) => Object.keys(e).join() === 'zip_code,zip_type,map_coverage,page_mode'), 'every entry is exactly zip_code, zip_type, map_coverage, page_mode');
 }

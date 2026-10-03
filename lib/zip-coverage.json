@@ -23,6 +23,14 @@
    "page_title": "{zip} ZIP Code Coverage | HomeSignal",
    "meta_description": "Coverage information for ZIP code {zip}. This ZIP does not currently have a Census-defined map area. Search an address to see development activity nearby."
   },
+  "unverified": {
+   "title": "ZIP {zip} is not available",
+   "body": [
+    "We couldn't confirm that ZIP code {zip} is an active U.S. Postal Service ZIP code, so we don't have a page for it. Check the number, or search by city or address to find your community."
+   ],
+   "primary_cta": "Look up another ZIP code or address →",
+   "page_title": "ZIP {zip} is not available — HomeSignal"
+  },
   "retired": {
    "title": "This ZIP code is no longer in use",
    "body": [
@@ -263,6 +271,18 @@
    "zip_type": "po_box",
    "map_coverage": "address_only",
    "page_mode": "specialized_zip"
+  },
+  "84684": {
+   "zip_code": "84684",
+   "zip_type": "other",
+   "map_coverage": "none",
+   "page_mode": "unverified"
+  },
+  "84685": {
+   "zip_code": "84685",
+   "zip_type": "other",
+   "map_coverage": "none",
+   "page_mode": "unverified"
   },
   "84717": {
    "zip_code": "84717",

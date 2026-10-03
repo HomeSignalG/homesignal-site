@@ -45,11 +45,15 @@ CSV_REL = "docs/maps-coverage/fix4/no-boundary-zip-classification.csv"
 OUT_REL = "lib/zip-coverage.json"                       # PUBLIC, shipped to browsers
 INTERNAL_REL = "docs/maps-coverage/fix4/zip-coverage-internal.json"   # INTERNAL, never deployed
 SOURCE_CLASS = "DECOMMISSIONED_IN_DATASET"
+# ZIPs whose very existence is unverified (founder, 2026-10-03: 84684 and 84685). They get NO page at all.
+UNVERIFIED_CLASS = "NOT_IN_ZIP_DATASET"
 
 POSTAL_STATUS = ("unverified", "active", "retired")
 POSTAL_SOURCE = ("third_party_flag", "usps_verified", "manual_review")
 MAP_COVERAGE = ("zcta", "address_only", "none")
-PAGE_MODE = ("standard", "specialized_zip", "verification_pending", "retired")
+PAGE_MODE = ("standard", "specialized_zip", "verification_pending", "retired", "unverified")
+# Modes that get NO /community/<zip>/ document, no sitemap entry and no sibling/city/project link.
+NO_PAGE_MODES = ("retired", "unverified")
 # The ONLY per-ZIP fields the browser receives, and the only top-level keys of the public file.
 PUBLIC_FIELDS = ("zip_code", "zip_type", "map_coverage", "page_mode")
 PUBLIC_TOP_KEYS = ("_doc", "copy", "zips")
@@ -85,6 +89,17 @@ COPY = {
         "secondary_cta": "Search nearby ZIPs",
         "page_title": "{zip} ZIP Code Coverage | HomeSignal",
         "meta_description": "Coverage information for ZIP code {zip}. This ZIP does not currently have a Census-defined map area. Search an address to see development activity nearby.",
+    },
+    # Not a coverage panel: the notice a ZIP shows when its existence could not be confirmed
+    # (founder, 2026-10-03, carried over word for word). It says only that; it never calls the ZIP
+    # retired, invalid or decommissioned, and it links nowhere but the home page.
+    "unverified": {
+        "title": "ZIP {zip} is not available",
+        "body": [
+            "We couldn't confirm that ZIP code {zip} is an active U.S. Postal Service ZIP code, so we don't have a page for it. Check the number, or search by city or address to find your community.",
+        ],
+        "primary_cta": "Look up another ZIP code or address →",
+        "page_title": "ZIP {zip} is not available — HomeSignal",
     },
     "retired": {
         "title": "This ZIP code is no longer in use",
@@ -130,6 +145,31 @@ def entry_from_row(r):
     }
 
 
+def entry_from_unverified_row(r):
+    """A ZIP whose existence is unverified (class NOT_IN_ZIP_DATASET). No page is built for it."""
+    return {
+        "zip_code": r["zip"],
+        "city": "",
+        "state": r["state"],
+        "county": r["county"],
+        "postal_status": "unverified",
+        "postal_status_source": "manual_review",
+        "postal_status_verified_at": None,
+        "zip_type": "other",
+        "zcta_2010_status": _census(r["census_zcta_2010"]),
+        "zcta_2020_status": _census(r["census_zcta_2020"]),
+        "map_coverage": "none",
+        "page_mode": "unverified",
+        "verification_notes": (
+            f"USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and "
+            f"Census 2010/2020 ZCTA datasets. Registry label '{r['page_name']}' is unsourced and must not be "
+            f"treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may "
+            f"be derived. Re-audit only after USPS or USPS City State Product verification. Source: {CSV_REL} "
+            f"(class {UNVERIFIED_CLASS})."
+        ),
+    }
+
+
 def validate(doc):
     """The INTERNAL record's invariants. Raises ValueError naming the offence."""
     zips = doc["zips"]
@@ -147,6 +187,8 @@ def validate(doc):
             raise ValueError(f"{z}: retired requires postal_status_source=usps_verified")
         if e["postal_status"] == "retired" and not e.get("postal_status_verified_at"):
             raise ValueError(f"{z}: retired requires postal_status_verified_at")
+        if e["page_mode"] == "unverified" and e["postal_status"] != "unverified":
+            raise ValueError(f"{z}: page_mode unverified requires postal_status unverified")
         if (e["postal_status"] == "retired") != (e["page_mode"] == "retired"):
             raise ValueError(f"{z}: page_mode retired and postal_status retired must go together")
         if e["page_mode"] == "standard" and e["map_coverage"] != "zcta":
@@ -192,7 +234,10 @@ def build():
     with open(os.path.join(ROOT, CSV_REL), "rb") as f:
         raw = f.read()
     rows = [r for r in csv.DictReader(raw.decode("utf-8").splitlines()) if r["class"] == SOURCE_CLASS]
-    zips = {r["zip"]: entry_from_row(r) for r in sorted(rows, key=lambda r: r["zip"])}
+    zips = {r["zip"]: entry_from_row(r) for r in rows}
+    urows = [r for r in csv.DictReader(raw.decode("utf-8").splitlines()) if r["class"] == UNVERIFIED_CLASS]
+    zips.update({r["zip"]: entry_from_unverified_row(r) for r in urows})
+    zips = dict(sorted(zips.items()))
     doc = {
         "_doc": ("INTERNAL ZIP coverage record (founder, 2026-10-03). Never deployed: docs/ is outside the "
                  "Pages artifact. Computed by scripts/build_zip_coverage.py from the Fix 4 classification "
@@ -201,7 +246,7 @@ def build():
                  "makes a ZIP retired: retired needs postal_status_source usps_verified."),
         "decided": "2026-10-03",
         "source": CSV_REL,
-        "source_class": SOURCE_CLASS,
+        "source_classes": [SOURCE_CLASS, UNVERIFIED_CLASS],
         "source_md5": hashlib.md5(raw).hexdigest(),
         "copy": COPY,
         "zips": zips,

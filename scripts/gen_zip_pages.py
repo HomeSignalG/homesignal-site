@@ -140,8 +140,8 @@ def coverage_mode(entry):
     made-up boundary."""
     if entry is None:
         return "standard"
-    if entry.get("page_mode") == "retired":
-        return "retired"
+    if entry.get("page_mode") in ("retired", "unverified"):
+        return entry["page_mode"]
     if entry.get("page_mode") == "standard" and entry.get("map_coverage") == "zcta":
         return "standard"
     if entry.get("page_mode") == "specialized_zip":
@@ -1002,7 +1002,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=c6b8d60b"></script>\n'
+        '<script src="/shell.js?v=d066a57f"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=67435c86"></script>\n'
         "</body>\n</html>\n")
@@ -1810,24 +1810,27 @@ def main():
     # lib/zip-coverage.json names the ZIPs with no Census-drawn area. Every one of them keeps a
     # document, a canonical URL and its usual sitemap rule: no map and no ZIP-wide development
     # claim, a coverage panel instead. Only a ZIP whose retirement the internal record shows as
-    # USPS-verified (page_mode retired) gets no document - none today. Against production every listed ZIP must be
+    # USPS-verified (page_mode retired, none today) or whose existence is unverified (page_mode
+    # unverified: 84684, 84685, founder 2026-10-03) gets no document. Against production every listed ZIP must be
     # canonical, or a typo would change nothing while the build reported success (a fixture is a
     # small slice of the registry, so it is only intersected).
     coverage = load_zip_coverage(a.zip_coverage)
     modes = {z: coverage_mode(e) for z, e in coverage["zips"].items()}
     nonstandard = {z for z, m in modes.items() if m != "standard"}
     retired = {z for z, m in modes.items() if m == "retired"}
+    unverified = {z for z, m in modes.items() if m == "unverified"}
+    nodoc = retired | unverified     # no document, no sitemap entry, no sibling/city/project link
     stray = sorted(set(coverage["zips"]) - set(zips))
     if stray and not a.fixture:
         sys.exit(f"ERROR: coverage ZIP(s) not in the canonical registry: {stray}")
     registry_n = len(zips)
-    zips = [z for z in zips if z not in retired]
+    zips = [z for z in zips if z not in nodoc]
     d["zips"] = zips
     present = {z: m for z, m in modes.items() if z in set(zips) and m != "standard"}
     counts = {m: sum(1 for x in present.values() if x == m) for m in ("specialized_zip", "verification_pending")}
     print(f"zip coverage   : {len(coverage['zips'])} modelled; documents for {len(present)} "
           f"({counts['specialized_zip']} specialized_zip, {counts['verification_pending']} verification_pending); "
-          f"{len(retired)} retired; building {len(zips)} of {registry_n}")
+          f"{len(retired)} retired, {len(unverified)} unverified (no page); building {len(zips)} of {registry_n}")
     # City and project pages list the ZIPs they cover. A ZIP with no Census-drawn area has no
     # ZIP-wide development records, so it leaves those lists, and it may only appear there as a
     # listed or held ZIP: a city that COUNTS such a ZIP as Rule D, or a project whose only ZIP is
@@ -1906,6 +1909,7 @@ def main():
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
                "canonical_registry": registry_n, "retired_zips": sorted(retired),
+               "unverified_zips": sorted(unverified),
                "coverage_zips": {z: m for z, m in sorted(present.items())},
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,

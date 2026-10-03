@@ -215,14 +215,16 @@ jobs:
           assert not os.path.exists('_site/docs'), 'docs/ (the internal coverage record) must not ship'
           missing = [z for z in man['coverage_zips'] if not os.path.exists(f'_site/community/{z}/index.html')]
           assert not missing, f'coverage ZIPs with no document: {missing}'
-          retired = man['retired_zips']
+          # ZIPs with NO page: USPS-verified retired (none today) and unverified (84684, 84685; founder 2026-10-03)
+          retired = man['retired_zips'] + man['unverified_zips']
+          assert sorted(man['unverified_zips']) == ['84684', '84685'], f"unverified ZIPs changed: {man['unverified_zips']}"
           present = [z for z in retired if os.path.exists(f'_site/community/{z}')]
-          assert not present, f'retired ZIP documents were written: {present}'
+          assert not present, f'documents were written for ZIPs with no page: {present}'
           sm = open('_site/sitemap.xml', encoding='utf-8').read()
           listed = [z for z in retired if f'/community/{z}/' in sm or f'zip={z}' in sm]
-          assert not listed, f'retired ZIPs are in the sitemap: {listed}'
+          assert not listed, f'ZIPs with no page are in the sitemap: {listed}'
           assert man['documents'] + len(retired) == man['canonical_registry'], \
-              f"documents {man['documents']} + retired {len(retired)} != registry {man['canonical_registry']}"
+              f"documents {man['documents']} + no-page {len(retired)} != registry {man['canonical_registry']}"
           print(f"ZIP coverage: {len(man['coverage_zips'])} limited-coverage ZIPs all have a document; "
                 f"{len(retired)} retired; {man['documents']} documents + {len(retired)} = {man['canonical_registry']}")
           PY

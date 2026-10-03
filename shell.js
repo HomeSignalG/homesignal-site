@@ -364,11 +364,13 @@
   //   verification_pending the same, worded as "being verified"
   //   retired              a neutral unavailable page; the build writes it only for a ZIP whose
   //                        retirement the internal record shows as USPS-verified
+  //   unverified           a ZIP whose existence could not be confirmed (founder, 2026-10-03: 84684,
+  //                        84685): no page, a noindex notice that says only that, no redirect
   // Anything we cannot place fails SAFE to verification_pending, never to a made-up boundary.
   HS.ZIP_COVERAGE_URL = 'lib/zip-coverage.json';
   HS.zipCoverageMode = function (entry) {
     if (!entry) return 'standard';
-    if (entry.page_mode === 'retired') return 'retired';
+    if (entry.page_mode === 'retired' || entry.page_mode === 'unverified') return entry.page_mode;
     if (entry.page_mode === 'standard' && entry.map_coverage === 'zcta') return 'standard';
     if (entry.page_mode === 'specialized_zip') return 'specialized_zip';
     return 'verification_pending';
@@ -421,16 +423,21 @@
     const c = hit && hit.copy; if (!c) return '';
     const z = hit.zip;
     const sub = function (t) { return String(t).split('{zip}').join(z); };
+    // An unverified ZIP has no page, so its notice carries the heading itself, offers one link (the
+    // home page, no ZIP carried) and never points at that ZIP's own document or its neighbours.
+    const unv = hit.mode === 'unverified';
     return '<section class="zcov" id="hs-zip-coverage" data-zip-coverage="' + escHtml(hit.mode) + '" data-zip="' + escHtml(z) + '">'
-      + '<h2>' + escHtml(sub(c.title)) + '</h2>'
+      + (unv ? '<h1>' : '<h2>') + escHtml(sub(c.title)) + (unv ? '</h1>' : '</h2>')
       + c.body.map(function (p) { return '<p style="margin:10px 0 0">' + escHtml(sub(p)) + '</p>'; }).join('')
       + '<p class="zcov-cta" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
-      + '<a class="inlinebtn" id="zcovAddress" style="text-decoration:none" href="/?near=' + encodeURIComponent(z) + '#homeSearch">' + escHtml(c.primary_cta) + '</a>'
-      + '<a class="inlinebtn" id="zcovNearby" style="text-decoration:none" href="/community/' + encodeURIComponent(z) + '/#zip-nearby">' + escHtml(c.secondary_cta) + '</a>'
+      + '<a class="inlinebtn" id="zcovAddress" style="text-decoration:none" href="' + (unv ? '/' : '/?near=' + encodeURIComponent(z) + '#homeSearch') + '">' + escHtml(c.primary_cta) + '</a>'
+      + (unv || !c.secondary_cta ? '' : '<a class="inlinebtn" id="zcovNearby" style="text-decoration:none" href="/community/' + encodeURIComponent(z) + '/#zip-nearby">' + escHtml(c.secondary_cta) + '</a>')
       + '</p></section>';
   };
   // The browser's model carries no place name (only page behavior), so the heading is the ZIP alone.
   HS.zipCoverageLabel = function () { return ''; };
+  // Modes with NO page of their own: the notice replaces the page everywhere the ZIP is drawn.
+  HS.zipCoverageNoPage = function (mode) { return mode === 'retired' || mode === 'unverified'; };
   // A list that cannot be read fails OPEN: the page draws as a standard page, whose own "this ZIP
   // has no mapped area" sentence is already honest for a ZIP with no boundary. One small
   // same-origin file must not take every ZIP page down. The build still writes the same documents.
@@ -455,16 +462,18 @@
     SS.set('viewZip', null);   // never carry this ZIP onto the next page
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
-    robots.content = hit.mode === 'retired' ? 'noindex, nofollow' : 'noindex, follow';
+    robots.content = HS.zipCoverageNoPage(hit.mode) ? 'noindex, nofollow' : 'noindex, follow';
     document.querySelectorAll('link[rel="canonical"]').forEach(function (l) { l.remove(); });
-    if (hit.mode !== 'retired') {
+    if (!HS.zipCoverageNoPage(hit.mode)) {
       const cl = document.createElement('link'); cl.rel = 'canonical';
       cl.href = '/community/' + encodeURIComponent(hit.zip) + '/'; document.head.appendChild(cl);
     }
     document.title = String(hit.copy.page_title).split('{zip}').join(hit.zip);
     const label = HS.zipCoverageLabel(hit);
+    // The notice for a ZIP that could not be confirmed carries its own heading (the founder's words);
+    // every other mode shows the ZIP as the heading and the panel below it.
     const html = '<div class="page" id="hs-zip-coverage-page" data-zip-coverage-page="' + escHtml(hit.mode) + '"><div class="ph">'
-      + '<div class="eyebrow">ZIP Codes</div><h1>' + escHtml(hit.zip) + (label ? ' · ' + escHtml(label) : '') + '</h1>'
+      + '<div class="eyebrow">ZIP Codes</div>' + (hit.mode === 'unverified' ? '' : '<h1>' + escHtml(hit.zip) + (label ? ' · ' + escHtml(label) : '') + '</h1>')
       + HS.zipCoveragePanelHTML(hit)
       + '</div></div>';
     const slot = $('hs-slot');
@@ -2617,7 +2626,7 @@
     await injectShell();
     // A ZIP with no standard page (lib/zip-coverage.json): a map page shows the coverage panel
     // and stops here, so no map or development code runs; the community page draws the same
-    // panel itself (lib/community-page.js reads HS.zipCoverageDoc). A retired ZIP stops anywhere.
+    // panel itself (lib/community-page.js reads HS.zipCoverageDoc). A retired or unverified ZIP stops anywhere.
     // On a map page only the URL's ?zip= decides, so an address search (lat/lng, addr) near one of
     // these ZIPs is never replaced: addresses are searched as addresses, never as ZIP geography.
     HS.zipCoverageDoc = await _zipCoverageP;
@@ -2631,7 +2640,7 @@
       viewedZip: kind === 'map' ? null : state.zip,
       onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)
     });
-    if (covHit && (covHit.mode === 'retired' || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
+    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();

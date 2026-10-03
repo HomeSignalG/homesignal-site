@@ -80,7 +80,8 @@ Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. 
   See receipt §5.
 - 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
   - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
-    established);
+    established) — ⏸️ **pages WITHHELD 2026-10-03 as UNVERIFIED** (not retired), now `page_mode unverified` in
+    the coverage model; re-audit only after USPS or USPS City State Product verification;
   - the 47 ZIPs the dataset flags as decommissioned — ✅ **BACK ON THE SITE 2026-10-03 as
     coverage-limited pages** (founder: the flag is third-party, not USPS; no ZCTA is not "inactive").
     `docs/maps-coverage/fix4/zip-coverage-internal.json` (computed from the Fix 4 record, never deployed)

@@ -96,8 +96,11 @@ const SHARE_SQL = 'docs/report-share.sql';
 const EVALUATION_SQL = 'docs/evaluation-entitlement.sql';
 // Build step 5b: the report function reads back ONE stored body by id, when a retried trial key returns the first report (3e).
 const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer and the report function\'s replay read; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
+// Build step 6: the two READ-ONLY saved-report functions join the ledger to this table to list a brokerage's reports and to open one by id.
+// They write nothing (STABLE, no DML), which test/saved-reports-structure.test.mjs pins.
+const SAVED_SQL = 'docs/saved-reports.sql';
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
 {
   const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);

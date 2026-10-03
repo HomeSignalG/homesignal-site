@@ -153,13 +153,17 @@ ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-sn
   const t = code(REPORT_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
   const fn = (t.match(/async contextMatches\(contextId, address\) \{[\s\S]*?\n    \},/) || [''])[0];
-  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read"]' && fn.includes('report_private_context_read')
+  // build step 6 adds the SECOND reader in this file: subjectOf, which returns the address a stored report was made for to a member of the
+  // brokerage that made it, and only while the layer still holds it ('active'). Everything else about the first reader is unchanged.
+  const subj = (t.match(/async subjectOf\(contextId\) \{[\s\S]*?\n    \},/) || [''])[0];
+  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read","report_private_context_read"]' && fn.includes('report_private_context_read')
+     && subj.includes('report_private_context_read') && /c\.state === 'active'/.test(subj) && /if \(!contextId\) return null;/.test(subj)
      && [...fn.matchAll(/return ([^;]+);/g)].map((m) => m[1]).every((r) => /^'unknown'$|^norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch'$/.test(r))
      && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t),
-    '5c4: the report function\'s data layer names the private layer once, the read function inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares (control: it does name it)', names);
+    '5c4: the report function\'s data layer names the private layer twice, both times the read function: inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares, and inside subjectOf, which returns the address only while the layer holds it (control: it does name it)', names);
 }
 ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).join() === REPORT_DATA,
-  '5d: one caller of the function that returns the private values: the report function\'s replay check, which compares and returns no value');
+  '5d: one FILE calls the function that returns the private values: the report function\'s data layer, for the replay check (compares, returns no value) and, from build step 6, for a saved report\'s own address (subjectOf, shown to its own brokerage while the layer holds it)');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),
   '5e: THIS file arms no schedule and makes no network call — the purge batch is scheduled only by docs/report-private-context-purge-schedule.sql, a separate file with its own go and its own proof');
 

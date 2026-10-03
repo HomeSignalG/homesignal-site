@@ -2,7 +2,10 @@
  "_doc": "INTERNAL ZIP coverage record (founder, 2026-10-03). Never deployed: docs/ is outside the Pages artifact. Computed by scripts/build_zip_coverage.py from the Fix 4 classification record; do not hand-edit. The browser's file, lib/zip-coverage.json, is derived from this one and carries none of the provenance below. A third-party 'decommissioned' flag never makes a ZIP retired: retired needs postal_status_source usps_verified.",
  "decided": "2026-10-03",
  "source": "docs/maps-coverage/fix4/no-boundary-zip-classification.csv",
- "source_class": "DECOMMISSIONED_IN_DATASET",
+ "source_classes": [
+  "DECOMMISSIONED_IN_DATASET",
+  "NOT_IN_ZIP_DATASET"
+ ],
  "source_md5": "549caaa08d4a49522d54fa98d95533e9",
  "copy": {
   "specialized_zip": {
@@ -26,6 +29,14 @@
    "secondary_cta": "Search nearby ZIPs",
    "page_title": "{zip} ZIP Code Coverage | HomeSignal",
    "meta_description": "Coverage information for ZIP code {zip}. This ZIP does not currently have a Census-defined map area. Search an address to see development activity nearby."
+  },
+  "unverified": {
+   "title": "ZIP {zip} is not available",
+   "body": [
+    "We couldn't confirm that ZIP code {zip} is an active U.S. Postal Service ZIP code, so we don't have a page for it. Check the number, or search by city or address to find your community."
+   ],
+   "primary_cta": "Look up another ZIP code or address →",
+   "page_title": "ZIP {zip} is not available — HomeSignal"
   },
   "retired": {
    "title": "This ZIP code is no longer in use",
@@ -609,6 +620,36 @@
    "map_coverage": "address_only",
    "page_mode": "specialized_zip",
    "verification_notes": "Flagged decommissioned by the pinned ZIP dataset (zipcodes 3.0.0, data from unitedstateszipcodes.org); NOT confirmed with USPS. Dataset type PO BOX; Census ZCTA 2010 absent, 2020 absent. Source: docs/maps-coverage/fix4/no-boundary-zip-classification.csv."
+  },
+  "84684": {
+   "zip_code": "84684",
+   "city": "",
+   "state": "UT",
+   "county": "Utah",
+   "postal_status": "unverified",
+   "postal_status_source": "manual_review",
+   "postal_status_verified_at": null,
+   "zip_type": "other",
+   "zcta_2010_status": "absent",
+   "zcta_2020_status": "absent",
+   "map_coverage": "none",
+   "page_mode": "unverified",
+   "verification_notes": "USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and Census 2010/2020 ZCTA datasets. Registry label 'West Mountain' is unsourced and must not be treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may be derived. Re-audit only after USPS or USPS City State Product verification. Source: docs/maps-coverage/fix4/no-boundary-zip-classification.csv (class NOT_IN_ZIP_DATASET)."
+  },
+  "84685": {
+   "zip_code": "84685",
+   "city": "",
+   "state": "UT",
+   "county": "Utah",
+   "postal_status": "unverified",
+   "postal_status_source": "manual_review",
+   "postal_status_verified_at": null,
+   "zip_type": "other",
+   "zcta_2010_status": "absent",
+   "zcta_2020_status": "absent",
+   "map_coverage": "none",
+   "page_mode": "unverified",
+   "verification_notes": "USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and Census 2010/2020 ZCTA datasets. Registry label 'Woodland Hills (84685)' is unsourced and must not be treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may be derived. Re-audit only after USPS or USPS City State Product verification. Source: docs/maps-coverage/fix4/no-boundary-zip-classification.csv (class NOT_IN_ZIP_DATASET)."
   },
   "84717": {
    "zip_code": "84717",

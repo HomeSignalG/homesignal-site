@@ -15,12 +15,13 @@
 //   §7 nothing left of the withhold mechanism; nothing visitor-facing says retired/decommissioned
 //   §8 the developer-only report (reads the INTERNAL record)
 //   §9 the PUBLIC model carries page behavior only: no provenance, no notes, no vendor detail
+//   §10 84684 and 84685 (existence unverified): no page, one mechanism with the 47
 //
 // TWO FILES (founder, 2026-10-03): docs/maps-coverage/fix4/zip-coverage-internal.json is the full,
 // auditable record and is never deployed; lib/zip-coverage.json is what browsers receive.
 //
 // Run: node test/zip-coverage.test.mjs
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -41,7 +42,9 @@ const doc = JSON.parse(read('lib/zip-coverage.json'));          // PUBLIC: what 
 const internal = JSON.parse(read(INTERNAL));                    // INTERNAL: full provenance
 const PUB = doc.zips;
 const Z = internal.zips;
-const ZIPS = Object.keys(Z).sort();
+const ALL = Object.keys(Z).sort();                                   // every modelled ZIP
+const UNV = ALL.filter((z) => Z[z].page_mode === 'unverified');       // no page at all (84684, 84685)
+const ZIPS = ALL.filter((z) => !UNV.includes(z));                    // the 47 coverage-limited pages
 
 // ── §1 the model ────────────────────────────────────────────────────────────────────────
 console.log('§1 the model is computed from the classification record');
@@ -126,7 +129,7 @@ const HS = {}; new Function('HS', fnSrc)(HS);
 const live = await import('../scripts/lib/zip-coverage-live.mjs');
 const cases = [...Object.values(PUB), undefined,
   { page_mode: 'standard', map_coverage: 'zcta' }, { page_mode: 'standard', map_coverage: 'address_only' },
-  { page_mode: 'retired' }, { page_mode: 'specialized_zip', map_coverage: 'address_only' },
+  { page_mode: 'retired' }, { page_mode: 'unverified' }, { page_mode: 'specialized_zip', map_coverage: 'address_only' },
   { page_mode: 'mystery', map_coverage: 'none' }, {}];
 const pyModes = JSON.parse(py(['-c', 'import sys,json; sys.path.insert(0,"scripts"); import gen_zip_pages as g; print(json.dumps([g.coverage_mode(e) for e in json.loads(sys.argv[1])]))',
   JSON.stringify(cases.map((c) => c ?? null))]).stdout);
@@ -266,7 +269,7 @@ ok(/usps_verified/.test(read('scripts/build_zip_coverage.py')) && /retired requi
 // the sitemap generator reads the same model
 {
   const r = py(['-c', 'import sys; sys.path.insert(0,"scripts"); import gen_sitemap as g; r,l=g.zip_coverage(); print(len(r), len(l))']);
-  ok(r.stdout.trim() === '0 47', '7g gen_sitemap.py: 0 retired, 47 coverage-limited (their map development URL is not advertised)', r.stdout + r.stderr);
+  ok(r.stdout.trim() === '2 49', '7g gen_sitemap.py: 2 no-page ZIPs (84684, 84685), 49 coverage-limited (their map development URL is not advertised)', r.stdout + r.stderr);
 }
 // shipped in the artifact, and workflows watch it
 {
@@ -304,11 +307,11 @@ console.log('§9 the browser-delivered model has no provenance, no notes and no 
   ok(FORBID.every((f) => !pubRaw.toLowerCase().includes(f)), '9a lib/zip-coverage.json contains none of the forbidden strings', FORBID.filter((f) => pubRaw.toLowerCase().includes(f)));
   ok(!/decommission|vendor|zipcodes\s*3|third[ _-]?party/i.test(pubRaw), '9b ...nor any text that says or implies "decommissioned", a vendor, or a third party');
   ok(JSON.stringify(Object.keys(doc)) === JSON.stringify(['_doc', 'copy', 'zips']), '9c the public file has exactly three top-level keys: _doc, copy, zips', Object.keys(doc));
-  ok(ZIPS.every((z) => JSON.stringify(Object.keys(PUB[z])) === JSON.stringify(['zip_code', 'zip_type', 'map_coverage', 'page_mode'])),
+  ok(ALL.every((z) => JSON.stringify(Object.keys(PUB[z])) === JSON.stringify(['zip_code', 'zip_type', 'map_coverage', 'page_mode'])),
     '9d every public entry is exactly zip_code, zip_type, map_coverage, page_mode');
-  ok(JSON.stringify(Object.keys(PUB).sort()) === JSON.stringify(ZIPS), '9e the public file covers the same 47 ZIPs as the internal record');
+  ok(JSON.stringify(Object.keys(PUB).sort()) === JSON.stringify(ALL), '9e the public file covers the same 49 ZIPs as the internal record');
   ok(ZIPS.every((z) => ['postal_status', 'postal_status_source', 'postal_status_verified_at', 'verification_notes', 'zcta_2010_status', 'zcta_2020_status'].every((k) => k in Z[z])
-    && Z[z].postal_status_source === 'third_party_flag' && /NOT confirmed with USPS/.test(Z[z].verification_notes)),
+    && Z[z].postal_status_source === 'third_party_flag' && /NOT confirmed with USPS/.test(Z[z].verification_notes)) && UNV.every((z) => /USPS lookup could not be performed/.test(Z[z].verification_notes)),
     '9f the full provenance is still auditable in the internal record');
   ok(!existsSync(join(root, 'lib', 'zip-coverage-internal.json')) && !/lib\/|\.\.\//.test(INTERNAL), '9g the internal record lives under docs/, not lib/');
   // CI refuses a reintroduction: validate_public must reject each shape
@@ -333,6 +336,53 @@ console.log('§9 the browser-delivered model has no provenance, no notes and no 
   rmSync(site, { recursive: true, force: true }); gen();   // §6 left the retired-fixture build in place
   const gh = MOD.map((z) => readFileSync(join(site, 'community', z, 'index.html'), 'utf8')).join('\n');
   ok(existsSync(join(site, 'community', '78769', 'index.html')) && !/third_party|decommission|verification_notes|postal_status/i.test(gh), '9q the generated ZIP documents carry none of it either');
+}
+
+// ── §10 84684 and 84685: existence unverified, so NO page (founder, 2026-10-03) ───────────
+console.log('§10 the two ZIPs whose existence is unverified have no page, through the same mechanism');
+{
+  const WANT_NOTES = {
+    84684: "USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and Census 2010/2020 ZCTA datasets. Registry label 'West Mountain' is unsourced and must not be treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may be derived. Re-audit only after USPS or USPS City State Product verification.",
+    84685: "USPS lookup could not be performed on 2026-10-03. ZIP is absent from zipcodes 3.0.0 and Census 2010/2020 ZCTA datasets. Registry label 'Woodland Hills (84685)' is unsourced and must not be treated as a confirmed ZIP locality. No geographic, civic, electoral, demographic, or map data may be derived. Re-audit only after USPS or USPS City State Product verification.",
+  };
+  ok(JSON.stringify(UNV) === '["84684","84685"]', '10a exactly 84684 and 84685 are unverified', UNV);
+  ok(UNV.every((z) => Z[z].postal_status === 'unverified' && Z[z].postal_status_source === 'manual_review' && Z[z].map_coverage === 'none' && Z[z].verification_notes.startsWith(WANT_NOTES[z])),
+    '10b the internal record carries the founder-approved audit notes word for word, and claims no status');
+  ok(!UNV.some((z) => ZIPS.includes(z)), '10c neither is one of the 47 decommissioned-in-dataset ZIPs');
+  ok(!ALL.includes('84651') && !ALL.includes('84653'), '10d the neighbouring real ZIPs 84651 and 84653 are not in the model');
+  ok(UNV.every((z) => PUB[z].page_mode === 'unverified' && Object.keys(PUB[z]).length === 4), '10e the public entry is the four public fields, page_mode unverified');
+  const U = doc.copy.unverified;
+  ok(U.title === 'ZIP {zip} is not available' && JSON.stringify(U.body) === JSON.stringify(["We couldn't confirm that ZIP code {zip} is an active U.S. Postal Service ZIP code, so we don't have a page for it. Check the number, or search by city or address to find your community."])
+    && U.primary_cta === 'Look up another ZIP code or address →' && !('secondary_cta' in U) && U.page_title === 'ZIP {zip} is not available — HomeSignal',
+    '10f the notice is the founder-approved one: it says only that the ZIP could not be confirmed, offers one link and no nearby-ZIP link');
+  ok(!/retired|invalid|decommission|inactive|no longer in use/i.test(JSON.stringify(U)), '10g it never calls either ZIP retired, invalid, decommissioned or inactive');
+  const committedSitemap = read('sitemap.xml');
+  ok(UNV.every((z) => !committedSitemap.includes(`zip=${z}`) && !committedSitemap.includes(`/community/${z}/`)), '10h the committed sitemap lists neither');
+  // the build: no document, no sitemap entry, no sibling link, and every other page byte-identical
+  const f2 = JSON.parse(read('test/fixtures/zip-pages.json'));
+  const base = { ...f2, zips: [...f2.zips] };
+  const withU = JSON.parse(JSON.stringify(f2));
+  for (const z of UNV) { withU.zips.push(z); withU.meta.push({ zip: z, name: `Utah County ${z}`, county: 'Utah', state: 'UT', data_quality: 'pass', indexable: true }); }
+  withU.zips = [...new Set(withU.zips)].sort();
+  const build = (fx2, tag) => {
+    const d = join(out, tag); rmSync(d, { recursive: true, force: true });
+    writeFileSync(join(out, tag + '.json'), JSON.stringify(fx2));
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\n');
+    const r = py(['scripts/gen_zip_pages.py', '--fixture', join(out, tag + '.json'), '--out', join(d, 'site'), '--now', '2026-09-04T00:00:00', '--dev-plane', 'test/fixtures/development_seo_plane.json']);
+    return { r, site: join(d, 'site') };
+  };
+  const A = build(base, 'u-without'), B = build(withU, 'u-with');
+  ok(A.r.status === 0 && B.r.status === 0, '10i the build succeeds with and without the two ZIPs in the registry', (B.r.stderr || B.r.stdout).slice(-300));
+  const mB = JSON.parse(readFileSync(join(B.site, 'zip-pages-manifest.json'), 'utf8'));
+  ok(UNV.every((z) => !existsSync(join(B.site, 'community', z))) && JSON.stringify(mB.unverified_zips) === JSON.stringify(UNV) && mB.retired_zips.length === 0,
+    '10j no document is written for either, and the manifest names them', mB.unverified_zips);
+  ok(mB.documents + UNV.length === mB.canonical_registry, '10k documents + unverified = registry');
+  const smB = readFileSync(join(B.site, 'sitemap.xml'), 'utf8');
+  ok(UNV.every((z) => !smB.includes(z)), '10l neither is in the generated sitemap');
+  const same = f2.zips.every((z) => readFileSync(join(A.site, 'community', z, 'index.html'), 'utf8') === readFileSync(join(B.site, 'community', z, 'index.html'), 'utf8'));
+  ok(same, '10m every other ZIP document is byte-identical with and without them (no sibling, city or project link to either)');
+  ok(f2.zips.every((z) => !readFileSync(join(B.site, 'community', z, 'index.html'), 'utf8').includes('8468')), '10n no generated document mentions 8468x');
 }
 
 rmSync(out, { recursive: true, force: true });

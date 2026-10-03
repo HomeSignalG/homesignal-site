@@ -126,7 +126,7 @@ def zip_coverage():
         print(f"ERROR: {path} must carry an object of 5-digit ZIP keys under 'zips'")
         sys.exit(1)
     retired = {z for z, e in zips.items()
-               if e.get("page_mode") == "retired"}
+               if e.get("page_mode") in ("retired", "unverified")}
     limited = {z for z, e in zips.items() if not (e.get("page_mode") == "standard" and e.get("map_coverage") == "zcta")}
     return retired, limited
 

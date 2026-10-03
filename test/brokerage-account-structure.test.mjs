@@ -108,10 +108,15 @@ ok(allFiles.length > 50 && naming.includes(SQL_FILE) && NAMES.test(stripSql('sel
 // agent". The role only decides what the page OFFERS; whether an invite may be made is evaluation_invite_mint's own check (Order L1).
 const L1_SQL = 'docs/evaluation-entitlement.sql', EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts';
 const readsCode = code(EVAL_READS);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS])
+// Build step 6 (docs/saved-reports.sql) adds ONE more reader of the RESOLVER, again never of a table: two read-only functions that ask
+// brokerage_membership_of who the caller is, then join the evaluation's ledger. Pinned: it names the resolver and no account or member table.
+const SAVED_SQL = 'docs/saved-reports.sql';
+const savedCode = code(SAVED_SQL);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL])
+   && !/brokerage_account|brokerage_member\b/.test(savedCode) && (savedCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 2
    && !/brokerage_account|brokerage_member\b/.test(readsCode) && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
    && /await rpc\('brokerage_membership_of', \{ p_user_id: userId \}\)/.test(readsCode),
-  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
+  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 
