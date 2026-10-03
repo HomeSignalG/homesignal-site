@@ -175,7 +175,37 @@ through once each step is complete").
        - the free-report rate limit;
        - checking how PostgREST turns the database's refusals into HTTP answers, now including `NOT_ENTITLED` from
          the mint.
-6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
+6. ~~**Saved reports.**~~ Each report gets a permanent ID; reopening, sharing or printing never uses another report.
+   *(Done: #1594 merged as `a5e5d0c`. Sharing and printing are step 8; this step covers listing and reopening.*
+   - *Database, applied to production 2026-10-03 as migration `saved_reports_20261003` from `docs/saved-reports.sql`. It
+     is additive and read-only: two functions, no table, column, trigger or schedule.*
+     - *Read back: each function body's md5 equals the committed file's (`evaluation_reports_of` `56b5dc46…`,
+       `evaluation_report_open` `a25cd553…`). Both are STABLE and SECURITY DEFINER, owned by `postgres`, and executable
+       by `service_role` only; `anon` and `authenticated` cannot run them.*
+     - *Production still holds 0 stored reports and 0 evaluations, so nothing was written.*
+   - *Three functions deployed from `main` on 2026-10-03, each with the JWT check on: `get-development-activity-report`
+     version 9 to 10 (run `37129613308`), `development-activity-trial` 3 to 4 (run `37129615065`), `follow-development-report`
+     3 to 4 (run `37129616660`). The last two have no behaviour change; they were redeployed because they import the
+     changed shared files.*
+   - *Deployed source of the report function read back by quoting the lines that matter, not byte-for-byte: both database
+     calls, the `list`/`open` branch, `charged: false`, the gate's `complete` flag, and the complete-trial refusal placed
+     after the saved-report branch.*
+   - *Live probe: a request with no token is refused by the gateway with 401; with only the public key, our own gate
+     refuses with 401.*
+   - *Pages deployed the customer page. Read back from homesignal.net, `development-activity-reports.html` is
+     byte-identical to `main` by md5 (`27759f35…`, 34,785 characters) and carries the Saved reports card.*
+   - *Not exercised live: the signed-in list and open path. No trial member exists in production yet, and none was created.
+     It is proven by the deployed source, the database fingerprints and the tests: 74 checks against a real Postgres, 60 on
+     the report function, 73 in a browser, and 43 deliberate breakages all caught.)*
+   - A trial member sees a "Saved reports" card listing their brokerage's stored reports, newest first, and can open one
+     again exactly as it was saved. Opening never uses a free report and writes nothing.
+   - A foreign, unknown or malformed report id gives the same "not found". A trial whose 20 reports are used can still
+     reopen them but cannot make a new one. A revoked or expired trial sees nothing.
+   - The address shows beside a saved report only while the private layer still keeps it; once purged, the report still opens.
+   - Defaults taken, the founder may change any: every member of a brokerage sees all of its reports (the ledger holds no
+     user id by design); reopening reads the stored text and never recomputes it.
+   - Open before step 13 (unchanged): the free-report rate limit; an owner cannot list or withdraw invite links or remove an
+     agent; how PostgREST turns the database's refusals into HTTP answers is unchecked against production.
 7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
 8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
    browser's print. *Founder decisions first:* how long a share link lasts; whether the client sees the
