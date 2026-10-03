@@ -30,6 +30,8 @@ const TH = await import('../supabase/functions/development-activity-trial/handle
 const E = await import('../supabase/functions/_shared/evaluation-reads.ts');
 const MH = await import('../supabase/functions/manage-shared-report/handler.ts');   // build step 8: the agent's share-link function
 const SR = await import('../supabase/functions/_shared/share-reads.ts');
+const WH = await import('../supabase/functions/manage-property-watch/handler.ts');  // build step 9: the agent's Watch function
+const WR = await import('../supabase/functions/_shared/watch-reads.ts');
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0, total = 0;
@@ -41,7 +43,7 @@ const ok = (c, name, detail) => {
 
 const PAGE = '/development-activity-reports.html';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/';
-const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report';
+const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report', WATCH_FN = SB + 'manage-property-watch';
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477', OTHER = '744 Evergreen Terrace, Springfield, OR 97477';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const UID = 'a1111111-1111-4111-8111-111111111111';
@@ -75,7 +77,8 @@ window.supabase = { createClient: function () { return { auth: {
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok' } = {}) {
   const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
-    shares: [], shareSeq: 0, shareFails: false, shareLimit: false };
+    shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
+    watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
@@ -122,6 +125,36 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
       if (row.status === 'REVOKED') return false;
       row.status = 'REVOKED'; row.revoked_at = '2026-10-03T13:00:00+00:00'; return true;
     },
+  });
+  // build step 9: the agent's Watch function, on the REAL handler. The store behind it is the world's: a watch is made only for a report this
+  // brokerage made, starting one twice is a no-op, a brokerage holds a limited number, and the property can have been purged.
+  const reportRow = (id) => { let n = 0; for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { number: n, ctx: 'ctx-' + key, address: m.address }; } return null; };
+  w.watchHandler = WH.makeHandler({
+    ...gate,
+    startWatch: async (_u, reportId) => {
+      if (w.watchFails) throw new RH.DataUnavailable('x');
+      if (!ownReport(reportId)) throw new WR.WatchNotFound('x');
+      const have = w.watches.find((x) => x.report_id === reportId);
+      if (have) return { watch_id: have.watch_id, started: false, created_at: have.created_at };
+      if (w.watchNotKept) throw new WR.PropertyNotKept('x');
+      if (w.watchLimit) throw new WR.WatchLimitReached('x');
+      w.watchSeq++;
+      const row = { watch_id: 'e0000000-0000-4000-8000-' + String(w.watchSeq).padStart(12, '0'), report_id: reportId, created_at: '2026-10-03T12:00:00+00:00',
+        last_run_at: null, last_outcome: null, next_due_at: '2026-10-03T12:00:00+00:00' };
+      w.watches.push(row);
+      return { watch_id: row.watch_id, started: true, created_at: row.created_at };
+    },
+    watchesOf: async () => {
+      if (w.watchFails || w.watchListFails) throw new RH.DataUnavailable('x');
+      return w.watches.slice().reverse().map((x) => { const r = reportRow(x.report_id); return { ...x, number: r ? r.number : null, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: r ? r.ctx : null }; });
+    },
+    stopWatch: async (_u, watchId) => {
+      if (w.watchFails) throw new RH.DataUnavailable('x');
+      const i = w.watches.findIndex((x) => x.watch_id === watchId);
+      if (i < 0) throw new WR.WatchNotFound('x');
+      w.watches.splice(i, 1);
+    },
+    addressOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return m ? m.address : null; },
   });
   const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active' });
   w.reportHandler = RH.makeHandler({
@@ -178,7 +211,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
-  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [];
+  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
@@ -189,6 +222,14 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       shareCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
       const res = await w.manageHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
+      return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+    }
+    if (url === WATCH_FN) {
+      const body = r.postData() ? JSON.parse(r.postData()) : null;
+      watchCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
+      // holdNextWatchList: the server has the list and the answer is on its way; it arrives only when the test lets it (after the person has moved on)
+      if (w.holdNextWatchList && body && body.action === 'list') { w.holdNextWatchList = false; await new Promise((res) => { w.releaseWatchList = res; }); }
+      const res = await w.watchHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
       return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
     }
     if (url === REPORT_FN || url === TRIAL_FN) {
@@ -208,7 +249,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, w };
+  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 const TRIALS = new WeakMap();
@@ -751,10 +792,11 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(after.some((r) => /^Withdrawn · made /.test(r) && !/Withdraw$/.test(r)) && after.some((r) => /^Working/.test(r)), '9k a withdrawn link is listed as withdrawn with no button; the other still works', after);
   ok(w.shares.filter((r) => r.status === 'REVOKED').length === 1 && (await page.$eval('#share-new', (e) => e.hidden)), '9l the server revoked exactly that one, and the page no longer shows the link');
 
-  // the report's own bar: Share is live and goes to the card, Download PDF is live and prints; Compare and Watch stay inert
+  // the report's own bar: Share and Watch are live and go to their cards, Download PDF is live and prints; Compare stays inert
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ t: e.textContent, live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action'), disabled: e.getAttribute('aria-disabled') })));
   ok(JSON.stringify(bar.map((b) => b.t)) === JSON.stringify(['Compare property', 'Watch property', 'Share report', 'Download PDF'])
-     && bar[0].disabled === 'true' && bar[1].disabled === 'true' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf', '9m the report\'s own bar has Share and Download PDF live, and Compare and Watch inert as before', bar);
+     && bar[0].disabled === 'true' && bar[1].live && bar[1].act === 'watch' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf',
+    '9m the report\'s own bar has Watch (build step 9), Share and Download PDF live, and Compare inert as before', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
   await page.click('#share-pdf');
@@ -836,6 +878,196 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(wide <= 0, '9z on a 390 px screen the share card, the link and the list do not scroll the page sideways', wide);
+  await ctx.close();
+}
+
+// ---- 10. watching the property of a saved report (build step 9) -------------------------------------------------------------------------
+// The real manage-property-watch handler behind a fake ledger. What is proved here is the PAGE: when it offers the watch, that it starts and
+// stops exactly one watch for the report on screen, that it says in plain words how the last check went, that the address and the client label
+// never go to the Watch function, and that another report or another person never inherits a watch. Who may watch, how many a brokerage may
+// have and when a check runs are the database's, proved by test/property_watch_pg.
+const watchHidden = (page) => page.$eval('#watch', (e) => e.hidden);
+const watchButtons = (page) => page.evaluate(() => ({ start: !document.getElementById('watch-start').hidden, stop: !document.getElementById('watch-stop').hidden }));
+const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('watch-state').textContent + ' ' + document.getElementById('watch-status').textContent), re.source, { timeout: 8000 }).catch(() => {});
+{
+  const w = world();
+  const { ctx, page, errors, watchCalls, foreign } = await open({ w });
+  await waitCount(page, /free reports left/);
+  ok(await watchHidden(page), '10a before any report, the Watch card is not shown');
+  await make(page);
+  ok(!(await watchHidden(page)) && /Watch this property/.test(await text(page, '#watch-title')), '10b a report that was saved shows the Watch card');
+  await waitWatch(page, /not watching/);
+  const first = watchCalls[0];
+  ok(first && first.body.action === 'list' && Object.keys(first.body).join() === 'action' && first.auth === 'Bearer user-token',
+    '10c the page first asked for the person\'s own watches, with their own token, and sent nothing else', first);
+  const sub = await text(page, '#watch .sub');
+  ok(/once a day/.test(sub) && /address you signed in with/.test(sub) && /does not include the property's address/.test(sub),
+    '10d the card says in plain words how often it checks, where the email goes, and that the email leaves the address out', sub);
+  ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && /You are not watching this property/.test(await text(page, '#watch-state')),
+    '10e not yet watching: "Watch this property" is offered, "Stop watching" is not, and the page says so');
+
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  const started = watchCalls.filter((c) => c.body.action === 'start');
+  ok(started.length === 1 && Object.keys(started[0].body).sort().join() === 'action,report_id' && /^c0000000-/.test(started[0].body.report_id) && started[0].auth === 'Bearer user-token',
+    '10f the start request names the saved report and nothing else', started);
+  const st = await text(page, '#watch-state');
+  ok(/You are watching this property, since October 3, 2026\./.test(st) && /The first check runs within a few minutes\./.test(st) && /Next check: October 3, 2026\./.test(st),
+    '10g after the start the card says since when, that the first check is soon and when the next one is', st);
+  ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: false, stop: true }) && w.watches.length === 1, '10h now "Stop watching" is offered and "Watch this property" is not; the server holds exactly one watch');
+  ok(!JSON.stringify(watchCalls).includes('Evergreen') && !(await text(page, '#watch')).includes('Evergreen'), '10i neither the Watch requests nor the card carry the property\'s address');
+
+  // every outcome, in plain words (the page reads the stored outcome; it decides none)
+  const WORDS = { CHECKED: /Last checked October 3, 2026: nothing new\. Next check/, CHECKED_PARTIAL: /nothing new, but some official sources near the property could not be fully read/, NOTIFIED: /a change was found and emailed to you\./,
+    READ_FAILED: /it could not be finished, so HomeSignal will try again\./, EMAIL_FAILED: /the email could not be sent, so HomeSignal will try again\./, NO_RECIPIENT: /your account has no email address to send it to\./ };
+  let allWords = true; const seen = {};
+  for (const [outcome, re] of Object.entries(WORDS)) {
+    w.watches[0].last_run_at = '2026-10-03T15:00:00+00:00'; w.watches[0].last_outcome = outcome;
+    await page.click('#saved-list button');
+    await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+    await waitWatch(page, /Last checked/);
+    const t = await text(page, '#watch-state'); seen[outcome] = t;
+    if (!re.test(t) || /The first check runs within a few minutes/.test(t)) allWords = false;
+  }
+  ok(allWords, '10j each of the six outcomes the database can record is told in its own plain words, and a watch that has been checked no longer says its first check is coming', seen);
+  w.watches[0].last_run_at = null; w.watches[0].last_outcome = null;
+  await page.click('#saved-list button');
+  await waitWatch(page, /first check runs/);
+
+  // the report's own bar: Watch is live and takes the person to the card
+  await page.click('.da-rv-act[data-da-action="watch"]');
+  ok(await page.evaluate(() => document.activeElement && document.activeElement.id) === 'watch-stop', '10k the report\'s own Watch button takes the person to the card (focus on "Stop watching" while it is on)');
+
+  await page.click('#watch-stop');
+  await waitWatch(page, /no longer watching/);
+  await waitWatch(page, /You are not watching this property/); // the card is redrawn from the server's list after the stop answer
+  const stopped = watchCalls.filter((c) => c.body.action === 'stop');
+  ok(stopped.length === 1 && Object.keys(stopped[0].body).sort().join() === 'action,watch_id' && /^e0000000-/.test(stopped[0].body.watch_id) && w.watches.length === 0,
+    '10l the stop request names the watch and nothing else; the server holds none', stopped);
+  ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && /You are not watching this property/.test(await text(page, '#watch-state')), '10m after the stop "Watch this property" is offered again and the card says it is off');
+  await page.click('.da-rv-act[data-da-action="watch"]');
+  ok(await page.evaluate(() => document.activeElement && document.activeElement.id) === 'watch-start', '10n and the report\'s Watch button now focuses "Watch this property"');
+
+  // print: the card is left off the paper
+  await page.emulateMedia({ media: 'print' });
+  ok(await page.evaluate(() => { const e = document.getElementById('watch'); return e.getClientRects().length === 0; }), '10o in print the Watch card is not on the paper');
+  await page.emulateMedia({ media: 'screen' });
+  ok(errors.length === 0 && foreign.length === 0, '10p no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // a report that was not saved cannot be watched
+  const w = world({ rights: RIGHTS_SHIPPED });
+  const { ctx, page, watchCalls } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  ok(w.made.size === 0 && (await watchHidden(page)) && watchCalls.length === 0, '10q a report that was not saved gets no Watch card and makes no Watch request');
+  const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
+  ok(bar.every((b) => b.act !== 'watch'), '10r and its own bar offers no Watch', bar);
+  await ctx.close();
+}
+{
+  // the ways it can fail are said in plain words; a refusal never leaves the card in a state the server did not give
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await waitWatch(page, /not watching/);
+  w.watchFails = true;
+  await page.click('#watch-start');
+  await waitWatch(page, /could not be done/);
+  ok(/Try again in a minute/.test(await text(page, '#watch-status')) && JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && !(await page.$eval('#watch-start', (e) => e.disabled)) && w.watches.length === 0,
+    '10s an unreachable service says so in plain words, leaves the button free and starts nothing');
+  w.watchFails = false; w.watchLimit = true;
+  await page.click('#watch-start');
+  await waitWatch(page, /most properties/);
+  ok(/most properties it can/.test(await text(page, '#watch-status')) && w.watches.length === 0, '10t a brokerage at its limit is told so, plainly');
+  w.watchLimit = false; w.watchNotKept = true;
+  await page.click('#watch-start');
+  await waitWatch(page, /no longer keeps/);
+  ok(/no longer keeps this property.s address/.test(await text(page, '#watch-status')) && /Make a new report/.test(await text(page, '#watch-status')) && w.watches.length === 0, '10u a property whose address has been purged is told so, with what to do');
+  w.watchNotKept = false;
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  w.watchFails = true;
+  await page.click('#watch-stop');
+  await waitWatch(page, /could not be done/);
+  ok(w.watches.length === 1 && JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: false, stop: true }) && !(await page.$eval('#watch-stop', (e) => e.disabled)),
+    '10v a stop that fails leaves the watch on, says so, and leaves the button free');
+  await ctx.close();
+}
+{
+  // a list that cannot be read: starting is still offered (it does nothing twice), and the failure is said
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  w.watchListFails = true;
+  await make(page);
+  await waitWatch(page, /could not be done/);
+  ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && /Try again in a minute/.test(await text(page, '#watch-status')) && (await text(page, '#watch-state')) === '',
+    '10w when the person\'s watches cannot be read the page says so, claims nothing about whether they are watching, and still offers to start');
+  await ctx.close();
+}
+{
+  // another report, and another person, never inherit a watch
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  await page.fill('#addr', OTHER);
+  await page.click('#go');
+  await page.waitForFunction(() => /Report ready|Making/.test(document.getElementById('status').textContent), null, { timeout: 8000 }).catch(() => {});
+  await waitWatch(page, /not watching/);
+  ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && w.watches.length === 1, '10x a second report is not watched just because the first is: the card is about the report on screen');
+  await page.evaluate(() => { window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); });
+  await page.waitForTimeout(200);
+  ok((await watchHidden(page)) && (await text(page, '#watch-state')) === '' && (await text(page, '#watch-status')) === '', '10y signing out clears the card, its state and its message');
+  await ctx.close();
+}
+{
+  // a different person signing in on the same tab takes the card, its state and its message away at once
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  const swap = await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('watch').hidden, state: document.getElementById('watch-state').textContent, status: document.getElementById('watch-status').textContent,
+      stop: !document.getElementById('watch-stop').hidden };
+  });
+  ok(swap.hidden && swap.state === '' && swap.status === '' && !swap.stop, '10y2 a different person signing in takes the Watch card and the first person\'s watch away at once', swap);
+  await ctx.close();
+}
+{
+  // a late answer for the report the person has since left is ignored: it must not paint a watch onto the report now on screen
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  w.holdNextWatchList = true;
+  await make(page);                                   // report 1; its list is held on the server's side
+  w.watches.push({ watch_id: 'e0000000-0000-4000-8000-0000000000aa', report_id: 'c0000000-0000-4000-8000-000000000001', created_at: '2026-10-03T12:00:00+00:00', last_run_at: null, last_outcome: null, next_due_at: '2026-10-03T12:00:00+00:00' });
+  await make(page, OTHER);                            // report 2 comes on screen and is read at once
+  await waitWatch(page, /not watching/);
+  w.releaseWatchList();                               // the first answer, about report 1, arrives now
+  await page.waitForTimeout(500);
+  const late = await page.evaluate(() => ({ state: document.getElementById('watch-state').textContent, start: !document.getElementById('watch-start').hidden, stop: !document.getElementById('watch-stop').hidden }));
+  ok(/not watching/.test(late.state) && late.start && !late.stop, '10y3 a late answer about the first report does not paint its watch onto the second report', late);
+  await ctx.close();
+}
+{
+  const w = world();
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(wide <= 0, '10z on a 390 px screen the Watch card does not scroll the page sideways', wide);
   await ctx.close();
 }
 

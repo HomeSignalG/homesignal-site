@@ -135,7 +135,14 @@ ok(namers(/report_private_context_read/).sort().join() === 'supabase/functions/_
   ok(addr.length > 80 && !/label|cleanDisplayName/.test(addr) && /return c \? addressText\(c\.address\) : null;/.test(addr) && /c\.state !== 'active'/.test(ps),
     '2h the window a client\'s function uses returns the address and NOTHING else, and only while the layer still keeps it');
   const users = fnFiles.filter((f) => /makePrivateSubjectReads/.test(S(f)) && f !== 'supabase/functions/_shared/private-subject.ts').sort();
-  ok(users.join() === 'supabase/functions/get-development-activity-report/data.ts,supabase/functions/view-shared-report/data.ts', '2i exactly two functions read the private layer: the report function (the address and the label, for the brokerage) and the client\'s function (the address)', users);
+  // build step 9 added two users of the one reader, each pinned to the narrowest window it needs: the agent's Watch list (the address alone, shown back to
+  // the agent who started the watch, the label discarded in the same expression) and the daily job (the point alone, never shown or sent).
+  ok(users.join() === 'supabase/functions/get-development-activity-report/data.ts,supabase/functions/manage-property-watch/data.ts,supabase/functions/run-property-watch/data.ts,supabase/functions/view-shared-report/data.ts',
+    '2i exactly four functions read the private layer: the report function (the address and the label, for the brokerage), the agent\'s Watch list (the address), the daily Watch job (the point) and the client\'s function (the address)', users);
+  const md = S('supabase/functions/manage-property-watch/data.ts').replace(/\/\/[^\n]*/g, ''), rd = S('supabase/functions/run-property-watch/data.ts').replace(/\/\/[^\n]*/g, '');
+  ok((md.match(/subjects\.\w+/g) || []).join() === 'subjects.subjectOf' && /addressOf: \(contextId\) => subjects\.subjectOf\(contextId, LABEL_MAX\)\.then\(\(s\) => s\.address\),/.test(md)
+     && (rd.match(/subjects\.\w+/g) || []).join() === 'subjects.pointOf' && /pointOf: subjects\.pointOf,/.test(rd) && !/subjectOf|addressOf/.test(rd),
+    '2i2 the Watch list takes the address from the brokerage window and drops the label in the same expression; the daily job is wired to the point window alone and cannot ask for an address or a label');
   ok(/subjects\.addressOf/.test(S('supabase/functions/view-shared-report/data.ts')) && !/subjectOf/.test(S('supabase/functions/view-shared-report/data.ts')), '2j the client\'s function is wired to the address-only window and cannot ask for the label');
 }
 {

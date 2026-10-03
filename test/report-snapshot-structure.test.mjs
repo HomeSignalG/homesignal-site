@@ -102,8 +102,13 @@ const SAVED_SQL = 'docs/saved-reports.sql';
 // Build step 8: the share-delivery SQL's client read (report_share_open) joins a share link's report id to this table to hand back the stored text
 // of a link that is usable, and nothing else. One STABLE read-only function; 3f pins that it names the table once and never writes or grants it.
 const DELIVERY_SQL = 'docs/report-share-delivery.sql';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read; and, from build step 8, the share-delivery client read, 3f)', namesTable.join(','));
+// Build step 9: docs/property-watch.sql joins this table in three read-only places to find a watched report's private-context handle and issue time: the closing
+// trigger, the agent's list and the audit. It writes nothing here (every DML statement of that file targets its own two property_watch tables).
+const WATCH_SQL = 'docs/property-watch.sql';
+const watchSrc = codeOf(WATCH_SQL);
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL)
+   && (watchSrc.match(/\breport_snapshot\b/g) || []).length === 5 && /references public\.report_snapshot \(report_id\)/.test(watchSrc) && (watchSrc.match(/(?:from|join) public\.report_snapshot s\b/g) || []).length === 3 && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(watchSrc) && !/grant[^;]*report_snapshot/i.test(watchSrc),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read; and, from build step 8, the share-delivery client read, 3f; and from build step 9 three read-only joins in the property-watch SQL)', namesTable.join(','));
 {
   const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);

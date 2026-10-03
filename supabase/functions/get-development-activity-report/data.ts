@@ -8,22 +8,23 @@
 import { GeocoderUnavailable } from './handler.ts';
 import type { Deps, Geocoded } from './handler.ts';
 import {
-  DataUnavailable, inBatches, makeServiceReads, POSTGREST_ROW_CAP, quoteIn,
+  DataUnavailable, makeServiceReads, POSTGREST_ROW_CAP, quoteIn,
 } from '../_shared/service-rest.ts';
+import { makeReportReads } from '../_shared/report-reads.ts';
 import { makeChangeReads } from '../_shared/change-reads.ts';
 import { issueEvaluationReport } from '../_shared/report-snapshot.ts';
 import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
 import { makePrivateSubjectReads } from '../_shared/private-subject.ts';
 import { norm } from '../_shared/national-report.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
-import type { ProjectRow, RadiusRow } from '../_shared/national-report.ts';
-import { LABEL_MAX, RADIUS_ROW_LIMIT } from './handler.ts';
+import { LABEL_MAX } from './handler.ts';
 
 export { POSTGREST_ROW_CAP, quoteIn };
 export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { base, svc, rest, rpc, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
+  const reportReads = makeReportReads({ base, svc }, rest, fetchFn);
   // the ledger, the reportable events and the source health: one definition, shared with Changes Since Report
   const changeReads = makeChangeReads(rest);
 
@@ -62,33 +63,9 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
       return rows.length === 1;
     },
 
-    async radius(lat, lng, radiusMi): Promise<RadiusRow[]> {
-      let r: Response;
-      try {
-        r = await fetchFn(base + '/rest/v1/rpc/n5_projects_within_radius', {
-          method: 'POST',
-          headers: { ...svc, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ p_lat: lat, p_lng: lng, p_radius_mi: radiusMi, p_limit: RADIUS_ROW_LIMIT }),
-        });
-      } catch { throw new DataUnavailable('network'); }
-      if (!r.ok) throw new DataUnavailable('http ' + r.status); // a refused radius is an error, not "nothing nearby"
-      const rows = await r.json().catch(() => null);
-      if (!Array.isArray(rows)) throw new DataUnavailable('shape');
-      return rows as RadiusRow[];
-    },
-
-    async hydrate(keys): Promise<ProjectRow[]> {
-      const cols = 'source_key,registry_id,record_kind,name,type,type_raw,status,stage,developer,size,investment,submitted_at,date_kind,address,source_ref,last_seen_at';
-      const rows = await inBatches<ProjectRow & { last_seen_at: string | null }>(keys, (b) =>
-        rest('app_projects?select=' + cols + '&record_kind=eq.development&source_key=in.' + encodeURIComponent(quoteIn(b))));
-      // a project has one copy per ZIP page; the newest materialisation is the one used (the order the N5 shadow read uses)
-      const best = new Map<string, ProjectRow & { last_seen_at: string | null }>();
-      for (const r of rows) {
-        const cur = best.get(r.source_key);
-        if (!cur || String(r.last_seen_at ?? '') > String(cur.last_seen_at ?? '')) best.set(r.source_key, r);
-      }
-      return [...best.values()].map(({ last_seen_at: _drop, ...p }) => p as ProjectRow);
-    },
+    // the two canonical project reads: ONE definition, shared with the Watch (_shared/report-reads.ts)
+    radius: reportReads.radius,
+    hydrate: reportReads.hydrate,
 
     ...changeReads,
 

@@ -121,7 +121,12 @@ const headerCode = code(HEADER_SQL);
 // brokerage's NAME from the account row for a client who holds a share link (one join) plus its precondition. Never the member table; no write of its own.
 const DELIVERY_SQL = 'docs/report-share-delivery.sql';
 const deliveryCode = code(DELIVERY_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL])
+// Build step 9 (docs/property-watch.sql) adds ONE more reader of the RESOLVER and nothing else: starting a watch asks which brokerage the caller is in, and the
+// per-brokerage count asks whether each watcher is still a member of it (so a departed agent stops holding a place). Never the account or member tables.
+const WATCH_SQL = 'docs/property-watch.sql';
+const watchCode = code(WATCH_SQL);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL])
+   && (watchCode.match(/brokerage_membership_of\(/g) || []).length === 3 && /brokerage_membership_of\(p_user_id\) m/.test(watchCode) && /brokerage_membership_of\(w\.user_id\) m/.test(watchCode) && (watchCode.match(/brokerage_account/g) || []).length === 1 && /to_regclass\('public\.brokerage_account'\) is null/.test(watchCode) && !/brokerage_member\b/.test(watchCode)
    && (deliveryCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 2 && (deliveryCode.match(/public\.brokerage_account\b/g) || []).length === 2 && /join public\.brokerage_account a on a\.id = e\.brokerage_id/.test(deliveryCode) && !/brokerage_member\b/.test(deliveryCode)
    && !/\b(insert|update|delete|truncate|alter\s+table|create\s+table|drop\s+table)\b/i.test(deliveryCode.replace(/drop function if exists[^;]*;/gi, '').replace(/'(?:[^']|'')*'/g, "''"))
    && (headerCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 1 && (headerCode.match(/public\.brokerage_account\b/g) || []).length === 2 && /join public\.brokerage_account a on a\.id = r\.brokerage_id/.test(headerCode) && /to_regclass\('public\.brokerage_account'\)/.test(headerCode) && !/brokerage_member\b/.test(headerCode)
@@ -130,7 +135,7 @@ ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQ
    && !/brokerage_account|brokerage_member\b/.test(savedCode) && (savedCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 2
    && !/brokerage_account|brokerage_member\b/.test(readsCode) && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
    && /await rpc\('brokerage_membership_of', \{ p_user_id: userId \}\)/.test(readsCode),
-  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) and the one read-only report-header function (build step 7: the resolver, then the account row it points at for the brokerage\'s name, no write) and the one share-delivery SQL (build step 8: the resolver twice, the account table for a name and its precondition, no write) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
+  '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) and the one read-only report-header function (build step 7: the resolver, then the account row it points at for the brokerage\'s name, no write) and the one share-delivery SQL (build step 8: the resolver twice, the account table for a name and its precondition, no write) and the one property-watch SQL (build step 9: the resolver twice, in start and in the per-brokerage count, plus its precondition, which only checks the account table exists; never the member table) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 

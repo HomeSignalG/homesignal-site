@@ -83,7 +83,7 @@ export const SOURCES_NOT_INCLUDED_SINCE = {
   text: 'Some projects in the report come from official sources that are not included in this answer.',
 };
 
-type ReportedProject = {
+export type ReportedProject = {
   project_id: string; source_family: string | null; name: unknown; type: unknown; lifecycle: unknown;
   source: { url?: unknown } | null; homesignal_detected_changes: Array<{ event_type: string; detected_at: string }>;
 };
@@ -108,7 +108,7 @@ function detectedChangesOf(p: { homesignal_detected_changes?: unknown }): Array<
 }
 
 /** Read the permanent body. Anything that is not the national report's own shape is refused. */
-export function parseStoredReport(stored: StoredReport): ParsedReport {
+export function parseStoredReport(stored: Pick<StoredReport, 'generated_at' | 'body'>): ParsedReport {
   if (!stored || typeof stored.body !== 'string') throw new ReportUnreadable('no body');
   if (!Number.isFinite(Date.parse(stored.generated_at))) throw new ReportUnreadable('no issue time');
   let body: any;
@@ -156,11 +156,33 @@ export type ChangesInput = {
 
 const instant = (s: unknown) => Date.parse(String(s));
 
-export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
-  const { now, view, report } = input;
-  if (view !== 'customer' && view !== 'internal') throw new Error('changesSinceReport: view must be customer or internal');
+/** The projects a comparison is made over, and the instant it starts from. Each project carries the changes the report ALREADY showed for it. */
+export type ProjectsInput = {
+  now: Date; view: View; rights: unknown;
+  /** The stored report's issue instant: the comparison starts here (less the overlap). */
+  issuedAt: string;
+  /** The projects to look at. For Changes Since Report these are the report's own; for a Watch they are the projects near the property NOW. */
+  projects: ReportedProject[];
+  ledger: LedgerProject[]; events: WrittenEvent[]; health: SourceHealth[];
+};
+export type ProjectsResult = {
+  changed: Array<Record<string, unknown> & { project_id: string }>;
+  excluded: { no_rights: Record<string, number>; not_change_ready: number };
+  /** What the caller turns into its own limitation text. This function owns the WHEN; the caller owns what it says to its reader. */
+  flags: { recordedAfterReport: boolean; sourcesNotIncluded: boolean; sourcesNotFullyRead: boolean };
+};
+
+/**
+ * THE ONE IMPLEMENTATION of "what has the ledger learned about these projects since this report was issued" (the boundary in time of
+ * docs/development-activity-follow-changes-2026-10-01.md §3). Changes Since Report asks it over the projects IN the report; a Watch
+ * (docs/development-activity-watch-2026-10-03.md) asks it over the projects near the property NOW, so a project that appeared after the
+ * report is covered by the same boundary, the same overlap, the same de-duplication against what the report showed, and the same rule for
+ * what a change is. Neither restates any of it.
+ */
+export function changesForProjects(input: ProjectsInput): ProjectsResult {
+  const { now, view } = input;
+  if (view !== 'customer' && view !== 'internal') throw new Error('changesForProjects: view must be customer or internal');
   const rights = validateRights(input.rights);
-  const parsed = parseStoredReport(report);
   const cleared = new Map(rights.cleared.map((e) => [e.registry_id, e]));
   const ledger = new Map(input.ledger.map((l) => [l.identity_key, l]));
   const eventsByKey = new Map<string, WrittenEvent[]>();
@@ -171,17 +193,18 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
     eventsByKey.get(e.identity_key)!.push(e);
   }
 
-  const issued = instant(parsed.generated_at);
+  const issued = instant(input.issuedAt);
+  if (!Number.isFinite(issued)) throw new ReportUnreadable('no issue time');
   const lower = issued - SINCE_REPORT_OVERLAP_MS;
   const upper = now.getTime();
 
   const excluded = { no_rights: {} as Record<string, number>, not_change_ready: 0 };
-  const changed: ChangesSinceReport['changed'] = [];
+  const changed: ProjectsResult['changed'] = [];
   const latest = new Map<string, string>();
   const familiesInAnswer = new Set<string>();
   let recordedAfterReport = false;
 
-  for (const p of parsed.projects) {
+  for (const p of input.projects) {
     const family = p.source_family ?? '';
     const grant = cleared.get(family);
     if (!grant && view === 'customer') { excluded.no_rights[family || '(none)'] = (excluded.no_rights[family || '(none)'] ?? 0) + 1; continue; }
@@ -227,10 +250,29 @@ export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
     return x < y ? 1 : x > y ? -1 : a.project_id < b.project_id ? -1 : 1;
   });
 
+  return {
+    changed, excluded,
+    flags: {
+      recordedAfterReport,
+      sourcesNotIncluded: Object.keys(excluded.no_rights).length > 0,
+      sourcesNotFullyRead: sourcesNotFullyRead(input.health, familiesInAnswer),
+    },
+  };
+}
+
+export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
+  const { now, view, report } = input;
+  if (view !== 'customer' && view !== 'internal') throw new Error('changesSinceReport: view must be customer or internal');
+  validateRights(input.rights);
+  const parsed = parseStoredReport(report);
+  const { changed, excluded, flags } = changesForProjects({
+    now, view, rights: input.rights, issuedAt: parsed.generated_at, projects: parsed.projects, ledger: input.ledger, events: input.events, health: input.health,
+  });
+
   const limitations = [{ ...NEW_PROJECTS_NOT_COVERED }];
-  if (recordedAfterReport) limitations.push({ ...RECORDED_AFTER_REPORT });
-  if (Object.keys(excluded.no_rights).length > 0) limitations.push({ ...SOURCES_NOT_INCLUDED_SINCE });
-  if (sourcesNotFullyRead(input.health, familiesInAnswer)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
+  if (flags.recordedAfterReport) limitations.push({ ...RECORDED_AFTER_REPORT });
+  if (flags.sourcesNotIncluded) limitations.push({ ...SOURCES_NOT_INCLUDED_SINCE });
+  if (flags.sourcesNotFullyRead) limitations.push({ ...SOURCE_NOT_FULLY_READ });
 
   return {
     product: PRODUCT_NAME,
