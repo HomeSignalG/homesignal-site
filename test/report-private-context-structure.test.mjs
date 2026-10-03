@@ -136,8 +136,14 @@ const SEQ_LOCKDOWN = 'docs/report-private-context-sequence-lockdown.sql';
 // only 'match' / 'mismatch' / 'unknown' leaves it (5c4, 5d). It never names the table, a column outside that comparison, the writer
 // or the purge.
 const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN, REPORT_DATA].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer, the file that closes the audit log\'s counter, and the report function\'s replay check', namesPrivate.join(','));
+// The FIFTH addition (2026-10-03, build step 8): the ONE reader of a stored report's address and client label, _shared/private-subject.ts. Build
+// steps 6 and 7 had that read inside the report function's data layer; step 8 lets the holder of a client share link see the street address too
+// (founder, 2026-10-03), and a second copy of "only while the layer still keeps it" in the public function would be a second way to decide that
+// fact. So the read moved to one shared file with two windows: subjectOf (address and label, for a member of the brokerage) and addressOf
+// (the address alone, for the holder of a link). 5c5 and 5d pin it.
+const PRIVATE_SUBJECT = 'supabase/functions/_shared/private-subject.ts';
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN, REPORT_DATA, PRIVATE_SUBJECT].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer, the file that closes the audit log\'s counter, the report function\'s replay check, and the one shared reader of a stored report\'s address and label', namesPrivate.join(','));
 {
   const names = [...new Set([...code(SEQ_LOCKDOWN).matchAll(/report_private_context\w*/g)].map((m) => m[0]))].sort();
   ok(namesPrivate.includes(SEQ_LOCKDOWN) && names.length > 0
@@ -153,19 +159,31 @@ ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-sn
   const t = code(REPORT_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
   const fn = (t.match(/async contextMatches\(contextId, address\) \{[\s\S]*?\n    \},/) || [''])[0];
-  // build step 6 adds the SECOND reader in this file: subjectOf, which returns the address a stored report was made for to a member of the
-  // brokerage that made it, and only while the layer still holds it ('active'). Everything else about the first reader is unchanged.
-  // Build step 7: that same read also returns the client label, the one customer-typed field a report's header shows, and no other column.
-  const subj = (t.match(/async subjectOf\(contextId\) \{[\s\S]*?\n    \},/) || [''])[0];
-  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read","report_private_context_read"]' && fn.includes('report_private_context_read')
-     && subj.includes('report_private_context_read') && /c\.state !== 'active'/.test(subj) && /if \(!contextId\) return \{ address: null, label: null \};/.test(subj)
-     && (subj.match(/c\.label/g) || []).length === 1 && /label: cleanDisplayName\(c\.label, LABEL_MAX\)/.test(subj) && !/c\.(normalized_address|latitude|longitude|property_keys|purge)/.test(subj)
+  // build step 8: the report function's data layer no longer reads a stored report's address itself; it hands that to the one shared reader (5c5).
+  // What stays here is the replay check: contextMatches returns only 'match' / 'mismatch' / 'unknown' and reads no column but the address it compares.
+  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read"]' && fn.includes('report_private_context_read')
+     && /subjectOf: \(contextId\) => subjects\.subjectOf\(contextId, LABEL_MAX\),/.test(t) && /const subjects = makePrivateSubjectReads\(rpc\);/.test(t)
      && [...fn.matchAll(/return ([^;]+);/g)].map((m) => m[1]).every((r) => /^'unknown'$|^norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch'$/.test(r))
-     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t.replace(subj, '')),
-    '5c4: the report function\'s data layer names the private layer twice, both times the read function: inside contextMatches, which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares, and inside subjectOf, which returns the address and the client label (cleaned for printing) only while the layer holds them, and reads no other column (control: it does name it)', names);
+     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t),
+    '5c4: the report function\'s data layer names the private layer once, the read function, inside contextMatches (which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares); a stored report\'s address and label are asked of the shared reader, and no private column is named here (control: it does name it)', names);
 }
-ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).join() === REPORT_DATA,
-  '5d: one FILE calls the function that returns the private values: the report function\'s data layer, for the replay check (compares, returns no value) and, from build step 6, for a saved report\'s own address (subjectOf, shown to its own brokerage while the layer holds it)');
+{
+  const t = code(PRIVATE_SUBJECT).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  const subj = (t.match(/async subjectOf\(contextId: string \| null, labelMax: number\)[^{]*\{[\s\S]*?\n    \},/) || [''])[0];
+  const addr = (t.match(/async addressOf\(contextId: string \| null\)[^{]*\{[\s\S]*?\n    \},/) || [''])[0];
+  // the ONE reader, with two windows. subjectOf (for a member of the brokerage) returns the address and the cleaned label; addressOf (for the holder
+  // of a client share link) returns the address as a bare string, and its text cannot reach the label. Both read only while the layer holds the
+  // context ('active'); a failed or oddly shaped read is a fault, never "no address".
+  ok(namesPrivate.includes(PRIVATE_SUBJECT) && JSON.stringify(names) === '["report_private_context_read"]'
+     && /if \(!c \|\| c\.state !== 'active'\) return null;/.test(t) && /if \(!contextId\) return null;/.test(t) && /if \(error \|\| !Array\.isArray\(data\)\) throw new DataUnavailable\('private context'\);/.test(t)
+     && subj.length > 100 && /label: cleanDisplayName\(c\.label, labelMax\)/.test(subj)
+     && addr.length > 60 && !/label/i.test(addr) && /return c \? addressText\(c\.address\) : null;/.test(addr)
+     && (t.match(/c\.label/g) || []).length === 2 && /return \{ address: c\.address, label: c\.label \};/.test(t) && !/c\.(normalized_address|latitude|longitude|property_keys|purge)/.test(t),
+    '5c5: the shared reader calls the read function ONCE, only for a context the layer still holds (state \'active\'); subjectOf returns the address and the cleaned label, addressOf returns the address alone and its text never names the label, and no other column is read (control: it does name the function)', names);
+}
+ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).sort().join() === [PRIVATE_SUBJECT, REPORT_DATA].sort().join(),
+  '5d: two FILES call the function that returns the private values: the report function\'s data layer, for the replay check (compares, returns no value), and the one shared reader of a stored report\'s own address and label (build steps 6, 7 and 8)');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),
   '5e: THIS file arms no schedule and makes no network call — the purge batch is scheduled only by docs/report-private-context-purge-schedule.sql, a separate file with its own go and its own proof');
 

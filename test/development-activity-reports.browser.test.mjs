@@ -28,6 +28,8 @@ import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW } from './lib/da-report-view-world
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
 const TH = await import('../supabase/functions/development-activity-trial/handler.ts');
 const E = await import('../supabase/functions/_shared/evaluation-reads.ts');
+const MH = await import('../supabase/functions/manage-shared-report/handler.ts');   // build step 8: the agent's share-link function
+const SR = await import('../supabase/functions/_shared/share-reads.ts');
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0, total = 0;
@@ -39,7 +41,7 @@ const ok = (c, name, detail) => {
 
 const PAGE = '/development-activity-reports.html';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/';
-const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial';
+const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report';
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477', OTHER = '744 Evergreen Terrace, Springfield, OR 97477';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const UID = 'a1111111-1111-4111-8111-111111111111';
@@ -72,7 +74,8 @@ window.supabase = { createClient: function () { return { auth: {
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok' } = {}) {
-  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false };
+  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
+    shares: [], shareSeq: 0, shareFails: false, shareLimit: false };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
@@ -92,6 +95,33 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     },
     createTrial: async () => { throw new Error('the customer page never creates a trial'); },
     now: () => NOW,
+  });
+  // build step 8: the agent's share-link function, on the REAL handler and the real link form. The store behind it is the world's: a link is
+  // made only for a report this brokerage made, a report holds at most 25, and revoking one that is already revoked is a quiet no-op.
+  const ownReport = (id) => [...w.made.values()].some((m) => m.id === id);
+  w.manageHandler = MH.makeHandler({
+    ...gate,
+    createShare: async (_u, reportId) => {
+      if (w.shareFails) throw new RH.DataUnavailable('x');
+      if (!ownReport(reportId)) throw new SR.ShareNotFound('x');
+      if (w.shareLimit) throw new SR.ShareLimitReached('x');
+      w.shareSeq++;
+      const token = String(w.shareSeq).padStart(43, 'S');
+      const row = { share_id: 'd0000000-0000-4000-8000-' + String(w.shareSeq).padStart(12, '0'), report_id: reportId, created_at: '2026-10-03T12:00:0' + (w.shareSeq % 10) + '+00:00',
+        expires_at: '2027-04-03T12:00:00+00:00', revoked_at: null, status: 'ACTIVE', token };
+      w.shares.push(row);
+      return { share_id: row.share_id, expires_at: row.expires_at, link: SR.shareLink(token) };
+    },
+    listShares: async (_u, reportId) => {
+      if (w.shareFails) throw new RH.DataUnavailable('x');
+      return w.shares.filter((r) => r.report_id === reportId).slice().reverse().map(({ token: _t, report_id: _r, ...pub }) => pub);
+    },
+    revokeShare: async (_u, shareId) => {
+      const row = w.shares.find((r) => r.share_id === shareId);
+      if (!row) throw new SR.ShareNotFound('x');
+      if (row.status === 'REVOKED') return false;
+      row.status = 'REVOKED'; row.revoked_at = '2026-10-03T13:00:00+00:00'; return true;
+    },
   });
   const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active' });
   w.reportHandler = RH.makeHandler({
@@ -148,13 +178,19 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
-  const errors = [], reports = [], trials = [], foreign = [], saved = [];
+  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
     const r = route.request(), url = r.url();
     if (url.startsWith(base)) return route.continue();
     if (url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB(signedIn, name) });
+    if (url === MANAGE_FN) {
+      const body = r.postData() ? JSON.parse(r.postData()) : null;
+      shareCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
+      const res = await w.manageHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
+      return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+    }
     if (url === REPORT_FN || url === TRIAL_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       const rec = { auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body };
@@ -172,7 +208,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  return { ctx, page, errors, reports, trials, foreign, saved, w };
+  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 const TRIALS = new WeakMap();
@@ -667,6 +703,139 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(await profileShown(page) && wide <= 0, '8s on a 390 px screen the card is shown and the page does not scroll sideways', wide);
+  await ctx.close();
+}
+
+// ---- 9. sharing a saved report with a client, and saving it as a PDF (build step 8) -------------------------------------------------------
+// The real manage-shared-report handler (and the real link form) behind a fake ledger. What is proved here is the PAGE: when it offers sharing,
+// that it shows the link once and keeps it nowhere, that it withdraws a link, and that what it sends carries nothing the client must not
+// see. Who may share, for how long and whether a link works are the database's, proved by test/report_share_delivery_pg.
+const LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
+const shareHidden = (page) => page.$eval('#share', (e) => e.hidden);
+const shareList = (page) => page.$$eval('#share-list li', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('share-status').textContent + ' ' + document.getElementById('share-list').textContent), re.source, { timeout: 8000 }).catch(() => {});
+{
+  const w = world();
+  const { ctx, page, errors, shareCalls, foreign } = await open({ w });
+  await waitCount(page, /free reports left/);
+  ok(await shareHidden(page), '9a before any report, the share card is not shown');
+  await make(page);
+  ok(!(await shareHidden(page)) && /Share this report with your client/.test(await text(page, '#share-title')), '9b a report that was saved shows the share card');
+  await waitShare(page, /No client link has been made/);
+  const first = shareCalls[0];
+  ok(first && first.body.action === 'list' && /^c0000000-/.test(first.body.report_id) && Object.keys(first.body).sort().join() === 'action,report_id' && first.auth === 'Bearer user-token',
+    '9c the page asked for the report\'s links with the signed-in person\'s own token, naming the saved report and nothing else', first);
+  ok(/6 months/.test(await text(page, '#share .sub')) && /street address/.test(await text(page, '#share .sub')) && /not your name, not your client label/.test(await text(page, '#share .sub')),
+    '9d the card says in plain words what the client sees and for how long');
+
+  await page.click('#share-make');
+  await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
+  const link = await page.$eval('#share-link', (e) => e.value);
+  ok(LINK.test(link) && link === SR.shareLink(link.split('#share=')[1]), '9e the link is shown, in the one form the server makes (the page builds none of it)', link);
+  const created = shareCalls.filter((c) => c.body.action === 'create');
+  ok(created.length === 1 && Object.keys(created[0].body).sort().join() === 'action,report_id', '9f the create request names the report and nothing else: no address, no client label, no expiry, no token');
+  ok(/only this once/.test(await text(page, '#share-note')) && /Anyone who has it can read this report/.test(await text(page, '#share-note')), '9g the page says the link is shown only once and that anyone who has it can read the report');
+  await waitShare(page, /Working/);
+  const rows = await shareList(page);
+  ok(rows.length === 1 && /^Working · made / .test(rows[0]) && /works until April 3, 2027/.test(rows[0]) && /Withdraw$/.test(rows[0]), '9h the list shows the link as working, with when it was made and when it stops', rows);
+  ok(!JSON.stringify(shareCalls).includes(link.split('#share=')[1]) && !(await page.evaluate(() => JSON.stringify(Object.assign({}, localStorage, sessionStorage)))).includes(link.split('#share=')[1]),
+    '9i the token goes to the server nowhere and into browser storage nowhere');
+
+  // a second link, then withdraw the first
+  await page.click('#share-make');
+  await page.waitForFunction(() => document.querySelectorAll('#share-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
+  ok((await shareList(page)).length === 2 && (await page.$eval('#share-link', (e) => e.value)) !== link, '9j a second link is a different link, and both are listed');
+  await page.click('#share-list li:last-child button');
+  await waitShare(page, /Withdrawn/);
+  const after = await shareList(page);
+  ok(after.some((r) => /^Withdrawn · made /.test(r) && !/Withdraw$/.test(r)) && after.some((r) => /^Working/.test(r)), '9k a withdrawn link is listed as withdrawn with no button; the other still works', after);
+  ok(w.shares.filter((r) => r.status === 'REVOKED').length === 1 && (await page.$eval('#share-new', (e) => e.hidden)), '9l the server revoked exactly that one, and the page no longer shows the link');
+
+  // the report's own bar: Share is live and goes to the card, Download PDF is live and prints; Compare and Watch stay inert
+  const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ t: e.textContent, live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action'), disabled: e.getAttribute('aria-disabled') })));
+  ok(JSON.stringify(bar.map((b) => b.t)) === JSON.stringify(['Compare property', 'Watch property', 'Share report', 'Download PDF'])
+     && bar[0].disabled === 'true' && bar[1].disabled === 'true' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf', '9m the report\'s own bar has Share and Download PDF live, and Compare and Watch inert as before', bar);
+  await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
+  await page.click('.da-rv-act[data-da-action="pdf"]');
+  await page.click('#share-pdf');
+  ok((await page.evaluate(() => window.__prints)) === 2, '9n both Download PDF buttons open the browser\'s print window (no PDF is made on a server)');
+  await page.click('.da-rv-act[data-da-action="share"]');
+  ok(await page.evaluate(() => document.activeElement && document.activeElement.id) === 'share-make', '9o the report\'s Share button takes the person to the card (focus on "Make a client link")');
+
+  // print: only the report goes on the paper
+  await page.emulateMedia({ media: 'print' });
+  const printed = await page.evaluate(() => {
+    const shown = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0; }; // takes up room on the page (a child of a hidden card does not)
+    return { report: shown('#report .da-rv'), head: shown('header.top'), share: shown('#share'), trial: shown('#trial'), status: shown('#status'), form: shown('#rf'),
+      actions: shown('.da-rv-actions'), filters: shown('.da-rv-sec--filters'), saved: shown('#saved'), auth: shown('#auth-overlay') };
+  });
+  ok(printed.report && !printed.head && !printed.share && !printed.trial && !printed.status && !printed.form && !printed.actions && !printed.filters && !printed.saved && !printed.auth,
+    '9p in print only the report is shown: no header, card, form, status, filter chips or action buttons', printed);
+  await page.emulateMedia({ media: 'screen' });
+  ok(errors.length === 0 && foreign.length === 0, '9q no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
+  const w = world({ rights: RIGHTS_SHIPPED });
+  const { ctx, page, shareCalls } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  ok(w.made.size === 0 && (await shareHidden(page)) && shareCalls.length === 0, '9r a report that was not saved gets no share card and makes no share request');
+  const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
+  ok(bar.length === 0 || (bar.every((b) => b.act !== 'share') && bar.filter((b) => b.live).every((b) => b.act === 'pdf')), '9s and its own bar offers no Share (Download PDF only, if the report has a bar at all)', bar);
+  await ctx.close();
+}
+{
+  // opening a saved report shows its card; another report, or another person, never inherits the link
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#share-make');
+  await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(LINK.test(await page.$eval('#share-link', (e) => e.value)), '9t (control) a link is on screen');
+  await page.fill('#addr', OTHER);
+  await page.click('#go');
+  await page.waitForFunction(() => /Report ready|Making/.test(document.getElementById('status').textContent), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  ok((await page.$eval('#share-link', (e) => e.value)) === '' && (await page.$eval('#share-new', (e) => e.hidden)), '9u making the next report clears the previous report\'s link from the page');
+  await page.click('#saved-list li:last-child button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(!(await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '', '9v opening a saved report shows its card with no link on it (a link is never shown a second time)');
+  await page.click('#share-make');
+  await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
+  await page.evaluate(() => { const o = window.__sb.session; window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); void o; });
+  await page.waitForTimeout(200);
+  ok((await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '' && (await shareList(page)).length === 0, '9w signing out clears the card, the link and the list');
+  await ctx.close();
+}
+{
+  // the ways it can fail are said in plain words, and a failure never shows a link
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  w.shareFails = true;
+  await page.click('#share-make');
+  await page.waitForFunction(() => /could not be done/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Try again in a minute/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)) && !(await page.$eval('#share-make', (e) => e.disabled)),
+    '9x an unreachable service says so in plain words, shows no link, and leaves the button free');
+  w.shareFails = false; w.shareLimit = true;
+  await page.click('#share-make');
+  await page.waitForFunction(() => /most client links/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/most client links it can have/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)), '9y a report at the most links it can have says so');
+  await ctx.close();
+}
+{
+  const w = world();
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#share-make');
+  await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(wide <= 0, '9z on a 390 px screen the share card, the link and the list do not scroll the page sideways', wide);
   await ctx.close();
 }
 

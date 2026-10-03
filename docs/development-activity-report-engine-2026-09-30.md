@@ -484,6 +484,73 @@ what was missing was where they come from.
 `evaluation_entitlement_mutants.py` (1), `single_customer_generation_path_mutants.py` (2) and `development_activity_review_mutants.py`
 (1). They are carried to step 13 with the other open items; none of them guards step 7.
 
+**Step 8 (2026-10-03): share and PDF.** An agent can send a client a private, read-only link to one saved report and take it back at any
+time. A client opens it with no account. "Download PDF" is the browser's own print window.
+
+- **Founder answers (2026-10-03):** a link lasts **6 months**; the client **sees the street address**.
+- **The share link primitive already existed** (`docs/report-share.sql`, Order J1: an opaque token whose SHA-256 is all the database keeps,
+  one function that decides whether a link is usable, revoke that cannot be undone). It had no owner, no caller and no default expiry.
+  `docs/report-share-delivery.sql` gives it all three. It adds **no table, column, trigger or schedule**: four functions and two
+  constants, executable by the service role alone.
+  - `report_share_lifetime()` = 6 months, written once. The caller passes no expiry, and a lapsed link is replaced, never renewed.
+  - `report_share_limit()` = 25 links per report, ever (live or not), counted under a lock keyed on the report. This bounds what a signed-in
+    caller can write; it is not a product promise.
+  - `evaluation_report_share_create` needs the SAME standing that lets a member reopen a saved report (an active trial, or a complete
+    one). `evaluation_report_shares_of` and `evaluation_report_share_revoke` need only **ownership**, so a brokerage whose trial has ended
+    can still see and withdraw the links it made. A report or link that is not the caller's brokerage's is "not found", the same as one
+    that does not exist.
+  - `report_share_open` returns the stored report, when it was made, the snapshot's opaque handle and the brokerage's name, and **zero rows
+    unless the link is usable**. Unknown, withdrawn and expired links are indistinguishable: nothing tells anyone a link ever existed. It
+    also returns nothing once the account is withdrawn (a revoked evaluation or an inactive brokerage); a trial that merely ended does not
+    take back a report already shared.
+- **Two edge functions.** `manage-shared-report` (signed-in; JWT stays on) makes, lists and withdraws links for the caller's own brokerage.
+  It is deliberately NOT the report function's gate. `view-shared-report` is what the link opens, and is the second Development Activity
+  function deployed **without JWT verification** (the client has no account; the token is the credential; `deploy-edge-functions.yml`
+  and `supabase/config.toml` name exactly it). Its only input is the token in a POST body; its answer is the report, the brokerage's name,
+  the address while the private layer keeps it, and nothing else. It writes nothing and charges nothing.
+- **One module names the database functions, mints the token and writes the link** (`_shared/share-reads.ts`). The token is random, 256
+  bits, hashed before the database sees it, and **returned once** inside the link. A lost link is withdrawn and replaced.
+  **The token rides in the URL fragment** (`shared-report.html#share=<token>`), which a browser never sends to any server; the page reads it,
+  removes it from the address bar, keeps it for that tab only, and sends it in a POST body with no referrer.
+- **One reader of the private layer for display** (`_shared/private-subject.ts`), with two windows: the report function gets the address and
+  the cleaned label (for the brokerage), the client's function gets the **address alone** and cannot return the label (the label can be an
+  agent's own note). The report function's replay check keeps its own comparison read (it returns only match / mismatch / unknown).
+- **The client's page** (`shared-report.html`) is noindex, disallowed in `robots.txt`, in no navigation or sitemap, linked from no page,
+  sends no referrer and holds no sign-in. It draws the report with the same shared view the agent saw, with the agent's four actions
+  (Compare, Watch, Share, PDF) hidden, and shows the brokerage's name and the address. It shows **no agent's name and no label**. Every link
+  that opens nothing gets one message ("may have been withdrawn, or may have expired"); a failure says the link is fine and offers
+  "Try again".
+- **The agent's page** has a "Share this report with your client" card: make a link (shown once, with a Copy button), the report's links
+  with their status (Working, Expired, Withdrawn) and a Withdraw button, and Download PDF. Nothing about a link is kept in the browser.
+- **PDF is the browser's print window** ("Save as PDF"); no PDF is made on a server. Print stylesheets leave only the report on the paper.
+
+**Decisions taken by default (the founder may change any of them):**
+- **D-8-1.** A share records **no actor**. The credit ledger holds no user id by design (an open question about keeping an agent's identity in a
+  permanent trail), so a link does not remember which agent made it, any member of the owning brokerage may list and withdraw it (the same
+  default as saved reports, D-6-2), and the client's view names the brokerage and no person. "Prepared by <agent>" would need a creator
+  column and that decision.
+- **D-8-2.** Opening a link is **not recorded** (J1's audit log has two kinds of event and no text). There is no "viewed" indicator.
+- **D-8-3.** A link works until it lapses or is withdrawn, even if the brokerage's trial later ends; it stops if HomeSignal withdraws the
+  account.
+- **D-8-4.** The client sees the street address only while the private layer keeps it. Once it is purged, the report still opens, without
+  an address.
+
+**Proof:**
+- `test/report_share_delivery_pg` (43 checks, plus two real concurrent sessions racing for a report's last place, a create under
+  REPEATABLE READ refused, a second apply, the rollback with shares stored, the refusal without the primitive) and `mutate.py`: 30
+  prohibited mutations, all killed. CI: `report-snapshot-suite.yml`.
+- `test/share-link-functions.test.mjs` (85): both handlers and data layers over a stand-in database: who may ask, the exact requests, one
+  answer for every dead link, no label, nothing logged or echoed.
+- `test/report-share-delivery-structure.test.mjs` (51): the SQL's shape, the one module, the JWT posture (exactly two functions unverified),
+  the wiring. `test/shared-report-page.test.mjs` (36): the client's page.
+- `test/shared-report-page.browser.test.mjs` (32) and `test/development-activity-reports.browser.test.mjs` (125) in Chromium, the client page
+  against the REAL `view-shared-report` handler.
+- `test/share_delivery_mutants.py`: 51 prohibited mutations of the edge, both pages and the wiring, all killed.
+
+**Still open, stated:** the public endpoint is not rate-limited (a 256-bit token cannot be guessed, but a flood of requests is not stopped:
+carried to step 13); an owner still cannot list or withdraw invite links or remove an agent; opens are not recorded; PostgREST's mapping of the
+database's refusals to HTTP errors is unchecked against production; the signed-in paths are not exercised live.
+
 ## 5. Decisions taken by default (the founder may change any of them)
 
 - **D-G1. Access is a signed-in user in `dashboard_admins`, as an internal diagnostic surface.** The plan permits exactly this

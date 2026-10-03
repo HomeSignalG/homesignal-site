@@ -29,3 +29,14 @@ verify_jwt = true
 # additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
 [functions.development-activity-trial]
 verify_jwt = true
+
+# A brokerage's agent makes, lists and withdraws the private client links to its own stored reports (build step 8). JWT stays ON, and the
+# handler additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-shared-report]
+verify_jwt = true
+
+# What a CLIENT who holds a share link may read (build step 8). The ONE Development Activity function with JWT verification OFF: the client has
+# no account, and the link's secret token is the only credential. The deploy workflow's second --no-verify-jwt exception (the first is
+# get-address-report). It answers only a token the database says is usable, reads one stored report and writes nothing.
+[functions.view-shared-report]
+verify_jwt = false

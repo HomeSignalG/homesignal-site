@@ -39,6 +39,13 @@
    brokerage's name comes from the account and is not editable here; the agent's name is the person's own, saved to their sign-in
    account (client.auth.updateUser) from the "Your name on reports" card. The report function sends the header with each report and
    reads it fresh each time: a report is never stored with a name on it, so a changed name changes every report the next time it is shown.
+
+   Build step 8: a report that was saved can be SHARED and SAVED AS A PDF. "Share this report with your client" makes a private, read-only
+   link (manage-shared-report) that the client opens without signing in (shared-report.html, view-shared-report). The link lasts 6 months
+   and can be withdrawn here at any time; the page shows it ONCE, when it is made, because HomeSignal stores only a hash of it. The client
+   sees the brokerage's name and the street address, never the agent's name or the client label. "Download PDF" is the browser's own print
+   window (choose "Save as PDF"): the print stylesheet below leaves only the report on the paper. The page decides nothing about a link:
+   who may make one, how long it lasts and whether it works are the database's, through the two share functions.
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -87,6 +94,28 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #saved-list button:disabled{opacity:.6;cursor:default}
 #saved-status{margin:0;font-size:14px;min-height:1.5em}
 #saved-status.err{color:var(--red);font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.go.ghost{background:var(--panel);color:var(--accent);border:1px solid var(--accent)}
+#share{display:grid;gap:10px}
+#share h2{margin:0;font-size:17px}
+#share .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#share-new{display:grid;gap:10px}
+#share-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+#share-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+#share-list li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13.5px}
+#share-list li .st{font-weight:600}
+#share-list li .st.live{color:var(--accent)}
+#share-list button{font:inherit;font-size:13px;font-weight:600;color:var(--red);background:none;border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-height:36px;cursor:pointer}
+#share-list button:disabled{opacity:.6;cursor:default}
+#share-status{margin:0;font-size:14px;min-height:1.5em}
+#share-status.err{color:var(--red);font-weight:600}
+/* PRINT: only the report goes on the paper (build step 8). Every card, the form, the status lines and the sign-in are left off; the report's
+   own stylesheet (lib/da-report-view.js) takes care of the report. */
+@media print{
+  body{background:#fff}
+  header.top,.card,#status,#creditnote,.auth-overlay{display:none!important}
+  .wrap{max-width:none;padding:0;display:block}
+}
 .auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
 .auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
 .auth-modal h2{margin:0 0 4px;font-size:19px}
@@ -155,6 +184,21 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   </section>
   <p id="status" role="status" aria-live="polite"></p>
   <p id="creditnote" hidden></p>
+  <section class="card" id="share" aria-labelledby="share-title" hidden>
+    <h2 id="share-title">Share this report with your client</h2>
+    <p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p>
+    <div class="row">
+      <button type="button" class="go" id="share-make">Make a client link</button>
+      <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+    </div>
+    <div id="share-new" hidden>
+      <label>Client link<input type="text" id="share-link" readonly></label>
+      <button type="button" class="go" id="share-copy">Copy link</button>
+      <p class="hint" id="share-note"></p>
+    </div>
+    <ul id="share-list"></ul>
+    <p id="share-status" role="status" aria-live="polite"></p>
+  </section>
   <div id="report"></div>
 </main>
 
@@ -171,7 +215,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=2cb756ec"></script>
+<script src="lib/da-report-view.js?v=769487f6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================================
@@ -184,11 +228,14 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
   var REPORT_FN = SB_URL + '/functions/v1/get-development-activity-report';
   var TRIAL_FN = SB_URL + '/functions/v1/development-activity-trial';
+  var SHARE_FN = SB_URL + '/functions/v1/manage-shared-report';
+  var SHARE_LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
   var INVITE = /^hse1_[0-9a-f]{64}$/;
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
   var savedFresh = false, opening = false, savingName = false;
+  var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
@@ -399,17 +446,19 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (opening || busy || !session || !session.user) return;
     var forUser = session.user.id;
     opening = true; savedSay('Opening report ' + number + '…', false);
-    $('creditnote').hidden = true; $('report').textContent = '';
+    $('creditnote').hidden = true; $('report').textContent = ''; hideShare();
     var r = await post(REPORT_FN, { action: 'open', report_id: reportId });
     opening = false;
     if (!session || !session.user || session.user.id !== forUser) return;
     var body = r.body || {};
     var V = window.HS && window.HS.daReportView;
     var hd = headerOf(body);
+    var canShare = r.status === 200 && body.status === 'OK' && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
     if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, {
       subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
-      brokerage: hd.brokerage, agent: hd.agent
+      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'pdf'] : ['pdf']
     })) {
+      if (canShare) showShare(body.report_id);
       savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
       $('creditnote').textContent = 'This is the report as it was saved. Opening it did not use a free report.'; $('creditnote').hidden = false;
       return;
@@ -417,6 +466,108 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (r.status === 401) { session = null; openAuth(); }
     savedSay(savedMessage(r.status), true);
   }
+  // ---- sharing a saved report with a client (build step 8) ----------------------------------------------------------------------
+  function shareSay(text, isError){ var s=$('share-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  /** Hide the card and forget everything on it. The link in particular is never left on the page for the next report or the next person. */
+  function hideShare(){
+    shareFor = null; sharing = false;
+    $('share').hidden = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    $('share-list').textContent = ''; shareSay('', false);
+    $('share-make').disabled = false; $('share-make').textContent = 'Make a client link';
+  }
+  /** Show the card for a report that was saved (it has a permanent id). A report that was not saved cannot be shared, so it gets no card. */
+  function showShare(reportId){
+    hideShare();
+    if (typeof reportId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reportId)) return false;
+    shareFor = reportId;
+    $('share').hidden = false;
+    refreshShares();
+    return true;
+  }
+  function shareMessage(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 404) return 'This report could not be shared from here. Open it from Saved reports, then try again.';
+    if (httpStatus === 409 && body.error === 'share_limit_reached') return 'This report has reached the most client links it can have. Ask HomeSignal if you need another.';
+    if (httpStatus === 0 || httpStatus >= 500) return 'That could not be done just now. Try again in a minute.';
+    return 'That could not be done. Try again.';
+  }
+  var SHARE_WORDS = { ACTIVE: 'Working', EXPIRED: 'Expired', REVOKED: 'Withdrawn' };
+  async function refreshShares(){
+    if (!session || !session.user || !shareFor) return;
+    var forUser = session.user.id, forReport = shareFor;
+    var r = await post(SHARE_FN, { action: 'list', report_id: forReport });
+    if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return; // the person or the report changed while the answer was on its way
+    var body = r.body || {};
+    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.shares)) { shareSay(shareMessage(r.status, body), true); return; }
+    var list = $('share-list');
+    list.textContent = '';
+    body.shares.forEach(function(sh){
+      if (!sh || typeof sh.share_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(sh.share_id) || !SHARE_WORDS[sh.status]) return;
+      var li = document.createElement('li'), info = document.createElement('span'), st = document.createElement('span');
+      st.className = 'st' + (sh.status === 'ACTIVE' ? ' live' : ''); st.textContent = SHARE_WORDS[sh.status];
+      var made = dateWords(sh.created_at), until = dateWords(sh.expires_at);
+      info.appendChild(st);
+      info.appendChild(document.createTextNode(' \u00b7 made ' + (made || 'earlier') + (sh.status === 'ACTIVE' && until ? ' \u00b7 works until ' + until : '')));
+      li.appendChild(info);
+      if (sh.status === 'ACTIVE') {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Withdraw';
+        b.addEventListener('click', function(){ withdrawShare(sh.share_id, b); });
+        li.appendChild(b);
+      }
+      list.appendChild(li);
+    });
+    if (!body.shares.length) shareSay('No client link has been made for this report yet.', false);
+    else if ($('share-status').className !== 'err') shareSay('', false);
+  }
+  async function makeShare(){
+    if (sharing || !session || !session.user || !shareFor) return;
+    var forUser = session.user.id, forReport = shareFor;
+    sharing = true; $('share-make').disabled = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    shareSay('Making the link\u2026', false);
+    var r = await post(SHARE_FN, { action: 'create', report_id: forReport });
+    sharing = false;
+    if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return;
+    $('share-make').disabled = false;
+    var body = r.body || {};
+    var link = typeof body.link === 'string' ? body.link : '';
+    if (r.status === 200 && body.status === 'OK' && SHARE_LINK.test(link)) {
+      var until = dateWords(body.expires_at);
+      shareSay('Client link made.', false);
+      $('share-link').value = link;
+      $('share-note').textContent = 'Send this link to your client. Anyone who has it can read this report' + (until ? ', until ' + until : '') + '. HomeSignal shows this link only this once: if you lose it, withdraw it below and make a new one.';
+      $('share-copy').textContent = 'Copy link';
+      $('share-new').hidden = false;
+      refreshShares();
+      return;
+    }
+    if (r.status === 401) { session = null; openAuth(); }
+    shareSay(shareMessage(r.status, body), true);
+  }
+  async function withdrawShare(shareId, button){
+    if (!session || !session.user || !shareFor) return;
+    var forUser = session.user.id, forReport = shareFor;
+    button.disabled = true; shareSay('Withdrawing the link\u2026', false);
+    var r = await post(SHARE_FN, { action: 'revoke', share_id: shareId });
+    if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return;
+    var body = r.body || {};
+    if (r.status === 200 && body.status === 'OK') { shareSay('The link no longer works.', false); $('share-new').hidden = true; $('share-link').value = ''; refreshShares(); return; }
+    button.disabled = false;
+    if (r.status === 401) { session = null; openAuth(); }
+    shareSay(shareMessage(r.status, body), true);
+  }
+  function copyShare(){
+    var v = $('share-link').value;
+    if (!v) return;
+    function select(){ $('share-link').focus(); $('share-link').select(); $('share-copy').textContent = 'Selected: press Ctrl+C or \u2318C'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('share-copy').textContent = 'Copied'; }, select);
+      else select();
+    } catch (e) { select(); }
+  }
+  /** "Download PDF" is the browser's own print window: the person chooses "Save as PDF" there. The print stylesheet leaves only the report. */
+  function printReport(){ window.print(); }
+
   function dateWords(iso){
     var d = iso ? new Date(iso) : null;
     return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
@@ -479,12 +630,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (session.user && session.user.id !== was) {
-        role = null; showTeam(false); showSaved(false); showProfile(false); // another person's role, invite link, reports and name are never shown to this one
+        role = null; showTeam(false); showSaved(false); showProfile(false); hideShare(); // another person's role, invite link, reports, client links and name are never shown to this one
         $('report').textContent = ''; $('creditnote').hidden = true; say('', false);
         loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
       }
     } else {
-      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false);
+      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false); hideShare();
       $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
@@ -544,7 +695,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (clientLabel) payload.label = clientLabel;
     if (access === 'trial') payload.idempotency_key = attempt.key; // an admin report is never charged and takes no key
     busy = true; $('go').disabled = true; say('Making the report…', false);
-    $('creditnote').hidden = true; $('report').textContent = '';
+    $('creditnote').hidden = true; $('report').textContent = ''; hideShare();
     var r = await post(REPORT_FN, payload);
     busy = false; $('go').disabled = false;
     if (r.status === 0) { say('The report service could not be reached. Check your connection, then press Make report again: it will not use a second free report.', true); return; }
@@ -559,7 +710,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!ok) { say(messageFor(r.status, body), true); return; }
     var V = window.HS && window.HS.daReportView;
     var hd = headerOf(body);
-    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent })) { say('The report came back but could not be shown.', true); return; }
+    // only a report that was saved (it has a permanent id) can be shared with a client; any report on screen can be printed
+    var shareable = body.stored === true && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
+    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'pdf'] : ['pdf'] })) { say('The report came back but could not be shown.', true); return; }
+    if (shareable) showShare(body.report_id);
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
@@ -580,6 +734,17 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });
     $('mint').addEventListener('click', mintInvite);
     $('copy-invite').addEventListener('click', copyInvite);
+    $('share-make').addEventListener('click', makeShare);
+    $('share-copy').addEventListener('click', copyShare);
+    $('share-pdf').addEventListener('click', printReport);
+    // the report's own Share and Download PDF buttons (lib/da-report-view.js writes them with data-da-action; the page decides what they do)
+    $('report').addEventListener('click', function(e){
+      var b = e.target && e.target.closest ? e.target.closest('[data-da-action]') : null;
+      if (!b) return;
+      var act = b.getAttribute('data-da-action');
+      if (act === 'pdf') printReport();
+      else if (act === 'share' && !$('share').hidden) { $('share').scrollIntoView(); $('share-make').focus(); }
+    });
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
     client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
   });

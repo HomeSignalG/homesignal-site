@@ -99,13 +99,24 @@ const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts'
 // Build step 6: the two READ-ONLY saved-report functions join the ledger to this table to list a brokerage's reports and to open one by id.
 // They write nothing (STABLE, no DML), which test/saved-reports-structure.test.mjs pins.
 const SAVED_SQL = 'docs/saved-reports.sql';
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read)', namesTable.join(','));
+// Build step 8: the share-delivery SQL's client read (report_share_open) joins a share link's report id to this table to hand back the stored text
+// of a link that is usable, and nothing else. One STABLE read-only function; 3f pins that it names the table once and never writes or grants it.
+const DELIVERY_SQL = 'docs/report-share-delivery.sql';
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read; and, from build step 8, the share-delivery client read, 3f)', namesTable.join(','));
 {
   const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
   ok(namesTable.includes(REPORT_DATA) && JSON.stringify(uses) === JSON.stringify(['report_snapshot?select=body&report_id=eq.']) && !/method: '(PUT|PATCH|DELETE)'/.test(t),
     '3e: the report function names the table once, to read ONE stored body by id (a retried trial key), and has no write verb (control: it does name it)', uses);
+}
+{
+  const t = codeOf(DELIVERY_SQL).replace(/'(?:[^']|'')*'/g, "''");
+  const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
+  const open = (t.match(/create or replace function public\.report_share_open\([\s\S]*?\$\$;/) || [''])[0];
+  ok(namesTable.includes(DELIVERY_SQL) && uses.length === 1 && /join public\.report_snapshot s on s\.report_id = r\.report_id/.test(open) && /language sql stable security definer/.test(open)
+    && !/\b(insert|update|delete|truncate|grant|alter|drop)\b[^;]*\breport_snapshot\b/i.test(t),
+    '3f: the share-delivery SQL names the table exactly once, as a JOIN inside the STABLE client read report_share_open, and never inserts, updates, deletes, truncates, grants, alters or drops it (control: it does name it)', uses);
 }
 {
   const t = codeOf(SHARE_SQL).replace(/'(?:[^']|'')*'/g, "''");
