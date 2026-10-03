@@ -116,15 +116,15 @@ ok(cp.includes("What\\'s changing across your zip code"),
 // Founder, 2026-10-02: the page is called Activity (the Explore menu entry), so its eyebrow
 // says Activity in all three hydrated states and in the generated document. "Your zip codes"
 // stays: that heading names the Place type (followed ZIP codes), not this page.
-ok((cp.match(/eyebrow">Activity</g) || []).length === 3 && !cp.includes('eyebrow">ZIP Codes<'),
-  'PS-001 the page eyebrow says Activity in all three states (not covered, honest-empty, normal)');
+ok((cp.match(/eyebrow">Activity</g) || []).length === 4 && !cp.includes('eyebrow">ZIP Codes<'),
+  'PS-001 the page eyebrow says Activity in all four states (not covered, honest-empty, normal, ZIP coverage panel)');
 ok(cp.includes('Your zip codes'),
   'PS-001 the followed-list heading still says Your zip codes (the Place type, not the page name)');
 ok(/class="eyebrow">Activity<\/p>/.test(gen) && !/class="eyebrow">ZIP Codes<\/p>/.test(gen),
   'PS-001 the generated document\'s SSR eyebrow is Activity too');
 // Founder, 2026-10-02: the browser TAB says Activity as well, matching the Explore menu and the
 // other Explore pages' tabs (development.html is "Quality of Life Impact"). The page's script
-// never rewrites document.title (only the withheld-ZIP notice does, in shell.js).
+// never rewrites document.title (only the ZIP coverage / retired page does, in shell.js).
 const communityHtml = read('community.html');
 ok(/<title>HomeSignal — Activity<\/title>/.test(communityHtml) && !/<title>HomeSignal — Community<\/title>/.test(communityHtml),
   'PS-001 the Activity page\'s browser tab title is "HomeSignal — Activity"');

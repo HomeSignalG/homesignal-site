@@ -12,8 +12,8 @@
 //   newly materialized 89501 (Reno NV — civic content, previously blocked)
 //                      35801 (Huntsville AL — coverage_coming honest empty)
 //   (84684 was walked here as the "hardest centroid" until 2026-10-03. Its existence is
-//    unverified, so its page is withheld (lib/withheld-zip-pages.json) and shows a noindex
-//    notice instead of Map 1. No other ZIP was substituted for it.)
+//    unverified, so it has no page (page_mode unverified in lib/zip-coverage.json) and shows a
+//    noindex notice instead of Map 1. No other ZIP was substituted for it.)
 // For each: page boots on live data, Street stays Street, Satellite stays
 // Satellite (no silent revert to Focus), Focus renders, hover = "type · name",
 // marker click opens the same right panel, zero page errors. Mobile bottom

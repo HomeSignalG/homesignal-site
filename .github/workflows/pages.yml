@@ -82,7 +82,9 @@ on:
       # ship an artifact whose controls file the live monitor cannot use.
       - 'scripts/lib/zip-page-controls.mjs'
       - 'lib/community-page.js'
-      - 'lib/withheld-zip-pages.json'
+      - 'lib/zip-coverage.json'
+      - 'docs/maps-coverage/fix4/zip-coverage-internal.json'
+      - 'scripts/build_zip_coverage.py'
       - 'shell.js'
       - 'community.html'
       - '404.html'
@@ -193,22 +195,38 @@ jobs:
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
-          # WITHHELD ZIP PAGES (founder, 2026-10-01): no document for any of them, the list
-          # itself ships (shell.js reads it), and the documents plus the withheld ZIPs are
-          # exactly the canonical registry.
+          # ZIP COVERAGE (founder, 2026-10-03): every ZIP in lib/zip-coverage.json keeps a document
+          # (a ZIP with no Census-drawn area is not proven inactive), the model ships (shell.js
+          # reads it), the model equals what the classification record derives, and the documents
+          # plus the USPS-confirmed retired ZIPs (none today) are exactly the canonical registry.
+          python3 scripts/build_zip_coverage.py --check
           python3 - <<'PY'
           import json, os
           man = json.load(open('_site/zip-pages-manifest.json'))
-          wh = json.load(open('_site/lib/withheld-zip-pages.json'))['zips']
-          assert sorted(wh) == man['withheld_zips'], 'the shipped list != the list the build used'
-          present = [z for z in wh if os.path.exists(f'_site/community/{z}')]
-          assert not present, f'withheld ZIP documents were written: {present}'
+          cov = json.load(open('_site/lib/zip-coverage.json'))['zips']
+          assert man['coverage_zips'] and set(man['coverage_zips']) <= set(cov), 'the build did not use the shipped model'
+          # PUBLIC MODEL HYGIENE (founder, 2026-10-03): what browsers receive carries page behavior only.
+          # No provenance, no review notes, no vendor detail; the full record stays internal.
+          import re
+          raw = open('_site/lib/zip-coverage.json', encoding='utf-8').read()
+          bad = re.findall(r'third_party_flag|decommission|verification_notes|postal_status(?:_source|_verified_at)?|source_md5|source_class|unitedstateszipcodes', raw, re.I)
+          assert not bad, f'internal provenance reached the browser-delivered model: {sorted(set(bad))}'
+          assert all(sorted(e) == ['map_coverage', 'page_mode', 'zip_code', 'zip_type'] for e in cov.values()), 'public coverage entries must be exactly the four public fields'
+          assert not os.path.exists('_site/docs'), 'docs/ (the internal coverage record) must not ship'
+          missing = [z for z in man['coverage_zips'] if not os.path.exists(f'_site/community/{z}/index.html')]
+          assert not missing, f'coverage ZIPs with no document: {missing}'
+          # ZIPs with NO page: USPS-verified retired (none today) and unverified (84684, 84685; founder 2026-10-03)
+          retired = man['retired_zips'] + man['unverified_zips']
+          assert sorted(man['unverified_zips']) == ['84684', '84685'], f"unverified ZIPs changed: {man['unverified_zips']}"
+          present = [z for z in retired if os.path.exists(f'_site/community/{z}')]
+          assert not present, f'documents were written for ZIPs with no page: {present}'
           sm = open('_site/sitemap.xml', encoding='utf-8').read()
-          listed = [z for z in wh if f'/community/{z}/' in sm or f'zip={z}' in sm]
-          assert not listed, f'withheld ZIPs are in the sitemap: {listed}'
-          assert man['documents'] + len(wh) == man['canonical_registry'], \
-              f"documents {man['documents']} + withheld {len(wh)} != registry {man['canonical_registry']}"
-          print(f"withheld ZIP pages: {len(wh)} absent; {man['documents']} documents + {len(wh)} = {man['canonical_registry']}")
+          listed = [z for z in retired if f'/community/{z}/' in sm or f'zip={z}' in sm]
+          assert not listed, f'ZIPs with no page are in the sitemap: {listed}'
+          assert man['documents'] + len(retired) == man['canonical_registry'], \
+              f"documents {man['documents']} + no-page {len(retired)} != registry {man['canonical_registry']}"
+          print(f"ZIP coverage: {len(man['coverage_zips'])} limited-coverage ZIPs all have a document; "
+                f"{len(retired)} retired; {man['documents']} documents + {len(retired)} = {man['canonical_registry']}")
           PY
           echo "artifact size: $(du -sh _site | cut -f1)"
           # SITEMAP RECONCILIATION — the advertised set must BE the index-eligible set.

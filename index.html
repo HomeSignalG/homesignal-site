@@ -45,6 +45,7 @@
           <button class="home-index__search-btn" id="homeSearchBtn" type="submit">Search</button>
         </form>
         <p class="home-index__search-error" id="homeSearchErr" role="alert" hidden></p>
+        <p class="home-index__search-hint" id="homeNearHint" hidden></p>
         <p class="home-index__helper">No account required.</p>
       </div>
 
@@ -121,7 +122,7 @@
 <script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=0e07ea2e"></script>
+<script src="shell.js?v=d066a57f"></script>
 <script>
 (function () {
   // EXPLORE SEARCH. Read-only discovery: a search never follows, saves, subscribes, changes a
@@ -323,6 +324,16 @@
 
   HS.onReady(function () {
     $('homeSearch').addEventListener('submit', submit);
+    // A ZIP page with no ZIP-wide map (lib/zip-coverage.json) sends its visitor here with ?near=<zip>:
+    // say what to enter and put the cursor in the box. The ZIP is context for the hint only; the
+    // search itself still geocodes the address that gets typed and searches around that point.
+    var near = new URLSearchParams(location.search).get('near');
+    if (/^\d{5}$/.test(near || '')) {
+      var hint = $('homeNearHint');
+      hint.textContent = 'Enter a street address near ZIP ' + near + ' to see development activity around that address.';
+      hint.hidden = false;
+      $('homeQuery').focus();
+    }
     var f = $('homeMapFrame');
     f.addEventListener('load', function () { watchSample(); });
     // The frame is in the page from the moment the shell injects it, so Map 1 can finish

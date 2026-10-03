@@ -38,7 +38,7 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { assertCommunityRow, indexable } from './lib/verify-communities-assert.mjs';
 import { surfaceBanner } from './lib/surface-banner.mjs';
-import { loadDeployedWithheld, readWithheldInPage, judgeWithheld } from './lib/withheld-zips-live.mjs';
+import { loadDeployedCoverage, readCoverageInPage, judgeCoverage } from './lib/zip-coverage-live.mjs';
 import {
   loadZipStateCrosswalk,
   assertQuarantineIsHonest,
@@ -104,14 +104,14 @@ async function readPage(page, zip) {
   try {
     await page.waitForFunction(() => {
       const p = document.getElementById('commPage');
-      return !!document.getElementById('hs-withheld')     // the shell's withheld-ZIP notice
+      return !!document.getElementById('hs-zip-coverage')   // the ZIP coverage panel (lib/zip-coverage.json)
         || !!(p && p.textContent && p.textContent.trim().length > 0);
     }, { timeout: 45000 });
   } catch (e) {
     throw new Error(`community.html?zip=${zip}: #commPage never rendered within 45s (${String(e && e.message).slice(0, 80)})`);
   }
-  const wh = await page.evaluate(readWithheldInPage);
-  if (wh.withheld) return { ...wh, withheldNotice: true };
+  const wh = await page.evaluate(readCoverageInPage);
+  if (wh.panel) return { ...wh, coveragePanel: true };
   return page.evaluate(() => {
     const p = document.getElementById('commPage');
     const robots = (document.getElementById('robots-meta') || {}).getAttribute
@@ -183,9 +183,9 @@ async function main() {
   // Phase 0 first: the model check is cheap and browser-free, so a geographic
   // modeling defect is reported even if the page walk later has trouble.
   const modelFails = await verifyZipStateModel();
-  // WITHHELD ZIP PAGES (founder, 2026-10-01): the list the live site serves.
-  const WH = await loadDeployedWithheld(SITE_BASE);
-  console.log('Withheld ZIP pages: ' + WH.note);
+  // ZIP COVERAGE (founder, 2026-10-03): the model the live site serves.
+  const WH = await loadDeployedCoverage(SITE_BASE);
+  console.log('ZIP coverage panels: ' + WH.note);
   let withheldOk = 0;
 
   let walked = [];
@@ -241,10 +241,10 @@ async function main() {
       const row = walked[i];
       try {
         const st = await readPage(page, row.zip);
-        if (WH.zips.has(row.zip) || st.withheldNotice) {
-          const wf = judgeWithheld(row.zip, WH.zips.has(row.zip), st);
+        if (WH.modes.has(row.zip) || st.coveragePanel) {
+          const wf = judgeCoverage(row.zip, WH.modes.get(row.zip), st);
           if (wf.length) fails.push(...wf);
-          else { withheldOk++; console.log(`  ✓ ${row.zip} → withheld: "not available" notice, noindex`); }
+          else { withheldOk++; console.log(`  ✓ ${row.zip} → ${WH.modes.get(row.zip)} coverage panel, noindex`); }
           continue;
         }
         const res = await assertCommunityRow(row, st, async (zip) =>
@@ -288,7 +288,7 @@ async function main() {
     `- Materialized pages checked: **${walked.length}** (all must render their stamped state and stay noindex; `
       + `${nIdx} carry the development gate, which is /community/<zip>/'s business, not this page's)`,
     `- Rows re-read after a mid-walk materializer change: **${reReads}**`,
-    `- Withheld ZIP pages (lib/withheld-zip-pages.json, as deployed): **${WH.zips.size}**, of which **${withheldOk}** were walked and showed the noindex "not available" notice`,
+    `- ZIP coverage panels (lib/zip-coverage.json, as deployed): **${WH.modes.size}**, of which **${withheldOk}** were walked and showed the right panel on a noindex URL`,
     `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Cross-state ZIP model violations: **${modelFails.length}** (every ZIP page vs the authoritative USPS state)`,
     `- Failed: **${fails.length}**`,

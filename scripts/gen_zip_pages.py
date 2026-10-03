@@ -128,20 +128,39 @@ def meeting_cutoff(now_iso):
     return (now_iso or "")[:10]
 
 
-WITHHELD_PATH = os.path.join(os.path.dirname(__file__), "..", "lib", "withheld-zip-pages.json")
+COVERAGE_PATH = os.path.join(os.path.dirname(__file__), "..", "lib", "zip-coverage.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_zip_coverage as zcov   # the model's own validator (one definition of its invariants)
 
 
-def load_withheld(path=WITHHELD_PATH):
-    """The ZIPs whose pages are taken off the live site. A missing or malformed list is an
-    error, never an empty set: an empty set would silently put every withheld page back."""
+def coverage_mode(entry):
+    """The page a ZIP gets. MUST equal shell.js HS.zipCoverageMode (pinned by
+    test/zip-coverage.test.mjs, which runs both over every entry). A ZIP with no entry is
+    standard. Anything this cannot place fails SAFE to verification_pending, never to a
+    made-up boundary."""
+    if entry is None:
+        return "standard"
+    if entry.get("page_mode") in ("retired", "unverified"):
+        return entry["page_mode"]
+    if entry.get("page_mode") == "standard" and entry.get("map_coverage") == "zcta":
+        return "standard"
+    if entry.get("page_mode") == "specialized_zip":
+        return "specialized_zip"
+    return "verification_pending"
+
+
+def load_zip_coverage(path=COVERAGE_PATH):
+    """The ZIP coverage model (lib/zip-coverage.json, founder 2026-10-03). A missing or
+    malformed model is an error, never an empty one: an empty model would silently turn every
+    one of these ZIPs back into a standard page that claims a map it does not have."""
     try:
         doc = json.load(open(path, encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        sys.exit(f"ERROR: cannot read the withheld ZIP list {path}: {e}")
-    zips = doc.get("zips") if isinstance(doc, dict) else None
-    if not isinstance(zips, list) or not all(isinstance(z, str) and ZIP_RE.match(z) for z in zips):
-        sys.exit(f"ERROR: {path} must carry a list of 5-digit ZIP strings under 'zips'")
-    return set(zips)
+        zcov.validate_public(doc)
+    except (OSError, ValueError, KeyError) as e:
+        sys.exit(f"ERROR: cannot use the ZIP coverage model {path}: {e}")
+    if not doc["zips"]:
+        sys.exit(f"ERROR: {path} holds no ZIPs")
+    return doc
 
 
 def fetch_data(key, now_iso):
@@ -777,6 +796,22 @@ OG_IMAGE = f"{BASE}/og-default.png"
 APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=16c0ab06">\n'
 
 
+def coverage_panel(p):
+    """The coverage panel for a ZIP with no Census-drawn area. Same words as shell.js
+    HS.zipCoveragePanelHTML (both read lib/zip-coverage.json's copy); test/zip-coverage.test.mjs
+    fails if the two ever differ. No count, no '0 projects', no empty-search sentence."""
+    cov, z = p["coverage"], p["zip"]
+    c = cov["copy"]
+    # The nearby link is absolute on purpose: the document sets <base href="/">, so a bare
+    # "#zip-nearby" would resolve to the HOME page and leave this one.
+    sub = lambda t: t.replace("{zip}", z)
+    return (f'<section class="zcov" id="hs-zip-coverage" data-zip-coverage="{esc(cov["mode"])}" data-zip="{esc(z)}">'
+            f'<h2>{esc(sub(c["title"]))}</h2>'
+            + "".join(f'<p style="margin:10px 0 0">{esc(sub(t))}</p>' for t in c["body"])
+            + f'<p class="zcov-cta"><a class="inlinebtn" id="zcovAddress" href="/?near={esc(z)}#homeSearch">{esc(c["primary_cta"])}</a> '
+              f'<a class="inlinebtn" id="zcovNearby" href="/community/{esc(z)}/#zip-nearby">{esc(c["secondary_cta"])}</a></p></section>')
+
+
 def render(p, built):
     z, name, st = p["zip"], p["name"], p["state"]
     label = f"{name}, {st}" if st else name
@@ -807,6 +842,17 @@ def render(p, built):
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
             "Government notices, public meetings and local news")
+    cov = p.get("coverage")
+    if cov:
+        # A ZIP with no Census-drawn area (lib/zip-coverage.json). Title and description are the
+        # founder's patterns; robots stays the usual Rule F decision (never noindex merely for
+        # lacking a ZCTA). Nothing here claims a ZIP-wide map, a ZIP-wide count or a ZIP-wide
+        # search: the records below are what the governments and publishers that cover this ZIP
+        # have posted, and the panel says what this page cannot show.
+        title = cov["copy"]["page_title"].replace("{zip}", z)
+        desc = cov["copy"]["meta_description"].replace("{zip}", z)
+        lead = ("Government notices, public meetings and local news from the governments and "
+                "publishers that cover")
     # Usable links in the INITIAL HTML (Step 12). Internal, crawlable, no JavaScript: the
     # ZIP's own development/map page and the site root. Deliberately NOT the legacy
     # community.html?zip= URL — that page canonicalises here, so linking to it from here
@@ -815,6 +861,11 @@ def render(p, built):
              f'Development &amp; permits map for {esc(z)}</a> · '
              f'<a href="/">HomeSignal home</a> · '
              f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
+    if cov:
+        # No ZIP map exists for this ZIP, so no link to one; the address search is the way in.
+        links = (f'<nav class="zsec"><a href="/?near={esc(z)}#homeSearch">Search an address near {esc(z)}</a> · '
+                 f'<a href="/">HomeSignal home</a> · '
+                 f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
     # The sibling block goes AFTER that nav and carries a DIFFERENT class, deliberately.
     # scripts/prove-zip-pages-live.mjs scrapes `<nav class="zsec">[\s\S]*?</nav>` and takes
     # the FIRST match to assert the page's usable internal links; a second zsec nav placed
@@ -827,8 +878,14 @@ def render(p, built):
         where = f"{esc(p['county'])} County, {esc(st)}" if st else f"{esc(p['county'])} County"
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
-        links += (f'<nav class="zsib" aria-label="More ZIP codes in this county">'
+        nearby_id = ' id="zip-nearby"' if cov else ""
+        links += (f'<nav class="zsib"{nearby_id} aria-label="More ZIP codes in this county">'
                   f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
+    elif cov:
+        # The panel's "Search nearby ZIPs" link needs somewhere to land even when the county
+        # offers no sibling ZIP.
+        links += ('<nav class="zsib" id="zip-nearby" aria-label="Search nearby ZIPs">'
+                  '<h2>Search nearby ZIPs</h2><p><a href="/#homeSearch">Search another ZIP code or an address</a></p></nav>')
     # UP to the city page (SEO plan step 10: City -> ZIP -> Project). Only a city page
     # that exists is linked; its own class, for the same reason as zsib above.
     cts = p.get("cities") or []
@@ -849,9 +906,11 @@ def render(p, built):
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
-        f'<p>{lead} that apply to the whole of '
-        f'ZIP {esc(z)}{county_bit}.</p></header>'
-        + _dev_items(p.get("dev_entities") or [])
+        + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
+           if cov else
+           f'<p>{lead} that apply to the whole of '
+           f'ZIP {esc(z)}{county_bit}.</p></header>')
+        + ("" if cov else _dev_items(p.get("dev_entities") or []))
         + _items(p["gn"][:GN_CAP], "Government notices",
                  "No government notices on file for this ZIP yet.", "gn")
         + _items(um_items, "Upcoming public meetings",
@@ -943,9 +1002,9 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=0e07ea2e"></script>\n'
+        '<script src="/shell.js?v=d066a57f"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=b487b306"></script>\n'
+        '<script src="/lib/community-page.js?v=67435c86"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1685,6 +1744,9 @@ def main():
                     help="project pages' data JSON published beside the plane "
                          "(default: data/development_seo_projects.json). Production: missing, "
                          "or from a different run than the plane, is a hard error.")
+    ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
+                    help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
+                         "this at a fixture model; production always uses the committed one.")
     ap.add_argument("--allow-missing-dev-plane", action="store_true",
                     help="fixture-only: a missing plane is {} (no Rule D). "
                          "Refused in production.")
@@ -1744,39 +1806,57 @@ def main():
     if "80249" in set(zips):
         sys.exit("ERROR: ZIP 80249 present in the canonical registry - removed drift page")
     print(f"canonical registry: {len(zips)} rows, {len(set(zips))} distinct, 0 duplicates")
-    # WITHHELD ZIP PAGES (founder, 2026-10-01: "take them off live site until i can investigate
-    # further"). lib/withheld-zip-pages.json is the one list; shell.js reads it too. A withheld
-    # ZIP stays in the registry and in the database, and gets no document, no sitemap entry and
-    # no sibling, city or project link from this build. Against production every listed ZIP
-    # must be canonical, or a typo would withhold nothing while the build reported success
-    # (a fixture is a small slice of the registry, so it is only intersected).
-    withheld = load_withheld()
-    stray = sorted(withheld - set(zips))
+    # ZIP COVERAGE (founder, 2026-10-03; replaces the 2026-10-01 "withheld pages" list).
+    # lib/zip-coverage.json names the ZIPs with no Census-drawn area. Every one of them keeps a
+    # document, a canonical URL and its usual sitemap rule: no map and no ZIP-wide development
+    # claim, a coverage panel instead. Only a ZIP whose retirement the internal record shows as
+    # USPS-verified (page_mode retired, none today) or whose existence is unverified (page_mode
+    # unverified: 84684, 84685, founder 2026-10-03) gets no document. Against production every listed ZIP must be
+    # canonical, or a typo would change nothing while the build reported success (a fixture is a
+    # small slice of the registry, so it is only intersected).
+    coverage = load_zip_coverage(a.zip_coverage)
+    modes = {z: coverage_mode(e) for z, e in coverage["zips"].items()}
+    nonstandard = {z for z, m in modes.items() if m != "standard"}
+    retired = {z for z, m in modes.items() if m == "retired"}
+    unverified = {z for z, m in modes.items() if m == "unverified"}
+    nodoc = retired | unverified     # no document, no sitemap entry, no sibling/city/project link
+    stray = sorted(set(coverage["zips"]) - set(zips))
     if stray and not a.fixture:
-        sys.exit(f"ERROR: withheld ZIP(s) not in the canonical registry: {stray}")
+        sys.exit(f"ERROR: coverage ZIP(s) not in the canonical registry: {stray}")
     registry_n = len(zips)
-    zips = [z for z in zips if z not in withheld]
+    zips = [z for z in zips if z not in nodoc]
     d["zips"] = zips
-    print(f"withheld pages : {len(withheld)} (lib/withheld-zip-pages.json); building {len(zips)} of {registry_n}")
-    # City and project pages list the ZIPs they cover. A withheld ZIP has no page, so it leaves
-    # those lists too. It may only appear there as a listed or held ZIP: a withheld ZIP that a
-    # city COUNTS as Rule D, or the only ZIP a project page has, would make that page describe
-    # records from a withheld page, so the build stops and names it rather than guessing.
+    present = {z: m for z, m in modes.items() if z in set(zips) and m != "standard"}
+    counts = {m: sum(1 for x in present.values() if x == m) for m in ("specialized_zip", "verification_pending")}
+    print(f"zip coverage   : {len(coverage['zips'])} modelled; documents for {len(present)} "
+          f"({counts['specialized_zip']} specialized_zip, {counts['verification_pending']} verification_pending); "
+          f"{len(retired)} retired, {len(unverified)} unverified (no page); building {len(zips)} of {registry_n}")
+    # City and project pages list the ZIPs they cover. A ZIP with no Census-drawn area has no
+    # ZIP-wide development records, so it leaves those lists, and it may only appear there as a
+    # listed or held ZIP: a city that COUNTS such a ZIP as Rule D, or a project whose only ZIP is
+    # one, would make a page describe ZIP-wide records that cannot exist, so the build stops and
+    # names it rather than guessing.
     for key, c in cities.items():
-        counted = [z for z in c["rule_d_zips"] if z in withheld]
+        counted = [z for z in c["rule_d_zips"] if z in nonstandard]
         if counted:
-            sys.exit(f"ERROR: city {key} counts withheld ZIP(s) {counted} as Rule D")
-        c["zips"] = [z for z in c["zips"] if z not in withheld]
-        c["held_zips"] = [z for z in c["held_zips"] if z not in withheld]
+            sys.exit(f"ERROR: city {key} counts coverage-limited ZIP(s) {counted} as Rule D")
+        c["zips"] = [z for z in c["zips"] if z not in nonstandard]
+        c["held_zips"] = [z for z in c["held_zips"] if z not in nonstandard]
     for key, pr in projects.items():
-        kept = [z for z in pr["zips"] if z not in withheld]
+        kept = [z for z in pr["zips"] if z not in nonstandard]
         if not kept:
-            sys.exit(f"ERROR: project {key!r} is only on withheld ZIP(s) {pr['zips'][:5]}")
+            sys.exit(f"ERROR: project {key!r} is only on coverage-limited ZIP(s) {pr['zips'][:5]}")
         pr["zips"] = kept
 
     pages = assemble(d, now_iso)
     if len(pages) != len(zips):
         sys.exit(f"ERROR: assembled {len(pages)} pages for {len(zips)} canonical ZIPs")
+    for z, m in present.items():
+        # Rule D (ZIP-wide development entities) and the development cards need a ZIP area; this
+        # ZIP has none, so neither applies. Rule F (government notices, meetings, news) is
+        # unchanged: it does not depend on a boundary.
+        pages[z]["coverage"] = {"mode": m, "copy": coverage["copy"][m], "entry": coverage["zips"][z]}
+        pages[z]["rule_d"], pages[z]["rule_d_count"], pages[z]["dev_entities"] = False, 0, []
     link_cities(pages, cities)
     linked = link_projects(pages, cities, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
@@ -1828,7 +1908,9 @@ def main():
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
-               "canonical_registry": registry_n, "withheld_zips": sorted(withheld),
+               "canonical_registry": registry_n, "retired_zips": sorted(retired),
+               "unverified_zips": sorted(unverified),
+               "coverage_zips": {z: m for z, m in sorted(present.items())},
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
