@@ -2375,13 +2375,43 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to Census TIGERweb's 2020
     ZCTA set. 0 of the 706 are in it. The Census code sets are committed, so this re-checks offline.
   - ⛔ **Do not give any of them a polygon** (neighbour, centroid, radius or the 2010 delineation).
-  - ⏸️ **THE 47 DECOMMISSIONED-IN-DATASET ZIP PAGES ARE WITHHELD (founder, 2026-10-01: "take them off
-    live site until i can investigate further").** One list, `lib/withheld-zip-pages.json`,
-    computed from the Fix 4 record. `shell.js` shows a noindex "not available" notice on every page
-    that draws one of them and never resolves `HS.ready`; `gen_zip_pages.py` writes no document,
-    sitemap entry or link for them (manifest: documents + withheld = registry). Nothing is deleted
-    and `canonical_zip_registry` still holds 12,722. **To restore one, move it from `zips` to
-    `restored`**; `test/withheld-zip-pages.test.mjs` requires zips + restored = the Fix 4 class.
+  - ✅ **THE 47 ARE BACK ON THE SITE, AS COVERAGE-LIMITED PAGES (founder, 2026-10-03). This replaces the
+    2026-10-01 withhold ("take them off live site until i can investigate further"), which is gone.**
+    The decommissioned flag came from a THIRD-PARTY dataset, not USPS; a missing Census ZCTA proves
+    nothing about mail (PO-box and single-organization ZIPs have none and receive mail daily).
+    - **TWO FILES, one generator (`scripts/build_zip_coverage.py`; `--check` re-derives both;
+      `test/zip-coverage.test.mjs` fails on a hand edit).** The INTERNAL record
+      `docs/maps-coverage/fix4/zip-coverage-internal.json` keeps the full provenance and is never
+      deployed (`docs/` is outside the Pages artifact): `postal_status` · `postal_status_source` ·
+      `postal_status_verified_at` · `zip_type` · `zcta_2010_status` · `zcta_2020_status` ·
+      `map_coverage` · `page_mode` · `verification_notes`. The PUBLIC `lib/zip-coverage.json` is what
+      browsers receive and is DERIVED from it: **only `zip_code`, `zip_type`, `map_coverage`,
+      `page_mode`** per ZIP, plus the approved copy. No provenance, no review notes, no vendor or
+      "decommissioned" wording, no place names. `validate_public` and a Pages step refuse any
+      reintroduction. A ZIP with no entry is a standard page. All 47 are `unverified` /
+      `third_party_flag` / never verified / `address_only`; **28 `specialized_zip`** (20
+      single-organization + 8 PO box) and **19 `verification_pending`** (regular street ZIPs, incl.
+      98205 and 98929, which had a 2010 area).
+    - **Specialized heading (founder, 2026-10-03): "HomeSignal coverage for ZIP [ZIP]"**, which says
+      nothing about the Postal Service. It replaced "This ZIP is active in HomeSignal".
+    - ⛔ **NOTHING IS `retired` OR `active` WITHOUT USPS EVIDENCE.** The validator refuses either on a
+      third-party flag, and `retired` only with `postal_status_source = usps_verified` and a date. That check
+      runs on the INTERNAL record, which is the only place the evidence exists; the public file then
+      carries just `page_mode: retired`. Shell, build and live verifier all fail SAFE to
+      `verification_pending` for anything they cannot place.
+    - **What a visitor gets:** `/community/<zip>/` keeps its normal URL, HTTP 200 and its usual Rule F
+      robots/sitemap decision (never noindex merely for lacking a ZCTA). The page shows the founder's
+      coverage panel plus its government notices, meetings and local news; **no ZIP map, no stat tiles,
+      no development cards, no ZIP-wide count or "0 projects"**. `development.html` / `homesignalmap.html`
+      with `?zip=` show the same panel (noindex, canonical to the document); an address search (lat/lng)
+      near one of them is NEVER replaced. Primary CTA: the homepage address search (`/?near=<zip>`, a hint
+      and focus only); secondary: the page's `#zip-nearby` section.
+    - ⚠️ **The nearby link is absolute on purpose**: the generated documents set `<base href="/">`, so a
+      bare `#zip-nearby` resolves to the HOME page. The browser test caught it.
+    - The other 659 no-boundary ZIPs are UNCHANGED: they keep the standard page with the 2026-10-02
+      "no mapped area" sentence. Extending the panel to them is a founder call, not done here.
+    - Developer-only view (reads the INTERNAL record): `node scripts/zip-coverage-report.mjs [zip…]`. Tests:
+      `test/zip-coverage.test.mjs`, `test/zip-coverage.browser.test.mjs`.
   - The class is decided only by `scripts/fix4_classify_no_boundary_zips.py`. Per-ZIP record:
     `docs/maps-coverage/fix4/no-boundary-zip-classification.csv`. Receipt:
     `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.

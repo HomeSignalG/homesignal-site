@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { surfaceBanner } from './lib/surface-banner.mjs';
-import { loadDeployedWithheld, readWithheldInPage, judgeWithheld } from './lib/withheld-zips-live.mjs';
+import { loadDeployedCoverage, readCoverageInPage, judgeCoverage } from './lib/zip-coverage-live.mjs';
 import {
   assertZip,
   runPool,
@@ -217,11 +217,11 @@ async function renderZipPage(page, zip) {
   // sites on window for verification; if it doesn't yet, add: window.__HS_SITES = sites).
   await page.waitForFunction(() => {
     return typeof window.__HS_SITES !== 'undefined'
-      || !!document.getElementById('hs-withheld')     // the shell's withheld-ZIP notice
+      || !!document.getElementById('hs-zip-coverage')   // the ZIP coverage panel (lib/zip-coverage.json)
       || document.querySelector('#map .leaflet-container, #map canvas');
   }, { timeout: 15000 });
-  const wh = await page.evaluate(readWithheldInPage);
-  if (wh.withheld) return { ...wh, withheldNotice: true };
+  const wh = await page.evaluate(readCoverageInPage);
+  if (wh.panel) return { ...wh, coveragePanel: true };
 
   return page.evaluate(() => {
     const sites = Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null;
@@ -281,8 +281,8 @@ async function main() {
   if (SAMPLE > 0) reports = reports.slice(0, SAMPLE);
   const indexableZips = await loadIndexableZips();
   // WITHHELD ZIP PAGES (founder, 2026-10-01): the list the live site serves.
-  const WH = await loadDeployedWithheld(SITE_BASE);
-  console.log('Withheld ZIP pages: ' + WH.note);
+  const WH = await loadDeployedCoverage(SITE_BASE);
+  console.log('ZIP coverage panels: ' + WH.note);
   console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${indexableZips.size} ZIPs indexable under the substance gate)`);
 
   const browser = await chromium.launch();
@@ -316,10 +316,10 @@ async function main() {
     const zip = rep.zip;
     try {
       let st = await renderZipPage(page, zip);
-      if (WH.zips.has(zip) || st.withheldNotice) {
-        const wf = judgeWithheld(zip, WH.zips.has(zip), st);
+      if (WH.modes.has(zip) || st.coveragePanel) {
+        const wf = judgeCoverage(zip, WH.modes.get(zip), st);
         if (wf.length) fails.push(...wf);
-        else console.log(`  ✓ ${zip} → withheld: "not available" notice, noindex`);
+        else console.log(`  ✓ ${zip} → ${WH.modes.get(zip)} coverage panel, noindex`);
         return;
       }
       let res = assertZip(zip, rep, indexableZips.has(zip), st);

@@ -349,27 +349,57 @@
   HS.ready = new Promise(r => (_resolveReady = r));
   HS.onReady = (fn) => HS.ready.then(fn);
 
-  // ------------------------------------------------------ withheld ZIP pages --
-  // Founder, 2026-10-01: "retire the 47 zip code pages, take them off live site until i can
-  // investigate further". The list is lib/withheld-zip-pages.json, the ONE record of which ZIP
-  // pages are withheld; the Pages build reads the same file and writes no document or sitemap
-  // entry for them. Every page that draws a ZIP waits on HS.ready, so the shell checks here
-  // ONCE, shows a noindex "not available" notice, and never resolves HS.ready for that page.
-  // Nothing is deleted: putting a ZIP back is moving it out of the list's "zips".
-  HS.WITHHELD_ZIPS_URL = 'lib/withheld-zip-pages.json';
-  // Pure. Which withheld ZIP (if any) this page would show. The URL's ?zip= and a page's own
-  // declared ZIP count on every page; the viewed ZIP (saved or carried in the session) counts
-  // only on a page that draws the viewed ZIP.
-  HS.withheldZipFor = function (opts) {
+  // ------------------------------------------------------------ ZIP coverage --
+  // Founder, 2026-10-03. Replaces the 2026-10-01 "withheld ZIP pages" list. A ZIP with no
+  // Census-drawn area (PO-box, single-organization and similar ZIPs) is NOT proven inactive, and
+  // the "decommissioned" flag that put 47 of them on that list came from a third-party dataset,
+  // not USPS. So those ZIPs stay on the site, and the page says only what is true: it has no
+  // ZIP-wide map or ZIP-wide development records, and an address search is the way in.
+  //
+  // lib/zip-coverage.json is the PUBLIC model (scripts/build_zip_coverage.py derives it from an internal
+  // record that is never deployed; the public file carries page behavior only); the Pages build reads
+  // the same file. A ZIP with no entry is a standard page. page_mode:
+  //   standard             the normal page
+  //   specialized_zip      coverage panel, no map or ZIP-wide records
+  //   verification_pending the same, worded as "being verified"
+  //   retired              a neutral unavailable page; the build writes it only for a ZIP whose
+  //                        retirement the internal record shows as USPS-verified
+  // Anything we cannot place fails SAFE to verification_pending, never to a made-up boundary.
+  HS.ZIP_COVERAGE_URL = 'lib/zip-coverage.json';
+  HS.zipCoverageMode = function (entry) {
+    if (!entry) return 'standard';
+    if (entry.page_mode === 'retired') return 'retired';
+    if (entry.page_mode === 'standard' && entry.map_coverage === 'zcta') return 'standard';
+    if (entry.page_mode === 'specialized_zip') return 'specialized_zip';
+    return 'verification_pending';
+  };
+  // Pure. The coverage hit (if any) for the ZIP this page would show: {zip, entry, mode, copy}.
+  // The URL's ?zip= and a page's own declared ZIP count on every page; the viewed ZIP (saved or
+  // carried in the session) counts only on a page that draws the viewed ZIP.
+  HS.zipCoverageFor = function (opts) {
     opts = opts || {};
-    const list = opts.withheld;
-    if (!list || typeof list.has !== 'function') return null;
+    const doc = opts.coverage;
+    if (!doc || !doc.zips) return null;
     const cands = [opts.urlZip, opts.pageZip];
     if (opts.onZipPage) cands.push(opts.viewedZip);
     for (let i = 0; i < cands.length; i++) {
       const z = cands[i] == null ? '' : String(cands[i]);
-      if (/^\d{5}$/.test(z) && list.has(z)) return z;
+      if (!/^\d{5}$/.test(z) || !Object.prototype.hasOwnProperty.call(doc.zips, z)) continue;
+      const entry = doc.zips[z];
+      const mode = HS.zipCoverageMode(entry);
+      if (mode === 'standard') continue;
+      return { zip: z, entry: entry, mode: mode, copy: (doc.copy || {})[mode] || null };
     }
+    return null;
+  };
+  // 'community' pages draw their own coverage panel (lib/community-page.js); 'map' pages are
+  // the ZIP-map pages and show the panel instead of a map; anything else is untouched.
+  HS.zipCoveragePageKind = function (path) {
+    path = String(path || '');
+    if (/\/community\/\d{5}\/?$/.test(path)) return 'community';
+    const base = path.split('/').pop() || 'index.html';
+    if (base === 'community.html') return 'community';
+    if (base === 'development.html' || base === 'homesignalmap.html') return 'map';
     return null;
   };
   HS.isZipPagePath = function (path) {
@@ -378,35 +408,64 @@
     const base = path.split('/').pop() || 'index.html';
     return (HS.ZIP_NAV_PAGES || []).indexOf(base) >= 0;
   };
-  // A list that cannot be read fails OPEN (the page draws as before) and says so: a failed
-  // fetch of one small same-origin file must not take every ZIP page down with it. The build
-  // still writes no document or sitemap entry for a withheld ZIP either way.
-  async function loadWithheldZips() {
+  function escHtml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  // The coverage panel: ONE renderer for the shell's map pages and the legacy community page.
+  // (scripts/gen_zip_pages.py writes the same words into the generated document; the copy comes
+  // from the same JSON, and test/zip-coverage.test.mjs fails if the two ever differ.)
+  // It states no count, no "0 projects" and no empty-search sentence: nothing here says a
+  // ZIP-wide search happened, because none can.
+  HS.zipCoveragePanelHTML = function (hit) {
+    const c = hit && hit.copy; if (!c) return '';
+    const z = hit.zip;
+    const sub = function (t) { return String(t).split('{zip}').join(z); };
+    return '<section class="zcov" id="hs-zip-coverage" data-zip-coverage="' + escHtml(hit.mode) + '" data-zip="' + escHtml(z) + '">'
+      + '<h2>' + escHtml(sub(c.title)) + '</h2>'
+      + c.body.map(function (p) { return '<p style="margin:10px 0 0">' + escHtml(sub(p)) + '</p>'; }).join('')
+      + '<p class="zcov-cta" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      + '<a class="inlinebtn" id="zcovAddress" style="text-decoration:none" href="/?near=' + encodeURIComponent(z) + '#homeSearch">' + escHtml(c.primary_cta) + '</a>'
+      + '<a class="inlinebtn" id="zcovNearby" style="text-decoration:none" href="/community/' + encodeURIComponent(z) + '/#zip-nearby">' + escHtml(c.secondary_cta) + '</a>'
+      + '</p></section>';
+  };
+  // The browser's model carries no place name (only page behavior), so the heading is the ZIP alone.
+  HS.zipCoverageLabel = function () { return ''; };
+  // A list that cannot be read fails OPEN: the page draws as a standard page, whose own "this ZIP
+  // has no mapped area" sentence is already honest for a ZIP with no boundary. One small
+  // same-origin file must not take every ZIP page down. The build still writes the same documents.
+  async function loadZipCoverage() {
     try {
-      const r = await fetch(HS.WITHHELD_ZIPS_URL, { cache: 'no-store' });
+      const r = await fetch(HS.ZIP_COVERAGE_URL, { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const doc = await r.json();
-      return new Set((doc && Array.isArray(doc.zips) ? doc.zips : []).map(String));
+      return (doc && doc.zips && typeof doc.zips === 'object') ? doc : null;
     } catch (e) {
-      console.warn('withheld ZIP list could not be read; pages draw as before', e);
+      console.warn('ZIP coverage model could not be read; pages draw as standard pages', e);
       return null;
     }
   }
-  // Started as the script loads, so the read runs alongside the shell's own fetches rather
-  // than after them.
-  const _withheldZipsP = loadWithheldZips();
-  function renderWithheldZip(zip) {
-    SS.set('viewZip', null);   // never carry a withheld ZIP onto the next page
+  // Started as the script loads, so the read runs alongside the shell's own fetches.
+  const _zipCoverageP = loadZipCoverage();
+  // The page a visitor gets in place of a map page (or for a retired ZIP): the panel inside the
+  // normal shell, so search and navigation still work. It never resolves HS.ready, so no map or
+  // development code runs. Robots: a ZIP-keyed map URL is not a canonical page (the document at
+  // /community/<zip>/ is), so it is noindex; its canonical points there.
+  function renderZipCoverage(hit) {
+    SS.set('viewZip', null);   // never carry this ZIP onto the next page
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
-    robots.content = 'noindex, nofollow';
+    robots.content = hit.mode === 'retired' ? 'noindex, nofollow' : 'noindex, follow';
     document.querySelectorAll('link[rel="canonical"]').forEach(function (l) { l.remove(); });
-    document.title = 'ZIP ' + zip + ' is not available — HomeSignal';
-    const html = '<div class="page" id="hs-withheld" data-zip-withheld="' + zip + '"><div class="ph">'
-      + '<div class="eyebrow">ZIP Codes</div><h1>ZIP ' + zip + ' is not available</h1>'
-      + '<p>We have taken this ZIP code\'s page down while we review it. Our ZIP code data lists '
-      + zip + ' as retired, so it may no longer be in use.</p>'
-      + '<p style="margin-top:12px"><a class="inlinebtn" href="/">Look up another ZIP code or address →</a></p>'
+    if (hit.mode !== 'retired') {
+      const cl = document.createElement('link'); cl.rel = 'canonical';
+      cl.href = '/community/' + encodeURIComponent(hit.zip) + '/'; document.head.appendChild(cl);
+    }
+    document.title = String(hit.copy.page_title).split('{zip}').join(hit.zip);
+    const label = HS.zipCoverageLabel(hit);
+    const html = '<div class="page" id="hs-zip-coverage-page" data-zip-coverage-page="' + escHtml(hit.mode) + '"><div class="ph">'
+      + '<div class="eyebrow">ZIP Codes</div><h1>' + escHtml(hit.zip) + (label ? ' · ' + escHtml(label) : '') + '</h1>'
+      + HS.zipCoveragePanelHTML(hit)
       + '</div></div>';
     const slot = $('hs-slot');
     if (slot) slot.innerHTML = html;
@@ -2556,17 +2615,23 @@
     captureReferral();          // first-touch attribution, before anything can fail
     captureEntry();             // which page type this visit entered through
     await injectShell();
-    // A withheld ZIP page shows its notice and stops here: HS.ready is never resolved, so no
-    // page code draws the ZIP, and no onboarding or sign-in flow opens over the notice.
-    const withheld = await _withheldZipsP;
-    const withheldZip = HS.withheldZipFor({
-      withheld: withheld,
+    // A ZIP with no standard page (lib/zip-coverage.json): a map page shows the coverage panel
+    // and stops here, so no map or development code runs; the community page draws the same
+    // panel itself (lib/community-page.js reads HS.zipCoverageDoc). A retired ZIP stops anywhere.
+    // On a map page only the URL's ?zip= decides, so an address search (lat/lng, addr) near one of
+    // these ZIPs is never replaced: addresses are searched as addresses, never as ZIP geography.
+    HS.zipCoverageDoc = await _zipCoverageP;
+    const kind = HS.zipCoveragePageKind(location.pathname);
+    const qs = new URLSearchParams(location.search);
+    const addressSearch = ['lat', 'lng', 'addr', 'address'].some(function (k) { return qs.has(k); });
+    const covHit = HS.zipCoverageFor({
+      coverage: HS.zipCoverageDoc,
       urlZip: HS.parseZipParam(location.search),
       pageZip: document.body && document.body.dataset ? document.body.dataset.zip : null,
-      viewedZip: state.zip,
-      onZipPage: HS.isZipPagePath(location.pathname)
+      viewedZip: kind === 'map' ? null : state.zip,
+      onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)
     });
-    if (withheldZip) { renderWithheldZip(withheldZip); return; }
+    if (covHit && (covHit.mode === 'retired' || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
