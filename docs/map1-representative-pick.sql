@@ -1,6 +1,8 @@
 -- ============================================================================
 -- MAP 1 STEP (a), SECOND VERSION: EACH PIN SHOWS ITS PROJECT'S NEWEST RECORD, LOOKED UP FROM A
--- STORED DAILY PICK (2026-10-02). DDL OF RECORD. NOT APPLIED.
+-- STORED DAILY PICK (2026-10-02). DDL OF RECORD. APPLIED 2026-10-03 (founder "go"), in parts, from main
+-- through db-sql: PART A, the first fill as four quarter calls (1,954 picks), PART B, homesignal-ingest's
+-- reader migration 20261002170000, then PART C (pg_cron job 83). Receipts: homesignal-ingest CLAUDE.md.
 -- Founder-approved goal, 2026-10-02: "newest record shown, page addresses kept the same, all
 -- three places changed together", with the before-and-after shown before anything goes live.
 -- Replaces docs/map1-representative-newest.sql, which was applied and rolled back the same hour.
