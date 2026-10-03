@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SQLF = 'docs/report-header.sql'
 HAND = 'supabase/functions/get-development-activity-report/handler.ts'
 DATA = 'supabase/functions/get-development-activity-report/data.ts'
+SUBJ = 'supabase/functions/_shared/private-subject.ts'   # build step 8: the one shared reader of a stored report's address and label
 READS = 'supabase/functions/_shared/evaluation-reads.ts'
 PAGE = 'development-activity-reports.html'
 NRF = 'test/national-report-function.test.mjs'
@@ -69,7 +70,7 @@ m('header_two_rows_accepted', "if (!Array.isArray(data) || data.length > 1) thro
 m('header_names_unchecked', "if (!r || !text(r.brokerage_name) || !text(r.agent_name)) throw new DataUnavailable('shape');", "if (!r) throw new DataUnavailable('shape');", [NRF], READS)
 
 # ---- the data layer ---------------------------------------------------------------------------------------------------------------------------
-m('label_uncleaned', "label: cleanDisplayName(c.label, LABEL_MAX)", "label: typeof c.label === 'string' ? c.label : null", [FNT, HST], DATA)
+m('label_uncleaned', "label: cleanDisplayName(c.label, labelMax)", "label: typeof c.label === 'string' ? c.label : null", [FNT, HST], SUBJ)
 m('header_stubbed', "headerOf: evaluation.reportHeader,", "headerOf: async () => ({ brokerage: null, agent: null }),", [PG, HST], DATA)
 
 # ---- the handler: on every trial report, read before the charge, never in what is stored, never for an admin ----------------------------------

@@ -116,11 +116,15 @@ const C = code(SRC);
   const subjectUses = [...C.matchAll(/\bsubject\b/g)].length, inHeader = [...head.matchAll(/\bsubject\b/g)].length;
   ok(subjectUses > 0 && subjectUses === inHeader, '4f the caller\'s address is read in ONE function, header(), and nowhere else', { subjectUses, inHeader });
   const optReads = [...C.matchAll(/opts\.(\w+)/g)].map((m) => m[1]);
-  ok(optReads.length > 0 && optReads.every((k) => ['subject', 'label', 'brokerage', 'agent'].includes(k)) && ['label', 'brokerage', 'agent'].every((k) => head.includes('opts.' + k)),
-    '4g opts carries the address, the client label, the brokerage and the agent, and is read in header() only', optReads);
+  // build step 8 adds two options, read in actionsBar() only: `live` (which of the four report actions are real buttons) and `hide` (which are left out)
+  const bar = (C.match(/function actionsBar\(opts\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(optReads.length > 0 && optReads.every((k) => ['subject', 'label', 'brokerage', 'agent', 'live', 'hide'].includes(k)) && ['label', 'brokerage', 'agent'].every((k) => head.includes('opts.' + k))
+     && bar.startsWith('function actionsBar(opts) {') && (C.match(/opts\.live/g) || []).length === 1 && (C.match(/opts\.hide/g) || []).length === 1 && bar.includes('opts.live') && bar.includes('opts.hide')
+     && !head.includes('opts.live') && !head.includes('opts.hide'),
+    '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
-  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-filter', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
-    '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, and the filter keys', dataNames);
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
+    '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, the filter keys and (build step 8) the action a live button stands for', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
 
@@ -153,24 +157,26 @@ const C = code(SRC);
     }
   };
   walk('.');
-  const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html';
+  const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html', CLIENT_PAGE = 'shared-report.html';
   const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
     'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md', 'docs/development-activity-build-steps-100526.md',
     // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
     REVIEW_PAGE, 'test/development-activity-review.test.mjs', 'test/development-activity-review.browser.test.mjs', 'test/lib-cache-keys.test.mjs',
     // build step 5c: the customer page for invited trial members, and its tests
-    CUSTOMER_PAGE, 'test/development-activity-reports.test.mjs', 'test/development-activity-reports.browser.test.mjs']);
+    CUSTOMER_PAGE, 'test/development-activity-reports.test.mjs', 'test/development-activity-reports.browser.test.mjs',
+    // build step 8: the client's page for a private share link, its tests, and the structural test of the whole share unit
+    CLIENT_PAGE, 'test/shared-report-page.test.mjs', 'test/shared-report-page.browser.test.mjs', 'test/report-share-delivery-structure.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
-  ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its two callers: the private review page (build step 4) and the customer page (build step 5c)', stray);
+  ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers: the private review page (build step 4), the customer page (build step 5c) and the client\'s page for a share link (build step 8)', stray);
   const pages = readdirSync(root).filter((f) => f.endsWith('.html')).concat(readdirSync(join(root, 'partials')).map((f) => 'partials/' + f));
   const loaders = pages.filter((p) => /da-report-view/.test(read(p)));
-  ok(pages.length > 10 && loaders.sort().join() === [CUSTOMER_PAGE, REVIEW_PAGE].sort().join() && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
-    '6c exactly two pages load it, the private review page and the customer page; no other page, partial, the ZIP-page generator or shell.js (' + pages.length + ' pages scanned)', loaders);
+  ok(pages.length > 10 && loaders.sort().join() === [CLIENT_PAGE, CUSTOMER_PAGE, REVIEW_PAGE].sort().join() && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
+    '6c exactly three pages load it, the private review page, the customer page and the client\'s share-link page; no other page, partial, the ZIP-page generator or shell.js (' + pages.length + ' pages scanned)', loaders);
   const keys = read('test/lib-cache-keys.test.mjs');
   ok(/'lib\/da-report-view\.js'\]/.test(keys) || /'lib\/da-report-view\.js',/.test(keys), '6d now that a page loads it, it is in lib-cache-keys CONTENT_KEYED, so its tag must carry its content hash (§1)');
-  ok([REVIEW_PAGE, CUSTOMER_PAGE].every((pg) => /<meta name="robots" content="noindex, nofollow">/.test(read(pg)) && new RegExp('^Disallow: /' + pg.replace('.', '\\.') + '$', 'm').test(read('robots.txt'))),
-    '6d2 both callers are noindex and disallowed in robots.txt (test/single-customer-generation-path.test.mjs P5 and P6 pin the rest)');
+  ok([REVIEW_PAGE, CUSTOMER_PAGE, CLIENT_PAGE].every((pg) => /<meta name="robots" content="noindex, nofollow">/.test(read(pg)) && new RegExp('^Disallow: /' + pg.replace('.', '\\.') + '$', 'm').test(read('robots.txt'))),
+    '6d2 all three callers are noindex and disallowed in robots.txt (test/single-customer-generation-path.test.mjs P5 and P6 pin the rest)');
   const fnTree = [];
   const walkFn = (d) => { for (const e of readdirSync(join(root, d))) { const p = d + '/' + e; if (statSync(join(root, p)).isDirectory()) walkFn(p); else fnTree.push(p); } };
   walkFn('supabase/functions');

@@ -167,9 +167,16 @@ const EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts', SNAP_MOD = 
 const namesIn = (f) => [...new Set([...code(f).matchAll(new RegExp(OURS.source, 'g'))].map((m) => m[0]))].sort();
 // Build step 6: docs/saved-reports.sql is a second SQL file that reads the ledger (two STABLE functions, no DML); test/saved-reports-structure.test.mjs pins it.
 const SAVED_SQL = 'docs/saved-reports.sql';
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, EVAL_READS, SNAP_MOD].sort())
+// Build step 8: docs/report-share-delivery.sql is a third SQL file that reads the ledger (it joins evaluation_credit and evaluation to find whose a
+// stored report is, and asks evaluation_report_open whether a brokerage has standing). It writes no row of this layer: its only writes are calls to the
+// share primitive. test/report-share-delivery-structure.test.mjs pins that (1g) and that standing is the SAME check saved reports use (1i).
+const DELIVERY_SQL = 'docs/report-share-delivery.sql';
+const deliveryCode = code(DELIVERY_SQL);
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, EVAL_READS, SNAP_MOD].sort())
+   && !/\b(insert\s+into|update|delete\s+from|truncate)\b/i.test(deliveryCode.replace(/'(?:[^']|'')*'/g, "''"))
+   && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(deliveryCode)
    && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL (and the read-only saved-reports SQL, build step 6), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+  '4: outside its SQL (and the read-only saved-reports SQL, build step 6, and the share-delivery SQL, build step 8, which writes no row of this layer), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 {
   const ER = code(EVAL_READS);
   const mints = [...ER.matchAll(/rpc\('evaluation_invite_mint', \{([^}]*)\}\)/g)];

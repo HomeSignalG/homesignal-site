@@ -38,9 +38,16 @@ name: report-snapshot-suite
 #      its report's private context. Against the REAL snapshot and private-layer SQL: the checks, a second apply, the rollback
 #      with shares stored, the refusal without the snapshot table, and every prohibited mutation, each of which MUST fail a
 #      NAMED check of the suite (a mutation that only crashes it fails the run). No caller, no endpoint, no page.
+#   7. SHARE AND PDF (docs/report-share-delivery.sql; Development Activity build step 8): the layer that gives that primitive its
+#      owner, its caller and its lifetime. A member of the brokerage that owns a stored report makes a link that lasts 6 months, lists the
+#      report's links and revokes them; a client who holds a link reads the report. Against the REAL account spine, private layer,
+#      snapshot, entitlement, saved-reports and share-primitive SQL: the checks, two REAL concurrent sessions racing for a report's last
+#      place (exactly one wins), a create under REPEATABLE READ refused, a second apply, the rollback with shares stored, the refusal
+#      without the primitive, and every prohibited mutation, each of which MUST fail a NAMED check of the suite.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
-# test/report-share.test.mjs, test/report-share-structure.test.mjs,
+# test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
+# test/share-link-functions.test.mjs, test/shared-report-page.test.mjs,
 # test/national-report*.test.mjs) run in unit-tests.yml with every
 # other offline suite.
 #
@@ -88,6 +95,14 @@ on:
       - 'supabase/functions/_shared/credit-rule.ts'
       - 'supabase/functions/_shared/evaluation-reads.ts'
       - 'supabase/functions/development-activity-trial/**'
+      - 'docs/report-share-delivery.sql'
+      - 'docs/saved-reports.sql'
+      - 'test/report_share_delivery_pg/**'
+      - 'test/report-share-delivery-structure.test.mjs'
+      - 'supabase/functions/_shared/share-reads.ts'
+      - 'supabase/functions/_shared/private-subject.ts'
+      - 'supabase/functions/manage-shared-report/**'
+      - 'supabase/functions/view-shared-report/**'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -130,6 +145,14 @@ on:
       - 'supabase/functions/_shared/credit-rule.ts'
       - 'supabase/functions/_shared/evaluation-reads.ts'
       - 'supabase/functions/development-activity-trial/**'
+      - 'docs/report-share-delivery.sql'
+      - 'docs/saved-reports.sql'
+      - 'test/report_share_delivery_pg/**'
+      - 'test/report-share-delivery-structure.test.mjs'
+      - 'supabase/functions/_shared/share-reads.ts'
+      - 'supabase/functions/_shared/private-subject.ts'
+      - 'supabase/functions/manage-shared-report/**'
+      - 'supabase/functions/view-shared-report/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -251,3 +274,13 @@ jobs:
         run: |
           set -o pipefail
           bash test/trial_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/trial.log
+      - name: A brokerage's member makes a 6-month link to its own stored report, lists and revokes it; a client who holds it reads the report; two sessions racing for the last place cannot both have it; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_share_delivery_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsd.log

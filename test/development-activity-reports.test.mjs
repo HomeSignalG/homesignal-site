@@ -52,14 +52,15 @@ ok(/shouldCreateUser:\s*true/.test(code) && !/shouldCreateUser:\s*false/.test(co
 // ---- 3. two functions, no decisions -----------------------------------------------------------------------------------------------------------
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
 ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
-   && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code),
-  '3a the only endpoints it names are the report function and the trial function on this project', urls);
+   && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
+   && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && (code.match(/\/functions\/v1\//g) || []).length === 3,
+  '3a the only endpoints it names are the report function, the trial function and (build step 8) the agent\'s share-link function, all on this project', urls);
 ok(!/\.from\(|\.rpc\(|\.storage\b|\.functions\.invoke\(/.test(code), '3b no table, RPC, storage or other function read');
 ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'internal'/.test(code) && !/radius/i.test(code),
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
 ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|report-rights|\.cleared\b|\.rights\b|\.stage\.key|\.lifecycle\.key|creditDecision|uses_report/.test(code),
   '3d no lifecycle, Type, stage, rights or credit rule on the page');
-ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
+ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'pdf'\] : \['pdf'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
 ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
@@ -145,6 +146,27 @@ ok(/var forUser = session\.user\.id;/.test(rs) && rs.indexOf('session.user.id !=
 ok(/if \(opening \|\| busy \|\| !session \|\| !session\.user\) return;/.test(os), '8c a saved report is not opened while one is being opened or a new report is being made');
 ok(os.indexOf('session.user.id !== forUser') > os.indexOf("post(REPORT_FN, { action: 'open'") && os.indexOf('session.user.id !== forUser') < os.indexOf('V.mount'),
   '8d an opened report that arrives after its person signed out, or after someone else signed in, is never shown');
+
+// 9. build step 8: sharing a saved report with a client, and the PDF
+const mk = fn('makeShare'), rf = fn('refreshShares'), wd = fn('withdrawShare'), hs = fn('hideShare');
+ok(mk.length > 400 && rf.length > 400 && wd.length > 200 && hs.length > 100, '9a makeShare, refreshShares, withdrawShare and hideShare are found (positive control)', [mk.length, rf.length, wd.length, hs.length]);
+const sharePosts = [...code.matchAll(/post\(SHARE_FN, (\{[^}]*\})\)/g)].map((m) => m[1].replace(/\s+/g, ' '));
+ok(JSON.stringify(sharePosts.sort()) === JSON.stringify(["{ action: 'create', report_id: forReport }", "{ action: 'list', report_id: forReport }", "{ action: 'revoke', share_id: shareId }"]),
+  '9b the share function is asked three things and each carries ONLY its id: no address, no client label, no expiry, no token', sharePosts);
+ok(/SHARE_LINK\.test\(link\)/.test(mk) && /typeof body\.link === 'string' \? body\.link : ''/.test(mk) && !/#share=['"]\s*\+|\+\s*['"]#share=/.test(code) && (code.match(/#share=/g) || []).length === 1,
+  '9c the page shows a link only when the server made it and it has the one expected form (the page builds none of it: the form appears once, in the check)');
+ok(!/(sessionStorage|localStorage)[^\n]*(share|SHARE)|(share|SHARE)[^\n]*(sessionStorage|localStorage)/.test(code), '9d no part of a share link is kept in browser storage');
+ok(/\$\('share-link'\)\.value = ''/.test(hs) && /\$\('share-list'\)\.textContent = ''/.test(hs) && /shareFor = null/.test(hs), '9e hiding the card forgets the link, the list and the report it was for');
+ok(code.split('hideShare();').length - 1 >= 5, '9f the card is hidden whenever a new report starts, a saved report is opened, or the person signs out or changes (five places call it)');
+ok(/session\.user\.id !== forUser \|\| shareFor !== forReport/.test(mk) && /session\.user\.id !== forUser \|\| shareFor !== forReport/.test(rf) && /session\.user\.id !== forUser \|\| shareFor !== forReport/.test(wd),
+  '9g an answer that arrives after the person or the report changed is never shown (create, list and withdraw each check)');
+ok(/<section class="card" id="share"[^>]*\shidden>/.test(page) && /var shareable = body\.stored === true && typeof body\.report_id === 'string'/.test(code),
+  '9h the card is hidden until a report that was SAVED is on screen: an unsaved report has no permanent id to share');
+ok(/function printReport\(\)\{ window\.print\(\); \}/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib|\.pdf\b/i.test(page.replace(/Download PDF|Save as PDF|\bPDF\b/g, '')),
+  '9i "Download PDF" is the browser\'s own print window and nothing else: no PDF library, no canvas, no file made');
+ok(/@media print\{[\s\S]*?header\.top,\.card,#status,#creditnote,\.auth-overlay\{display:none!important\}/.test(page), '9j the print stylesheet leaves the header, every card, the status lines and the sign-in off the paper');
+ok(/not your name, not your client label/.test(page) && /6 months/.test(page) && /street address/.test(page), '9k the card tells the agent what the client will and will not see, and how long the link lasts (founder, 2026-10-03)');
+ok(!/shared-report/.test(read('development-activity.html')) && !/shared-report/.test(read('partials/shell.html')) && !/shared-report/.test(read('shell.js')), '9l no public page links the client\'s page: a client reaches it only from a link an agent made');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

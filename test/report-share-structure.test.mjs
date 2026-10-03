@@ -194,8 +194,13 @@ const codeOf = (f) => { const t = readFileSync(join(ROOT, f), 'utf8'); return f.
 const namesShare = scanned.filter((f) => /\breport_share\w*/.test(codeOf(f)));
 ok(scanned.length > 50 && scanned.includes('supabase/functions/_shared/report-snapshot.ts') && namesShare.includes('docs/report-share.sql'),
   '10-control: the scan covers the code directories, the root files and every docs SQL (it reaches the shared edge-function directory) and finds the SQL of record', scanned.length + ' files');
-ok(namesShare.length === 1 && namesShare[0] === 'docs/report-share.sql',
-  '10: nothing outside the SQL of record names a share object or function — no page, script, edge function or other SQL creates, revokes or resolves a share', namesShare.join(','));
+// Build step 8 is the unit this pin was waiting for ("the unit that designs who may call"). It names exactly three files: the SQL of record, the
+// delivery SQL that gives it an owner, a lifetime and a reader (docs/report-share-delivery.sql), and the ONE edge module that calls them
+// (_shared/share-reads.ts). No page, script, workflow or other function names a share object; test/report-share-delivery-structure.test.mjs
+// pins what those two additions may and may not do.
+const SHARE_FILES = ['docs/report-share-delivery.sql', 'docs/report-share.sql', 'supabase/functions/_shared/share-reads.ts'];
+ok(JSON.stringify([...namesShare].sort()) === JSON.stringify(SHARE_FILES),
+  '10: nothing outside the SQL of record, the delivery SQL and the one share-reads module names a share object or function — no page, script, other edge function or other SQL creates, revokes or resolves a share', namesShare.join(','));
 const importsModule = scanned.filter((f) => f !== 'supabase/functions/_shared/report-share.ts' && /report-share(\.ts|\.js)?['"`]/.test(readFileSync(join(ROOT, f), 'utf8')));
 // The scan above stops at the code directories. A workflow that curls the RPC, or a data file that calls it, is also a caller, so the
 // FUNCTION names (not the table names, which this unit's own workflow path filters mention) are searched in the places a caller could hide.
@@ -204,8 +209,8 @@ const callsFunction = HIDING.filter((f) => /report_share_(create|revoke|resolve)
   && !/^docs\/(report-snapshot-contract|report-private-context-contract|development-activity-)/.test(f));
 ok(HIDING.length > 30 && HIDING.some((f) => f.startsWith('.github/workflows/')) && callsFunction.length === 0,
   '10c: no workflow, data file or script-like document calls a share function or its RPC route (the design documents that DESCRIBE the functions are exempt by name; a workflow or data file is not)', HIDING.length + ' files; ' + callsFunction.join(','));
-ok(existsSync(join(ROOT, 'supabase/functions/_shared/report-share.ts')) && importsModule.length === 0,
-  '10b: nothing imports the share module — there is no caller, no endpoint and no page (the first endpoint must sit behind the admin gate, and is a later unit)', importsModule.join(','));
+ok(existsSync(join(ROOT, 'supabase/functions/_shared/report-share.ts')) && JSON.stringify(importsModule) === JSON.stringify(['supabase/functions/_shared/share-reads.ts']),
+  '10b: the share module (the token mint, shape and hash) has exactly ONE importer, _shared/share-reads.ts — the two functions that serve a link (the agent\'s, behind a sign-in, and the client\'s, behind the token itself) reach it only through that file', importsModule.join(','));
 {
   const callers = scanned.filter((f) => /issueSnapshot|report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
   ok(callers.length > 0 && !callers.includes('docs/report-share.sql') && !callers.includes('supabase/functions/_shared/report-share.ts')

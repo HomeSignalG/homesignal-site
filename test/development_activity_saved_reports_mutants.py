@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SQLF = 'docs/saved-reports.sql'
 HAND = 'supabase/functions/get-development-activity-report/handler.ts'
 DATA = 'supabase/functions/get-development-activity-report/data.ts'
+SUBJ = 'supabase/functions/_shared/private-subject.ts'   # build step 8: the one shared reader of a stored report's address and label
 READS = 'supabase/functions/_shared/evaluation-reads.ts'
 GATE = 'supabase/functions/_shared/admin-gate.ts'
 PAGE = 'development-activity-reports.html'
@@ -65,9 +66,9 @@ m('list_unbounded', " || data.length > 1000) throw new DataUnavailable('shape');
 m('list_error_called_empty', "      if (error) throw new DataUnavailable('evaluation_reports_of');", "      if (error) return [];", [FNT], READS)
 
 # ---- the data layer: the address is shown only while the private layer keeps it ---------------------------------------------------------------
-m('purged_address_shown', "if (!c || c.state !== 'active') return { address: null, label: null };", "if (!c) return { address: null, label: null };", [FNT, PG], DATA)
-m('unreadable_layer_called_no_address', "      if (error || !Array.isArray(data)) throw new DataUnavailable('private context');\n      const c = data.length === 1 ? data[0] : null;\n      if (!c || c.state !== 'active') return {",
-  "      if (error || !Array.isArray(data)) return { address: null, label: null };\n      const c = data.length === 1 ? data[0] : null;\n      if (!c || c.state !== 'active') return {", [FNT], DATA)
+m('purged_address_shown', "if (!c || c.state !== 'active') return null;", "if (!c) return null;", [FNT, PG], SUBJ)
+m('unreadable_layer_called_no_address', "    if (error || !Array.isArray(data)) throw new DataUnavailable('private context');\n    const c = data.length === 1 ? data[0] : null;\n    if (!c || c.state !== 'active') return null;",
+  "    if (error || !Array.isArray(data)) return null;\n    const c = data.length === 1 ? data[0] : null;\n    if (!c || c.state !== 'active') return null;", [FNT], SUBJ)
 
 # ---- the report function: who may ask, what is called, what is charged ------------------------------------------------------------------------
 m('admin_may_list', "      if (!trial) return reply(req, { error: 'forbidden' }, 403);\n      try {\n        if (b.action === 'list')",

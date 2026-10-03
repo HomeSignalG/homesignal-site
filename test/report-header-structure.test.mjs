@@ -84,7 +84,9 @@ ok(metaNamers.includes('docs/report-header.sql') && metaNamers.every((f) => !/\b
 const tsNamers = fnFiles.filter((f) => /user_metadata|raw_user_meta_data|full_name/.test(stripJs(read(f))));
 ok(tsNamers.length === 0, '4b no edge function reads or writes sign-in metadata itself: the name reaches a function only through the database function', tsNamers);
 const labelReaders = fnFiles.filter((f) => f.endsWith('.ts') && /\bc\.label\b/.test(stripJs(read(f))));
-ok(labelReaders.join() === 'supabase/functions/get-development-activity-report/data.ts', '4c the client label is read from the private layer in ONE place, the report function\'s data layer', labelReaders);
+// build step 8: that read moved, unchanged in what it returns, into the ONE shared reader (_shared/private-subject.ts), whose address-only window
+// serves the public share-link function; the report function's data layer now only asks it (and reads no label column itself)
+ok(labelReaders.join() === 'supabase/functions/_shared/private-subject.ts', '4c the client label is read from the private layer in ONE place, the shared reader of a stored report\'s address and label', labelReaders);
 const reportFn = stripJs(read('supabase/functions/_shared/national-report.ts'));
 ok(/\.\.\.\(subject\.label \? \{ label: subject\.label \} : \{\}\)/.test(reportFn) && /LABEL_IN_BODY/.test(reportFn), '4d (control) the engine still scans the permanent body for the label and carries it only in the private context');
 
