@@ -122,7 +122,7 @@ const team = fn('showTeam');
 ok(/if \(!on\) \{ \$\('minted'\)\.hidden = true; \$\('invite-link'\)\.value = '';/.test(team) && /\$\('team'\)\.hidden = !on;/.test(team),
   '7g hiding the card also forgets the link it showed');
 const onSess = fn('onSession');
-ok(/access = null; role = null; attempt = null; showTeam\(false\);/.test(onSess) && /role = null; showTeam\(false\);[^\n]*\n\s*loadTrial\(\)/.test(onSess)
+ok(/access = null; role = null; attempt = null; showTeam\(false\);/.test(onSess) && /role = null; showTeam\(false\); showSaved\(false\);[^\n]*\n[^\n]*\n\s*loadTrial\(\)/.test(onSess)
    && /access = null; role = null; showTeam\(false\);/.test(fn('trialUnreadable')),
   '7h signing out, a different person signing in, and an unreadable trial each forget the role and the link');
 ok(/var forUser = session\.user \? session\.user\.id : null;/.test(mint) && /if \(!session \|\| !session\.user \|\| session\.user\.id !== forUser\) \{ showTeam\(false\); return; \}/.test(mint)
@@ -136,6 +136,15 @@ for (const [what, re] of [['sign-in needed (401)', /httpStatus === 401/], ['not 
 ok(!/teamSay\([^)]*(body\.error|body\.status|body\.detail)/.test(code), '7k no raw error code is ever printed on the invite card');
 ok(/shown only this once|only this once/.test(mint) && /one agent/.test(mint) && /limit on agents/.test(mint),
   '7l the note says the link is for one agent, may be stopped by a full seat limit, and is shown only once');
+
+// 8. build step 6: saved reports
+const rs = fn('refreshSaved'), os = fn('openSaved');
+ok(rs.length > 200 && os.length > 200, '8a refreshSaved and openSaved are found (positive control)', [rs.length, os.length]);
+ok(/var forUser = session\.user\.id;/.test(rs) && rs.indexOf('session.user.id !== forUser') > rs.indexOf("post(REPORT_FN, { action: 'list' })") && rs.indexOf('session.user.id !== forUser') < rs.indexOf("$('saved-list')"),
+  '8b a list that arrives after its person signed out, or after someone else signed in, is never shown');
+ok(/if \(opening \|\| busy \|\| !session \|\| !session\.user\) return;/.test(os), '8c a saved report is not opened while one is being opened or a new report is being made');
+ok(os.indexOf('session.user.id !== forUser') > os.indexOf("post(REPORT_FN, { action: 'open'") && os.indexOf('session.user.id !== forUser') < os.indexOf('V.mount'),
+  '8d an opened report that arrives after its person signed out, or after someone else signed in, is never shown');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

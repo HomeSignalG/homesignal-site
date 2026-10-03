@@ -81,7 +81,11 @@ async function identify(req: Request, deps: AdminGateDeps): Promise<Response | {
 
 /** A trial as public.evaluation_usage reports it. */
 export type TrialState = { status: string; credits_used: number; credits_remaining: number; expired: boolean };
-export type ReportCaller = { kind: 'admin' } | { kind: 'trial'; userId: string; trial: TrialState };
+/**
+ * `complete` is true for a trial whose 20 free reports are used. Such a member can no longer MAKE a report (the handler refuses it), but
+ * their brokerage's stored reports stay readable (build step 6), so the gate lets them through and the handler decides by what they ask.
+ */
+export type ReportCaller = { kind: 'admin' } | { kind: 'trial'; userId: string; trial: TrialState; complete: boolean };
 export type ReportGateDeps = AdminGateDeps & { trialOf: (userId: string) => Promise<TrialState | null> };
 
 /** What a trial member is told about their own trial: never an id. */
@@ -109,9 +113,8 @@ export async function authorizeReportCaller(req: Request, deps: ReportGateDeps):
   try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }
   if (!trial) return reply(req, { error: 'forbidden' }, 403);
   const standing = trialStanding(trial);
-  if (standing === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);
-  if (standing !== 'active') return reply(req, { error: 'forbidden' }, 403);
-  return { kind: 'trial', userId: who.user.id, trial };
+  if (standing !== 'active' && standing !== 'complete') return reply(req, { error: 'forbidden' }, 403);
+  return { kind: 'trial', userId: who.user.id, trial, complete: standing === 'complete' };
 }
 
 // ── ANY SIGNED-IN PERSON (build step 5c): the trial function's gate ──────────────────────────────────────────────────────────────

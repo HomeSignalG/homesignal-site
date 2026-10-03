@@ -383,6 +383,53 @@ property:
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.
 
+**Step 6 (2026-10-03): saved reports.** A report is stored, once, with a permanent random id when it uses a free report (Order F's
+`report_snapshot`, linked to its brokerage by the credit ledger, Order L1). What was missing was a way back to it.
+
+- **Two read-only database functions** (`docs/saved-reports.sql`; no table, column, trigger or schedule):
+  - `evaluation_reports_of(user)`: the caller's brokerage's stored reports, newest first: id, number, time, and the handle of the
+    private context.
+  - `evaluation_report_open(user, id)`: one stored report, by its id, only if it is in the ledger of the caller's own brokerage.
+    The stored text, byte for byte.
+  - Both are STABLE, SECURITY DEFINER, executable by the service role alone, and built on the one membership resolver
+    (`brokerage_membership_of`). Neither names an address, client, email or coordinate.
+  - An id from another brokerage, an unknown id, and a malformed id all give the same answer: not found.
+- **The report function** (`get-development-activity-report`) takes two more requests, `{ action: "list" }` and
+  `{ action: "open", report_id }`. Only a trial member may ask (an admin has no stored reports). Nothing else may travel with them.
+  They reach neither the geocoder, the spatial read, the credit rule nor the issue function. An opened report says `charged: false`,
+  `reopened: true`, and carries the stored report unchanged, not rebuilt or re-rendered.
+- **The address** shown beside a saved report comes from the private layer's own reader, and only while that layer still keeps it.
+  Once it has been purged, the report still opens and the list says "address no longer kept".
+- **A trial whose 20 free reports are used** can still reopen its saved reports but can make no new one. The gate lets a complete trial
+  through and says so (`complete`); the handler refuses it before it reads or geocodes anything, but only after the saved-report branch.
+  A revoked or expired trial sees nothing.
+- **The customer page** has a "Saved reports" card for a trial member, active or complete. It lists the reports (newest first, with
+  number, address and date); clicking one shows it in the same report view and says opening it did not use a free report. Nothing about
+  a saved report is kept in the browser. Signing out, a different person signing in, or the trial ending removes the list and any
+  report shown. A report just made joins the list.
+
+**Decisions taken by default (the founder may change any of them):**
+- **D-6-1.** Reopening reads the stored text. It never recomputes, so a saved report never changes when sources or rules change.
+- **D-6-2.** Every member of a brokerage sees all of its reports. The ledger records no user id by design (an open founder question
+  about keeping an agent's identity in a permanent trail), so "whose report" is not known.
+- **D-6-3.** A revoked or expired evaluation shows nothing; a complete one shows its reports.
+- **D-6-4.** Sharing and printing are step 8, not here. They will need their own private, revocable link; this step adds none.
+
+**Proof:**
+- `test/saved-reports-function.test.mjs` (60): who may ask, the exact request, what is never called, the answer's exact fields, not
+  found for a foreign or unknown id, the data layer's exact requests and every wrong shape, and a complete trial.
+- `test/saved-reports-structure.test.mjs` (45): the SQL only reads and is system-only; one module reaches it; the action branch never
+  reaches a charge; the gate and handler order; the page keeps nothing and forgets on sign-out.
+- `test/development-activity-reports.browser.test.mjs` (73): the list, opening one, no free report used, a purged address, sign-out, a
+  different person, no card without standing, a complete trial, a failed list, a phone.
+- `test/trial_report_pg` (74) through the real handler, data layer and shipped SQL, including that the database itself returns nothing
+  for another brokerage's or a revoked evaluation's reports.
+- `test/development_activity_saved_reports_mutants.py`: 43 prohibited mutations, all killed (the 5c, 5d and 5e harnesses still kill all theirs).
+
+**Still open, stated:** the free-report rate limit, an owner's list or withdrawal of agent links, and PostgREST's mapping of database
+refusals to HTTP errors against production (all carried to step 13). Saved reports are listed, not searched or paged (at most 20 per
+brokerage today).
+
 ## 5. Decisions taken by default (the founder may change any of them)
 
 - **D-G1. Access is a signed-in user in `dashboard_admins`, as an internal diagnostic surface.** The plan permits exactly this

@@ -95,12 +95,25 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
       const prior = w.made.get(key);
       if (prior) return { replayed: true, report_id: prior.id, generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, credit: credit() };
       w.used++;
-      const id = 'r0000000-0000-4000-8000-' + String(w.used).padStart(12, '0');
+      const id = 'c0000000-0000-4000-8000-' + String(w.used).padStart(12, '0');
       w.made.set(key, { id, address: w.lastAddress, report: intelligence });
       return { replayed: false, report_id: id, content_hash: 'h', report_version: 'v', generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, report: intelligence, credit: credit() };
     },
     contextMatches: async (ctx, address) => { const m = w.made.get(ctx.slice(4)); return m && m.address === address ? 'match' : 'mismatch'; },
     storedReport: async (id) => { for (const m of w.made.values()) if (m.id === id) return JSON.stringify(m.report); return null; },
+    // saved reports (build step 6): the stored reports of this brokerage, newest first; the database shows nothing without standing
+    savedReports: async () => {
+      if (w.trial !== 'active' && w.used < 20) return [];
+      const rows = [...w.made.entries()].map(([key, m], i) => ({ report_id: m.id, number: i + 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key }));
+      return w.listFails ? (() => { throw new RH.DataUnavailable('x'); })() : rows.reverse();
+    },
+    openSavedReport: async (_u, id) => {
+      if (w.trial !== 'active' && w.used < 20) return null;
+      let n = 0;
+      for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { report_id: m.id, number: n, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key, body: JSON.stringify(m.report) }; }
+      return null;
+    },
+    subjectOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return m ? m.address : null; },
   });
   return w;
 }
@@ -123,7 +136,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   const ctx = await browser.newContext({ viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
-  const errors = [], reports = [], trials = [], foreign = [];
+  const errors = [], reports = [], trials = [], foreign = [], saved = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
@@ -133,11 +146,12 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
     if (url === REPORT_FN || url === TRIAL_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       const rec = { auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body };
-      (url === REPORT_FN ? reports : trials).push(rec);
+      // a saved-reports read (build step 6) is not a report request: it is kept apart so "one request per report" stays checkable
+      (url === REPORT_FN ? (body && body.action ? saved : reports) : trials).push(rec);
       if (url === REPORT_FN) w.lastAddress = body && body.address;
       const res = await (url === REPORT_FN ? w.reportHandler : w.trialHandler)(new Request(url, { method: 'POST', headers: { authorization: rec.auth || '', 'content-type': 'application/json' }, body: r.postData() }));
       const answer = await res.text();
-      if (url === REPORT_FN && lose(body)) return route.abort(); // the server did the work (and charged); only its answer is lost
+      if (url === REPORT_FN && !(body && body.action) && lose(body)) return route.abort(); // the server did the work (and charged); only its answer is lost
       if (url === TRIAL_FN && body && body.action === 'invite' && loseInvite(body)) return route.abort(); // the invite was made; its answer is lost
       return route.fulfill({ status: res.status, contentType: 'application/json', body: answer });
     }
@@ -146,7 +160,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  return { ctx, page, errors, reports, trials, foreign, w };
+  return { ctx, page, errors, reports, trials, foreign, saved, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 const TRIALS = new WeakMap();
@@ -394,6 +408,104 @@ for (const [label, w, count] of [
   await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(!(await page.$eval('#minted', (e) => e.hidden)) && wide <= 0, '6p on a 390 px screen the link is shown and the page does not scroll sideways', wide);
+  await ctx.close();
+}
+
+// ---- 7. saved reports (build step 6): the brokerage's stored reports, opened as stored, never charged ---------------------------------
+const ADDRESS_2 = '1600 Pennsylvania Ave NW, Washington, DC 20500';
+const savedShown = (page) => page.$eval('#saved', (e) => !e.hidden);
+const rowsOf = (page) => page.$$eval('#saved-list button', (bs) => bs.map((b) => b.textContent.trim()));
+const waitRows = (page, k) => page.waitForFunction((c) => document.querySelectorAll('#saved-list button').length === c, k, { timeout: 8000 }).catch(() => {});
+{
+  const w = world();
+  const { ctx, page, errors, reports, saved, foreign } = await open({ w });
+  await waitCount(page, /free reports left/);
+  ok(await savedShown(page) && (await rowsOf(page)).length === 0 && /No reports saved yet/.test(await text(page, '#saved-status')),
+    '7a a trial member with no report yet sees the card and is told none is saved', await text(page, '#saved-status'));
+  await make(page, ADDRESS); await make(page, ADDRESS_2);
+  await waitRows(page, 2);
+  const rows = await rowsOf(page);
+  ok(rows.length === 2 && /^Report 2 · /.test(rows[0]) && /^Report 1 · /.test(rows[1]) && rows[0].includes(ADDRESS_2) && rows[1].includes(ADDRESS),
+    '7b the list is newest first, each with its number, its address and its date', rows);
+  ok(reports.length === 2 && w.used === 2, '7c listing made no report and used no free report', { reports: reports.length, used: w.used });
+  const lists = saved.filter((r) => r.body.action === 'list');
+  ok(lists.length >= 1 && lists.every((r) => JSON.stringify(r.body) === '{"action":"list"}' && r.auth === 'Bearer user-token'), '7d a list request carries the action and the person\'s own token, nothing else', lists.map((r) => r.body));
+  await page.evaluate(() => { document.getElementById('report').textContent = ''; });
+  await page.click('#saved-list li:nth-child(2) button');
+  await page.waitForFunction(() => /Saved report 1/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const opens = saved.filter((r) => r.body.action === 'open');
+  ok(opens.length === 1 && opens[0].body.report_id === 'c0000000-0000-4000-8000-000000000001' && Object.keys(opens[0].body).sort().join() === 'action,report_id', '7e opening sends the action and the report id only (no address, no key)', opens.map((o) => o.body));
+  ok((await page.$eval('#report', (e) => e.textContent.trim().length)) > 100 && !(await page.$eval('#creditnote', (e) => e.hidden)) && /did not use a free report/.test(await text(page, '#creditnote')),
+    '7f the stored report is shown and the page says opening did not use a free report', await text(page, '#creditnote'));
+  ok(w.used === 2 && reports.length === 2 && /Saved report 1/.test(await text(page, '#saved-status')), '7g opening used no free report and made no report request', { used: w.used });
+  w.made.forEach((m) => { m.address = null; }); // the private layer has purged the addresses
+  await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
+  await page.waitForTimeout(200);
+  ok(!(await savedShown(page)) && (await rowsOf(page)).length === 0, '7h signing out hides the card and empties the list', await rowsOf(page));
+  await page.evaluate((s2) => { window.__sb.session = s2; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', s2)); }, { access_token: 'user-token', user: { id: UID, email: 'agent@example.test' } });
+  await waitRows(page, 2);
+  const purged = await rowsOf(page);
+  ok(purged.length === 2 && purged.every((r) => /address no longer kept/.test(r)), '7i a report whose address has been purged is still listed and opens, saying the address is no longer kept', purged);
+  ok((await page.evaluate(() => JSON.stringify(sessionStorage) + JSON.stringify(localStorage))).indexOf('c0000000') === -1, '7j no report id is kept in the browser');
+  ok(errors.length === 0 && foreign.length === 0, '7k no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // a different person on the same tab: the first person's list and report are gone in the same moment
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await waitRows(page, 1);
+  const swap = await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('saved').hidden, rows: document.querySelectorAll('#saved-list button').length };
+  });
+  ok(swap.hidden && swap.rows === 0, '7l a different person signing in takes the list away at once', swap);
+  await ctx.close();
+}
+{
+  // no standing, no card: a person with no trial, and a trial that has ended
+  for (const [label, opts] of [['no trial', { trial: null }], ['an ended trial', { trial: 'revoked' }]]) {
+    const { ctx, page, saved } = await open({ w: world(opts) });
+    await settled(page);
+    await page.waitForTimeout(300);
+    ok(!(await savedShown(page)) && saved.length === 0, '7m ' + label + ': the card is not offered and nothing is asked', saved.length);
+    await ctx.close();
+  }
+}
+{
+  // a trial whose 20 reports are used: the card stays, the stored reports reopen, and the page makes no new one
+  const w = world({ used: 19 });
+  const { ctx, page, reports } = await open({ w });
+  await waitCount(page, /^1 free report left$/);
+  await make(page);
+  await waitCount(page, /0 free reports left|used/);
+  await waitRows(page, 1);
+  ok(w.used === 20 && await savedShown(page), '7n after the 20th report the card is still offered', w.used);
+  await page.click('#saved-list button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Saved report 1/.test(await text(page, '#saved-status')) && reports.length === 1 && w.used === 20, '7o a complete trial reopens a saved report and uses nothing', await text(page, '#saved-status'));
+  await ctx.close();
+}
+{
+  const w = world(); w.listFails = true;
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => /could not be read/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/could not be read just now/.test(await text(page, '#saved-status')) && (await rowsOf(page)).length === 0, '7p a list that cannot be read says so in plain words and shows no rows', await text(page, '#saved-status'));
+  w.listFails = false;
+  await ctx.close();
+}
+{
+  const w = world();
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await waitRows(page, 1);
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(await savedShown(page) && wide <= 0, '7q on a 390 px screen the list is shown and the page does not scroll sideways', wide);
   await ctx.close();
 }
 

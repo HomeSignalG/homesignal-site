@@ -190,7 +190,7 @@ const gate = readRepo('supabase/functions/_shared/admin-gate.ts');
 const iGate = handler.indexOf('await authorizeReportCaller(req, deps)'), iBody = handler.indexOf('await readBounded(req)');
 ok(iGate > 0 && iBody > iGate, 'P5f the function still runs its gate before it reads anything the caller sent', { iGate, iBody });
 ok(/if \(!who\.admin\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(!token\) return reply\(req, \{ error: 'unauthorized' \}, 401\)/.test(gate)
-   && /if \(!trial\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(standing !== 'active'\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate)
+   && /if \(!trial\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate) && /if \(standing !== 'active' && standing !== 'complete'\) return reply\(req, \{ error: 'forbidden' \}, 403\)/.test(gate)
    && /if \(t\.status === 'active' && !t\.expired\) return 'active';/.test(gate),
   'P5g the gate still refuses a caller with no token (401), and a signed-in caller who is neither an admin nor a member of an active, unexpired trial (403)');
 ok(!/service_role|SERVICE_ROLE/.test(review), 'P5h the review page carries no service-role key; it uses the public browser key and the signed-in user\'s own token');

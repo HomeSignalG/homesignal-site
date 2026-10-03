@@ -102,6 +102,19 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
       return rows.length === 1 && typeof rows[0].body === 'string' ? rows[0].body : null;
     },
 
+    // saved reports (build step 6): the brokerage's stored reports, read through the one membership resolver
+    savedReports: evaluation.savedReports,
+    openSavedReport: evaluation.openSavedReport,
+
+    // the address a stored report was made for, from the private layer's own reader; null once the layer no longer keeps it
+    async subjectOf(contextId) {
+      if (!contextId) return null;
+      const { data, error } = await rpc('report_private_context_read', { p_context: contextId });
+      if (error || !Array.isArray(data)) throw new DataUnavailable('private context');
+      const c = data.length === 1 ? data[0] : null;
+      return c && c.state === 'active' && typeof c.address === 'string' && c.address ? c.address : null;
+    },
+
     // A retried key returns the FIRST report (D-L6). Whether it is the same property is asked of its private context; the address read
     // stays inside this function, and only the answer leaves it.
     async contextMatches(contextId, address) {

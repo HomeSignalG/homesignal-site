@@ -15,6 +15,12 @@
 // through public.evaluation_report_issue (via _shared/report-snapshot.ts `issueEvaluationReport`), which stores the snapshot and the
 // credit in ONE transaction. This function never calls the plain snapshot writer (`issueSnapshot`), so no report is stored without a
 // credit; a structural test fails if it does. A retried key returns the first report, and only if it is about the same property (D-L6).
+//
+// SAVED REPORTS (build step 6). A trial member may also LIST their brokerage's stored reports (`{ action: 'list' }`) and REOPEN one by its
+// permanent id (`{ action: 'open', report_id }`). Both are reads through the one membership resolver (public.evaluation_reports_of and
+// public.evaluation_report_open): they reach neither the engine, the geocoder, the credit rule nor the issue function, so opening a report
+// can never charge, store or recompute anything, and the text shown is the text that was stored. An id that is not one of the caller's own
+// brokerage's reports is "not found", the same for another brokerage's and for an unknown one.
 import {
   addDays, assemble, dayOf, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateRights,
 } from '../_shared/national-report.ts';
@@ -22,6 +28,8 @@ import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import type { TrialState } from '../_shared/admin-gate.ts';
 import { EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
+import { UUID } from '../_shared/evaluation-reads.ts';
+import type { OpenedReport, SavedReport } from '../_shared/evaluation-reads.ts';
 import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 import type {
@@ -52,6 +60,11 @@ export type Deps = {
     opts: { reportVersion: string; engineInputs: Record<string, unknown> }) => Promise<EvaluationIssue>;
   storedReport: (reportId: string) => Promise<string | null>;
   contextMatches: (contextId: string, address: string) => Promise<'match' | 'mismatch' | 'unknown'>;
+  // saved reports (build step 6)
+  savedReports: (userId: string) => Promise<SavedReport[]>;
+  openSavedReport: (userId: string, reportId: string) => Promise<OpenedReport | null>;
+  /** The address a stored report was made for, while the private layer still keeps it; null once it has been purged. */
+  subjectOf: (contextId: string | null) => Promise<string | null>;
 };
 
 /** A random (v4) UUID the trial page mints once per report request, and repeats only when it retries that same request. */
@@ -63,11 +76,12 @@ export class GeocoderUnavailable extends Error {}
 export function capability() {
   return {
     product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-    method: 'POST { address, radius_mi?, view?, label?, idempotency_key? }',
+    method: 'POST { address, radius_mi?, view?, label?, idempotency_key? } | { action: "list" } | { action: "open", report_id }',
     radius_mi: [REPORT_RADIUS_MI],
     recent_days: RECENT_DAYS,
     access: 'signed-in: an internal admin (dashboard_admins), or an invited trial member with an active trial (customer view only).',
     stores_reports: 'only a trial report that uses a free report (credit rule); never an admin report',
+    saved_reports: 'list: the stored reports of a trial member\'s trial; open: one of them by its id, as stored, never charged',
     credit_rule: CREDIT_RULE_VERSION,
   };
 }
@@ -94,6 +108,40 @@ export function makeHandler(deps: Deps) {
     if (raw === TOO_LARGE) return reply(req, { error: 'request_too_large' }, 413);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return reply(req, { error: 'invalid_request' }, 400);
     const b = raw as Record<string, unknown>;
+    // saved reports (build step 6): a request with an action reads what is already stored, and carries nothing else
+    if (b.action !== undefined) {
+      if (b.action !== 'list' && b.action !== 'open') return reply(req, { error: 'invalid_request', detail: 'action' }, 400);
+      const allowed = b.action === 'open' ? ['action', 'report_id'] : ['action'];
+      const extra = Object.keys(b).filter((k) => !allowed.includes(k));
+      if (extra.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + extra[0] }, 400);
+      // only a trial member has a brokerage's stored reports; an admin's reports are never stored
+      if (!trial) return reply(req, { error: 'forbidden' }, 403);
+      try {
+        if (b.action === 'list') {
+          const rows = await deps.savedReports(trial.userId);
+          const reports = await Promise.all(rows.map(async (r) => ({
+            report_id: r.report_id, number: r.number, generated_at: r.generated_at, address: await deps.subjectOf(r.private_context_id),
+          })));
+          return reply(req, { status: 'OK', reports, trial: trialSummary(trial.trial) });
+        }
+        if (typeof b.report_id !== 'string' || !UUID.test(b.report_id)) return reply(req, { error: 'invalid_request', detail: 'report_id' }, 400);
+        const opened = await deps.openSavedReport(trial.userId, b.report_id);
+        if (!opened) return reply(req, { error: 'not_found' }, 404);
+        let stored: { coverage?: { state?: string } } | null;
+        try { stored = JSON.parse(opened.body); } catch { throw new DataUnavailable('stored report'); }
+        if (!stored || typeof stored !== 'object') throw new DataUnavailable('stored report');
+        return reply(req, {
+          status: 'OK', coverage_state: stored.coverage?.state ?? null, report: stored,
+          stored: true, reopened: true, report_id: opened.report_id, number: opened.number, generated_at: opened.generated_at,
+          address: await deps.subjectOf(opened.private_context_id), charged: false, trial: trialSummary(trial.trial),
+        });
+      } catch (e) {
+        if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
+        return reply(req, { error: 'internal' }, 500);
+      }
+    }
+    // a trial whose 20 free reports are used can make no more: refused here, before anything is read, geocoded or charged
+    if (trial && trial.complete) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial) }, 403);
     const unknown = Object.keys(b).filter((k) => !['address', 'radius_mi', 'view', 'label', 'idempotency_key'].includes(k));
     if (unknown.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + unknown[0] }, 400);
     const address = typeof b.address === 'string' ? b.address.trim() : '';

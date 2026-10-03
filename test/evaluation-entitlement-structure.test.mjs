@@ -165,9 +165,11 @@ ok(SCAN.length > 200 && SCAN.some((f) => f.startsWith('.github/workflows/')) && 
 // owner passed as the ACTOR so the database decides who may. evaluation_invite_revoke and evaluation_revoke still have no caller.
 const EVAL_READS = 'supabase/functions/_shared/evaluation-reads.ts', SNAP_MOD = 'supabase/functions/_shared/report-snapshot.ts';
 const namesIn = (f) => [...new Set([...code(f).matchAll(new RegExp(OURS.source, 'g'))].map((m) => m[0]))].sort();
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, EVAL_READS, SNAP_MOD].sort())
+// Build step 6: docs/saved-reports.sql is a second SQL file that reads the ledger (two STABLE functions, no DML); test/saved-reports-structure.test.mjs pins it.
+const SAVED_SQL = 'docs/saved-reports.sql';
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, EVAL_READS, SNAP_MOD].sort())
    && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL, exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+  '4: outside its SQL (and the read-only saved-reports SQL, build step 6), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 {
   const ER = code(EVAL_READS);
   const mints = [...ER.matchAll(/rpc\('evaluation_invite_mint', \{([^}]*)\}\)/g)];
