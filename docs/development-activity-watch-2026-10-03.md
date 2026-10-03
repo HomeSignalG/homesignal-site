@@ -154,8 +154,12 @@ cannot lose a change.
   `brokerage-account-structure`, `evaluation-entitlement-structure`, `report-snapshot-structure`.
 - `test/development-activity-reports.browser.test.mjs` section 10 (26 checks in Chromium, against the REAL `manage-property-watch` handler):
   when the card is offered, the exact requests, each outcome's words, every refusal, print, a second report, signing out, a 390 px screen.
-- `test/property_watch_mutants.py`: prohibited mutations of the edge, the private layer's point window, the wiring and the page, each of which
-  must make one of the suites above fail. See the run recorded in the engine document.
+- `test/property_watch_mutants.py`: 98 prohibited mutations of the edge, the private layer's point window, the wiring and the page, each of
+  which must make one of the suites above fail. **98 of 98 killed** on the final tree (2026-10-03). Its first full run left 9 alive; each was
+  traced and closed by a test that was missing (a nearby project from an uncleared source; an event type the told-about table does not accept;
+  the private layer's point window; a run-level failure logged with its message; a different person signing in; a late answer for the report the
+  person had left), except the handler's own `validateRights` call, an equivalent mutant (two independent validators sit behind it), which is
+  retired in the harness with its reason.
 - CI: `report-snapshot-suite.yml` runs both database harnesses and covers the Watch's SQL and functions in both path lists.
 
 ## 7. Applying it (in this order; each step is read back)

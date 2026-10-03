@@ -578,7 +578,8 @@ agent's own, not the brokerage's; D-9-7 failures are retried within the day and 
 D-9-8 the recipient is the agent's sign-in email, read at send time and stored nowhere.
 
 **Proof:** `test/property_watch_pg` (64 checks, 66 mutations killed), `test/property_watch_schedule_pg` (44 checks, 38 mutations killed),
-`test/property-watch-changes` (41), `-functions` (128), `-email` (35), `-structure`; CI in `report-snapshot-suite.yml`.
+`test/property-watch-changes` (43), `-functions` (140), `-email` (35), `-structure`; `test/property_watch_mutants.py` (98 mutations of the edge,
+the point window, the wiring and the page: 98 killed); 26 Chromium checks for the Watch card; CI in `report-snapshot-suite.yml`.
 
 **Still open, stated:** the signed-in start, list and stop and a real email are exercised live only as far as step 9d's read-back says;
 `run-property-watch` has no rate limit beyond its secret; an ended or failing watch is not emailed to the agent.
