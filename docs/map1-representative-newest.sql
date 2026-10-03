@@ -15,6 +15,10 @@
 -- and SET clauses unchanged). STILL PRESENT: the PART A index (harmless) and
 -- public.app_project_representative, called by nothing (its drop is a destructive statement
 -- waiting on the founder's confirmation).
+-- SECOND VERSION (not applied): docs/map1-representative-pick.sql decides the pick once a day
+-- and stores it, and gives public.app_project_representative a new body that only looks the
+-- stored pick up. It reuses this function rather than dropping it. The PART A index is not
+-- used by it.
 --
 -- THE DEFECT. Map 1 draws one pin per source_key, and a source_key can carry several
 -- public.app_projects rows: the same record copied into each ZIP it touches, and sometimes
