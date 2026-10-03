@@ -227,6 +227,8 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
     if (url === WATCH_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       watchCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
+      // holdNextWatchList: the server has the list and the answer is on its way; it arrives only when the test lets it (after the person has moved on)
+      if (w.holdNextWatchList && body && body.action === 'list') { w.holdNextWatchList = false; await new Promise((res) => { w.releaseWatchList = res; }); }
       const res = await w.watchHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
       return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
     }
@@ -938,6 +940,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 
   await page.click('#watch-stop');
   await waitWatch(page, /no longer watching/);
+  await waitWatch(page, /You are not watching this property/); // the card is redrawn from the server's list after the stop answer
   const stopped = watchCalls.filter((c) => c.body.action === 'stop');
   ok(stopped.length === 1 && Object.keys(stopped[0].body).sort().join() === 'action,watch_id' && /^e0000000-/.test(stopped[0].body.watch_id) && w.watches.length === 0,
     '10l the stop request names the watch and nothing else; the server holds none', stopped);
@@ -1021,6 +1024,39 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.evaluate(() => { window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); });
   await page.waitForTimeout(200);
   ok((await watchHidden(page)) && (await text(page, '#watch-state')) === '' && (await text(page, '#watch-status')) === '', '10y signing out clears the card, its state and its message');
+  await ctx.close();
+}
+{
+  // a different person signing in on the same tab takes the card, its state and its message away at once
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page);
+  await page.click('#watch-start');
+  await waitWatch(page, /You are watching this property, since/);
+  const swap = await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('watch').hidden, state: document.getElementById('watch-state').textContent, status: document.getElementById('watch-status').textContent,
+      stop: !document.getElementById('watch-stop').hidden };
+  });
+  ok(swap.hidden && swap.state === '' && swap.status === '' && !swap.stop, '10y2 a different person signing in takes the Watch card and the first person\'s watch away at once', swap);
+  await ctx.close();
+}
+{
+  // a late answer for the report the person has since left is ignored: it must not paint a watch onto the report now on screen
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  w.holdNextWatchList = true;
+  await make(page);                                   // report 1; its list is held on the server's side
+  w.watches.push({ watch_id: 'e0000000-0000-4000-8000-0000000000aa', report_id: 'c0000000-0000-4000-8000-000000000001', created_at: '2026-10-03T12:00:00+00:00', last_run_at: null, last_outcome: null, next_due_at: '2026-10-03T12:00:00+00:00' });
+  await make(page, OTHER);                            // report 2 comes on screen and is read at once
+  await waitWatch(page, /not watching/);
+  w.releaseWatchList();                               // the first answer, about report 1, arrives now
+  await page.waitForTimeout(500);
+  const late = await page.evaluate(() => ({ state: document.getElementById('watch-state').textContent, start: !document.getElementById('watch-start').hidden, stop: !document.getElementById('watch-stop').hidden }));
+  ok(/not watching/.test(late.state) && late.start && !late.stop, '10y3 a late answer about the first report does not paint its watch onto the second report', late);
   await ctx.close();
 }
 {
