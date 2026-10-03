@@ -55,7 +55,7 @@ through once each step is complete").
 
 ## Part B — the customer page
 
-5. **Free trial sign-up.** Invite link, sign-in, 20 shared reports, "reports remaining". The 20-report limit
+5. ~~**Free trial sign-up.**~~ Invite link, sign-in, 20 shared reports, "reports remaining". The 20-report limit
    is already enforced in the database (Order L1, applied 2026-10-02).
    *Founder decision first:* does a report with limited coverage use up a free report? (ruling R5)
    **Answered 2026-10-02** (`docs/development-activity-founder-ruling-r5-2026-10-02.md`): a report that shows
@@ -141,10 +141,40 @@ through once each step is complete").
        - an owner cannot yet invite agents (`evaluation_invite_mint`);
        - the free-report rate limit;
        - checking how PostgREST turns the database's refusals into HTTP answers, now possible with a test trial.
-   - **5e. Agents join the trial.** *(Added 2026-10-02, after 5d.)* The trial's 20 reports are shared by a
+   - ~~**5e. Agents join the trial.**~~ *(Added 2026-10-02, after 5d.)* The trial's 20 reports are shared by a
      brokerage's agents, so its owner needs a way to invite them. That is `evaluation_invite_mint` with the owner as
      actor: agent invites only, within the seat limit, through the same invite link and the same customer page.
      Step 5 is struck when 5e is done.
+     *(Done: #1592 merged as `4bbf16d`.*
+     - *Two functions deployed from `main` at 2026-10-03 13:30Z, each with the JWT check on:*
+       - *`development-activity-trial` went from version 2 to 3 (run `37126364726`).*
+       - *`get-development-activity-report` went from version 8 to 9 (run `37126366271`). It imports the changed
+         `_shared/evaluation-reads.ts`.*
+       - *Follow is unchanged: its files did not change.*
+     - *All 18 deployed files (6 + 12) read back byte-identical to `main`, and no imported file is missing. Two
+       negative controls (one changed character, one removed file) were each caught.*
+     - *Live probe 13:32Z:*
+       - *The trial function's capability answer is byte-identical to the one `main` defines. It names the `invite`
+         action, for an owner of an active trial, and lists the agent invite among what it writes.*
+       - *An `invite` request with no token is refused by the gateway with 401.*
+       - *With only the public key, our own gate refuses `invite` with 401.*
+     - *Pages run `37126362289` deployed the customer page. Read back from homesignal.net at 13:33Z, each
+       byte-identical to `main` by md5:*
+       - *`development-activity-reports.html`, `9eb315ce…` (noindex, with "Invite an agent");*
+       - *`robots.txt`, `c6ec81ff…`.*
+     - *Production still holds 0 trials, invites, members and stored reports. The first trial is created by the
+       founder on the review page.)*
+     - The trial function's `invite` action makes one agent invite link for an owner of an active trial. The database
+       checks the person is an owner of that brokerage at the moment the link is made; the function does not decide it.
+     - The status answer now carries the person's role (owner, agent, or none), read from the one membership resolver.
+     - The customer page shows "Invite an agent" only to an owner of an active trial. Each link is shown once, with
+       Copy, and is never stored. Signing out, a different person signing in, or the trial ending takes it away.
+     - The seat limit is checked when an agent joins, so an owner may make several links.
+     - Open before step 13:
+       - an owner cannot yet list, withdraw or see again the links they made, or remove an agent;
+       - the free-report rate limit;
+       - checking how PostgREST turns the database's refusals into HTTP answers, now including `NOT_ENTITLED` from
+         the mint.
 6. **Saved reports.** Each report gets a permanent ID; reopening, sharing or printing never uses another report.
 7. **Brokerage and agent header**, filled from the account (brokerage name, agent name, optional client label).
 8. **Share and PDF.** Private read-only link for the client that the agent can revoke; PDF through the
