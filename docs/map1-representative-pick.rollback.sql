@@ -1,5 +1,5 @@
 -- ============================================================================
--- ROLLBACK of docs/map1-representative-pick.sql. NOT APPLIED.
+-- ROLLBACK of docs/map1-representative-pick.sql. NOT APPLIED (the forward file was applied 2026-10-03).
 -- Roll back homesignal-ingest's reader FIRST (re-apply its previous DDL of record,
 -- 20260928160000). Then:
 --   PART B'  one transaction: both site readers go back to `order by p.id asc limit 1`, byte for
