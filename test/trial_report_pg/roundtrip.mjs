@@ -1,4 +1,4 @@
-// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d and 5e).
+// A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d, 5e and 6).
 // Creating the trial (5d, an admin), joining it (5c) and an owner inviting agents (5e) go through the real handler and data layer of
 // development-activity-trial;
 // making reports goes through
@@ -36,6 +36,9 @@ const RPC = {
   // PostgREST passes a JSON null as SQL null; psql variables cannot carry one, so '' stands for null here and nowhere else
   evaluation_create: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_create(:'n', nullif(:'s', '')::integer, nullif(:'e', '')::timestamptz) t",
     { n: a.p_brokerage_name, s: a.p_seat_limit === null ? '' : String(a.p_seat_limit), e: a.p_expires_at === null ? '' : a.p_expires_at }],
+  // saved reports (build step 6): two read-only functions
+  evaluation_reports_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_reports_of(:'u'::uuid) t", { u: a.p_user_id }],
+  evaluation_report_open: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_report_open(:'u'::uuid, :'r'::uuid) t", { u: a.p_user_id, r: a.p_report_id }],
   brokerage_membership_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_membership_of(:'u'::uuid) t", { u: a.p_user_id }],
   // the lifetime is left to the database's default, as PostgREST does when the argument is not sent
   evaluation_invite_mint: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid) t",
@@ -263,6 +266,104 @@ ok(t.status === 409 && t.json.error === 'trial_not_active' && Number(one('select
   '6f the owner of a complete trial cannot invite: an agent joining it could make no report (build step 5e)', t.json);
 t = await trialAsk(LATE, { action: 'status' });
 ok(t.status === 200 && t.json.access === 'complete' && t.json.role === 'agent' && t.json.trial.credits_used === 20, '6g the agent sees the same shared trial: complete, twenty used', t.json);
+
+// ---- 7. saved reports (build step 6): list and reopen, through the real handler, data layer and SQL -------------------------------------------
+// MEMBER's brokerage has used all twenty free reports (section 6); LATE joined it as an AGENT (0n). Nothing below may write, charge or store.
+const snapState = () => one("select (select count(*) from public.report_snapshot) || ' ' || (select count(*) from public.evaluation_credit) || ' ' || (select count(*) from public.evaluation_event) || ' ' || (select coalesce(sum(length(body)), 0) from public.report_snapshot) || ' ' || (select md5(string_agg(content_hash, ',' order by content_hash collate \"C\")) from public.report_snapshot)");
+const before7 = snapState();
+const savedAsk = (userId, body) => ask(CLEARED, userId, body);
+const listed = await savedAsk(MEMBER, { action: 'list' });
+ok(listed.status === 200 && listed.json.status === 'OK' && listed.json.reports.length === 20 && listed.json.reports.map((x) => x.number).join(',') === Array.from({ length: 20 }, (_, i) => 20 - i).join(','),
+  '7a a member of a COMPLETE trial lists their brokerage\'s twenty stored reports, newest first, numbered 20 down to 1', listed.json.reports && listed.json.reports.map((x) => x.number));
+ok(listed.json.reports.every((x) => /^[0-9a-f-]{36}$/.test(x.report_id) && typeof x.generated_at === 'string' && typeof x.address === 'string' && x.address.length > 8)
+   && new Set(listed.json.reports.map((x) => x.report_id)).size === 20 && listed.json.reports.find((x) => x.number === 1).report_id === firstId && listed.json.reports.find((x) => x.number === 1).address === HOME,
+  '7b every row has its permanent id, time and address (while the private layer keeps it); report 1 is the first report made, for the first address', listed.json.reports[19]);
+ok(JSON.stringify(Object.keys(listed.json.reports[0]).sort()) === '["address","generated_at","number","report_id"]' && !/context|evaluation|brokerage|credit/i.test(JSON.stringify(listed.json.reports)),
+  '7c a row holds exactly id, number, time and address: no context handle, no evaluation, brokerage or credit id', Object.keys(listed.json.reports[0]));
+const agentList = await savedAsk(LATE, { action: 'list' });
+ok(agentList.status === 200 && JSON.stringify(agentList.json.reports) === JSON.stringify(listed.json.reports), '7d an AGENT of the same brokerage sees the same twenty reports (every member sees all of the brokerage\'s reports, D-6-2)');
+
+const storedBody = one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: firstId });
+const opened = await savedAsk(MEMBER, { action: 'open', report_id: firstId });
+ok(opened.status === 200 && opened.json.status === 'OK' && opened.json.reopened === true && opened.json.stored === true && opened.json.charged === false
+   && opened.json.report_id === firstId && opened.json.number === 1 && opened.json.address === HOME && opened.json.render === undefined && opened.json.credit === undefined,
+  '7e opening report 1 returns it as reopened, stored and NOT charged, with its number and address, and no live render block', opened.json && Object.keys(opened.json));
+ok(JSON.stringify(opened.json.report) === JSON.stringify(JSON.parse(storedBody)) && opened.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+  '7f the report shown is the STORED report, field for field (it is not recomputed from today\'s data)');
+ok(snapState() === before7, '7g listing and opening wrote nothing: the same snapshots, credits, events, bytes and content hashes as before', [before7, snapState()]);
+const agentOpen = await savedAsk(LATE, { action: 'open', report_id: firstId });
+ok(agentOpen.status === 200 && JSON.stringify(agentOpen.json.report) === JSON.stringify(opened.json.report), '7h an agent opens a report the owner made: the same report');
+
+// another brokerage: its own reports, and no way into this one
+const NEWBIE = 'a8888888-8888-4888-8888-888888888888', BCODE = 'b9999999-9999-4999-8999-999999999999';
+one("insert into auth.users (id, email) values (:'n'::uuid, 'newbie@example.test')", { n: NEWBIE });
+const newbieToken = one("select owner_token from public.evaluation_create('Other Brokerage Realty')");
+t = await trialAsk(NEWBIE, { action: 'redeem', token: newbieToken });
+ok(t.status === 200 && t.json.role === 'owner', '7i a second brokerage\'s owner joins their own, fresh trial', t.json);
+const otherList = await savedAsk(NEWBIE, { action: 'list' });
+ok(otherList.status === 200 && otherList.json.reports.length === 0, '7j the other brokerage lists NO reports (none of the first brokerage\'s)', otherList.json);
+const foreign = await savedAsk(NEWBIE, { action: 'open', report_id: firstId });
+const unknownId = await savedAsk(NEWBIE, { action: 'open', report_id: BCODE });
+ok(foreign.status === 404 && unknownId.status === 404 && JSON.stringify(foreign.json) === JSON.stringify(unknownId.json) && foreign.json.error === 'not_found' && !JSON.stringify(foreign.json).includes(firstId),
+  '7k another brokerage\'s report id and an unknown id give the SAME answer (404 not_found): the caller cannot tell which exists', [foreign.json, unknownId.json]);
+t = await trialAsk(NEWBIE, { action: 'status' });
+ok(t.json.trial.credits_used === 0 && count('evaluation_credit') === 20, '7l and the other brokerage\'s trial is untouched: nothing was charged to either');
+
+// no standing: nothing
+const none = await savedAsk(STRANGER, { action: 'list' });
+const noneOpen = await savedAsk(STRANGER, { action: 'open', report_id: firstId });
+ok(none.status === 403 && noneOpen.status === 403 && none.json.error === 'forbidden', '7m a signed-in person with no trial can neither list nor open (403)', [none.json, noneOpen.json]);
+const real7 = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', rights: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
+const adminH = H.makeHandler({ ...real7, authenticate: async () => ({ email: 'founder@example.test', id: ADMIN }), isAdmin: async () => true });
+const adminRes = await adminH(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'list' }) }));
+ok(adminRes.status === 403, '7n an admin has no brokerage\'s reports to list: 403 (an admin report is never stored)', adminRes.status);
+
+// the private layer: a privacy-request purge removes the address from the list, and leaves the report byte for byte
+const ctxId = one("select private_context_id from public.report_snapshot where report_id = :'r'::uuid", { r: firstId });
+const hashBefore = one("select content_hash from public.report_snapshot where report_id = :'r'::uuid", { r: firstId });
+one("select public.report_private_context_purge(:'c'::uuid, 'verified_privacy_request')", { c: ctxId });
+const afterPurge = await savedAsk(MEMBER, { action: 'list' });
+const row1 = afterPurge.json.reports.find((x) => x.number === 1);
+ok(row1.address === null && afterPurge.json.reports.filter((x) => x.address !== null).length === 19, '7o after a privacy-request purge that report\'s address is gone from the list (null) and the other nineteen keep theirs', row1);
+const reopened = await savedAsk(MEMBER, { action: 'open', report_id: firstId });
+ok(reopened.status === 200 && reopened.json.address === null && JSON.stringify(reopened.json.report) === JSON.stringify(opened.json.report)
+   && one("select content_hash from public.report_snapshot where report_id = :'r'::uuid", { r: firstId }) === hashBefore,
+  '7p the purged report still opens, identical to before, with no address; its stored hash is unchanged (history survives the privacy purge)');
+
+// bad requests
+const badId = await savedAsk(MEMBER, { action: 'open', report_id: 'not-a-uuid' });
+const extra = await savedAsk(MEMBER, { action: 'list', address: HOME });
+const badAction = await savedAsk(MEMBER, { action: 'delete', report_id: firstId });
+ok(badId.status === 400 && badId.json.detail === 'report_id' && extra.status === 400 && badAction.status === 400, '7q a malformed id, an extra field and an unknown action are refused (400)', [badId.json, extra.json, badAction.json]);
+
+// the report function still cannot MAKE a report for a complete trial, and still refuses before any work
+const beforeMake = seen.length;
+r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(60) });
+ok(r.status === 403 && r.json.error === 'evaluation_complete' && !seen.slice(beforeMake).some((x) => /evaluation_report_issue|report_snapshot/.test(x)) && count('evaluation_credit') === 20,
+  '7r a complete trial still cannot make a report (403 evaluation_complete), and nothing was issued', r.json);
+
+// a revoked evaluation: the gate refuses, and the database itself returns nothing
+one("select public.evaluation_revoke(:'e'::uuid)", { e: evalId });
+const revokedList = await savedAsk(MEMBER, { action: 'list' });
+ok(revokedList.status === 403, '7s once the evaluation is revoked the report function refuses the member (403)', revokedList.json);
+ok(one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: MEMBER }) === '0'
+   && one("select count(*) from public.evaluation_report_open(:'u'::uuid, :'r'::uuid)", { u: MEMBER, r: firstId }) === '0',
+  '7t and the database functions themselves return NOTHING for a revoked evaluation: the handler\'s refusal is not the only guard');
+ok(count('report_snapshot') === 20 && count('evaluation_credit') === 20, '7u revoking leaves the twenty stored reports and their ledger rows in place (nothing is deleted)');
+
+// an ACTIVE evaluation whose end date has passed: the same rule as a revoked one (D-6-3). The other brokerage makes one report, then its end date passes.
+r = await ask(CLEARED, NEWBIE, { address: HOME, idempotency_key: key(70) });
+const otherReport = r.status === 200 ? one("select c.report_id from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Other Brokerage Realty'") : '';
+ok(r.status === 200 && otherReport !== ''
+   && one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: NEWBIE }) === '1'
+   && one("select count(*) from public.evaluation_report_open(:'u'::uuid, :'r'::uuid)", { u: NEWBIE, r: otherReport }) === '1',
+  '7v while its trial is active and unexpired the other brokerage lists and opens its one report', r.json);
+one("update public.evaluation e set expires_at = e.created_at + interval '1 second' from public.brokerage_account a where a.id = e.brokerage_id and a.name = 'Other Brokerage Realty' and e.status = 'active'");
+ok(one("select count(*) from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Other Brokerage Realty' and e.status = 'active' and e.expires_at < now()") === '1'
+   && one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: NEWBIE }) === '0'
+   && one("select count(*) from public.evaluation_report_open(:'u'::uuid, :'r'::uuid)", { u: NEWBIE, r: otherReport }) === '0'
+   && count('report_snapshot') === 21,
+  '7w once an ACTIVE trial\'s end date has passed the database functions return nothing, and the stored report is still there');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

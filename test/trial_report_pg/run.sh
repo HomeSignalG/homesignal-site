@@ -18,4 +18,6 @@ P -f "$root/docs/brokerage-account-spine.sql" >/dev/null 2>&1 || { echo "FAIL �
 P -f "$root/docs/report-private-context.sql" >/dev/null 2>&1 || { echo "FAIL — the private context does not apply"; exit 1; }
 P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1 || { echo "FAIL — the snapshot does not apply"; exit 1; }
 P -f "$root/docs/evaluation-entitlement.sql" >/dev/null 2>&1 || { echo "FAIL — the evaluation entitlement does not apply"; exit 1; }
+P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply"; exit 1; }
+P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply a second time"; exit 1; }
 exec node "$here/roundtrip.mjs"

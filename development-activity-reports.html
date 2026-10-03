@@ -30,6 +30,10 @@
    is active, and makes one invite link per agent through the trial function.
    Whether this person may make one is the database's check, not the page's:
    the page only offers it to an owner and shows the answer.
+
+   Build step 6: a "Saved reports" card lists the reports the brokerage has made and opens one again by its permanent id. Opening is a
+   read of what was stored (the report function's `list` and `open` actions): it never makes a report, never uses a free report and
+   shows the report exactly as it was saved. Nothing about a saved report is kept in the browser.
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -64,6 +68,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #invite-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
 #team-status{margin:0;font-size:14px;min-height:1.5em}
 #team-status.err{color:var(--red);font-weight:600}
+#saved{display:grid;gap:10px}
+#saved h2{margin:0;font-size:17px}
+#saved .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#saved-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+#saved-list button{width:100%;text-align:left;font:inherit;font-size:14px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;min-height:44px;overflow-wrap:anywhere}
+#saved-list button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+#saved-list button:disabled{opacity:.6;cursor:default}
+#saved-status{margin:0;font-size:14px;min-height:1.5em}
+#saved-status.err{color:var(--red);font-weight:600}
 .auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
 .auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
 .auth-modal h2{margin:0 0 4px;font-size:19px}
@@ -104,6 +117,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       <p class="hint" id="invite-note"></p>
     </div>
     <p id="team-status" role="status" aria-live="polite"></p>
+  </section>
+  <section class="card" id="saved" aria-labelledby="saved-title" hidden>
+    <h2 id="saved-title">Saved reports</h2>
+    <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report.</p>
+    <ul id="saved-list"></ul>
+    <p id="saved-status" role="status" aria-live="polite"></p>
   </section>
   <section class="card" aria-label="Make a report">
     <form id="rf" novalidate>
@@ -150,6 +169,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
+  var savedFresh = false, opening = false;
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
@@ -248,9 +268,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (note) sub.textContent = note + ' ' + sub.textContent;
     $('go').disabled = busy || !(a === 'trial' || a === 'admin');
     showTeam(a === 'trial' && role === 'owner');
+    showSaved(a === 'trial' || a === 'complete');
   }
   function trialUnreadable(){
-    access = null; role = null; showTeam(false);
+    access = null; role = null; showTeam(false); showSaved(false);
     $('trial-count').className = 'count out';
     $('trial-count').textContent = 'Your trial could not be read just now';
     $('trial-sub').textContent = 'Reload the page in a minute.';
@@ -287,6 +308,58 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }
     $('team').hidden = !on;
     $('mint').disabled = minting || !on;
+  }
+  // ---- saved reports (build step 6): the brokerage's stored reports, opened as stored ------------------------------------------
+  function savedSay(text, isError){ var s=$('saved-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  /** Hide or show the card. Hiding also forgets the list, so one person's reports are never left on the page for the next. */
+  function showSaved(on){
+    if (!on) { savedFresh = false; $('saved-list').textContent = ''; savedSay('', false); $('saved').hidden = true; return; }
+    $('saved').hidden = false;
+    if (!savedFresh) refreshSaved();
+  }
+  function savedMessage(httpStatus){
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 404) return 'That saved report could not be found.';
+    if (httpStatus === 403) return 'This account cannot open saved reports right now.';
+    return 'The saved reports could not be read just now. Try again in a minute.';
+  }
+  async function refreshSaved(){
+    if (!session || !session.user) return;
+    var forUser = session.user.id;
+    savedFresh = true; // one read at a time; a failure below lets the next call try again
+    var r = await post(REPORT_FN, { action: 'list' });
+    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
+    var body = r.body || {};
+    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; savedSay(savedMessage(r.status), true); return; }
+    var list = $('saved-list');
+    list.textContent = '';
+    savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your free reports.', false);
+    body.reports.forEach(function(rep){
+      if (!rep || typeof rep.report_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(rep.report_id)) return;
+      var li = document.createElement('li'), b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '');
+      b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
+      li.appendChild(b); list.appendChild(li);
+    });
+  }
+  async function openSaved(reportId, number){
+    if (opening || busy || !session || !session.user) return;
+    var forUser = session.user.id;
+    opening = true; savedSay('Opening report ' + number + '…', false);
+    $('creditnote').hidden = true; $('report').textContent = '';
+    var r = await post(REPORT_FN, { action: 'open', report_id: reportId });
+    opening = false;
+    if (!session || !session.user || session.user.id !== forUser) return;
+    var body = r.body || {};
+    var V = window.HS && window.HS.daReportView;
+    if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, { subject: typeof body.address === 'string' ? body.address : '' })) {
+      savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
+      $('creditnote').textContent = 'This is the report as it was saved. Opening it did not use a free report.'; $('creditnote').hidden = false;
+      return;
+    }
+    if (r.status === 401) { session = null; openAuth(); }
+    savedSay(savedMessage(r.status), true);
   }
   function dateWords(iso){
     var d = iso ? new Date(iso) : null;
@@ -350,11 +423,13 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (session.user && session.user.id !== was) {
-        role = null; showTeam(false); // another person's role and invite link are never shown to this one
+        role = null; showTeam(false); showSaved(false); // another person's role, invite link and reports are never shown to this one
+        $('report').textContent = ''; $('creditnote').hidden = true; say('', false);
         loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
       }
     } else {
-      access = null; role = null; attempt = null; showTeam(false);
+      access = null; role = null; attempt = null; showTeam(false); showSaved(false);
+      $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
       $('trial-sub').textContent = invite ? 'Use the email address the invite was sent to.' : '';
@@ -429,6 +504,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
+    if (body.stored === true) { savedFresh = false; showSaved(true); } // a report that was just saved joins the list
   }
 
   document.addEventListener('DOMContentLoaded', function(){

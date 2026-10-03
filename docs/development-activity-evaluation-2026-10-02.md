@@ -267,6 +267,15 @@ Used credits are the count of ledger rows; a mutable counter would be a second c
 > The seat limit is still enforced when an agent joins (D-L2), and the agent invite keeps the database's default 14 days (D-L4). The
 > person's role is read from the one resolver, `brokerage_membership_of`; it decides only what the page offers. No database object
 > was added. `evaluation_invite_revoke` and `evaluation_revoke` are still called by nothing. Record: the engine doc, "Step 5e".
+>
+> **Dated note, 2026-10-03 (build step 6).** The credit ledger is now also READ, for saved reports. Two new read-only functions
+> (`docs/saved-reports.sql`, system-only) join `brokerage_membership_of` → `evaluation` → `evaluation_credit` → `report_snapshot`:
+> - `evaluation_reports_of(user)` lists the brokerage's stored reports, newest first;
+> - `evaluation_report_open(user, id)` returns one stored report if it is in that brokerage's ledger, else nothing.
+>
+> They write nothing and can charge nothing. They serve an active, unexpired evaluation or a complete one, never a revoked or expired one
+> (D-6-3). The ledger still holds no user id, so every member of a brokerage sees all its reports (D-6-2). The trial gate now lets a
+> COMPLETE trial through and the handler refuses it only for MAKING a report. Record: the engine doc, "Step 6".
 
 - It builds no handler, edge function, page, workspace read, admin gate change or schedule, and does not touch `public.subscriptions`.
   `_shared/admin-gate.ts`, `_shared/service-rest.ts`, the shared snapshot module and both report handlers are unchanged and pinned so.
