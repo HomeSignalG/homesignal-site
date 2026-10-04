@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, RIGHTS_NONE, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
 import { LAUNCH_TEST_LOCATION, OTHER_PROPERTY, addressNo, geocodeStandIn } from './lib/launch-test-location.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
@@ -284,6 +284,13 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
+// WHAT A PERSON SEES, not what the attribute says. `el.hidden` is only the attribute: a page rule that sets a display (the cards below are display:grid by id)
+// beats the browser's own rule for it, so an element can have hidden === true and still be drawn. That is exactly what happened live in Manual Test Part B
+// (2026-10-04: Billing, "Invite an agent", "Saved reports" for a signed-out visitor; the Share box under a report that was not saved), and every earlier
+// check passed because it read the attribute. So "not shown" is asserted here as: computed display is not none AND the box has a size.
+const CARDS = ['#billing', '#team', '#saved', '#compare', '#profile', '#share', '#watch'];
+const drawn = (page, sel) => page.$eval(sel, (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; });
+const drawnCards = (page) => page.evaluate((sels) => sels.filter((sel) => { const e = document.querySelector(sel), s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && r.width > 0 && r.height > 0; }), CARDS);
 const TRIALS = new WeakMap();
 const trialsOf = (page) => TRIALS.get(page);
 const settled = (page) => page.waitForFunction(() => !/Making the report/.test(document.getElementById('status').textContent) && !/^Sign in/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -339,7 +346,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(/^16 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 16 left, from the report function\'s own count');
   // a fresh world with nothing cleared: a "No data ingested" report
   await ctx.close();
-  const w2 = world({ used: 4, rights: RIGHTS_SHIPPED });
+  const w2 = world({ used: 4, rights: RIGHTS_NONE });
   const o2 = await open({ w: w2 });
   await waitCount(o2.page, /^16 free reports left$/);
   await make(o2.page);
@@ -357,7 +364,25 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(!/\b0 (official )?(records?|projects?)\b/i.test(await text(o2.page, '#report')) && !(await text(o2.page, '#report')).includes('No development activity'),
     '2e5 and it states no measured zero and does not use the other outcome\'s words ("No development activity"): the two founder outcomes are never confused');
   ok(errors.length === 0 && o2.errors.length === 0 && foreign.length === 0 && o2.foreign.length === 0, '2f no page error, nothing foreign fetched', { errors, e2: o2.errors });
+  // RENDERED, not the attribute (Manual Test Part B, 2026-10-04). A "No data ingested" report is not saved, so nothing about it can be shared or watched: no Share box and no
+  // Watch box is DRAWN under it, while the report itself is (the positive control: this check can see a box that is on screen).
+  ok(!(await drawn(o2.page, '#share')) && !(await drawn(o2.page, '#watch')) && (await drawn(o2.page, '#report')) && (await drawn(o2.page, '#rf')),
+    '2g after a "No data ingested" report no Share box and no Watch box is drawn, while the report and the form are', { share: await drawn(o2.page, '#share'), watch: await drawn(o2.page, '#watch') });
   await o2.ctx.close();
+  // A visitor who is not signed in sees none of the member cards. Billing, "Invite an agent", "Saved reports", Compare, "Your name", Share and Watch are all hidden by the
+  // script and each has a display:grid rule of its own, so only the page's [hidden] rule keeps them off the screen.
+  const so = await open({ w: world(), signedIn: false });
+  const drawnOut = await drawnCards(so.page);
+  ok(drawnOut.length === 0 && (await drawn(so.page, '#rf')) && (await drawn(so.page, '#trial')),
+    '2h signed out, none of the seven member cards is drawn (Billing, Invite an agent, Saved reports, Compare, Your name, Share, Watch), while the form and the sign-in panel are', drawnOut);
+  // the instrument must be able to see the defect: take the page's [hidden] rule out of the live stylesheet (the page as it was before the fix) and the same read must now
+  // find all seven drawn. The count of rules removed is asserted, so a mutation that did not apply cannot pass as a kill.
+  const removed = await so.page.evaluate(() => { let n = 0; for (const sh of document.styleSheets) { for (let i = sh.cssRules.length - 1; i >= 0; i--) { if (sh.cssRules[i].selectorText === '[hidden]') { sh.deleteRule(i); n++; } } } return n; });
+  const drawnOld = await drawnCards(so.page);
+  ok(removed === 1 && JSON.stringify(drawnOld.slice().sort()) === JSON.stringify(CARDS.slice().sort()),
+    '2i without the page\'s [hidden] rule the same read finds all seven hidden cards drawn: this check fails on the old page', { removed, drawnOld });
+  ok(so.errors.length === 0 && so.foreign.length === 0, '2j signed out: no page error, nothing foreign fetched', { e: so.errors, f: so.foreign });
+  await so.ctx.close();
 }
 
 // ---- 3. a lost answer is retried with the same key, and is not charged twice -------------------------------------------------------------
@@ -475,7 +500,7 @@ for (const [label, w, count, disabled] of [
 }
 
 // ---- 6. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------
-const teamShown = (page) => page.$eval('#team', (e) => !e.hidden && e.getBoundingClientRect().height > 0);
+const teamShown = (page) => drawn(page, '#team'); // rendered, not the attribute (see `drawn`)
 for (const [label, w, count] of [
   ['an agent', world({ role: 'agent' }), /free reports left/],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/],
@@ -899,7 +924,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
-  const w = world({ rights: RIGHTS_SHIPPED });
+  const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, shareCalls } = await open({ w });
   await waitCount(page, /free reports left/);
   await make(page);
@@ -1037,7 +1062,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was not saved cannot be watched
-  const w = world({ rights: RIGHTS_SHIPPED });
+  const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, watchCalls } = await open({ w });
   await waitCount(page, /free reports left/);
   await make(page);
@@ -1166,7 +1191,7 @@ const tableOf = (page) => page.evaluate(() => {
 });
 const rowCells = (t, label) => (t.rows.find((r) => r.label === label) || { cells: [] }).cells;
 const A1 = '1 First Ave, Brigham City, UT 84302', A2 = '2 Second Ave, Brigham City, UT 84302', A3 = '3 Third Ave, Brigham City, UT 84302', A4 = '4 Fourth Ave, Brigham City, UT 84302', A5 = '5 Fifth Ave, Brigham City, UT 84302', A6 = '6 Sixth Ave, Brigham City, UT 84302';
-const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
+const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
 {
   // before there are two reports there is nothing to compare, and the card says so
   const w = world();

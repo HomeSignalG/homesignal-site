@@ -237,7 +237,7 @@ Run 2026-10-04 on the final tree, in a sandbox with **no network egress** (so no
 | `test/launch-location-structure.test.mjs` | 22 / 22 |
 | `test/launch-gate-structure.test.mjs` | 67 / 67 (the original 73 gate checks are pinned by name in 6a-6g) |
 | `test/evaluation-entitlement-structure.test.mjs` · `brokerage-account-structure` · `national-report-function` | 76 / 76 · 57 / 57 · 194 / 194 |
-| `test/report_rate_limit_pg/run.sh` (the limiter against a real Postgres, incl. real concurrent sessions) | 71 / 71 |
+| `test/report_rate_limit_pg/run.sh` (the limiter against a real Postgres, incl. real concurrent sessions) | 71 / 71 *(73 / 73 since section 14a added the deterministic overlap check)* |
 | `test/launch_gate_pg/run.sh` (invite to a 100-report paid month, over the real handlers and SQL) | **86 / 86** = the original 73 + 13 in section 15 |
 | `test/trial_report_pg/run.sh` | 95 / 95 |
 | Chromium: `development-activity-reports.browser` · `development-activity-review.browser` | 257 / 257 · 54 / 54 |
@@ -255,3 +255,66 @@ Run 2026-10-04 on the final tree, in a sandbox with **no network egress** (so no
 **The whole browser sweep (reported-only in CI).** `node scripts/run-unit-tests.mjs --browser` ended "17 test file(s) failed" out of 55. That is **not** caused by this change, shown rather than assumed: the same 17 files were run on a pristine checkout of `main` (`2c0246dc`) and all 17 fail there too. 15 fail with the identical set of failing check names. The two that differed by one check were re-run three times each, alone, on both trees: `user-journey` matched on `main` every time (the extra failure only appeared while other jobs were loading the machine), and in `home-zip-or-address` the extra "no page errors" check is `console: Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED`, a sandbox network-proxy failure on an external resource, in a page this change does not touch (no file in the diff is loaded by the home page). The failures I read were the sandbox itself: no network (Map 1 and the geocoder checks need the live database and geocoder), and in one file a Chrome channel that is not installed. I did not read every line of all 17; the evidence that none is this change's is that each one fails on `main` too. A first baseline attempt was **invalid** and is not used: the pristine checkout had no `node_modules`, so those tests printed "SKIP — playwright not installed" and exited 0 without running.
 
 **Not tested, and why.** The automated tests never asked the live address lookup for `20 N Main St, Brigham City, UT 84302` (no egress); the founder did on 2026-10-04 through the landing page's coverage check, and it passed (section 8). Still not seen live: the report page's "No data ingested" state (manual test, Part A, steps 1-4). Before the go, `docs/report-rate-limit.sql` had been run only against disposable Postgres. It was then applied and the function deployed (section 9, receipt); what has still NOT been seen is a real member's request passing through the live limiter, because no signed-in member was available to make one from this session (manual test, Part C). Nothing was sent to a publisher and no public button was exposed.
+
+## 13. Found by the live manual test (Part B, 2026-10-04): hidden boxes were drawn on the customer page
+
+**What the founder saw.** Signed in as a trial owner, after a "No data ingested" report, the page drew the "Share this report with your client" and "Watch this property" boxes. Earlier, signed out in a private window, it drew Billing, "Invite an agent" and "Saved reports". The same page, as an admin, drew "Invite an agent" with its button greyed out.
+
+**What was true underneath (read-only, same minute).** Nothing was stored and nothing was charged: `report_snapshot` 0 rows, 0 credits used on the trial, and the rate limiter held exactly 6 rows, each used = 1 (one request, three windows, person and brokerage). The server's answer said `stored: false`; the boxes were on screen anyway.
+
+**Cause.** `development-activity-reports.html` hides and shows its cards with the `hidden` attribute. The browser's own rule for that attribute loses to any page rule that sets a display, and nine of the page's elements have one (`#billing`, `#team`, `#minted`, `#saved`, `#compare`, `#profile`, `#share`, `#share-new`, `#watch` are `display:grid` by id). The page had no `[hidden]{display:none!important}` rule, so every one of them was drawn whatever the script said. The other pages are not affected: the review and landing pages have the rule, and `shared-report.html`'s hidden elements have no display rule of their own (scan of all 30 root pages, 2026-10-04: only this page had both a hidden id and an author display rule on it without the rule).
+
+**Why every test passed.** The browser suite asserted `el.hidden` (the attribute), never what is drawn. Its "not shown" check for the owner card was `!e.hidden && height > 0`, which is false whenever the attribute is set, so it could not see a hidden card that was drawn.
+
+**The fix.** One rule at the top of the page's CSS: `[hidden]{display:none!important}`. No script, no server, no data change.
+
+**How it is held.**
+- `test/development-activity-reports.browser.test.mjs` now reads what is DRAWN (computed display and a box with size): 2g (no Share or Watch box under a "No data ingested" report), 2h (signed out, none of the seven member cards), 2i (the page's `[hidden]` rule taken out of the live stylesheet: the same read finds all seven drawn, with the number of rules removed asserted), 2j. The "Invite an agent" checks (6a, 6i, 6l, 6o) now read the same way. **261 / 261 on the fixed page. On the page as it was: 250 / 261, 11 fail**, among them the five 6a checks, which show the owner's invite card was also drawn for an agent, an admin, a person with no trial, and an owner of a used-up or revoked trial.
+- `test/development-activity-reports.test.mjs` 10a-10c (offline, so in the required check): the reason exists (nine ids carry a display), the rule is in the CSS and not only a comment, and it comes before the first rule that sets a display. Three mutations (rule removed, rule only in a comment, rule moved after the display rules) are each killed by a named check.
+- Whole offline suite: 325 test files pass.
+
+**Not changed, and what it does not cover.** This is a display fix. It does not change what any card does, which accounts see which card, or any data. Whether a non-owner agent should see the Billing card is the existing design and is untouched; this only makes the page do what its script already said. The fix is not live until it is merged and the site is deployed.
+
+## 14. Why the Brigham City report was empty, and founder ruling R7 (2026-10-04)
+
+**The finding.** The founder asked why the report for `20 N Main St, Brigham City, UT 84302` said "No data ingested" when the development map shows records for the same address. Read-only on production: the report's own radius read at that point, half a mile (`n5_projects_within_radius`), returns **9** rows, all `udot-active-projects-lines`, record kind development. That is the same 9 the map reports as "9 canonical projects within ½ mile". The report left them out because `report-rights.json` listed no source (ruling R4), and an empty report is labelled "No data ingested" by the engine's one outcome rule (R5, which names "no source cleared for paying customers" as one of its causes). So the answer was by design, and the label was still misleading here: the data **is** ingested, it was held back.
+
+**The decision.** The founder ruled that every source in the jurisdiction registry may appear in a paid report (`docs/development-activity-founder-ruling-r7-2026-10-04.md`). It is a risk the founder accepted, **not** a publisher's grant, and no classification in the rights audit is edited (verdict still NOT YET).
+
+**What this change does.**
+- `supabase/functions/_shared/report-rights.json`, version 2: all **240** registry sources, generated by `scripts/build-report-rights.mjs` (never typed; `--check` fails on a byte of difference). Fingerprint `32af7ab5a9f963a562e9af19eab246bf`, equal to the same array fingerprinted inside the production database. Three sources carry the credit line their publisher requires (NYC DOB twice, Seattle).
+- `test/report-rights-r7.test.mjs` (18 checks): the file equals the registry exactly, a new registry source fails the fingerprint until a new ruling changes it, the ruling quotes the founder and says it is not a publisher's grant, and each credit line is backed by that publisher's own file.
+- `test/report-rights-evidence.test.mjs` (52 checks): a second, separately-proved kind of evidence (the ruling), with 11 refusals by name; the publisher standard is unchanged.
+- The suites that used the shipped file to mean "nothing cleared" now name an explicit empty list (`RIGHTS_NONE`), so the empty state is still tested. The Brigham City journey test now shows the stored UDOT records in the shipped state (charged, stored, "Development shown") and keeps the empty answer as its own case.
+
+**What it does not do.** It does not make every ZIP show records. **8,215** of the 12,722 ZIPs have any development record in HomeSignal's data; the other 4,507 correctly keep saying "No data ingested". A report covers half a mile, and a completed (operating) record appears only with an official event in the recent window (R3). It clears only registry sources (not facilities, scores or Local News). It does not clear the geocoder or ZCTA terms, change the Terms of Use, or open billing.
+
+**What was open when this was written, and where each item stands (updated the same day).**
+1. **Deploy.** The list is read by `get-development-activity-report`, `follow-development-report` and `run-property-watch`. Merging does not redeploy them, but `deploy-edge-functions.yml` ships whatever `main` is. **The founder gave the go on 2026-10-04** (section 14a). The deploy and the live read-back are recorded in section 16, which is written after the deploy.
+2. **Real reports will be stored for the first time.** Until now `report_snapshot` holds 0 rows because no report ever had a record to store. The private-context contract (`docs/report-private-context-contract-2026-09-30.md` §6) lists the gates to close before a real customer report is stored. **Re-read on 2026-10-04 at the founder's choice, after the first attempt was refused by the tool's safety check; the result is section 14a.**
+3. **The Terms of Use** still say personal, non-commercial use; that is for counsel. Unchanged.
+4. **Local runs not made after the last edit.** Superseded: CI ran them on the pull request. On head `63813117`: unit, structural, isolation, launch-gate, billing, verify and browser were green; `report-rate-limit` was red for a reason unrelated to this change (section 14a); `snapshot` was still running when this was written.
+
+## 14a. The private-context gates, re-read, and the founder's go (2026-10-04)
+
+**What was read.** `docs/report-private-context-contract-2026-09-30.md` §6, "The five gates before the first real customer report is stored", and its dated note of 2026-10-02: clearing the first source turns the storing path on, and that change is the moment to re-read gates 1, 2 and 5. R7 is that change.
+
+**Where the five stand** (the contract's own words, checked against the code and against production today):
+
+| # | Gate | Standing |
+|---|---|---|
+| 1 | the exact address resides only in the deletable layer | closed in tests on a disposable Postgres; the engine emits intelligence and private context as two objects |
+| 2 | the permanent record holds the address nowhere else | a backstop with stated limits: the database matches whole values only; the engine's own `boundaryFindings` also looks for fragments (the street line) before any store and, on a finding, marks the report not storable (not stored, not charged: `handler.ts` 242-256, `credit-rule.ts` 51) |
+| 3 | deleting the private context does not damage report history | proven (`report_snapshot_pg` P01-P06) |
+| 4 | Changes Since Report works while the context is active | proven on a disposable Postgres; the function is deployed; no signed-in call has been made against production |
+| 5 | the clock and the purge are testable and auditable | applied and live. Read on 2026-10-04 just after 19:20 UTC: pg_cron job 70 `5,20,35,50 * * * *`, active; **96 runs in 24 hours, 96 succeeded**, newest 19:20:00Z; monitor check `report_private_context_retention` `ok = true` (updated 19:10:00Z, "0 private context(s) held (0 ever created)"). The purge of a real due context has not been seen in production because none exists |
+
+**Production before the go (read-only, same minute):** `report_snapshot` 0 rows, `report_private_context` 0 rows, 0 open needs.
+
+**Two consequences put to the founder in plain words before the go:**
+1. **Nothing closes a saved report yet.** The contract (D-4) keeps the `report` need open until Orders J and L define what closes a report. The 90-day purge starts only when the last need closes, so a stored address stays until a verified privacy request purges it (`report_private_context_purge(context, 'verified_privacy_request')`, a manual step today). This matches the founder's rule as written ("keep while the report is active") and is not what "90 days" sounds like.
+2. **A property that is itself a record's address is shown but not saved.** The contract §8.3 names the missing allow-list. The report fails closed: not stored, not charged. With R7 this will be common, because many addresses carry their own permit record.
+
+**The founder's decision, 2026-10-04: "go live."** Both consequences above had been stated. No gate was reinterpreted; the open parts listed in the contract (the limits of gate 2, the indefinite Follow, the unseen real purge, the missing close-rule) are accepted risks, not closed items.
+
+**One test hardened in this change (not part of R7).** The `report-rate-limit` job went red on this pull request because the prohibited mutation `no_advisory_locks` was not caught that time: it was caught only by the eight-session race, which depends on timing (caught 20 of 20 on an idle machine, missed once on a busy runner; the same job had passed on this branch's first commit). `test/report_rate_limit_pg/run.sh` gains one deterministic overlap check (R3b, R3c): a person at 9 of 10 has the tenth claim held open for three seconds while a second claim arrives one second later; with the locks the second waits and is refused (the minute ends at 10), without them it is admitted (the minute ends at 11). Measured locally on PostgreSQL 16: the suite passes **73 / 73** (it was 71), and the mutation fails R3b and R3c in **10 of 10** runs. No rate-limit rule, number or SQL changed.

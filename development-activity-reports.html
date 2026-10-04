@@ -69,6 +69,11 @@
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
+/* The page hides and shows its cards with the `hidden` attribute (el.hidden = true / false). The browser's own rule for that attribute is weaker than any
+   page rule that sets a display, and several cards below have one (#billing, #team, #saved, #share, #watch ... are display:grid). Without this line a card
+   the script has hidden is STILL DRAWN: a signed-out visitor saw Billing, "Invite an agent" and "Saved reports", and a report that was not saved showed the
+   "Share this report with your client" box (seen live in Manual Test Part B, 2026-10-04). Keep it ABOVE every display rule's reach: !important. */
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
 header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
 header.top .in{max-width:960px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}

@@ -28,7 +28,7 @@ const V = sandbox.window.HS.daReportView;
 
 // ---- the engine: every response comes from its real handler (test/lib/da-report-view-world.mjs), and assemble() is called directly once, to compare
 const M = await import('../supabase/functions/_shared/national-report.ts');
-import { NOW, FAM_A, FAM_B, RIGHTS_SHIPPED, RIGHTS_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
+import { NOW, FAM_A, FAM_B, RIGHTS_NONE, RIGHTS_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
 /** The view of a response. A throw is returned as a marker so the check that looked at it fails BY NAME instead of the whole suite crashing. */
 let threw = 0;
 const view = (r, subject = ADDRESS) => { try { return V.html(r, { subject }); } catch (e) { threw++; return '[[the view threw: ' + String((e && e.message) || e) + ']]'; } };
@@ -47,8 +47,8 @@ const stripShapes = (h) => h.replace(/<svg class="da-rv-shape"[\s\S]*?<\/svg>/g,
 
 const W = await wire(RICH);
 const WCOLD = await wire(COLD);
-const WNONE = await wire(RICH, { rights: RIGHTS_SHIPPED });
-const WINT = await wire(RICH, { view: 'internal', rights: RIGHTS_SHIPPED });
+const WNONE = await wire(RICH, { rights: RIGHTS_NONE });
+const WINT = await wire(RICH, { view: 'internal', rights: RIGHTS_NONE });
 const html = view(W), htmlCold = view(WCOLD), htmlNone = view(WNONE), htmlInt = view(WINT);
 
 // ---- 0. the fixtures ARE the engine's output --------------------------------------------------------------------------------------------

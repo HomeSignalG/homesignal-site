@@ -10,13 +10,16 @@
 // WHAT IT PROVES
 //   * the location is accepted and ROUTED: typed address -> geocode -> ZIP 84302 asked of the canonical registry -> the 0.5-mile spatial read at that point;
 //   * an address outside the registry's ZIPs, and one that cannot be found, are named as such, free, and are not the "No data ingested" outcome;
-//   * with the rights registry as shipped (nothing cleared) the report for this location says "No data ingested": 200 OK, not an error, not charged, not stored,
-//     and NONE of the stored records leaks into the answer, although the database holds 41 of them for this ZIP;
-//   * a covered ZIP is NOT a clearance: clearing some other source changes nothing here;
-//   * (control) the very same journey with a FIXTURE source cleared shows development, so the empty answer above is caused by the rights registry and not by the
+//   * with the rights registry AS SHIPPED (founder ruling R7, 2026-10-04: every registry source, including the UDOT lines family these rows belong to) the report for
+//     this location SHOWS the stored records: 200 OK, outcome "Development shown", the records by name with their official links, charged as one free report and
+//     stored (the issuing function is called once);
+//   * with NOTHING cleared (an explicit empty list, which is what the shipped file said until R7) the same journey says "No data ingested": 200 OK, not an error, not
+//     charged, not stored, and NONE of the stored records leaks into the answer. That state still exists for any source that is not on the list;
+//   * a covered ZIP is NOT a clearance: a list that names some other source leaves these records hidden;
+//   * (control) the very same journey with a FIXTURE source cleared shows development, so an empty answer is caused by the rights registry and not by the
 //     location or the routing failing.
 // WHAT IT DOES NOT PROVE: that the live geocoder resolves the street address (a person checks that: docs/development-activity-manual-test-brigham-city-84302.md),
-// or that any publisher's records may be shown to a customer (nothing is cleared; build step 12).
+// or that any publisher permits its records in a paid report (R7 is the founder's decision to list them, not a publisher's grant).
 // Run: node test/brigham-city-84302-journey.test.mjs
 import { readFileSync } from 'node:fs';
 import { LAUNCH_TEST_LOCATION as L, OTHER_PROPERTY, geocodeStandIn } from './lib/launch-test-location.mjs';
@@ -29,6 +32,7 @@ let n = 0, bad = 0;
 const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m + (d !== undefined ? '  [' + JSON.stringify(d).slice(0, 400) + ']' : '')); } };
 
 const SHIPPED = JSON.parse(readFileSync(new URL('../supabase/functions/_shared/report-rights.json', import.meta.url), 'utf8'));
+const NONE = { version: 1, cleared: [] }; // nothing cleared, named here: the empty state does not depend on what the shipped file says
 const NOW = new Date('2026-10-04T12:00:00Z');
 const UDOT_LINES = 'udot-active-projects-lines';
 const USER = 'a1111111-1111-4111-8111-111111111111';
@@ -93,9 +97,10 @@ const asked = (net, path) => net.seen.filter((s) => s.path === path);
 
 // ---- 0. the fixtures say what they claim ------------------------------------------------------------------------------------------------------------
 ok(L.zip === '84302' && L.city === 'Brigham City' && L.state === 'UT' && L.county === 'Box Elder' && /Brigham City, UT 84302$/.test(L.address), '0a the test location is Brigham City, UT 84302 (Box Elder County)');
-// TRIPWIRE, on purpose: the day a source is cleared (build step 12) this control fails, and so do the "No data ingested" answers below, which describe the production situation today.
-// That is the signal to update this file deliberately - the expected answers become development - and to record the clearance evidence, not to loosen the test.
-ok(Array.isArray(SHIPPED.cleared) && SHIPPED.cleared.length === 0, '0b (control) the rights registry as shipped clears NOTHING, so the empty answers below are the production situation, not a staged one');
+// The shipped list is read from disk. It names the family these rows belong to (ruling R7); if that ever stops being true this control fails, and so does section 2, which
+// describes what a customer gets at this address. The empty state is tested separately, against an explicit empty list.
+const cleared = (fam) => SHIPPED.cleared.some((e) => e.registry_id === fam);
+ok(Array.isArray(SHIPPED.cleared) && cleared(UDOT_LINES) && cleared('udot-active-projects'), '0b (control) the rights registry as shipped lists the UDOT families the stored rows below belong to (ruling R7), so section 2 describes production, not a staged case');
 ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id === UDOT_LINES), '0c (control) the stand-in holds stored UDOT records for this point, as production does for 84302: an empty report is not an empty database');
 
 // ---- 1. the location is accepted and routed -------------------------------------------------------------------------------------------------------
@@ -120,9 +125,24 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   ok(claims.length === 1 && JSON.stringify(claims[0].body) === JSON.stringify({ p_user: USER }), '1g the rate limit is asked once, for the signed-in person\'s id and nothing else (no address, no email)', claims.map((x) => x.body));
 }
 
-// ---- 2. the empty-source state: accurate, plain, and not an error ------------------------------------------------------------------------------------
+// ---- 2. as shipped (ruling R7): the stored records are SHOWN ---------------------------------------------------------------------------------------------
 {
   const t = ask({ used: 3 });
+  const r = await t.go();
+  const rep = r.json.report;
+  ok(r.status === 200 && r.json.status === 'OK' && rep.activity.outcome === 'DEVELOPMENT_SHOWN' && rep.activity.label === 'Development shown', '2.1 the report for the test address says "Development shown"', rep.activity);
+  const names = (rep.projects || []).map((p) => p.name).sort();
+  ok(names.length === 2 && JSON.stringify(names) === JSON.stringify([...STORED_NAMES].sort()), '2.2 and it carries the two stored records, by name', names);
+  ok(rep.projects.every((p) => p.source && /^https:\/\//.test(p.source.url) && p.source_family === UDOT_LINES), '2.3 each record carries its official link and its source family', rep.projects.map((p) => p.source));
+  ok(r.json.charged === true && r.json.stored === true && typeof r.json.report_id === 'string' && t.calls.issue === 1 && r.json.credit.uses_report === true && r.json.credit.reason === 'DEVELOPMENT_SHOWN',
+    '2.4 it is charged as one free report and stored: the issuing function is called once and the credit decision says a report is used', [r.json.charged, r.json.stored, r.json.credit]);
+  ok(r.json.trial.credits_used === 4 && r.json.trial.credits_remaining === 16, '2.5 the trial now reads 4 used / 16 left', r.json.trial);
+  ok(rep.projects.every((p) => p.source.attribution === null) && rep.coverage && rep.coverage.state !== 'LIMITED_COVERAGE', '2.6 these sources require no credit line, and the report is not marked limited coverage', rep.coverage);
+}
+
+// ---- 2b. NOTHING cleared: the empty-source state, accurate, plain, and not an error ----------------------------------------------------------------
+{
+  const t = ask({ used: 3, rights: NONE });
   const r = await t.go();
   const rep = r.json.report;
   ok(r.status === 200 && r.json.status === 'OK' && r.json.error === undefined, '2a the answer is a normal 200 OK with no error field: "No data ingested" is a report, not a failure', [r.status, r.json.status, r.json.error]);

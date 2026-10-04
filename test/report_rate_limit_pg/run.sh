@@ -74,6 +74,20 @@ scenarios() {
   local used; used="$(P -tA -c "select used from public.report_rate_window where bucket='user' and subject='$RU1' and window_secs=60")"
   ok "$([ "$used" = "10" ] && echo 1 || echo 0)" "R2 and the person's minute reads exactly 10, not more" "used=$used"
   ok "$([ ! -s "$d/e1.txt" ] && [ ! -s "$d/e5.txt" ] && echo 1 || echo 0)" "R3 no session raised an error while racing (a lock that deadlocks would show here)" "$(head -c 160 "$d/e1.txt" "$d/e5.txt" 2>/dev/null | tr '\n' ' ')"
+  # (1b) THE OVERLAP, ONCE, ON PURPOSE (not left to the race above, which is a matter of timing): person RU2 has used 9 of 10 in the minute. Session A claims the tenth
+  # and HOLDS its transaction open for three seconds; session B claims one second later. With the locks B must WAIT for A, then read 10 and be refused. Without them B
+  # reads 9 (A's write is not committed), is admitted, and the minute ends at 11.
+  local RU2='f0000000-0000-4000-8000-000000000002' T2='2032-06-01 09:40:00+00'
+  P -c "insert into auth.users (id, email) values ('$RU2', 'race-overlap@example.test');" >/dev/null
+  for i in 1 2 3 4 5 6 7 8 9; do P -tA -c "select allowed from public.report_rate_claim_at('$RU2', '$T2')" >/dev/null; done
+  printf 'begin;\nselect allowed from public.report_rate_claim_at(%s, %s);\nselect pg_sleep(3);\ncommit;\n' "'$RU2'" "'$T2'" > "$d/a.sql"
+  P -tA -f "$d/a.sql" > "$d/a.txt" 2>"$d/a.err" &
+  sleep 1
+  P -tA -c "select allowed from public.report_rate_claim_at('$RU2', '$T2')" > "$d/b.txt" 2>"$d/b.err"
+  wait
+  ok "$([ "$(grep -m1 -E '^[tf]$' "$d/a.txt")" = "t" ] && [ "$(head -1 "$d/b.txt")" = "f" ] && echo 1 || echo 0)" "R3b a claim that overlaps another open claim of the same person WAITS for it: the tenth is admitted, the eleventh (one second later, while the tenth is still uncommitted) is refused" "a=$(grep -m1 -E '^[tf]$' "$d/a.txt") b=$(head -1 "$d/b.txt")"
+  used="$(P -tA -c "select used from public.report_rate_window where bucket='user' and subject='$RU2' and window_secs=60")"
+  ok "$([ "$used" = "10" ] && echo 1 || echo 0)" "R3c and the person's minute reads exactly 10 after the overlap, not 11" "used=$used"
   # (2) sixteen sessions, four people of one brokerage: the brokerage's minute admits exactly thirty (each person alone could take ten)
   rm -f "$d"/*
   w=0; for u in "${RUS[@]}"; do for i in 1 2 3 4; do w=$((w+1)); worker_file "$d/w$w.sql" "$u"; done; done

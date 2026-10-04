@@ -64,7 +64,8 @@ ok(NATIONAL.length > 5000 && !/zip_supported[^;]*cleared|cleared[^;]*zip_support
 const JOURNEY = read('test/brigham-city-84302-journey.test.mjs');
 ok(/report-rights\.json/.test(JOURNEY) && /readFileSync/.test(JOURNEY) && /covered ZIP is not a clearance/.test(JOURNEY) && /clearing a different source|different source/i.test(JOURNEY),
   '4e the journey test reads the rights registry from disk (not a copy), and carries the checks that a covered ZIP is not a clearance and that another source\'s clearance changes nothing');
-ok(/tripwire|TRIPWIRE|fails on purpose/i.test(JOURNEY), '4f and it says that its "nothing is cleared" control is a tripwire: it fails on purpose the day a source is cleared, so the expected answers get updated deliberately');
+ok(/const NONE = \{ version: 1, cleared: \[\] \}/.test(JOURNEY) && /rights: NONE/.test(JOURNEY) && /0b \(control\) the rights registry as shipped lists the UDOT families/.test(JOURNEY),
+  '4f and it tests the empty state against an EXPLICIT empty list (not the shipped file), while its shipped-state control fails if the list stops naming the UDOT families the stored rows belong to');
 
 // ---- 5. step 12 and step 13 stay open -------------------------------------------------------------------------------------------------------------------------------
 const MANUAL = read(DOCS[0]);
