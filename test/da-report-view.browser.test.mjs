@@ -102,7 +102,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const ratio = (el) => { const f = rgb(getComputedStyle(el).color).slice(0, 3), b = bg(el); const a = lum(f), d = lum(b); return (Math.max(a, d) + 0.05) / (Math.min(a, d) + 0.05); };
     const pick = (sel) => [...document.querySelectorAll(sel)].map((e) => [sel, +ratio(e).toFixed(2)]);
     return [].concat(pick('.da-rv-lifetext'), pick('.da-rv-life'), pick('.da-rv-metric span'), pick('.da-rv-line'), pick('.da-rv-link'), pick('.da-rv-p'), pick('.da-rv-tag'), pick('.da-rv-eyebrow'), pick('.da-rv-meta'), pick('.da-rv-h2'), pick('.da-rv-ev'),
-      pick('.da-rv-stage'), pick('.da-rv-chip'), pick('.da-rv-chipn'), pick('.da-rv-flab'), pick('.da-rv-revmeta'), pick('.da-rv-onrecord'), pick('.da-rv-act'), pick('.da-rv-soon'), pick('.da-rv-gen'), pick('.da-rv-legend li'));
+      pick('.da-rv-stage'), pick('.da-rv-chip'), pick('.da-rv-chipn'), pick('.da-rv-flab'), pick('.da-rv-revmeta'), pick('.da-rv-onrecord'), pick('.da-rv-act'), pick('.da-rv-soon'), pick('.da-rv-gen'), pick('.da-rv-legend li'), pick('.da-rv-brief'));
   });
   const worst = contrast.reduce((m, c) => (c[1] < m[1] ? c : m), ['', 99]);
   ok(contrast.length > 60 && worst[1] >= 4.5, '1f every text colour measured (' + contrast.length + ' elements: lifecycle labels, counts, lines, links, evidence copy) has at least 4.5:1 contrast; the lowest is ' + worst[0] + ' at ' + worst[1], worst);
@@ -294,6 +294,31 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   }));
   ok(laidOut.approved === 0 && laidOut.marks === 4, '7h on a host page whose CSS sets display on article and g, a filtered-out card and marker still take no space', laidOut);
   await ctx.close();
+}
+
+{
+  // The client briefing (realtor wording pass, 2026-10-04): a paragraph under the header that must read on a phone, print, and never
+  // bring the internal lifecycle line back into the customer view.
+  for (const [width, label] of [[390, 'phone'], [1280, 'desktop']]) {
+    const { ctx, page, errors } = await open(width, 900);
+    await mount(page, W, ADDRESS);
+    const m = await page.evaluate(() => {
+      const b = document.querySelector('.da-rv-brief'), h = document.querySelector('.da-rv-head'), f = document.querySelector('.da-rv-sec');
+      if (!b) return null;
+      const r = b.getBoundingClientRect(), hr = h.getBoundingClientRect(), fr = f.getBoundingClientRect();
+      return { w: Math.round(r.width), vw: document.documentElement.clientWidth, below: r.top >= hr.bottom - 1, above: r.bottom <= fr.top + 1, scrollW: document.documentElement.scrollWidth, text: b.textContent.length,
+        life: document.querySelectorAll('.da-rv-card').length ? [...document.querySelectorAll('.da-rv-card')].filter((c) => /HomeSignal lifecycle/.test(c.textContent)).length : -1 };
+    });
+    ok(m && m.below && m.above && m.w <= m.vw && m.scrollW <= m.vw && m.text > 100, '11-' + label + 'a the briefing sits between the header and the first section, fits the ' + label + ' width, and causes no sideways scroll', m);
+    ok(m && m.life === 0, '11-' + label + 'b no card in the customer view carries a "HomeSignal lifecycle" line', m);
+    if (width === 390) {
+      await page.emulateMedia({ media: 'print' });
+      const pr = await page.evaluate(() => { const b = document.querySelector('.da-rv-brief'); const cs = b && getComputedStyle(b); return b ? { shown: cs.display !== 'none', avoid: cs.breakInside } : null; });
+      ok(pr && pr.shown && pr.avoid === 'avoid', '11-printa in print the briefing is shown and is not split across pages', pr);
+    }
+    ok(errors.length === 0, '11-' + label + 'c no page error and no console error', errors);
+    await ctx.close();
+  }
 }
 
 await browser.close();

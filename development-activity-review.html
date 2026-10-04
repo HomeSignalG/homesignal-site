@@ -145,7 +145,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
 </div>
 
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=09e9661a"></script>
+<script src="lib/da-report-view.js?v=5f9b3f78"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================================
@@ -281,7 +281,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     if (httpStatus === 401) { session = null; pending = true; openAuth(); }
     var ok = httpStatus === 200 && body && body.status === 'OK';
     if (!ok) { say(messageFor(httpStatus, body), true); return; }
-    var opts = { subject: address, label: field('label'), brokerage: field('brokerage'), agent: field('agent') };
+    var opts = { subject: address, label: field('label'), brokerage: field('brokerage'), agent: field('agent'), showLifecycle: true };
     var V = window.HS && window.HS.daReportView;
     if (!V || !V.mount($('report'), body, opts)) { say('The report came back but could not be shown.', true); return; }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;

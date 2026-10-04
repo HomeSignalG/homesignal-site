@@ -127,9 +127,10 @@ const C = code(SRC);
   const optReads = [...C.matchAll(/opts\.(\w+)/g)].map((m) => m[1]);
   // build step 8 adds two options, read in actionsBar() only: `live` (which of the four report actions are real buttons) and `hide` (which are left out)
   const bar = (C.match(/function actionsBar\(opts\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok(optReads.length > 0 && optReads.every((k) => ['subject', 'label', 'brokerage', 'agent', 'live', 'hide'].includes(k)) && ['label', 'brokerage', 'agent'].every((k) => head.includes('opts.' + k))
+  ok(optReads.length > 0 && optReads.every((k) => ['subject', 'label', 'brokerage', 'agent', 'live', 'hide', 'showLifecycle'].includes(k)) && ['label', 'brokerage', 'agent'].every((k) => head.includes('opts.' + k))
      && bar.startsWith('function actionsBar(opts) {') && (C.match(/opts\.live/g) || []).length === 1 && (C.match(/opts\.hide/g) || []).length === 1 && bar.includes('opts.live') && bar.includes('opts.hide')
-     && !head.includes('opts.live') && !head.includes('opts.hide'),
+     && !head.includes('opts.live') && !head.includes('opts.hide')
+     && (C.match(/opts\.showLifecycle/g) || []).length === 1 && /opts\.showLifecycle === true/.test(C) && !head.includes('opts.showLifecycle') && !bar.includes('opts.showLifecycle'),
     '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
   ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
