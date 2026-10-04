@@ -370,8 +370,52 @@ through once each step is complete").
      production; the signed-in paths are not exercised live; `run-property-watch` has no rate limit beyond its private secret; an ended or
      failing watch is not emailed to the agent. Also carried: several older mutation harnesses have stale anchors that predate step 7;
      none guards step 10.
-11. **$79/month checkout** on the existing Lemon Squeezy connection: 100 reports a month, Billing tab.
+11. ~~**$79/month checkout**~~ on the existing Lemon Squeezy connection: 100 reports a month, Billing tab.
     *Founder action:* create the $79 product in Lemon Squeezy and make one test payment.
+   *(Done: #1614 merged as `8dafe51`. **The build is done. The founder actions are NOT done, no payment has been made, and nothing has been
+   exercised against Lemon Squeezy.***
+   - *SQL applied (`docs/brokerage-billing.sql`, db-sql run `37171141594`; the migration-ledger row `brokerage_billing` is a hand-written
+     backfill with empty statements, like the two watch rows). Read back from production: two tables, one view and 11 functions; **all 11 function
+     bodies are md5-identical to the committed file**; both tables have row level security on and no grant to `anon`, `authenticated` or
+     `service_role` (the view likewise); 8 functions are executable by `service_role` alone and 3 (the two triggers and the charging helper) by
+     nobody; the six ownership readers now read the one view and their attributes are unchanged (md5 `e1e95ccb…` before and after);
+     `billing_report_limit()` is 100; the table constraints carry the cap (primary key `(binding_id, period_index, ordinal)`, ordinal 1 to the
+     limit). Controls: `postgres` holds 12 table privileges, `service_role` executes 8 billing functions and still executes the free evaluation
+     function. Production held 0 payment events, 0 stored reports and 0 free credits before and after. `billing_check()` reads 0 on all 8
+     invariants, but beside **controls of 0**, because production's tables are empty: that proves nothing is broken, not that the rules work. The
+     rules are proved on a disposable database (below).*
+   - *Functions deployed from `main` (runs `37171227622`, `37171230489`, `37171231495`, all success): `get-development-activity-report` v14 and
+     `manage-billing` v1 with JWT on, `development-activity-billing-webhook` v2 with JWT off. The map product's `lemonsqueezy-webhook` (v4) is
+     untouched. **Read back live with the secrets unset:** the webhook's GET answers 200 with `configured: false`; an unsigned POST answers 503
+     `not_set_up`; `manage-billing` with no token answers 401 at the gateway, and with the anon key (no signed-in person) its own 401
+     `unauthorized`, as does the report function.*
+   - *Pages deployed (run `37171204410`, success). `development-activity-reports.html` read back from homesignal.net by md5 and size,
+     byte-identical to `main` (`0e2c21c7…`, 79,185 bytes), with the Billing card and its Subscribe button.*
+   - *Not exercised live: **every signed-in path** (a member's plan, an owner's checkout answering 503 `billing_not_set_up`), because no signed-in
+     session and no Lemon account were available; **payment**, which cannot be tested without the founder's product and test card; and any real
+     Lemon payload, none of which was captured, so **every field name read from the processor is unverified** and the code refuses what it does
+     not recognise. Proved by tests instead: 72 checks of the SQL on a disposable Postgres with real concurrent sessions (two callers racing for
+     the 100th report, the same key sent twice, two events binding one subscription to two brokerages), the rollback run with 315 paid
+     reports stored, 38 deliberate SQL breakages and 96 edge breakages all caught, and 232 checks in Chromium against the real handlers. The
+     CI run on the first push caught one gap the local run did not: the trial suite had neither the billing file nor the two database calls the
+     handler now makes (fixed and pinned).*
+   - *Founder decision needed (D-11-1): **a cancelled subscription ends access at once**, because the ledger holds no period-end date, so a
+     member who cancels loses the month they paid for. A later change can honour the paid-to date once the first real event shows where the
+     processor puts it. Other defaults taken are D-11-2 to D-11-12 in `docs/development-activity-billing-2026-10-04.md` (a second webhook with
+     its own address and secret, billing-specific secret names, free reports never counting toward the plan).)*
+   - A brokerage owner opens the **Billing** card, starts a $79/month checkout, and once a signed webhook records an `active` subscription the
+     brokerage gets **100 new reports a month**, separate from its 20 free reports. Reopening, sharing, printing, Watch and Compare never use a
+     report. Test payments never grant reports (the card says "Test subscription only"). The cap is a database constraint, not a count.
+   - **Founder actions, none done** (exact steps and the read-only ledger queries are in section 5 of the record): create the $79 product (test
+     mode first) · create a **second** webhook with its own signing secret · set `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`,
+     `LEMONSQUEEZY_BILLING_VARIANT_ID`, `LEMONSQUEEZY_BILLING_WEBHOOK_SECRET` and `LEMONSQUEEZY_TEST_MODE=true` · make one test payment · check
+     the ledger rows before anything goes live. Until the four secrets are set, everything fails closed.
+   - Open before step 13 (unchanged, plus three): the free-report rate limit; the public link endpoint is not rate-limited; an owner cannot list
+     or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into HTTP answers is unchecked against production;
+     `run-property-watch` has no rate limit beyond its private secret; an ended or failing watch is not emailed to the agent; **there is no
+     billing-portal link, so a customer cannot change a card or cancel from the page**; **`docs/payment-event-ledger.sql`'s header still says
+     "NOT APPLIED" though it was applied on 2026-10-02**; **the ledger row for this runner apply is a hand-written backfill**. The landing page's
+     buttons stay inert (step 13). Also carried: several older mutation harnesses have stale anchors that predate step 7; none guards step 11.
 
 ## Part C — before the buttons go live
 
@@ -389,5 +433,5 @@ through once each step is complete").
 | After step 4 | Review the layout with 84302 |
 | ~~Before step 5~~ | ~~Does a limited-coverage report use up a free report?~~ Answered 2026-10-02: "No development activity" is charged, "No data ingested" is not. |
 | ~~Before step 8~~ | ~~How long share links last; whether the client sees the address~~ Answered 2026-10-03: 6 months; yes. |
-| Step 11 | Create the Lemon Squeezy product and make one test payment |
+| Step 11 (build done, still yours) | Create the Lemon Squeezy product and a second webhook, set the four secrets and test mode, make one test payment, check the ledger rows before going live. Steps: section 5 of `docs/development-activity-billing-2026-10-04.md`. Also decide D-11-1 (a cancelled subscription ends access at once) |
 | Any time, needed by step 12 | Send the Utah permission requests |
