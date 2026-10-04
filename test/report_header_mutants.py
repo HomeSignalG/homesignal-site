@@ -82,15 +82,15 @@ m('header_failure_called_empty', "const headerInfo = trial ? { header: await dep
   "const headerInfo = trial ? { header: await deps.headerOf(trial.userId).catch(() => ({ brokerage: null, agent: null })) } : {};", [NRF], HAND)
 mm('header_read_after_the_charge', [
   ("const headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};", "let headerInfo: Record<string, unknown> = {};"),
-  ("      const used = { trial: { status: issued.credit.evaluation_status", "      headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};\n      const used = { trial: { status: issued.credit.evaluation_status")], [NRF, HST], HAND)
+  ("      const used = c.allotment === 'paid'\n", "      headerInfo = trial ? { header: await deps.headerOf(trial.userId) } : {};\n      const used = c.allotment === 'paid'\n")], [NRF, HST], HAND)
 m('open_without_header', "address: subject.address, client_label: subject.label, header, charged: false,", "address: subject.address, client_label: subject.label, charged: false,", [FNT, PG, BRO, HST], HAND)
 m('open_without_label', "address: subject.address, client_label: subject.label, header, charged: false,", "address: subject.address, client_label: null, header, charged: false,", [PG, BRO], HAND)
 m('open_header_unread', "        const header = await deps.headerOf(trial.userId);\n", "        const header = { brokerage: null, agent: null };\n", [FNT, PG, HST], HAND)
 m('list_carries_the_label', "address: (await deps.subjectOf(r.private_context_id)).address,", "address: (await deps.subjectOf(r.private_context_id)).address, client_label: (await deps.subjectOf(r.private_context_id)).label,", [FNT, PG], HAND)
 
 # ---- the customer page ------------------------------------------------------------------------------------------------------------------------
-m('page_header_not_shown_on_make', "{ subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent }", "{ subject: address, label: field('label') }", [SRC, BRO, HST], PAGE)
-m('page_header_not_shown_on_reopen', "label: typeof body.client_label === 'string' ? body.client_label : '',\n      brokerage: hd.brokerage, agent: hd.agent\n", "label: typeof body.client_label === 'string' ? body.client_label : ''\n", [BRO, HST], PAGE)
+m('page_header_not_shown_on_make', "{ subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live:", "{ subject: address, label: field('label'), live:", [SRC, BRO, HST], PAGE)
+m('page_header_not_shown_on_reopen', "label: typeof body.client_label === 'string' ? body.client_label : '',\n      brokerage: hd.brokerage, agent: hd.agent, live: canShare", "label: typeof body.client_label === 'string' ? body.client_label : '',\n      live: canShare", [BRO, HST], PAGE)
 m('page_label_not_sent', "    if (clientLabel) payload.label = clientLabel;\n", "", [BRO, HST], PAGE)
 m('page_name_kept_in_storage', "      $('agent-name').value = name;\n      profileSay(name ?", "      $('agent-name').value = name; try { sessionStorage.setItem('hs-agent-name', name); } catch (e) {}\n      profileSay(name ?", [BRO, HST], PAGE)
 m('page_name_saved_unclean', "var name = ($('agent-name').value || '').replace(/" + BS + "s+/g, ' ').trim();", "var name = ($('agent-name').value || '');", [BRO], PAGE)
@@ -98,7 +98,7 @@ m('page_overlong_name_sent', "    if (name.length > 80) { profileSay('Use 80 cha
 m('page_save_sets_more_than_the_name', "client.auth.updateUser({ data: { full_name: name } })", "client.auth.updateUser({ data: { full_name: name, role: 'owner' } })", [BRO, HST], PAGE)
 m('page_card_for_everyone', "showProfile(a === 'trial' || a === 'complete');", "showProfile(true);", [BRO, HST], PAGE)
 m('page_card_survives_sign_out', "attempt = null; showTeam(false); showSaved(false); showProfile(false);", "attempt = null; showTeam(false); showSaved(false);", [BRO, HST], PAGE)
-m('page_card_survives_a_new_person', "showSaved(false); showProfile(false); // another person", "showSaved(false); // another person", [BRO, HST], PAGE)
+m('page_card_survives_a_new_person', "showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch(); // another person", "showSaved(false); hideBilling(); hideShare(); hideWatch(); // another person", [BRO, HST], PAGE)
 m('page_typing_overwritten', "if (was) $('agent-name').value = ownName();", "$('agent-name').value = ownName();", [BRO], PAGE)
 m('page_late_save_shown', "    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way\n    if (res && !res.error) {",
   "    if (res && !res.error) {", [BRO], PAGE)

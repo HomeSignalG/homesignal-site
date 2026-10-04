@@ -40,9 +40,10 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
   const cfg = read('supabase/config.toml');
   ok(/\[functions\.follow-development-report\]\s*\nverify_jwt = true/.test(cfg), '1a the function pins verify_jwt = true');
   const wf = read('.github/workflows/deploy-edge-functions.yml').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
-  // build step 8 adds the SECOND, deliberate exception: view-shared-report (a client opening a private share link has no account)
-  ok([...wf.matchAll(/--no-verify-jwt/g)].length === 2 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && !/follow-development-report/.test(wf),
-    '1b the deploy workflow\'s only --no-verify-jwt exceptions are get-address-report and view-shared-report; this function is not in them');
+  // build step 8 adds the SECOND, deliberate exception: view-shared-report (a client opening a private share link has no account); build step 11 adds the THIRD:
+  // development-activity-billing-webhook (the payment processor sends no Supabase token; its HMAC signature is the credential)
+  ok([...wf.matchAll(/--no-verify-jwt/g)].length === 3 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(wf) && !/follow-development-report/.test(wf),
+    '1b the deploy workflow\'s only --no-verify-jwt exceptions are get-address-report, view-shared-report and development-activity-billing-webhook; this function is not in them');
   const h = c.handler, at = (s) => h.indexOf(s);
   const firstRead = Math.min(at('deps.reportContext('), at('deps.report('));
   ok(at('authorizeAdmin(req, deps)') > 0 && at('authorizeAdmin(req, deps)') < at('readBounded(req)') && at('readBounded(req)') < firstRead && at('deps.reportContext(') > 0 && at('deps.report(') > 0,

@@ -54,8 +54,9 @@ const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m
 ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
    && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
    && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && /var WATCH_FN = SB_URL \+ '\/functions\/v1\/manage-property-watch';/.test(code)
-   && (code.match(/\/functions\/v1\//g) || []).length === 4,
-  '3a the only endpoints it names are the report function, the trial function, (build step 8) the agent\'s share-link function and (build step 9) the agent\'s Watch function, all on this project', urls);
+   && /var BILLING_FN = SB_URL \+ '\/functions\/v1\/manage-billing';/.test(code)
+   && (code.match(/\/functions\/v1\//g) || []).length === 5,
+  '3a the only endpoints it names are the report function, the trial function, (build step 8) the agent\'s share-link function, (build step 9) the agent\'s Watch function and (build step 11) the Billing function, all on this project', urls);
 ok(!/\.from\(|\.rpc\(|\.storage\b|\.functions\.invoke\(/.test(code), '3b no table, RPC, storage or other function read');
 ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'internal'/.test(code) && !/radius/i.test(code),
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
@@ -67,8 +68,11 @@ const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[
 ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
   '3f the page may connect only to itself and this Supabase project', csp);
 const showTrial = fn('showTrial');
-ok(/\$\('go'\)\.disabled = busy \|\| !\(a === 'trial' \|\| a === 'admin'\);/.test(showTrial) && /access !== 'trial' && access !== 'admin'/.test(fn('run')),
-  '3g it offers "Make report" only to the two kinds of caller the report function serves, as the trial function named them');
+const canMake = fn('canMake');
+ok(/\$\('go'\)\.disabled = busy \|\| !canMake\(\);/.test(showTrial) && /!canMake\(\)/.test(fn('run'))
+   && /if \(access === 'admin'\) return true;/.test(canMake) && /if \(access !== 'trial' && access !== 'complete'\) return false;/.test(canMake)
+   && /return isPaid\(\) \? plan\.credits_remaining > 0 : access === 'trial';/.test(canMake),
+  '3g it offers "Make report" only to the callers the report function serves: an admin, a member with free reports left, or (build step 11) a member whose plan is paid with reports left this month, as the trial and Billing functions named them');
 
 // ---- 4. the invite, and what the browser keeps ------------------------------------------------------------------------------------------------
 const readInvite = fn('readInvite');
@@ -87,8 +91,8 @@ ok(/if \(r\.status === 0 \|\| r\.status >= 500\) \{ trialUnreadable\(\); return;
 // ---- 5. a report request's key ------------------------------------------------------------------------------------------------------------
 const run = fn('run');
 ok(/if \(!attempt \|\| attempt\.address !== address\) attempt = \{ key: newKey\(\), address: address \};/.test(run)
-   && /if \(access === 'trial'\) payload\.idempotency_key = attempt\.key;/.test(run),
-  '5a a trial report carries a key made once per address; an admin report carries none (the report function refuses one)');
+   && /if \(access !== 'admin'\) payload\.idempotency_key = attempt\.key;/.test(run),
+  '5a a member report (a free one or one of the paid month\'s) carries a key made once per address; an admin report carries none (the report function refuses one)');
 ok(run.indexOf("if (r.status === 0)") > 0 && run.indexOf('attempt = null;') > run.indexOf("if (r.status === 0)"),
   '5b the key is dropped only once the server has answered: after a lost answer, the same address is retried with the same key');
 ok(/b\[6\] = \(b\[6\] & 0x0f\) \| 0x40; b\[8\] = \(b\[8\] & 0x3f\) \| 0x80;/.test(fn('newKey')) && /crypto\.randomUUID/.test(fn('newKey')),

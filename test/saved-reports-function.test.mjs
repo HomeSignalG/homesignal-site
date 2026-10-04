@@ -41,6 +41,8 @@ function fakes(over = {}) {
     authenticate: rec('authenticate', async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null)),
     isAdmin: rec('isAdmin', async () => false),
     trialOf: rec('trialOf', async () => ACTIVE),
+    // build step 11: the member's plan, read once per request after the gate. Reading or reopening a saved report never needs a paid plan.
+    planOf: rec('planOf', async () => ({ brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null })),
     savedReports: rec('savedReports', async () => ROWS),
     openSavedReport: rec('openSavedReport', async (_u, id) => (id === R1 ? { ...ROWS[1], body: JSON.stringify(STORED) } : null)),
     subjectOf: rec('subjectOf', async (c) => ({ address: c ? ADDR[c] ?? null : null, label: c ? LABEL[c] ?? null : null })),
@@ -118,7 +120,7 @@ await ask(f.deps, { action: 'open', report_id: R1 });
 const afterOpen = names(f.calls);
 ok(MAKES.every((m) => !afterList.includes(m) && !afterOpen.includes(m)),
   '3a a list and an open reach neither the geocoder, the spatial read, the ledger, the credit rule nor the issue function (nothing can be made, charged or stored)', { afterList, afterOpen });
-ok(JSON.stringify(afterOpen.filter((x) => !['authenticate', 'isAdmin'].includes(x))) === JSON.stringify(['trialOf', 'openSavedReport', 'subjectOf', 'headerOf']), '3b an open reads the trial, the one stored report, its address and client label, and the viewer\'s own header, in that order', afterOpen);
+ok(JSON.stringify(afterOpen.filter((x) => !['authenticate', 'isAdmin'].includes(x))) === JSON.stringify(['trialOf', 'planOf', 'openSavedReport', 'subjectOf', 'headerOf']), '3b an open reads the trial, the plan, the one stored report, its address and client label, and the viewer\'s own header, in that order', afterOpen);
 ok(f.calls.find((c) => c[0] === 'openSavedReport')[1] === UID && f.calls.find((c) => c[0] === 'openSavedReport')[2] === R1, '3c it asks for the signed-in person\'s own id and the id they sent');
 
 // ---- 4. what comes back -----------------------------------------------------------------------------------------------------------------------
@@ -135,7 +137,7 @@ ok(r.status === 200 && r.json.status === 'OK' && r.json.reopened === true && r.j
    && r.json.address === '742 Evergreen Terrace, Springfield, OR 97477' && JSON.stringify(r.json.report) === JSON.stringify(STORED) && r.json.coverage_state === 'COVERED',
   '4c an open returns the stored report as stored, flagged reopened and NOT charged, with its number and address', r.json);
 ok(r.json.render === undefined && r.json.credit === undefined && !r.text.includes(CTX1), '4d with no render block (it is measured from a live address and never stored), no credit decision and no handle');
-ok(JSON.stringify(Object.keys(r.json).sort()) === JSON.stringify(['address','charged','client_label','coverage_state','generated_at','header','number','reopened','report','report_id','status','stored','trial'].sort()), '4e exactly those fields', Object.keys(r.json).sort());
+ok(JSON.stringify(Object.keys(r.json).sort()) === JSON.stringify(['address','charged','client_label','coverage_state','generated_at','header','number','plan','reopened','report','report_id','status','stored','trial'].sort()), '4e exactly those fields (build step 11 added the plan summary: the state and the month\'s figures, never an id)', Object.keys(r.json).sort());
 f = fakes({ subjectOf: async () => ({ address: null, label: null }) });
 r = await ask(f.deps, { action: 'open', report_id: R1 });
 ok(r.status === 200 && r.json.address === null && r.json.client_label === null && JSON.stringify(r.json.report) === JSON.stringify(STORED), '4f with the address and label purged the report is the same, and both are null');

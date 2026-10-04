@@ -108,7 +108,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 /**
  * Everything both writers check BEFORE the database is asked: the shapes, the subject-relative keys, the body and its hash. ONE
- * definition, so the evaluation path (issueEvaluationReport) can never store a body this module would refuse.
+ * definition, so the evaluation path (issueBrokerageReport) can never store a body this module would refuse.
  */
 async function prepare(
   who: string,
@@ -195,22 +195,31 @@ export async function issueSnapshot(
   };
 }
 
-// ── the evaluation path: a stored report that uses one of a brokerage's free reports (build step 5b) ─────────────────────
+// ── the member path: a stored report that uses a report from the brokerage's allotment (build steps 5b and 11) ─────────────
 //
-// public.evaluation_report_issue (docs/evaluation-entitlement.sql) stores the snapshot AND appends the credit in ONE transaction: it
-// is the only way a trial report is stored. The caller decides WHETHER to call it (_shared/credit-rule.ts, founder ruling R5); this
-// module only prepares the body exactly as issueSnapshot does and reads the answer back.
+// public.brokerage_report_issue (docs/brokerage-billing.sql) is the ONE way a member's report is stored. It decides which allotment the report
+// uses: the monthly allotment when the brokerage's plan is paid, otherwise the free evaluation's (public.evaluation_report_issue, docs/
+// evaluation-entitlement.sql, which it calls and does not change). Either way the snapshot AND the credit are written in ONE transaction. The
+// caller decides WHETHER to call it (_shared/credit-rule.ts, founder ruling R5); this module only prepares the body exactly as issueSnapshot
+// does and reads the answer back. It names no allotment rule: the database's answer says which one was used.
 
 /** The trial's 20 reports are used up (EV002). Nothing was stored and nothing was charged. */
 export class EvaluationComplete extends Error {}
+/** The paid month's 100 reports are used (EV010). Nothing was stored and nothing was charged. */
+export class AllotmentComplete extends Error {}
 /** The person is not an active member of an active, unexpired evaluation (EV003). Nothing was stored and nothing was charged. */
 export class NotEntitled extends Error {}
 
-export type EvaluationCredit = { ordinal: number; credits_used: number; credits_remaining: number; evaluation_status: string };
+/** Which allotment a report used: the free evaluation's 20 or the paid month's 100. The database says; nothing here chooses. */
+export type Allotment = 'trial' | 'paid';
+export type EvaluationCredit = {
+  ordinal: number; credits_used: number; credits_remaining: number; evaluation_status: string;
+  allotment: Allotment; period_ends_at: string | null;
+};
 /**
  * A NEW report: stored now and charged now, with the body this call prepared. A REPLAY: the same idempotency key was already
  * charged, so the database returned the FIRST report's id and charged nothing; its body is the stored one, which the caller must
- * read back (and must check it is the same property: the key is bound to the evaluation, never to the address, D-L6).
+ * read back (and must check it is the same property: the key is bound to the brokerage, never to the address, D-L6).
  */
 export type EvaluationIssue =
   | (SnapshotEnvelope & { replayed: false; credit: EvaluationCredit })
@@ -218,17 +227,17 @@ export type EvaluationIssue =
 
 const UUID_ANY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-export async function issueEvaluationReport(
+export async function issueBrokerageReport(
   rpc: SnapshotRpc,
   who: { userId: string; idempotencyKey: string },
   intelligence: Record<string, unknown>,
   privateContext: PrivateContext | null,
   opts: { reportVersion: string; engineInputs: Record<string, unknown> },
 ): Promise<EvaluationIssue> {
-  if (!who || typeof who.userId !== 'string' || !UUID_ANY.test(who.userId)) throw new Error('issueEvaluationReport: a user id is required');
-  if (typeof who.idempotencyKey !== 'string' || !UUID_V4.test(who.idempotencyKey)) throw new Error('issueEvaluationReport: a random (v4) idempotency key is required');
-  const { body, contentHash } = await prepare('issueEvaluationReport', intelligence, privateContext, opts);
-  const { data, error } = await rpc('evaluation_report_issue', {
+  if (!who || typeof who.userId !== 'string' || !UUID_ANY.test(who.userId)) throw new Error('issueBrokerageReport: a user id is required');
+  if (typeof who.idempotencyKey !== 'string' || !UUID_V4.test(who.idempotencyKey)) throw new Error('issueBrokerageReport: a random (v4) idempotency key is required');
+  const { body, contentHash } = await prepare('issueBrokerageReport', intelligence, privateContext, opts);
+  const { data, error } = await rpc('brokerage_report_issue', {
     p_user_id: who.userId,
     p_idempotency_key: who.idempotencyKey,
     p_body: body,
@@ -238,17 +247,22 @@ export async function issueEvaluationReport(
     p_private: privateContext,
   });
   if (error) {
-    // the database's refusals carry their name as the message (docs/evaluation-entitlement.sql, ERRORS); anything else is a failure
+    // the database's refusals carry their name as the message (docs/evaluation-entitlement.sql and docs/brokerage-billing.sql, ERRORS); anything else is a failure
     if (error.message === 'EVALUATION_COMPLETE') throw new EvaluationComplete('the evaluation\'s reports are used up');
-    if (error.message === 'NOT_ENTITLED') throw new NotEntitled('not an active evaluation member');
-    throw new Error('issueEvaluationReport: the report was not stored: ' + error.message);
+    if (error.message === 'ALLOTMENT_COMPLETE') throw new AllotmentComplete('the month\'s reports are used up');
+    if (error.message === 'NOT_ENTITLED') throw new NotEntitled('not an active member');
+    throw new Error('issueBrokerageReport: the report was not stored: ' + error.message);
   }
-  const { row, reportId, generatedAt, contextId } = confirmedRow('issueEvaluationReport', data, privateContext);
+  const { row, reportId, generatedAt, contextId } = confirmedRow('issueBrokerageReport', data, privateContext);
   const n = (k: string) => (Number.isInteger(row[k]) ? (row[k] as number) : NaN);
+  const allotment = row.allotment === 'trial' || row.allotment === 'paid' ? row.allotment : null;
+  const period = row.period_ends_at === null || row.period_ends_at === undefined ? null : typeof row.period_ends_at === 'string' && Number.isFinite(Date.parse(row.period_ends_at)) ? row.period_ends_at : undefined;
   const credit: EvaluationCredit = { ordinal: n('credit_ordinal'), credits_used: n('credits_used'), credits_remaining: n('credits_remaining'),
-    evaluation_status: typeof row.evaluation_status === 'string' ? row.evaluation_status : '' };
-  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean') {
-    throw new Error('issueEvaluationReport: the database did not confirm the credit');
+    evaluation_status: typeof row.evaluation_status === 'string' ? row.evaluation_status : '', allotment: allotment as Allotment, period_ends_at: period as string | null };
+  // a paid report names the month it ends; a free one names none. Anything else is a shape the database does not give.
+  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean'
+      || allotment === null || period === undefined || (allotment === 'paid') !== (period !== null)) {
+    throw new Error('issueBrokerageReport: the database did not confirm the credit');
   }
   if (row.replayed) return { replayed: true, report_id: reportId, generated_at: generatedAt, private_context_id: contextId, credit };
   return {

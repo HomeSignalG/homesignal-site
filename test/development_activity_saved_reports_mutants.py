@@ -80,7 +80,7 @@ m('not_found_called_forbidden', "if (!opened) return reply(req, { error: 'not_fo
 m('reopen_says_charged', "address: subject.address, client_label: subject.label, header, charged: false,", "address: subject.address, client_label: subject.label, header, charged: true,", [FNT, STR, PG], HAND)
 m('reopen_not_marked', "stored: true, reopened: true,", "stored: true,", [FNT, BRO], HAND)
 m('stored_text_unparsed_called_ok', "try { stored = JSON.parse(opened.body); } catch { throw new DataUnavailable('stored report'); }", "try { stored = JSON.parse(opened.body); } catch { stored = {}; }", [FNT], HAND)
-m('complete_trial_may_make_reports', "    if (trial && trial.complete) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial) }, 403);\n", '', [FNT, PG], HAND)
+m('complete_trial_may_make_reports', "    if (trial && trial.complete && !paid) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);\n", '', [FNT, PG], HAND)
 m('complete_trial_refused_saved', "    if (b.action !== undefined) {\n      if (b.action !== 'list'", "    if (trial && trial.complete) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial) }, 403);\n    if (b.action !== undefined) {\n      if (b.action !== 'list'", [FNT, STR, PG], HAND)
 m('list_reaches_the_issue_rule', "          const rows = await deps.savedReports(trial.userId);", "          const rows = await deps.savedReports(trial.userId); await deps.issue(trial.userId, 'k', {});", [FNT, STR], HAND)
 

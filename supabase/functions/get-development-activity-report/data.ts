@@ -12,8 +12,9 @@ import {
 } from '../_shared/service-rest.ts';
 import { makeReportReads } from '../_shared/report-reads.ts';
 import { makeChangeReads } from '../_shared/change-reads.ts';
-import { issueEvaluationReport } from '../_shared/report-snapshot.ts';
+import { issueBrokerageReport } from '../_shared/report-snapshot.ts';
 import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
+import { makeBillingReads } from '../_shared/billing-reads.ts';
 import { makePrivateSubjectReads } from '../_shared/private-subject.ts';
 import { norm } from '../_shared/national-report.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
@@ -31,6 +32,8 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   // the trial: one definition, shared with the trial function (_shared/evaluation-reads.ts)
   const evaluation = makeEvaluationReads(rpc);
   const subjects = makePrivateSubjectReads(rpc);
+  // the plan (build step 11): one definition, shared with the Billing function (_shared/billing-reads.ts)
+  const billing = makeBillingReads(rpc);
 
   return {
     now: cfg.now ?? (() => new Date()),
@@ -71,9 +74,10 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
 
     // ── the trial (build step 5b): every one of these goes through a database function that owns the decision ──
     trialOf: evaluation.trialOf,
+    planOf: billing.usageOf,
 
     issue(userId, idempotencyKey, intelligence, privateContext, opts) {
-      return issueEvaluationReport(rpc, { userId, idempotencyKey }, intelligence, privateContext, opts);
+      return issueBrokerageReport(rpc, { userId, idempotencyKey }, intelligence, privateContext, opts);
     },
 
     async storedReport(reportId) {

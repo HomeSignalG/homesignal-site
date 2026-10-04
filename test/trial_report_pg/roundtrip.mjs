@@ -29,7 +29,11 @@ const one = (q, v) => { const r = psql(q, v); if (!r.ok) throw new Error('psql: 
 // ---- the database's own functions, called the way PostgREST would call them -------------------------------------------------
 const RPC = {
   evaluation_usage: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_usage(:'u'::uuid) t", { u: a.p_user_id }],
-  evaluation_report_issue: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
+  // billing (build step 11): the member's plan is read through billing_usage, and a member's report is stored and charged by
+  // brokerage_report_issue, the ONE entry that decides which allotment a report uses. The free evaluation's own issue function is NOT listed:
+  // the handler calling it directly would be a second way to charge a report, and an unlisted call stops this run.
+  billing_usage: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.billing_usage(:'u'::uuid) t", { u: a.p_user_id }],
+  brokerage_report_issue: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
   report_private_context_read: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_private_context_read(:'c'::uuid) t", { c: a.p_context }],
   evaluation_invite_redeem: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_redeem(:'t', :'u'::uuid) t", { t: a.p_token, u: a.p_user_id }],
@@ -249,8 +253,10 @@ ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && 
   '4a with nothing cleared the report is "No data ingested": not charged, not stored, still one used', [r.json.charged, r.json.trial]);
 ok(JSON.stringify(r.json.header) === '{"brokerage":"Round Trip Realty","agent":"Pat Agent"}', '4a2 and it carries the same header');
 ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '4b the database is unchanged');
-ok(seen.some((s) => /rpc\/evaluation_report_issue$/.test(s)) && seen.some((s) => /rpc\/report_private_context_read$/.test(s)) && seen.some((s) => /report_snapshot\?select=body/.test(s)),
-  '4c (control) the real data layer did reach the issue function, the private-context check and the stored-report read');
+ok(seen.some((s) => /rpc\/brokerage_report_issue$/.test(s)) && seen.some((s) => /rpc\/billing_usage$/.test(s)) && seen.some((s) => /rpc\/report_private_context_read$/.test(s)) && seen.some((s) => /report_snapshot\?select=body/.test(s)),
+  '4c (control) the real data layer did reach the plan read, the ONE issue function, the private-context check and the stored-report read');
+ok(!seen.some((s) => /rpc\/evaluation_report_issue$/.test(s)) && count('brokerage_paid_credit') === 0,
+  '4d no report was charged by calling the free evaluation function directly, and a trial pays for nothing: no paid credit exists');
 
 // ---- 5. someone who is not a member ---------------------------------------------------------------------------------------------------
 r = await ask(CLEARED, STRANGER, { address: HOME, idempotency_key: key(3) });
@@ -265,7 +271,7 @@ ok(count('evaluation_credit') === 20 && count('report_snapshot') === 20 && one("
 const before = seen.length;
 r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(40) });
 ok(r.status === 403 && r.json.error === 'evaluation_complete' && r.json.trial.credits_remaining === 0, '6b the next request is told the trial is complete (403), with its counts', r.json);
-ok(seen.slice(before).every((s) => /evaluation_usage/.test(s)) && count('evaluation_credit') === 20, '6c and nothing past the trial read ran: no report made, nothing charged');
+ok(seen.slice(before).every((s) => /rpc\/(evaluation_usage|billing_usage)$/.test(s)) && count('evaluation_credit') === 20, '6c and nothing past the trial and plan reads ran: no report made, nothing charged');
 const ord = one("select string_agg(ordinal::text, ',' order by ordinal) from public.evaluation_credit");
 ok(ord === Array.from({ length: 20 }, (_, i) => i + 1).join(','), '6d the ledger is the ordinals 1 to 20, no gap', ord);
 t = await trialAsk(MEMBER, { action: 'status' });
@@ -390,7 +396,7 @@ ok(badId.status === 400 && badId.json.detail === 'report_id' && extra.status ===
 // the report function still cannot MAKE a report for a complete trial, and still refuses before any work
 const beforeMake = seen.length;
 r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(60) });
-ok(r.status === 403 && r.json.error === 'evaluation_complete' && !seen.slice(beforeMake).some((x) => /evaluation_report_issue|report_snapshot/.test(x)) && count('evaluation_credit') === 20,
+ok(r.status === 403 && r.json.error === 'evaluation_complete' && !seen.slice(beforeMake).some((x) => /brokerage_report_issue|evaluation_report_issue|report_snapshot/.test(x)) && count('evaluation_credit') === 20,
   '7r a complete trial still cannot make a report (403 evaluation_complete), and nothing was issued', r.json);
 
 // a revoked evaluation: the gate refuses, and the database itself returns nothing

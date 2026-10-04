@@ -122,7 +122,7 @@ m('events_window_wrong', HAN, "const since = addDays(dayOf(deps.now()), -RECENT_
 m('keys_not_deduped', HAN, "const keys = [...new Set(rows.map((r) => r.source_key))].sort();", "const keys = rows.map((r) => r.source_key);")
 m('unresolved_address_reports', HAN, "if (!g) return reply(req, { status: 'ADDRESS_NOT_RESOLVED', report: null,", "if (!g) return reply(req, { status: 'OK', report: null,")
 m('outside_coverage_proceeds', HAN, "if (!supported) return reply(req, { status: 'OUTSIDE_COVERAGE', zip: g.zip, report: null, stored: false, credit: creditDecision({ status: 'OUTSIDE_COVERAGE' }), ...trialInfo });", "void 0;")
-m('capability_claims_storage', HAN, "stores_reports: 'only a trial report that uses a free report (credit rule); never an admin report',", "stores_reports: true,")
+m('capability_claims_storage', HAN, "stores_reports: 'only a member\\'s report that uses a report from the allotment (credit rule): a free one, or one of the paid month\\'s; never an admin report',", "stores_reports: true,")
 m('handler_logs_the_address', HAN, "const address = typeof b.address === 'string' ? b.address.trim() : '';", "const address = typeof b.address === 'string' ? b.address.trim() : ''; console.log(address);")
 m('handler_imports_the_writer', HAN, "export { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };", "import { issueSnapshot } from '../_shared/report-snapshot.ts'; void issueSnapshot;\nexport { MAX_BODY_BYTES, ALLOWED_ORIGINS, DataUnavailable };")
 # ---- the reads ------------------------------------------------------------------------------------------------------------------------------
@@ -187,8 +187,8 @@ m('replay_not_checked', HAN, "        if (same !== 'match') return reply(req, { 
 m('replay_unknown_accepted', HAN, "        if (same !== 'match') return reply", "        if (same === 'mismatch') return reply")
 m('replay_shows_the_fresh_report', HAN, "status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: stored,", "status: 'OK', coverage_state: stored?.coverage?.state ?? out.coverage_state, report: out.intelligence,")
 m('replay_said_charged', HAN, "credit, charged: false, replayed: true, ...used,", "credit, charged: true, replayed: true, ...used,")
-m('trial_counts_from_before_the_charge', HAN, "      const used = { trial: { status: issued.credit.evaluation_status, credits_used: issued.credit.credits_used, credits_remaining: issued.credit.credits_remaining } };",
-  "      const used = trialInfo;")
+m('trial_counts_from_before_the_charge', HAN, "        : { allotment: 'trial', trial: { status: c.evaluation_status, credits_used: c.credits_used, credits_remaining: c.credits_remaining }, ...planInfo };",
+  "        : { allotment: 'trial', ...trialInfo };")
 m('gate_lets_a_complete_trial_in', GATE, "  if (standing === 'complete') return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial) }, 403);\n", "")
 # build step 5c: the gate reads a trial through trialStanding, the one reading shared with the trial function
 m('gate_ignores_expiry', GATE, "  if (t.status === 'active' && !t.expired) return 'active';", "  if (t.status === 'active') return 'active';")
@@ -203,10 +203,10 @@ m('data_5xx_is_a_refusal', REST, "    if (r.status < 500 && j && typeof j.messag
 m('data_context_lets_purged_match', DAT, "      if (!c || c.state !== 'active' || typeof c.address !== 'string') return 'unknown';", "      if (!c || typeof c.address !== 'string') return 'unknown';")
 m('data_context_exact_text', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return c.address === address ? 'match' : 'mismatch';")
 m('data_context_hands_out_the_address', DAT, "      return norm(c.address) === norm(address) ? 'match' : 'mismatch';", "      return norm(c.address) === norm(address) ? 'match' : c.address;")
-m('snapshot_trial_skips_prepare', SNAP, "  const { body, contentHash } = await prepare('issueEvaluationReport', intelligence, privateContext, opts);",
+m('snapshot_trial_skips_prepare', SNAP, "  const { body, contentHash } = await prepare('issueBrokerageReport', intelligence, privateContext, opts);",
   "  const body = JSON.stringify(intelligence); const contentHash = await sha256Hex(body);")
 m('snapshot_complete_not_named', SNAP, "    if (error.message === 'EVALUATION_COMPLETE') throw new EvaluationComplete('the evaluation\\'s reports are used up');\n", "")
-m('snapshot_credit_unchecked', SNAP, "  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean') {",
+m('snapshot_credit_unchecked', SNAP, "  if (!(credit.ordinal >= 1) || !(credit.credits_used >= 1) || !(credit.credits_remaining >= 0) || !credit.evaluation_status || typeof row.replayed !== 'boolean'\n      || allotment === null || period === undefined || (allotment === 'paid') !== (period !== null)) {",
   "  if (false) {")
 m('snapshot_replay_returns_this_body', SNAP, "  if (row.replayed) return { replayed: true, report_id: reportId, generated_at: generatedAt, private_context_id: contextId, credit };\n", "")
 

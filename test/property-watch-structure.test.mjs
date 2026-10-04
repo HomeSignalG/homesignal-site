@@ -225,7 +225,7 @@ const TOML = read('supabase/config.toml');
 ok(/\[functions\.manage-property-watch\]\s*\nverify_jwt = true/.test(TOML) && /\[functions\.run-property-watch\]\s*\nverify_jwt = true/.test(TOML), '4a JWT verification stays ON for both new functions');
 const noYamlComments = (t) => t.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
 const DEPLOY = noYamlComments(read('.github/workflows/deploy-edge-functions.yml'));
-ok(count(DEPLOY, /--no-verify-jwt/g) === 2 && /"\$FN" = "get-address-report"/.test(DEPLOY) && /"\$FN" = "view-shared-report"/.test(DEPLOY) && !/property-watch/.test(DEPLOY), '4b the deploy workflow\'s --no-verify-jwt exceptions are still exactly two, and neither is a Watch function');
+ok(count(DEPLOY, /--no-verify-jwt/g) === 3 && /"\$FN" = "get-address-report"/.test(DEPLOY) && /"\$FN" = "view-shared-report"/.test(DEPLOY) && /"\$FN" = "development-activity-billing-webhook"/.test(DEPLOY) && !/property-watch/.test(DEPLOY), '4b the deploy workflow\'s --no-verify-jwt exceptions are exactly three (build step 11 added the payment processor\'s webhook), and none is a Watch function');
 const CI = noYamlComments(read('.github/workflows/report-snapshot-suite.yml'));
 ok(/bash test\/property_watch_pg\/run\.sh/.test(CI) && /bash test\/property_watch_schedule_pg\/run\.sh/.test(CI) && count(CI, /docs\/property-watch\.sql/g) === 2 && count(CI, /supabase\/functions\/run-property-watch\/\*\*/g) === 2 && count(CI, /supabase\/functions\/manage-property-watch\/\*\*/g) === 2,
   '4c the CI job runs both database harnesses, and both its path lists include the Watch\'s SQL and functions');
