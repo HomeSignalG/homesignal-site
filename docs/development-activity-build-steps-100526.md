@@ -441,6 +441,20 @@ through once each step is complete").
      and the paid month cannot be exercised on real data. They can be exercised on test data.)*
 13. **End-to-end launch test, then the Enterprise page buttons go live.** A test brokerage runs sign-up,
     20 reports, the end of the trial, payment and a 100-report month.
+   *(**HALF done, and not struck.** The test is built and green; the buttons are NOT live. Full record: `docs/development-activity-launch-gate-2026-10-04.md`.*
+   - *The gate: `test/launch_gate_pg` runs the plan's sequence as one scenario through the real handlers (`development-activity-trial`,
+     `get-development-activity-report`, `manage-billing`, `development-activity-billing-webhook`) and the shipped SQL of every layer: an admin creates the
+     trial, the owner joins and invites an agent, twenty free reports, the 21st refused, the owner's checkout, a test payment that grants nothing, the live
+     payment that binds the subscription and opens a month of 100, a hundred paid reports, the 101st refused (by the handler and by the database), all 120
+     listed and opened, a second brokerage unable to read or take any of it, and a cancellation that ends new reports and deletes nothing. 73 checks.
+     It runs in CI as its own job (`launch-gate` in `report-snapshot-suite.yml`). MUTATION_SUMMARY*
+   - ***What it does not prove:** nothing reached Lemon Squeezy (the processor is a stand-in that records the request), **no payment has been made**, the
+     processor's field names are still the unconfirmed ones, and the reports are fixture reports because no source is cleared.*
+   - ***The buttons stay hidden and inert** (`data-commerce hidden`; `test/development-activity-landing.test.mjs` still fails if one is shown). Before they go
+     live: the Lemon Squeezy product, second webhook, four secrets and one test payment (step 11, founder) · at least one source cleared (step 12, founder,
+     requests not yet sent) · **D-13-1, a decision: what do the public "Start with 20 free reports" and "Join for $79/month" buttons do?** Today a trial is
+     created by an admin and joined by an invite link, and only an existing brokerage's owner can start a checkout, so neither button has anything to call ·
+     and the carried open items (the free-report rate limit; no billing-portal link, so a customer cannot change a card or cancel from the page).)*
 
 ## Founder actions, and when
 
@@ -450,4 +464,5 @@ through once each step is complete").
 | ~~Before step 5~~ | ~~Does a limited-coverage report use up a free report?~~ Answered 2026-10-02: "No development activity" is charged, "No data ingested" is not. |
 | ~~Before step 8~~ | ~~How long share links last; whether the client sees the address~~ Answered 2026-10-03: 6 months; yes. |
 | Step 11 (build done, still yours) | Create the Lemon Squeezy product and a second webhook, set the four secrets and test mode, make one test payment, check the ledger rows before going live. Steps: section 5 of `docs/development-activity-billing-2026-10-04.md`. Also decide D-11-1 (a cancelled subscription ends access at once) |
+| Step 13 (test done, buttons still yours) | Decide D-13-1: what "Start with 20 free reports" and "Join for $79/month" do on the public page (request-and-invite, or self-serve trial creation). Then, with the Lemon Squeezy test payment made and one source cleared, the buttons can go live. Record: `docs/development-activity-launch-gate-2026-10-04.md` section 4 |
 | Any time, needed by step 12 | Send the three Utah permission requests (UDOT, Salt Lake City, Provo). Ready to send, with the steps: `docs/utah-source-requests-send-ready-2026-10-04.md`. Two recipients still have to be found. Tell me each date you send one |
