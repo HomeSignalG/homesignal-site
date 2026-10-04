@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, RIGHTS_NONE, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
 import { LAUNCH_TEST_LOCATION, OTHER_PROPERTY, addressNo, geocodeStandIn } from './lib/launch-test-location.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
@@ -346,7 +346,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(/^16 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 16 left, from the report function\'s own count');
   // a fresh world with nothing cleared: a "No data ingested" report
   await ctx.close();
-  const w2 = world({ used: 4, rights: RIGHTS_SHIPPED });
+  const w2 = world({ used: 4, rights: RIGHTS_NONE });
   const o2 = await open({ w: w2 });
   await waitCount(o2.page, /^16 free reports left$/);
   await make(o2.page);
@@ -924,7 +924,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
-  const w = world({ rights: RIGHTS_SHIPPED });
+  const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, shareCalls } = await open({ w });
   await waitCount(page, /free reports left/);
   await make(page);
@@ -1062,7 +1062,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was not saved cannot be watched
-  const w = world({ rights: RIGHTS_SHIPPED });
+  const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, watchCalls } = await open({ w });
   await waitCount(page, /free reports left/);
   await make(page);
@@ -1191,7 +1191,7 @@ const tableOf = (page) => page.evaluate(() => {
 });
 const rowCells = (t, label) => (t.rows.find((r) => r.label === label) || { cells: [] }).cells;
 const A1 = '1 First Ave, Brigham City, UT 84302', A2 = '2 Second Ave, Brigham City, UT 84302', A3 = '3 Third Ave, Brigham City, UT 84302', A4 = '4 Fourth Ave, Brigham City, UT 84302', A5 = '5 Fifth Ave, Brigham City, UT 84302', A6 = '6 Sixth Ave, Brigham City, UT 84302';
-const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
+const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
 {
   // before there are two reports there is nothing to compare, and the card says so
   const w = world();

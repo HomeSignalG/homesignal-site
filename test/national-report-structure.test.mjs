@@ -142,12 +142,16 @@ const all = Object.values(src).map(code).join('\n');
   ok(/\(input, init\) => fetch\(input, init\)/.test(code(src.index)), '5e index.ts is the one place the real fetch is handed in');
 }
 
-// ---- 6. the rights registry is CLOSED ------------------------------------------------------------------------------------------------
+// ---- 6. the rights registry: every entry is a RECORDED DECISION --------------------------------------------------------------------
+// Until 2026-10-04 this registry was closed (no source cleared). Founder ruling R7 (docs/development-activity-founder-ruling-r7-2026-10-04.md) lists every source in
+// the jurisdiction registry; test/report-rights-r7.test.mjs pins the list itself. A cleared source also switches on charging and storing trial reports (since build
+// step 5b), so a change to this list is a change to what is stored, not only to what is shown.
 {
   const reg = JSON.parse(read('supabase/functions/_shared/report-rights.json'));
-  ok(Array.isArray(reg.cleared) && reg.cleared.length === 0,
-    '6a NO SOURCE FAMILY IS CLEARED. Adding one is a recorded clearance (audit reference, date, attribution), and this pin is edited in the same change so the decision is visible twice. Since build step 5b it also switches on charging and storing trial reports: re-read docs/report-private-context-contract-2026-09-30.md §6 (gates 1, 2, 5) in that change', reg.cleared.length);
-  ok(/corporate-output-source-rights-audit-2026-09-27\.md/.test(reg.authority) && /HOLD is never cleared/.test(reg.rule), '6b the registry names its authority and says a HOLD is never cleared');
+  ok(Array.isArray(reg.cleared) && reg.cleared.length > 0 && reg.cleared.every((e) => /^docs\/[A-Za-z0-9._\-\/]+\.md §\d+$/.test(e.audit_ref) && existsSync(join(root, e.audit_ref.replace(/ §\d+$/, '')))),
+    '6a every cleared source names the recorded decision it rests on (a real file and section), so the list is never a default', reg.cleared.length);
+  ok(/corporate-output-source-rights-audit-2026-09-27\.md/.test(reg.authority) && /Founder ruling R7/.test(reg.rule) && /NOT a publisher grant/.test(reg.rule) && /HOLD finding stays a HOLD finding/.test(reg.rule),
+    '6b the registry names its authority and says plainly that the listing is a founder decision, not a publisher grant, and that no HOLD finding is rewritten');
   ok(existsSync(join(root, reg.authority)), '6c and the authority file exists');
   ok(/report-rights\.json/.test(src.index) && /rights/.test(code(src.handler)) && /validateRights\(/.test(code(src.module)), '6d the function loads that file and validates it on every request');
   ok(!/rights_class/.test(all), '6e the report does not read the ledger\'s rights_class column (it is NULL by design; rights are enforced here, from the audit)');

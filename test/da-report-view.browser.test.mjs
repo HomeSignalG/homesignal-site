@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, COLD, RIGHTS_SHIPPED, ADDRESS, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, COLD, RIGHTS_NONE, ADDRESS, wire, clone } from './lib/da-report-view-world.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0, total = 0;
@@ -60,7 +60,7 @@ async function open(width, height) {
 const mount = (page, resp, subject) => page.evaluate(([r, s]) => window.HS.daReportView.mount(document.getElementById('host'), r, s === undefined ? {} : { subject: s }), [resp, subject]);
 
 const W = await wire(RICH);
-const WNONE = await wire(RICH, { rights: RIGHTS_SHIPPED });
+const WNONE = await wire(RICH, { rights: RIGHTS_NONE });
 const WCOLD = await wire(COLD);
 
 // a report whose publisher text cannot wrap by itself, and whose text tries to run code

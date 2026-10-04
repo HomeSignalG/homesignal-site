@@ -14,7 +14,8 @@ const H = await import('../../supabase/functions/get-development-activity-report
 export const NOW = new Date('2026-09-29T12:00:00Z');
 export const FAM_A = 'wsdot-project-delivery-plan-proposed';
 export const FAM_B = 'austin-site-plan-cases';
-export const RIGHTS_SHIPPED = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/report-rights.json'), 'utf8'));
+export const RIGHTS_SHIPPED = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/report-rights.json'), 'utf8')); // the list as it ships (ruling R7: every registry source)
+export const RIGHTS_NONE = { version: 1, cleared: [] }; // nothing cleared: the "No data ingested" state, named here rather than read from the shipped file
 export const RIGHTS_AB = { version: 1, cleared: [
   { registry_id: FAM_A, cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: 'Data: WSDOT' },
   { registry_id: FAM_B, cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: '' },

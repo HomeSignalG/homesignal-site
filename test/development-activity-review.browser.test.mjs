@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_SHIPPED, wire } from './lib/da-report-view-world.mjs';
+import { RICH, RIGHTS_NONE, wire } from './lib/da-report-view-world.mjs';
 
 const TH = await import('../supabase/functions/development-activity-trial/handler.ts');
 const E = await import('../supabase/functions/_shared/evaluation-reads.ts');
@@ -57,7 +57,7 @@ function trialWorld({ admin = true, create = 'ok' } = {}) {
 }
 const ADDRESS = '20 N Main St, Brigham City, UT 84302';
 const W_INTERNAL = await wire(RICH, { view: 'internal' });
-const W_CUSTOMER = await wire(RICH, { rights: RIGHTS_SHIPPED });
+const W_CUSTOMER = await wire(RICH, { rights: RIGHTS_NONE });
 const W_CLEARED = await wire(RICH); // a customer view with sources cleared: what a trial report looks like once permissions arrive
 
 // supabase-js stand-in. window.__sb.session is the signed-in session, or null; verifyOtp signs in and tells every listener.

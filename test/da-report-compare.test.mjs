@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { RICH, COLD, RIGHTS_SHIPPED, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, COLD, RIGHTS_NONE, wire, clone } from './lib/da-report-view-world.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let n = 0, bad = 0;
@@ -39,7 +39,7 @@ runInNewContext(src('lib/da-report-compare.js'), alone);
 const reopened = (r) => { const c = clone(r); delete c.render; c.reopened = true; return c; };
 const W = reopened(await wire(RICH));                              // records, change history proven (the ledger has observed them twice)
 const WCOLD = reopened(await wire(COLD));                          // records, but no ledger: HomeSignal has not yet observed them long enough
-const WNONE = reopened(await wire(RICH, { rights: RIGHTS_SHIPPED })); // nothing cleared: zero records, outcome "No data ingested"
+const WNONE = reopened(await wire(RICH, { rights: RIGHTS_NONE })); // nothing cleared: zero records, outcome "No data ingested"
 const WZERO = clone(WNONE); WZERO.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' }; // the engine's other outcome, set by hand: it never emits it today
 const WUNSTATED = clone(WNONE); delete WUNSTATED.report.activity;                // an older report with no records and no outcome
 const WREADY = clone(WCOLD); WREADY.report.coverage.change_ready = true;         // observed long enough, and still no change
