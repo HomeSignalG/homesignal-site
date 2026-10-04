@@ -479,7 +479,7 @@ Source: the "Realtor Value, Information, and Layout Review" of the live 84302 re
 recorded in the change log of this step. Everything is in `lib/da-report-view.js`: no engine, database or edge-function change, and no stored report
 changes (the view renders from the stored report, so a reopened or shared report picks the new words up).
 
-14. **Wording pass: briefing, quiet hero, verify lines, lifecycle line.** Not struck until it is merged, deployed and read back live.
+14. ~~**Wording pass: briefing, quiet hero, verify lines, lifecycle line.**~~ Done: merged in #1631 (`e2b133e`), deployed, and read back live 2026-10-04 (four files byte-equal to the merge; `lib/da-report-view.js` md5 `fa9da23d…`).
    - A plain **client briefing** paragraph under the header, built only from the report's own counts and fixed sentences: how many records, in which
      stages, that *this report* lists nothing future-stage (never "the area has none"), how far the first Things to Review item is (left out when the
      response carries no distances), and one neutral "check the source" sentence. It names no address, project or effect. It is not a section, so the
@@ -494,7 +494,7 @@ changes (the view renders from the stored report, so a reopened or shared report
      links are dataset-level), plain-English scope and timing columns (the registry maps no such fields), street names on the map (no cleared basemap),
      parcel and MLS numbers in the header (private-context contract), a corridor group (needs lineage proof or a founder ruling), the 90-day status-change
      sentence (the ledger's first run was 2026-09-29), alert types the ledger cannot detect, agent notes (none built).
-15. **Comparison table.** Not struck until deployed and read back live. Founder-approved 2026-10-04 (E: "a comparison table instead of three repeated cards").
+15. ~~**Comparison table.**~~ Done: merged in #1632 (`9faf06a`), deployed, and read back live 2026-10-04 (four files byte-equal to the merge; `lib/da-report-view.js` md5 `3c646cef…`). Founder-approved 2026-10-04 (E: "a comparison table instead of three repeated cards"). Not viewed signed in by the builder: the checks used a Brigham-shaped fixture, so the founder should look at the real customer, review and share pages.
    - Each stage section opens with a table: map number (with the marker's own shape), record, distance, Type, publisher stage and official link. A column no
      record has a value for is left out (no placeholder cells). The rows carry the same Type and Stage the cards and map markers do, so the filters, the map
      numbers and the counts agree.
