@@ -364,8 +364,8 @@ const htmlLife = viewLife(W);
   ok(h7j && !/da-rv-hist/.test(h7j.html) && textOf(h7j.html) === 'Change History Change history begins once HomeSignal has observed these records at least twice.',
     '7j with neither, Change History says when it will start (no ledger observation yet), and lists nothing', h7j && textOf(h7j.html));
   const ready = await wire({ rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01' })], ledger: [{ identity_key: 'q1', registry_id: FAM_A, comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-09-20T19:00:00Z', last_observed_at: '2026-09-28T19:30:00Z' }] });
-  ok(textOf(sec(view(ready), 'history').html) === 'Change History HomeSignal recorded no status change for the projects in this report in the last 90 days.' && ready.report.coverage.change_ready === true,
-    '7j2 once HomeSignal has observed them twice, it says it recorded no status change in the window (the ledger\'s own readiness)');
+  ok(textOf(sec(view(ready), 'history').html) === 'Change History HomeSignal\u2019s change history for these records starts on Sep 20, 2026. Since then it has recorded no status change for the projects in this report.' && ready.report.coverage.change_ready === true,
+    '7j2 once HomeSignal has observed them twice, it says when its history starts and that it recorded no status change since (the ledger\'s own readiness)');
   const unk = clone(W);
   unk.report.projects.find((p) => p.project_id === 'k-first').homesignal_detected_changes[0].event_type = 'brand_new_type';
   unk.report.projects.find((p) => p.project_id === 'k-first').homesignal_detected_changes[0].changes[0].field = 'some_new_field';
@@ -617,6 +617,42 @@ const htmlLife = viewLife(W);
   const nums = [...tableOf(sec(html, 'proposed').html).matchAll(/da-rv-td--num"><svg[^>]*>.*?<\/svg><span>(\d+)<\/span>/g)].map((m) => m[1]);
   const cardNums = cardsOf(sec(html, 'proposed').html).map((c) => (/Map (\d+)/.exec(c) || [0, ''])[1]);
   ok(nums.length === 4 && nums.join() === cardNums.join(), '12k the map numbers in the rows are the numbers on the cards', [nums, cardNums]);
+}
+
+// ---- 13. honest ledger claims (follow-up to steps 14-15): no "first detected" from a baseline read, and "no change" names the window ---------------
+{
+  const quiet = () => {
+    const r = clone(W);
+    r.report.projects.forEach((p) => { p.homesignal_detected_changes = []; p.publisher_event = null; p.homesignal_observation = { first_observed_at: '2026-09-25T10:44:00.061Z', last_observed_at: '2026-10-04T02:00:00Z', observation_count: 3, change_ready: true }; });
+    r.report.coverage.change_ready = true;
+    return r;
+  };
+  const histText = (r) => textOf(sec(V.html(r, {}), 'history').html);
+  const N = quiet().report.projects.length;
+  // the ledger's first observation of a record read at the national baseline is a refresh sweep's time BEFORE the ledger existed: never "first detected"
+  const base = quiet(), hb = V.html(base, {});
+  const allCards = ['permitted', 'approved', 'proposed'].flatMap((k) => cardsOf(sec(hb, k).html));
+  ok(allCards.length > 0 && allCards.every((c) => !/First detected by HomeSignal|Sep 25, 2026/.test(textOf(c))), '13a a record whose only ledger fact is its first observation (a baseline read, Sep 25) carries no "First detected by HomeSignal" line and no Sep 25 date on its card', allCards.length);
+  // a REAL detection (a first_detected event) still shows, dated by the event, in its own lane
+  const real = quiet(); const rp = real.report.projects.find((p) => p.project_id === 'k-proposed');
+  rp.homesignal_detected_changes = [{ event_type: 'first_detected', detected_at: '2026-10-02T04:00:00Z', publisher_event: null, changes: [] }];
+  const cardR = cardsOf(sec(V.html(real, {}), 'proposed').html).find((c) => /Proposed/.test(c) && /HomeSignal detected/.test(c));
+  ok(cardR && /HomeSignal detected: First detected by HomeSignal \u00b7 Oct 2, 2026/.test(textOf(cardR)), '13b a real first_detected event still shows on its card, dated by the event itself', cardR && textOf(cardR));
+  // "no status change" names the window the ledger holds
+  ok(N > 1 && histText(quiet()) === 'Change History HomeSignal\u2019s change history for these records starts on Sep 25, 2026. Since then it has recorded no status change for the projects in this report.', '13c with every record comparable it says when the history starts, then that it recorded no status change since', histText(quiet()));
+  ok(!/last \d+ days|90 days/.test(histText(quiet())), '13d it never claims a window the ledger does not hold ("in the last 90 days")');
+  const late = quiet(); late.report.projects[0].homesignal_observation.first_observed_at = '2026-09-29T19:29:04Z';
+  ok(/starts on Sep 29, 2026\./.test(histText(late)), '13e the history start is the LATEST first observation among the records, so the sentence is true of all of them', histText(late));
+  const part = quiet(); part.report.projects[0].homesignal_observation.change_ready = false;
+  ok(histText(part) === 'Change History HomeSignal\u2019s change history for ' + (N - 1) + ' of the ' + N + ' records in this report starts on Sep 25, 2026, and it has recorded no status change for them since. The other 1 is not yet comparable.', '13f when only some records are comparable it says how many, and never speaks for the rest', histText(part));
+  const none = quiet(); none.report.projects.forEach((p) => { p.homesignal_observation.change_ready = false; });
+  ok(histText(none) === 'Change History ' + V.CHANGE_NOT_READY, '13g when the engine says change-ready but no record is comparable, it falls back to "begins once observed twice"', histText(none));
+  const flagOff = quiet(); flagOff.report.coverage.change_ready = false;
+  ok(histText(flagOff) === 'Change History ' + V.CHANGE_NOT_READY, '13h with the engine\'s change_ready flag off it says nothing about changes');
+  const noObs = quiet(); noObs.report.projects.forEach((p) => { delete p.homesignal_observation; });
+  ok(histText(noObs) === 'Change History ' + V.CHANGE_NOT_READY, '13i with no per-record observation it makes no claim');
+  const badDay = quiet(); badDay.report.projects.forEach((p) => { p.homesignal_observation.first_observed_at = 'not a date'; });
+  ok(histText(badDay) === 'Change History ' + V.CHANGE_NOT_READY, '13j with no readable start day it makes no claim');
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);
