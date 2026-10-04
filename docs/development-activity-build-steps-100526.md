@@ -473,6 +473,29 @@ through once each step is complete").
      card or cancel from the page: open, not built**; (c) the public client link endpoint is not rate-limited; (d) an owner cannot list or withdraw invite links or remove
      an agent; (e) `run-property-watch` has no rate limit beyond its private secret; (f) an ended or failing watch is not emailed to the agent.)*
 
+## Part D — the realtor wording pass (founder-approved 2026-10-04)
+
+Source: the "Realtor Value, Information, and Layout Review" of the live 84302 report. Only the parts that fit the rulings were taken; the rest is
+recorded in the change log of this step. Everything is in `lib/da-report-view.js`: no engine, database or edge-function change, and no stored report
+changes (the view renders from the stored report, so a reopened or shared report picks the new words up).
+
+14. **Wording pass: briefing, quiet hero, verify lines, lifecycle line.** Not struck until it is merged, deployed and read back live.
+   - A plain **client briefing** paragraph under the header, built only from the report's own counts and fixed sentences: how many records, in which
+     stages, that *this report* lists nothing future-stage (never "the area has none"), how far the first Things to Review item is (left out when the
+     response carries no distances), and one neutral "check the source" sentence. It names no address, project or effect. It is not a section, so the
+     plan's section order is untouched.
+   - The **quiet hero** reads "0 Records with official activity in the last 90 days" and "The 3 official records in this report remain on file." The
+     engine's window is a publisher-dated event or a HomeSignal-detected change inside 90 days (`national-report.ts`, `RECENT_DAYS`), so the old "New official
+     records" and the reviewer's "newly identified" both said more than the number means.
+   - The **verify lines** (`REVIEW_PROMPTS`) say what to verify at the source, stage by stage. The "worth reading, not a prediction" note stays.
+   - The **"HomeSignal lifecycle"** line is left out of the customer view (it sat beside "Publisher stage: Under Construction" and read as a contradiction).
+     The engine's four lifecycle values are unchanged; the internal review page asks for the line with `opts.showLifecycle`.
+   - **Not taken from the review, with the reason:** "Active construction" (would merge Permitted and Under Construction), "View official agency record" (the
+     links are dataset-level), plain-English scope and timing columns (the registry maps no such fields), street names on the map (no cleared basemap),
+     parcel and MLS numbers in the header (private-context contract), a corridor group (needs lineage proof or a founder ruling), the 90-day status-change
+     sentence (the ledger's first run was 2026-09-29), alert types the ledger cannot detect, agent notes (none built).
+15. **Comparison table.** A table at the top of each stage section; the full cards stay below it. Not struck until deployed and read back live.
+
 ## Founder actions, and when
 
 | When | What |
